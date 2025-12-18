@@ -13,15 +13,44 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ### Added
 - Root governance docs: `INVARIANTS.md`, `ARCHITECTURE.md`, `DECISIONS.md`.
+- **NEW DOMAINS (M4):**
+  - `view_filters` - Global domain capturing filter definitions (rules, categories)
+  - `phases` - Global domain capturing phase inventory and sequence (names excluded from hash per D-010)
+  - `phase_filters` - Global domain capturing phase filter settings (New/Existing/Demolished/Temporary visibility)
+  - `phase_graphics` - Global domain capturing phase graphic override settings (limited API access)
+- Context dictionary (`ctx`) now populated by global domains:
+  - `filter_uid_to_hash` - Mapping of view filter UIDs to definition hashes
+  - `phase_uid_to_hash` - Mapping of phase UIDs to definition hashes
+  - `phase_filter_uid_to_hash` - Mapping of phase filter UIDs to definition hashes
 
 ### Changed
-- View Templates planned to move from name-only presence hashing to behavior-based hashing using record rows and auditable preimages.
-- Filters planned to split into a global domain (definition) referenced by views/templates (application).
+- **BREAKING: View Templates (M5):** Moved from name-only presence hashing to behavior-based hashing
+  - Template identity: Now uses UniqueId (was: name)
+  - Template hash: Now derived from controlled behavior (was: name presence)
+  - Behavioral inputs: view type, detail level, scale, discipline, phase, phase filter, view filters (ordered), display style
+  - Names: Now metadata-only (excluded from hash per D-008)
+  - Filter stack: Order-sensitive (preserved)
+  - References global domains: filters, phases, phase_filters via context
+  - record_rows emitted with per-template sig_hash
+- Execution order now enforces dependency: global domains run before contextual domains.
+
+### Semantic Rules Applied
+- **View Filters:** Filter rules are order-sensitive (preserved), categories are sorted
+- **Phases:** Phase names are metadata-only (excluded from hash per D-010), sequence number captured where available
+- **Phase Filters:** Settings are order-insensitive (sorted before hashing)
+- **Phase Graphics:** Placeholder implementation (API exposure varies by Revit version)
+- **View Templates (M5):**
+  - Template names: metadata-only (per D-008)
+  - Filter stack: order-sensitive (filter application order matters)
+  - Other settings: order-insensitive (sorted)
+  - Global references: uses hashes from filters/phases/phase_filters domains
+  - Unreadable templates: fail-soft with explicit markers
 
 ### Decisions captured
 - Nested fenced code blocks are prohibited in documentation (portability rule).
-- View filters should be a global section referenced by views and view templates.
-- Phase filters and phase graphic overrides should be global; phase names are metadata-only.
+- View filters are global definitions referenced by views and view templates.
+- Phase filters and phase graphic overrides are global; phase names are metadata-only.
+- Phase sequence number is included in phase signatures to capture ordering.
 
 ---
 
