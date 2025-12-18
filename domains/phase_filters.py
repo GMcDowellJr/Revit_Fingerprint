@@ -9,7 +9,7 @@ Phase filters define how elements in different phases are displayed.
 This is a GLOBAL domain - filters are defined once and referenced by views.
 
 Per-record identity: UniqueId (element-backed)
-Ordering: order-insensitive (settings are unordered)
+Ordering: deterministic (status order is fixed); record list order-insensitive
 """
 
 import sys
@@ -96,42 +96,28 @@ def extract(doc, ctx=None):
         except:
             uid = None
 
-        # Build phase filter signature
-        sig = []
+        # Build phase filter signature (DETERMINISTIC ORDER)
+        # Include name for semantic identity across projects.
+        sig = ["name={}".format(sig_val(name))]
 
-        # For each phase status, get the graphic settings
+        # For each phase status (fixed order), get the graphic settings
         for status_name, status_enum in statuses:
             try:
-                # Line style override (if any)
-                line_style_id = pf.GetPhaseStatusLineStyle(status_enum)
-                line_style_uid = "<None>"
-                if line_style_id and line_style_id.IntegerValue > 0:
-                    try:
-                        ls_elem = doc.GetElement(line_style_id)
-                        line_style_uid = canon_str(getattr(ls_elem, "UniqueId", None)) or "<None>"
-                    except:
-                        pass
-
-                # Visibility override
-                is_overridden = pf.IsPhaseStatusOverridden(status_enum)
-
-                sig.append("{}|overridden={}".format(status_name, sig_val(is_overridden)))
-                sig.append("{}|line_style={}".format(status_name, line_style_uid))
+                pres = pf.GetPhaseStatusPresentation(status_enum)
+                sig.append("{}|presentation={}".format(status_name, sig_val(str(pres))))
             except:
-                sig.append("{}|<Unreadable>".format(status_name))
+                info["debug_fail_read"] += 1
+                sig.append("{}|presentation={}".format(status_name, sig_val(int(pres))))
 
-        # Sort signature components (order-insensitive)
-        sig_sorted = sorted(sig)
-
-        # Hash the definition
-        def_hash = make_hash(sig_sorted)
+        # Hash the definition (keep the deterministic order; do NOT sort)
+        def_hash = make_hash(sig)
 
         rec = {
             "id": safe_str(pf.Id.IntegerValue),
             "uid": uid or "",
             "name": name,
             "def_hash": def_hash,
-            "def_signature": sig_sorted
+            "def_signature": sig
         }
 
         records.append(rec)
@@ -147,7 +133,7 @@ def extract(doc, ctx=None):
         ctx["phase_filter_uid_to_hash"] = uid_to_hash
 
     info["names"] = sorted(set(names))
-    info["count"] = len(info["names"])
+    info["count"] = len(records)
     info["records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
     info["signature_hashes"] = sorted(per_hashes)
     info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
