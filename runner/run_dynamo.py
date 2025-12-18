@@ -83,9 +83,30 @@ def run_fingerprint(doc):
     return fingerprint
 
 
-# Execute extraction
-doc = get_doc()
-fingerprint = run_fingerprint(doc)
+# Execute extraction (OUT protection)
+try:
+    doc = get_doc()
+    fingerprint = run_fingerprint(doc)
 
-# Output JSON (Dynamo expects OUT variable)
-OUT = json.dumps(fingerprint, indent=2, sort_keys=True)
+    fingerprint["_meta"] = {
+        "runner": "M5",
+        "domains_emitted": sorted(fingerprint.keys()),
+    }
+
+    # Output JSON (Dynamo expects OUT variable)
+    OUT = json.dumps(fingerprint, indent=2, sort_keys=True)
+
+except Exception as e:
+    import traceback as _traceback
+
+    err = {
+        "error": str(e),
+        "traceback": _traceback.format_exc(),
+        "_meta": {
+            "runner": "M5",
+            "runner_file": __file__,
+        },
+    }
+
+    # Keep OUT type consistent (JSON string) even on failure
+    OUT = json.dumps(err, indent=2, sort_keys=True)
