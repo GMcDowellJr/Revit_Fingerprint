@@ -14,6 +14,8 @@ import clr
 import json
 import sys
 import os
+import time
+_SCRIPT_START = time.perf_counter()
 
 # Add parent directory to path for imports
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -64,6 +66,8 @@ def run_fingerprint(doc):
     Returns:
         Dictionary with all domain fingerprints
     """
+    start_ts = time.time()
+    
     # Context dictionary for cross-domain references
     # Populated by global domains, consumed by contextual domains
     ctx = {}
@@ -105,7 +109,9 @@ def run_fingerprint(doc):
     # Contextual domains (can reference global domains via ctx)
     if _enabled("view_templates"):
         fingerprint["view_templates"] = view_templates.extract(doc, ctx)
-
+    
+    elapsed_seconds = round(time.time() - start_ts, 3)
+    fingerprint["_elapsed_seconds"] = elapsed_seconds
     return fingerprint
 
 
@@ -123,6 +129,8 @@ try:
 
     fingerprint["_meta"] = {
         "runner": "M5",
+        "elapsed_seconds": fingerprint.pop("_elapsed_seconds", None),
+        "elapsed_seconds_total": round(time.perf_counter() - _SCRIPT_START, 3),
         "domains_requested": domains_requested,
         "domains_emitted": domains_emitted,
     }
