@@ -6,8 +6,8 @@ Fingerprints phase inventory and ordering including:
 - Phase sequence number (ordering where available)
 - Phase UniqueId (identity)
 
-NOTE: Phase names are EXCLUDED from behavioral hashes per D-010.
-Names are metadata only.
+NOTE: Phase names are INCLUDED in behavioral hashes for cross-project comparability.
+UniqueId remains identity/debug only (document-specific).
 
 This is a GLOBAL domain - phases are defined once and referenced
 by views, phase filters, and phase graphics.
@@ -60,10 +60,15 @@ def extract(doc, ctx=None):
         "debug_kept": 0,
     }
 
+    # Prefer doc.Phases to preserve true phase ordering in the document.
+    # Fall back to collector if unavailable.
     try:
-        col = list(FilteredElementCollector(doc).OfClass(Phase))
+        col = list(doc.Phases)
     except:
-        return info
+        try:
+            col = list(FilteredElementCollector(doc).OfClass(Phase))
+        except:
+            return info
 
     info["raw_count"] = len(col)
 
@@ -72,44 +77,37 @@ def extract(doc, ctx=None):
     per_hashes = []
     uid_to_hash = {}  # For context population
 
-    for p in col:
-        # Name is metadata ONLY (per D-010)
+    for i, p in enumerate(col):
         name = canon_str(getattr(p, "Name", None))
         if not name:
             info["debug_missing_name"] += 1
             name = "<unnamed>"
         names.append(name)
 
-        uid = None
         try:
-            uid = canon_str(getattr(p, "UniqueId", None))
+            uid = canon_str(p.UniqueId)
         except:
             uid = None
-
-        if not uid:
             info["debug_missing_uid"] += 1
 
-        # Build phase signature (EXCLUDING name per D-010)
-        sig = []
-
-        # Sequence number (if available) - this captures ordering
         try:
-            seq = getattr(p, "SequenceNumber", None)
-            sig.append("seq={}".format(sig_val(seq)))
+            seq = p.SequenceNumber
         except:
-            sig.append("seq=<None>")
+            seq = None
+        if seq is None:
+            seq = i + 1  # stable fallback based on document order
 
-        # UniqueId is part of identity, not behavior signature
-        # But we include it to ensure phases remain distinct
-        sig.append("uid={}".format(sig_val(uid)))
+        sig = [
+            "seq={}".format(sig_val(seq)),
+            "name={}".format(sig_val(name))
+        ]
 
-        # Hash the definition
         def_hash = make_hash(sig)
 
         rec = {
             "id": safe_str(p.Id.IntegerValue),
             "uid": uid or "",
-            "name": name,  # metadata only
+            "name": name,
             "def_hash": def_hash,
             "def_signature": sig
         }
@@ -118,7 +116,6 @@ def extract(doc, ctx=None):
         per_hashes.append(def_hash)
         info["debug_kept"] += 1
 
-        # Populate context mapping
         if uid:
             uid_to_hash[uid] = def_hash
 
@@ -127,9 +124,9 @@ def extract(doc, ctx=None):
         ctx["phase_uid_to_hash"] = uid_to_hash
 
     info["names"] = sorted(set(names))
-    info["count"] = len(info["names"])
-    info["records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
-    info["signature_hashes"] = sorted(per_hashes)
+    info["count"] = len(records)
+    info["records"] = records
+    info["signature_hashes"] = per_hashes
     info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
 
     info["record_rows"] = []
