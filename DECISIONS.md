@@ -224,6 +224,52 @@ GitHub Mobile, Obsidian, and chat renderers handle nested fences inconsistently.
 
 ---
 
+## D-013 — Phase Graphics Domain Disabled (API Limitation)
+
+**Status:** Accepted  
+**Date:** 2025-12-18  
+**Scope:** `phase_graphics` domain
+
+### Context
+The Revit UI exposes *Phase Graphic Overrides* (per-status line styles, colors, patterns).
+During implementation, it was unclear whether these overrides were accessible via the
+public Revit API.
+
+A targeted API probe in Revit 2025 (and consistent with behavior back to 2021) confirmed:
+- `PhaseFilter.GetPhaseStatusPresentation` **is available**
+- No API access exists for:
+  - per-status graphic overrides
+  - line style assignments
+  - color / pattern overrides
+
+Earlier attempts that surfaced `<Unreadable>` values were calling non-existent or unsupported
+API members and did not represent real accessible data.
+
+### Decision
+The `phase_graphics` domain is **intentionally disabled** at runtime.
+
+The system will not emit stub hashes or placeholder signatures for data that cannot be
+reliably extracted via the API.
+
+### Rationale
+- Avoids misleading fingerprints and false confidence
+- Keeps all emitted data verifiable and reproducible
+- Maintains a clean separation between:
+  - `phase_filters` → presentation (API-supported)
+  - `phase_graphics` → not available via API
+
+### Consequences
+- Phase graphic overrides are not fingerprinted
+- Downstream consumers must not assume graphic override coverage
+- Future enablement requires a documented, supported API path or non-API extraction strategy
+
+### Revisit Criteria
+Revisit this decision if:
+- Autodesk exposes phase graphic overrides via the public API
+- A sanctioned non-API extraction mechanism is introduced and approved
+
+---
+
 ## Notes
 
 - This document is **append-only**.
