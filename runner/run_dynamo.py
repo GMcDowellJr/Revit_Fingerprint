@@ -7,7 +7,7 @@ This runner:
 - Selects which domains to run (allowlist mechanism)
 - Assembles final JSON output
 
-Current implementation (M4): uses modular domain extractors with new global domains
+Current implementation (M5): full modular architecture with behavioral view templates
 """
 
 import clr

@@ -24,7 +24,14 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   - `phase_filter_uid_to_hash` - Mapping of phase filter UIDs to definition hashes
 
 ### Changed
-- View Templates planned to move from name-only presence hashing to behavior-based hashing using record rows and auditable preimages (M5).
+- **BREAKING: View Templates (M5):** Moved from name-only presence hashing to behavior-based hashing
+  - Template identity: Now uses UniqueId (was: name)
+  - Template hash: Now derived from controlled behavior (was: name presence)
+  - Behavioral inputs: view type, detail level, scale, discipline, phase, phase filter, view filters (ordered), display style
+  - Names: Now metadata-only (excluded from hash per D-008)
+  - Filter stack: Order-sensitive (preserved)
+  - References global domains: filters, phases, phase_filters via context
+  - record_rows emitted with per-template sig_hash
 - Execution order now enforces dependency: global domains run before contextual domains.
 
 ### Semantic Rules Applied
@@ -32,6 +39,12 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 - **Phases:** Phase names are metadata-only (excluded from hash per D-010), sequence number captured where available
 - **Phase Filters:** Settings are order-insensitive (sorted before hashing)
 - **Phase Graphics:** Placeholder implementation (API exposure varies by Revit version)
+- **View Templates (M5):**
+  - Template names: metadata-only (per D-008)
+  - Filter stack: order-sensitive (filter application order matters)
+  - Other settings: order-insensitive (sorted)
+  - Global references: uses hashes from filters/phases/phase_filters domains
+  - Unreadable templates: fail-soft with explicit markers
 
 ### Decisions captured
 - Nested fenced code blocks are prohibited in documentation (portability rule).
