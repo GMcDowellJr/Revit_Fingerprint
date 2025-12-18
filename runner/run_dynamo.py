@@ -35,7 +35,7 @@ from domains import view_templates
 
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
-ENABLED_DOMAINS = ["phase_filters"]  # None = all domains
+ENABLED_DOMAINS = ["phase_graphics"]  # None = all domains
 
 def _enabled(domain_name):
     """
@@ -103,8 +103,10 @@ def run_fingerprint(doc):
         fingerprint["phases"] = phases.extract(doc, ctx)
     if _enabled("phase_filters"):
         fingerprint["phase_filters"] = phase_filters.extract(doc, ctx)
-    if _enabled("phase_graphics"):
-        fingerprint["phase_graphics"] = phase_graphics.extract(doc, ctx)
+    # Phase graphics are not exposed via the Revit API (as of 2021–2025).
+    # Domain intentionally disabled to avoid misleading fingerprints.
+    # if _enabled("phase_graphics"):
+    #     fingerprint["phase_graphics"] = phase_graphics.extract(doc, ctx)
 
     # Contextual domains (can reference global domains via ctx)
     if _enabled("view_templates"):
