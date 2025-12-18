@@ -1,0 +1,231 @@
+# DECISIONS
+
+This document records **architectural and semantic decisions** that materially affect
+system behavior, evolution, or constraints.
+
+It exists to:
+- prevent re-litigation of settled questions
+- make intent explicit
+- preserve rationale when context is lost
+
+This is **not** a log of implementation details.
+If a decision changes hashes, identity rules, or system structure, it belongs here.
+
+---
+
+## Decision Log
+
+### D-001 — Behavior-First Fingerprinting
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+Fingerprints represent **behavior**, not UI presentation or naming.
+
+**Rationale**  
+Names, ordering in UI, and cosmetic properties change frequently and are not reliable
+signals of functional intent. Behavioral properties are the only stable basis for
+standards governance and drift detection.
+
+**Consequences**
+- Names are metadata only unless explicitly stated otherwise
+- Hash changes are meaningful signals, not noise
+
+---
+
+### D-002 — Deterministic, Auditable Hashes
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+All hashes must be:
+- deterministic
+- stable across sessions
+- derived from an auditable preimage
+
+**Rationale**  
+Hashes without explainability cannot be trusted or debugged.
+Auditability is mandatory for governance and standards enforcement.
+
+**Consequences**
+- `record_rows` is mandatory for record-based domains
+- Debug markers must be explicit when data is unreadable
+
+---
+
+### D-003 — `record_rows` as Canonical Explainability
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+`record_rows` is the canonical explainability structure for all record-based domains.
+
+**Rationale**  
+Lists of names or counts are insufficient for traceability.
+A stable `(record_key → sig_hash)` mapping enables diffs, audits, and downstream tooling.
+
+**Consequences**
+- Every record-based domain must emit `record_rows`
+- Global hashes are always derived from per-record hashes
+
+---
+
+### D-004 — UniqueId Usage Is Restricted
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+`UniqueId` is used **only** where element-backed identity is meaningful and persistent.
+
+**Rationale**  
+Blind use of `UniqueId` causes unnecessary churn and false drift.
+Some domains are definition-based, not identity-based.
+
+**Consequences**
+- Styles, patterns, and definitions avoid `UniqueId` unless identity matters
+- Views, view templates, filters, phases may use `UniqueId`
+
+---
+
+### D-005 — Fail-Soft Is Mandatory
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+Unreadable or inaccessible data must never cause silent collapse.
+
+**Rationale**  
+Silence hides risk. Explicit failure markers preserve state distinctions and auditability.
+
+**Consequences**
+- `<Unreadable>` / `<None>` markers are emitted instead of skipping data
+- Errors propagate into hashes intentionally
+
+---
+
+### D-006 — Ordering Rules Are Explicit Per Domain
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+Ordering sensitivity is a **domain decision**, not an implementation accident.
+
+**Rationale**  
+Some structures (e.g. view filter stacks) are order-dependent; others are not.
+Implicit ordering leads to accidental semantic changes.
+
+**Consequences**
+- Order-sensitive structures preserve order in signatures
+- Order-insensitive structures are sorted before hashing
+- Each domain must state its ordering behavior
+
+---
+
+### D-007 — Global vs Contextual Domain Split
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+Globally defined entities are fingerprinted once and referenced elsewhere.
+
+**Rationale**  
+Duplication of global definitions inside views/templates causes inconsistency and waste.
+
+**Consequences**
+- Filters, phases, phase filters, phase graphics are global domains
+- Views and view templates reference global domains by identity + hash
+
+---
+
+### D-008 — View Templates Are Behavioral, Not Nominal
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+View templates are fingerprinted by **controlled behavior**, not by name or existence.
+
+**Rationale**  
+Two templates with the same name can behave differently.
+Name-only fingerprints are misleading and unsafe.
+
+**Consequences**
+- Template hashes are derived from controlled parameters, filters, phase settings, etc.
+- Names are metadata only
+
+---
+
+### D-009 — Views Compose Templates + Deltas
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+A view’s effective behavior is:
+- template behavior (if assigned)
+- plus view-specific deltas not controlled by the template
+
+**Rationale**  
+This mirrors actual Revit behavior and avoids double-counting settings.
+
+**Consequences**
+- Views with templates do not re-hash template-controlled settings
+- Views without templates hash full allowlisted behavior
+
+---
+
+### D-010 — Phase Names Are Non-Behavioral
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+Phase names are metadata only and excluded from behavioral hashes.
+
+**Rationale**  
+Renaming a phase should not be interpreted as a behavioral change.
+
+**Consequences**
+- Phase identity and ordering may be hashed
+- Naming compliance, if needed, is handled separately
+
+---
+
+### D-011 — Domain-Driven Architecture
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+The system is structured into:
+- Core (pure Python)
+- Domain extractors (Revit-aware)
+- Context builder
+- Host-specific runners
+
+**Rationale**  
+This enables refactoring, selective execution, and future portability.
+
+**Consequences**
+- Domains do not import each other
+- Cross-domain data flows only through context
+
+---
+
+### D-012 — Markdown Portability Rule
+**Status:** Accepted  
+**Date:** 2025-12-17
+
+**Decision**  
+Nested fenced code blocks are forbidden in documentation.
+
+**Rationale**  
+GitHub Mobile, Obsidian, and chat renderers handle nested fences inconsistently.
+
+**Consequences**
+- Fenced blocks are used only for whole-file examples
+- Indented blocks are used for schemas and inline snippets
+
+---
+
+## Notes
+
+- This document is **append-only**.
+- Reversals require a new decision entry that references the original.
+- Implementation details belong in code, not here.
