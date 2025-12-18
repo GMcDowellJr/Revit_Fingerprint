@@ -7,7 +7,7 @@ This runner:
 - Selects which domains to run (allowlist mechanism)
 - Assembles final JSON output
 
-Current implementation (M3): uses modular domain extractors
+Current implementation (M4): uses modular domain extractors with new global domains
 """
 
 import clr
@@ -27,7 +27,9 @@ from RevitServices.Persistence import DocumentManager
 
 # Import domain extractors
 from domains import identity, units, object_styles, line_patterns, line_styles
-from domains import fill_patterns, text_types, dimension_types, view_templates
+from domains import fill_patterns, text_types, dimension_types
+from domains import view_filters, phases, phase_filters, phase_graphics
+from domains import view_templates
 
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
@@ -49,7 +51,8 @@ def run_fingerprint(doc):
     Returns:
         Dictionary with all domain fingerprints
     """
-    # Context dictionary for cross-domain references (currently unused, but ready for M4/M5)
+    # Context dictionary for cross-domain references
+    # Populated by global domains, consumed by contextual domains
     ctx = {}
 
     # Assemble fingerprint by calling each domain extractor
@@ -67,7 +70,14 @@ def run_fingerprint(doc):
     fingerprint["text_types"] = text_types.extract(doc, ctx)
     fingerprint["dimension_types"] = dimension_types.extract(doc, ctx)
 
-    # Contextual domains
+    # New global domains (M4) - run before contextual domains
+    # These populate ctx with mappings for views/templates to reference
+    fingerprint["view_filters"] = view_filters.extract(doc, ctx)
+    fingerprint["phases"] = phases.extract(doc, ctx)
+    fingerprint["phase_filters"] = phase_filters.extract(doc, ctx)
+    fingerprint["phase_graphics"] = phase_graphics.extract(doc, ctx)
+
+    # Contextual domains (can reference global domains via ctx)
     fingerprint["view_templates"] = view_templates.extract(doc, ctx)
 
     return fingerprint
