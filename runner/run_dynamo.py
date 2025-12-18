@@ -35,7 +35,7 @@ from domains import view_templates
 
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
-ENABLED_DOMAINS = ["phases"]  # None = all domains
+ENABLED_DOMAINS = ["phase_filters"]  # None = all domains
 
 def _enabled(domain_name):
     """
