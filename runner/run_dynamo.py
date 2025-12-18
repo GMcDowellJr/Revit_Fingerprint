@@ -35,6 +35,19 @@ from domains import view_templates
 # Set to None to run all domains, or provide a list of domain names to run specific domains
 ENABLED_DOMAINS = None  # None = all domains
 
+def _enabled(domain_name):
+    """
+    Allowlist gate for domain execution.
+    - ENABLED_DOMAINS = None  -> run all domains
+    - ENABLED_DOMAINS = [...] -> run only listed domains (exact key match)
+    """
+    if ENABLED_DOMAINS is None:
+        return True
+    try:
+        allowed = set(ENABLED_DOMAINS)
+    except:
+        allowed = set()
+    return domain_name in allowed
 
 def get_doc():
     """Get current Revit document from Dynamo context."""
@@ -59,26 +72,39 @@ def run_fingerprint(doc):
     fingerprint = {}
 
     # Metadata domains (no behavioral hash)
-    fingerprint["identity"] = identity.extract(doc, ctx)
-    fingerprint["units"] = units.extract(doc, ctx)
+    if _enabled("identity"):
+        fingerprint["identity"] = identity.extract(doc, ctx)
+    if _enabled("units"):
+        fingerprint["units"] = units.extract(doc, ctx)
 
     # Global style domains (locked semantics)
-    fingerprint["objectstyles"] = object_styles.extract(doc, ctx)
-    fingerprint["line_patterns"] = line_patterns.extract(doc, ctx)
-    fingerprint["line_styles"] = line_styles.extract(doc, ctx)
-    fingerprint["fill_patterns"] = fill_patterns.extract(doc, ctx)
-    fingerprint["text_types"] = text_types.extract(doc, ctx)
-    fingerprint["dimension_types"] = dimension_types.extract(doc, ctx)
+    if _enabled("objectstyles"):
+        fingerprint["objectstyles"] = object_styles.extract(doc, ctx)
+    if _enabled("line_patterns"):
+        fingerprint["line_patterns"] = line_patterns.extract(doc, ctx)
+    if _enabled("line_styles"):
+        fingerprint["line_styles"] = line_styles.extract(doc, ctx)
+    if _enabled("fill_patterns"):
+        fingerprint["fill_patterns"] = fill_patterns.extract(doc, ctx)
+    if _enabled("text_types"):
+        fingerprint["text_types"] = text_types.extract(doc, ctx)
+    if _enabled("dimension_types"):
+        fingerprint["dimension_types"] = dimension_types.extract(doc, ctx)
 
     # New global domains (M4) - run before contextual domains
     # These populate ctx with mappings for views/templates to reference
-    fingerprint["view_filters"] = view_filters.extract(doc, ctx)
-    fingerprint["phases"] = phases.extract(doc, ctx)
-    fingerprint["phase_filters"] = phase_filters.extract(doc, ctx)
-    fingerprint["phase_graphics"] = phase_graphics.extract(doc, ctx)
+    if _enabled("view_filters"):
+        fingerprint["view_filters"] = view_filters.extract(doc, ctx)
+    if _enabled("phases"):
+        fingerprint["phases"] = phases.extract(doc, ctx)
+    if _enabled("phase_filters"):
+        fingerprint["phase_filters"] = phase_filters.extract(doc, ctx)
+    if _enabled("phase_graphics"):
+        fingerprint["phase_graphics"] = phase_graphics.extract(doc, ctx)
 
     # Contextual domains (can reference global domains via ctx)
-    fingerprint["view_templates"] = view_templates.extract(doc, ctx)
+    if _enabled("view_templates"):
+        fingerprint["view_templates"] = view_templates.extract(doc, ctx)
 
     return fingerprint
 
@@ -88,9 +114,17 @@ try:
     doc = get_doc()
     fingerprint = run_fingerprint(doc)
 
+    domains_emitted = sorted(fingerprint.keys())
+
+    if ENABLED_DOMAINS is None:
+        domains_requested = "ALL"
+    else:
+        domains_requested = list(ENABLED_DOMAINS)
+
     fingerprint["_meta"] = {
         "runner": "M5",
-        "domains_emitted": sorted(fingerprint.keys()),
+        "domains_requested": domains_requested,
+        "domains_emitted": domains_emitted,
     }
 
     # Output JSON (Dynamo expects OUT variable)
