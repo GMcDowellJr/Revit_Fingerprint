@@ -73,6 +73,7 @@ def extract(doc, ctx=None):
     names = []
     records = []
     per_hashes = []
+    uid_to_hash = {}
 
     def fnum(v, nd=9):
         if v is None:
@@ -122,7 +123,6 @@ def extract(doc, ctx=None):
             # Fail-soft: keep element, but signature will collapse unless we add distinguishing info.
             # We add uid as metadata marker ONLY for the failure case to avoid "all same hash".
             sig.append("error=GetLinePatternFailed")
-            sig.append("uid={}".format(sig_val(uid)))
         else:
             segs = None
             try:
@@ -151,7 +151,6 @@ def extract(doc, ctx=None):
 
             if segs is None:
                 sig.append("error=SegmentsUnreadable")
-                sig.append("uid={}".format(sig_val(uid)))
             else:
                 # IMPORTANT: do NOT sort; segment order is part of the definition.
                 sig.append("segment_count={}".format(sig_val(len(segs))))
@@ -181,6 +180,9 @@ def extract(doc, ctx=None):
 
         # Deterministic: keep order (don't sort), hash the definition signature
         def_hash = make_hash(sig)
+        if uid:
+            uid_to_hash[uid] = def_hash
+
 
         rec = {
             "id": safe_str(e.Id.IntegerValue),
@@ -200,6 +202,10 @@ def extract(doc, ctx=None):
     info["records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
     info["signature_hashes"] = sorted(per_hashes)
     info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
+
+    # Populate context for downstream domains (UID allowed only as lookup key)
+    if ctx is not None:
+        ctx["line_pattern_uid_to_hash"] = uid_to_hash
 
     info["record_rows"] = []
     try:

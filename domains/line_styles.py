@@ -99,13 +99,17 @@ def extract(doc, ctx=None):
             except:
                 rgb_sig = "<None>"
 
-            # SINGLE line pattern field (UID) with "<None>" for invalid/solid
+            # Line pattern reference in hash surface:
+            # - Must not include UniqueId/GUID/+ElementId
+            # - Prefer line_patterns def_hash via ctx map; else deterministic sentinel
             lp_val = "<None>"
             try:
                 lp_id = sc.GetLinePatternId(GraphicsStyleType.Projection)
                 if lp_id and lp_id != ElementId.InvalidElementId:
                     lp_elem = doc.GetElement(lp_id)
-                    lp_val = getattr(lp_elem, "UniqueId", None) or "<None>"
+                    lp_uid = getattr(lp_elem, "UniqueId", None) if lp_elem else None
+                    lp_map = (ctx or {}).get("line_pattern_uid_to_hash", {}) if ctx is not None else {}
+                    lp_val = lp_map.get(lp_uid) or "<LP:UNMAPPED>"
             except:
                 lp_val = "<None>"
 

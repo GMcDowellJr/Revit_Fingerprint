@@ -85,25 +85,21 @@ def extract(doc, ctx=None):
             rgb_sig = "<None>"
 
         # Line pattern (Object Styles has ONE pattern, not proj/cut)
+        # Hash surface contract: no UniqueId/GUID/+ElementId
+        # Prefer line_patterns def_hash via ctx map; else deterministic sentinel
         try:
             lp_id = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
             lp_val = "<None>"
             if lp_id and lp_id.IntegerValue > 0:
                 lp_e = doc.GetElement(lp_id)
-                lp_val = canon_str(getattr(lp_e, "UniqueId", None)) or "<None>"
+                lp_uid = canon_str(getattr(lp_e, "UniqueId", None)) if lp_e else None
+                lp_map = (ctx or {}).get("line_pattern_uid_to_hash", {}) if ctx is not None else {}
+                lp_val = lp_map.get(lp_uid) or "<LP:UNMAPPED>"
         except:
             lp_val = "<None>"
 
-        # Category material Id
-        # Material (UID for stability)
-        try:
-            mat_id = cat_obj.Material
-            mat_val = "<None>"
-            if mat_id and mat_id.IntegerValue > 0:
-                m = doc.GetElement(mat_id)
-                mat_val = canon_str(getattr(m, "UniqueId", None)) or "<None>"
-        except:
-            mat_val = "<None>"
+        # NOTE: Material intentionally excluded from signature for now.
+        # TODO: Re-introduce via domains/materials.py def_hash once that domain exists.
 
         # Deterministic row signature
         return "|".join([
@@ -113,8 +109,7 @@ def extract(doc, ctx=None):
             safe_str(w_proj),
             safe_str(w_cut),
             rgb_sig,
-            lp_val,
-            mat_val
+            lp_val
         ])
 
     records = []

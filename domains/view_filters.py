@@ -69,15 +69,25 @@ def _rule_token(rule):
     except Exception:
         parts.append("type=<Unknown>")
 
-    # Parameter id (stable within a given model; better than display strings)
+    # Parameter id:
+    # - negative ids (BuiltInParameter-style) are allowed
+    # - positive ElementIds must NOT enter hash surfaces
     try:
         pid = rule.GetRuleParameter() if hasattr(rule, "GetRuleParameter") else None
-        if pid is not None:
-            parts.append("param_id={}".format(safe_str(getattr(pid, "IntegerValue", pid))))
+        pid_int = getattr(pid, "IntegerValue", pid) if pid is not None else None
+        try:
+            pid_int = int(pid_int) if pid_int is not None else None
+        except Exception:
+            pid_int = None
+
+        if pid_int is None:
+            parts.append("param=<None>")
+        elif pid_int < 0:
+            parts.append("param_id={}".format(safe_str(pid_int)))
         else:
-            parts.append("param_id=<None>")
+            parts.append("param=<PositiveId>")
     except Exception:
-        parts.append("param_id=<Unreadable>")
+        parts.append("param=<Unreadable>")
 
     # Try to capture evaluator/operator identity + value
     # String rules
@@ -138,10 +148,20 @@ def _rule_token(rule):
                 parts.append("op=<Unreadable>")
             try:
                 v = getattr(rule, "RuleValue", None)
-                parts.append("val_id={}".format(safe_str(getattr(v, "IntegerValue", v))))
+                v_int = getattr(v, "IntegerValue", v)
+                try:
+                    v_int = int(v_int) if v_int is not None else None
+                except Exception:
+                    v_int = None
+
+                if v_int is None:
+                    parts.append("val=<None>")
+                elif v_int < 0:
+                    parts.append("val_id={}".format(safe_str(v_int)))
+                else:
+                    parts.append("val=<PositiveId>")
             except Exception:
-                parts.append("val_id=<Unreadable>")
-            return "|".join(parts)
+                parts.append("val=<Unreadable>")
     except Exception:
         pass
 
@@ -302,8 +322,19 @@ def extract(doc, ctx=None):
             if cat_names_sorted:
                 sig.append("categories={}".format(sig_val(",".join(cat_names_sorted))))
             else:
-                cat_ids_sorted = sorted(set([c for c in cat_ints if c]))
-                sig.append("categories_ids={}".format(sig_val(",".join(cat_ids_sorted) if cat_ids_sorted else "<None>")))
+                # Contract: only negative ids allowed in hash surfaces
+                neg_ids = []
+                for cid in cat_ids:
+                    try:
+                        iv = getattr(cid, "IntegerValue", cid)
+                        iv = int(iv)
+                        if iv < 0:
+                            neg_ids.append(str(iv))
+                    except:
+                        pass
+
+                neg_ids_sorted = sorted(set([x for x in neg_ids if x]))
+                sig.append("categories_ids={}".format(sig_val(",".join(neg_ids_sorted) if neg_ids_sorted else "<None>")))
         except:
             sig.append("categories=<None>")
 
