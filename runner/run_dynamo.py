@@ -35,7 +35,7 @@ from domains import view_templates
 
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
-ENABLED_DOMAINS = ["phase_graphics"]  # None = all domains
+ENABLED_DOMAINS = ["view_templates","view_filters","phase_filters"]  # None = all domains
 
 def _enabled(domain_name):
     """
@@ -71,6 +71,7 @@ def run_fingerprint(doc):
     # Context dictionary for cross-domain references
     # Populated by global domains, consumed by contextual domains
     ctx = {}
+    ctx["debug_vg_details"] = True
 
     # Assemble fingerprint by calling each domain extractor
     fingerprint = {}
