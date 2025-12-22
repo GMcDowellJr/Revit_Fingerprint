@@ -30,14 +30,13 @@ except ImportError:
     GraphicsStyleType = None
     CategoryType = None
 
-
 def extract(doc, ctx=None):
     """
     Extract Object Styles fingerprint from document.
 
     Args:
         doc: Revit Document
-        ctx: Context dictionary (unused for this domain)
+        ctx: Context dictionary (used for v2 mappings + optional output controls)
 
     Returns:
         Dictionary with count, hash, signature_hashes, category_hashes,
@@ -51,12 +50,30 @@ def extract(doc, ctx=None):
         "signature_hashes": [],
         "category_hashes": {},
         "records": [],
+
+        # v2 (contract semantic hash) — additive only; legacy behavior unchanged
+        "hash_v2": None,
+        "debug_v2_blocked": False,
+        "debug_v2_block_reasons": {},
+
         # debug counters
         "debug_total_categories": 0,
         "debug_rows_emitted": 0,
         "debug_skipped_import": 0,
+        "debug_skipped_cad_layers": 0,
         "debug_fail_row": 0
     }
+
+    # Output controls (default preserve legacy payload)
+    emit_records = True
+    include_cad_layer_categories = True
+    try:
+        if ctx is not None:
+            emit_records = bool(ctx.get("emit_records", True))
+            include_cad_layer_categories = bool(ctx.get("include_cad_layer_categories", True))
+    except:
+        emit_records = True
+        include_cad_layer_categories = True
 
     row_pairs = []
 
@@ -65,7 +82,27 @@ def extract(doc, ctx=None):
     except:
         return info
 
-    def row_sig(cat_obj, parent_name, row_name, cat_type):
+    # v2 build state (domain-level block; no partial coverage semantics)
+    v2_records = []
+    v2_blocked = False
+    v2_reasons = {}
+
+    # Dependency: line_patterns semantic_v2 must provide UID -> def_hash_v2 map
+    lp_map_v2 = None
+    try:
+        lp_map_v2 = (ctx or {}).get("line_pattern_uid_to_hash_v2", None) if ctx is not None else None
+        if not isinstance(lp_map_v2, dict) or not lp_map_v2:
+            lp_map_v2 = None
+    except:
+        lp_map_v2 = None
+
+    def _looks_like_cad_import_category(name_str):
+        if not name_str:
+            return False
+        n = name_str.strip().lower()
+        return n.endswith(".dwg") or n.endswith(".dxf") or n.endswith(".dwf")
+
+    def row_sig_legacy(cat_obj, parent_name, row_name, cat_type):
         # Projection / cut lineweights
         try:
             w_proj = cat_obj.GetLineWeight(GraphicsStyleType.Projection)
@@ -79,8 +116,7 @@ def extract(doc, ctx=None):
 
         # Line color
         try:
-            col = cat_obj.LineColor
-            rgb_sig = rgb_sig_from_color(col)
+            rgb_sig = rgb_sig_from_color(cat_obj.LineColor)
         except:
             rgb_sig = "<None>"
 
@@ -98,29 +134,83 @@ def extract(doc, ctx=None):
         except:
             lp_val = "<None>"
 
-        # NOTE: Material intentionally excluded from signature for now.
-        # TODO: Re-introduce via domains/materials.py def_hash once that domain exists.
-
-        # Deterministic row signature
-        return "|".join([
-            parent_name,
-            row_name,
-            cat_type,
+        sig = "|".join([
+            safe_str(parent_name),
+            safe_str(row_name),
+            safe_str(cat_type),
             safe_str(w_proj),
             safe_str(w_cut),
-            rgb_sig,
-            lp_val
+            safe_str(rgb_sig),
+            safe_str(lp_val),
         ])
+        return sig, w_proj, w_cut, rgb_sig
 
+    def row_sig_v2(cat_obj, parent_name, row_name, cat_type, w_proj, w_cut, rgb_sig):
+        """
+        v2 signature (contract semantic hash)
+
+        Exception (explicit): object_styles uses names as part of identity/definition.
+        Rationale: category/subcategory stable ids are not available or reliable cross-file.
+        """
+        # Block on unreadables / sentinel-like values (no partial coverage semantics)
+        if w_proj is None or w_cut is None:
+            return None, "unreadable_line_weight"
+
+        if rgb_sig == "<None>":
+            return None, "unreadable_line_color"
+
+        # Line pattern mapping requirement (upstream v2 dependency)
+        try:
+            lp_id_v2 = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
+        except:
+            lp_id_v2 = None
+
+        if lp_id_v2 is None:
+            return None, "unreadable_line_pattern_id"
+
+        try:
+            is_real = bool(lp_id_v2 and lp_id_v2.IntegerValue > 0)
+        except:
+            is_real = False
+
+        if is_real:
+            if lp_map_v2 is None:
+                return None, "dependency_missing_line_patterns_v2"
+
+            try:
+                lp_elem_v2 = doc.GetElement(lp_id_v2)
+                lp_uid_v2 = getattr(lp_elem_v2, "UniqueId", None) if lp_elem_v2 else None
+            except:
+                lp_uid_v2 = None
+
+            lp_hash_v2 = lp_map_v2.get(lp_uid_v2) if lp_uid_v2 else None
+            if not lp_hash_v2:
+                return None, "unmapped_line_pattern_v2"
+        else:
+            # Legacy would emit "<None>" — in v2 we block rather than hash sentinels.
+            return None, "no_line_pattern"
+
+        sig_v2 = "|".join([
+            safe_str(parent_name),
+            safe_str(row_name),
+            safe_str(cat_type),
+            safe_str(w_proj),
+            safe_str(w_cut),
+            safe_str(rgb_sig),
+            safe_str(lp_hash_v2),
+        ])
+        return sig_v2, None
+
+    names = []
     records = []
     row_hashes = []
-    names = []
-    per_parent_hashes = {}  # parent_name -> [row_hash,...]
+    per_parent_hashes = {}  # parent_name -> list(sig_hashes)
 
     for cat in cats:
-        info["debug_total_categories"] += 1
         if cat is None:
             continue
+
+        info["debug_total_categories"] += 1
 
         # Skip import categories
         try:
@@ -136,6 +226,10 @@ def extract(doc, ctx=None):
         except:
             continue
 
+        if (not include_cad_layer_categories) and _looks_like_cad_import_category(parent_name):
+            info["debug_skipped_cad_layers"] += 1
+            continue
+
         # Category type
         try:
             cat_type = safe_str(cat.CategoryType)
@@ -144,7 +238,7 @@ def extract(doc, ctx=None):
 
         # Emit the parent row ("<self>")
         try:
-            sig = row_sig(cat, parent_name, "<self>", cat_type)
+            sig, w_proj, w_cut, rgb_sig = row_sig_legacy(cat, parent_name, "<self>", cat_type)
             row_key = "{}|{}".format(parent_name, "<self>")
             names.append(row_key)
             h = make_hash([sig])  # stable, deterministic
@@ -153,30 +247,49 @@ def extract(doc, ctx=None):
             row_pairs.append((sig, h))
             per_parent_hashes.setdefault(parent_name, []).append(h)
             info["debug_rows_emitted"] += 1
+
+            if not v2_blocked:
+                sig_v2, reason = row_sig_v2(cat, parent_name, "<self>", cat_type, w_proj, w_cut, rgb_sig)
+                if sig_v2 is None:
+                    v2_blocked = True
+                    v2_reasons[reason] = True
+                else:
+                    v2_records.append(sig_v2)
         except:
             info["debug_fail_row"] += 1
 
         # Emit each subcategory row
+        subs = []
         try:
-            subs = cat.SubCategories
+            subs = list(cat.SubCategories)
         except:
-            subs = None
+            subs = []
 
-        if subs:
-            for sub in subs:
-                try:
-                    sub_name = canon_str(sub.Name)
-                    row_key = "{}|{}".format(parent_name, sub_name)
-                    names.append(row_key)
-                    sig = row_sig(sub, parent_name, sub_name, cat_type)
-                    h = make_hash([sig])
-                    records.append(sig)
-                    row_hashes.append(h)
-                    per_parent_hashes.setdefault(parent_name, []).append(h)
-                    info["debug_rows_emitted"] += 1
-                except:
-                    info["debug_fail_row"] += 1
+        for sub in subs:
+            try:
+                sub_name = canon_str(getattr(sub, "Name", None))
+                if not sub_name:
                     continue
+
+                sig, w_proj, w_cut, rgb_sig = row_sig_legacy(sub, parent_name, sub_name, cat_type)
+                row_key = "{}|{}".format(parent_name, sub_name)
+                names.append(row_key)
+                h = make_hash([sig])
+                records.append(sig)
+                row_hashes.append(h)
+                per_parent_hashes.setdefault(parent_name, []).append(h)
+                info["debug_rows_emitted"] += 1
+
+                if not v2_blocked:
+                    sig_v2, reason = row_sig_v2(sub, parent_name, sub_name, cat_type, w_proj, w_cut, rgb_sig)
+                    if sig_v2 is None:
+                        v2_blocked = True
+                        v2_reasons[reason] = True
+                    else:
+                        v2_records.append(sig_v2)
+            except:
+                info["debug_fail_row"] += 1
+                continue
 
     records_sorted = sorted(records)
     row_hashes_sorted = sorted(row_hashes)
@@ -199,5 +312,18 @@ def extract(doc, ctx=None):
         hs_sorted = sorted(hs)
         cat_hashes[pname] = make_hash(hs_sorted) if hs_sorted else None
     info["category_hashes"] = cat_hashes
+
+    # v2 hash (domain-level block; no partial coverage semantics)
+    info["debug_v2_blocked"] = bool(v2_blocked)
+    info["debug_v2_block_reasons"] = v2_reasons if v2_blocked else {}
+    if (not v2_blocked) and v2_records:
+        info["hash_v2"] = make_hash(sorted(v2_records))
+    else:
+        info["hash_v2"] = None
+
+    # Optional payload suppression (does not affect hash)
+    if not emit_records:
+        info["records"] = []
+        info["record_rows"] = []
 
     return info

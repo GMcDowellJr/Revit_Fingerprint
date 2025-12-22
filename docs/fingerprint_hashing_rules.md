@@ -82,7 +82,15 @@ Only the following may appear in `semantic`:
 - Exception messages
 - Raw API object dumps
 
-Names and strings belong in `debug` only.
+#### Allowed exceptions (must be explicit)
+Names are forbidden in semantic **unless** a domain explicitly declares a narrowly-scoped exception where:
+- No stable, cross-file API identity exists for the records being fingerprinted, and
+- The name is treated as part of the **definition/identity** for that domain, and
+- The exception is documented in-code (domain module) and in release notes.
+
+Exceptions must never be introduced implicitly.
+
+Names and strings belong in `debug` only when they are not part of an explicitly-declared identity exception.
 
 ---
 
