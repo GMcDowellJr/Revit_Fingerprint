@@ -15,6 +15,8 @@ import json
 import sys
 import os
 import time
+import hashlib
+
 _SCRIPT_START = time.perf_counter()
 
 # Add parent directory to path for imports
@@ -291,8 +293,128 @@ try:
         "domains_emitted": domains_emitted,
     }
 
-    # Output JSON (Dynamo expects OUT variable)
-    OUT = json.dumps(fingerprint, indent=2, sort_keys=True)
+    # ------------------------------------------------------------
+    # Output strategy:
+    # - If IN[0] provides an output file path: write full JSON to disk here,
+    #   then return a small summary JSON via OUT (keeps Revit/Dynamo responsive).
+    # - If no path provided: preserve legacy behavior (OUT is the full JSON string).
+    # ------------------------------------------------------------
+    def _get_output_path_from_dynamo():
+        # 1) Preferred: env var injected by thin runner (works across import boundary)
+        try:
+            p = os.getenv("REVIT_FINGERPRINT_OUTPUT_PATH", "")
+            if p is not None:
+                p = str(p).strip()
+                if p:
+                    return p
+        except:
+            pass
+
+        # 2) Fallback: direct IN[0] (only works if this module is executed as the Dynamo node)
+        try:
+            _in = IN
+            if _in is not None and len(_in) > 0 and _in[0] is not None:
+                p = str(_in[0]).strip()
+                if p:
+                    return p
+        except:
+            pass
+
+        # 3) Default: user temp directory
+        try:
+            import tempfile
+            from datetime import datetime
+
+            base = os.path.join(tempfile.gettempdir(), "Revit_Fingerprint")
+            try:
+                if not os.path.exists(base):
+                    os.makedirs(base)
+            except:
+                pass
+
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            return os.path.join(base, "fingerprint_{0}.json".format(stamp))
+        except:
+            return None
+
+    def _ensure_parent_dir(path):
+        try:
+            parent = os.path.dirname(path)
+            if parent and not os.path.exists(parent):
+                os.makedirs(parent)
+        except:
+            pass
+
+    def _write_json_to_disk(path, payload):
+        """
+        Writes JSON directly to disk to avoid returning multi-MB payloads through Dynamo.
+        Returns (bytes_written, write_elapsed_seconds).
+        """
+        t0 = time.perf_counter()
+        _ensure_parent_dir(path)
+        # Keep formatting identical to legacy OUT behavior (indent=2, sort_keys=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, sort_keys=True)
+        bytes_written = None
+        try:
+            bytes_written = os.path.getsize(path)
+        except:
+            pass
+        return bytes_written, round(time.perf_counter() - t0, 3)
+
+    def _sha256_of_file(path, buf_size=1024 * 1024):
+        """
+        Compute SHA-256 of a file without loading it into memory.
+        Returns hex digest string.
+        """
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(buf_size)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest()
+
+    # Timings around the post-extraction phase
+    t_extract_done = round(time.perf_counter() - _SCRIPT_START, 3)
+
+    output_path = _get_output_path_from_dynamo()
+    
+    # Escape hatch: force legacy behavior (return full JSON via OUT) when explicitly requested
+    force_full_out = False
+    try:
+        force_full_out = str(os.getenv("REVIT_FINGERPRINT_FORCE_FULL_OUT", "")).strip() in ("1", "true", "True", "YES", "yes")
+    except:
+        force_full_out = False
+
+
+    if output_path and not force_full_out:
+        bytes_written, write_sec = _write_json_to_disk(output_path, fingerprint)
+
+        # Keep OUT a JSON string (type-stable for Dynamo graphs),
+        # but small enough to avoid marshaling/preview stalls.
+        sha256 = _sha256_of_file(output_path)
+        t_total_done = round(time.perf_counter() - _SCRIPT_START, 3)
+
+        summary = {
+            "status": "ok",
+            "output_path": output_path,
+            "bytes_written": bytes_written,
+            "sha256": sha256,
+            "timings": {
+                "extract_done_sec_from_start": t_extract_done,
+                "json_write_sec": write_sec,
+                "total_done_sec_from_start": t_total_done,
+            },
+            "_meta": fingerprint.get("_meta", {}),
+        }
+
+        OUT = json.dumps(summary, indent=2, sort_keys=True)
+    else:
+        # Legacy behavior: return full JSON through Dynamo (may hang on large payloads)
+        OUT = json.dumps(fingerprint, indent=2, sort_keys=True)
+
 
 except Exception as e:
     import traceback as _traceback
