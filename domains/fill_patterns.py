@@ -51,12 +51,19 @@ def extract(doc, ctx=None):
         "signature_hashes": [],
         "hash": None,
         "records": [],
+
         # debug counters so you can see why things disappear
         "debug_total_elements": 0,
         "debug_kept": 0,
         "debug_skipped_no_name": 0,
         "debug_fail_getfillpattern": 0,
         "debug_fail_grid_read": 0,
+
+        # v2 (contract semantic) surfaces - additive only
+        "hash_v2": None,
+        "signature_hashes_v2": [],
+        "debug_v2_blocked": 0,
+        "debug_v2_block_reasons": {},
     }
 
     try:
@@ -163,9 +170,116 @@ def extract(doc, ctx=None):
 
         return parts
 
+    # v2 helpers (strict: block on unreadables / missing)
+    def _bump_v2_reason(reason):
+        info["debug_v2_blocked"] += 1
+        try:
+            info["debug_v2_block_reasons"][reason] = info["debug_v2_block_reasons"].get(reason, 0) + 1
+        except:
+            pass
+
+    def _grid_sig_v2(fp, i):
+        """
+        Return (ok, parts, reason). parts contain only numeric primitives.
+        """
+        idx = "{:03d}".format(int(i))
+        g = None
+        try:
+            if hasattr(fp, "GetFillPatternGrid"):
+                g = fp.GetFillPatternGrid(i)
+        except:
+            g = None
+        if g is None:
+            try:
+                if hasattr(fp, "GetFillGrid"):
+                    g = fp.GetFillGrid(i)
+            except:
+                g = None
+
+        if g is None:
+            return False, [], "grid_unreadable"
+
+        parts = []
+
+        def req_float(prop_name, key):
+            try:
+                v = getattr(g, prop_name)
+            except:
+                return False, "grid_{}_unreadable".format(key)
+            if v is None:
+                return False, "grid_{}_none".format(key)
+            try:
+                fv = float(v)
+            except:
+                return False, "grid_{}_not_float".format(key)
+            parts.append("grid[{}].{}={}".format(idx, key, sig_val(f(v, 9))))
+            return True, None
+
+        # origin: require 2 floats, pick first supported shape
+        def req_origin():
+            # UV origin
+            try:
+                o = g.Origin
+                u = getattr(o, "U", None)
+                v = getattr(o, "V", None)
+                if u is not None and v is not None:
+                    fu = float(u)
+                    fv = float(v)
+                    parts.append("grid[{}].origin_uv={},{}".format(idx, sig_val(f(fu, 9)), sig_val(f(fv, 9))))
+                    return True, None
+            except:
+                pass
+
+            # XY origin
+            try:
+                o = g.Origin
+                x = getattr(o, "X", None)
+                y = getattr(o, "Y", None)
+                if x is not None and y is not None:
+                    fx = float(x)
+                    fy = float(y)
+                    parts.append("grid[{}].origin_xy={},{}".format(idx, sig_val(f(fx, 9)), sig_val(f(fy, 9))))
+                    return True, None
+            except:
+                pass
+
+            # scalar origin props
+            for u_name, v_name in [("OriginU", "OriginV"), ("UOrigin", "VOrigin")]:
+                try:
+                    u = getattr(g, u_name)
+                    v = getattr(g, v_name)
+                    if u is None or v is None:
+                        continue
+                    fu = float(u)
+                    fv = float(v)
+                    parts.append("grid[{}].origin_uv={},{}".format(idx, sig_val(f(fu, 9)), sig_val(f(fv, 9))))
+                    return True, None
+                except:
+                    continue
+
+            return False, "grid_origin_unreadable"
+
+        ok, reason = req_float("Angle", "angle")
+        if not ok:
+            return False, [], reason
+        ok, reason = req_origin()
+        if not ok:
+            return False, [], reason
+        ok, reason = req_float("Offset", "offset")
+        if not ok:
+            return False, [], reason
+        ok, reason = req_float("Shift", "shift")
+        if not ok:
+            return False, [], reason
+
+        return True, parts, None
+
     records = []
     per_hashes = []
+    per_hashes_v2 = []
     names = []
+    uid_to_hash_v2 = {}
+    uid_to_hash = {}
 
     for e in col:
         info["debug_total_elements"] += 1
@@ -176,6 +290,8 @@ def extract(doc, ctx=None):
             continue
         names.append(name)
 
+        uid = getattr(e, "UniqueId", "") or ""
+
         # Always keep the element, even if we can't read its FillPattern
         fp = None
         try:
@@ -183,6 +299,9 @@ def extract(doc, ctx=None):
         except:
             fp = None
 
+        # -------------------------
+        # Legacy signature (UNCHANGED meaning)
+        # -------------------------
         if fp is None:
             info["debug_fail_getfillpattern"] += 1
             sig = [
@@ -194,7 +313,6 @@ def extract(doc, ctx=None):
                 "error=GetFillPatternFailed",
             ]
         else:
-            # Core fields
             is_solid = None
             try: is_solid = fp.IsSolidFill
             except: pass
@@ -216,7 +334,6 @@ def extract(doc, ctx=None):
                 "grid_count={}".format(sig_val(gc)),
             ]
 
-            # Grids (fail-soft: if grid read fails, you still keep pattern)
             if gc:
                 try:
                     for i in range(int(gc)):
@@ -225,15 +342,89 @@ def extract(doc, ctx=None):
                     info["debug_fail_grid_read"] += 1
                     sig.append("error=GridLoopFailed")
 
-        # Keep signature deterministic
         sig_sorted = sorted(sig)
         def_hash = make_hash(sig_sorted)
+        if uid:
+            uid_to_hash[uid] = def_hash
+
+        # -------------------------
+        # v2 (contract semantic): NO names; block on unreadable/missing
+        # -------------------------
+        v2_ok = True
+        v2_reason = None
+        sig_v2 = []
+
+        if fp is None:
+            v2_ok = False
+            v2_reason = "get_fillpattern_failed"
+        else:
+            # is_solid: require bool-coercible
+            try:
+                is_solid_v2 = fp.IsSolidFill
+            except:
+                v2_ok = False
+                v2_reason = "is_solid_unreadable"
+
+            if v2_ok:
+                # target: require int
+                try:
+                    target_v2 = fp.Target
+                    target_id = int(target_v2)
+                except:
+                    v2_ok = False
+                    v2_reason = "target_unreadable"
+
+            if v2_ok:
+                # is_model: require bool (direct or inferred); but must resolve, else block
+                try:
+                    is_model_v2 = read_is_model(fp, target_v2)
+                    if is_model_v2 is None:
+                        v2_ok = False
+                        v2_reason = "is_model_unresolved"
+                except:
+                    v2_ok = False
+                    v2_reason = "is_model_unreadable"
+
+            if v2_ok:
+                # grid_count: require int (0 allowed)
+                try:
+                    gc_v2 = fp.GridCount
+                    gc_i = int(gc_v2)
+                except:
+                    v2_ok = False
+                    v2_reason = "grid_count_unreadable"
+
+            if v2_ok:
+                sig_v2.append("is_solid={}".format(sig_val(bool(is_solid_v2))))
+                sig_v2.append("is_model={}".format(sig_val(bool(is_model_v2))))
+                sig_v2.append("target_id={}".format(sig_val(target_id)))
+                sig_v2.append("grid_count={}".format(sig_val(gc_i)))
+
+                # grids: every grid must be readable
+                if gc_i:
+                    for i in range(gc_i):
+                        ok, parts, reason = _grid_sig_v2(fp, i)
+                        if not ok:
+                            v2_ok = False
+                            v2_reason = reason
+                            break
+                        sig_v2.extend(parts)
+
+        if v2_ok:
+            # keep deterministic: sort like legacy (order-insensitive at record level)
+            sig_v2_sorted = sorted(sig_v2)
+            def_hash_v2 = make_hash(sig_v2_sorted)
+            per_hashes_v2.append(def_hash_v2)
+            if uid:
+                uid_to_hash_v2[uid] = def_hash_v2
+        else:
+            _bump_v2_reason(v2_reason or "unknown")
 
         rec = {
             "id": safe_str(e.Id.IntegerValue),
-            "uid": getattr(e, "UniqueId", "") or "",
+            "uid": uid,
             "name": name,          # metadata only
-            "def_hash": def_hash,  # hashed definition
+            "def_hash": def_hash,  # hashed legacy definition
         }
         if DEBUG_INCLUDE_FILLPATTERN_SIGNATURES:
             rec["def_signature"] = sig_sorted
@@ -242,12 +433,23 @@ def extract(doc, ctx=None):
         per_hashes.append(def_hash)
         info["debug_kept"] += 1
 
-    per_hashes = sorted(per_hashes)
     info["signature_hashes"] = sorted(per_hashes)
     info["names"] = sorted(set(names))
     info["count"] = len(info["names"])
     info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
     info["records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
+
+    # v2 finalize: block domain hash if any record blocked
+    info["signature_hashes_v2"] = sorted(per_hashes_v2)
+    if info["debug_v2_blocked"] > 0:
+        info["hash_v2"] = None
+    else:
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"]) if info["signature_hashes_v2"] else None
+
+    # Context mapping (UID is allowed only as lookup key; values are semantic hashes)
+    if ctx is not None:
+        ctx["fill_pattern_uid_to_hash"] = uid_to_hash
+        ctx["fill_pattern_uid_to_hash_v2"] = uid_to_hash_v2
 
     info["record_rows"] = []
     try:
