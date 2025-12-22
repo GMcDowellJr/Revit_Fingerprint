@@ -41,31 +41,48 @@ def extract(doc, ctx=None):
 
     Args:
         doc: Revit Document
-        ctx: Context dictionary (unused for this domain)
+        ctx: Context dictionary (unused here; present for extractor parity)
 
     Returns:
-        Dictionary with count, hash, signature_hashes, records,
-        record_rows, and debug counters
+        Dictionary with count, hash, records, record_rows, and debug counters
     """
     info = {
         "count": 0,
+        "raw_count": 0,
         "names": [],
-        "hash": None,
-
-        # new
         "records": [],
         "signature_hashes": [],
-        "raw_count": 0,
-        "debug_missing_name": 0
+        "hash": None,
+
+        # v2 (contract semantic hash) — additive only; legacy behavior unchanged
+        "hash_v2": None,
+        "debug_v2_blocked": False,
+        "debug_v2_block_reasons": {},
     }
 
-    types = list(FilteredElementCollector(doc).OfClass(TextNoteType))
+    types = []
+    try:
+        types = list(FilteredElementCollector(doc).OfClass(TextNoteType).ToElements())
+    except:
+        types = []
+
     info["raw_count"] = len(types)
 
     names = []
     missing = 0
     records = []
     sig_hashes = []
+
+    # v2 build state (domain-level block; no partial coverage semantics)
+    v2_records = []
+    v2_blocked = False
+    v2_reasons = {}
+
+    def _v2_block(reason_key):
+        nonlocal v2_blocked
+        if not v2_blocked:
+            v2_blocked = True
+        v2_reasons[reason_key] = True
 
     for t in types:
         type_name = get_type_display_name(t)
@@ -111,18 +128,17 @@ def extract(doc, ctx=None):
         leader_arrow_name = None
         try:
             p_arrow = first_param(t, bip_names=["LEADER_ARROWHEAD"], ui_names=["Leader Arrowhead"])
-            if p_arrow and p_arrow.HasValue:
-                ah_eid = p_arrow.AsElementId()
-                if ah_eid and ah_eid.IntegerValue > 0:
-                    ah = doc.GetElement(ah_eid)
-                    if ah:
-                        leader_arrow_uid = ah.UniqueId
-                        try:
-                            leader_arrow_name = get_element_display_name(ah)
-                        except:
-                            leader_arrow_name = None
+            if p_arrow:
+                arrow_id = p_arrow.AsElementId()
+                if arrow_id and arrow_id.IntegerValue > 0:
+                    arrow = doc.GetElement(arrow_id)
+                    if arrow:
+                        leader_arrow_uid = getattr(arrow, "UniqueId", None)
+                        leader_arrow_name = get_type_display_name(arrow) or getattr(arrow, "Name", None)
+                        leader_arrow_name = canon_str(leader_arrow_name)
         except:
-            pass
+            leader_arrow_uid = None
+            leader_arrow_name = None
 
         # --- signature tuple (core) ---
         signature_tuple = [
@@ -141,6 +157,65 @@ def extract(doc, ctx=None):
             "underline={}".format(sig_val(underline)),
         ]
         sig_hash = make_hash(signature_tuple)
+
+        # ---------------------------
+        # v2 signature (contract semantic hash)
+        # ---------------------------
+        # Exception (explicit): text type name is part of identity/definition in this domain.
+        # Leader Arrowhead is excluded from v2 by policy decision.
+        if not v2_blocked:
+            # Block on unreadables / sentinel-like values (no partial coverage semantics)
+            if not font:
+                _v2_block("unreadable_font")
+
+            # numeric fields must be non-None and must not be sentinel strings
+            if size_ft is None:
+                _v2_block("unreadable_text_size")
+            if width_factor is None:
+                _v2_block("unreadable_width_factor")
+            if background_i is None:
+                _v2_block("unreadable_background")
+            if line_weight is None:
+                _v2_block("unreadable_line_weight")
+
+            # color must be readable; use RGB in v2 (avoid element ids / GUIDs)
+            if (color_rgb is None) or (safe_str(color_rgb) in ["", "<None>", "<Unreadable>"]):
+                _v2_block("unreadable_color_rgb")
+
+            # boolean-ish fields must be non-None
+            if show_border is None:
+                _v2_block("unreadable_show_border")
+            if bold is None:
+                _v2_block("unreadable_bold")
+            if italic is None:
+                _v2_block("unreadable_italic")
+            if underline is None:
+                _v2_block("unreadable_underline")
+
+            # offsets/tab sizes must be readable doubles
+            if leader_border_offset_ft is None:
+                _v2_block("unreadable_leader_border_offset")
+            if tab_size_ft is None:
+                _v2_block("unreadable_tab_size")
+
+            if not v2_blocked:
+                # Use the already-normalized representations where applicable
+                v2_records.append("|".join([
+                    "name={}".format(safe_str(type_name)),
+                    "font={}".format(safe_str(font)),
+                    "size_in={}".format(safe_str(size_in)),
+                    "width_factor={}".format(safe_str(width_factor_n)),
+                    "background={}".format(safe_str(background_i)),
+                    "line_weight={}".format(safe_str(line_weight)),
+                    "color_rgb={}".format(safe_str(color_rgb)),
+
+                    "show_border={}".format(safe_str(show_border)),
+                    "leader_border_offset_in={}".format(safe_str(leader_border_offset_in)),
+                    "tab_size_in={}".format(safe_str(tab_size_in)),
+                    "bold={}".format(safe_str(bold)),
+                    "italic={}".format(safe_str(italic)),
+                    "underline={}".format(safe_str(underline)),
+                ]))
 
         rec = {
             "type_id": safe_str(t.Id.IntegerValue),
@@ -174,16 +249,20 @@ def extract(doc, ctx=None):
         records.append(rec)
         sig_hashes.append(sig_hash)
 
-    info["debug_missing_name"] = missing
+    info["names"] = sorted(names)
+    info["count"] = len(info["names"])
 
-    names_sorted = sorted(set(names))
-    info["count"] = len(names_sorted)
-    info["names"] = names_sorted
-
-    # new: records + signature-based hash
-    info["records"] = sorted(records, key=lambda r: (r.get("type_name",""), r.get("type_id","")))
+    info["records"] = sorted(records, key=lambda r: safe_str(r.get("type_name", "")))
     info["signature_hashes"] = sorted(sig_hashes)
     info["hash"] = make_hash(sorted(sig_hashes)) if sig_hashes else None
+
+    # v2 hash (domain-level block; no partial coverage semantics)
+    info["debug_v2_blocked"] = bool(v2_blocked)
+    info["debug_v2_block_reasons"] = v2_reasons if v2_blocked else {}
+    if (not v2_blocked) and v2_records:
+        info["hash_v2"] = make_hash(sorted(v2_records))
+    else:
+        info["hash_v2"] = None
 
     info["record_rows"] = []
     try:
