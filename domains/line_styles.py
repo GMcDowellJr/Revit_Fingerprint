@@ -37,7 +37,7 @@ def extract(doc, ctx=None):
 
     Args:
         doc: Revit Document
-        ctx: Context dictionary (unused for this domain)
+        ctx: Context dictionary (used for v2 line pattern hash mapping)
 
     Returns:
         Dictionary with count, hash, records, record_rows, and debug counters
@@ -49,6 +49,11 @@ def extract(doc, ctx=None):
         "records": [],
         "signature_hashes": [],
         "hash": None,
+
+        # v2 (contract semantic hash) — additive only; legacy behavior unchanged
+        "hash_v2": None,
+        "debug_v2_blocked": False,
+        "debug_v2_block_reasons": {},
 
         # (optional) small, domain-local debug counters
         "debug_fail_get_lines_cat": 0,
@@ -77,6 +82,20 @@ def extract(doc, ctx=None):
 
     records = []
     names = []
+
+    # v2 build state (domain-level block; no partial coverage semantics)
+    v2_records = []
+    v2_blocked = False
+    v2_reasons = {}
+
+    # Dependency: line_patterns semantic_v2 must provide UID -> def_hash_v2 map
+    lp_map_v2 = None
+    try:
+        lp_map_v2 = (ctx or {}).get("line_pattern_uid_to_hash_v2", None) if ctx is not None else None
+        if not isinstance(lp_map_v2, dict) or not lp_map_v2:
+            lp_map_v2 = None
+    except:
+        lp_map_v2 = None
 
     for sc in subs:
         try:
@@ -121,6 +140,54 @@ def extract(doc, ctx=None):
                 safe_str(rgb_sig),
                 safe_str(lp_val),
             ]))
+
+            # ---------------------------
+            # v2 signature (contract semantic hash)
+            # ---------------------------
+            # Exception (explicit): line style name is part of the definition/identity for this domain.
+            # Rationale: Revit does not provide a stable built-in id for line style subcategories.
+            if not v2_blocked:
+                # block on any unreadable / sentinel-like values (no partial coverage semantics)
+                if w_proj is None or w_cut is None:
+                    v2_blocked = True
+                    v2_reasons["unreadable_line_weight"] = True
+
+                if rgb_sig == "<None>":
+                    v2_blocked = True
+                    v2_reasons["unreadable_line_color"] = True
+
+                # line pattern mapping requirement (upstream v2 dependency)
+                try:
+                    lp_id_v2 = sc.GetLinePatternId(GraphicsStyleType.Projection)
+                except:
+                    lp_id_v2 = None
+
+                if lp_id_v2 is None or lp_id_v2 == ElementId.InvalidElementId:
+                    v2_blocked = True
+                    v2_reasons["unreadable_line_pattern_id"] = True
+                else:
+                    if lp_map_v2 is None:
+                        v2_blocked = True
+                        v2_reasons["dependency_missing_line_patterns_v2"] = True
+                    else:
+                        try:
+                            lp_elem_v2 = doc.GetElement(lp_id_v2)
+                            lp_uid_v2 = getattr(lp_elem_v2, "UniqueId", None) if lp_elem_v2 else None
+                        except:
+                            lp_uid_v2 = None
+
+                        lp_hash_v2 = lp_map_v2.get(lp_uid_v2) if lp_uid_v2 else None
+                        if not lp_hash_v2:
+                            v2_blocked = True
+                            v2_reasons["unmapped_line_pattern_v2"] = True
+                        else:
+                            v2_records.append("|".join([
+                                safe_str(sc_name),
+                                safe_str(w_proj),
+                                safe_str(w_cut),
+                                safe_str(rgb_sig),
+                                safe_str(lp_hash_v2),
+                            ]))
         except:
             info["debug_fail_record_build"] += 1
             continue
@@ -146,4 +213,14 @@ def extract(doc, ctx=None):
 
     # GLOBAL hash stays EXACTLY the same semantic as before
     info["hash"] = make_hash(records_sorted) if records_sorted else None
+
+    # v2 hash (domain-level block; no partial coverage semantics)
+    info["debug_v2_blocked"] = bool(v2_blocked)
+    info["debug_v2_block_reasons"] = v2_reasons if v2_blocked else {}
+
+    if (not v2_blocked) and v2_records:
+        info["hash_v2"] = make_hash(sorted(v2_records))
+    else:
+        info["hash_v2"] = None
+
     return info
