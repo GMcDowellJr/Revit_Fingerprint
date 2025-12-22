@@ -25,7 +25,7 @@ from core.canon import canon_str, sig_val
 
 try:
     from Autodesk.Revit.DB import FilteredElementCollector, PhaseFilter, ElementOnPhaseStatus
-except ImportError:
+except:
     FilteredElementCollector = None
     PhaseFilter = None
     ElementOnPhaseStatus = None
@@ -33,10 +33,10 @@ except ImportError:
 
 def extract(doc, ctx=None):
     """
-    Extract Phase Filters fingerprint from document.
+    Extract phase filter fingerprint.
 
     Args:
-        doc: Revit Document
+        doc: Revit document
         ctx: Context dictionary (will be populated with phase_filter_uid -> def_hash mapping)
 
     Returns:
@@ -55,6 +55,12 @@ def extract(doc, ctx=None):
         "debug_missing_name": 0,
         "debug_fail_read": 0,
         "debug_kept": 0,
+
+        # v2 (contract semantic) surfaces - additive only
+        "hash_v2": None,
+        "signature_hashes_v2": [],
+        "debug_v2_blocked": 0,
+        "debug_v2_block_reasons": {},
     }
 
     try:
@@ -67,6 +73,8 @@ def extract(doc, ctx=None):
     names = []
     records = []
     per_hashes = []
+    per_hashes_v2 = []
+    uid_to_hash_v2 = {}  # For downstream v2 mapping (only when record v2 is ok)
     uid_to_hash = {}  # For context population
 
     # Phase statuses to check
@@ -96,6 +104,11 @@ def extract(doc, ctx=None):
         except:
             uid = None
 
+        # Build v2 (contract semantic) signature in parallel (no names; block on unreadables)
+        sig_v2 = []
+        v2_ok = True
+        v2_reason = None
+
         # Build phase filter signature (DETERMINISTIC ORDER)
         # Include name for semantic identity across projects.
         sig = ["name={}".format(sig_val(name))]
@@ -109,8 +122,30 @@ def extract(doc, ctx=None):
                 info["debug_fail_read"] += 1
                 sig.append("{}|presentation={}".format(status_name, sig_val(int(pres))))
 
+            # v2: strict numeric enum id only; block on unreadable
+            if v2_ok:
+                try:
+                    pres_v2 = pf.GetPhaseStatusPresentation(status_enum)
+                    pres_int = int(pres_v2)
+                    sig_v2.append("{}|presentation_id={}".format(status_name, sig_val(pres_int)))
+                except Exception:
+                    v2_ok = False
+                    v2_reason = "presentation_unreadable"
+
         # Hash the definition (keep the deterministic order; do NOT sort)
         def_hash = make_hash(sig)
+        def_hash_v2 = None
+        if v2_ok:
+            def_hash_v2 = make_hash(sig_v2)
+            per_hashes_v2.append(def_hash_v2)
+            if uid:
+                uid_to_hash_v2[uid] = def_hash_v2
+        else:
+            info["debug_v2_blocked"] += 1
+            try:
+                info["debug_v2_block_reasons"][v2_reason] = info["debug_v2_block_reasons"].get(v2_reason, 0) + 1
+            except:
+                pass
 
         rec = {
             "id": safe_str(pf.Id.IntegerValue),
@@ -131,12 +166,18 @@ def extract(doc, ctx=None):
     # Populate context for downstream domains
     if ctx is not None:
         ctx["phase_filter_uid_to_hash"] = uid_to_hash
+        ctx["phase_filter_uid_to_hash_v2"] = uid_to_hash_v2
 
     info["names"] = sorted(set(names))
     info["count"] = len(records)
     info["records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
     info["signature_hashes"] = sorted(per_hashes)
     info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
+    info["signature_hashes_v2"] = sorted(per_hashes_v2)
+    if info["debug_v2_blocked"] > 0:
+        info["hash_v2"] = None
+    else:
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"]) if info["signature_hashes_v2"] else None
 
     info["record_rows"] = []
     try:
