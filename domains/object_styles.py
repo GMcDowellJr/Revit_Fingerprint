@@ -65,8 +65,8 @@ def extract(doc, ctx=None):
     }
 
     # Output controls (default preserve legacy payload)
-    emit_records = True
-    include_cad_layer_categories = True
+    emit_records = False
+    include_cad_layer_categories = False
     try:
         if ctx is not None:
             emit_records = bool(ctx.get("emit_records", True))
