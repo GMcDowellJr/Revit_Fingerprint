@@ -236,12 +236,13 @@ def _walk_elem_filter(elem_filter, out_tokens):
     except Exception:
         out_tokens.append("leaf=<Unknown>")
 
-def _rule_token_v2(rule):
+def _rule_token_v2(rule, doc):
     """
     Contract semantic tokenization:
     - No unreadables in semantic.
     - No ToString()/raw fallbacks in semantic.
     - No positive ElementIds in semantic.
+    - Positive parameter ids are allowed ONLY if resolvable to a Shared Parameter GUID.
     Returns: (token:str, ok:bool, reason:str|None)
     """
     if rule is None:
@@ -253,9 +254,9 @@ def _rule_token_v2(rule):
     try:
         parts.append("type={}".format(rule.GetType().FullName))
     except Exception:
-        return None, False, "rule_type_unreadable"
+        return None, False, "type_unreadable"
 
-    # Parameter id: allow negative only
+    # Parameter id (must be negative BuiltInParameter id OR shared-parameter GUID)
     try:
         pid = rule.GetRuleParameter() if hasattr(rule, "GetRuleParameter") else None
         pid_int = getattr(pid, "IntegerValue", pid) if pid is not None else None
@@ -265,9 +266,38 @@ def _rule_token_v2(rule):
 
     if pid_int is None:
         return None, False, "param_none"
+
     if pid_int >= 0:
-        return None, False, "param_positive_id"
-    parts.append("param_id={}".format(pid_int))
+        # Positive param ids: allow ONLY when resolvable to a Shared Parameter GUID.
+        # This avoids hashing unstable per-project ids while still supporting shared params.
+        try:
+            pe = doc.GetElement(pid) if (doc is not None and pid is not None) else None
+        except Exception:
+            pe = None
+
+        guid_val = None
+        if pe is not None:
+            # Revit API commonly exposes GuidValue on SharedParameterElement
+            try:
+                if hasattr(pe, "GuidValue"):
+                    guid_val = pe.GuidValue
+            except Exception:
+                guid_val = None
+
+        if not guid_val:
+            return None, False, "param_positive_id"
+
+        try:
+            guid_s = safe_str(guid_val).strip().lower()
+        except Exception:
+            return None, False, "param_guid_unreadable"
+
+        if not guid_s:
+            return None, False, "param_guid_empty"
+
+        parts.append("param_guid={}".format(guid_s))
+    else:
+        parts.append("param_id={}".format(pid_int))
 
     # Evaluator/operator identity (API type name; not user-editable)
     try:
@@ -279,13 +309,14 @@ def _rule_token_v2(rule):
     except Exception:
         return None, False, "op_unreadable"
 
-    # Rule value by type (no raw fallbacks)
+    # Rule value tokenization
     try:
         if FilterStringRule is not None and isinstance(rule, FilterStringRule):
-            v = canon_str(getattr(rule, "RuleString", None))
+            v = getattr(rule, "RuleString", None)
             if v is None:
                 return None, False, "val_none"
-            parts.append("val_s={}".format(sig_val(v)))
+            # String values are user-editable but semantically relevant; canon via safe_str + sig_val
+            parts.append("val_s={}".format(sig_val(canon_str(v))))
             return "|".join(parts), True, None
 
         if FilterIntegerRule is not None and isinstance(rule, FilterIntegerRule):
@@ -317,37 +348,23 @@ def _rule_token_v2(rule):
     except Exception:
         return None, False, "val_unreadable"
 
-
-def _walk_elem_filter_v2(elem_filter, out_tokens):
+def _walk_elem_filter_v2(elem_filter, out_tokens, doc):
     """
     Contract semantic walk:
     - No unreadables/sentinels in semantic.
     Returns: (ok:bool, reason:str|None)
     """
     if elem_filter is None:
-        return False, "filter_none"
+        return False, "elem_filter_none"
 
-    # Logical filters (AND/OR): recurse
-    try:
-        if ElementLogicalFilter is not None and isinstance(elem_filter, ElementLogicalFilter):
-            out_tokens.append("logic={}".format(elem_filter.GetType().FullName))
-            kids = list(elem_filter.GetFilters()) if hasattr(elem_filter, "GetFilters") else []
-            out_tokens.append("child_count={}".format(len(kids)))
-            for k in kids:
-                ok, reason = _walk_elem_filter_v2(k, out_tokens)
-                if not ok:
-                    return False, reason
-            return True, None
-    except Exception:
-        return False, "logic_unreadable"
-
+    # Logical filters
     try:
         if LogicalAndFilter is not None and isinstance(elem_filter, LogicalAndFilter):
             out_tokens.append("logic=LogicalAndFilter")
             kids = list(elem_filter.GetFilters()) if hasattr(elem_filter, "GetFilters") else []
             out_tokens.append("child_count={}".format(len(kids)))
             for k in kids:
-                ok, reason = _walk_elem_filter_v2(k, out_tokens)
+                ok, reason = _walk_elem_filter_v2(k, out_tokens, doc)
                 if not ok:
                     return False, reason
             return True, None
@@ -360,7 +377,7 @@ def _walk_elem_filter_v2(elem_filter, out_tokens):
             kids = list(elem_filter.GetFilters()) if hasattr(elem_filter, "GetFilters") else []
             out_tokens.append("child_count={}".format(len(kids)))
             for k in kids:
-                ok, reason = _walk_elem_filter_v2(k, out_tokens)
+                ok, reason = _walk_elem_filter_v2(k, out_tokens, doc)
                 if not ok:
                     return False, reason
             return True, None
@@ -370,20 +387,25 @@ def _walk_elem_filter_v2(elem_filter, out_tokens):
     # Parameter filter leaf: rules
     try:
         if ElementParameterFilter is not None and isinstance(elem_filter, ElementParameterFilter):
-            out_tokens.append("leaf={}".format(elem_filter.GetType().FullName))
+            out_tokens.append("leaf=ElementParameterFilter")
             rules = list(elem_filter.GetRules()) if hasattr(elem_filter, "GetRules") else []
             out_tokens.append("rule_count={}".format(len(rules)))
+
             for i, r in enumerate(rules):
-                tok, ok, reason = _rule_token_v2(r)
+                tok, ok, reason = _rule_token_v2(r, doc)
                 if not ok:
                     return False, reason
-                idx = "{:03d}".format(i)
-                out_tokens.append("rule[{}]={}".format(idx, sig_val(tok)))
+                out_tokens.append("rule[{}]={}".format("{:03d}".format(i), tok))
             return True, None
     except Exception:
-        return False, "param_filter_unreadable"
+        return False, "leaf_unreadable"
 
-    # Unknown leaf types are not allowed in contract semantic
+    # Unknown leaf type
+    try:
+        tname = elem_filter.GetType().FullName
+        out_tokens.append("leaf_unknown={}".format(tname))
+    except Exception:
+        pass
     return False, "leaf_unknown"
 
 def extract(doc, ctx=None):
@@ -546,7 +568,7 @@ def extract(doc, ctx=None):
             try:
                 elem_filter_v2 = f.GetElementFilter()
                 tokens_v2 = []
-                ok, reason = _walk_elem_filter_v2(elem_filter_v2, tokens_v2)
+                ok, reason = _walk_elem_filter_v2(elem_filter_v2, tokens_v2, doc)
                 if not ok:
                     v2_ok = False
                     v2_reason = reason
