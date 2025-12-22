@@ -236,6 +236,156 @@ def _walk_elem_filter(elem_filter, out_tokens):
     except Exception:
         out_tokens.append("leaf=<Unknown>")
 
+def _rule_token_v2(rule):
+    """
+    Contract semantic tokenization:
+    - No unreadables in semantic.
+    - No ToString()/raw fallbacks in semantic.
+    - No positive ElementIds in semantic.
+    Returns: (token:str, ok:bool, reason:str|None)
+    """
+    if rule is None:
+        return None, False, "rule_none"
+
+    parts = []
+
+    # Rule type identity (API type name; not user-editable)
+    try:
+        parts.append("type={}".format(rule.GetType().FullName))
+    except Exception:
+        return None, False, "rule_type_unreadable"
+
+    # Parameter id: allow negative only
+    try:
+        pid = rule.GetRuleParameter() if hasattr(rule, "GetRuleParameter") else None
+        pid_int = getattr(pid, "IntegerValue", pid) if pid is not None else None
+        pid_int = int(pid_int) if pid_int is not None else None
+    except Exception:
+        return None, False, "param_unreadable"
+
+    if pid_int is None:
+        return None, False, "param_none"
+    if pid_int >= 0:
+        return None, False, "param_positive_id"
+    parts.append("param_id={}".format(pid_int))
+
+    # Evaluator/operator identity (API type name; not user-editable)
+    try:
+        ev = rule.GetEvaluator() if hasattr(rule, "GetEvaluator") else None
+        ev_name = ev.GetType().FullName if ev else None
+        if not ev_name:
+            return None, False, "op_none"
+        parts.append("op={}".format(ev_name))
+    except Exception:
+        return None, False, "op_unreadable"
+
+    # Rule value by type (no raw fallbacks)
+    try:
+        if FilterStringRule is not None and isinstance(rule, FilterStringRule):
+            v = canon_str(getattr(rule, "RuleString", None))
+            if v is None:
+                return None, False, "val_none"
+            parts.append("val_s={}".format(sig_val(v)))
+            return "|".join(parts), True, None
+
+        if FilterIntegerRule is not None and isinstance(rule, FilterIntegerRule):
+            v = getattr(rule, "RuleValue", None)
+            if v is None:
+                return None, False, "val_none"
+            parts.append("val_i={}".format(sig_val(safe_str(v))))
+            return "|".join(parts), True, None
+
+        if FilterDoubleRule is not None and isinstance(rule, FilterDoubleRule):
+            v = getattr(rule, "RuleValue", None)
+            if v is None:
+                return None, False, "val_none"
+            parts.append("val_d={}".format(sig_val(safe_str(v))))
+            return "|".join(parts), True, None
+
+        if FilterElementIdRule is not None and isinstance(rule, FilterElementIdRule):
+            v = getattr(rule, "RuleValue", None)
+            v_int = getattr(v, "IntegerValue", v)
+            v_int = int(v_int) if v_int is not None else None
+            if v_int is None:
+                return None, False, "val_none"
+            if v_int >= 0:
+                return None, False, "val_positive_id"
+            parts.append("val_id={}".format(v_int))
+            return "|".join(parts), True, None
+
+        return None, False, "rule_type_unsupported"
+    except Exception:
+        return None, False, "val_unreadable"
+
+
+def _walk_elem_filter_v2(elem_filter, out_tokens):
+    """
+    Contract semantic walk:
+    - No unreadables/sentinels in semantic.
+    Returns: (ok:bool, reason:str|None)
+    """
+    if elem_filter is None:
+        return False, "filter_none"
+
+    # Logical filters (AND/OR): recurse
+    try:
+        if ElementLogicalFilter is not None and isinstance(elem_filter, ElementLogicalFilter):
+            out_tokens.append("logic={}".format(elem_filter.GetType().FullName))
+            kids = list(elem_filter.GetFilters()) if hasattr(elem_filter, "GetFilters") else []
+            out_tokens.append("child_count={}".format(len(kids)))
+            for k in kids:
+                ok, reason = _walk_elem_filter_v2(k, out_tokens)
+                if not ok:
+                    return False, reason
+            return True, None
+    except Exception:
+        return False, "logic_unreadable"
+
+    try:
+        if LogicalAndFilter is not None and isinstance(elem_filter, LogicalAndFilter):
+            out_tokens.append("logic=LogicalAndFilter")
+            kids = list(elem_filter.GetFilters()) if hasattr(elem_filter, "GetFilters") else []
+            out_tokens.append("child_count={}".format(len(kids)))
+            for k in kids:
+                ok, reason = _walk_elem_filter_v2(k, out_tokens)
+                if not ok:
+                    return False, reason
+            return True, None
+    except Exception:
+        return False, "and_unreadable"
+
+    try:
+        if LogicalOrFilter is not None and isinstance(elem_filter, LogicalOrFilter):
+            out_tokens.append("logic=LogicalOrFilter")
+            kids = list(elem_filter.GetFilters()) if hasattr(elem_filter, "GetFilters") else []
+            out_tokens.append("child_count={}".format(len(kids)))
+            for k in kids:
+                ok, reason = _walk_elem_filter_v2(k, out_tokens)
+                if not ok:
+                    return False, reason
+            return True, None
+    except Exception:
+        return False, "or_unreadable"
+
+    # Parameter filter leaf: rules
+    try:
+        if ElementParameterFilter is not None and isinstance(elem_filter, ElementParameterFilter):
+            out_tokens.append("leaf={}".format(elem_filter.GetType().FullName))
+            rules = list(elem_filter.GetRules()) if hasattr(elem_filter, "GetRules") else []
+            out_tokens.append("rule_count={}".format(len(rules)))
+            for i, r in enumerate(rules):
+                tok, ok, reason = _rule_token_v2(r)
+                if not ok:
+                    return False, reason
+                idx = "{:03d}".format(i)
+                out_tokens.append("rule[{}]={}".format(idx, sig_val(tok)))
+            return True, None
+    except Exception:
+        return False, "param_filter_unreadable"
+
+    # Unknown leaf types are not allowed in contract semantic
+    return False, "leaf_unknown"
+
 def extract(doc, ctx=None):
     """
     Extract View Filters fingerprint from document.
@@ -260,6 +410,11 @@ def extract(doc, ctx=None):
         "debug_missing_name": 0,
         "debug_fail_read": 0,
         "debug_kept": 0,
+        # v2 (contract semantic) surfaces - additive only
+        "hash_v2": None,
+        "signature_hashes_v2": [],
+        "debug_v2_blocked": 0,
+        "debug_v2_block_reasons": {},        
     }
 
     try:
@@ -273,6 +428,8 @@ def extract(doc, ctx=None):
     records = []
     per_hashes = []
     uid_to_hash = {}  # For context population
+    per_hashes_v2 = []
+    uid_to_hash_v2 = {}  # For downstream v2 mapping (only when record v2 is ok)
 
     for f in col:
         # Name is metadata only
@@ -289,6 +446,11 @@ def extract(doc, ctx=None):
             uid = None
 
         # Build filter signature
+        # Build v2 (contract semantic) signature in parallel (no names, no unreadables)
+        sig_v2 = []
+        v2_ok = True
+        v2_reason = None
+        
         sig = []
 
         # Filter type (rule-based vs selection-based)
@@ -337,6 +499,32 @@ def extract(doc, ctx=None):
                 sig.append("categories_ids={}".format(sig_val(",".join(neg_ids_sorted) if neg_ids_sorted else "<None>")))
         except:
             sig.append("categories=<None>")
+            
+        # v2 categories: negative category ids only (no names)
+        if v2_ok:
+            try:
+                cat_ids_v2 = list(f.GetCategories())
+                neg_ids = []
+                for cid in cat_ids_v2:
+                    iv = getattr(cid, "IntegerValue", cid)
+                    iv = int(iv)
+                    if iv < 0:
+                        neg_ids.append(str(iv))
+                    else:
+                        # Positive ids are not allowed in semantic surfaces
+                        v2_ok = False
+                        v2_reason = "category_positive_id"
+                        break
+                if v2_ok:
+                    neg_ids_sorted = sorted(set([x for x in neg_ids if x]))
+                    if not neg_ids_sorted:
+                        v2_ok = False
+                        v2_reason = "category_none"
+                    else:
+                        sig_v2.append("categories_ids={}".format(sig_val(",".join(neg_ids_sorted))))
+            except Exception:
+                v2_ok = False
+                v2_reason = "category_unreadable"
 
         # Filter rules (order-sensitive by traversal order; preserves AND/OR structure)
         try:
@@ -352,9 +540,37 @@ def extract(doc, ctx=None):
                     sig.append("ft[{}]={}".format(idx, sig_val(t)))
         except:
             sig.append("filter_tree=<Unreadable>")
+            
+        # v2 filter tree: strict walk, block on unreadable/unallowed
+        if v2_ok:
+            try:
+                elem_filter_v2 = f.GetElementFilter()
+                tokens_v2 = []
+                ok, reason = _walk_elem_filter_v2(elem_filter_v2, tokens_v2)
+                if not ok:
+                    v2_ok = False
+                    v2_reason = reason
+                else:
+                    sig_v2.append("filter_tree_count={}".format(len(tokens_v2)))
+                    for i, t in enumerate(tokens_v2):
+                        idx = "{:03d}".format(i)
+                        sig_v2.append("ft[{}]={}".format(idx, sig_val(t)))
+            except Exception:
+                v2_ok = False
+                v2_reason = "filter_tree_unreadable"
 
         # Hash the definition (rules are NOT sorted - order matters)
         def_hash = make_hash(sig)
+        def_hash_v2 = None
+        if v2_ok:
+            def_hash_v2 = make_hash(sig_v2)
+            per_hashes_v2.append(def_hash_v2)
+            if uid:
+                uid_to_hash_v2[uid] = def_hash_v2
+        else:
+            info["debug_v2_blocked"] += 1
+            if v2_reason:
+                info["debug_v2_block_reasons"][v2_reason] = info["debug_v2_block_reasons"].get(v2_reason, 0) + 1
 
         rec = {
             "id": safe_str(f.Id.IntegerValue),
@@ -375,12 +591,18 @@ def extract(doc, ctx=None):
     # Populate context for downstream domains (views, templates)
     if ctx is not None:
         ctx["filter_uid_to_hash"] = uid_to_hash
+        ctx["filter_uid_to_hash_v2"] = uid_to_hash_v2
 
     info["names"] = sorted(set(names))
     info["count"] = len(info["names"])
     info["records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
     info["signature_hashes"] = sorted(per_hashes)
     info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
+    info["signature_hashes_v2"] = sorted(per_hashes_v2)
+    if info["debug_v2_blocked"] > 0:
+        info["hash_v2"] = None
+    else:
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"]) if info["signature_hashes_v2"] else None
 
     info["record_rows"] = []
     try:

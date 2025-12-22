@@ -58,6 +58,16 @@ def _new_domain_envelope(domain_name):
         "legacy_ref": domain_name,
     }
 
+def _extract_v2_hash(payload):
+    """
+    Best-effort extraction of the contract semantic hash (v2) without changing legacy behavior.
+    """
+    try:
+        if isinstance(payload, dict) and "hash_v2" in payload:
+            return payload.get("hash_v2", None)
+    except:
+        pass
+    return None
 
 def _extract_legacy_hash(payload):
     """
@@ -95,7 +105,7 @@ def _domain_run(domain_name, fn, doc, ctx, runner_notes):
         env["capability"] = {"api_reachable": True}
         legacy_hash = _extract_legacy_hash(legacy)
         env["semantic"]["hash"] = legacy_hash
-        env["semantic_v2"]["hash"] = None  # populated by future domain patches
+        env["semantic_v2"]["hash"] = _extract_v2_hash(legacy)
 
         if HASH_MODE == "semantic":
             env["semantic"]["hash"] = env["semantic_v2"]["hash"]
