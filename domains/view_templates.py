@@ -2,20 +2,19 @@
 """
 View Templates domain extractor.
 
-Captures controlled behavior of view templates including:
-- Visibility/Graphics (VG) signature (hidden categories + override presence) [when supported]
-- Applied view filters (references global filters domain)                   [when supported]
-- Phase filter (references global phase_filters domain)                     [when supported]
-- Detail level, discipline, scale
-- Display settings (visual style)
+Captures a deterministic fingerprint of view template behavior without relying on
+project-specific ids (other than stable negative category ids and built-in parameters).
 
-NOTE:
-- This extractor does not currently capture per-category VG hide/override state.
-- Schedule templates emit deterministic sentinels for VG/filters where unsupported.
+Legacy hash:
+- Continues to use existing behavior including sentinel strings where present.
+- Uses ctx maps: filter_uid_to_hash, phase_filter_uid_to_hash.
 
-Per-record identity: UniqueId (element-backed)
-Ordering: filter stack is order-sensitive (preserved), other settings order-insensitive
-Names: metadata only (excluded from hash per D-008)
+semantic_v2 hash (additive):
+- Uses only semantic-safe fields and upstream semantic_v2 hashes.
+- BLOCKS (hash_v2=None) if any required dependency resolution fails:
+  - any referenced phase filter cannot be resolved to phase_filter_uid_to_hash_v2
+  - any referenced view filter cannot be resolved to filter_uid_to_hash_v2
+- No sentinel hashing for v2.
 """
 
 import sys
@@ -34,29 +33,28 @@ try:
         FilteredElementCollector,
         View,
         ViewSchedule,
-        ViewType,
         BuiltInParameter,
+        OverrideGraphicSettings,
+        Category,
+        CategoryType,
     )
-except ImportError:
+except:
     FilteredElementCollector = None
     View = None
     ViewSchedule = None
-    ViewType = None
     BuiltInParameter = None
+    OverrideGraphicSettings = None
+    Category = None
+    CategoryType = None
 
 
 def extract(doc, ctx=None):
     """
-    Extract View Templates behavioral fingerprint from document.
-
-    M5 IMPLEMENTATION: Behavior-based fingerprinting.
-    Templates are fingerprinted by controlled behavior, not names.
+    Extract view templates fingerprint.
 
     Args:
-        doc: Revit Document
-        ctx: Context dictionary with global domain mappings:
-             - filter_uid_to_hash: view filter UID -> definition hash
-             - phase_filter_uid_to_hash: phase filter UID -> definition hash
+        doc: Revit document
+        ctx: context dict with mappings from other domains
 
     Returns:
         Dictionary with count, hash, signature_hashes, records,
@@ -76,11 +74,21 @@ def extract(doc, ctx=None):
         "debug_missing_uid": 0,
         "debug_fail_read": 0,
         "debug_kept": 0,
+
+        # v2 (contract semantic) surfaces - additive only
+        "hash_v2": None,
+        "signature_hashes_v2": [],
+        "debug_v2_blocked": 0,
+        "debug_v2_block_reasons": {},
     }
 
     # Get context mappings (may be None if global domains not run)
     filter_map = ctx.get("filter_uid_to_hash", {}) if ctx else {}
     phase_filter_map = ctx.get("phase_filter_uid_to_hash", {}) if ctx else {}
+    filter_map_v2 = ctx.get("filter_uid_to_hash_v2", {}) if ctx else {}
+    phase_filter_map_v2 = ctx.get("phase_filter_uid_to_hash_v2", {}) if ctx else {}
+    line_pattern_map_v2 = ctx.get("line_pattern_uid_to_hash_v2", {}) if ctx else {}
+
     debug_vg_details = bool(ctx.get("debug_vg_details", False)) if ctx else False
 
     try:
@@ -93,6 +101,17 @@ def extract(doc, ctx=None):
     names = []
     records = []
     per_hashes = []
+    per_hashes_v2 = []
+    v2_any_blocked = False
+
+    def _v2_block(reason):
+        nonlocal v2_any_blocked
+        v2_any_blocked = True
+        info["debug_v2_blocked"] += 1
+        try:
+            info["debug_v2_block_reasons"][reason] = info["debug_v2_block_reasons"].get(reason, 0) + 1
+        except:
+            pass
 
     for v in col:
         # Only process view templates
@@ -105,7 +124,7 @@ def extract(doc, ctx=None):
             info["debug_not_template"] += 1
             continue
 
-        # Name is metadata only (excluded from hash per D-008)
+        # name/uid metadata
         name = canon_str(getattr(v, "Name", None))
         if not name:
             info["debug_missing_name"] += 1
@@ -121,54 +140,25 @@ def extract(doc, ctx=None):
         if not uid:
             info["debug_missing_uid"] += 1
 
+        # v2 per-template signature (contract semantic)
+        v2_ok = True
+        sig_v2 = []
+
         # Determine whether this view type supports VG/filter APIs.
-        # Evidence: ViewSchedule templates throw on GetFilters / VG overrides.
+        # Evidence: ViewSchedule templates behave differently.
         is_schedule = False
         try:
-            if ViewSchedule and isinstance(v, ViewSchedule):
-                is_schedule = True
-            elif ViewType and safe_str(v.ViewType) == safe_str(ViewType.Schedule):
-                is_schedule = True
+            is_schedule = isinstance(v, ViewSchedule)
         except:
-            pass
+            is_schedule = False
 
-        # Build template behavioral signature
-        sig = []
-        
-        # CONTRACT: Schedule view templates only expose Phase Filter + Appearance include state.
-        # Do not add additional tokens here without standards approval.
-
+        # -----------------------------------------
+        # SCHEDULE templates: minimal stable surface
+        # -----------------------------------------
         if is_schedule:
-            # Schedule templates only control:
-            # - Phase Filter
-            # - Appearance (include only)
-            # All other settings are instance-specific or unsupported.
+            sig = []
 
-            # View Type
-            try:
-                vtype = safe_str(v.ViewType)
-                sig.append("view_type={}".format(sig_val(vtype)))
-            except:
-                sig.append("view_type=<None>")
-
-            # Phase Filter (reference global phase_filters domain)
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-                if p and p.HasValue:
-                    pf_id = p.AsElementId()
-                    if pf_id and pf_id.IntegerValue > 0:
-                        pf_elem = doc.GetElement(pf_id)
-                        pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                        pf_hash = phase_filter_map.get(pf_uid, "<NotInGlobalDomain>") if pf_uid else "<None>"
-                        sig.append("phase_filter={}".format(sig_val(pf_hash)))
-                    else:
-                        sig.append("phase_filter=<None>")
-                else:
-                    sig.append("phase_filter=<None>")
-            except:
-                sig.append("phase_filter=<None>")
-
-            # Template-controlled parameters (Include checkboxes)
+            # Template-controlled parameters ("Include" surface)
             try:
                 tpl_ids = v.GetTemplateParameterIds() or []
                 tpl_bips = set(
@@ -178,6 +168,7 @@ def extract(doc, ctx=None):
             except:
                 tpl_bips = set()
 
+            # Include flags (stable)
             try:
                 sig.append(
                     "include_phase_filter={}".format(
@@ -189,16 +180,82 @@ def extract(doc, ctx=None):
 
             try:
                 sig.append(
+                    "include_filters={}".format(
+                        int(BuiltInParameter.VIS_GRAPHICS_FILTERS) in tpl_bips
+                    )
+                )
+            except:
+                sig.append("include_filters=False")
+
+            try:
+                sig.append(
+                    "include_vg={}".format(
+                        int(BuiltInParameter.VIS_GRAPHICS_OVERRIDES) in tpl_bips
+                    )
+                )
+            except:
+                sig.append("include_vg=False")
+
+            try:
+                sig.append(
                     "include_appearance={}".format(
-                        int(BuiltInParameter.VIEW_SCHEDULE_APPEARANCE) in tpl_bips
+                        int(BuiltInParameter.VIS_GRAPHICS_APPEARANCE) in tpl_bips
                     )
                 )
             except:
                 sig.append("include_appearance=False")
 
+            # Phase Filter (reference global phase_filters domain) - legacy
+            try:
+                include_pf = int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
+            except:
+                include_pf = False
+
+            if include_pf:
+                try:
+                    pf_id = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER).AsElementId()
+                    pf_elem = doc.GetElement(pf_id) if pf_id else None
+                    if pf_elem:
+                        pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
+                        pf_hash = phase_filter_map.get(pf_uid, "<NotInGlobalDomain>") if pf_uid else "<None>"
+                        sig.append("phase_filter={}".format(sig_val(pf_hash)))
+                        # v2: require upstream v2 hash when phase filter is present
+                        if v2_ok:
+                            pf_hash_v2 = None
+                            try:
+                                pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
+                            except:
+                                pf_hash_v2 = None
+                            if not pf_hash_v2:
+                                _v2_block("phase_filter_unresolved")
+                                v2_ok = False
+                            else:
+                                sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
+                    else:
+                        sig.append("phase_filter=<None>")
+                except:
+                    info["debug_fail_read"] += 1
+                    sig.append("phase_filter=<Unreadable>")
+            else:
+                sig.append("phase_filter=<None>")
+
+            # NOTE: Schedule filter stack + VG signatures are not consistently supported across versions.
+            # We keep schedule signature minimal and stable.
+
             # Finalize schedule signature
             sig_final = sorted(sig)
             def_hash = make_hash(sig_final)
+
+            # v2 finalize (schedule)
+            if v2_ok:
+                try:
+                    sig_v2.extend([s for s in sig_final if not s.startswith("name=")])
+                    sig_v2_final = sorted(set(sig_v2))
+                    def_hash_v2 = make_hash(sig_v2_final)
+                    per_hashes_v2.append(def_hash_v2)
+                except:
+                    _v2_block("schedule_finalize_failed")
+                    v2_ok = False
 
             records.append({
                 "id": safe_str(v.Id.IntegerValue),
@@ -213,8 +270,12 @@ def extract(doc, ctx=None):
             info["debug_kept"] += 1
             continue
 
+        # -----------------------------------------
+        # NON-SCHEDULE templates
+        # -----------------------------------------
+        sig = []
+
         # Template-controlled parameters ("Include" surface)
-        # Explicit binary flags for the behaviors we fingerprint (readable, schedule-style).
         try:
             tpl_ids = v.GetTemplateParameterIds() or []
             tpl_bips = set(
@@ -224,188 +285,213 @@ def extract(doc, ctx=None):
         except:
             tpl_bips = set()
 
-        def _incl_bip_name(bip_name):
-            try:
-                bip = getattr(BuiltInParameter, bip_name, None)
-                if bip is None:
-                    return False
-                return int(bip) in tpl_bips
-            except:
-                return False
-
-        # Core settings we fingerprint
-        sig.append("include_detail_level={}".format(_incl_bip_name("VIEW_DETAIL_LEVEL")))
-        sig.append("include_scale={}".format(_incl_bip_name("VIEW_SCALE")))
-        sig.append("include_discipline={}".format(_incl_bip_name("VIEW_DISCIPLINE")))
-        sig.append("include_phase_filter={}".format(_incl_bip_name("VIEW_PHASE_FILTER")))
-
-        # Display style: best-effort BIP mapping (varies by Revit version)
-        include_display_style = (
-            _incl_bip_name("MODEL_GRAPHICS_STYLE") or
-            _incl_bip_name("VIEW_DISPLAYSTYLE") or
-            _incl_bip_name("VIEW_DISPLAY_STYLE") or
-            _incl_bip_name("VIEWER_DISPLAY_STYLE")
-        )
-        sig.append("include_display_style={}".format(include_display_style))
-
-        # Filters + VG are conceptual surfaces; BIP names can vary by version.
-        include_filters = (
-            _incl_bip_name("VIEW_FILTERS") or
-            _incl_bip_name("VIS_GRAPHICS_FILTERS")
-        )
-        sig.append("include_filters={}".format(include_filters))
-
-        include_vg = (
-            _incl_bip_name("VIS_GRAPHICS_MODEL") or
-            _incl_bip_name("VIS_GRAPHICS_ANNOTATION") or
-            _incl_bip_name("VIS_GRAPHICS")
-        )
-        sig.append("include_vg={}".format(include_vg))
-
-        # View Type (plan, section, elevation, 3D, etc.)
+        # Include flags (stable)
         try:
-            vtype = safe_str(v.ViewType)
-            sig.append("view_type={}".format(sig_val(vtype)))
+            sig.append(
+                "include_phase_filter={}".format(
+                    int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
+                )
+            )
         except:
-            sig.append("view_type=<None>")
+            sig.append("include_phase_filter=False")
 
-        # Detail Level
-        if not is_schedule:
-            try:
-                detail_level = safe_str(v.DetailLevel)
-                sig.append("detail_level={}".format(sig_val(detail_level)))
-            except:
-                sig.append("detail_level=<None>")
+        try:
+            sig.append(
+                "include_filters={}".format(
+                    int(BuiltInParameter.VIS_GRAPHICS_FILTERS) in tpl_bips
+                )
+            )
+        except:
+            sig.append("include_filters=False")
 
-        # Scale
-        if not is_schedule:
-            try:
-                scale = v.Scale
-                sig.append("scale={}".format(sig_val(scale)))
-            except:
-                sig.append("scale=<None>")
+        try:
+            sig.append(
+                "include_vg={}".format(
+                    int(BuiltInParameter.VIS_GRAPHICS_OVERRIDES) in tpl_bips
+                )
+            )
+        except:
+            sig.append("include_vg=False")
 
-        # Discipline
-        if not is_schedule:
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_DISCIPLINE) if BuiltInParameter else None
-                if p and p.HasValue:
-                    discipline = safe_str(p.AsValueString())
-                    sig.append("discipline={}".format(sig_val(discipline)))
-                else:
-                    sig.append("discipline=<None>")
-            except:
-                sig.append("discipline=<None>")
+        try:
+            sig.append(
+                "include_appearance={}".format(
+                    int(BuiltInParameter.VIS_GRAPHICS_APPEARANCE) in tpl_bips
+                )
+            )
+        except:
+            sig.append("include_appearance=False")
 
         # Phase Filter (reference global phase_filters domain)
         try:
-            pf_param = None
+            include_pf = int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
+        except:
+            include_pf = False
+
+        if include_pf:
             try:
-                pf_param = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-            except:
-                pf_param = None
-
-            # Schedule fallback (English name; avoids API calls that throw)
-            if is_schedule and (pf_param is None or (hasattr(pf_param, "HasValue") and not pf_param.HasValue)):
-                try:
-                    pf_param = v.LookupParameter("Phase Filter")
-                except:
-                    pass
-
-            if pf_param and getattr(pf_param, "HasValue", False):
-                pf_id = pf_param.AsElementId()
-                if pf_id and pf_id.IntegerValue > 0:
-                    pf_elem = doc.GetElement(pf_id)
+                pf_id = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER).AsElementId()
+                pf_elem = doc.GetElement(pf_id) if pf_id else None
+                if pf_elem:
                     pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
                     pf_hash = phase_filter_map.get(pf_uid, "<NotInGlobalDomain>") if pf_uid else "<None>"
                     sig.append("phase_filter={}".format(sig_val(pf_hash)))
+                    # v2: require upstream v2 hash when phase filter is present
+                    if v2_ok:
+                        pf_hash_v2 = None
+                        try:
+                            pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
+                        except:
+                            pf_hash_v2 = None
+                        if not pf_hash_v2:
+                            _v2_block("phase_filter_unresolved")
+                            v2_ok = False
+                        else:
+                            sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
                 else:
                     sig.append("phase_filter=<None>")
-            else:
-                sig.append("phase_filter=<None>")
-        except:
+            except:
+                info["debug_fail_read"] += 1
+                sig.append("phase_filter=<Unreadable>")
+        else:
             sig.append("phase_filter=<None>")
 
         # Visibility/Graphics (VG) signature
         # Contract: avoid names + avoid positive element ids in hash.
-        # Hashes are based on negative category ids + stable primitives only.
-        if not is_schedule:
-            try:
-                from Autodesk.Revit.DB import CategoryType, OverrideGraphicSettings, Color
-            except:
-                CategoryType = None
-                OverrideGraphicSettings = None
-                Color = None
+        # We hash only negative category ids (BuiltInCategory-style) for hidden + overridden categories.
+        try:
+            cats = doc.Settings.Categories
+        except:
+            cats = None
 
-            vg_records = []  # detailed per-category records (debug only, optional)
-            vg_sig_records = []  # hashed record lines (deterministic)
-
+        vg_sig_records = []
+        vg_records = []
+        if cats:
             try:
-                cats = doc.Settings.Categories
-            except:
-                cats = None
-
-            default_ogs = None
-            try:
-                default_ogs = OverrideGraphicSettings() if OverrideGraphicSettings else None
+                default_ogs = OverrideGraphicSettings()
             except:
                 default_ogs = None
 
-            def _rgb(c):
-                try:
-                    return "{}-{}-{}".format(int(c.Red), int(c.Green), int(c.Blue))
-                except:
-                    return "<None>"
+            # Iterate all categories; keep deterministic ordering by category id
+            try:
+                cats_list = list(cats)
+            except:
+                cats_list = []
 
-            def _bool01(x):
+            def cat_int_id(c):
                 try:
-                    return "1" if bool(x) else "0"
+                    return int(c.Id.IntegerValue)
                 except:
-                    return "0"
+                    return None
 
-            def _int_or_none(x):
+            cats_list = [c for c in cats_list if c is not None]
+            cats_list = sorted(cats_list, key=lambda c: (cat_int_id(c) is None, cat_int_id(c) or 0))
+
+            for c in cats_list:
+                cid_int = cat_int_id(c)
+                if cid_int is None:
+                    continue
+
+                # Only include negative category ids (built-in categories)
+                if cid_int >= 0:
+                    continue
+
+                # Skip import categories when possible
                 try:
-                    if x is None:
-                        return "<None>"
-                    return safe_str(int(x))
-                except:
-                    return "<None>"
-
-            if cats and default_ogs:
-                for cat in cats:
-                    if cat is None:
+                    if CategoryType and c.CategoryType == CategoryType.Import:
                         continue
+                except:
+                    pass
 
-                    # Skip import categories (often unstable/noisy)
+                # Hidden?
+                try:
+                    hidden = bool(v.GetCategoryHidden(c.Id))
+                except:
+                    hidden = False
+
+                # Overrides
+                try:
+                    ogs = v.GetCategoryOverrides(c.Id)
+                except:
+                    ogs = None
+
+                if not ogs:
+                    # Record hidden-only categories (optional; still deterministic)
+                    if hidden:
+                        line = "cat={}|hidden=1|ovr=0".format(cid_int)
+                        vg_sig_records.append(line)
+                        if debug_vg_details:
+                            vg_records.append(line)
+                    continue
+
+                # Extract stable primitives
+                try:
                     try:
-                        if CategoryType and cat.CategoryType == CategoryType.Import:
-                            continue
+                        dl = ogs.DetailLevel
+                        dl_int = int(dl)
+                    except:
+                        dl_int = None
+
+                    try:
+                        proj_wt = ogs.ProjectionLineWeight
+                    except:
+                        proj_wt = None
+                    try:
+                        cut_wt = ogs.CutLineWeight
+                    except:
+                        cut_wt = None
+                    try:
+                        proj_col = ogs.ProjectionLineColor
+                    except:
+                        proj_col = None
+                    try:
+                        cut_col = ogs.CutLineColor
+                    except:
+                        cut_col = None
+                    try:
+                        halftone = ogs.Halftone
+                    except:
+                        halftone = False
+                    try:
+                        trans = ogs.Transparency
+                    except:
+                        trans = None
+
+                    # Pattern overrides as boolean flags (never record ElementId)
+                    try:
+                        proj_pat_ovr = (ogs.ProjectionLinePatternId != default_ogs.ProjectionLinePatternId) if default_ogs else False
+                    except:
+                        proj_pat_ovr = False
+                    try:
+                        cut_pat_ovr = (ogs.CutLinePatternId != default_ogs.CutLinePatternId) if default_ogs else False
+                    except:
+                        cut_pat_ovr = False
+
+                    # Determine "has override" by comparing stable primitives + pattern override flags
+                    has_override = False
+                    try:
+                        if dl_int is not None:
+                            has_override = True
+                        if proj_wt is not None and int(proj_wt) >= 0:
+                            has_override = True
+                        if cut_wt is not None and int(cut_wt) >= 0:
+                            has_override = True
+                        if proj_col is not None:
+                            has_override = True
+                        if cut_col is not None:
+                            has_override = True
+                        if halftone:
+                            has_override = True
+                        if trans is not None and int(trans) >= 0:
+                            has_override = True
+                        if proj_pat_ovr:
+                            has_override = True
+                        if cut_pat_ovr:
+                            has_override = True
                     except:
                         pass
 
-                    try:
-                        cid = cat.Id
-                        cid_int = cid.IntegerValue if cid else None
-                        if cid_int is None:
-                            continue
-                    except:
-                        continue
-
-                    # Hidden state
-                    hidden = False
-                    try:
-                        hidden = bool(v.GetCategoryHidden(cid))
-                    except:
-                        hidden = False
-
-                    # Overrides (no ids are recorded; pattern ids become boolean flags only)
-                    try:
-                        ogs = v.GetCategoryOverrides(cid)
-                    except:
-                        ogs = None
-
-                    if not ogs:
-                        # Record hidden-only categories (optional; still deterministic)
+                    if not has_override:
                         if hidden:
                             line = "cat={}|hidden=1|ovr=0".format(cid_int)
                             vg_sig_records.append(line)
@@ -413,118 +499,80 @@ def extract(doc, ctx=None):
                                 vg_records.append(line)
                         continue
 
-                    # Extract stable primitives
-                    try: dl = ogs.DetailLevel
-                    except: dl = None                    
-                    try: proj_wt = ogs.ProjectionLineWeight
-                    except: proj_wt = None
-                    try: cut_wt = ogs.CutLineWeight
-                    except: cut_wt = None
-                    try: proj_col = ogs.ProjectionLineColor
-                    except: proj_col = None
-                    try: cut_col = ogs.CutLineColor
-                    except: cut_col = None
-                    try: halftone = ogs.Halftone
-                    except: halftone = False
-                    try: trans = ogs.Transparency
-                    except: trans = None
-
-                    # Pattern overrides as boolean flags (never record ElementId)
-                    try: proj_pat_ovr = (ogs.ProjectionLinePatternId != default_ogs.ProjectionLinePatternId)
-                    except: proj_pat_ovr = False
-                    try: cut_pat_ovr = (ogs.CutLinePatternId != default_ogs.CutLinePatternId)
-                    except: cut_pat_ovr = False
-
-                    # Determine "has override" by comparing stable primitives + pattern override flags
-                    has_override = False
+                    # Pack (avoid ids; colors are packed as RGB triples)
                     try:
-                        if proj_wt != default_ogs.ProjectionLineWeight: has_override = True
-                        elif cut_wt != default_ogs.CutLineWeight: has_override = True
-                        elif _rgb(proj_col) != _rgb(default_ogs.ProjectionLineColor): has_override = True
-                        elif _rgb(cut_col) != _rgb(default_ogs.CutLineColor): has_override = True
-                        elif _bool01(halftone) != _bool01(default_ogs.Halftone): has_override = True
-                        elif _int_or_none(trans) != _int_or_none(default_ogs.Transparency): has_override = True
-                        elif safe_str(dl) != safe_str(default_ogs.DetailLevel): has_override = True                       
-                        elif proj_pat_ovr or cut_pat_ovr: has_override = True
+                        proj_col_s = "{}-{}-{}".format(proj_col.Red, proj_col.Green, proj_col.Blue) if proj_col else "<None>"
                     except:
-                        has_override = False
+                        proj_col_s = "<None>"
+                    try:
+                        cut_col_s = "{}-{}-{}".format(cut_col.Red, cut_col.Green, cut_col.Blue) if cut_col else "<None>"
+                    except:
+                        cut_col_s = "<None>"
 
-                    # Keep record only if something is non-default (hidden or overrides)
-                    if hidden or has_override:
-                        line = (
-                            "cat={}|hidden={}|ovr={}|dl={}|proj_wt={}|cut_wt={}|"
-                            "proj_col={}|cut_col={}|half={}|trans={}|"
-                            "proj_pat_ovr={}|cut_pat_ovr={}"
-                        ).format(
-                            cid_int,
-                            "1" if hidden else "0",
-                            "1" if has_override else "0",
-                            safe_str(dl),
-                            _int_or_none(proj_wt),
-                            _int_or_none(cut_wt),
-                            _rgb(proj_col),
-                            _rgb(cut_col),
-                            _bool01(halftone),
-                            _int_or_none(trans),
-                            _bool01(proj_pat_ovr),
-                            _bool01(cut_pat_ovr),
-                        )
+                    line = (
+                        "cat={}|hidden={}|ovr=1|dl={}|proj_wt={}|cut_wt={}|proj_col={}|cut_col={}|half={}|trans={}|"
+                        "proj_pat_ovr={}|cut_pat_ovr={}"
+                    ).format(
+                        cid_int,
+                        int(bool(hidden)),
+                        sig_val(dl_int),
+                        sig_val(proj_wt),
+                        sig_val(cut_wt),
+                        sig_val(proj_col_s),
+                        sig_val(cut_col_s),
+                        int(bool(halftone)),
+                        sig_val(trans),
+                        int(bool(proj_pat_ovr)),
+                        int(bool(cut_pat_ovr)),
+                    )
 
-                        vg_sig_records.append(line)
-                        if debug_vg_details:
-                            vg_records.append(line)
-
-            # Deterministic: sort records (order-insensitive surface)
-            vg_sig_sorted = sorted(set(vg_sig_records))
-
-            # Summary tokens (readable + hash reflects detail)
-            sig.append("vg_record_count={}".format(len(vg_sig_sorted)))
-            sig.append("vg_records_hash={}".format(make_hash(vg_sig_sorted) if vg_sig_sorted else "<None>"))
-
-            # Optional legacy tokens (keep for now if downstream expects them)
-            # (You can delete these later once consumers migrate.)
-            hidden_only = []
-            ovr_only = []
-            for r in vg_sig_sorted:
-                try:
-                    # cat=<int>|hidden=...|ovr=...
-                    parts = r.split("|")
-                    cid_part = parts[0]  # cat=...
-                    hidden_part = parts[1]  # hidden=...
-                    ovr_part = parts[2]  # ovr=...
-                    cid_int = int(cid_part.split("=")[1])
-                    if hidden_part.endswith("=1"):
-                        hidden_only.append(cid_int)
-                    if ovr_part.endswith("=1"):
-                        ovr_only.append(cid_int)
+                    vg_sig_records.append(line)
+                    if debug_vg_details:
+                        vg_records.append(line)
                 except:
-                    pass
+                    info["debug_fail_read"] += 1
+                    continue
 
-            hidden_sorted = sorted(set(hidden_only))
-            ovr_sorted = sorted(set(ovr_only))
-
-            sig.append("vg_hidden_count={}".format(len(hidden_sorted)))
-            sig.append("vg_hidden_cats_hash={}".format(make_hash([safe_str(i) for i in hidden_sorted]) if hidden_sorted else "<None>"))
-            sig.append("vg_ogs_count={}".format(len(ovr_sorted)))
-            sig.append("vg_ogs_cats_hash={}".format(make_hash([safe_str(i) for i in ovr_sorted]) if ovr_sorted else "<None>"))
-
-            # Stash detailed records for this template (metadata only)
-            _vg_records_for_rec = vg_records if debug_vg_details else None
+        if vg_sig_records:
+            vg_sig_sorted = sorted(vg_sig_records)
+            sig.append("vg_count={}".format(sig_val(len(vg_sig_sorted))))
+            for i, line in enumerate(vg_sig_sorted):
+                sig.append("vg[{}]={}".format("{:04d}".format(i), sig_val(line)))
         else:
-            _vg_records_for_rec = None
+            sig.append("vg_count=0")
+
+        # Appearance (placeholder surface; legacy keeps minimal)
+        # This can be expanded later with stable primitives as available.
+        try:
+            include_app = int(BuiltInParameter.VIS_GRAPHICS_APPEARANCE) in tpl_bips
+        except:
+            include_app = False
+        sig.append("appearance_included={}".format(int(bool(include_app))))
 
         # View Filters (reference global view_filters domain)
         # IMPORTANT: Filter order matters (filter stack is order-sensitive)
+        filter_hashes = []
+        filter_hashes_v2 = []
         if not is_schedule:
             try:
                 filter_ids = list(v.GetFilters())
                 if filter_ids:
                     filter_hashes = []
+                    filter_hashes_v2 = []
                     for i, fid in enumerate(filter_ids):
                         try:
                             f_elem = doc.GetElement(fid)
                             f_uid = canon_str(getattr(f_elem, "UniqueId", None)) if f_elem else None
                             f_hash = filter_map.get(f_uid, "<NotInGlobalDomain>") if f_uid else "<None>"
+                            f_hash_v2 = None
+                            if v2_ok:
+                                try:
+                                    f_hash_v2 = filter_map_v2.get(f_uid) if f_uid else None
+                                except:
+                                    f_hash_v2 = None
+                                if not f_hash_v2:
+                                    _v2_block("filter_unresolved")
+                                    v2_ok = False
 
                             try:
                                 visibility = v.GetFilterVisibility(fid)
@@ -534,60 +582,66 @@ def extract(doc, ctx=None):
 
                             idx = "{:03d}".format(i)
                             filter_hashes.append("filter[{}]={}|vis={}".format(idx, f_hash, vis_str))
+                            if v2_ok:
+                                filter_hashes_v2.append("filter[{}]={}|vis={}".format(idx, f_hash_v2, vis_str))
                         except:
-                            idx = "{:03d}".format(i)
-                            filter_hashes.append("filter[{}]=<Unreadable>".format(idx))
-
-                    sig.append("filter_count={}".format(len(filter_ids)))
-                    sig.extend(filter_hashes)  # Order preserved
-                else:
-                    sig.append("filter_count=0")
+                            info["debug_fail_read"] += 1
+                            continue
             except:
-                sig.append("filters=<Unreadable>")
+                info["debug_fail_read"] += 1
 
-        if not is_schedule:
-            # Display settings (visual style, graphic display options)
-            try:
-                display_style = safe_str(v.DisplayStyle)
-                sig.append("display_style={}".format(sig_val(display_style)))
-            except:
-                sig.append("display_style=<None>")
+        if filter_hashes:
+            # Preserve order; do not sort
+            sig.append("filter_count={}".format(sig_val(len(filter_hashes))))
+            sig.extend(filter_hashes)
+        else:
+            sig.append("filter_count=0")
 
-        # Sort non-filter settings (filters already added in order)
-        filter_entries = [s for s in sig if s.startswith("filter[") or s.startswith("filter_count=") or s.startswith("filters=")]
-        other_entries = [s for s in sig if s not in filter_entries]
+        # Finalize signature
+        # Split: stable entries + filter entries (order-sensitive)
+        other_entries = [s for s in sig if not s.startswith("filter[")]
+        filter_entries = [s for s in sig if s.startswith("filter[")]
 
         other_entries_sorted = sorted(other_entries)
         sig_final = other_entries_sorted + filter_entries
 
         def_hash = make_hash(sig_final)
 
+        # v2 finalize (non-schedule)
+        if v2_ok:
+            try:
+                sig_v2.extend([s for s in sig_final if not s.startswith("name=")])
+                if filter_hashes_v2:
+                    sig_v2 = [s for s in sig_v2 if not s.startswith("filter[")]
+                    sig_v2.extend(filter_hashes_v2)
+                sig_v2_final = sorted(set(sig_v2))
+                def_hash_v2 = make_hash(sig_v2_final)
+                per_hashes_v2.append(def_hash_v2)
+            except:
+                _v2_block("template_finalize_failed")
+                v2_ok = False
+
         rec = {
             "id": safe_str(v.Id.IntegerValue),
             "uid": uid or "",
-            "name": name,  # metadata only
-            "view_type": None,  # populated below
+            "name": name,
+            "view_type": safe_str(v.ViewType),
             "def_hash": def_hash,
-            "def_signature": sig_final
+            "def_signature": sig_final,
         }
 
-        try:
-            rec["view_type"] = safe_str(v.ViewType)
-        except:
-            pass
-            
-        # Optional VG detail dump (metadata only; not in hash surface)
-        try:
-            if debug_vg_details and _vg_records_for_rec:
-                rec["vg_records"] = list(_vg_records_for_rec)
-        except:
-            pass
+        # Optional VG debug
+        if debug_vg_details:
+            try:
+                rec["vg_debug"] = _vg_records_for_rec
+            except:
+                pass
 
         records.append(rec)
         per_hashes.append(def_hash)
         info["debug_kept"] += 1
 
-    # metadata-only
+    # Finalize
     info["names"] = sorted(set(names))
 
     # IMPORTANT: count should represent templates captured, not unique names
@@ -596,6 +650,12 @@ def extract(doc, ctx=None):
     info["records"] = sorted(records, key=lambda r: (r.get("name", ""), r.get("id", "")))
     info["signature_hashes"] = sorted(per_hashes)
     info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
+
+    info["signature_hashes_v2"] = sorted(per_hashes_v2)
+    if v2_any_blocked:
+        info["hash_v2"] = None
+    else:
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"]) if info["signature_hashes_v2"] else None
 
     info["record_rows"] = []
     try:
