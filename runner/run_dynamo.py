@@ -36,12 +36,21 @@ from domains import view_templates
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
 ENABLED_DOMAINS = None  # None = all domains
+HASH_MODE = os.getenv("REVIT_FINGERPRINT_HASH_MODE", "legacy").strip().lower()
+if HASH_MODE not in ("legacy", "semantic"):
+    HASH_MODE = "legacy"
 
 def _new_domain_envelope(domain_name):
     return {
         "status": None,        # ok | blocked | unsupported | error
         "capability": {},      # api reachability / environment notes
+
+        # Runner-selected semantic (default legacy)
         "semantic": {"hash": None},
+
+        # Future contract semantic (domain patches will populate)
+        "semantic_v2": {"hash": None},
+
         "quality": {},
         "debug": {},
         "_notes": [],
@@ -84,7 +93,13 @@ def _domain_run(domain_name, fn, doc, ctx, runner_notes):
         legacy = fn(doc, ctx)
         env["status"] = "ok"
         env["capability"] = {"api_reachable": True}
-        env["semantic"]["hash"] = _extract_legacy_hash(legacy)
+        legacy_hash = _extract_legacy_hash(legacy)
+        env["semantic"]["hash"] = legacy_hash
+        env["semantic_v2"]["hash"] = None  # populated by future domain patches
+
+        if HASH_MODE == "semantic":
+            env["semantic"]["hash"] = env["semantic_v2"]["hash"]
+
         env["quality"] = _extract_legacy_quality(legacy)
         return legacy, env
     except Exception as e:
@@ -237,6 +252,7 @@ def run_fingerprint(doc):
 
     elapsed_seconds = round(time.time() - start_ts, 3)
     fingerprint["_elapsed_seconds"] = elapsed_seconds
+    fingerprint["_hash_mode"] = HASH_MODE
 
     # Additive contract surfaces
     fingerprint["_domains"] = domains_v2
