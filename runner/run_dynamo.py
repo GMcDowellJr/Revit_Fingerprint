@@ -250,7 +250,7 @@ try:
     doc = get_doc()
     fingerprint = run_fingerprint(doc)
 
-        domains_emitted = sorted([k for k in fingerprint.keys() if k not in ("_domains", "_notes")])
+    domains_emitted = sorted([k for k in fingerprint.keys() if k not in ("_domains", "_notes")])
 
     if ENABLED_DOMAINS is None:
         domains_requested = "ALL"
