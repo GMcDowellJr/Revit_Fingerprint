@@ -158,14 +158,15 @@ def extract(doc, ctx=None):
         else:
             if set(["length", "area", "volume"]).issubset(read_labels):
                 # deterministic: preserve fixed spec order (no sorting needed)
-                result["hash_v2"] = make_hash(v2_records) if v2_records else None
-                result["debug_v2_blocked"] = False
-                result["debug_v2_block_reasons"] = {}
-            else:
-                result["hash_v2"] = None
-                result["debug_v2_blocked"] = True
-                reasons = dict(v2_reasons)
-                reasons["missing_required_specs"] = True
-                result["debug_v2_block_reasons"] = reasons
+                if not v2_records:
+                    result["hash_v2"] = None
+                    result["debug_v2_blocked"] = True
+                    reasons = dict(v2_reasons)
+                    reasons["no_v2_records"] = True
+                    result["debug_v2_block_reasons"] = reasons
+                else:
+                    result["hash_v2"] = make_hash(v2_records)
+                    result["debug_v2_blocked"] = False
+                    result["debug_v2_block_reasons"] = {}
 
     return result
