@@ -56,8 +56,14 @@ def extract(doc, ctx=None):
         "records": [],
         "signature_hashes": [],
         "raw_count": 0,
-        "debug_missing_name": 0
+        "debug_missing_name": 0,
+
+        # v2 (contract semantic hash) — additive only; legacy behavior unchanged
+        "hash_v2": None,
+        "debug_v2_blocked": False,
+        "debug_v2_block_reasons": {},
     }
+
 
     types = list(FilteredElementCollector(doc).OfClass(DimensionType))
     info["raw_count"] = len(types)
@@ -66,6 +72,18 @@ def extract(doc, ctx=None):
     missing = 0
     records = []
     sig_hashes = []
+
+    # v2 build state (domain-level block; no partial coverage semantics)
+    v2_records = []
+    v2_blocked = False
+    v2_reasons = {}
+
+    def _v2_block(reason_key):
+        nonlocal v2_blocked
+        if not v2_blocked:
+            v2_blocked = True
+        v2_reasons[reason_key] = True
+
 
     for d in types:
         type_name = get_type_display_name(d)
@@ -129,6 +147,46 @@ def extract(doc, ctx=None):
 
         sig_hash = make_hash(signature_tuple)
 
+
+        # ---------------------------
+        # v2 signature (contract semantic hash)
+        # ---------------------------
+        # Exception (explicit): dimension type name is part of identity/definition in this domain.
+        # Policy: tick mark is represented by its display name (no ids/guids).
+        if not v2_blocked:
+            if not type_name or safe_str(type_name) in ["", "<None>", "<Unreadable>"]:
+                _v2_block("unreadable_type_name")
+
+            if not text_font:
+                _v2_block("unreadable_text_font")
+
+            if text_size_ft is None:
+                _v2_block("unreadable_text_size")
+
+            if lw is None:
+                _v2_block("unreadable_line_weight")
+
+            # color must be readable; use RGB in v2 (avoid element ids / GUIDs)
+            if (color_rgb is None) or (safe_str(color_rgb) in ["", "<None>", "<Unreadable>"]):
+                _v2_block("unreadable_color_rgb")
+
+            if not tick_name:
+                _v2_block("unreadable_tick_mark_name")
+
+            if witness is None:
+                _v2_block("unreadable_witness_line_control")
+
+            if not v2_blocked:
+                v2_records.append("|".join([
+                    "name={}".format(safe_str(type_name)),
+                    "text_font={}".format(safe_str(text_font)),
+                    "text_size_in={}".format(safe_str(text_size_in)),
+                    "line_weight={}".format(safe_str(lw)),
+                    "color_rgb={}".format(safe_str(color_rgb)),
+                    "tick_mark={}".format(safe_str(tick_name)),
+                    "witness_ctrl={}".format(safe_str(witness)),
+                ]))
+
         rec = {
             "type_id": safe_str(d.Id.IntegerValue),
             "type_uid": getattr(d, "UniqueId", "") or "",
@@ -173,5 +231,13 @@ def extract(doc, ctx=None):
         } for r in recs]
     except:
         info["record_rows"] = []
+
+    # v2 hash (domain-level block; no partial coverage semantics)
+    info["debug_v2_blocked"] = bool(v2_blocked)
+    info["debug_v2_block_reasons"] = v2_reasons if v2_blocked else {}
+    if (not v2_blocked) and v2_records:
+        info["hash_v2"] = make_hash(sorted(v2_records))
+    else:
+        info["hash_v2"] = None
 
     return info
