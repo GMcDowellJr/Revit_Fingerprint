@@ -65,15 +65,19 @@ def extract(doc, ctx=None):
     }
 
     # Output controls (default preserve legacy payload)
-    emit_records = False
+    # Defaults are conservative: do NOT emit heavy payloads, and do NOT include CAD-layer categories,
+    # unless explicitly enabled via ctx keys.
+    emit_records = True
     include_cad_layer_categories = False
     try:
         if ctx is not None:
-            emit_records = bool(ctx.get("emit_records", True))
-            include_cad_layer_categories = bool(ctx.get("include_cad_layer_categories", True))
+            emit_records = bool(ctx.get("emit_records", emit_records))
+            include_cad_layer_categories = bool(
+                ctx.get("include_cad_layer_categories", include_cad_layer_categories)
+            )
     except:
-        emit_records = True
-        include_cad_layer_categories = True
+        # Keep defaults on any ctx read errors
+        pass
 
     row_pairs = []
 
