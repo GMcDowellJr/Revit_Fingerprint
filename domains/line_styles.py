@@ -221,6 +221,12 @@ def extract(doc, ctx=None):
     if (not v2_blocked) and v2_records:
         info["hash_v2"] = make_hash(sorted(v2_records))
     else:
+        # If v2 wasn't explicitly blocked but we produced no v2 records, make the null explainable.
+        if (not v2_blocked) and (not v2_records):
+            v2_blocked = True
+            v2_reasons["no_v2_records"] = True
+            info["debug_v2_blocked"] = True
+            info["debug_v2_block_reasons"] = v2_reasons
         info["hash_v2"] = None
 
     return info

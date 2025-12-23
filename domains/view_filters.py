@@ -268,35 +268,11 @@ def _rule_token_v2(rule, doc):
         return None, False, "param_none"
 
     if pid_int >= 0:
-        # Positive param ids: allow ONLY when resolvable to a Shared Parameter GUID.
-        # This avoids hashing unstable per-project ids while still supporting shared params.
-        try:
-            pe = doc.GetElement(pid) if (doc is not None and pid is not None) else None
-        except Exception:
-            pe = None
-
-        guid_val = None
-        if pe is not None:
-            # Revit API commonly exposes GuidValue on SharedParameterElement
-            try:
-                if hasattr(pe, "GuidValue"):
-                    guid_val = pe.GuidValue
-            except Exception:
-                guid_val = None
-
-        if not guid_val:
-            return None, False, "param_positive_id"
-
-        try:
-            guid_s = safe_str(guid_val).strip().lower()
-        except Exception:
-            return None, False, "param_guid_unreadable"
-
-        if not guid_s:
-            return None, False, "param_guid_empty"
-
-        parts.append("param_guid={}".format(guid_s))
+        # Contract: no guids/unstable ids in semantic surfaces.
+        # Positive parameter ids are unstable across projects; block v2.
+        return None, False, "param_positive_id"
     else:
+        # Negative ids represent BuiltInParameter-style identifiers (stable enum surface).
         parts.append("param_id={}".format(pid_int))
 
     # Evaluator/operator identity (API type name; not user-editable)
