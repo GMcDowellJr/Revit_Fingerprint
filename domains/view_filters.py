@@ -613,7 +613,7 @@ def extract(doc, ctx=None):
     # Populate context for downstream domains (views, templates)
     if ctx is not None:
         ctx["filter_uid_to_hash"] = uid_to_hash
-        ctx["filter_uid_to_hash_v2"] = uid_to_hash_v2
+        # NOTE: filter_uid_to_hash_v2 is populated after domain-level v2 outcome is known.
 
     info["names"] = sorted(set(names))
     info["count"] = len(info["names"])
@@ -625,6 +625,11 @@ def extract(doc, ctx=None):
         info["hash_v2"] = None
     else:
         info["hash_v2"] = make_hash(info["signature_hashes_v2"]) if info["signature_hashes_v2"] else None
+        
+    # Only publish v2 mapping when the DOMAIN v2 hash is valid.
+    # Contract: no partial v2 coverage; downstream must block if view_filters v2 is blocked.
+    if ctx is not None:
+        ctx["filter_uid_to_hash_v2"] = uid_to_hash_v2 if info["hash_v2"] is not None else {}
 
     info["record_rows"] = []
     try:
