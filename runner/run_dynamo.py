@@ -65,8 +65,15 @@ def _extract_v2_hash(payload):
     Best-effort extraction of the contract semantic hash (v2) without changing legacy behavior.
     """
     try:
-        if isinstance(payload, dict) and "hash_v2" in payload:
-            return payload.get("hash_v2", None)
+        if isinstance(payload, dict):
+            # Primary: current domain contract surface
+            if "hash_v2" in payload:
+                return payload.get("hash_v2", None)
+
+            # Fallback: future/alternate nesting (do not require domains to emit this)
+            sv2 = payload.get("semantic_v2", None)
+            if isinstance(sv2, dict) and "hash" in sv2:
+                return sv2.get("hash", None)
     except:
         pass
     return None
@@ -108,6 +115,20 @@ def _domain_run(domain_name, fn, doc, ctx, runner_notes):
         legacy_hash = _extract_legacy_hash(legacy)
         env["semantic"]["hash"] = legacy_hash
         env["semantic_v2"]["hash"] = _extract_v2_hash(legacy)
+        
+        # If v2 is null, try to surface explicit domain-level block reasons (if provided)
+        try:
+            if env["semantic_v2"]["hash"] is None and isinstance(legacy, dict):
+                blocked = legacy.get("debug_v2_blocked", None)
+                reasons = legacy.get("debug_v2_block_reasons", None)
+
+                if blocked is True:
+                    if isinstance(reasons, list) and reasons:
+                        env["_notes"].append("semantic_v2 blocked: " + ", ".join([str(r) for r in reasons]))
+                    else:
+                        env["_notes"].append("semantic_v2 blocked (no reasons provided).")
+        except:
+            pass
 
         if HASH_MODE == "semantic":
             env["semantic"]["hash"] = env["semantic_v2"]["hash"]
