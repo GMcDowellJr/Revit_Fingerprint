@@ -54,6 +54,11 @@ def extract(doc, ctx=None):
         "signature_hashes": [],
         "hash": None,
 
+        # v2 (contract semantic hash) — additive only; legacy behavior unchanged
+        "hash_v2": None,
+        "debug_v2_blocked": False,
+        "debug_v2_block_reasons": {},
+
         # debug counters
         "debug_missing_name": 0,
         "debug_missing_uid": 0,
@@ -76,12 +81,26 @@ def extract(doc, ctx=None):
     records = []
     per_hashes = []
     uid_to_hash = {}  # For context population
+    
+    # v2 build state (domain-level block; no partial coverage semantics)
+    per_hashes_v2 = []
+    v2_blocked = False
+    v2_reasons = {}
+
+    def _v2_block(reason_key):
+        nonlocal v2_blocked
+        if not v2_blocked:
+            v2_blocked = True
+        v2_reasons[reason_key] = True
 
     for i, p in enumerate(col):
         name = canon_str(getattr(p, "Name", None))
         if not name:
             info["debug_missing_name"] += 1
+            # legacy behavior unchanged
             name = "<unnamed>"
+            # v2 contract: no sentinel hashing; block domain v2
+            _v2_block("missing_name")
         names.append(name)
 
         try:
@@ -101,6 +120,14 @@ def extract(doc, ctx=None):
             "seq={}".format(sig_val(seq)),
             "name={}".format(sig_val(name))
         ]
+
+        # v2 signature: exclude element ids/UniqueIds; keep only semantic fields
+        sig_v2 = [
+            "seq={}".format(sig_val(seq)),
+            "name={}".format(sig_val(name)),
+        ]
+        def_hash_v2 = make_hash(sig_v2)
+        per_hashes_v2.append(def_hash_v2)
 
         def_hash = make_hash(sig)
 
@@ -128,6 +155,16 @@ def extract(doc, ctx=None):
     info["records"] = records
     info["signature_hashes"] = per_hashes
     info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
+
+    # v2 finalize (domain-level block; no partial coverage)
+    if v2_blocked:
+        info["hash_v2"] = None
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = v2_reasons
+    else:
+        info["hash_v2"] = make_hash(per_hashes_v2) if per_hashes_v2 else None
+        info["debug_v2_blocked"] = False
+        info["debug_v2_block_reasons"] = {}
 
     info["record_rows"] = []
     try:
