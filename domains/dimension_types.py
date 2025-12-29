@@ -28,6 +28,81 @@ from rows import (
     get_type_display_name, get_element_display_name
 )
 
+# --- v2 helpers: Units / Alternate Units FormatOptions ---
+
+def _fmt_in_from_ft(ft, places=6):
+    if ft is None:
+        return None
+    try:
+        inches = float(ft) * 12.0
+        return format(inches, ".{}f".format(int(places)))
+    except:
+        return None
+
+def _fmt_float(x, places=12):
+    if x is None:
+        return None
+    try:
+        return format(float(x), ".{}g".format(int(places)))
+    except:
+        return None
+
+def _fmt_in_from_ft(ft, places=6):
+    if ft is None:
+        return None
+    try:
+        inches = float(ft) * 12.0
+        return format(inches, ".{}f".format(int(places)))
+    except:
+        return None
+
+def _format_options_to_kv(fo):
+    """
+    Serialize Autodesk.Revit.DB.FormatOptions to a stable, hashable dict.
+    Only include semantically relevant fields; stringify enums.
+    """
+    if fo is None:
+        return None
+
+    out = {}
+    try:
+        out["use_default"] = bool(getattr(fo, "UseDefault", False))
+    except:
+        out["use_default"] = False
+
+    # If using project default, do NOT serialize overrides
+    if out["use_default"]:
+        return out
+
+    keys = [
+        "Accuracy",
+        "RoundingMethod",
+        "UseDigitGrouping",
+        "SuppressLeadingZeros",
+        "SuppressTrailingZeros",
+        "SuppressSpaces",
+        "SuppressZeroFeet",
+        "SuppressZeroInches",
+        "UsePlusPrefix",
+    ]
+
+    for k in keys:
+        try:
+            if not hasattr(fo, k):
+                continue
+
+            v = getattr(fo, k)
+
+            if k == "Accuracy":
+                out["accuracy_in"] = _fmt_in_from_ft(v)
+            else:
+                out[k.lower()] = safe_str(v)
+
+        except:
+            continue
+
+    return out
+
 try:
     from Autodesk.Revit.DB import FilteredElementCollector, DimensionType
 except ImportError:
@@ -134,6 +209,73 @@ def extract(doc, ctx=None):
         witness = _as_string(first_param(d, ui_names=["Witness Line Control"]))
         witness = canon_str(witness)
 
+        # --- additional likely-visible parameters (optional; will be <None> if absent) ---
+        def _p(ui_name):
+            return first_param(d, ui_names=[ui_name])
+
+        # Text formatting / placement
+        text_bg = canon_str(_as_string(_p("Text Background")))
+        width_factor = _as_double(_p("Width Factor"))
+        text_offset = _as_double(_p("Text Offset"))
+
+        bold = _as_int(_p("Bold"))
+        italic = _as_int(_p("Italic"))
+        underline = _as_int(_p("Underline"))
+        suppress_spaces = _as_int(_p("Suppress Spaces"))
+        read_conv = canon_str(_as_string(_p("Read Convention")))
+
+        # Leaders (dims + spots vary; optional)
+        leader_type = canon_str(_as_string(_p("Leader Type")))
+        show_leader_when_text_moves = _as_int(_p("Show Leader When Text Moves"))
+        leader_tick_mark = canon_str(_as_string(_p("Leader Tick Mark")))
+
+        # Tick / line weights
+        tick_lw = _as_int(_p("Tick Mark Line Weight"))
+
+        # Common dim line + witness line settings (mostly linear/angular; optional)
+        dim_line_ext = _as_double(_p("Dimension Line Extension"))
+        flipped_dim_line_ext = _as_double(_p("Flipped Dimension Line Extension"))
+        snap_dist = _as_double(_p("Dimension Line Snap Distance"))
+
+        witness_ext = _as_double(_p("Witness Line Extension"))
+        witness_gap = _as_double(_p("Witness Line Gap to Element"))
+        witness_len = _as_double(_p("Witness Line Length"))
+
+        # Center marks (radial/diameter; optional)
+        center_marks = _as_int(_p("Center Marks"))
+        center_mark_size = _as_double(_p("Center Mark Size"))
+
+        # Units formatting via FormatOptions (NOT parameters)
+        units_fmt = None
+        alt_units_fmt = None
+        try:
+            fo = d.GetUnitsFormatOptions()
+            units_fmt = fo  # keep raw; stringify below
+        except:
+            units_fmt = None
+
+        try:
+            afo = d.GetAlternateUnitsFormatOptions()
+            alt_units_fmt = afo
+        except:
+            alt_units_fmt = None
+
+        # --- Units formatting (v2 only; NOT parameters) ---
+        units_fmt = None
+        alt_units_fmt = None
+
+        try:
+            fo = d.GetUnitsFormatOptions()
+            units_fmt = _format_options_to_kv(fo)
+        except:
+            units_fmt = None
+
+        try:
+            afo = d.GetAlternateUnitsFormatOptions()
+            alt_units_fmt = _format_options_to_kv(afo)
+        except:
+            alt_units_fmt = None
+
         tick_name = canon_str(tick_name)
 
         signature_tuple = [
@@ -143,6 +285,37 @@ def extract(doc, ctx=None):
             "color_int={}".format(sig_val(color_int)),
             "tick_mark={}".format(sig_val(tick_name)),
             "witness_ctrl={}".format(sig_val(witness)),
+
+            # expanded signature (optional fields)
+            "text_bg={}".format(sig_val(text_bg)),
+            "width_factor={}".format(sig_val(width_factor)),
+            "text_offset_in={}".format(sig_val(_fmt_in_from_ft(text_offset))),
+            "bold={}".format(sig_val(bold)),
+            "italic={}".format(sig_val(italic)),
+            "underline={}".format(sig_val(underline)),
+            "suppress_spaces={}".format(sig_val(suppress_spaces)),
+            "read_convention={}".format(sig_val(read_conv)),
+
+            "leader_type={}".format(sig_val(leader_type)),
+            "show_leader_when_text_moves={}".format(sig_val(show_leader_when_text_moves)),
+            "leader_tick_mark={}".format(sig_val(leader_tick_mark)),
+
+            "tick_mark_line_weight={}".format(sig_val(tick_lw)),
+
+            "dim_line_ext_in={}".format(sig_val(_fmt_in_from_ft(dim_line_ext))),
+            "flipped_dim_line_ext_in={}".format(sig_val(_fmt_in_from_ft(flipped_dim_line_ext))),
+            "snap_dist_in={}".format(sig_val(_fmt_in_from_ft(snap_dist))),
+
+            "witness_ext_in={}".format(sig_val(_fmt_in_from_ft(witness_ext))),
+            "witness_gap_in={}".format(sig_val(_fmt_in_from_ft(witness_gap))),
+            "witness_len_in={}".format(sig_val(_fmt_in_from_ft(witness_len))),
+
+            "center_marks={}".format(sig_val(center_marks)),
+            "center_mark_size_in={}".format(sig_val(_fmt_in_from_ft(center_mark_size))),
+
+            # FormatOptions stringify (captures UseDefault + overrides without pretending it's a Parameter)
+            "units_fmt={}".format(sig_val(safe_str(units_fmt) if units_fmt is not None else None)),
+            "alt_units_fmt={}".format(sig_val(safe_str(alt_units_fmt) if alt_units_fmt is not None else None)),
         ]
 
         sig_hash = make_hash(signature_tuple)
@@ -163,19 +336,18 @@ def extract(doc, ctx=None):
             if text_size_ft is None:
                 _v2_block("unreadable_text_size")
 
-            if lw is None:
-                _v2_block("unreadable_line_weight")
+            #if lw is None:
+            #    _v2_block("unreadable_line_weight")
 
             # color must be readable; use RGB in v2 (avoid element ids / GUIDs)
             if (color_rgb is None) or (safe_str(color_rgb) in ["", "<None>", "<Unreadable>"]):
                 _v2_block("unreadable_color_rgb")
 
-            if not tick_name:
-                _v2_block("unreadable_tick_mark_name")
+            #if not tick_name:
+            #    _v2_block("unreadable_tick_mark_name")
 
-            if witness is None:
-                _v2_block("unreadable_witness_line_control")
-
+            # witness_line_control is not reliably readable across dimension families;
+            # do not block v2 on it, and do not include it in the v2 record.
             if not v2_blocked:
                 v2_records.append("|".join([
                     "name={}".format(safe_str(type_name)),
@@ -184,13 +356,16 @@ def extract(doc, ctx=None):
                     "line_weight={}".format(safe_str(lw)),
                     "color_rgb={}".format(safe_str(color_rgb)),
                     "tick_mark={}".format(safe_str(tick_name)),
-                    "witness_ctrl={}".format(safe_str(witness)),
                 ]))
 
         rec = {
             "type_id": safe_str(d.Id.IntegerValue),
             "type_uid": getattr(d, "UniqueId", "") or "",
             "type_name": type_name,
+            
+            # v2-only metadata (not part of legacy signature)
+            "units_format_options": units_fmt,
+            "alternate_units_format_options": alt_units_fmt,
 
             "text_font": text_font,
             "text_size_ft": text_size_ft,
