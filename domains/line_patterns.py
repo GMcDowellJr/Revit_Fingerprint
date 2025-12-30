@@ -30,6 +30,45 @@ except ImportError:
 # Global debug flag (will be configurable via runner later)
 DEBUG_INCLUDE_LINEPATTERN_SIGNATURES = True
 
+# Canonical, locked mapping observed in Dynamo output:
+# 0 = Dash, 1 = Space, 2 = Dot
+_LP_SEG_TYPE_NAME = {0: "Dash", 1: "Space", 2: "Dot"}
+
+def _lp_seg_type_id_and_name(seg):
+    """
+    Robustly read a line pattern segment type across API surfaces.
+
+    Preferred property in your Dynamo environment: LinePatternSegment.Type
+    Fallback (some older/other surfaces): SegmentType
+
+    Returns: (type_id:int|None, type_name:str|None)
+    """
+    st = None
+    # Preferred: .Type
+    try:
+        if hasattr(seg, "Type"):
+            st = getattr(seg, "Type", None)
+    except Exception:
+        st = None
+
+    # Fallback: .SegmentType
+    if st is None:
+        try:
+            if hasattr(seg, "SegmentType"):
+                st = getattr(seg, "SegmentType", None)
+        except Exception:
+            st = None
+
+    if st is None:
+        return None, None
+
+    try:
+        st_id = int(st)
+    except Exception:
+        return None, None
+
+    return st_id, _LP_SEG_TYPE_NAME.get(st_id, "Unknown")
+
 def extract(doc, ctx=None):
     """
     Extract Line Patterns fingerprint from document.
@@ -172,27 +211,19 @@ def extract(doc, ctx=None):
                 sig.append("seg_count={}".format(sig_val(len(segs))))
                 for idx, s in enumerate(segs):
                     try:
-                        # segment type
-                        stype_out = "<None>"
-                        try:
-                            st = getattr(s, "SegmentType", None)
-                            if st is None:
-                                stype_out = "<None>"
-                            else:
-                                try:
-                                    stype_out = safe_str(int(st))
-                                except:
-                                    stype_out = safe_str(int(st))
-                        except:
-                            stype_out = "<None>"
+                        st_id, st_name = _lp_seg_type_id_and_name(s)
 
-                        # length
                         try:
                             slen = getattr(s, "Length", None)
-                        except:
+                        except Exception:
                             slen = None
 
-                        sig.append("seg[{}].type={}".format(idx, sig_val(stype_out)))
+                        # Dot normalization (observed: dots are always 0.0 length)
+                        if st_id == 2:
+                            slen = 0.0
+
+                        sig.append("seg[{}].type_id={}".format(idx, sig_val(st_id if st_id is not None else "<None>")))
+                        sig.append("seg[{}].type={}".format(idx, sig_val(st_name if st_name is not None else "<None>")))
                         sig.append("seg[{}].len={}".format(idx, sig_val(fnum(slen, 9))))
                     except:
                         info["debug_fail_segment_read"] += 1
@@ -215,7 +246,11 @@ def extract(doc, ctx=None):
             v2_reason = "get_line_pattern_failed"
         else:
             try:
-                segs_v2 = list(getattr(lp, "Segments", None) or [])
+                # Match legacy acquisition: prefer GetSegments() when available
+                if hasattr(lp, "GetSegments"):
+                    segs_v2 = list(lp.GetSegments() or [])
+                else:
+                    segs_v2 = list(getattr(lp, "Segments", None) or [])
             except Exception:
                 v2_ok = False
                 v2_reason = "segments_unreadable"
@@ -224,24 +259,11 @@ def extract(doc, ctx=None):
             if v2_ok:
                 sig_v2.append("seg_count={}".format(sig_val(len(segs_v2))))
                 for idx, s in enumerate(segs_v2):
-                    # SegmentType must be readable as an int enum id
-                    try:
-                        st = getattr(s, "SegmentType", None)
-                    except Exception:
+                    # Segment type must be readable as an int enum id
+                    st_id, _st_name = _lp_seg_type_id_and_name(s)
+                    if st_id is None:
                         v2_ok = False
                         v2_reason = "segment_type_unreadable"
-                        break
-
-                    if st is None:
-                        v2_ok = False
-                        v2_reason = "segment_type_none"
-                        break
-
-                    try:
-                        st_id = int(st)
-                    except Exception:
-                        v2_ok = False
-                        v2_reason = "segment_type_not_int"
                         break
 
                     # Length must be readable as float
@@ -264,8 +286,13 @@ def extract(doc, ctx=None):
                         v2_reason = "segment_length_not_float"
                         break
 
+                    # Dot normalization (observed: dots are always 0.0 length)
+                    if st_id == 2:
+                        slen_f = 0.0
+
                     sig_v2.append("seg[{}].type_id={}".format(idx, sig_val(st_id)))
                     sig_v2.append("seg[{}].len={}".format(idx, sig_val(fnum(slen_f, 9))))
+
 
         def_hash_v2 = None
         if v2_ok:
