@@ -42,6 +42,8 @@ def extract(doc, ctx=None):
         Dictionary with count, hash, signature_hashes, records,
         record_rows, and debug counters
     """
+    import traceback
+
     info = {
         "count": 0,
         "raw_count": 0,
@@ -106,23 +108,30 @@ def extract(doc, ctx=None):
 
         lp = None
         try:
-            # Use static overload to avoid pythonnet/IronPython method-binding issues
-            lp = LinePatternElement.GetLinePattern(doc, e.Id)
-        except Exception as ex:
-            info["debug_fail_getpattern"] += 1
-
-            t = ex.__class__.__name__
-            info["debug_getpattern_ex_types"][t] = info["debug_getpattern_ex_types"].get(t, 0) + 1
-
-            if len(info["debug_getpattern_ex_samples"]) < 5:
-                info["debug_getpattern_ex_samples"].append({
-                    "name": name,
-                    "id": safe_str(e.Id.IntegerValue),
-                    "uid": uid,
-                    "ex_type": t,
-                    "ex_msg": safe_str(str(ex)),
-                })
+            # Prefer instance method (most reliable under CPython/pythonnet)
+            lp = e.GetLinePattern()
+        except Exception:
             lp = None
+
+        if lp is None:
+            try:
+                # Fallback: some API surfaces expose a static helper
+                lp = LinePatternElement.GetLinePattern(doc, e.Id)
+            except Exception as ex:
+                info["debug_fail_getpattern"] += 1
+
+                t = ex.__class__.__name__
+                info["debug_getpattern_ex_types"][t] = info["debug_getpattern_ex_types"].get(t, 0) + 1
+
+                if len(info["debug_getpattern_ex_samples"]) < 5:
+                    info["debug_getpattern_ex_samples"].append({
+                        "name": name,
+                        "id": safe_str(e.Id.IntegerValue),
+                        "uid": uid,
+                        "ex_type": t,
+                        "ex_msg": safe_str(str(ex)),
+                    })
+                lp = None
 
         # -------------------------
         # Legacy signature (UNCHANGED behavior)
@@ -136,7 +145,11 @@ def extract(doc, ctx=None):
         else:
             segs = None
             try:
-                segs = list(getattr(lp, "Segments", None) or [])
+                # Revit API commonly exposes segments via GetSegments()
+                if hasattr(lp, "GetSegments"):
+                    segs = list(lp.GetSegments() or [])
+                else:
+                    segs = list(getattr(lp, "Segments", None) or [])
             except Exception as ex:
                 info["debug_fail_segment_read"] += 1
 
