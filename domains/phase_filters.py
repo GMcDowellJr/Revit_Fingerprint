@@ -25,7 +25,7 @@ from core.canon import canon_str, sig_val
 
 try:
     from Autodesk.Revit.DB import FilteredElementCollector, PhaseFilter, ElementOnPhaseStatus
-except:
+except Exception as e:
     FilteredElementCollector = None
     PhaseFilter = None
     ElementOnPhaseStatus = None
@@ -65,7 +65,7 @@ def extract(doc, ctx=None):
 
     try:
         col = list(FilteredElementCollector(doc).OfClass(PhaseFilter))
-    except:
+    except Exception as e:
         return info
 
     info["raw_count"] = len(col)
@@ -87,7 +87,7 @@ def extract(doc, ctx=None):
                 ("Demolished", ElementOnPhaseStatus.Demolished),
                 ("Temporary", ElementOnPhaseStatus.Temporary),
             ]
-        except:
+        except Exception as e:
             pass
 
     for pf in col:
@@ -101,7 +101,7 @@ def extract(doc, ctx=None):
         uid = None
         try:
             uid = canon_str(getattr(pf, "UniqueId", None))
-        except:
+        except Exception as e:
             uid = None
 
         # Build v2 (contract semantic) signature in parallel (no names; block on unreadables)
@@ -118,7 +118,7 @@ def extract(doc, ctx=None):
             try:
                 pres = pf.GetPhaseStatusPresentation(status_enum)
                 sig.append("{}|presentation={}".format(status_name, sig_val(str(pres))))
-            except:
+            except Exception as e:
                 info["debug_fail_read"] += 1
                 sig.append("{}|presentation={}".format(status_name, sig_val(int(pres))))
 
@@ -144,7 +144,7 @@ def extract(doc, ctx=None):
             info["debug_v2_blocked"] += 1
             try:
                 info["debug_v2_block_reasons"][v2_reason] = info["debug_v2_block_reasons"].get(v2_reason, 0) + 1
-            except:
+            except Exception as e:
                 pass
 
         rec = {
@@ -187,7 +187,7 @@ def extract(doc, ctx=None):
             "sig_hash":   safe_str(r.get("def_hash", "")),
             "name":       safe_str(r.get("name", "")),
         } for r in recs]
-    except:
+    except Exception as e:
         info["record_rows"] = []
 
     return info

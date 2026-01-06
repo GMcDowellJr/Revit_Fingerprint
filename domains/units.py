@@ -54,7 +54,7 @@ def extract(doc, ctx=None):
 
     try:
         u = doc.GetUnits()
-    except:
+    except Exception as e:
         return result
 
     result["repr"] = safe_str(u)
@@ -78,7 +78,7 @@ def extract(doc, ctx=None):
             import re
             s = safe_str(s)
             return re.search(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", s) is not None
-        except:
+        except Exception as e:
             return False
 
     if SpecTypeId is None:
@@ -100,7 +100,7 @@ def extract(doc, ctx=None):
     for label, spec_id in specs:
         try:
             fmt = u.GetFormatOptions(spec_id)
-        except:
+        except Exception as e:
             # legacy behavior: continue partial
             # v2 contract: blocks if any required spec is unreadable
             if label in required_labels:
@@ -112,17 +112,17 @@ def extract(doc, ctx=None):
 
         try:
             unit_id   = safe_str(fmt.GetUnitTypeId())
-        except:
+        except Exception as e:
             unit_id   = "<no-unit>"
 
         try:
             symbol_id = safe_str(fmt.GetSymbolTypeId())
-        except:
+        except Exception as e:
             symbol_id = "<no-symbol>"
 
         try:
             acc = fmt.Accuracy
-        except:
+        except Exception as e:
             acc = None
 
         rec = {

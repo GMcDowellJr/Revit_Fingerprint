@@ -72,7 +72,7 @@ def extract(doc, ctx=None):
                     ("Demolished", ElementOnPhaseStatus.Demolished),
                     ("Temporary", ElementOnPhaseStatus.Temporary),
                 ]
-            except:
+            except Exception as e:
                 pass
 
         # For each category that supports phase overrides, capture settings
@@ -82,7 +82,7 @@ def extract(doc, ctx=None):
         sig.append("note=PhaseGraphicsNotFullyImplemented")
         sig.append("statuses_count={}".format(len(statuses)))
 
-    except:
+    except Exception as e:
         sig.append("error=CannotAccessPhaseGraphics")
 
     # Sort signature components (order-insensitive)

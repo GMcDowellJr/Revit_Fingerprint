@@ -36,7 +36,7 @@ def _fmt_in_from_ft(ft, places=6):
     try:
         inches = float(ft) * 12.0
         return format(inches, ".{}f".format(int(places)))
-    except:
+    except Exception as e:
         return None
 
 def _fmt_float(x, places=12):
@@ -44,7 +44,7 @@ def _fmt_float(x, places=12):
         return None
     try:
         return format(float(x), ".{}g".format(int(places)))
-    except:
+    except Exception as e:
         return None
 
 def _fmt_in_from_ft(ft, places=6):
@@ -53,7 +53,7 @@ def _fmt_in_from_ft(ft, places=6):
     try:
         inches = float(ft) * 12.0
         return format(inches, ".{}f".format(int(places)))
-    except:
+    except Exception as e:
         return None
 
 def _format_options_to_kv(fo):
@@ -67,7 +67,7 @@ def _format_options_to_kv(fo):
     out = {}
     try:
         out["use_default"] = bool(getattr(fo, "UseDefault", False))
-    except:
+    except Exception as e:
         out["use_default"] = False
 
     # If using project default, do NOT serialize overrides
@@ -98,7 +98,7 @@ def _format_options_to_kv(fo):
             else:
                 out[k.lower()] = safe_str(v)
 
-        except:
+        except Exception as e:
             continue
 
     return out
@@ -200,9 +200,9 @@ def extract(doc, ctx=None):
                             tick_name = tick_name or get_element_display_name(te)
                             if tick_name is not None:
                                 tick_name = canon_str(tick_name)
-                        except:
+                        except Exception as e:
                             pass
-        except:
+        except Exception as e:
             pass
 
         # Witness line control is common; keep as metadata + optional signature
@@ -251,13 +251,13 @@ def extract(doc, ctx=None):
         try:
             fo = d.GetUnitsFormatOptions()
             units_fmt = fo  # keep raw; stringify below
-        except:
+        except Exception as e:
             units_fmt = None
 
         try:
             afo = d.GetAlternateUnitsFormatOptions()
             alt_units_fmt = afo
-        except:
+        except Exception as e:
             alt_units_fmt = None
 
         # --- Units formatting (v2 only; NOT parameters) ---
@@ -267,13 +267,13 @@ def extract(doc, ctx=None):
         try:
             fo = d.GetUnitsFormatOptions()
             units_fmt = _format_options_to_kv(fo)
-        except:
+        except Exception as e:
             units_fmt = None
 
         try:
             afo = d.GetAlternateUnitsFormatOptions()
             alt_units_fmt = _format_options_to_kv(afo)
-        except:
+        except Exception as e:
             alt_units_fmt = None
 
         tick_name = canon_str(tick_name)
@@ -404,7 +404,7 @@ def extract(doc, ctx=None):
             "sig_hash":  safe_str(r.get("signature_hash", "")),
             "name":      safe_str(r.get("type_name", "")),   # optional metadata
         } for r in recs]
-    except:
+    except Exception as e:
         info["record_rows"] = []
 
     # v2 hash (domain-level block; no partial coverage semantics)

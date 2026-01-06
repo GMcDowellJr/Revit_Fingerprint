@@ -15,10 +15,10 @@ def safe_str(x):
     """
     try:
         return str(x)
-    except:
+    except Exception as e:
         try:
             return unicode(x)
-        except:
+        except Exception as e:
             return u"<unrepr>"
 
 

@@ -24,7 +24,7 @@ def canon_str(s):
     try:
         s2 = safe_str(s)
         return s2.strip()
-    except:
+    except Exception as e:
         return None
 
 
@@ -73,7 +73,7 @@ def rgb_sig_from_color(col):
     """
     try:
         return "{},{},{}".format(int(col.Red), int(col.Green), int(col.Blue))
-    except:
+    except Exception as e:
         return "<None>"
 
 
@@ -89,5 +89,5 @@ def rgb_dict_from_color(col):
     """
     try:
         return {"r": int(col.Red), "g": int(col.Green), "b": int(col.Blue)}
-    except:
+    except Exception as e:
         return None

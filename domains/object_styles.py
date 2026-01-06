@@ -75,7 +75,7 @@ def extract(doc, ctx=None):
             include_cad_layer_categories = bool(
                 ctx.get("include_cad_layer_categories", include_cad_layer_categories)
             )
-    except:
+    except Exception as e:
         # Keep defaults on any ctx read errors
         pass
 
@@ -83,7 +83,7 @@ def extract(doc, ctx=None):
 
     try:
         cats = doc.Settings.Categories
-    except:
+    except Exception as e:
         return info
 
     # v2 build state (domain-level block; no partial coverage semantics)
@@ -97,7 +97,7 @@ def extract(doc, ctx=None):
         lp_map_v2 = (ctx or {}).get("line_pattern_uid_to_hash_v2", None) if ctx is not None else None
         if not isinstance(lp_map_v2, dict) or not lp_map_v2:
             lp_map_v2 = None
-    except:
+    except Exception as e:
         lp_map_v2 = None
 
     def _looks_like_cad_import_category(name_str):
@@ -110,18 +110,18 @@ def extract(doc, ctx=None):
         # Projection / cut lineweights
         try:
             w_proj = cat_obj.GetLineWeight(GraphicsStyleType.Projection)
-        except:
+        except Exception as e:
             w_proj = None
 
         try:
             w_cut = cat_obj.GetLineWeight(GraphicsStyleType.Cut)
-        except:
+        except Exception as e:
             w_cut = None
 
         # Line color
         try:
             rgb_sig = rgb_sig_from_color(cat_obj.LineColor)
-        except:
+        except Exception as e:
             rgb_sig = "<None>"
 
         # Line pattern (Object Styles has ONE pattern, not proj/cut)
@@ -135,7 +135,7 @@ def extract(doc, ctx=None):
                 lp_uid = canon_str(getattr(lp_e, "UniqueId", None)) if lp_e else None
                 lp_map = (ctx or {}).get("line_pattern_uid_to_hash", {}) if ctx is not None else {}
                 lp_val = lp_map.get(lp_uid) or "<LP:UNMAPPED>"
-        except:
+        except Exception as e:
             lp_val = "<None>"
 
         sig = "|".join([
@@ -166,7 +166,7 @@ def extract(doc, ctx=None):
         # Line pattern mapping requirement (upstream v2 dependency)
         try:
             lp_id_v2 = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
-        except:
+        except Exception as e:
             lp_id_v2 = None
 
         if lp_id_v2 is None:
@@ -174,7 +174,7 @@ def extract(doc, ctx=None):
 
         try:
             is_real = bool(lp_id_v2 and lp_id_v2.IntegerValue > 0)
-        except:
+        except Exception as e:
             is_real = False
 
         if is_real:
@@ -184,7 +184,7 @@ def extract(doc, ctx=None):
             try:
                 lp_elem_v2 = doc.GetElement(lp_id_v2)
                 lp_uid_v2 = getattr(lp_elem_v2, "UniqueId", None) if lp_elem_v2 else None
-            except:
+            except Exception as e:
                 lp_uid_v2 = None
 
             lp_hash_v2 = lp_map_v2.get(lp_uid_v2) if lp_uid_v2 else None
@@ -221,13 +221,13 @@ def extract(doc, ctx=None):
             if cat.CategoryType == CategoryType.Import:
                 info["debug_skipped_import"] += 1
                 continue
-        except:
+        except Exception as e:
             pass
 
         # Parent name
         try:
             parent_name = canon_str(cat.Name)
-        except:
+        except Exception as e:
             continue
 
         if (not include_cad_layer_categories) and _looks_like_cad_import_category(parent_name):
@@ -237,7 +237,7 @@ def extract(doc, ctx=None):
         # Category type
         try:
             cat_type = safe_str(cat.CategoryType)
-        except:
+        except Exception as e:
             cat_type = "<unknown>"
 
         # Emit the parent row ("<self>")
@@ -259,14 +259,14 @@ def extract(doc, ctx=None):
                     v2_reasons[reason] = True
                 else:
                     v2_records.append(sig_v2)
-        except:
+        except Exception as e:
             info["debug_fail_row"] += 1
 
         # Emit each subcategory row
         subs = []
         try:
             subs = list(cat.SubCategories)
-        except:
+        except Exception as e:
             subs = []
 
         for sub in subs:
@@ -291,7 +291,7 @@ def extract(doc, ctx=None):
                         v2_reasons[reason] = True
                     else:
                         v2_records.append(sig_v2)
-            except:
+            except Exception as e:
                 info["debug_fail_row"] += 1
                 continue
 

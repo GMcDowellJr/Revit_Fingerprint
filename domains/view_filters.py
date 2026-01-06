@@ -417,7 +417,7 @@ def extract(doc, ctx=None):
 
     try:
         col = list(FilteredElementCollector(doc).OfClass(ParameterFilterElement))
-    except:
+    except Exception as e:
         return info
 
     info["raw_count"] = len(col)
@@ -440,7 +440,7 @@ def extract(doc, ctx=None):
         uid = None
         try:
             uid = canon_str(getattr(f, "UniqueId", None))
-        except:
+        except Exception as e:
             uid = None
 
         # Build filter signature
@@ -456,7 +456,7 @@ def extract(doc, ctx=None):
             # Check if this is a selection filter
             is_selection = hasattr(f, "GetElementFilter") and f.GetElementFilter() is None
             sig.append("is_selection={}".format(sig_val(is_selection)))
-        except:
+        except Exception as e:
             sig.append("is_selection=<None>")
 
         # Categories the filter applies to
@@ -467,14 +467,14 @@ def extract(doc, ctx=None):
             for cid in cat_ids:
                 try:
                     cat_ints.append(safe_str(getattr(cid, "IntegerValue", cid)))
-                except:
+                except Exception as e:
                     pass
                 try:
                     cat = doc.Settings.Categories.get_Item(cid)
                     cat_name = canon_str(cat.Name) if cat else None
                     if cat_name:
                         cat_names.append(cat_name)
-                except:
+                except Exception as e:
                     pass
 
             # Prefer names when resolvable; otherwise fall back to ids deterministically
@@ -490,12 +490,12 @@ def extract(doc, ctx=None):
                         iv = int(iv)
                         if iv < 0:
                             neg_ids.append(str(iv))
-                    except:
+                    except Exception as e:
                         pass
 
                 neg_ids_sorted = sorted(set([x for x in neg_ids if x]))
                 sig.append("categories_ids={}".format(sig_val(",".join(neg_ids_sorted) if neg_ids_sorted else "<None>")))
-        except:
+        except Exception as e:
             sig.append("categories=<None>")
             
         # v2 categories: negative category ids only (no names)
@@ -536,7 +536,7 @@ def extract(doc, ctx=None):
                 for i, t in enumerate(tokens):
                     idx = "{:03d}".format(i)
                     sig.append("ft[{}]={}".format(idx, sig_val(t)))
-        except:
+        except Exception as e:
             sig.append("filter_tree=<Unreadable>")
             
         # v2 filter tree: strict walk, block on unreadable/unallowed
@@ -615,7 +615,7 @@ def extract(doc, ctx=None):
             "sig_hash":   safe_str(r.get("def_hash", "")),
             "name":       safe_str(r.get("name", "")),
         } for r in recs]
-    except:
+    except Exception as e:
         info["record_rows"] = []
 
     return info

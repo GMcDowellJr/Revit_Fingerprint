@@ -38,7 +38,7 @@ try:
         Category,
         CategoryType,
     )
-except:
+except Exception as e:
     FilteredElementCollector = None
     View = None
     ViewSchedule = None
@@ -93,7 +93,7 @@ def extract(doc, ctx=None):
 
     try:
         col = list(FilteredElementCollector(doc).OfClass(View))
-    except:
+    except Exception as e:
         return info
 
     info["raw_count"] = len(col)
@@ -110,14 +110,14 @@ def extract(doc, ctx=None):
         info["debug_v2_blocked"] += 1
         try:
             info["debug_v2_block_reasons"][reason] = info["debug_v2_block_reasons"].get(reason, 0) + 1
-        except:
+        except Exception as e:
             pass
 
     for v in col:
         # Only process view templates
         try:
             is_template = v.IsTemplate
-        except:
+        except Exception as e:
             is_template = False
 
         if not is_template:
@@ -134,7 +134,7 @@ def extract(doc, ctx=None):
         uid = None
         try:
             uid = canon_str(getattr(v, "UniqueId", None))
-        except:
+        except Exception as e:
             uid = None
 
         if not uid:
@@ -149,7 +149,7 @@ def extract(doc, ctx=None):
         is_schedule = False
         try:
             is_schedule = isinstance(v, ViewSchedule)
-        except:
+        except Exception as e:
             is_schedule = False
 
         # -----------------------------------------
@@ -165,7 +165,7 @@ def extract(doc, ctx=None):
                     pid.IntegerValue for pid in tpl_ids
                     if hasattr(pid, "IntegerValue") and pid.IntegerValue < 0
                 )
-            except:
+            except Exception as e:
                 tpl_bips = set()
 
             # Include flags (stable)
@@ -175,7 +175,7 @@ def extract(doc, ctx=None):
                         int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
                     )
                 )
-            except:
+            except Exception as e:
                 sig.append("include_phase_filter=False")
 
             try:
@@ -184,7 +184,7 @@ def extract(doc, ctx=None):
                         int(BuiltInParameter.VIS_GRAPHICS_FILTERS) in tpl_bips
                     )
                 )
-            except:
+            except Exception as e:
                 sig.append("include_filters=False")
 
             try:
@@ -193,7 +193,7 @@ def extract(doc, ctx=None):
                         int(BuiltInParameter.VIS_GRAPHICS_OVERRIDES) in tpl_bips
                     )
                 )
-            except:
+            except Exception as e:
                 sig.append("include_vg=False")
 
             try:
@@ -202,13 +202,13 @@ def extract(doc, ctx=None):
                         int(BuiltInParameter.VIS_GRAPHICS_APPEARANCE) in tpl_bips
                     )
                 )
-            except:
+            except Exception as e:
                 sig.append("include_appearance=False")
 
             # Phase Filter (reference global phase_filters domain) - legacy
             try:
                 include_pf = int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
-            except:
+            except Exception as e:
                 include_pf = False
 
             if include_pf:
@@ -224,7 +224,7 @@ def extract(doc, ctx=None):
                             pf_hash_v2 = None
                             try:
                                 pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                            except:
+                            except Exception as e:
                                 pf_hash_v2 = None
                             if not pf_hash_v2:
                                 _v2_block("phase_filter_unresolved")
@@ -233,7 +233,7 @@ def extract(doc, ctx=None):
                                 sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
                     else:
                         sig.append("phase_filter=<None>")
-                except:
+                except Exception as e:
                     info["debug_fail_read"] += 1
                     sig.append("phase_filter=<Unreadable>")
             else:
@@ -253,7 +253,7 @@ def extract(doc, ctx=None):
                     sig_v2_final = sorted(set(sig_v2))
                     def_hash_v2 = make_hash(sig_v2_final)
                     per_hashes_v2.append(def_hash_v2)
-                except:
+                except Exception as e:
                     _v2_block("schedule_finalize_failed")
                     v2_ok = False
 
@@ -282,7 +282,7 @@ def extract(doc, ctx=None):
                 pid.IntegerValue for pid in tpl_ids
                 if hasattr(pid, "IntegerValue") and pid.IntegerValue < 0
             )
-        except:
+        except Exception as e:
             tpl_bips = set()
 
         # Include flags (stable)
@@ -292,7 +292,7 @@ def extract(doc, ctx=None):
                     int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
                 )
             )
-        except:
+        except Exception as e:
             sig.append("include_phase_filter=False")
 
         try:
@@ -301,7 +301,7 @@ def extract(doc, ctx=None):
                     int(BuiltInParameter.VIS_GRAPHICS_FILTERS) in tpl_bips
                 )
             )
-        except:
+        except Exception as e:
             sig.append("include_filters=False")
 
         try:
@@ -310,7 +310,7 @@ def extract(doc, ctx=None):
                     int(BuiltInParameter.VIS_GRAPHICS_OVERRIDES) in tpl_bips
                 )
             )
-        except:
+        except Exception as e:
             sig.append("include_vg=False")
 
         try:
@@ -319,13 +319,13 @@ def extract(doc, ctx=None):
                     int(BuiltInParameter.VIS_GRAPHICS_APPEARANCE) in tpl_bips
                 )
             )
-        except:
+        except Exception as e:
             sig.append("include_appearance=False")
 
         # Phase Filter (reference global phase_filters domain)
         try:
             include_pf = int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
-        except:
+        except Exception as e:
             include_pf = False
 
         if include_pf:
@@ -341,7 +341,7 @@ def extract(doc, ctx=None):
                         pf_hash_v2 = None
                         try:
                             pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                        except:
+                        except Exception as e:
                             pf_hash_v2 = None
                         if not pf_hash_v2:
                             _v2_block("phase_filter_unresolved")
@@ -350,7 +350,7 @@ def extract(doc, ctx=None):
                             sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
                 else:
                     sig.append("phase_filter=<None>")
-            except:
+            except Exception as e:
                 info["debug_fail_read"] += 1
                 sig.append("phase_filter=<Unreadable>")
         else:
@@ -361,7 +361,7 @@ def extract(doc, ctx=None):
         # We hash only negative category ids (BuiltInCategory-style) for hidden + overridden categories.
         try:
             cats = doc.Settings.Categories
-        except:
+        except Exception as e:
             cats = None
 
         vg_sig_records = []
@@ -369,19 +369,19 @@ def extract(doc, ctx=None):
         if cats:
             try:
                 default_ogs = OverrideGraphicSettings()
-            except:
+            except Exception as e:
                 default_ogs = None
 
             # Iterate all categories; keep deterministic ordering by category id
             try:
                 cats_list = list(cats)
-            except:
+            except Exception as e:
                 cats_list = []
 
             def cat_int_id(c):
                 try:
                     return int(c.Id.IntegerValue)
-                except:
+                except Exception as e:
                     return None
 
             cats_list = [c for c in cats_list if c is not None]
@@ -400,19 +400,19 @@ def extract(doc, ctx=None):
                 try:
                     if CategoryType and c.CategoryType == CategoryType.Import:
                         continue
-                except:
+                except Exception as e:
                     pass
 
                 # Hidden?
                 try:
                     hidden = bool(v.GetCategoryHidden(c.Id))
-                except:
+                except Exception as e:
                     hidden = False
 
                 # Overrides
                 try:
                     ogs = v.GetCategoryOverrides(c.Id)
-                except:
+                except Exception as e:
                     ogs = None
 
                 if not ogs:
@@ -429,42 +429,42 @@ def extract(doc, ctx=None):
                     try:
                         dl = ogs.DetailLevel
                         dl_int = int(dl)
-                    except:
+                    except Exception as e:
                         dl_int = None
 
                     try:
                         proj_wt = ogs.ProjectionLineWeight
-                    except:
+                    except Exception as e:
                         proj_wt = None
                     try:
                         cut_wt = ogs.CutLineWeight
-                    except:
+                    except Exception as e:
                         cut_wt = None
                     try:
                         proj_col = ogs.ProjectionLineColor
-                    except:
+                    except Exception as e:
                         proj_col = None
                     try:
                         cut_col = ogs.CutLineColor
-                    except:
+                    except Exception as e:
                         cut_col = None
                     try:
                         halftone = ogs.Halftone
-                    except:
+                    except Exception as e:
                         halftone = False
                     try:
                         trans = ogs.Transparency
-                    except:
+                    except Exception as e:
                         trans = None
 
                     # Pattern overrides as boolean flags (never record ElementId)
                     try:
                         proj_pat_ovr = (ogs.ProjectionLinePatternId != default_ogs.ProjectionLinePatternId) if default_ogs else False
-                    except:
+                    except Exception as e:
                         proj_pat_ovr = False
                     try:
                         cut_pat_ovr = (ogs.CutLinePatternId != default_ogs.CutLinePatternId) if default_ogs else False
-                    except:
+                    except Exception as e:
                         cut_pat_ovr = False
 
                     # Determine "has override" by comparing stable primitives + pattern override flags
@@ -488,7 +488,7 @@ def extract(doc, ctx=None):
                             has_override = True
                         if cut_pat_ovr:
                             has_override = True
-                    except:
+                    except Exception as e:
                         pass
 
                     if not has_override:
@@ -502,11 +502,11 @@ def extract(doc, ctx=None):
                     # Pack (avoid ids; colors are packed as RGB triples)
                     try:
                         proj_col_s = "{}-{}-{}".format(proj_col.Red, proj_col.Green, proj_col.Blue) if proj_col else "<None>"
-                    except:
+                    except Exception as e:
                         proj_col_s = "<None>"
                     try:
                         cut_col_s = "{}-{}-{}".format(cut_col.Red, cut_col.Green, cut_col.Blue) if cut_col else "<None>"
-                    except:
+                    except Exception as e:
                         cut_col_s = "<None>"
 
                     line = (
@@ -529,7 +529,7 @@ def extract(doc, ctx=None):
                     vg_sig_records.append(line)
                     if debug_vg_details:
                         vg_records.append(line)
-                except:
+                except Exception as e:
                     info["debug_fail_read"] += 1
                     continue
 
@@ -545,7 +545,7 @@ def extract(doc, ctx=None):
         # This can be expanded later with stable primitives as available.
         try:
             include_app = int(BuiltInParameter.VIS_GRAPHICS_APPEARANCE) in tpl_bips
-        except:
+        except Exception as e:
             include_app = False
         sig.append("appearance_included={}".format(int(bool(include_app))))
 
@@ -568,7 +568,7 @@ def extract(doc, ctx=None):
                             if v2_ok:
                                 try:
                                     f_hash_v2 = filter_map_v2.get(f_uid) if f_uid else None
-                                except:
+                                except Exception as e:
                                     f_hash_v2 = None
                                 if not f_hash_v2:
                                     _v2_block("filter_unresolved")
@@ -577,17 +577,17 @@ def extract(doc, ctx=None):
                             try:
                                 visibility = v.GetFilterVisibility(fid)
                                 vis_str = safe_str(visibility)
-                            except:
+                            except Exception as e:
                                 vis_str = "<None>"
 
                             idx = "{:03d}".format(i)
                             filter_hashes.append("filter[{}]={}|vis={}".format(idx, f_hash, vis_str))
                             if v2_ok:
                                 filter_hashes_v2.append("filter[{}]={}|vis={}".format(idx, f_hash_v2, vis_str))
-                        except:
+                        except Exception as e:
                             info["debug_fail_read"] += 1
                             continue
-            except:
+            except Exception as e:
                 info["debug_fail_read"] += 1
 
         if filter_hashes:
@@ -617,7 +617,7 @@ def extract(doc, ctx=None):
                 sig_v2_final = sorted(set(sig_v2))
                 def_hash_v2 = make_hash(sig_v2_final)
                 per_hashes_v2.append(def_hash_v2)
-            except:
+            except Exception as e:
                 _v2_block("template_finalize_failed")
                 v2_ok = False
 
@@ -634,7 +634,7 @@ def extract(doc, ctx=None):
         if debug_vg_details:
             try:
                 rec["vg_debug"] = _vg_records_for_rec
-            except:
+            except Exception as e:
                 pass
 
         records.append(rec)
@@ -666,7 +666,7 @@ def extract(doc, ctx=None):
             "name":       safe_str(r.get("name", "")),      # metadata
             "view_type":  safe_str(r.get("view_type", "")), # metadata
         } for r in recs]
-    except:
+    except Exception as e:
         info["record_rows"] = []
 
     return info

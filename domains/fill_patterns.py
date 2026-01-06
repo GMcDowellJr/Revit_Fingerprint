@@ -68,7 +68,7 @@ def extract(doc, ctx=None):
 
     try:
         col = list(FilteredElementCollector(doc).OfClass(FillPatternElement))
-    except:
+    except Exception as e:
         return info
     info["raw_count"] = len(col)
 
@@ -77,7 +77,7 @@ def extract(doc, ctx=None):
             return "<None>"
         try:
             return format(float(v), ".{}f".format(nd))
-        except:
+        except Exception as e:
             return sig_val(v)
 
     def read_is_model(fp, target):
@@ -88,13 +88,13 @@ def extract(doc, ctx=None):
                 if hasattr(fp, attr):
                     is_model = getattr(fp, attr)
                     break
-            except:
+            except Exception as e:
                 pass
         if is_model is None:
             try:
                 if target is not None:
                     is_model = (int(target) == 1)  # Drafting=0, Model=1 in many builds
-            except:
+            except Exception as e:
                 pass
         return is_model
 
@@ -105,13 +105,13 @@ def extract(doc, ctx=None):
         try:
             if hasattr(fp, "GetFillPatternGrid"):
                 g = fp.GetFillPatternGrid(i)
-        except:
+        except Exception as e:
             g = None
         if g is None:
             try:
                 if hasattr(fp, "GetFillGrid"):
                     g = fp.GetFillGrid(i)
-            except:
+            except Exception as e:
                 g = None
 
         if g is None:
@@ -124,7 +124,7 @@ def extract(doc, ctx=None):
             try:
                 v = getattr(g, prop_name)
                 parts.append("grid[{}].{}={}".format(idx, key, f(v)))
-            except:
+            except Exception as e:
                 parts.append("grid[{}].{}=<None>".format(idx, key))
 
         # origin can vary across versions; try a couple shapes
@@ -137,7 +137,7 @@ def extract(doc, ctx=None):
                 if u is not None and v is not None:
                     parts.append("grid[{}].origin_uv={},{}".format(idx, f(u), f(v)))
                     return
-            except:
+            except Exception as e:
                 pass
 
             # Try XYZ-style origin but store only X,Y
@@ -148,7 +148,7 @@ def extract(doc, ctx=None):
                 if x is not None and y is not None:
                     parts.append("grid[{}].origin_xy={},{}".format(idx, f(x), f(y)))
                     return
-            except:
+            except Exception as e:
                 pass
 
             # Try separate scalars
@@ -158,7 +158,7 @@ def extract(doc, ctx=None):
                     v = getattr(g, v_name)
                     parts.append("grid[{}].origin_uv={},{}".format(idx, f(u), f(v)))
                     return
-                except:
+                except Exception as e:
                     pass
 
             parts.append("grid[{}].origin=<None>".format(idx))
@@ -175,7 +175,7 @@ def extract(doc, ctx=None):
         info["debug_v2_blocked"] += 1
         try:
             info["debug_v2_block_reasons"][reason] = info["debug_v2_block_reasons"].get(reason, 0) + 1
-        except:
+        except Exception as e:
             pass
 
     def _grid_sig_v2(fp, i):
@@ -187,13 +187,13 @@ def extract(doc, ctx=None):
         try:
             if hasattr(fp, "GetFillPatternGrid"):
                 g = fp.GetFillPatternGrid(i)
-        except:
+        except Exception as e:
             g = None
         if g is None:
             try:
                 if hasattr(fp, "GetFillGrid"):
                     g = fp.GetFillGrid(i)
-            except:
+            except Exception as e:
                 g = None
 
         if g is None:
@@ -204,13 +204,13 @@ def extract(doc, ctx=None):
         def req_float(prop_name, key):
             try:
                 v = getattr(g, prop_name)
-            except:
+            except Exception as e:
                 return False, "grid_{}_unreadable".format(key)
             if v is None:
                 return False, "grid_{}_none".format(key)
             try:
                 fv = float(v)
-            except:
+            except Exception as e:
                 return False, "grid_{}_not_float".format(key)
             parts.append("grid[{}].{}={}".format(idx, key, sig_val(f(v, 9))))
             return True, None
@@ -227,7 +227,7 @@ def extract(doc, ctx=None):
                     fv = float(v)
                     parts.append("grid[{}].origin_uv={},{}".format(idx, sig_val(f(fu, 9)), sig_val(f(fv, 9))))
                     return True, None
-            except:
+            except Exception as e:
                 pass
 
             # XY origin
@@ -240,7 +240,7 @@ def extract(doc, ctx=None):
                     fy = float(y)
                     parts.append("grid[{}].origin_xy={},{}".format(idx, sig_val(f(fx, 9)), sig_val(f(fy, 9))))
                     return True, None
-            except:
+            except Exception as e:
                 pass
 
             # scalar origin props
@@ -254,7 +254,7 @@ def extract(doc, ctx=None):
                     fv = float(v)
                     parts.append("grid[{}].origin_uv={},{}".format(idx, sig_val(f(fu, 9)), sig_val(f(fv, 9))))
                     return True, None
-                except:
+                except Exception as e:
                     continue
 
             return False, "grid_origin_unreadable"
@@ -296,7 +296,7 @@ def extract(doc, ctx=None):
         fp = None
         try:
             fp = e.GetFillPattern()
-        except:
+        except Exception as e:
             fp = None
 
         # -------------------------
@@ -315,17 +315,17 @@ def extract(doc, ctx=None):
         else:
             is_solid = None
             try: is_solid = fp.IsSolidFill
-            except: pass
+            except Exception as e: pass
 
             target = None
             try: target = fp.Target
-            except: pass
+            except Exception as e: pass
 
             is_model = read_is_model(fp, target)
 
             gc = None
             try: gc = fp.GridCount
-            except: pass
+            except Exception as e: pass
 
             sig = [
                 "is_solid={}".format(sig_val(is_solid)),
@@ -338,7 +338,7 @@ def extract(doc, ctx=None):
                 try:
                     for i in range(int(gc)):
                         sig.extend(grid_sig(fp, i))
-                except:
+                except Exception as e:
                     info["debug_fail_grid_read"] += 1
                     sig.append("error=GridLoopFailed")
 
@@ -361,7 +361,7 @@ def extract(doc, ctx=None):
             # is_solid: require bool-coercible
             try:
                 is_solid_v2 = fp.IsSolidFill
-            except:
+            except Exception as e:
                 v2_ok = False
                 v2_reason = "is_solid_unreadable"
 
@@ -370,7 +370,7 @@ def extract(doc, ctx=None):
                 try:
                     target_v2 = fp.Target
                     target_id = int(target_v2)
-                except:
+                except Exception as e:
                     v2_ok = False
                     v2_reason = "target_unreadable"
 
@@ -381,7 +381,7 @@ def extract(doc, ctx=None):
                     if is_model_v2 is None:
                         v2_ok = False
                         v2_reason = "is_model_unresolved"
-                except:
+                except Exception as e:
                     v2_ok = False
                     v2_reason = "is_model_unreadable"
 
@@ -390,7 +390,7 @@ def extract(doc, ctx=None):
                 try:
                     gc_v2 = fp.GridCount
                     gc_i = int(gc_v2)
-                except:
+                except Exception as e:
                     v2_ok = False
                     v2_reason = "grid_count_unreadable"
 
@@ -459,7 +459,7 @@ def extract(doc, ctx=None):
             "sig_hash":   safe_str(r.get("def_hash", "")),
             "name":       safe_str(r.get("name", "")),       # optional metadata
         } for r in recs]
-    except:
+    except Exception as e:
         info["record_rows"] = []
 
     return info

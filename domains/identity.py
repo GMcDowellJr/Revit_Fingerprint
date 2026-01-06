@@ -49,11 +49,11 @@ def extract(doc, ctx=None):
             try:
                 mp = WorksharingUtils.GetModelPath(doc)
                 info["central_path"] = safe_str(mp.CentralServerPath)
-            except:
+            except Exception as e:
                 info["central_path"] = safe_str(doc.PathName)
         else:
             info["central_path"] = safe_str(doc.PathName)
-    except:
+    except Exception as e:
         info["central_path"] = safe_str(doc.PathName)
 
     info["is_workshared"] = bool(getattr(doc, "IsWorkshared", False))
