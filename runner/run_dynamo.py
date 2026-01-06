@@ -74,7 +74,7 @@ def _extract_v2_hash(payload):
             sv2 = payload.get("semantic_v2", None)
             if isinstance(sv2, dict) and "hash" in sv2:
                 return sv2.get("hash", None)
-    except:
+    except Exception as e:
         pass
     return None
 
@@ -85,7 +85,7 @@ def _extract_legacy_hash(payload):
     try:
         if isinstance(payload, dict) and "hash" in payload:
             return payload.get("hash", None)
-    except:
+    except Exception as e:
         pass
     return None
 
@@ -97,7 +97,7 @@ def _extract_legacy_quality(payload):
             q["count"] = payload.get("count", None)
         if isinstance(payload, dict) and "raw_count" in payload:
             q["raw_count"] = payload.get("raw_count", None)
-    except:
+    except Exception as e:
         pass
     return q
 
@@ -127,7 +127,7 @@ def _domain_run(domain_name, fn, doc, ctx, runner_notes):
                         env["_notes"].append("semantic_v2 blocked: " + ", ".join([str(r) for r in reasons]))
                     else:
                         env["_notes"].append("semantic_v2 blocked (no reasons provided).")
-        except:
+        except Exception as e:
             pass
 
         if HASH_MODE == "semantic":
@@ -157,7 +157,7 @@ def _enabled(domain_name):
         return True
     try:
         allowed = set(ENABLED_DOMAINS)
-    except:
+    except Exception as e:
         allowed = set()
     return domain_name in allowed
 
@@ -328,7 +328,7 @@ try:
                 p = str(p).strip()
                 if p:
                     return p
-        except:
+        except Exception as e:
             pass
 
         # 2) Fallback: direct IN[0] (only works if this module is executed as the Dynamo node)
@@ -338,7 +338,7 @@ try:
                 p = str(_in[0]).strip()
                 if p:
                     return p
-        except:
+        except Exception as e:
             pass
 
         # 3) Default: user temp directory
@@ -350,12 +350,12 @@ try:
             try:
                 if not os.path.exists(base):
                     os.makedirs(base)
-            except:
+            except Exception as e:
                 pass
 
             stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             return os.path.join(base, "fingerprint_{0}.json".format(stamp))
-        except:
+        except Exception as e:
             return None
 
     def _ensure_parent_dir(path):
@@ -363,7 +363,7 @@ try:
             parent = os.path.dirname(path)
             if parent and not os.path.exists(parent):
                 os.makedirs(parent)
-        except:
+        except Exception as e:
             pass
 
     def _write_json_to_disk(path, payload):
@@ -379,7 +379,7 @@ try:
         bytes_written = None
         try:
             bytes_written = os.path.getsize(path)
-        except:
+        except Exception as e:
             pass
         return bytes_written, round(time.perf_counter() - t0, 3)
 
@@ -406,7 +406,7 @@ try:
     force_full_out = False
     try:
         force_full_out = str(os.getenv("REVIT_FINGERPRINT_FORCE_FULL_OUT", "")).strip() in ("1", "true", "True", "YES", "yes")
-    except:
+    except Exception as e:
         force_full_out = False
 
 

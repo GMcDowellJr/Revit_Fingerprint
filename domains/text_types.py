@@ -63,7 +63,7 @@ def extract(doc, ctx=None):
     types = []
     try:
         types = list(FilteredElementCollector(doc).OfClass(TextNoteType).ToElements())
-    except:
+    except Exception as e:
         types = []
 
     info["raw_count"] = len(types)
@@ -136,7 +136,7 @@ def extract(doc, ctx=None):
                         leader_arrow_uid = getattr(arrow, "UniqueId", None)
                         leader_arrow_name = get_type_display_name(arrow) or getattr(arrow, "Name", None)
                         leader_arrow_name = canon_str(leader_arrow_name)
-        except:
+        except Exception as e:
             leader_arrow_uid = None
             leader_arrow_name = None
 
@@ -272,7 +272,7 @@ def extract(doc, ctx=None):
             "sig_hash":  safe_str(r.get("signature_hash", "")),
             "name":      safe_str(r.get("type_name", "")),   # optional metadata
         } for r in recs]
-    except:
+    except Exception as e:
         info["record_rows"] = []
 
     return info

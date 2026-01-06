@@ -111,7 +111,7 @@ def extract(doc, ctx=None):
 
     try:
         col = list(FilteredElementCollector(doc).OfClass(LinePatternElement))
-    except:
+    except Exception as e:
         return info
 
     info["raw_count"] = len(col)
@@ -128,7 +128,7 @@ def extract(doc, ctx=None):
             return "<None>"
         try:
             return format(float(v), ".{}f".format(nd))
-        except:
+        except Exception as e:
             return sig_val(v)
 
     for e in col:
@@ -142,7 +142,7 @@ def extract(doc, ctx=None):
         uid = None
         try:
             uid = canon_str(getattr(e, "UniqueId", None))
-        except:
+        except Exception as e:
             uid = None
 
         lp = None
@@ -225,7 +225,7 @@ def extract(doc, ctx=None):
                         sig.append("seg[{}].type_id={}".format(idx, sig_val(st_id if st_id is not None else "<None>")))
                         sig.append("seg[{}].type={}".format(idx, sig_val(st_name if st_name is not None else "<None>")))
                         sig.append("seg[{}].len={}".format(idx, sig_val(fnum(slen, 9))))
-                    except:
+                    except Exception as e:
                         info["debug_fail_segment_read"] += 1
                         sig.append("seg[{}].error=SegmentReadFailed".format(idx))
 
@@ -304,7 +304,7 @@ def extract(doc, ctx=None):
             info["debug_v2_blocked"] += 1
             try:
                 info["debug_v2_block_reasons"][v2_reason] = info["debug_v2_block_reasons"].get(v2_reason, 0) + 1
-            except:
+            except Exception as e:
                 pass
 
         rec = {
@@ -346,7 +346,7 @@ def extract(doc, ctx=None):
             "sig_hash":   safe_str(r.get("def_hash", "")),
             "name":       safe_str(r.get("name", "")),       # optional metadata
         } for r in recs]
-    except:
+    except Exception as e:
         info["record_rows"] = []
 
     return info

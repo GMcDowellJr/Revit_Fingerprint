@@ -65,7 +65,7 @@ def extract(doc, ctx=None):
     # Only "Lines" category contains actual Line Styles (subcategories)
     try:
         lines_cat = Category.GetCategory(doc, BuiltInCategory.OST_Lines)
-    except:
+    except Exception as e:
         info["debug_fail_get_lines_cat"] += 1
         lines_cat = None
 
@@ -74,7 +74,7 @@ def extract(doc, ctx=None):
 
     try:
         subs = list(lines_cat.SubCategories)
-    except:
+    except Exception as e:
         info["debug_fail_subcats"] += 1
         subs = []
 
@@ -94,7 +94,7 @@ def extract(doc, ctx=None):
         lp_map_v2 = (ctx or {}).get("line_pattern_uid_to_hash_v2", None) if ctx is not None else None
         if not isinstance(lp_map_v2, dict) or not lp_map_v2:
             lp_map_v2 = None
-    except:
+    except Exception as e:
         lp_map_v2 = None
 
     for sc in subs:
@@ -107,15 +107,17 @@ def extract(doc, ctx=None):
 
             # weights
             try: w_proj = sc.GetLineWeight(GraphicsStyleType.Projection)
-            except: w_proj = None
+            except Exception as e:
+                w_proj = None
             try: w_cut  = sc.GetLineWeight(GraphicsStyleType.Cut)
-            except: w_cut = None
+            except Exception as e:
+                w_cut = None
 
             # color
             try:
                 c = sc.LineColor
                 rgb_sig = "{}-{}-{}".format(int(c.Red), int(c.Green), int(c.Blue))
-            except:
+            except Exception as e:
                 rgb_sig = "<None>"
 
             # Line pattern reference in hash surface:
@@ -129,7 +131,7 @@ def extract(doc, ctx=None):
                     lp_uid = getattr(lp_elem, "UniqueId", None) if lp_elem else None
                     lp_map = (ctx or {}).get("line_pattern_uid_to_hash", {}) if ctx is not None else {}
                     lp_val = lp_map.get(lp_uid) or "<LP:UNMAPPED>"
-            except:
+            except Exception as e:
                 lp_val = "<None>"
 
             # record signature (names ARE identity here by your locked semantics)
@@ -159,7 +161,7 @@ def extract(doc, ctx=None):
                 # line pattern mapping requirement (upstream v2 dependency)
                 try:
                     lp_id_v2 = sc.GetLinePatternId(GraphicsStyleType.Projection)
-                except:
+                except Exception as e:
                     lp_id_v2 = None
 
                 if lp_id_v2 is None or lp_id_v2 == ElementId.InvalidElementId:
@@ -173,7 +175,7 @@ def extract(doc, ctx=None):
                         try:
                             lp_elem_v2 = doc.GetElement(lp_id_v2)
                             lp_uid_v2 = getattr(lp_elem_v2, "UniqueId", None) if lp_elem_v2 else None
-                        except:
+                        except Exception as e:
                             lp_uid_v2 = None
 
                         lp_hash_v2 = lp_map_v2.get(lp_uid_v2) if lp_uid_v2 else None
@@ -188,7 +190,7 @@ def extract(doc, ctx=None):
                                 safe_str(rgb_sig),
                                 safe_str(lp_hash_v2),
                             ]))
-        except:
+        except Exception as e:
             info["debug_fail_record_build"] += 1
             continue
 

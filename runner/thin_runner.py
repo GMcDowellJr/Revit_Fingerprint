@@ -11,7 +11,7 @@ try:
         os.environ["REVIT_FINGERPRINT_OUTPUT_PATH"] = str(IN[0]).strip()
     else:
         os.environ.pop("REVIT_FINGERPRINT_OUTPUT_PATH", None)
-except:
+except Exception as e:
     os.environ.pop("REVIT_FINGERPRINT_OUTPUT_PATH", None)
 
 # Optional: IN[1] == True forces full OUT (debug/back-compat)
@@ -20,7 +20,7 @@ try:
         os.environ["REVIT_FINGERPRINT_FORCE_FULL_OUT"] = "1"
     else:
         os.environ.pop("REVIT_FINGERPRINT_FORCE_FULL_OUT", None)
-except:
+except Exception as e:
     os.environ.pop("REVIT_FINGERPRINT_FORCE_FULL_OUT", None)
 
 # MUST be the repo root that contains: core/, domains/, runner/

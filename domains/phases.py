@@ -69,10 +69,10 @@ def extract(doc, ctx=None):
     # Fall back to collector if unavailable.
     try:
         col = list(doc.Phases)
-    except:
+    except Exception as e:
         try:
             col = list(FilteredElementCollector(doc).OfClass(Phase))
-        except:
+        except Exception as e:
             return info
 
     info["raw_count"] = len(col)
@@ -105,13 +105,13 @@ def extract(doc, ctx=None):
 
         try:
             uid = canon_str(p.UniqueId)
-        except:
+        except Exception as e:
             uid = None
             info["debug_missing_uid"] += 1
 
         try:
             seq = p.SequenceNumber
-        except:
+        except Exception as e:
             seq = None
         if seq is None:
             seq = i + 1  # stable fallback based on document order
@@ -174,7 +174,7 @@ def extract(doc, ctx=None):
             "sig_hash":   safe_str(r.get("def_hash", "")),
             "name":       safe_str(r.get("name", "")),
         } for r in recs]
-    except:
+    except Exception as e:
         info["record_rows"] = []
 
     return info

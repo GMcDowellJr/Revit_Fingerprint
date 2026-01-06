@@ -31,7 +31,7 @@ def _param(elem, bip):
     """
     try:
         return elem.get_Parameter(bip)
-    except:
+    except Exception as e:
         return None
 
 
@@ -50,7 +50,7 @@ def _as_string(p):
             s = p.AsString()
             if s is not None:
                 return safe_str(s)
-    except:
+    except Exception as e:
         pass
     return None
 
@@ -68,7 +68,7 @@ def _as_double(p):
     try:
         if p and p.HasValue:
             return p.AsDouble()
-    except:
+    except Exception as e:
         pass
     return None
 
@@ -86,7 +86,7 @@ def _as_int(p):
     try:
         if p and p.HasValue:
             return p.AsInteger()
-    except:
+    except Exception as e:
         pass
     return None
 
@@ -124,7 +124,7 @@ def first_param(elem, bip_names=None, ui_names=None):
     for bip_name in (bip_names or []):
         try:
             bip = getattr(BuiltInParameter, bip_name, None)
-        except:
+        except Exception as e:
             bip = None
         if bip is None:
             continue
@@ -132,7 +132,7 @@ def first_param(elem, bip_names=None, ui_names=None):
             p = elem.get_Parameter(bip)
             if p and p.HasValue:
                 return p
-        except:
+        except Exception as e:
             pass
 
     # UI-name fallback (English UI labels)
@@ -141,7 +141,7 @@ def first_param(elem, bip_names=None, ui_names=None):
             p = elem.LookupParameter(nm)
             if p and p.HasValue:
                 return p
-        except:
+        except Exception as e:
             pass
 
     return None
@@ -161,11 +161,11 @@ def format_len_inches(feet_val):
         return None
     try:
         return UnitUtils.ConvertFromInternalUnits(feet_val, UnitTypeId.Inches)
-    except:
+    except Exception as e:
         try:
             # Fallback for older API versions
             return float(feet_val) * 12.0
-        except:
+        except Exception as e:
             return None
 
 
@@ -194,7 +194,7 @@ def try_get_color_rgb_from_elem(elem):
         g = (color_int >>  8) & 0xFF
         b = (color_int >> 16) & 0xFF
         return color_int, {"r": r, "g": g, "b": b}
-    except:
+    except Exception as e:
         return color_int, None
 
 
@@ -219,7 +219,7 @@ def get_element_display_name(elem):
         nm_c = canon_str(nm)
         if nm_c:
             return nm_c
-    except:
+    except Exception as e:
         pass
 
     # 2) Common name parameters
@@ -234,7 +234,7 @@ def get_element_display_name(elem):
                 s_c = canon_str(s)
                 if s_c:
                     return s_c
-        except:
+        except Exception as e:
             pass
 
     return None
@@ -260,7 +260,7 @@ def get_type_display_name(elem):
             nm_c = canon_str(nm)
             if nm_c:
                 return nm_c
-    except:
+    except Exception as e:
         pass
 
     # 2) Fallback to .Name
@@ -269,7 +269,7 @@ def get_type_display_name(elem):
         nm_c = canon_str(nm)
         if nm_c:
             return nm_c
-    except:
+    except Exception as e:
         pass
 
     return None
