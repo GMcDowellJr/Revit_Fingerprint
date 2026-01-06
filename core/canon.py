@@ -2,92 +2,173 @@
 """
 Core canonicalization and formatting utilities (pure Python, no Revit API).
 
-Provides consistent string normalization and value formatting for
-deterministic fingerprinting.
+PR3 scope (behavior-changing):
+- Single source of truth for canonical primitives.
+- Single set of sentinel strings:
+    <MISSING>, <UNREADABLE>, <NOT_APPLICABLE>
+
+Policy:
+- Domains must emit canonicalized primitives (strings) and/or the declared sentinels.
+- Do not introduce new angle-bracket sentinels in domains.
 """
 
-from hashing import safe_str
+from __future__ import annotations
+
+from typing import Any, Optional
+
+from .hashing import safe_str
 
 
-def canon_str(s):
-    """
-    Canonicalize a string value by stripping whitespace.
+# =========================
+# Sentinel strings (SoT)
+# =========================
 
-    Args:
-        s: String value to canonicalize (may be None)
-
-    Returns:
-        Stripped string, or None if input is None or conversion fails
-    """
-    if s is None:
-        return None
-    try:
-        s2 = safe_str(s)
-        return s2.strip()
-    except Exception as e:
-        return None
+S_MISSING = "<MISSING>"
+S_UNREADABLE = "<UNREADABLE>"
+S_NOT_APPLICABLE = "<NOT_APPLICABLE>"
 
 
-def sig_val(v):
-    """
-    Format a value for signature inclusion with fail-soft handling.
+def is_sentinel(v: Any) -> bool:
+    return v in (S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE)
 
-    Converts None or empty strings to "<None>" marker to ensure
-    distinct states remain distinct in signatures.
 
-    Args:
-        v: Value to format (any type)
+# =========================
+# Canonical primitives
+# =========================
 
-    Returns:
-        String representation or "<None>" marker
+def canon_str(v: Any) -> str:
+    """Canonicalize string-like values.
+
+    Rules:
+    - None -> <MISSING>
+    - str(...) conversion failure -> <UNREADABLE>
+    - Strip leading/trailing whitespace
+    - Empty-after-strip -> <MISSING>
+    - Normalize legacy tokens: <None> -> <MISSING>, <Unreadable> -> <UNREADABLE>
     """
     if v is None:
-        return "<None>"
-    s = safe_str(v).strip()
-    return s if s else "<None>"
+        return S_MISSING
+    try:
+        s = safe_str(v)
+    except Exception:
+        return S_UNREADABLE
+
+    if s is None:
+        return S_UNREADABLE
+
+    s2 = s.strip()
+    if not s2:
+        return S_MISSING
+
+    if s2 == "<None>":
+        return S_MISSING
+    if s2 == "<Unreadable>":
+        return S_UNREADABLE
+
+    return s2
 
 
-def fnum(v, nd):
+def canon_bool(v: Any) -> str:
+    """Canonicalize booleans.
+
+    - None -> <MISSING>
+    - bool -> "true"/"false"
+    - int-like 0/1 -> "false"/"true"
+    - Anything else -> <UNREADABLE>
     """
-    Format a numeric value to a fixed number of decimal places.
+    if v is None:
+        return S_MISSING
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        if v == 0:
+            return "false"
+        if v == 1:
+            return "true"
+    return S_UNREADABLE
 
-    Args:
-        v: Numeric value (may be None)
-        nd: Number of decimal places
 
-    Returns:
-        Formatted float or None if input is None
+def canon_num(v: Any, nd: int = 9) -> str:
+    """Canonicalize numbers to a fixed decimal string.
+
+    - None -> <MISSING>
+    - Conversion failure -> <UNREADABLE>
     """
-    return None if v is None else float(format(float(v), ".{}f".format(nd)))
+    if v is None:
+        return S_MISSING
+    try:
+        f = float(v)
+        return format(f, f".{int(nd)}f")
+    except Exception:
+        return S_UNREADABLE
 
 
-def rgb_sig_from_color(col):
+def canon_id(v: Any) -> str:
+    """Canonicalize Revit ElementId-like values to a decimal string.
+
+    Accepts:
+    - ElementId (IntegerValue)
+    - int
+    - numeric string
+
+    - None -> <MISSING>
+    - Anything else / failure -> <UNREADABLE>
     """
-    Create RGB signature string from a Revit Color object.
+    if v is None:
+        return S_MISSING
 
-    Args:
-        col: Revit Color object
+    try:
+        iv = getattr(v, "IntegerValue", None)
+        if iv is not None:
+            return str(int(iv))
+    except Exception:
+        return S_UNREADABLE
 
-    Returns:
-        "R,G,B" string or "<None>" if color cannot be read
-    """
+    try:
+        if isinstance(v, int):
+            return str(v)
+        if isinstance(v, str):
+            s = v.strip()
+            if not s:
+                return S_MISSING
+            return str(int(s))
+        return str(int(v))
+    except Exception:
+        return S_UNREADABLE
+
+
+# =========================
+# Back-compat helpers (deprecated; kept to reduce churn)
+# =========================
+
+def sig_val(v: Any) -> str:
+    """Legacy alias for canon_str."""
+    return canon_str(v)
+
+
+def fnum(v: Any, nd: int) -> str:
+    """Legacy alias for canon_num."""
+    return canon_num(v, nd=nd)
+
+
+def rgb_sig_from_color(col: Any) -> str:
+    """Create RGB signature string from a Revit Color object."""
+    if col is None:
+        return S_MISSING
     try:
         return "{},{},{}".format(int(col.Red), int(col.Green), int(col.Blue))
-    except Exception as e:
-        return "<None>"
+    except Exception:
+        return S_UNREADABLE
 
 
-def rgb_dict_from_color(col):
+def rgb_dict_from_color(col: Any) -> Optional[dict]:
+    """Create RGB dict from a Revit Color object.
+
+    Returns None on missing/unreadable (dict path stays non-sentinel).
     """
-    Create RGB dictionary from a Revit Color object.
-
-    Args:
-        col: Revit Color object
-
-    Returns:
-        {"r": int, "g": int, "b": int} or None if color cannot be read
-    """
+    if col is None:
+        return None
     try:
         return {"r": int(col.Red), "g": int(col.Green), "b": int(col.Blue)}
-    except Exception as e:
+    except Exception:
         return None

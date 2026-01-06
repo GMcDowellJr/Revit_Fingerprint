@@ -14,16 +14,27 @@ Per-record identity: UniqueId (element-backed)
 Ordering: rules are order-sensitive (preserved), categories are sorted
 """
 
-import sys
 import os
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-core_dir = os.path.join(parent_dir, 'core')
-if core_dir not in sys.path:
-    sys.path.insert(0, core_dir)
+import sys
+
+# Ensure repo root is importable (so `import core...` works everywhere)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(current_dir)
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.canon import canon_str, sig_val
+from core.canon import (
+    canon_str,
+    canon_num,
+    canon_bool,
+    canon_id,
+    sig_val,
+    S_MISSING,
+    S_UNREADABLE,
+    S_NOT_APPLICABLE,
+)
+
 
 try:
     from Autodesk.Revit.DB import FilteredElementCollector, ParameterFilterElement
@@ -61,13 +72,13 @@ def _rule_token(rule):
     Goal: represent parameter + operator/evaluator + value.
     """
     if rule is None:
-        return "rule=<None>"
+        return f"rule={S_MISSING}"
 
     parts = []
     try:
         parts.append("type={}".format(rule.GetType().FullName))
     except Exception:
-        parts.append("type=<Unknown>")
+        parts.append(f"type={S_MISSING}")
 
     # Parameter id:
     # - negative ids (BuiltInParameter-style) are allowed
@@ -81,13 +92,13 @@ def _rule_token(rule):
             pid_int = None
 
         if pid_int is None:
-            parts.append("param=<None>")
+            parts.append(f"param={S_MISSING}")
         elif pid_int < 0:
             parts.append("param_id={}".format(safe_str(pid_int)))
         else:
-            parts.append("param=<PositiveId>")
+            parts.append(f"param={S_NOT_APPLICABLE}")
     except Exception:
-        parts.append("param=<Unreadable>")
+        parts.append(f"param={S_UNREADABLE}")
 
     # Try to capture evaluator/operator identity + value
     # String rules
@@ -95,13 +106,13 @@ def _rule_token(rule):
         if FilterStringRule is not None and isinstance(rule, FilterStringRule):
             try:
                 ev = rule.GetEvaluator() if hasattr(rule, "GetEvaluator") else None
-                parts.append("op={}".format(ev.GetType().FullName if ev else "<None>"))
+                parts.append("op={}".format(ev.GetType().FullName if ev else S_MISSING))
             except Exception:
-                parts.append("op=<Unreadable>")
+                parts.append(f"op={S_UNREADABLE}")
             try:
                 parts.append("val={}".format(sig_val(canon_str(getattr(rule, "RuleString", None)))))
             except Exception:
-                parts.append("val=<Unreadable>")
+                parts.append(f"val={S_UNREADABLE}")
             return "|".join(parts)
     except Exception:
         pass
@@ -111,13 +122,13 @@ def _rule_token(rule):
         if FilterIntegerRule is not None and isinstance(rule, FilterIntegerRule):
             try:
                 ev = rule.GetEvaluator() if hasattr(rule, "GetEvaluator") else None
-                parts.append("op={}".format(ev.GetType().FullName if ev else "<None>"))
+                parts.append("op={}".format(ev.GetType().FullName if ev else S_MISSING))
             except Exception:
-                parts.append("op=<Unreadable>")
+                parts.append(f"op={S_UNREADABLE}")
             try:
                 parts.append("val={}".format(sig_val(safe_str(getattr(rule, "RuleValue", None)))))
             except Exception:
-                parts.append("val=<Unreadable>")
+                parts.append(f"val={S_UNREADABLE}")
             return "|".join(parts)
     except Exception:
         pass
@@ -127,13 +138,13 @@ def _rule_token(rule):
         if FilterDoubleRule is not None and isinstance(rule, FilterDoubleRule):
             try:
                 ev = rule.GetEvaluator() if hasattr(rule, "GetEvaluator") else None
-                parts.append("op={}".format(ev.GetType().FullName if ev else "<None>"))
+                parts.append("op={}".format(ev.GetType().FullName if ev else S_MISSING))
             except Exception:
-                parts.append("op=<Unreadable>")
+                parts.append(f"op={S_UNREADABLE}")
             try:
                 parts.append("val={}".format(sig_val(safe_str(getattr(rule, "RuleValue", None)))))
             except Exception:
-                parts.append("val=<Unreadable>")
+                parts.append(f"val={S_UNREADABLE}")
             return "|".join(parts)
     except Exception:
         pass
@@ -143,9 +154,9 @@ def _rule_token(rule):
         if FilterElementIdRule is not None and isinstance(rule, FilterElementIdRule):
             try:
                 ev = rule.GetEvaluator() if hasattr(rule, "GetEvaluator") else None
-                parts.append("op={}".format(ev.GetType().FullName if ev else "<None>"))
+                parts.append("op={}".format(ev.GetType().FullName if ev else S_MISSING))
             except Exception:
-                parts.append("op=<Unreadable>")
+                parts.append(f"op={S_UNREADABLE}")
             try:
                 v = getattr(rule, "RuleValue", None)
                 v_int = getattr(v, "IntegerValue", v)
@@ -155,13 +166,13 @@ def _rule_token(rule):
                     v_int = None
 
                 if v_int is None:
-                    parts.append("val=<None>")
+                    parts.append("val={S_MISSING}")
                 elif v_int < 0:
                     parts.append("val_id={}".format(safe_str(v_int)))
                 else:
-                    parts.append("val=<PositiveId>")
+                    parts.append(f"val={S_NOT_APPLICABLE}")
             except Exception:
-                parts.append("val=<Unreadable>")
+                parts.append(f"val={S_UNREADABLE}")
     except Exception:
         pass
 
@@ -169,7 +180,7 @@ def _rule_token(rule):
     try:
         parts.append("raw={}".format(sig_val(safe_str(rule))))
     except Exception:
-        parts.append("raw=<Unreadable>")
+        parts.append("raw={S_UNREADABLE}")
     return "|".join(parts)
 
 
@@ -179,7 +190,7 @@ def _walk_elem_filter(elem_filter, out_tokens):
     Rules are appended in traversal order.
     """
     if elem_filter is None:
-        out_tokens.append("filter=<None>")
+        out_tokens.append("filter={S_MISSING}")
         return
 
     # Logical filters (AND/OR): recurse into children
@@ -234,7 +245,7 @@ def _walk_elem_filter(elem_filter, out_tokens):
     try:
         out_tokens.append("leaf={}".format(elem_filter.GetType().FullName))
     except Exception:
-        out_tokens.append("leaf=<Unknown>")
+        out_tokens.append("leaf={S_MISSING}")
 
 def _rule_token_v2(rule, doc):
     """
@@ -434,7 +445,7 @@ def extract(doc, ctx=None):
         name = canon_str(getattr(f, "Name", None))
         if not name:
             info["debug_missing_name"] += 1
-            name = "<unnamed>"
+            name = S_MISSING
         names.append(name)
 
         uid = None
@@ -457,7 +468,7 @@ def extract(doc, ctx=None):
             is_selection = hasattr(f, "GetElementFilter") and f.GetElementFilter() is None
             sig.append("is_selection={}".format(sig_val(is_selection)))
         except Exception as e:
-            sig.append("is_selection=<None>")
+            sig.append("is_selection={S_MISSING}")
 
         # Categories the filter applies to
         try:
@@ -494,9 +505,9 @@ def extract(doc, ctx=None):
                         pass
 
                 neg_ids_sorted = sorted(set([x for x in neg_ids if x]))
-                sig.append("categories_ids={}".format(sig_val(",".join(neg_ids_sorted) if neg_ids_sorted else "<None>")))
+                sig.append("categories_ids={}".format(sig_val(",".join(neg_ids_sorted) if neg_ids_sorted else S_MISSING)))
         except Exception as e:
-            sig.append("categories=<None>")
+            sig.append("categories={S_MISSING}")
             
         # v2 categories: negative category ids only (no names)
         if v2_ok:
@@ -528,7 +539,7 @@ def extract(doc, ctx=None):
         try:
             elem_filter = f.GetElementFilter()
             if elem_filter is None:
-                sig.append("filter_tree=<None>")
+                sig.append("filter_tree={S_MISSING}")
             else:
                 tokens = []
                 _walk_elem_filter(elem_filter, tokens)
@@ -537,7 +548,7 @@ def extract(doc, ctx=None):
                     idx = "{:03d}".format(i)
                     sig.append("ft[{}]={}".format(idx, sig_val(t)))
         except Exception as e:
-            sig.append("filter_tree=<Unreadable>")
+            sig.append(f"filter_tree={S_UNREADABLE}")
             
         # v2 filter tree: strict walk, block on unreadable/unallowed
         if v2_ok:

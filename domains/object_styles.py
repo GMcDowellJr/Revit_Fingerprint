@@ -13,16 +13,27 @@ Per-row identity: parent_name|row_name (name-based, not UniqueId)
 Ordering: order-insensitive (sorted before hashing)
 """
 
-import sys
 import os
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-core_dir = os.path.join(parent_dir, 'core')
-if core_dir not in sys.path:
-    sys.path.insert(0, core_dir)
+import sys
 
-from hashing import make_hash, safe_str
-from canon import canon_str, rgb_sig_from_color
+# Ensure repo root is importable (so `import core...` works everywhere)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(current_dir)
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+
+from core.hashing import make_hash, safe_str
+from core.canon import (
+    canon_str,
+    canon_num,
+    canon_bool,
+    canon_id,
+    rgb_sig_from_color,
+    S_MISSING,
+    S_UNREADABLE,
+    S_NOT_APPLICABLE,
+)
+
 
 try:
     from Autodesk.Revit.DB import GraphicsStyleType, CategoryType
@@ -122,21 +133,21 @@ def extract(doc, ctx=None):
         try:
             rgb_sig = rgb_sig_from_color(cat_obj.LineColor)
         except Exception as e:
-            rgb_sig = "<None>"
+            rgb_sig = S_MISSING
 
         # Line pattern (Object Styles has ONE pattern, not proj/cut)
         # Hash surface contract: no UniqueId/GUID/+ElementId
         # Prefer line_patterns def_hash via ctx map; else deterministic sentinel
         try:
             lp_id = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
-            lp_val = "<None>"
+            lp_val = S_MISSING
             if lp_id and lp_id.IntegerValue > 0:
                 lp_e = doc.GetElement(lp_id)
                 lp_uid = canon_str(getattr(lp_e, "UniqueId", None)) if lp_e else None
                 lp_map = (ctx or {}).get("line_pattern_uid_to_hash", {}) if ctx is not None else {}
                 lp_val = lp_map.get(lp_uid) or "<LP:UNMAPPED>"
         except Exception as e:
-            lp_val = "<None>"
+            lp_val = S_MISSING
 
         sig = "|".join([
             safe_str(parent_name),
@@ -160,7 +171,7 @@ def extract(doc, ctx=None):
         if w_proj is None or w_cut is None:
             return None, "unreadable_line_weight"
 
-        if rgb_sig == "<None>":
+        if rgb_sig == S_MISSING:
             return None, "unreadable_line_color"
 
         # Line pattern mapping requirement (upstream v2 dependency)
@@ -191,7 +202,7 @@ def extract(doc, ctx=None):
             if not lp_hash_v2:
                 return None, "unmapped_line_pattern_v2"
         else:
-            # Legacy would emit "<None>" — in v2 we block rather than hash sentinels.
+            # Legacy would emit S_MISSING — in v2 we block rather than hash sentinels.
             return None, "no_line_pattern"
 
         sig_v2 = "|".join([
@@ -238,12 +249,12 @@ def extract(doc, ctx=None):
         try:
             cat_type = safe_str(cat.CategoryType)
         except Exception as e:
-            cat_type = "<unknown>"
+            cat_type = S_MISSING
 
-        # Emit the parent row ("<self>")
+        # Emit the parent row ("self")
         try:
-            sig, w_proj, w_cut, rgb_sig = row_sig_legacy(cat, parent_name, "<self>", cat_type)
-            row_key = "{}|{}".format(parent_name, "<self>")
+            sig, w_proj, w_cut, rgb_sig = row_sig_legacy(cat, parent_name, "self", cat_type)
+            row_key = "{}|{}".format(parent_name, "self")
             names.append(row_key)
             h = make_hash([sig])  # stable, deterministic
             records.append(sig)
@@ -253,7 +264,7 @@ def extract(doc, ctx=None):
             info["debug_rows_emitted"] += 1
 
             if not v2_blocked:
-                sig_v2, reason = row_sig_v2(cat, parent_name, "<self>", cat_type, w_proj, w_cut, rgb_sig)
+                sig_v2, reason = row_sig_v2(cat, parent_name, "self", cat_type, w_proj, w_cut, rgb_sig)
                 if sig_v2 is None:
                     v2_blocked = True
                     v2_reasons[reason] = True

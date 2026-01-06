@@ -11,15 +11,26 @@ Captures project metadata including:
 This is not a fingerprinted domain (no hash) - purely metadata.
 """
 
-import sys
 import os
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-core_dir = os.path.join(parent_dir, 'core')
-if core_dir not in sys.path:
-    sys.path.insert(0, core_dir)
+import sys
 
-from hashing import safe_str
+# Ensure repo root is importable (so `import core...` works everywhere)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(current_dir)
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+
+from core.hashing import make_hash, safe_str
+from core.canon import (
+    canon_str,
+    canon_num,
+    canon_bool,
+    canon_id,
+    S_MISSING,
+    S_UNREADABLE,
+    S_NOT_APPLICABLE,
+)
+
 
 try:
     from Autodesk.Revit.DB import WorksharingUtils

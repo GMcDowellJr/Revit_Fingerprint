@@ -11,16 +11,26 @@ Per-record identity: line style name (name-based, not UniqueId)
 Ordering: order-insensitive (sorted before hashing)
 """
 
-import sys
 import os
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-core_dir = os.path.join(parent_dir, 'core')
-if core_dir not in sys.path:
-    sys.path.insert(0, core_dir)
+import sys
 
-from hashing import make_hash, safe_str
-from canon import canon_str
+# Ensure repo root is importable (so `import core...` works everywhere)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(current_dir)
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+
+from core.hashing import make_hash, safe_str
+from core.canon import (
+    canon_str,
+    canon_num,
+    canon_bool,
+    canon_id,
+    S_MISSING,
+    S_UNREADABLE,
+    S_NOT_APPLICABLE,
+)
+
 
 try:
     from Autodesk.Revit.DB import Category, BuiltInCategory, GraphicsStyleType, ElementId
@@ -118,12 +128,12 @@ def extract(doc, ctx=None):
                 c = sc.LineColor
                 rgb_sig = "{}-{}-{}".format(int(c.Red), int(c.Green), int(c.Blue))
             except Exception as e:
-                rgb_sig = "<None>"
+                rgb_sig = S_MISSING
 
             # Line pattern reference in hash surface:
             # - Must not include UniqueId/GUID/+ElementId
             # - Prefer line_patterns def_hash via ctx map; else deterministic sentinel
-            lp_val = "<None>"
+            lp_val = S_MISSING
             try:
                 lp_id = sc.GetLinePatternId(GraphicsStyleType.Projection)
                 if lp_id and lp_id != ElementId.InvalidElementId:
@@ -132,7 +142,7 @@ def extract(doc, ctx=None):
                     lp_map = (ctx or {}).get("line_pattern_uid_to_hash", {}) if ctx is not None else {}
                     lp_val = lp_map.get(lp_uid) or "<LP:UNMAPPED>"
             except Exception as e:
-                lp_val = "<None>"
+                lp_val = S_MISSING
 
             # record signature (names ARE identity here by your locked semantics)
             records.append("|".join([
@@ -154,7 +164,7 @@ def extract(doc, ctx=None):
                     v2_blocked = True
                     v2_reasons["unreadable_line_weight"] = True
 
-                if rgb_sig == "<None>":
+                if rgb_sig == S_MISSING:
                     v2_blocked = True
                     v2_reasons["unreadable_line_color"] = True
 
@@ -205,9 +215,9 @@ def extract(doc, ctx=None):
     info["record_rows"] = []
     if records_sorted:
         sigs = info.get("signature_hashes") or []
-        # Defensive: if something ever goes out of sync, fail-soft by pairing "<None>"
+        # Defensive: if something ever goes out of sync, fail-soft by pairing S_MISSING
         for i, r in enumerate(records_sorted):
-            sh = sigs[i] if i < len(sigs) else "<None>"
+            sh = sigs[i] if i < len(sigs) else S_MISSING
             info["record_rows"].append({
                 "record": r,
                 "sig_hash": sh,

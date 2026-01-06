@@ -12,17 +12,29 @@ Per-record identity: UniqueId
 Ordering: order-insensitive (sorted before hashing)
 """
 
-import sys
 import os
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-core_dir = os.path.join(parent_dir, 'core')
-if core_dir not in sys.path:
-    sys.path.insert(0, core_dir)
+import sys
 
-from hashing import make_hash, safe_str
-from canon import canon_str, sig_val, fnum
-from rows import (
+# Ensure repo root is importable (so `import core...` works everywhere)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(current_dir)
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+
+from core.hashing import make_hash, safe_str
+from core.canon import (
+    canon_str,
+    canon_num,
+    canon_bool,
+    canon_id,
+    sig_val,
+    fnum,
+    S_MISSING,
+    S_UNREADABLE,
+    S_NOT_APPLICABLE,
+)
+
+from core.rows import (
     first_param, _as_string, _as_double, _as_int, _as_bool_from_param,
     format_len_inches, try_get_color_rgb_from_elem,
     get_type_display_name, get_element_display_name
@@ -91,7 +103,7 @@ def extract(doc, ctx=None):
             names.append(type_name)
         else:
             missing += 1
-            type_name = "<unnamed>"
+            type_name = S_MISSING
 
         # --- core fields ---
         font = _as_string(first_param(t, bip_names=["TEXT_FONT"], ui_names=["Text Font"]))
@@ -179,8 +191,8 @@ def extract(doc, ctx=None):
                 _v2_block("unreadable_line_weight")
 
             # color must be readable; use RGB in v2 (avoid element ids / GUIDs)
-            if (color_rgb is None) or (safe_str(color_rgb) in ["", "<None>", "<Unreadable>"]):
-                _v2_block("unreadable_color_rgb")
+            if canon_str(color_rgb) in (S_MISSING, S_UNREADABLE):
+                 _v2_block("unreadable_color_rgb")
 
             # boolean-ish fields must be non-None
             if show_border is None:
