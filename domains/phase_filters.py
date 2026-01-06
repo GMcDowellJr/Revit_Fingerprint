@@ -12,16 +12,27 @@ Per-record identity: UniqueId (element-backed)
 Ordering: deterministic (status order is fixed); record list order-insensitive
 """
 
-import sys
 import os
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-core_dir = os.path.join(parent_dir, 'core')
-if core_dir not in sys.path:
-    sys.path.insert(0, core_dir)
+import sys
+
+# Ensure repo root is importable (so `import core...` works everywhere)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(current_dir)
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.canon import canon_str, sig_val
+from core.canon import (
+    canon_str,
+    canon_num,
+    canon_bool,
+    canon_id,
+    sig_val,
+    S_MISSING,
+    S_UNREADABLE,
+    S_NOT_APPLICABLE,
+)
+
 
 try:
     from Autodesk.Revit.DB import FilteredElementCollector, PhaseFilter, ElementOnPhaseStatus
@@ -95,7 +106,7 @@ def extract(doc, ctx=None):
         name = canon_str(getattr(pf, "Name", None))
         if not name:
             info["debug_missing_name"] += 1
-            name = "<unnamed>"
+            name = S_MISSING
         names.append(name)
 
         uid = None

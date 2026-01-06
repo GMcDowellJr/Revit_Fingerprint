@@ -12,21 +12,28 @@ Per-record identity: UniqueId
 Ordering: order-insensitive (sorted before hashing)
 """
 
-import sys
 import os
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-core_dir = os.path.join(parent_dir, 'core')
-if core_dir not in sys.path:
-    sys.path.insert(0, core_dir)
+import sys
 
-from hashing import make_hash, safe_str
-from canon import canon_str, sig_val, fnum
-from rows import (
-    first_param, _as_string, _as_double, _as_int,
-    format_len_inches, try_get_color_rgb_from_elem,
-    get_type_display_name, get_element_display_name
+# Ensure repo root is importable (so `import core...` works everywhere)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(current_dir)
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+
+from core.hashing import make_hash, safe_str
+from core.canon import (
+    canon_str,
+    canon_num,
+    canon_bool,
+    canon_id,
+    sig_val,
+    fnum,
+    S_MISSING,
+    S_UNREADABLE,
+    S_NOT_APPLICABLE,
 )
+
 
 # --- v2 helpers: Units / Alternate Units FormatOptions ---
 
@@ -209,7 +216,7 @@ def extract(doc, ctx=None):
         witness = _as_string(first_param(d, ui_names=["Witness Line Control"]))
         witness = canon_str(witness)
 
-        # --- additional likely-visible parameters (optional; will be <None> if absent) ---
+        # --- additional likely-visible parameters (optional; will be S_MISSING if absent) ---
         def _p(ui_name):
             return first_param(d, ui_names=[ui_name])
 
@@ -327,7 +334,8 @@ def extract(doc, ctx=None):
         # Exception (explicit): dimension type name is part of identity/definition in this domain.
         # Policy: tick mark is represented by its display name (no ids/guids).
         if not v2_blocked:
-            if not type_name or safe_str(type_name) in ["", "<None>", "<Unreadable>"]:
+            type_name = canon_str(type_name)
+            if type_name in (S_MISSING, S_UNREADABLE):
                 _v2_block("unreadable_type_name")
 
             if not text_font:
@@ -340,7 +348,7 @@ def extract(doc, ctx=None):
             #    _v2_block("unreadable_line_weight")
 
             # color must be readable; use RGB in v2 (avoid element ids / GUIDs)
-            if (color_rgb is None) or (safe_str(color_rgb) in ["", "<None>", "<Unreadable>"]):
+            if canon_str(color_rgb) in (S_MISSING, S_UNREADABLE):
                 _v2_block("unreadable_color_rgb")
 
             #if not tick_name:

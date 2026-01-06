@@ -10,16 +10,28 @@ Per-record identity: UniqueId
 Ordering: segment order is preserved (order-sensitive for segments)
 """
 
-import sys
 import os
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-core_dir = os.path.join(parent_dir, 'core')
-if core_dir not in sys.path:
-    sys.path.insert(0, core_dir)
+import sys
 
-from hashing import make_hash, safe_str
-from canon import canon_str, sig_val
+# Ensure repo root is importable (so `import core...` works everywhere)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(current_dir)
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+
+from core.hashing import make_hash, safe_str
+from core.canon import (
+    canon_str,
+    canon_num,
+    canon_bool,
+    canon_id,
+    sig_val,
+    fnum,
+    S_MISSING,
+    S_UNREADABLE,
+    S_NOT_APPLICABLE,
+)
+
 
 try:
     from Autodesk.Revit.DB import FilteredElementCollector, LinePatternElement
@@ -125,7 +137,7 @@ def extract(doc, ctx=None):
 
     def fnum(v, nd=9):
         if v is None:
-            return "<None>"
+            return S_MISSING
         try:
             return format(float(v), ".{}f".format(nd))
         except Exception as e:
@@ -136,7 +148,7 @@ def extract(doc, ctx=None):
         name = canon_str(getattr(e, "Name", None))
         if not name:
             info["debug_missing_name"] += 1
-            name = "<unnamed>"
+            name = S_MISSING
         names.append(name)
 
         uid = None
@@ -222,8 +234,8 @@ def extract(doc, ctx=None):
                         if st_id == 2:
                             slen = 0.0
 
-                        sig.append("seg[{}].type_id={}".format(idx, sig_val(st_id if st_id is not None else "<None>")))
-                        sig.append("seg[{}].type={}".format(idx, sig_val(st_name if st_name is not None else "<None>")))
+                        sig.append("seg[{}].type_id={}".format(idx, sig_val(st_id)))
+                        sig.append("seg[{}].type={}".format(idx, sig_val(st_name)))
                         sig.append("seg[{}].len={}".format(idx, sig_val(fnum(slen, 9))))
                     except Exception as e:
                         info["debug_fail_segment_read"] += 1

@@ -17,16 +17,28 @@ semantic_v2 hash (additive):
 - No sentinel hashing for v2.
 """
 
-import sys
 import os
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-core_dir = os.path.join(parent_dir, 'core')
-if core_dir not in sys.path:
-    sys.path.insert(0, core_dir)
+import sys
+
+# Ensure repo root is importable (so `import core...` works everywhere)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(current_dir)
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.canon import canon_str, sig_val
+from core.canon import (
+    canon_str,
+    sig_val,
+    fnum,
+    canon_num,
+    canon_bool,
+    canon_id,
+    S_MISSING,
+    S_UNREADABLE,
+    S_NOT_APPLICABLE,
+)
+
 
 try:
     from Autodesk.Revit.DB import (
@@ -128,7 +140,7 @@ def extract(doc, ctx=None):
         name = canon_str(getattr(v, "Name", None))
         if not name:
             info["debug_missing_name"] += 1
-            name = "<unnamed>"
+            name = S_MISSING
         names.append(name)
 
         uid = None
@@ -217,7 +229,7 @@ def extract(doc, ctx=None):
                     pf_elem = doc.GetElement(pf_id) if pf_id else None
                     if pf_elem:
                         pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                        pf_hash = phase_filter_map.get(pf_uid, "<NotInGlobalDomain>") if pf_uid else "<None>"
+                        pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
                         sig.append("phase_filter={}".format(sig_val(pf_hash)))
                         # v2: require upstream v2 hash when phase filter is present
                         if v2_ok:
@@ -232,12 +244,12 @@ def extract(doc, ctx=None):
                             else:
                                 sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
                     else:
-                        sig.append("phase_filter=<None>")
+                        sig.append("phase_filte
                 except Exception as e:
                     info["debug_fail_read"] += 1
-                    sig.append("phase_filter=<Unreadable>")
+                    sig.append(f"phase_filter={S_UNREADABLE}")
             else:
-                sig.append("phase_filter=<None>")
+                sig.append("phase_filter={S_MISSING}")
 
             # NOTE: Schedule filter stack + VG signatures are not consistently supported across versions.
             # We keep schedule signature minimal and stable.
@@ -334,7 +346,7 @@ def extract(doc, ctx=None):
                 pf_elem = doc.GetElement(pf_id) if pf_id else None
                 if pf_elem:
                     pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                    pf_hash = phase_filter_map.get(pf_uid, "<NotInGlobalDomain>") if pf_uid else "<None>"
+                    pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
                     sig.append("phase_filter={}".format(sig_val(pf_hash)))
                     # v2: require upstream v2 hash when phase filter is present
                     if v2_ok:
@@ -349,12 +361,12 @@ def extract(doc, ctx=None):
                         else:
                             sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
                 else:
-                    sig.append("phase_filter=<None>")
+                    sig.append(f"phase_filter={S_MISSING}")
             except Exception as e:
                 info["debug_fail_read"] += 1
-                sig.append("phase_filter=<Unreadable>")
+                sig.append(f"phase_filter={S_UNREADABLE}")
         else:
-            sig.append("phase_filter=<None>")
+            sig.append("phase_filter={S_MISSING}")
 
         # Visibility/Graphics (VG) signature
         # Contract: avoid names + avoid positive element ids in hash.
@@ -501,13 +513,13 @@ def extract(doc, ctx=None):
 
                     # Pack (avoid ids; colors are packed as RGB triples)
                     try:
-                        proj_col_s = "{}-{}-{}".format(proj_col.Red, proj_col.Green, proj_col.Blue) if proj_col else "<None>"
+                        proj_col_s = "{}-{}-{}".format(proj_col.Red, proj_col.Green, proj_col.Blue) if proj_col else S_MISSING
                     except Exception as e:
-                        proj_col_s = "<None>"
+                        proj_col_s = S_MISSING
                     try:
-                        cut_col_s = "{}-{}-{}".format(cut_col.Red, cut_col.Green, cut_col.Blue) if cut_col else "<None>"
+                        cut_col_s = "{}-{}-{}".format(cut_col.Red, cut_col.Green, cut_col.Blue) if cut_col else S_MISSING
                     except Exception as e:
-                        cut_col_s = "<None>"
+                        cut_col_s = S_MISSING
 
                     line = (
                         "cat={}|hidden={}|ovr=1|dl={}|proj_wt={}|cut_wt={}|proj_col={}|cut_col={}|half={}|trans={}|"
@@ -563,7 +575,7 @@ def extract(doc, ctx=None):
                         try:
                             f_elem = doc.GetElement(fid)
                             f_uid = canon_str(getattr(f_elem, "UniqueId", None)) if f_elem else None
-                            f_hash = filter_map.get(f_uid, "<NotInGlobalDomain>") if f_uid else "<None>"
+                            f_hash = filter_map.get(f_uid, S_UNREADABLE) if f_uid else S_MISSING
                             f_hash_v2 = None
                             if v2_ok:
                                 try:
@@ -578,7 +590,7 @@ def extract(doc, ctx=None):
                                 visibility = v.GetFilterVisibility(fid)
                                 vis_str = safe_str(visibility)
                             except Exception as e:
-                                vis_str = "<None>"
+                                vis_str = S_MISSING
 
                             idx = "{:03d}".format(i)
                             filter_hashes.append("filter[{}]={}|vis={}".format(idx, f_hash, vis_str))
