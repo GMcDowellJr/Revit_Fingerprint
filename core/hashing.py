@@ -21,23 +21,66 @@ def safe_str(x):
         except Exception as e:
             return u"<unrepr>"
 
-
 def make_hash(values):
     """
     Deterministic hash based on a sequence of strings.
-    Uses .NET MD5 to avoid IronPython limitations.
 
-    Args:
-        values: Iterable of values to hash (will be converted to strings)
+    Streaming/incremental implementation to avoid building a huge joined
+    preimage in memory.
 
-    Returns:
-        Hexadecimal MD5 hash string (32 characters)
+    Semantics intentionally match:
+        preimage = "|".join(safe_str(v) for v in values)
+        md5(preimage.encode("utf-8")).hexdigest()
+
+    Supports two runtimes:
+      - Revit/pythonnet: use CLR MD5 (streaming)
+      - Plain CPython (pytest): fall back to hashlib (streaming)
     """
-    from System.Text import Encoding
-    from System.Security.Cryptography import MD5
+    # First try CLR backend (Revit / pythonnet). If not available, use hashlib.
+    try:
+        from System.Text import Encoding  # type: ignore
+        from System.Security.Cryptography import MD5  # type: ignore
+    except (ImportError, ModuleNotFoundError):
+        Encoding = None
+        MD5 = None
 
-    joined = u"|".join([safe_str(v) for v in values])
-    data = Encoding.UTF8.GetBytes(joined)
-    md5 = MD5.Create()
-    hash_bytes = md5.ComputeHash(data)
-    return "".join(["{0:02x}".format(b) for b in hash_bytes])
+    if Encoding is not None and MD5 is not None:
+        # CLR streaming MD5 via TransformBlock/TransformFinalBlock
+        md5 = MD5.Create()
+        first = True
+
+        for v in values:
+            s = safe_str(v)
+
+            if not first:
+                sep = Encoding.UTF8.GetBytes(u"|")
+                md5.TransformBlock(sep, 0, sep.Length, sep, 0)
+            else:
+                first = False
+
+            chunk = Encoding.UTF8.GetBytes(s)
+            md5.TransformBlock(chunk, 0, chunk.Length, chunk, 0)
+
+        # Finalize
+        empty = Encoding.UTF8.GetBytes(u"")
+        md5.TransformFinalBlock(empty, 0, 0)
+        hash_bytes = md5.Hash
+        return "".join(["{0:02x}".format(b) for b in hash_bytes])
+
+    # CPython fallback: hashlib (also incremental)
+    import hashlib
+
+    h = hashlib.md5()
+    first = True
+
+    for v in values:
+        s = safe_str(v)
+
+        if not first:
+            h.update(b"|")
+        else:
+            first = False
+
+        h.update(s.encode("utf-8"))
+
+    return h.hexdigest()
