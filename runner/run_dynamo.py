@@ -28,6 +28,7 @@ if parent_dir not in sys.path:
 # Contract + dependency utilities (must be imported after sys.path adjustment)
 from core import contracts
 from core.collect import CollectCtx
+from core.context import DocViewContext
 from core.deps import Blocked, require_domain
 
 # Revit/Dynamo plumbing
@@ -103,6 +104,38 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
     try:
         legacy = fn(doc, ctx)
 
+        # Domains may optionally emit contract signals into their legacy payload.
+        # Runner lifts these into the authoritative contract envelope and strips them from the legacy payload.
+        domain_status = contracts.DOMAIN_STATUS_OK
+        block_reasons = []
+        domain_diag = {
+            "api_reachable": True,
+            "hash_mode": HASH_MODE,
+        }
+
+        if isinstance(legacy, dict):
+            try:
+                _st = legacy.pop("_domain_status", None)
+                if isinstance(_st, str) and _st in contracts.VALID_DOMAIN_STATUSES:
+                    domain_status = _st
+            except Exception:
+                pass
+
+            try:
+                _br = legacy.pop("_domain_block_reasons", None)
+                if isinstance(_br, list):
+                    block_reasons = [str(x) for x in _br]
+            except Exception:
+                pass
+
+            try:
+                _dg = legacy.pop("_domain_diag", None)
+                if isinstance(_dg, dict):
+                    # Merge domain diag into base diag (domain wins on key collisions)
+                    domain_diag.update(_dg)
+            except Exception:
+                pass
+
         # Select which hash is surfaced in the contract based on runner HASH_MODE.
         legacy_hash = _extract_legacy_hash(legacy)
         v2_hash = _extract_v2_hash(legacy)
@@ -113,12 +146,9 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
         env = contracts.new_domain_envelope(
             domain=domain_name,
             domain_version=_DOMAIN_VERSION,
-            status=contracts.DOMAIN_STATUS_OK,
-            block_reasons=[],
-            diag={
-                "api_reachable": True,
-                "hash_mode": HASH_MODE,
-            },
+            status=domain_status,
+            block_reasons=block_reasons,
+            diag=domain_diag,
             records=None,
             hash_value=hash_value,
         )
@@ -188,6 +218,9 @@ def run_fingerprint(doc):
 
     # PR5: per-run collector cache + counters
     ctx["_collect"] = CollectCtx()
+
+    # PR6: shared document + view context (domains can use for consistent view reads)
+    ctx["_doc_view"] = DocViewContext(doc)
 
     # Assemble fingerprint by calling each domain extractor (legacy payloads)
     fingerprint = {}
