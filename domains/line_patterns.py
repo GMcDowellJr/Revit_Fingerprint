@@ -20,6 +20,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.collect import collect_types
 from core.canon import (
     canon_str,
     canon_num,
@@ -34,9 +35,8 @@ from core.canon import (
 
 
 try:
-    from Autodesk.Revit.DB import FilteredElementCollector, LinePatternElement
+    from Autodesk.Revit.DB import LinePatternElement
 except ImportError:
-    FilteredElementCollector = None
     LinePatternElement = None
 
 # Global debug flag (will be configurable via runner later)
@@ -122,7 +122,15 @@ def extract(doc, ctx=None):
     }
 
     try:
-        col = list(FilteredElementCollector(doc).OfClass(LinePatternElement))
+        col = list(
+            collect_types(
+                doc,
+                of_class=LinePatternElement,
+                require_unique_id=True,
+                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+                cache_key="line_patterns:LinePatternElement:types",
+            )
+        )
     except Exception as e:
         return info
 

@@ -22,6 +22,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.collect import collect_types
 from core.canon import (
     canon_str,
     canon_num,
@@ -33,11 +34,9 @@ from core.canon import (
     S_NOT_APPLICABLE,
 )
 
-
 try:
-    from Autodesk.Revit.DB import FilteredElementCollector, PhaseFilter, ElementOnPhaseStatus
-except Exception as e:
-    FilteredElementCollector = None
+    from Autodesk.Revit.DB import PhaseFilter, ElementOnPhaseStatus
+except ImportError:
     PhaseFilter = None
     ElementOnPhaseStatus = None
 
@@ -75,7 +74,15 @@ def extract(doc, ctx=None):
     }
 
     try:
-        col = list(FilteredElementCollector(doc).OfClass(PhaseFilter))
+        col = list(
+            collect_types(
+                doc,
+                of_class=PhaseFilter,
+                require_unique_id=True,
+                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+                cache_key="phase_filters:PhaseFilter:types",
+            )
+        )
     except Exception as e:
         return info
 

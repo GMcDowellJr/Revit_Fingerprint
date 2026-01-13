@@ -27,6 +27,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.collect import collect_types
 from core.canon import (
     canon_str,
     sig_val,
@@ -42,7 +43,6 @@ from core.canon import (
 
 try:
     from Autodesk.Revit.DB import (
-        FilteredElementCollector,
         View,
         ViewSchedule,
         BuiltInParameter,
@@ -51,7 +51,6 @@ try:
         CategoryType,
     )
 except Exception as e:
-    FilteredElementCollector = None
     View = None
     ViewSchedule = None
     BuiltInParameter = None
@@ -104,7 +103,15 @@ def extract(doc, ctx=None):
     debug_vg_details = bool(ctx.get("debug_vg_details", False)) if ctx else False
 
     try:
-        col = list(FilteredElementCollector(doc).OfClass(View))
+        col = list(
+            collect_types(
+                doc,
+                of_class=View,
+                require_unique_id=True,
+                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+                cache_key="view_templates:View:types",
+            )
+        )
     except Exception as e:
         return info
 

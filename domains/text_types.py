@@ -22,6 +22,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.collect import collect_types
 from core.canon import (
     canon_str,
     canon_num,
@@ -41,11 +42,9 @@ from core.rows import (
 )
 
 try:
-    from Autodesk.Revit.DB import FilteredElementCollector, TextNoteType
+    from Autodesk.Revit.DB import TextNoteType
 except ImportError:
-    FilteredElementCollector = None
     TextNoteType = None
-
 
 def extract(doc, ctx=None):
     """
@@ -74,7 +73,15 @@ def extract(doc, ctx=None):
 
     types = []
     try:
-        types = list(FilteredElementCollector(doc).OfClass(TextNoteType).ToElements())
+        types = list(
+            collect_types(
+                doc,
+                of_class=TextNoteType,
+                require_unique_id=True,
+                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+                cache_key="text_types:TextNoteType:types",
+            )
+        )
     except Exception as e:
         types = []
 

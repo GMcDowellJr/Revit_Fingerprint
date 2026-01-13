@@ -24,6 +24,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.collect import collect_types
 from core.canon import (
     canon_str,
     canon_num,
@@ -35,11 +36,9 @@ from core.canon import (
     S_NOT_APPLICABLE,
 )
 
-
 try:
-    from Autodesk.Revit.DB import FilteredElementCollector, ParameterFilterElement
+    from Autodesk.Revit.DB import ParameterFilterElement
 except ImportError:
-    FilteredElementCollector = None
     ParameterFilterElement = None
 
 try:
@@ -68,7 +67,7 @@ except Exception:
 
 def _rule_token(rule):
     """
-    Convert a Revit FilterRule into a stable, comparable token string.
+    Convert a Revit FilterRule intoi a stable, comparable token string.
     Goal: represent parameter + operator/evaluator + value.
     """
     if rule is None:
@@ -427,7 +426,15 @@ def extract(doc, ctx=None):
     }
 
     try:
-        col = list(FilteredElementCollector(doc).OfClass(ParameterFilterElement))
+        col = list(
+            collect_types(
+                doc,
+                of_class=ParameterFilterElement,
+                require_unique_id=True,
+                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+                cache_key="view_filters:ParameterFilterElement:types",
+            )
+        )
     except Exception as e:
         return info
 
