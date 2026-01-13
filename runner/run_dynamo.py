@@ -27,6 +27,7 @@ if parent_dir not in sys.path:
 
 # Contract + dependency utilities (must be imported after sys.path adjustment)
 from core import contracts
+from core.collect import CollectCtx
 from core.deps import Blocked, require_domain
 
 # Revit/Dynamo plumbing
@@ -185,6 +186,9 @@ def run_fingerprint(doc):
     ctx = {}
     ctx["debug_vg_details"] = False
 
+    # PR5: per-run collector cache + counters
+    ctx["_collect"] = CollectCtx()
+
     # Assemble fingerprint by calling each domain extractor (legacy payloads)
     fingerprint = {}
 
@@ -303,6 +307,16 @@ def run_fingerprint(doc):
                 code=b.code,
                 message=";".join(list(b.reasons)),
             )
+
+    # PR5: merge collector counters into contract run_diag for acceptance verification
+    try:
+        _c = ctx.get("_collect")
+        if _c is not None and hasattr(_c, "counters"):
+            for _k, _v in dict(_c.counters).items():
+                run_diag["counters"][str(_k)] = int(_v)
+    except Exception:
+        # Do not change run outcome if diagnostics merge fails.
+        pass
 
     elapsed_seconds = round(time.time() - start_ts, 3)
     fingerprint["_elapsed_seconds"] = elapsed_seconds

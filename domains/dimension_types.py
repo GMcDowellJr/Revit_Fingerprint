@@ -22,6 +22,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.collect import collect_types
 from core.canon import (
     canon_str,
     canon_num,
@@ -43,6 +44,12 @@ from core.rows import (
     get_element_display_name,
     get_type_display_name,
 )
+
+try:
+    from Autodesk.Revit.DB import DimensionType
+except ImportError:
+    DimensionType = None
+
 
 # --- v2 helpers: Units / Alternate Units FormatOptions ---
 
@@ -195,13 +202,6 @@ def _format_options_to_kv(fo):
 
     return out
 
-try:
-    from Autodesk.Revit.DB import FilteredElementCollector, DimensionType
-except ImportError:
-    FilteredElementCollector = None
-    DimensionType = None
-
-
 def extract(doc, ctx=None):
     """
     Extract Dimension Types fingerprint from document.
@@ -231,8 +231,16 @@ def extract(doc, ctx=None):
         "debug_v2_block_reasons": {},
     }
 
+    types = list(
+        collect_types(
+            doc,
+            of_class=DimensionType,
+            require_unique_id=True,
+            cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+            cache_key="dimension_types:DimensionType:types",
+        )
+    )
 
-    types = list(FilteredElementCollector(doc).OfClass(DimensionType))
     info["raw_count"] = len(types)
 
     names = []

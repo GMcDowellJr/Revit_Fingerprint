@@ -21,6 +21,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.collect import collect_types
 from core.canon import (
     canon_str,
     sig_val,
@@ -34,9 +35,8 @@ from core.canon import (
 )
 
 try:
-    from Autodesk.Revit.DB import FilteredElementCollector, FillPatternElement
+    from Autodesk.Revit.DB import FillPatternElement
 except ImportError:
-    FilteredElementCollector = None
     FillPatternElement = None
 
 # Global debug flag
@@ -78,7 +78,15 @@ def extract(doc, ctx=None):
     }
 
     try:
-        col = list(FilteredElementCollector(doc).OfClass(FillPatternElement))
+        col = list(
+            collect_types(
+                doc,
+                of_class=FillPatternElement,
+                require_unique_id=True,
+                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+                cache_key="fill_patterns:FillPatternElement:types",
+            )
+        )
     except Exception as e:
         return info
     info["raw_count"] = len(col)
