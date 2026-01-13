@@ -244,7 +244,7 @@ def extract(doc, ctx=None):
                             else:
                                 sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
                     else:
-                        sig.append("phase_filte
+                        sig.append(f"phase_filter={S_MISSING}")
                 except Exception as e:
                     info["debug_fail_read"] += 1
                     sig.append(f"phase_filter={S_UNREADABLE}")

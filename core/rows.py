@@ -15,7 +15,7 @@ except ImportError:
     UnitUtils = None
     UnitTypeId = None
 
-from canon import canon_str, safe_str
+from core.canon import canon_str, safe_str
 
 
 def _param(elem, bip):
