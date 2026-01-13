@@ -33,9 +33,94 @@ from core.canon import (
     S_UNREADABLE,
     S_NOT_APPLICABLE,
 )
-
+from core.rows import (
+    first_param,
+    _as_string,
+    _as_double,
+    _as_int,
+    format_len_inches,
+    try_get_color_rgb_from_elem,
+    get_element_display_name,
+    get_type_display_name,
+)
 
 # --- v2 helpers: Units / Alternate Units FormatOptions ---
+
+def _as_string(v):
+    """
+    Defensive conversion to a stable string.
+
+    Handles:
+      - None
+      - Revit Parameter-like objects (AsString / AsValueString)
+      - Any other object via str()
+    """
+    if v is None:
+        return ""
+
+    # Revit DB.Parameter has AsString/AsValueString.
+    try:
+        if hasattr(v, "AsString"):
+            s = v.AsString()
+            if s is not None:
+                return str(s)
+    except Exception:
+        pass
+
+    try:
+        if hasattr(v, "AsValueString"):
+            s = v.AsValueString()
+            if s is not None:
+                return str(s)
+    except Exception:
+        pass
+
+    try:
+        return str(v)
+    except Exception:
+        return ""
+
+def get_type_display_name(elem_type):
+    """
+    Deterministic, defensive type name extraction.
+
+    Preference order:
+      1) FamilyName + ":" + Name (common for many types)
+      2) Name
+      3) ElementId string as last resort
+
+    This intentionally avoids localized UI display names.
+    """
+    if elem_type is None:
+        return S_MISSING
+
+    # Avoid raising if the element is a proxy or partially invalid.
+    family = None
+    name = None
+
+    try:
+        family = getattr(elem_type, "FamilyName", None)
+    except Exception:
+        family = None
+
+    try:
+        name = getattr(elem_type, "Name", None)
+    except Exception:
+        name = None
+
+    if family and name:
+        return "{0}:{1}".format(str(family), str(name))
+    if name:
+        return str(name)
+
+    try:
+        eid = getattr(elem_type, "Id", None)
+        if eid is not None:
+            return "id:{0}".format(str(eid))
+    except Exception:
+        pass
+
+    return S_MISSING
 
 def _fmt_in_from_ft(ft, places=6):
     if ft is None:
