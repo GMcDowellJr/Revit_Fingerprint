@@ -91,6 +91,10 @@ def extract(doc, ctx=None):
         "signature_hashes_v2": [],
         "debug_v2_blocked": 0,
         "debug_v2_block_reasons": {},
+        # PR6: deterministic degraded signaling
+        "debug_view_context_problem": 0,
+        "debug_view_context_reasons": {},
+        "debug_collect_types_failed": 0,
     }
 
     # Get context mappings (may be None if global domains not run)
@@ -113,6 +117,13 @@ def extract(doc, ctx=None):
             )
         )
     except Exception as e:
+        info["debug_collect_types_failed"] += 1
+        info["_domain_status"] = "degraded"
+        info["_domain_diag"] = {
+            "degraded_reasons": ["collect_types_failed"],
+            "degraded_reason_counts": {"collect_types_failed": 1},
+            "error": str(e),
+        }
         return info
 
     info["raw_count"] = len(col)
@@ -158,6 +169,22 @@ def extract(doc, ctx=None):
 
         if not uid:
             info["debug_missing_uid"] += 1
+
+        # PR6: view-scoped context snapshot (explicit missing vs unreadable)
+        try:
+            dv = (ctx or {}).get("_doc_view") if ctx is not None else None
+            if dv is not None:
+                vi = dv.view_info(v, source="HOST")
+                if vi.reasons:
+                    info["debug_view_context_problem"] += 1
+                    for r in vi.reasons:
+                        info["debug_view_context_reasons"][r] = info["debug_view_context_reasons"].get(r, 0) + 1
+        except Exception:
+            # Context read failed; treat as unreadable (explicit) but keep going
+            info["debug_view_context_problem"] += 1
+            info["debug_view_context_reasons"]["view_context_unreadable"] = (
+                info["debug_view_context_reasons"].get("view_context_unreadable", 0) + 1
+            )
 
         # v2 per-template signature (contract semantic)
         v2_ok = True
@@ -687,5 +714,44 @@ def extract(doc, ctx=None):
         } for r in recs]
     except Exception as e:
         info["record_rows"] = []
+
+    # PR6: deterministic degraded signaling into contract
+    degraded_reason_counts = {}
+
+    try:
+        if int(info.get("debug_missing_uid", 0)) > 0:
+            degraded_reason_counts["template_missing_uid"] = int(info.get("debug_missing_uid", 0))
+    except Exception:
+        pass
+
+    try:
+        if int(info.get("debug_fail_read", 0)) > 0:
+            degraded_reason_counts["api_read_failure"] = int(info.get("debug_fail_read", 0))
+    except Exception:
+        pass
+
+    try:
+        if int(info.get("debug_view_context_problem", 0)) > 0:
+            # Roll up view context reasons as distinct degraded reasons
+            for k, v in dict(info.get("debug_view_context_reasons", {})).items():
+                degraded_reason_counts[str(k)] = int(v)
+    except Exception:
+        pass
+
+    try:
+        if int(info.get("debug_v2_blocked", 0)) > 0:
+            degraded_reason_counts["semantic_v2_blocked"] = int(info.get("debug_v2_blocked", 0))
+    except Exception:
+        pass
+
+    if degraded_reason_counts:
+        info["_domain_status"] = "degraded"
+        info["_domain_diag"] = {
+            "degraded_reasons": sorted(degraded_reason_counts.keys()),
+            "degraded_reason_counts": degraded_reason_counts,
+        }
+    else:
+        info["_domain_status"] = "ok"
+        info["_domain_diag"] = {}
 
     return info
