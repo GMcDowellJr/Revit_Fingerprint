@@ -30,6 +30,7 @@ from core import contracts
 from core.collect import CollectCtx
 from core.context import DocViewContext
 from core.deps import Blocked, require_domain
+from core import naming as fp_naming
 
 # Revit/Dynamo plumbing
 clr.AddReference("RevitServices")
@@ -40,6 +41,8 @@ from domains import identity, units, object_styles, line_patterns, line_styles
 from domains import fill_patterns, text_types, dimension_types
 from domains import view_filters, phases, phase_filters, phase_graphics
 from domains import view_templates
+from core.manifest import build_manifest
+from core.features import build_features
 
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
@@ -49,6 +52,71 @@ if HASH_MODE not in ("legacy", "semantic"):
     HASH_MODE = "legacy"
 
 _DOMAIN_VERSION = "1"
+
+def _use_filename_stamp():
+    """
+    Returns True unless explicitly disabled.
+
+    Accepts common Dynamo / shell representations for false.
+    """
+    try:
+        v = os.environ.get("REVIT_FINGERPRINT_FILENAME_STAMP", "")
+    except Exception:
+        v = ""
+    v = str(v).strip().lower()
+
+    if not v:
+        return True
+
+    if v in ("0", "false", "no", "off", "n", "f"):
+        return False
+
+    # Handle "0.0" / "1.0" style values
+    try:
+        fv = float(v)
+        if fv == 0.0:
+            return False
+        if fv == 1.0:
+            return True
+    except Exception:
+        pass
+
+    # Default: enabled
+    return True
+
+def _selected_output_surfaces():
+    """
+    Which sibling artifacts to write when output_path is provided.
+
+    Env var:
+      REVIT_FINGERPRINT_OUTPUT_SURFACES
+
+    Values:
+      - unset / "" / "all"         => payload,manifest,features
+      - "minimal"                  => manifest,features
+      - comma list e.g. "payload,manifest"
+    """
+    try:
+        raw = os.environ.get("REVIT_FINGERPRINT_OUTPUT_SURFACES", "")
+    except Exception:
+        raw = ""
+    raw = str(raw).strip().lower()
+
+    if not raw or raw == "all":
+        return {"payload", "manifest", "features"}
+
+    if raw == "minimal":
+        return {"manifest", "features"}
+
+    parts = []
+    for p in raw.split(","):
+        s = p.strip().lower()
+        if s:
+            parts.append(s)
+
+    allowed = {"payload", "manifest", "features"}
+    out = {p for p in parts if p in allowed}
+    return out if out else {"payload", "manifest", "features"}
 
 def _extract_v2_hash(payload):
     """
@@ -428,8 +496,7 @@ def run_fingerprint(doc):
         # Do not change run outcome if diagnostics merge fails.
         pass
 
-    elapsed_seconds = round(time.time() - start_ts, 3)
-    fingerprint["_elapsed_seconds"] = elapsed_seconds
+    # Hash mode participates in stable surfaces; timing does not.
     fingerprint["_hash_mode"] = HASH_MODE
 
     # Authoritative contract (statuses live here; legacy payloads may still exist at top-level)
@@ -440,6 +507,44 @@ def run_fingerprint(doc):
         run_diag=run_diag,
         domains=contract_domains,
     )
+
+    # Stable comparison + cohort-analysis surfaces
+    # Must never throw (runner should remain usable even if these builders fail).
+    try:
+        fingerprint["_manifest"] = build_manifest(fingerprint)
+    except Exception as e:
+        contracts.add_bounded_error(
+            run_diag,
+            domain="_runner",
+            status=contracts.DOMAIN_STATUS_DEGRADED,
+            code="manifest_build_failed",
+            message=str(e),
+        )
+        run_status2, run_diag2 = contracts.compute_run_status(contract_domains, base_run_diag=run_diag)
+        fingerprint["_contract"] = contracts.new_run_envelope(
+            schema_version=contracts.SCHEMA_VERSION,
+            run_status=run_status2,
+            run_diag=run_diag2,
+            domains=contract_domains,
+        )
+
+    try:
+        fingerprint["_features"] = build_features(fingerprint)
+    except Exception as e:
+        contracts.add_bounded_error(
+            run_diag,
+            domain="_runner",
+            status=contracts.DOMAIN_STATUS_DEGRADED,
+            code="features_build_failed",
+            message=str(e),
+        )
+        run_status3, run_diag3 = contracts.compute_run_status(contract_domains, base_run_diag=run_diag)
+        fingerprint["_contract"] = contracts.new_run_envelope(
+            schema_version=contracts.SCHEMA_VERSION,
+            run_status=run_status3,
+            run_diag=run_diag3,
+            domains=contract_domains,
+        )
 
     # Back-compat: keep a pointer to domains map (same object shape as _contract.domains)
     fingerprint["_domains"] = contract_domains
@@ -495,7 +600,7 @@ try:
         except Exception as e:
             pass
 
-        # 3) Default: user temp directory
+        # 3) Default: user temp directory (file named from RVT identity)
         try:
             import tempfile
             from datetime import datetime
@@ -504,12 +609,23 @@ try:
             try:
                 if not os.path.exists(base):
                     os.makedirs(base)
-            except Exception as e:
+            except Exception:
                 pass
 
-            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            return os.path.join(base, "fingerprint_{0}.json".format(stamp))
-        except Exception as e:
+            # Timestamp control (single source of truth)
+            use_stamp = _use_filename_stamp()
+            stamp = datetime.now().strftime("%Y%m%dT%H%M") if use_stamp else None
+
+            fname = fp_naming.build_output_filename(
+                doc,
+                stamp=stamp,
+                kind="fingerprint",
+                ext="json",
+                include_stamp=use_stamp,
+            )
+            return os.path.join(base, fname)
+
+        except Exception:
             return None
 
     def _ensure_parent_dir(path):
@@ -537,6 +653,73 @@ try:
             pass
         return bytes_written, round(time.perf_counter() - t0, 3)
 
+    def _write_sibling_artifacts(base_payload_path, fingerprint_payload):
+        """
+        Write payload + sibling stable surfaces.
+
+        Returns:
+          (paths_dict, bytes_dict, sha256_dict, write_sec_total, write_errors_list)
+        """
+        import time as _time
+
+        base_no_ext, _ext = os.path.splitext(base_payload_path)
+        paths = {
+            "payload": base_payload_path,
+            "manifest": base_no_ext + ".manifest.json",
+            "features": base_no_ext + ".features.json",
+        }
+
+        surfaces = _selected_output_surfaces()
+
+        bytes_written = {}
+        sha256 = {}
+        errors = []
+
+        t0 = _time.perf_counter()
+        total_write_sec = 0.0
+
+        def _try_write(kind, obj):
+            nonlocal total_write_sec
+            try:
+                b, sec = _write_json_to_disk(paths[kind], obj)
+                bytes_written[kind] = b
+                total_write_sec += float(sec) if sec is not None else 0.0
+                try:
+                    sha256[kind] = _sha256_of_file(paths[kind])
+                except Exception as e:
+                    errors.append({"surface": kind, "code": "sha256_failed", "message": str(e)})
+            except Exception as e:
+                errors.append({"surface": kind, "code": "write_failed", "message": str(e)})
+
+        if "payload" in surfaces:
+            _try_write("payload", fingerprint_payload)
+
+        if "manifest" in surfaces:
+            m = None
+            try:
+                m = fingerprint_payload.get("_manifest", None) if isinstance(fingerprint_payload, dict) else None
+            except Exception:
+                m = None
+            if m is None:
+                errors.append({"surface": "manifest", "code": "missing_manifest", "message": "payload missing _manifest"})
+            else:
+                _try_write("manifest", m)
+
+        if "features" in surfaces:
+            f = None
+            try:
+                f = fingerprint_payload.get("_features", None) if isinstance(fingerprint_payload, dict) else None
+            except Exception:
+                f = None
+            if f is None:
+                errors.append({"surface": "features", "code": "missing_features", "message": "payload missing _features"})
+            else:
+                _try_write("features", f)
+
+        total_write_sec = round(_time.perf_counter() - t0, 3)
+
+        return paths, bytes_written, sha256, total_write_sec, errors
+
     def _sha256_of_file(path, buf_size=1024 * 1024):
         """
         Compute SHA-256 of a file without loading it into memory.
@@ -556,6 +739,54 @@ try:
 
     output_path = _get_output_path_from_dynamo()
 
+    # If caller provided a directory, write a deterministically-named file into it.
+    # This supports batch runs: set output path once to a folder and let the runner name files.
+    try:
+        if output_path:
+            op = str(output_path).strip()
+            if op:
+                is_dir = False
+                try:
+                    if os.path.isdir(op):
+                        is_dir = True
+                except Exception:
+                    is_dir = False
+
+                # Heuristic: treat as directory if it ends with a path separator or has no ".json" suffix.
+                # (We do NOT want to silently interpret arbitrary filenames as directories.)
+                try:
+                    if (op.endswith(os.sep) or op.endswith("/") or op.endswith("\\")) and (not os.path.exists(op) or os.path.isdir(op)):
+                        is_dir = True
+                except Exception:
+                    pass
+
+                if is_dir:
+                    try:
+                        if not os.path.exists(op):
+                            os.makedirs(op)
+                    except Exception:
+                        # If we cannot create the directory, fall back to original op and let write fail explicitly.
+                        pass
+
+                    from datetime import datetime
+
+                    # Timestamp control (single source of truth)
+                    use_stamp = _use_filename_stamp()
+                    stamp = datetime.now().strftime("%Y%m%dT%H%M") if use_stamp else None
+
+                    fname = fp_naming.build_output_filename(
+                        doc,
+                        stamp=stamp,
+                        kind="fingerprint",
+                        ext="json",
+                        include_stamp=use_stamp,
+)
+                    output_path = os.path.join(op, fname)
+
+    except Exception:
+        # Never crash the run due to naming; write will handle errors explicitly.
+        pass
+
     # Escape hatch: force legacy behavior (return full JSON via OUT) when explicitly requested
     force_full_out = False
     try:
@@ -564,27 +795,31 @@ try:
         force_full_out = False
 
     if output_path and not force_full_out:
-        bytes_written, write_sec = _write_json_to_disk(output_path, fingerprint)
+        paths, bytes_written, sha256, write_sec_total, write_errors = _write_sibling_artifacts(output_path, fingerprint)
 
-        # Keep OUT a JSON string (type-stable for Dynamo graphs),
-        # but small enough to avoid marshaling/preview stalls.
-        sha256 = _sha256_of_file(output_path)
         t_total_done = round(time.perf_counter() - _SCRIPT_START, 3)
 
+        status = "ok" if not write_errors else "degraded"
+
         summary = {
-            "status": "ok",
-            "output_path": output_path,
+            "status": status,
+            "output_paths": paths,
+            "output_surfaces": sorted(list(_selected_output_surfaces())),
+            "filename_stamp_enabled": _use_filename_stamp(),
+            "filename_stamp_env": os.environ.get("REVIT_FINGERPRINT_FILENAME_STAMP", None),
             "bytes_written": bytes_written,
             "sha256": sha256,
+            "write_errors": write_errors,
             "timings": {
                 "extract_done_sec_from_start": t_extract_done,
-                "json_write_sec": write_sec,
+                "json_write_sec_total": write_sec_total,
                 "total_done_sec_from_start": t_total_done,
             },
             "_meta": fingerprint.get("_meta", {}),
         }
 
         OUT = json.dumps(summary, indent=2, sort_keys=True)
+
     else:
         # Legacy behavior: return full JSON through Dynamo (may hang on large payloads)
         OUT = json.dumps(fingerprint, indent=2, sort_keys=True)

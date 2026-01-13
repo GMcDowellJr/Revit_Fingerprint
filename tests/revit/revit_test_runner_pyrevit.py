@@ -35,7 +35,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from tests.revit._json_diff import compare_json, pretty_json  # noqa: E402
-
+from core.manifest import build_manifest  # noqa: E402
 
 def _load_json(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -121,21 +121,63 @@ def main():
             payload = run_fingerprint(doc)
             _write_json(actual_path, payload)
 
-            if not os.path.exists(golden_path):
+            # Stable comparison artifacts
+            actual_manifest = payload.get("_manifest", None)
+            if not isinstance(actual_manifest, dict):
+                actual_manifest = build_manifest(payload)
+
+            actual_manifest_path = os.path.join(out_dir, "{}.manifest.actual.json".format(name))
+            _write_json(actual_manifest_path, actual_manifest)
+            case_rec["actual_manifest"] = actual_manifest_path
+
+            golden_manifest_path = os.path.join(golden_dir, "{}.manifest.golden.json".format(name))
+            case_rec["golden_manifest"] = golden_manifest_path
+
+            # Back-compat: if old golden exists, compare manifests extracted from it.
+            old_full_golden_exists = os.path.exists(golden_path)
+            if not os.path.exists(golden_manifest_path) and old_full_golden_exists:
+                try:
+                    old_full_golden = _load_json(golden_path)
+                    golden_manifest = old_full_golden.get("_manifest", None)
+                    if not isinstance(golden_manifest, dict):
+                        golden_manifest = build_manifest(old_full_golden)
+                    _write_json(golden_manifest_path, golden_manifest)
+                    case_rec["notes"].append("Derived manifest golden from legacy full golden: {}".format(golden_path))
+                except Exception as e:
+                    case_rec["notes"].append("WARNING: failed to derive manifest from legacy golden: {}".format(str(e)))
+
+            if not os.path.exists(golden_manifest_path):
                 if update_golden:
-                    _write_json(golden_path, payload)
-                    case_rec["status"] = "UPDATED (golden created)"
+                    _write_json(golden_manifest_path, actual_manifest)
+                    case_rec["status"] = "UPDATED (manifest golden created)"
                     results["summary"]["updated"] += 1
                     results["summary"]["passed"] += 1
                 else:
-                    case_rec["status"] = "FAILED (missing golden)"
-                    case_rec["notes"].append("Golden missing. Re-run with REVIT_FP_UPDATE_GOLDEN=1 to create.")
+                    case_rec["status"] = "FAILED (missing manifest golden)"
+                    case_rec["notes"].append("Manifest golden missing. Re-run with REVIT_FP_UPDATE_GOLDEN=1 to create.")
                     results["summary"]["failed"] += 1
                 results["cases"].append(case_rec)
                 continue
 
-            golden = _load_json(golden_path)
-            equal, summary = compare_json(golden, payload, max_diffs=max_diffs)
+            golden_manifest = _load_json(golden_manifest_path)
+            equal, summary = compare_json(golden_manifest, actual_manifest, max_diffs=max_diffs)
+            case_rec["compare"] = summary
+
+            if equal:
+                case_rec["status"] = "PASSED"
+                results["summary"]["passed"] += 1
+            else:
+                if update_golden:
+                    _write_json(golden_manifest_path, actual_manifest)
+                    case_rec["status"] = "UPDATED (manifest golden overwritten)"
+                    results["summary"]["updated"] += 1
+                    results["summary"]["passed"] += 1
+                else:
+                    case_rec["status"] = "FAILED (manifest diff)"
+                    results["summary"]["failed"] += 1
+
+            results["cases"].append(case_rec)
+
             case_rec["compare"] = summary
 
             if equal:

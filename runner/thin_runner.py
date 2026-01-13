@@ -18,6 +18,13 @@ try:
 except Exception as e:
     os.environ.pop("REVIT_FINGERPRINT_OUTPUT_PATH", None)
 
+# Optional: control which output surfaces are written
+# Values: "all", "minimal", or comma list e.g. "payload,manifest"
+try:
+    os.environ["REVIT_FINGERPRINT_OUTPUT_SURFACES"] = "minimal"
+except Exception:
+    pass
+
 # Optional: IN[1] == True forces full OUT (debug/back-compat)
 try:
     if IN is not None and len(IN) > 1 and bool(IN[1]) is True:
@@ -26,6 +33,60 @@ try:
         os.environ.pop("REVIT_FINGERPRINT_FORCE_FULL_OUT", None)
 except Exception as e:
     os.environ.pop("REVIT_FINGERPRINT_FORCE_FULL_OUT", None)
+
+# Optional: IN[2] controls whether a timestamp is appended to output filenames
+#  - True / 1 / "true"  => stamp ON  (REVIT_FINGERPRINT_FILENAME_STAMP=1)
+#  - False / 0 / "false" => stamp OFF (REVIT_FINGERPRINT_FILENAME_STAMP=0)
+#  - Missing/None => stamp OFF (safer for batch determinism)
+#  - Unparseable => stamp OFF + warning
+_thinrunner_warnings = []
+
+def _parse_boolish(v):
+    if v is None:
+        return None
+    if isinstance(v, bool):
+        return v
+    try:
+        # Dynamo sometimes gives int-like values
+        if isinstance(v, (int, float)) and int(v) == v:
+            return bool(int(v))
+    except Exception:
+        pass
+    try:
+        s = str(v).strip()
+    except Exception:
+        return None
+    if not s:
+        return None
+    sl = s.lower()
+    if sl in ("1", "true", "t", "yes", "y", "on"):
+        return True
+    if sl in ("0", "false", "f", "no", "n", "off"):
+        return False
+    return None
+
+try:
+    raw_in2 = None
+    have_in2 = (IN is not None and len(IN) > 2)
+    if have_in2:
+        raw_in2 = IN[2]
+
+    stamp_choice = _parse_boolish(raw_in2) if have_in2 else None
+
+    if stamp_choice is True:
+        os.environ["REVIT_FINGERPRINT_FILENAME_STAMP"] = "1"
+    elif stamp_choice is False:
+        os.environ["REVIT_FINGERPRINT_FILENAME_STAMP"] = "0"
+    else:
+        # Missing/None/unparseable => default OFF
+        os.environ["REVIT_FINGERPRINT_FILENAME_STAMP"] = "0"
+        if have_in2 and raw_in2 is not None:
+            _thinrunner_warnings.append(
+                "IN[2] unparseable for timestamp flag; defaulting REVIT_FINGERPRINT_FILENAME_STAMP=0"
+            )
+except Exception:
+    # Default OFF on any thinrunner failure here
+    os.environ["REVIT_FINGERPRINT_FILENAME_STAMP"] = "0"
 
 # MUST be the repo root that contains: core/, domains/, runner/
 REPO_DIR = r"C:\Users\gmcdowell\Documents\Revit_Fingerprint"
@@ -60,6 +121,12 @@ else:
 
         # Import triggers execution in this repo (run_dynamo computes OUT at import time)
         exporter = importlib.import_module("runner.run_dynamo")
+
+        try:
+            if _thinrunner_warnings and isinstance(getattr(exporter, "OUT", None), dict):
+                exporter.OUT["_thinrunner_warnings"] = list(_thinrunner_warnings)
+        except Exception:
+            pass
 
         # Forward the computed OUT from the runner module
         OUT = exporter.OUT
