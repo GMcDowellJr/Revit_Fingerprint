@@ -168,7 +168,8 @@ def extract(doc, ctx=None):
         Rationale: category/subcategory stable ids are not available or reliable cross-file.
         """
         # Block on unreadables / sentinel-like values (no partial coverage semantics)
-        if w_proj is None or w_cut is None:
+        # NOTE: Cut weight is legitimately not defined for many categories; treat as NOT_APPLICABLE.
+        if w_proj is None:
             return None, "unreadable_line_weight"
 
         if rgb_sig == S_MISSING:
@@ -202,15 +203,15 @@ def extract(doc, ctx=None):
             if not lp_hash_v2:
                 return None, "unmapped_line_pattern_v2"
         else:
-            # Legacy would emit S_MISSING — in v2 we block rather than hash sentinels.
-            return None, "no_line_pattern"
+            # SOLID is not a LinePatternElement; treat as a real semantic value in v2.
+            lp_hash_v2 = "SOLID"
 
         sig_v2 = "|".join([
             safe_str(parent_name),
             safe_str(row_name),
             safe_str(cat_type),
             safe_str(w_proj),
-            safe_str(w_cut),
+            safe_str(w_cut if w_cut is not None else S_NOT_APPLICABLE),
             safe_str(rgb_sig),
             safe_str(lp_hash_v2),
         ])

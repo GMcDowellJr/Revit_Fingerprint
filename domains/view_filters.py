@@ -24,7 +24,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types
+from core.collect import collect_instances
 from core.canon import (
     canon_str,
     canon_num,
@@ -37,10 +37,10 @@ from core.canon import (
 )
 
 try:
-    from Autodesk.Revit.DB import ParameterFilterElement
-except ImportError:
-    ParameterFilterElement = None
-
+    from Autodesk.Revit.DB import ParameterFilterElement, ParameterElement, SharedParameterElement
+except Exception:
+    ParameterElement = None
+    SharedParameterElement = None
 try:
     from Autodesk.Revit.DB import (
         ElementParameterFilter,
@@ -278,9 +278,27 @@ def _rule_token_v2(rule, doc):
         return None, False, "param_none"
 
     if pid_int >= 0:
-        # Contract: no guids/unstable ids in semantic surfaces.
-        # Positive parameter ids are unstable across projects; block v2.
-        return None, False, "param_positive_id"
+        # Positive parameter ids are unstable unless resolvable to a SharedParameterElement GUID.
+        # Project parameters (no GUID) remain blocked.
+        pe = None
+        try:
+            pe = doc.GetElement(pid) if (doc is not None and pid is not None) else None
+        except Exception:
+            pe = None
+
+        guid_str = None
+        if pe is not None and SharedParameterElement is not None and isinstance(pe, SharedParameterElement):
+            try:
+                g = getattr(pe, "GuidValue", None)
+                if g:
+                    guid_str = safe_str(g)
+            except Exception:
+                guid_str = None
+
+        if not guid_str:
+            return None, False, "param_positive_id"
+
+        parts.append("param_guid={}".format(guid_str))
     else:
         # Negative ids represent BuiltInParameter-style identifiers (stable enum surface).
         parts.append("param_id={}".format(pid_int))
@@ -427,15 +445,23 @@ def extract(doc, ctx=None):
 
     try:
         col = list(
-            collect_types(
+            collect_instances(
                 doc,
                 of_class=ParameterFilterElement,
                 require_unique_id=True,
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="view_filters:ParameterFilterElement:types",
+                cache_key="view_filters:ParameterFilterElement:instances",
             )
         )
     except Exception as e:
+        info["debug_fail_read"] += 1
+        try:
+            t = e.__class__.__name__
+            info.setdefault("debug_collect_ex_types", {})
+            info["debug_collect_ex_types"][t] = info["debug_collect_ex_types"].get(t, 0) + 1
+            info["debug_collect_ex_msg"] = safe_str(str(e))
+        except Exception:
+            pass
         return info
 
     info["raw_count"] = len(col)
@@ -613,12 +639,12 @@ def extract(doc, ctx=None):
     info["count"] = len(info["names"])
     info["records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
     info["signature_hashes"] = sorted(per_hashes)
-    info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
+    info["hash"] = make_hash(info["signature_hashes"])
     info["signature_hashes_v2"] = sorted(per_hashes_v2)
     if info["debug_v2_blocked"] > 0:
         info["hash_v2"] = None
     else:
-        info["hash_v2"] = make_hash(info["signature_hashes_v2"]) if info["signature_hashes_v2"] else None
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
         
     # Only publish v2 mapping when the DOMAIN v2 hash is valid.
     # Contract: no partial v2 coverage; downstream must block if view_filters v2 is blocked.

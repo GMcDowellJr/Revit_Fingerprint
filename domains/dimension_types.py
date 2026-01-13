@@ -274,21 +274,59 @@ def extract(doc, ctx=None):
             continue
 
         # --- minimal dim-style signature (text + graphics + ticks) ---
-        text_font = _as_string(first_param(d, ui_names=["Text Font"]))
+        # Prefer BuiltInParameter when possible to avoid localized UI name dependence.
+        text_font = _as_string(
+            first_param(
+                d,
+                bip_names=[
+                    "TEXT_FONT",
+                    "DIM_TEXT_FONT",
+                    "SPOT_ELEV_TEXT_FONT",
+                    "SPOT_COORDINATE_TEXT_FONT",
+                ],
+                ui_names=["Text Font"],
+            )
+        )
         text_font = canon_str(text_font)
 
-        text_size_ft = _as_double(first_param(d, ui_names=["Text Size"]))
+        text_size_ft = _as_double(
+            first_param(
+                d,
+                bip_names=[
+                    "TEXT_SIZE",
+                    "DIM_TEXT_SIZE",
+                    "SPOT_ELEV_TEXT_SIZE",
+                    "SPOT_COORDINATE_TEXT_SIZE",
+                ],
+                ui_names=["Text Size"],
+            )
+        )
         text_size_in = fnum(format_len_inches(text_size_ft), 6)
 
-        lw = _as_int(first_param(d, ui_names=["Line Weight"]))
+        lw = _as_int(
+            first_param(
+                d,
+                bip_names=["LINE_WEIGHT", "DIM_LINE_WEIGHT"],
+                ui_names=["Line Weight"],
+            )
+        )
         color_int, color_rgb = try_get_color_rgb_from_elem(d)
 
         # Tick Mark (arrowhead) – store UniqueId metadata + include NAME in signature (more stable than ids)
-
-        tick_name = _as_string(first_param(d, ui_names=["Tick Mark"]))
+        tick_name = _as_string(
+            first_param(
+                d,
+                bip_names=["DIM_LEADER_ARROWHEAD", "TICK_MARK", "DIM_TICK_MARK"],
+                ui_names=["Tick Mark"],
+            )
+        )
         tick_uid = None
         try:
-            p_tick = first_param(d, ui_names=["Tick Mark"])
+            p_tick = first_param(
+                d,
+                bip_names=["DIM_LEADER_ARROWHEAD", "TICK_MARK", "DIM_TICK_MARK"],
+                ui_names=["Tick Mark"],
+            )
             if p_tick and p_tick.HasValue:
                 tid = p_tick.AsElementId()
                 if tid and tid.IntegerValue > 0:

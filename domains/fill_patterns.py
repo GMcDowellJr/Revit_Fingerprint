@@ -21,7 +21,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types
+from core.collect import collect_instances
 from core.canon import (
     canon_str,
     sig_val,
@@ -79,12 +79,12 @@ def extract(doc, ctx=None):
 
     try:
         col = list(
-            collect_types(
+            collect_instances(
                 doc,
                 of_class=FillPatternElement,
                 require_unique_id=True,
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="fill_patterns:FillPatternElement:types",
+                cache_key="fill_patterns:FillPatternElement:instances",
             )
         )
     except Exception as e:
@@ -455,7 +455,7 @@ def extract(doc, ctx=None):
     info["signature_hashes"] = sorted(per_hashes)
     info["names"] = sorted(set(names))
     info["count"] = len(info["names"])
-    info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
+    info["hash"] = make_hash(info["signature_hashes"])
     info["records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
 
     # v2 finalize: block domain hash if any record blocked
@@ -463,7 +463,7 @@ def extract(doc, ctx=None):
     if info["debug_v2_blocked"] > 0:
         info["hash_v2"] = None
     else:
-        info["hash_v2"] = make_hash(info["signature_hashes_v2"]) if info["signature_hashes_v2"] else None
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
 
     # Context mapping (UID is allowed only as lookup key; values are semantic hashes)
     if ctx is not None:

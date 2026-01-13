@@ -91,6 +91,64 @@ def _extract_legacy_quality(payload):
         pass
     return q
 
+def _extract_v2_block_reasons(payload):
+    """Best-effort extraction of v2 block reasons from a domain payload.
+
+    Domains are allowed to evolve their internal debug surfaces; the runner
+    lifts these into the authoritative contract diag.
+    """
+    if not isinstance(payload, dict):
+        return {}
+
+    # Current domains (PR6–PR8) typically emit one of these.
+    for k in ("debug_v2_block_reasons", "v2_block_reasons", "semantic_v2_block_reasons"):
+        try:
+            v = payload.get(k, None)
+        except Exception:
+            v = None
+        if isinstance(v, dict) and v:
+            # Keep values stable: prefer ints/bools/strings only.
+            out = {}
+            for rk, rv in v.items():
+                try:
+                    key = str(rk)
+                except Exception:
+                    continue
+                if rv is None:
+                    out[key] = True
+                elif isinstance(rv, (bool, int, float, str)):
+                    out[key] = rv
+                else:
+                    out[key] = True
+            return out
+
+    # Some domains only expose a simple blocked flag.
+    for k in ("debug_v2_blocked", "v2_blocked"):
+        try:
+            if bool(payload.get(k, False)) is True:
+                return {"blocked": True}
+        except Exception:
+            pass
+
+    return {}
+
+
+def _has_v2_surface(payload):
+    """Return True if the domain payload appears to implement a v2 hash surface."""
+    if not isinstance(payload, dict):
+        return False
+    try:
+        if "hash_v2" in payload:
+            return True
+    except Exception:
+        pass
+    try:
+        sv2 = payload.get("semantic_v2", None)
+        if isinstance(sv2, dict) and ("hash" in sv2):
+            return True
+    except Exception:
+        pass
+    return False
 
 def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_notes):
     """Runs a domain extractor and records a contract envelope.
@@ -139,9 +197,27 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
         # Select which hash is surfaced in the contract based on runner HASH_MODE.
         legacy_hash = _extract_legacy_hash(legacy)
         v2_hash = _extract_v2_hash(legacy)
+
         hash_value = legacy_hash
         if HASH_MODE == "semantic":
             hash_value = v2_hash
+
+        # Lift v2 diagnostics into the contract envelope.
+        domain_diag["has_v2"] = bool(_has_v2_surface(legacy))
+        v2_reasons = _extract_v2_block_reasons(legacy)
+        if v2_reasons:
+            domain_diag["v2_block_reasons"] = v2_reasons
+
+        # Semantic mode is an authoritative contract: missing v2 hash must BLOCK.
+        if HASH_MODE == "semantic":
+            if domain_status == contracts.DOMAIN_STATUS_OK and hash_value is None:
+                domain_status = contracts.DOMAIN_STATUS_BLOCKED
+                if v2_reasons:
+                    block_reasons = sorted({str(k) for k in v2_reasons.keys()})
+                else:
+                    block_reasons = ["missing_v2_hash"]
+            elif domain_status == contracts.DOMAIN_STATUS_BLOCKED and not block_reasons:
+                block_reasons = sorted({str(k) for k in v2_reasons.keys()}) if v2_reasons else ["blocked"]
 
         env = contracts.new_domain_envelope(
             domain=domain_name,
@@ -242,15 +318,16 @@ def run_fingerprint(doc):
             fingerprint["units"] = legacy
 
     # Global style domains (locked semantics)
-    if _enabled("objectstyles"):
-        legacy = _domain_run("objectstyles", object_styles.extract, doc, ctx, contract_domains, run_diag, runner_notes)
-        if legacy is not None:
-            fingerprint["objectstyles"] = legacy
-
+    # NOTE: line_patterns must run first to populate ctx mappings consumed by objectstyles/line_styles.
     if _enabled("line_patterns"):
         legacy = _domain_run("line_patterns", line_patterns.extract, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["line_patterns"] = legacy
+
+    if _enabled("objectstyles"):
+        legacy = _domain_run("objectstyles", object_styles.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["objectstyles"] = legacy
 
     if _enabled("line_styles"):
         legacy = _domain_run("line_styles", line_styles.extract, doc, ctx, contract_domains, run_diag, runner_notes)

@@ -27,7 +27,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types
+from core.collect import collect_instances
 from core.canon import (
     canon_str,
     sig_val,
@@ -108,12 +108,12 @@ def extract(doc, ctx=None):
 
     try:
         col = list(
-            collect_types(
+            collect_instances(
                 doc,
                 of_class=View,
                 require_unique_id=True,
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="view_templates:View:types",
+                cache_key="view_templates:View:instances",
             )
         )
     except Exception as e:
@@ -283,7 +283,7 @@ def extract(doc, ctx=None):
                     info["debug_fail_read"] += 1
                     sig.append(f"phase_filter={S_UNREADABLE}")
             else:
-                sig.append("phase_filter={S_MISSING}")
+                sig.append(f"phase_filter={S_MISSING}")
 
             # NOTE: Schedule filter stack + VG signatures are not consistently supported across versions.
             # We keep schedule signature minimal and stable.
@@ -679,7 +679,7 @@ def extract(doc, ctx=None):
         # Optional VG debug
         if debug_vg_details:
             try:
-                rec["vg_debug"] = _vg_records_for_rec
+                rec["vg_debug"] = list(vg_records)
             except Exception as e:
                 pass
 
@@ -695,13 +695,13 @@ def extract(doc, ctx=None):
 
     info["records"] = sorted(records, key=lambda r: (r.get("name", ""), r.get("id", "")))
     info["signature_hashes"] = sorted(per_hashes)
-    info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
+    info["hash"] = make_hash(info["signature_hashes"])
 
     info["signature_hashes_v2"] = sorted(per_hashes_v2)
     if v2_any_blocked:
         info["hash_v2"] = None
     else:
-        info["hash_v2"] = make_hash(info["signature_hashes_v2"]) if info["signature_hashes_v2"] else None
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
 
     info["record_rows"] = []
     try:
