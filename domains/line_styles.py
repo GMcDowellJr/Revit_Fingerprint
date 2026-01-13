@@ -160,7 +160,8 @@ def extract(doc, ctx=None):
             # Rationale: Revit does not provide a stable built-in id for line style subcategories.
             if not v2_blocked:
                 # block on any unreadable / sentinel-like values (no partial coverage semantics)
-                if w_proj is None or w_cut is None:
+                # NOTE: Cut weight is legitimately not defined for many line styles; treat as NOT_APPLICABLE.
+                if w_proj is None:
                     v2_blocked = True
                     v2_reasons["unreadable_line_weight"] = True
 
@@ -174,9 +175,32 @@ def extract(doc, ctx=None):
                 except Exception as e:
                     lp_id_v2 = None
 
-                if lp_id_v2 is None or lp_id_v2 == ElementId.InvalidElementId:
+                # line pattern mapping requirement (upstream v2 dependency)
+                try:
+                    lp_id_v2 = sc.GetLinePatternId(GraphicsStyleType.Projection)
+                except Exception as e:
+                    lp_id_v2 = None
+
+                # SOLID is not a LinePatternElement; it often presents as InvalidElementId or a non-positive id.
+                # Treat SOLID as a real semantic value in v2 (no dependency on line_patterns domain).
+                lp_id_int = None
+                try:
+                    lp_id_int = int(getattr(lp_id_v2, "IntegerValue", lp_id_v2)) if lp_id_v2 is not None else None
+                except Exception:
+                    lp_id_int = None
+
+                if lp_id_v2 is None:
                     v2_blocked = True
                     v2_reasons["unreadable_line_pattern_id"] = True
+                elif lp_id_v2 == ElementId.InvalidElementId or (lp_id_int is not None and lp_id_int <= 0):
+                    lp_hash_v2 = "SOLID"
+                    v2_records.append("|".join([
+                        safe_str(sc_name),
+                        safe_str(w_proj),
+                        safe_str(w_cut),
+                        safe_str(rgb_sig),
+                        safe_str(lp_hash_v2),
+                    ]))
                 else:
                     if lp_map_v2 is None:
                         v2_blocked = True
@@ -200,6 +224,7 @@ def extract(doc, ctx=None):
                                 safe_str(rgb_sig),
                                 safe_str(lp_hash_v2),
                             ]))
+
         except Exception as e:
             info["debug_fail_record_build"] += 1
             continue

@@ -20,7 +20,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types
+from core.collect import collect_instances
 from core.canon import (
     canon_str,
     canon_num,
@@ -123,12 +123,12 @@ def extract(doc, ctx=None):
 
     try:
         col = list(
-            collect_types(
+            collect_instances(
                 doc,
                 of_class=LinePatternElement,
                 require_unique_id=True,
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="line_patterns:LinePatternElement:types",
+                cache_key="line_patterns:LinePatternElement:instances",
             )
         )
     except Exception as e:
@@ -344,14 +344,14 @@ def extract(doc, ctx=None):
     info["count"] = len(records)
     info["records"] = sorted(records, key=lambda r: (r.get("name", ""), r.get("id", "")))
     info["signature_hashes"] = sorted(per_hashes)
-    info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
+    info["hash"] = make_hash(info["signature_hashes"])
 
     # v2 finalize: block domain hash if any record blocked
     info["signature_hashes_v2"] = sorted(per_hashes_v2)
     if info["debug_v2_blocked"] > 0:
         info["hash_v2"] = None
     else:
-        info["hash_v2"] = make_hash(info["signature_hashes_v2"]) if info["signature_hashes_v2"] else None
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
 
     # Populate context for downstream domains (UID allowed only as lookup key)
     if ctx is not None:
