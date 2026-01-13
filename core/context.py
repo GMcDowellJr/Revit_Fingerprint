@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
-from core.canon import canon_id, canon_str, S_MISSING, S_UNREADABLE
+from core.canon import canon_id, canon_str, S_MISSING, S_NOT_APPLICABLE, S_UNREADABLE
 
 try:
     from Autodesk.Revit.DB import BuiltInParameter
@@ -126,7 +126,8 @@ class DocViewContext:
             view_template_id_val = S_UNREADABLE
 
         # phase_id (via VIEW_PHASE parameter when available)
-        # Not all views expose phase; treat as missing if not applicable/unset.
+        # Not all views expose phase; treat as NOT_APPLICABLE if the parameter is not bound,
+        # and as MISSING only when the parameter exists but is unset/invalid.
         phase_id_val = S_MISSING
         if BuiltInParameter is None:
             # Outside Revit context; cannot read param
@@ -136,8 +137,8 @@ class DocViewContext:
             try:
                 p = view.get_Parameter(BuiltInParameter.VIEW_PHASE)
                 if p is None:
-                    reasons.append("phase_param_missing")
-                    phase_id_val = S_MISSING
+                    reasons.append("phase_param_not_applicable")
+                    phase_id_val = S_NOT_APPLICABLE
                 else:
                     pid = p.AsElementId()
                     phase_id_val = canon_id(pid)
@@ -158,17 +159,16 @@ class DocViewContext:
             try:
                 dp = view.get_Parameter(BuiltInParameter.VIEW_DISCIPLINE)
                 if dp is None:
-                    reasons.append("discipline_param_missing")
-                    discipline_val = S_MISSING
+                    reasons.append("discipline_param_not_applicable")
+                    discipline_val = S_NOT_APPLICABLE
                 else:
                     # VIEW_DISCIPLINE is typically integer-coded; keep as string for stable hashing surfaces
                     try:
                         discipline_val = canon_str(dp.AsInteger())
                     except Exception:
                         discipline_val = canon_str(dp.AsValueString())
-                    if not discipline_val:
+                    if discipline_val == S_MISSING:
                         reasons.append("discipline_missing")
-                        discipline_val = S_MISSING
             except Exception:
                 reasons.append("discipline_unreadable")
                 discipline_val = S_UNREADABLE

@@ -259,29 +259,39 @@ def extract(doc, ctx=None):
 
             if include_pf:
                 try:
-                    pf_id = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER).AsElementId()
-                    pf_elem = doc.GetElement(pf_id) if pf_id else None
-                    if pf_elem:
-                        pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                        pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                        sig.append("phase_filter={}".format(sig_val(pf_hash)))
-                        # v2: require upstream v2 hash when phase filter is present
-                        if v2_ok:
-                            pf_hash_v2 = None
-                            try:
-                                pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                            except Exception as e:
-                                pf_hash_v2 = None
-                            if not pf_hash_v2:
-                                _v2_block("phase_filter_unresolved")
-                                v2_ok = False
-                            else:
-                                sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
+                    p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
+                    if p is None:
+                        # Schedule templates often don't expose phase filter meaningfully.
+                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
                     else:
-                        sig.append(f"phase_filter={S_MISSING}")
+                        pf_id = p.AsElementId()
+                        # Invalid/None phase filter for schedules should be treated as NOT_APPLICABLE
+                        if not pf_id or canon_id(pf_id) == S_MISSING:
+                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
+                        else:
+                            pf_elem = doc.GetElement(pf_id)
+                            if pf_elem:
+                                pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
+                                pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
+                                sig.append("phase_filter={}".format(sig_val(pf_hash)))
+                                # v2: require upstream v2 hash when phase filter is present
+                                if v2_ok:
+                                    pf_hash_v2 = None
+                                    try:
+                                        pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
+                                    except Exception:
+                                        pf_hash_v2 = None
+                                    if not pf_hash_v2:
+                                        _v2_block("phase_filter_unresolved")
+                                        v2_ok = False
+                                    else:
+                                        sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
+                            else:
+                                sig.append(f"phase_filter={S_NOT_APPLICABLE}")
                 except Exception as e:
                     info["debug_fail_read"] += 1
                     sig.append(f"phase_filter={S_UNREADABLE}")
+
             else:
                 sig.append(f"phase_filter={S_MISSING}")
 
@@ -376,29 +386,39 @@ def extract(doc, ctx=None):
 
         if include_pf:
             try:
-                pf_id = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER).AsElementId()
-                pf_elem = doc.GetElement(pf_id) if pf_id else None
-                if pf_elem:
-                    pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                    pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                    sig.append("phase_filter={}".format(sig_val(pf_hash)))
-                    # v2: require upstream v2 hash when phase filter is present
-                    if v2_ok:
-                        pf_hash_v2 = None
-                        try:
-                            pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                        except Exception as e:
-                            pf_hash_v2 = None
-                        if not pf_hash_v2:
-                            _v2_block("phase_filter_unresolved")
-                            v2_ok = False
-                        else:
-                            sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
+                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
+                if p is None:
+                    # Schedule templates often don't expose phase filter meaningfully.
+                    sig.append(f"phase_filter={S_NOT_APPLICABLE}")
                 else:
-                    sig.append(f"phase_filter={S_MISSING}")
+                    pf_id = p.AsElementId()
+                    # Invalid/None phase filter for schedules should be treated as NOT_APPLICABLE
+                    if not pf_id or canon_id(pf_id) == S_MISSING:
+                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
+                    else:
+                        pf_elem = doc.GetElement(pf_id)
+                        if pf_elem:
+                            pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
+                            pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
+                            sig.append("phase_filter={}".format(sig_val(pf_hash)))
+                            # v2: require upstream v2 hash when phase filter is present
+                            if v2_ok:
+                                pf_hash_v2 = None
+                                try:
+                                    pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
+                                except Exception:
+                                    pf_hash_v2 = None
+                                if not pf_hash_v2:
+                                    _v2_block("phase_filter_unresolved")
+                                    v2_ok = False
+                                else:
+                                    sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
+                        else:
+                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
             except Exception as e:
                 info["debug_fail_read"] += 1
                 sig.append(f"phase_filter={S_UNREADABLE}")
+
         else:
             sig.append("phase_filter={S_MISSING}")
 
@@ -513,6 +533,17 @@ def extract(doc, ctx=None):
                     except Exception as e:
                         cut_pat_ovr = False
 
+                    def _rgb(cobj):
+                        try:
+                            return (int(cobj.Red), int(cobj.Green), int(cobj.Blue))
+                        except Exception:
+                            return None
+
+                    proj_rgb = _rgb(proj_col)
+                    cut_rgb = _rgb(cut_col)
+                    def_proj_rgb = _rgb(default_ogs.ProjectionLineColor) if default_ogs else None
+                    def_cut_rgb = _rgb(default_ogs.CutLineColor) if default_ogs else None
+
                     # Determine "has override" by comparing stable primitives + pattern override flags
                     has_override = False
                     try:
@@ -522,9 +553,10 @@ def extract(doc, ctx=None):
                             has_override = True
                         if cut_wt is not None and int(cut_wt) >= 0:
                             has_override = True
-                        if proj_col is not None:
+                            
+                        if proj_rgb is not None and (def_proj_rgb is None or proj_rgb != def_proj_rgb):
                             has_override = True
-                        if cut_col is not None:
+                        if cut_rgb is not None and (def_cut_rgb is None or cut_rgb != def_cut_rgb):
                             has_override = True
                         if halftone:
                             has_override = True
@@ -547,13 +579,13 @@ def extract(doc, ctx=None):
 
                     # Pack (avoid ids; colors are packed as RGB triples)
                     try:
-                        proj_col_s = "{}-{}-{}".format(proj_col.Red, proj_col.Green, proj_col.Blue) if proj_col else S_MISSING
-                    except Exception as e:
-                        proj_col_s = S_MISSING
+                        proj_col_s = "{}-{}-{}".format(*proj_rgb) if proj_rgb is not None else S_NOT_APPLICABLE
+                    except Exception:
+                        proj_col_s = S_UNREADABLE
                     try:
-                        cut_col_s = "{}-{}-{}".format(cut_col.Red, cut_col.Green, cut_col.Blue) if cut_col else S_MISSING
-                    except Exception as e:
-                        cut_col_s = S_MISSING
+                        cut_col_s = "{}-{}-{}".format(*cut_rgb) if cut_rgb is not None else S_NOT_APPLICABLE
+                    except Exception:
+                        cut_col_s = S_UNREADABLE
 
                     line = (
                         "cat={}|hidden={}|ovr=1|dl={}|proj_wt={}|cut_wt={}|proj_col={}|cut_col={}|half={}|trans={}|"
