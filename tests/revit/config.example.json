@@ -1,0 +1,11 @@
+{
+  "golden_dir": "tests/golden",
+  "out_dir": "tests/revit/out",
+  "max_diffs": 200,
+  "cases": [
+    {
+      "name": "SampleModel_A",
+      "rvt_path": "C:\\path\\to\\SampleModel_A.rvt"
+    }
+  ]
+}
