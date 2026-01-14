@@ -764,9 +764,13 @@ def extract(doc, ctx=None):
 
     try:
         if int(info.get("debug_view_context_problem", 0)) > 0:
-            # Roll up view context reasons as distinct degraded reasons
+            # Roll up view context reasons as distinct degraded reasons.
+            # NOTE: *_not_applicable signals are expected and must not degrade the domain.
             for k, v in dict(info.get("debug_view_context_reasons", {})).items():
-                degraded_reason_counts[str(k)] = int(v)
+                key = str(k)
+                if key.endswith("_not_applicable"):
+                    continue
+                degraded_reason_counts[key] = int(v)
     except Exception:
         pass
 
