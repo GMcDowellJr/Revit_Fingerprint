@@ -218,7 +218,7 @@ def _has_v2_surface(payload):
         pass
     return False
 
-def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_notes):
+def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_notes, *, require_v2_hash=True):
     """Runs a domain extractor and records a contract envelope.
 
     Returns legacy_payload (or None on failure).
@@ -276,9 +276,9 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
         if v2_reasons:
             domain_diag["v2_block_reasons"] = v2_reasons
 
-        # Semantic mode is an authoritative contract: missing v2 hash must BLOCK.
+        # Semantic mode is an authoritative contract: missing v2 hash must BLOCK for fingerprinted domains.
         if HASH_MODE == "semantic":
-            if domain_status == contracts.DOMAIN_STATUS_OK and hash_value is None:
+            if require_v2_hash and domain_status == contracts.DOMAIN_STATUS_OK and hash_value is None:
                 domain_status = contracts.DOMAIN_STATUS_BLOCKED
                 if v2_reasons:
                     block_reasons = sorted({str(k) for k in v2_reasons.keys()})
@@ -376,7 +376,7 @@ def run_fingerprint(doc):
 
     # Metadata domains (no behavioral hash)
     if _enabled("identity"):
-        legacy = _domain_run("identity", identity.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("identity", identity.extract, doc, ctx, contract_domains, run_diag, runner_notes, require_v2_hash=False)
         if legacy is not None:
             fingerprint["identity"] = legacy
 
@@ -500,7 +500,7 @@ def run_fingerprint(doc):
     fingerprint["_hash_mode"] = HASH_MODE
 
     # Authoritative contract (statuses live here; legacy payloads may still exist at top-level)
-    run_status, run_diag = contracts.compute_run_status(contract_domains, base_run_diag=run_diag)
+    run_status, run_diag = contracts.compute_run_status(contract_domains, base_run_diag=run_diag, treat_unsupported_as_degraded=False)
     fingerprint["_contract"] = contracts.new_run_envelope(
         schema_version=contracts.SCHEMA_VERSION,
         run_status=run_status,
@@ -520,7 +520,7 @@ def run_fingerprint(doc):
             code="manifest_build_failed",
             message=str(e),
         )
-        run_status2, run_diag2 = contracts.compute_run_status(contract_domains, base_run_diag=run_diag)
+        run_status2, run_diag2 = contracts.compute_run_status(contract_domains, base_run_diag=run_diag, treat_unsupported_as_degraded=False)
         fingerprint["_contract"] = contracts.new_run_envelope(
             schema_version=contracts.SCHEMA_VERSION,
             run_status=run_status2,
@@ -538,7 +538,7 @@ def run_fingerprint(doc):
             code="features_build_failed",
             message=str(e),
         )
-        run_status3, run_diag3 = contracts.compute_run_status(contract_domains, base_run_diag=run_diag)
+        run_status3, run_diag3 = contracts.compute_run_status(contract_domains, base_run_diag=run_diag, treat_unsupported_as_degraded=False)
         fingerprint["_contract"] = contracts.new_run_envelope(
             schema_version=contracts.SCHEMA_VERSION,
             run_status=run_status3,

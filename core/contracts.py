@@ -206,13 +206,15 @@ def compute_run_status(
     domains: Dict[str, Dict[str, Any]],
     *,
     base_run_diag: Optional[Dict[str, Any]] = None,
+    treat_unsupported_as_degraded: bool = True,
 ) -> Tuple[str, Dict[str, Any]]:
     """
     Deterministically compute run_status from domain statuses and return (run_status, run_diag).
 
     Rollup rule (PR1 lock):
     - any domain failed -> run failed
-    - else any domain degraded|blocked|unsupported -> run degraded
+    - else any domain degraded|blocked -> run degraded
+    - else any domain unsupported -> run degraded only if treat_unsupported_as_degraded is True
     - else run ok
 
     Also populates counters in run_diag.
@@ -235,22 +237,22 @@ def compute_run_status(
             "domain_blocked": 0,
             "domain_failed": 0,
             "domain_unsupported": 0,
-            "errors_dropped": int(counters.get("errors_dropped", 0)),  # preserve
         }
     )
 
     any_failed = False
     any_degradedish = False
 
-    counters["domain_total"] = len(domains)
+    for name, env in sorted(domains.items(), key=lambda kv: str(kv[0])):
+        counters["domain_total"] += 1
 
-    for name, env in domains.items():
-        status = None
-        if isinstance(env, dict):
-            status = env.get("status")
+        try:
+            status = str(env.get("status", ""))
+        except Exception:
+            status = ""
 
         if status not in VALID_DOMAIN_STATUSES:
-            # Treat invalid/missing status as failed (explicit degradation beats silent OK).
+            # Explicitly fail run: contract is inconsistent/untrusted.
             any_failed = True
             counters["domain_failed"] += 1
             add_bounded_error(
@@ -258,7 +260,7 @@ def compute_run_status(
                 domain=str(name),
                 status=DOMAIN_STATUS_FAILED,
                 code="invalid_domain_status",
-                message=f"Domain envelope missing/invalid status: {status!r}",
+                message=f"Invalid domain status: {status!r}",
             )
             continue
 
@@ -274,7 +276,8 @@ def compute_run_status(
             any_degradedish = True
             counters["domain_blocked"] += 1
         elif status == DOMAIN_STATUS_UNSUPPORTED:
-            any_degradedish = True
+            if treat_unsupported_as_degraded:
+                any_degradedish = True
             counters["domain_unsupported"] += 1
         else:
             # Should be unreachable due to validation above; keep explicit.
