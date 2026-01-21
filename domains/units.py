@@ -57,7 +57,11 @@ def extract(doc, ctx=None):
         "specs": {},
         "hash": None,
 
-        # v2 (contract semantic hash) — additive only; legacy behavior unchanged
+        # record.v2 per-record emission
+        "records": [],
+        "record_rows": [],
+
+        # v2 (contract semantic hash)
         "hash_v2": None,
         "debug_v2_blocked": False,
         "debug_v2_block_reasons": {},
@@ -65,119 +69,180 @@ def extract(doc, ctx=None):
 
     try:
         u = doc.GetUnits()
-    except Exception as e:
+    except Exception:
+        # No API reachability: caller/runner will decide domain status; we only emit explicit v2 block.
+        result["debug_v2_blocked"] = True
+        result["debug_v2_block_reasons"] = {"units_unreadable": True}
         return result
 
     result["repr"] = safe_str(u)
 
-    records = []
+    # ---- Legacy (domain-level) hash: keep behavior as close as possible ----
+    legacy_records = []
 
-    # v2 build state (domain-level block; no partial coverage semantics)
+    # ---- record.v2 per-spec records ----
     v2_records = []
-    v2_blocked = False
-    v2_reasons = {}
-
-    def _v2_block(reason_key):
-        nonlocal v2_blocked
-        if not v2_blocked:
-            v2_blocked = True
-        v2_reasons[reason_key] = True
-
-    def _looks_guid_like(s):
-        # Conservative: if it looks like a GUID, we treat it as disallowed for v2.
-        try:
-            import re
-            s = safe_str(s)
-            return re.search(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", s) is not None
-        except Exception as e:
-            return False
+    v2_sig_hashes = []  # non-null only
+    v2_block_reasons = {}
 
     if SpecTypeId is None:
-        # Legacy stays as-is (hash will remain None/partial depending on downstream),
-        # but v2 explicitly blocks because required spec identifiers are unavailable.
-        _v2_block("SpecTypeId_unavailable")
-        specs = []
-    else:
-        specs = [
-            ("length", SpecTypeId.Length),
-            ("area",   SpecTypeId.Area),
-            ("volume", SpecTypeId.Volume)
-        ]
+        # Cannot even reference required specs deterministically.
+        result["debug_v2_blocked"] = True
+        result["debug_v2_block_reasons"] = {"SpecTypeId_unavailable": True}
+        return result
 
-    # Track which required specs were successfully read (for v2 domain-level completeness)
-    required_labels = set(["length", "area", "volume"])
-    read_labels = set()
+    specs = [
+        ("length", SpecTypeId.Length),
+        ("area",   SpecTypeId.Area),
+        ("volume", SpecTypeId.Volume),
+    ]
 
     for label, spec_id in specs:
+        record_id = "units:{}".format(label)
+
+        # Default identity items (explicit) — required keys are always present as items.
+        spec_v, spec_q = canonicalize_str(label)
+        items = [make_identity_item("units.spec", spec_v, spec_q)]
+
+        fmt = None
         try:
             fmt = u.GetFormatOptions(spec_id)
-        except Exception as e:
-            # legacy behavior: continue partial
-            # v2 contract: blocks if any required spec is unreadable
-            if label in required_labels:
-                _v2_block("format_options_unreadable_{}".format(label))
-            continue
+        except Exception:
+            fmt = None
 
-        if label in required_labels:
-            read_labels.add(label)
-
-        try:
-            unit_id   = safe_str(fmt.GetUnitTypeId())
-        except Exception as e:
-            unit_id   = "<no-unit>"
-
-        try:
-            symbol_id = safe_str(fmt.GetSymbolTypeId())
-        except Exception as e:
-            symbol_id = "<no-symbol>"
-
-        try:
-            acc = fmt.Accuracy
-        except Exception as e:
-            acc = None
-
-        rec = {
-            "spec": label,
-            "unit_id": unit_id,
-            "symbol_id": symbol_id,
-            "accuracy": acc
-        }
-        
-        # v2 signature: allow only non-guid-like identifiers; otherwise block (no ids/guids contract)
-        if _looks_guid_like(unit_id) or _looks_guid_like(symbol_id):
-            _v2_block("guid_like_unit_or_symbol_{}".format(label))
+        # unit_type_id (required)
+        if fmt is None:
+            unit_v, unit_q = (None, ITEM_Q_UNREADABLE)
         else:
-            v2_records.append("{}|{}|{}|{}".format(label, unit_id, symbol_id, safe_str(acc)))
-        
-        result["specs"][label] = rec
-        records.append("{}|{}|{}|{}".format(label, unit_id, symbol_id, acc))
+            try:
+                unit_v, unit_q = canonicalize_str(safe_str(fmt.GetUnitTypeId()))
+            except Exception:
+                unit_v, unit_q = (None, ITEM_Q_UNREADABLE)
+        items.append(make_identity_item("units.unit_type_id", unit_v, unit_q))
 
-    if records:
-        result["hash"] = make_hash(sorted(records))
+        # symbol_type_id (optional)
+        if fmt is None:
+            sym_v, sym_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            try:
+                sym_v, sym_q = canonicalize_str(safe_str(fmt.GetSymbolTypeId()))
+            except Exception:
+                sym_v, sym_q = (None, ITEM_Q_UNREADABLE)
+        items.append(make_identity_item("units.symbol_type_id", sym_v, sym_q))
 
-    # v2 finalize (domain-level block; no partial coverage)
-    if v2_blocked:
+        # accuracy (optional)
+        if fmt is None:
+            acc_v, acc_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            try:
+                acc_v, acc_q = canonicalize_float(getattr(fmt, "Accuracy", None))
+            except Exception:
+                acc_v, acc_q = (None, ITEM_Q_UNREADABLE)
+        items.append(make_identity_item("units.accuracy", acc_v, acc_q))
+
+        # rounding_method (optional)
+        if fmt is None:
+            rm_v, rm_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            try:
+                rm_v, rm_q = canonicalize_enum(getattr(fmt, "RoundingMethod", None))
+            except Exception:
+                rm_v, rm_q = (None, ITEM_Q_UNREADABLE)
+        items.append(make_identity_item("units.rounding_method", rm_v, rm_q))
+
+        # Sort items by k for validator determinism.
+        items_sorted = sorted(items, key=lambda it: it.get("k", ""))
+
+        # Minima: block if any required key q != ok
+        required_qs = [spec_q, unit_q]
+        required_keys = ["units.spec", "units.unit_type_id"]
+        required_kq = list(zip(required_keys, required_qs))
+        blocked = any(q != ITEM_Q_OK for (_, q) in required_kq)
+
+        status_reasons = []
+        any_incomplete = False
+        for it in items_sorted:
+            q = it.get("q")
+            if q != ITEM_Q_OK:
+                any_incomplete = True
+                k = it.get("k")
+                status_reasons.append("identity.incomplete:{}:{}".format(q, k))
+
+        label_quality = "system"
+        label_prov = "revit.SpecTypeId"
+        label_display = "Units ({})".format(label)
+        if blocked:
+            label_quality = "placeholder_unreadable" if (unit_q == ITEM_Q_UNREADABLE) else "placeholder_missing"
+
+        label = {
+            "display": label_display,
+            "quality": label_quality,
+            "provenance": label_prov,
+            "components": {"spec": label},
+        }
+
+        if blocked:
+            rec = build_record_v2(
+                domain="units",
+                record_id=record_id,
+                status=STATUS_BLOCKED,
+                status_reasons=sorted(set(status_reasons)) or ["minima.required_not_ok"],
+                sig_hash=None,
+                identity_items=items_sorted,
+                required_qs=(),
+                label=label,
+            )
+            # Domain-level signal: v2 cannot be complete if any required key unreadable/missing.
+            v2_block_reasons["record_blocked:{}".format(label)] = True
+        else:
+            status = STATUS_DEGRADED if any_incomplete else STATUS_OK
+            preimage = serialize_identity_items(items_sorted)
+            sig_hash = make_hash(preimage)
+            rec = build_record_v2(
+                domain="units",
+                record_id=record_id,
+                status=status,
+                status_reasons=sorted(set(status_reasons)),
+                sig_hash=sig_hash,
+                identity_items=items_sorted,
+                required_qs=required_qs,
+                label=label,
+            )
+            v2_sig_hashes.append(sig_hash)
+
+        v2_records.append(rec)
+
+        # Legacy payload + hash surface
+        result["specs"][label] = {
+            "spec": label,
+            "unit_id": (unit_v if unit_v is not None else None),
+            "symbol_id": (sym_v if sym_v is not None else None),
+            "accuracy": (float(acc_v) if (acc_v is not None and acc_q == ITEM_Q_OK) else None),
+        }
+        legacy_records.append("{}|{}|{}|{}".format(label, safe_str(unit_v), safe_str(sym_v), safe_str(acc_v)))
+
+    # Legacy domain hash
+    if legacy_records:
+        result["hash"] = make_hash(sorted(legacy_records))
+
+    # record.v2 surfaces
+    result["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
+    result["record_rows"] = [
+        {
+            "record_key": safe_str(r.get("record_id", "")),
+            "sig_hash": r.get("sig_hash", None),
+            "name": safe_str(r.get("label", {}).get("display", "")),
+        }
+        for r in result["records"]
+    ]
+
+    if v2_sig_hashes:
+        result["hash_v2"] = make_hash(sorted(v2_sig_hashes))
+        result["debug_v2_blocked"] = False
+        result["debug_v2_block_reasons"] = {}
+    else:
         result["hash_v2"] = None
         result["debug_v2_blocked"] = True
-        result["debug_v2_block_reasons"] = v2_reasons
-    else:
-        # Must have all required specs read for v2
-        if SpecTypeId is None:
-            result["hash_v2"] = None
-            result["debug_v2_blocked"] = True
-            result["debug_v2_block_reasons"] = {"SpecTypeId_unavailable": True}
-        else:
-            if set(["length", "area", "volume"]).issubset(read_labels):
-                # deterministic: preserve fixed spec order (no sorting needed)
-                if not v2_records:
-                    result["hash_v2"] = None
-                    result["debug_v2_blocked"] = True
-                    reasons = dict(v2_reasons)
-                    reasons["no_v2_records"] = True
-                    result["debug_v2_block_reasons"] = reasons
-                else:
-                    result["hash_v2"] = make_hash(v2_records)
-                    result["debug_v2_blocked"] = False
-                    result["debug_v2_block_reasons"] = {}
+        result["debug_v2_block_reasons"] = v2_block_reasons or {"no_nonblocked_records": True}
 
     return result
