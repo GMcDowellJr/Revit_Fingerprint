@@ -1,0 +1,165 @@
+{
+  "version": "domain_identity_keys.v2",
+  "record_schema_version": "record.v2",
+  "identity_item_schema": "identity_items.v1",
+
+  "identity_quality_dominance_order": [
+    "none_blocked",
+    "incomplete_unreadable",
+    "incomplete_unsupported",
+    "incomplete_missing",
+    "complete"
+  ],
+
+  "banned_identity_value_substrings": [
+    "<MISSING>",
+    "<UNREADABLE>",
+    "<NOT_APPLICABLE>",
+    "<LP:UNMAPPED>"
+  ],
+
+  "domains": {
+    "dimension_types": {
+      "allowed_keys": [
+        "dim_type.uid",
+        "dim_type.shape",
+        "dim_type.text_type_uid",
+        "dim_type.tick_mark_uid",
+        "dim_type.witness_line_control",
+        "dim_type.unit_format_id",
+        "dim_type.rounding",
+        "dim_type.accuracy",
+        "dim_type.prefix",
+        "dim_type.suffix"
+      ],
+      "required_keys": [
+        "dim_type.uid",
+        "dim_type.shape"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "line_patterns": {
+      "allowed_keys": [
+        "line_pattern.uid_or_namekey",
+        "line_pattern.segment_count"
+      ],
+      "allowed_key_prefixes": [
+        "line_pattern.seg["
+      ],
+      "required_keys": [
+        "line_pattern.uid_or_namekey",
+        "line_pattern.segment_count"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {
+        "line_pattern.seg[i].kind": true,
+        "line_pattern.seg[i].length": true
+      }
+    },
+
+    "line_styles": {
+      "allowed_keys": [
+        "line_style.path",
+        "line_style.color.rgb",
+        "line_style.weight.projection",
+        "line_style.weight.cut",
+        "line_style.pattern_ref.kind",
+        "line_style.pattern_ref.sig_hash"
+      ],
+      "required_keys": [
+        "line_style.path"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "object_styles": {
+      "allowed_keys": [
+        "obj_style.row_key",
+        "obj_style.color.rgb",
+        "obj_style.weight.projection",
+        "obj_style.weight.cut",
+        "obj_style.pattern_ref.kind",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "required_keys": [
+        "obj_style.row_key"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "units": {
+      "allowed_keys": [
+        "units.spec",
+        "units.unit_type_id",
+        "units.symbol_type_id",
+        "units.accuracy",
+        "units.rounding_method"
+      ],
+      "required_keys": [
+        "units.spec",
+        "units.unit_type_id"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "view_filter_definitions": {
+      "allowed_keys": [
+        "vf.uid_or_namekey",
+        "vf.logic_root",
+        "vf.rule_count",
+        "vf.categories"
+      ],
+      "allowed_key_prefixes": [
+        "vf.rule["
+      ],
+      "required_keys": [
+        "vf.uid_or_namekey",
+        "vf.logic_root",
+        "vf.rule_count"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {
+        "vf.rule[i].kind": true,
+        "vf.rule[i].op": true,
+        "vf.rule[i].param_ref.kind": true,
+        "vf.rule[i].param_ref.id": true,
+        "vf.rule[i].value": true
+      }
+    },
+
+    "view_filter_applications_view_templates": {
+      "allowed_keys": [
+        "vfa.template_uid_or_namekey",
+        "vfa.filter_stack_count"
+      ],
+      "allowed_key_prefixes": [
+        "vfa.stack["
+      ],
+      "required_keys": [
+        "vfa.template_uid_or_namekey",
+        "vfa.filter_stack_count"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {
+        "vfa.stack[i].filter_sig_hash": true,
+        "vfa.stack[i].visibility": true,
+        "vfa.stack[i].overrides": true
+      }
+    }
+  }
+}
