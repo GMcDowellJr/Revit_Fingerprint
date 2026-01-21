@@ -248,17 +248,10 @@ def extract(doc, ctx=None):
     records = []
     sig_hashes = []
 
-    # v2 build state (domain-level block; no partial coverage semantics)
+    # record.v2 build state
     v2_records = []
-    v2_blocked = False
-    v2_reasons = {}
-
-    def _v2_block(reason_key):
-        nonlocal v2_blocked
-        if not v2_blocked:
-            v2_blocked = True
-        v2_reasons[reason_key] = True
-
+    v2_sig_hashes = []  # non-null only
+    v2_block_reasons = {}
 
     for d in types:
         type_name = get_type_display_name(d)
@@ -338,9 +331,9 @@ def extract(doc, ctx=None):
                             tick_name = tick_name or get_element_display_name(te)
                             if tick_name is not None:
                                 tick_name = canon_str(tick_name)
-                        except Exception as e:
+                        except Exception:
                             pass
-        except Exception as e:
+        except Exception:
             pass
 
         # Witness line control is common; keep as metadata + optional signature
@@ -386,32 +379,17 @@ def extract(doc, ctx=None):
         # Units formatting via FormatOptions (NOT parameters)
         units_fmt = None
         alt_units_fmt = None
-        try:
-            fo = d.GetUnitsFormatOptions()
-            units_fmt = fo  # keep raw; stringify below
-        except Exception as e:
-            units_fmt = None
-
-        try:
-            afo = d.GetAlternateUnitsFormatOptions()
-            alt_units_fmt = afo
-        except Exception as e:
-            alt_units_fmt = None
-
-        # --- Units formatting (v2 only; NOT parameters) ---
-        units_fmt = None
-        alt_units_fmt = None
 
         try:
             fo = d.GetUnitsFormatOptions()
             units_fmt = _format_options_to_kv(fo)
-        except Exception as e:
+        except Exception:
             units_fmt = None
 
         try:
             afo = d.GetAlternateUnitsFormatOptions()
             alt_units_fmt = _format_options_to_kv(afo)
-        except Exception as e:
+        except Exception:
             alt_units_fmt = None
 
         tick_name = canon_str(tick_name)
@@ -458,100 +436,176 @@ def extract(doc, ctx=None):
 
         sig_hash = make_hash(signature_tuple)
 
-
         # ---------------------------
-        # v2 signature (contract semantic hash)
+        # record.v2 per-record emission (identity lives in sig_hash)
         # ---------------------------
-        # Exception (explicit): dimension type name is part of identity/definition in this domain.
-        # Policy: tick mark is represented by its display name (no ids/guids).
-        if not v2_blocked:
-            type_name = canon_str(type_name)
-            if type_name in (S_MISSING, S_UNREADABLE):
-                _v2_block("unreadable_type_name")
 
-            if not text_font:
-                _v2_block("unreadable_text_font")
+        # Required: dim_type.uid
+        try:
+            uid_raw = getattr(d, "UniqueId", None)
+        except Exception:
+            uid_raw = None
+        uid_v, uid_q = canonicalize_str(uid_raw)
 
-            if text_size_ft is None:
-                _v2_block("unreadable_text_size")
+        # Required: dim_type.shape
+        # Revit API varies by version; prefer any stable style/shape enum we can read.
+        shape_raw = None
+        for _attr in ("Shape", "StyleType", "DimensionShape", "DimensionStyleType"):
+            try:
+                if hasattr(d, _attr):
+                    shape_raw = getattr(d, _attr, None)
+                    if shape_raw is not None:
+                        break
+            except Exception:
+                continue
+        shape_v, shape_q = canonicalize_enum(shape_raw)
 
-            #if lw is None:
-            #    _v2_block("unreadable_line_weight")
+        # Optional: dim_type.text_type_uid (ElementId -> element.UniqueId)
+        text_type_uid_v, text_type_uid_q = (None, ITEM_Q_MISSING)
+        try:
+            p_tt = first_param(d, bip_names=["TEXT_TYPE"], ui_names=["Text Type"])  # best-effort
+            if p_tt is None:
+                text_type_uid_v, text_type_uid_q = (None, ITEM_Q_MISSING)
+            else:
+                try:
+                    eid = p_tt.AsElementId()
+                except Exception:
+                    eid = None
+                if eid is None:
+                    text_type_uid_v, text_type_uid_q = (None, ITEM_Q_UNREADABLE)
+                else:
+                    try:
+                        el = doc.GetElement(eid)
+                    except Exception:
+                        el = None
+                    if el is None:
+                        text_type_uid_v, text_type_uid_q = (None, ITEM_Q_MISSING)
+                    else:
+                        try:
+                            text_type_uid_v, text_type_uid_q = canonicalize_str(getattr(el, "UniqueId", None))
+                        except Exception:
+                            text_type_uid_v, text_type_uid_q = (None, ITEM_Q_UNREADABLE)
+        except Exception:
+            text_type_uid_v, text_type_uid_q = (None, ITEM_Q_UNREADABLE)
 
-            # color must be readable; use RGB in v2 (avoid element ids / GUIDs)
-            if canon_str(color_rgb) in (S_MISSING, S_UNREADABLE):
-                _v2_block("unreadable_color_rgb")
+        # Optional: dim_type.tick_mark_uid
+        tick_uid_v, tick_uid_q = canonicalize_str(tick_uid if tick_uid else None)
 
-            #if not tick_name:
-            #    _v2_block("unreadable_tick_mark_name")
+        # Optional: dim_type.witness_line_control
+        witness_v, witness_q = canonicalize_str(witness if witness else None)
 
-            # witness_line_control is not reliably readable across dimension families;
-            # do not block v2 on it, and do not include it in the v2 record.
-            if not v2_blocked:
-                v2_records.append("|".join([
-                    "name={}".format(safe_str(type_name)),
-                    "text_font={}".format(safe_str(text_font)),
-                    "text_size_in={}".format(safe_str(text_size_in)),
-                    "line_weight={}".format(safe_str(lw)),
-                    "color_rgb={}".format(safe_str(color_rgb)),
-                    "tick_mark={}".format(safe_str(tick_name)),
-                ]))
+        # Optional: unit format identity fields from UnitsFormatOptions
+        unit_format_id_v, unit_format_id_q = (None, ITEM_Q_MISSING)
+        rounding_v, rounding_q = (None, ITEM_Q_MISSING)
+        accuracy_v, accuracy_q = (None, ITEM_Q_MISSING)
+        prefix_v, prefix_q = (None, ITEM_Q_UNSUPPORTED)
+        suffix_v, suffix_q = (None, ITEM_Q_UNSUPPORTED)
 
-        rec = {
-            "type_id": safe_str(d.Id.IntegerValue),
-            "type_uid": getattr(d, "UniqueId", "") or "",
-            "type_name": type_name,
-            
-            # v2-only metadata (not part of legacy signature)
-            "units_format_options": units_fmt,
-            "alternate_units_format_options": alt_units_fmt,
+        try:
+            fo = d.GetUnitsFormatOptions()
+        except Exception:
+            fo = None
 
-            "text_font": text_font,
-            "text_size_ft": text_size_ft,
-            "text_size_in": text_size_in,
+        if fo is None:
+            unit_format_id_v, unit_format_id_q = (None, ITEM_Q_UNREADABLE)
+            rounding_v, rounding_q = (None, ITEM_Q_UNREADABLE)
+            accuracy_v, accuracy_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            try:
+                unit_format_id_v, unit_format_id_q = canonicalize_str(safe_str(fo.GetUnitTypeId()))
+            except Exception:
+                unit_format_id_v, unit_format_id_q = (None, ITEM_Q_UNREADABLE)
+            try:
+                rounding_v, rounding_q = canonicalize_enum(getattr(fo, "RoundingMethod", None))
+            except Exception:
+                rounding_v, rounding_q = (None, ITEM_Q_UNREADABLE)
+            try:
+                # UnitsFormatOptions.Accuracy is stored as feet; identity key expects a string, so use inches string.
+                accuracy_v, accuracy_q = canonicalize_float(_fmt_in_from_ft(getattr(fo, "Accuracy", None)))
+            except Exception:
+                accuracy_v, accuracy_q = (None, ITEM_Q_UNREADABLE)
+            # Prefix/Suffix are version-dependent; mark unsupported when absent.
+            if hasattr(fo, "Prefix"):
+                try:
+                    prefix_v, prefix_q = canonicalize_str(getattr(fo, "Prefix", None))
+                except Exception:
+                    prefix_v, prefix_q = (None, ITEM_Q_UNREADABLE)
+            if hasattr(fo, "Suffix"):
+                try:
+                    suffix_v, suffix_q = canonicalize_str(getattr(fo, "Suffix", None))
+                except Exception:
+                    suffix_v, suffix_q = (None, ITEM_Q_UNREADABLE)
 
-            "line_weight": lw,
-            "color_int": color_int,
-            "color_rgb": color_rgb,
+        identity_items = [
+            make_identity_item("dim_type.uid", uid_v, uid_q),
+            make_identity_item("dim_type.shape", shape_v, shape_q),
+            make_identity_item("dim_type.text_type_uid", text_type_uid_v, text_type_uid_q),
+            make_identity_item("dim_type.tick_mark_uid", tick_uid_v, tick_uid_q),
+            make_identity_item("dim_type.witness_line_control", witness_v, witness_q),
+            make_identity_item("dim_type.unit_format_id", unit_format_id_v, unit_format_id_q),
+            make_identity_item("dim_type.rounding", rounding_v, rounding_q),
+            make_identity_item("dim_type.accuracy", accuracy_v, accuracy_q),
+            make_identity_item("dim_type.prefix", prefix_v, prefix_q),
+            make_identity_item("dim_type.suffix", suffix_v, suffix_q),
+        ]
+        identity_items = sorted(identity_items, key=lambda it: it.get("k", ""))
 
-            "tick_mark_name": tick_name,
-            "tick_mark_uid": tick_uid,
-            "witness_line_control": witness,
+        required_qs = [uid_q, shape_q]
+        blocked = any(q != ITEM_Q_OK for q in required_qs)
 
-            "signature_tuple": signature_tuple,
-            "signature_hash": sig_hash
+        status_reasons = []
+        any_incomplete = False
+        for it in identity_items:
+            q = it.get("q")
+            if q != ITEM_Q_OK:
+                any_incomplete = True
+                status_reasons.append("identity.incomplete:{}:{}".format(q, it.get("k")))
+
+        # Label
+        label_quality = "human"
+        label_display = safe_str(type_name) if (type_name not in (S_MISSING, S_UNREADABLE) and safe_str(type_name).strip()) else "Dimension Type"
+        if blocked:
+            # Required identity missing/unreadable: mark placeholder to avoid implying a human label is authoritative.
+            label_quality = "placeholder_unreadable" if (uid_q == ITEM_Q_UNREADABLE or shape_q == ITEM_Q_UNREADABLE) else "placeholder_missing"
+
+        label = {
+            "display": label_display,
+            "quality": label_quality,
+            "provenance": "revit.Name",
+            "components": {
+                "type_id": safe_str(getattr(getattr(d, "Id", None), "IntegerValue", "")),
+                "type_name": safe_str(type_name),
+            },
         }
 
-        records.append(rec)
-        sig_hashes.append(sig_hash)
+        record_id = uid_v if (uid_q == ITEM_Q_OK and uid_v) else "dim_type_id:{}".format(safe_str(getattr(getattr(d, "Id", None), "IntegerValue", "")))
 
-    info["debug_missing_name"] = missing
+        if blocked:
+            v2_block_reasons["blocked_required"] = int(v2_block_reasons.get("blocked_required", 0)) + 1
+            rec_v2 = build_record_v2(
+                domain="dimension_types",
+                record_id=record_id,
+                status=STATUS_BLOCKED,
+                status_reasons=sorted(set(status_reasons)) or ["minima.required_not_ok"],
+                sig_hash=None,
+                identity_items=identity_items,
+                required_qs=(),
+                label=label,
+            )
+        else:
+            status = STATUS_DEGRADED if any_incomplete else STATUS_OK
+            preimage = serialize_identity_items(identity_items)
+            sig_hash_v2 = make_hash(preimage)
+            v2_sig_hashes.append(sig_hash_v2)
+            rec_v2 = build_record_v2(
+                domain="dimension_types",
+                record_id=record_id,
+                status=status,
+                status_reasons=sorted(set(status_reasons)),
+                sig_hash=sig_hash_v2,
+                identity_items=identity_items,
+                required_qs=required_qs,
+                label=label,
+            )
 
-    names_sorted = sorted(set(names))
-    info["count"] = len(names_sorted)
-    info["names"] = names_sorted
-
-    info["records"] = sorted(records, key=lambda r: (r.get("type_name",""), r.get("type_id","")))
-    info["signature_hashes"] = sorted(sig_hashes)
-    info["hash"] = make_hash(sorted(sig_hashes)) if sig_hashes else None
-
-    info["record_rows"] = []
-    try:
-        recs = info.get("records") or []
-        info["record_rows"] = [{
-            "record_key": safe_str(r.get("type_uid", "")),
-            "sig_hash":  safe_str(r.get("signature_hash", "")),
-            "name":      safe_str(r.get("type_name", "")),   # optional metadata
-        } for r in recs]
-    except Exception as e:
-        info["record_rows"] = []
-
-    # v2 hash (domain-level block; no partial coverage semantics)
-    info["debug_v2_blocked"] = bool(v2_blocked)
-    info["debug_v2_block_reasons"] = v2_reasons if v2_blocked else {}
-    if (not v2_blocked) and v2_records:
-        info["hash_v2"] = make_hash(sorted(v2_records))
-    else:
-        info["hash_v2"] = None
-
-    return info
+        v2_records.append_
