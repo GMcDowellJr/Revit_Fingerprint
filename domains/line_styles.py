@@ -203,10 +203,9 @@ def extract(doc, ctx=None):
                 status_reasons.append("weight_projection_missing_or_unreadable")
             identity_items.append(make_identity_item("line_style.weight.projection", wproj_v, wproj_q))
 
-            wcut_v, wcut_q = canonicalize_int(w_cut)
-            if wcut_q != ITEM_Q_OK:
-                status_v2 = STATUS_DEGRADED
-                status_reasons.append("weight_cut_missing_or_unreadable")
+            # Line styles (subcategories under Lines) do not have a Cut lineweight surface in Revit UI.
+            # Treat as not applicable; do not degrade.
+            wcut_v, wcut_q = (None, ITEM_Q_UNSUPPORTED)
             identity_items.append(make_identity_item("line_style.weight.cut", wcut_v, wcut_q))
 
             # Optional: color rgb
@@ -229,19 +228,47 @@ def extract(doc, ctx=None):
                 status_reasons.append("get_line_pattern_id_failed")
                 lp_id = None
 
-            if lp_id and lp_id != ElementId.InvalidElementId:
+            # Determine projection line pattern.
+            # SOLID has no LinePatternElement; treat non-resolvable ids as solid to avoid false "uid_missing".
+            lp_elem = None
+            lp_uid = None
+
+            is_solid = False
+            if lp_id is None:
+                is_solid = True
+            else:
+                try:
+                    if lp_id == ElementId.InvalidElementId:
+                        is_solid = True
+                except Exception:
+                    # If comparison itself is unreliable, fall back to integer check
+                    try:
+                        is_solid = (int(getattr(lp_id, "IntegerValue", -1)) in (-1, 0))
+                    except Exception:
+                        is_solid = True
+
+            if not is_solid:
+                try:
+                    lp_elem = doc.GetElement(lp_id)
+                except Exception:
+                    lp_elem = None
+
+                if lp_elem is None:
+                    # Treat as solid-ish: id present but cannot resolve element
+                    is_solid = True
+
+            if is_solid:
+                lp_kind_v = "solid"
+            else:
                 lp_kind_v = "ref"
                 if lp_uid_to_sig_hash_v2 is None:
                     status_v2 = STATUS_DEGRADED
                     status_reasons.append("dependency_missing_line_patterns_v2_sig_hash")
                 else:
                     try:
-                        lp_elem = doc.GetElement(lp_id)
                         lp_uid = getattr(lp_elem, "UniqueId", None) if lp_elem else None
                     except Exception:
                         lp_uid = None
-                        status_v2 = STATUS_DEGRADED
-                        status_reasons.append("get_line_pattern_element_failed")
 
                     if lp_uid:
                         lp_sig_hash_v = lp_uid_to_sig_hash_v2.get(lp_uid, None)
@@ -251,11 +278,9 @@ def extract(doc, ctx=None):
                             status_v2 = STATUS_DEGRADED
                             status_reasons.append("dependency_unmapped_line_pattern_v2_sig_hash")
                     else:
+                        # If we have an element but it has no UID, that's unusual; degrade explicitly.
                         status_v2 = STATUS_DEGRADED
                         status_reasons.append("line_pattern_uid_missing")
-            else:
-                # Invalid/None => solid
-                lp_kind_v = "solid"
 
             # kind always present (optional key, but stable surface)
             kind_v, kind_q = canonicalize_str(lp_kind_v)

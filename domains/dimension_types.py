@@ -105,41 +105,75 @@ def _as_string(v):
 
 def get_type_display_name(elem_type):
     """
-    Deterministic, defensive type name extraction.
+    Deterministic, defensive type name extraction for DimensionType.
+
+    IMPORTANT:
+    - DimensionType.Name may throw TypeError and MUST NOT be relied on.
+    - UI-visible names are exposed via parameters:
+        SYMBOL_FAMILY_NAME_PARAM (-1002002)
+        SYMBOL_NAME_PARAM        (-1002001)
 
     Preference order:
-      1) FamilyName + ":" + Name (common for many types)
-      2) Name
-      3) ElementId string as last resort
-
-    This intentionally avoids localized UI display names.
+      1) Family Name + ":" + Type Name   (matches Revit UI grouping)
+      2) Type Name
+      3) Family Name
+      4) id:<ElementId>
     """
     if elem_type is None:
         return S_MISSING
 
-    # Avoid raising if the element is a proxy or partially invalid.
-    family = None
-    name = None
+    fam = None
+    typ = None
 
+    # Family Name
     try:
-        family = getattr(elem_type, "FamilyName", None)
+        p_fam = first_param(
+            elem_type,
+            bip_names=["SYMBOL_FAMILY_NAME_PARAM"],
+            ui_names=["Family Name"],
+        )
+        fam = canon_str(_as_string(p_fam))
+        # canon_str("") may return sentinel strings like "<MISSING>".
+        # Treat sentinels as absent for display-name composition.
+        if fam in (S_MISSING, S_UNREADABLE, "", None):
+            fam = None
     except Exception:
-        family = None
+        fam = None
 
+    # Type Name
     try:
-        name = getattr(elem_type, "Name", None)
+        p_typ = first_param(
+            elem_type,
+            bip_names=["SYMBOL_NAME_PARAM", "ALL_MODEL_TYPE_NAME"],
+            ui_names=["Type Name", "Name"],
+        )
+        typ = canon_str(_as_string(p_typ))
+        # canon_str("") may return sentinel strings like "<MISSING>".
+        # Treat sentinels as absent for display-name composition.
+        if typ in (S_MISSING, S_UNREADABLE, "", None):
+            typ = None
     except Exception:
-        name = None
+        typ = None
 
-    if family and name:
-        return "{0}:{1}".format(str(family), str(name))
-    if name:
-        return str(name)
+    if fam and typ:
+        return "{}:{}".format(fam, typ)
+    if typ:
+        return typ
+    if fam:
+        # Type Name exists but is blank for some unused/system DimensionTypes.
+        # Provide deterministic fallback to avoid "<MISSING>" strings.
+        try:
+            eid = getattr(elem_type, "Id", None)
+            if eid is not None:
+                return "{}:id:{}".format(fam, safe_str(getattr(eid, "IntegerValue", eid)))
+        except Exception:
+            pass
+        return fam
 
     try:
         eid = getattr(elem_type, "Id", None)
         if eid is not None:
-            return "id:{0}".format(str(eid))
+            return "id:{}".format(str(eid))
     except Exception:
         pass
 
@@ -633,3 +667,31 @@ def extract(doc, ctx=None):
 
         v2_records.append(rec_v2)
         sig_hashes.append(sig_hash)
+
+        # Legacy (v1) record emission was never completed in this file.
+        # Preserve existing keys and compute only domain-level aggregates.
+        # If you later want per-type v1 rows, add them explicitly and deterministically.
+
+    # --- finalize legacy (v1) aggregates ---
+    info["count"] = len(names)
+    info["names"] = sorted(names)
+    info["signature_hashes"] = sorted(sig_hashes)
+    info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else make_hash([])
+
+    info["debug_missing_name"] = int(missing)
+
+    # --- finalize v2 aggregates ---
+    info["records"] = v2_records
+
+    v2_sig_hashes = sorted([h for h in v2_sig_hashes if h])
+    if v2_sig_hashes:
+        info["hash_v2"] = make_hash(v2_sig_hashes)
+        info["debug_v2_blocked"] = False
+    else:
+        # If we saw types but none could produce a v2 signature, force blocked signal.
+        info["hash_v2"] = None
+        info["debug_v2_blocked"] = True
+
+    info["debug_v2_block_reasons"] = dict(v2_block_reasons)
+
+    return info

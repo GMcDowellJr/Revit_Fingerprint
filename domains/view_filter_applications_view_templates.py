@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from Autodesk.Revit.DB import ElementId, View
+from Autodesk.Revit.DB import ElementId, View, ViewSchedule
 
 from core.collect import collect_instances
 from core.hashing import make_hash, safe_str
@@ -38,39 +38,56 @@ from core.record_v2 import (
 
 
 def _is_schedule_view(view) -> bool:
+    # Most reliable: schedule views/templates are ViewSchedule instances.
+    try:
+        if isinstance(view, ViewSchedule):
+            return True
+    except Exception:
+        pass
+
+    # Fallback: tolerate enum stringify variations
     try:
         vt = getattr(view, "ViewType", None)
-        return safe_str(vt) == "Schedule"
+        s = safe_str(vt)
+        return s == "Schedule" or s.endswith(".Schedule") or (".Schedule" in s)
     except Exception:
         return False
 
 
 def _has_any_override(ogs) -> Tuple[Optional[str], str]:
-    """Return (v, q) for vfa.stack[i].overrides as a bool-like string."""
+    """Return (v, q) for vfa.stack[i].overrides as a bool-like string.
+
+    Policy:
+      - If we can positively detect any override -> ("true", ok)
+      - If we can inspect all checked knobs without exception and see no overrides -> ("false", ok)
+      - If any knob access throws (partial unreadable), but none prove overrides -> (None, unreadable)
+        (conservative: cannot assert false if some signals were unreadable)
+    """
     if ogs is None:
         return "false", ITEM_Q_OK
 
-    try:
-        # Conservative check across common override knobs.
-        # Any readable non-default value marks overrides=True.
-        # Note: This intentionally does NOT attempt to hash the override content.
+    had_unreadable = False
 
+    try:
+        # Boolean-ish knobs
         for attr in ("Halftone",):
             try:
                 v = getattr(ogs, attr, None)
                 if v is True:
                     return "true", ITEM_Q_OK
             except Exception:
-                return None, ITEM_Q_UNREADABLE
+                had_unreadable = True
 
+        # Integer-ish knobs
         for attr in ("ProjectionLineWeight", "CutLineWeight", "SurfaceTransparency"):
             try:
                 v = getattr(ogs, attr, None)
                 if v is not None and int(v) > 0:
                     return "true", ITEM_Q_OK
             except Exception:
-                return None, ITEM_Q_UNREADABLE
+                had_unreadable = True
 
+        # ElementId-ish knobs (pattern ids)
         for attr in (
             "ProjectionLinePatternId",
             "CutLinePatternId",
@@ -86,8 +103,9 @@ def _has_any_override(ogs) -> Tuple[Optional[str], str]:
                     if iv != -1 and iv != 0:
                         return "true", ITEM_Q_OK
             except Exception:
-                return None, ITEM_Q_UNREADABLE
+                had_unreadable = True
 
+        # Color-ish knobs
         for attr in (
             "ProjectionLineColor",
             "CutLineColor",
@@ -105,9 +123,13 @@ def _has_any_override(ogs) -> Tuple[Optional[str], str]:
                     if int(r) != 0 or int(g) != 0 or int(b) != 0:
                         return "true", ITEM_Q_OK
             except Exception:
-                return None, ITEM_Q_UNREADABLE
+                had_unreadable = True
 
+        # If nothing indicated overrides:
+        if had_unreadable:
+            return None, ITEM_Q_UNREADABLE
         return "false", ITEM_Q_OK
+
     except Exception:
         return None, ITEM_Q_UNREADABLE
 
@@ -135,7 +157,8 @@ def extract(doc, ctx=None):
                 doc,
                 of_class=View,
                 require_unique_id=False,
-                predicate=lambda v: bool(getattr(v, "IsTemplate", False)),
+                where=lambda v: bool(getattr(v, "IsTemplate", False)),
+                where_key="IsTemplate==True",
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
                 cache_key="view_filter_applications_view_templates:View:templates",
             )
@@ -187,29 +210,38 @@ def extract(doc, ctx=None):
 
         # Filter stack
         filter_ids: Optional[List[ElementId]] = None
-        stack_ok = True
+        stack_q = ITEM_Q_OK
 
         if _is_schedule_view(v):
+            # Schedules/templates do not have view filters. Treat as empty + OK.
             filter_ids = []
+            stack_q = ITEM_Q_OK
         else:
             try:
                 if hasattr(v, "GetFilters"):
                     filter_ids = list(v.GetFilters() or [])
+                    stack_q = ITEM_Q_OK
                 else:
                     filter_ids = []
+                    stack_q = ITEM_Q_UNSUPPORTED
+                    status_reasons.append("filter_stack.unsupported:missing_api")
             except Exception:
-                stack_ok = False
-                filter_ids = None
+                # Some view/template types throw here even when API is reachable.
+                # Treat as unsupported rather than unreadable so downstream can degrade if policy allows.
+                filter_ids = []
+                stack_q = ITEM_Q_UNSUPPORTED
+                status_reasons.append("filter_stack.unsupported:exception")
 
         # Required: vfa.filter_stack_count
-        if stack_ok and filter_ids is not None:
-            sc_v, sc_q = canonicalize_int(len(filter_ids))
+        if filter_ids is not None:
+            sc_v, _ = canonicalize_int(len(filter_ids))
+            sc_q = stack_q
         else:
             sc_v, sc_q = (None, ITEM_Q_UNREADABLE)
             status_reasons.append("filter_stack.unreadable")
         identity_items.append(make_identity_item("vfa.filter_stack_count", sc_v, sc_q))
 
-        if stack_ok and filter_ids is not None:
+        if filter_ids is not None and stack_q != ITEM_Q_UNREADABLE:
             for i, fid in enumerate(filter_ids):
                 idx3 = "{:03d}".format(i)
 
