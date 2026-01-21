@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "record_contract_v2.schema.json",
+  "title": "Fingerprint Record Contract v2",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "domain",
+    "record_id",
+    "status",
+    "status_reasons",
+    "sig_hash",
+    "identity_basis",
+    "identity_quality",
+    "label"
+  ],
+  "properties": {
+    "schema_version": { "const": "record.v2" },
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9_]+$"
+    },
+    "record_id": { "type": "string", "minLength": 1 },
+
+    "status": { "enum": ["ok", "degraded", "blocked"] },
+
+    "status_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[a-z0-9_.:-]+$"
+      }
+    },
+
+    "sig_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{32}$"
+    },
+
+    "identity_basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hash_alg", "item_schema", "items"],
+      "properties": {
+        "hash_alg": { "type": "string", "minLength": 1 },
+        "item_schema": { "const": "identity_items.v1" },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["k", "v", "q"],
+            "properties": {
+              "k": { "type": "string", "minLength": 1 },
+              "v": { "type": ["string", "null"] },
+              "q": { "enum": ["ok", "missing", "unreadable", "unsupported"] }
+            }
+          }
+        }
+      }
+    },
+
+    "identity_quality": {
+      "enum": [
+        "complete",
+        "incomplete_missing",
+        "incomplete_unreadable",
+        "incomplete_unsupported",
+        "none_blocked"
+      ]
+    },
+
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["display", "quality", "provenance", "components"],
+      "properties": {
+        "display": { "type": "string" },
+        "quality": {
+          "enum": [
+            "human",
+            "system",
+            "placeholder_missing",
+            "placeholder_unreadable",
+            "placeholder_unsupported"
+          ]
+        },
+        "provenance": {
+          "enum": [
+            "revit.Name",
+            "revit.FamilyName+Name",
+            "revit.ViewName",
+            "revit.BuiltInEnum",
+            "revit.SpecTypeId",
+            "computed.path",
+            "none"
+          ]
+        },
+        "components": { "type": "object" }
+      }
+    },
+
+    "debug": { "type": "object" }
+  },
+
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "blocked" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "sig_hash": { "type": "null" },
+          "identity_quality": { "const": "none_blocked" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "enum": ["ok", "degraded"] } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "sig_hash": { "type": "string", "pattern": "^[0-9a-f]{32}$" }
+        }
+      }
+    }
+  ]
+}
