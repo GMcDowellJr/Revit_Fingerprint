@@ -25,6 +25,16 @@ import os
 import sys
 from typing import Any, Dict, Optional, Tuple
 
+# Ensure repo root (parent of /tools) is on sys.path so `import core` works
+# even when running this script from outside the repo root.
+try:
+    _HERE = os.path.abspath(os.path.dirname(__file__))
+    _REPO_ROOT = os.path.abspath(os.path.join(_HERE, os.pardir))
+    if _REPO_ROOT not in sys.path:
+        sys.path.insert(0, _REPO_ROOT)
+except Exception:
+    pass
+
 from core.features import build_features
 from core.manifest import build_manifest
 

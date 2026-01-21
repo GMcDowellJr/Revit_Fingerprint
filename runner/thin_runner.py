@@ -21,7 +21,7 @@ except Exception as e:
 # Optional: control which output surfaces are written
 # Values: "all", "minimal", or comma list e.g. "payload,manifest"
 try:
-    os.environ["REVIT_FINGERPRINT_OUTPUT_SURFACES"] = "minimal"
+    os.environ["REVIT_FINGERPRINT_OUTPUT_SURFACES"] = "payload"
 except Exception:
     pass
 
@@ -40,6 +40,16 @@ except Exception as e:
 #  - Missing/None => stamp OFF (safer for batch determinism)
 #  - Unparseable => stamp OFF + warning
 _thinrunner_warnings = []
+
+# Install path segments (centralized)
+# Override REVIT_FINGERPRINT_ORG_DIR to change "Company" without editing the graph.
+try:
+    ORG_DIR = str(os.environ.get("REVIT_FINGERPRINT_ORG_DIR", "Company")).strip() or "Company"
+except Exception:
+    ORG_DIR = "Stantec"
+
+APP_DIR = "RevitFingerprint"
+CHANNEL_DIR = "current"
 
 def _parse_boolish(v):
     if v is None:
@@ -89,22 +99,119 @@ except Exception:
     os.environ["REVIT_FINGERPRINT_FILENAME_STAMP"] = "0"
 
 # MUST be the repo root that contains: core/, domains/, runner/
-REPO_DIR = r"C:\Users\gmcdowell\Documents\Revit_Fingerprint"
+# Dynamo-node safe behavior:
+#  - No __file__ reliance (this code is pasted into a Dynamo Python node)
+#  - Repo root is discovered from env var or conventional local install paths
+#  - Hard block if repo appears to be on SharePoint/OneDrive sync or UNC/network path
 
-# Basic validation to catch the most common path mistake
-expected = [
-    os.path.join(REPO_DIR, "runner", "run_dynamo.py"),
-    os.path.join(REPO_DIR, "domains"),
-    os.path.join(REPO_DIR, "core"),
-]
-missing = [p for p in expected if not os.path.exists(p)]
-if missing:
+def _looks_like_unc_path(p):
+    try:
+        s = str(p)
+    except Exception:
+        return False
+    return s.startswith("\\\\")
+
+def _is_probably_sync_path(p):
+    """
+    Heuristic, Windows-centric: block common SharePoint/OneDrive sync roots.
+    We block (not degrade) because runtime location affects determinism.
+    """
+    try:
+        s = os.path.abspath(str(p))
+    except Exception:
+        return False
+
+    sl = s.lower()
+
+    # Common sync markers
+    for m in ("\\onedrive\\", "\\sharepoint\\", "\\microsoft teams\\"):
+        if m in sl:
+            return True
+
+    # Some orgs sync SharePoint under Documents with tenant/library naming
+    if "\\documents\\" in sl and ("- sharepoint" in sl or "sharepoint" in sl):
+        return True
+
+    return False
+
+def _is_repo_root(p):
+    expected_local = [
+        os.path.join(p, "runner", "run_dynamo.py"),
+        os.path.join(p, "domains"),
+        os.path.join(p, "core"),
+    ]
+    missing_local = [x for x in expected_local if not os.path.exists(x)]
+    return (len(missing_local) == 0), missing_local
+
+def _candidate_repo_dirs():
+    tried = []
+
+    # 1) Optional override: power users can set this once
+    try:
+        v = os.environ.get("REVIT_FINGERPRINT_REPO_DIR", "")
+    except Exception:
+        v = ""
+    v = str(v).strip()
+    if v:
+        tried.append(("env:REVIT_FINGERPRINT_REPO_DIR", v))
+
+    # 2) Preferred per-user install location (Documents)
+    # NOTE: Documents is sometimes redirected into OneDrive/SharePoint.
+    # We will still *search* here, but runtime will be BLOCKED if it looks synced.
+    up = os.environ.get("USERPROFILE", "")
+    if up:
+        tried.append(("documents:current", os.path.join(up, "Documents", ORG_DIR, APP_DIR, CHANNEL_DIR)))
+
+    # 3) Fallback: LocalAppData (less visible, usually not synced)
+    lad = os.environ.get("LOCALAPPDATA", "")
+    if lad:
+        tried.append(("localappdata:current", os.path.join(lad, ORG_DIR, APP_DIR, CHANNEL_DIR)))
+
+    # 4) Fallback: legacy-ish user profile location
+    if up:
+        tried.append(("userprofile:RevitFingerprint_current", os.path.join(up, "RevitFingerprint", "current")))
+
+    return tried
+
+_selected = None
+_tried = []
+for src, p in _candidate_repo_dirs():
+    if not p:
+        continue
+    repo_dir = os.path.abspath(str(p))
+    _tried.append({"source": src, "path": repo_dir})
+
+    unsafe = []
+    if _looks_like_unc_path(repo_dir):
+        unsafe.append("repo_dir_is_unc_path")
+    if _is_probably_sync_path(repo_dir):
+        unsafe.append("repo_dir_looks_like_sharepoint_onedrive_sync")
+
+    ok, missing = _is_repo_root(repo_dir)
+    if ok and not unsafe:
+        _selected = {"repo_dir": repo_dir, "source": src}
+        break
+
+if _selected is None:
     OUT = {
-        "error": "REPO_DIR does not look like the repo root (missing expected paths).",
-        "REPO_DIR": REPO_DIR,
-        "missing": missing,
+        "status": "blocked",
+        "error": "Local install not found (or only found in unsafe locations).",
+        "expected_install": {
+            "recommended_current": r"%USERPROFILE%\Documents\{ORG}\{APP}\{CH}".format(ORG=ORG_DIR, APP=APP_DIR, CH=CHANNEL_DIR),
+            "zip_extract_example": r"%USERPROFILE%\Documents\{ORG}\{APP}\vX.Y.Z".format(ORG=ORG_DIR, APP=APP_DIR),
+            "fallback_current_localappdata": r"%LOCALAPPDATA%\{ORG}\{APP}\{CH}".format(ORG=ORG_DIR, APP=APP_DIR, CH=CHANNEL_DIR),
+            "override_env_var": "REVIT_FINGERPRINT_ORG_DIR",
+        },
+        "tried": _tried,
+        "notes": [
+            "Do not run from SharePoint/OneDrive-synced folders or UNC paths.",
+            "Install the code locally, then run the Dynamo Player graph from SharePoint.",
+            "Optional override: set REVIT_FINGERPRINT_REPO_DIR to your local install root.",
+        ],
     }
 else:
+    REPO_DIR = _selected["repo_dir"]
+
     # Ensure this repo wins import resolution
     if REPO_DIR in sys.path:
         sys.path.remove(REPO_DIR)
@@ -112,9 +219,7 @@ else:
 
     try:
         # ---- CPython 3: purge cached modules so edits on disk are picked up ----
-        # Only purge the repo's packages to avoid destabilizing stdlib / Dynamo internals.
         prefixes = ("runner", "domains", "core")
-
         for name in list(sys.modules.keys()):
             if name in prefixes or name.startswith("runner.") or name.startswith("domains.") or name.startswith("core."):
                 sys.modules.pop(name, None)
@@ -122,20 +227,16 @@ else:
         # Import triggers execution in this repo (run_dynamo computes OUT at import time)
         exporter = importlib.import_module("runner.run_dynamo")
 
-        try:
-            if _thinrunner_warnings and isinstance(getattr(exporter, "OUT", None), dict):
-                exporter.OUT["_thinrunner_warnings"] = list(_thinrunner_warnings)
-        except Exception:
-            pass
-
         # Forward the computed OUT from the runner module
         OUT = exporter.OUT
 
     except Exception as e:
         OUT = {
+            "status": "failed",
             "error": str(e),
             "traceback": traceback.format_exc(),
             "REPO_DIR": REPO_DIR,
+            "repo_dir_source": _selected.get("source", None),
             "sys_path_head": sys.path[:8],
             "exporter_file": getattr(sys.modules.get("runner.run_dynamo", None), "__file__", None),
         }
