@@ -30,6 +30,21 @@ from core.canon import (
     S_NOT_APPLICABLE,
 )
 
+from core.record_v2 import (
+    canonicalize_str,
+    canonicalize_enum,
+    canonicalize_float,
+    ITEM_Q_OK,
+    ITEM_Q_MISSING,
+    ITEM_Q_UNREADABLE,
+    ITEM_Q_UNSUPPORTED,
+    build_record_v2,
+    make_identity_item,
+    serialize_identity_items,
+    STATUS_OK,
+    STATUS_DEGRADED,
+    STATUS_BLOCKED,
+)
 
 try:
     from Autodesk.Revit.DB import SpecTypeId
@@ -174,11 +189,13 @@ def extract(doc, ctx=None):
         if blocked:
             label_quality = "placeholder_unreadable" if (unit_q == ITEM_Q_UNREADABLE) else "placeholder_missing"
 
-        label = {
+        spec_name = label  # preserve the string loop key before building record label dict
+
+        rec_label = {
             "display": label_display,
             "quality": label_quality,
             "provenance": label_prov,
-            "components": {"spec": label},
+            "components": {"spec": spec_name},
         }
 
         if blocked:

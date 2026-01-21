@@ -45,6 +45,22 @@ from core.rows import (
     get_type_display_name,
 )
 
+from core.record_v2 import (
+    canonicalize_str,
+    canonicalize_enum,
+    canonicalize_float,
+    ITEM_Q_OK,
+    ITEM_Q_MISSING,
+    ITEM_Q_UNREADABLE,
+    ITEM_Q_UNSUPPORTED,
+    build_record_v2,
+    make_identity_item,
+    serialize_identity_items,
+    STATUS_OK,
+    STATUS_DEGRADED,
+    STATUS_BLOCKED,
+)
+
 try:
     from Autodesk.Revit.DB import DimensionType
 except ImportError:
@@ -492,7 +508,14 @@ def extract(doc, ctx=None):
         tick_uid_v, tick_uid_q = canonicalize_str(tick_uid if tick_uid else None)
 
         # Optional: dim_type.witness_line_control
-        witness_v, witness_q = canonicalize_str(witness if witness else None)
+        if witness in (S_MISSING, "", None):
+            witness_v, witness_q = (None, ITEM_Q_MISSING)
+        elif witness == S_UNREADABLE:
+            witness_v, witness_q = (None, ITEM_Q_UNREADABLE)
+        elif witness == S_NOT_APPLICABLE:
+            witness_v, witness_q = (None, ITEM_Q_UNSUPPORTED)
+        else:
+            witness_v, witness_q = canonicalize_str(witness)
 
         # Optional: unit format identity fields from UnitsFormatOptions
         unit_format_id_v, unit_format_id_q = (None, ITEM_Q_MISSING)
@@ -608,4 +631,5 @@ def extract(doc, ctx=None):
                 label=label,
             )
 
-        v2_records.append_
+        v2_records.append(rec_v2)
+        sig_hashes.append(sig_hash)

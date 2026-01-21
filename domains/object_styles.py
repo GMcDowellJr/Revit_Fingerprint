@@ -34,6 +34,21 @@ from core.canon import (
     S_NOT_APPLICABLE,
 )
 
+from core.record_v2 import (
+    STATUS_OK,
+    STATUS_DEGRADED,
+    STATUS_BLOCKED,
+    ITEM_Q_OK,
+    ITEM_Q_MISSING,
+    ITEM_Q_UNREADABLE,
+    ITEM_Q_UNSUPPORTED,
+    canonicalize_str,
+    canonicalize_int,
+    make_identity_item,
+    serialize_identity_items,
+    build_record_v2,
+)
+
 
 try:
     from Autodesk.Revit.DB import GraphicsStyleType, CategoryType
@@ -45,301 +60,312 @@ def extract(doc, ctx=None):
     """
     Extract Object Styles fingerprint from document.
 
-    Args:
-        doc: Revit Document
-        ctx: Context dictionary (used for v2 mappings + optional output controls)
+    Legacy surfaces:
+      - info["hash"], info["legacy_records"], info["signature_hashes"]
 
-    Returns:
-        Dictionary with count, hash, signature_hashes, category_hashes,
-        records, record_rows, and debug counters
+    record.v2 surfaces:
+      - info["hash_v2"], info["records"] (record.v2 dicts), info["signature_hashes_v2"]
+
+    Pattern references:
+      - Uses line_patterns record.v2 sig_hash via ctx["line_pattern_uid_to_hash_v2"].
+      - No sentinel literals are injected into identity items.
     """
     info = {
         "count": 0,
         "raw_count": 0,
         "names": [],
-        "hash": None,
+        "legacy_records": [],
         "signature_hashes": [],
-        "category_hashes": {},
-        "records": [],
+        "hash": None,
 
-        # v2 (contract semantic hash) — additive only; legacy behavior unchanged
+        # record.v2
+        "records": [],
+        "signature_hashes_v2": [],
         "hash_v2": None,
         "debug_v2_blocked": False,
         "debug_v2_block_reasons": {},
 
         # debug counters
         "debug_total_categories": 0,
-        "debug_rows_emitted": 0,
         "debug_skipped_import": 0,
-        "debug_skipped_cad_layers": 0,
-        "debug_fail_row": 0
+        "debug_skipped_no_name": 0,
+        "debug_fail_record_build": 0,
     }
 
-    # Output controls (default preserve legacy payload)
-    # Defaults are conservative: do NOT emit heavy payloads, and do NOT include CAD-layer categories,
-    # unless explicitly enabled via ctx keys.
-    emit_records = True
-    include_cad_layer_categories = False
-    try:
-        if ctx is not None:
-            emit_records = bool(ctx.get("emit_records", emit_records))
-            include_cad_layer_categories = bool(
-                ctx.get("include_cad_layer_categories", include_cad_layer_categories)
-            )
-    except Exception as e:
-        # Keep defaults on any ctx read errors
-        pass
+    if GraphicsStyleType is None or CategoryType is None:
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {"revit_api_unavailable": True}
+        return info
 
-    row_pairs = []
+    # Dependency map: LinePatternElement.UniqueId -> line_patterns record.v2 sig_hash
+    lp_uid_to_sig_hash_v2 = None
+    try:
+        lp_uid_to_sig_hash_v2 = (ctx or {}).get("line_pattern_uid_to_hash_v2", None) if ctx is not None else None
+        if not isinstance(lp_uid_to_sig_hash_v2, dict) or not lp_uid_to_sig_hash_v2:
+            lp_uid_to_sig_hash_v2 = None
+    except Exception:
+        lp_uid_to_sig_hash_v2 = None
+
+    # Legacy map (def_hash) used for legacy signature only
+    lp_uid_to_hash_legacy = {}
+    try:
+        lp_uid_to_hash_legacy = (ctx or {}).get("line_pattern_uid_to_hash", {}) if ctx is not None else {}
+        if not isinstance(lp_uid_to_hash_legacy, dict):
+            lp_uid_to_hash_legacy = {}
+    except Exception:
+        lp_uid_to_hash_legacy = {}
+
+    def rgb_sig_from_color(c):
+        try:
+            return "{}-{}-{}".format(int(c.Red), int(c.Green), int(c.Blue))
+        except Exception:
+            return S_MISSING
 
     try:
         cats = doc.Settings.Categories
-    except Exception as e:
+    except Exception:
         return info
 
-    # v2 build state (domain-level block; no partial coverage semantics)
-    v2_records = []
-    v2_blocked = False
-    v2_reasons = {}
-
-    # Dependency: line_patterns semantic_v2 must provide UID -> def_hash_v2 map
-    lp_map_v2 = None
-    try:
-        lp_map_v2 = (ctx or {}).get("line_pattern_uid_to_hash_v2", None) if ctx is not None else None
-        if not isinstance(lp_map_v2, dict) or not lp_map_v2:
-            lp_map_v2 = None
-    except Exception as e:
-        lp_map_v2 = None
-
-    def _looks_like_cad_import_category(name_str):
-        if not name_str:
-            return False
-        n = name_str.strip().lower()
-        return n.endswith(".dwg") or n.endswith(".dxf") or n.endswith(".dwf")
-
-    def row_sig_legacy(cat_obj, parent_name, row_name, cat_type):
-        # Projection / cut lineweights
-        try:
-            w_proj = cat_obj.GetLineWeight(GraphicsStyleType.Projection)
-        except Exception as e:
-            w_proj = None
-
-        try:
-            w_cut = cat_obj.GetLineWeight(GraphicsStyleType.Cut)
-        except Exception as e:
-            w_cut = None
-
-        # Line color
-        try:
-            rgb_sig = rgb_sig_from_color(cat_obj.LineColor)
-        except Exception as e:
-            rgb_sig = S_MISSING
-
-        # Line pattern (Object Styles has ONE pattern, not proj/cut)
-        # Hash surface contract: no UniqueId/GUID/+ElementId
-        # Prefer line_patterns def_hash via ctx map; else deterministic sentinel
-        try:
-            lp_id = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
-            lp_val = S_MISSING
-            if lp_id and lp_id.IntegerValue > 0:
-                lp_e = doc.GetElement(lp_id)
-                lp_uid = canon_str(getattr(lp_e, "UniqueId", None)) if lp_e else None
-                lp_map = (ctx or {}).get("line_pattern_uid_to_hash", {}) if ctx is not None else {}
-                lp_val = lp_map.get(lp_uid) or "<LP:UNMAPPED>"
-        except Exception as e:
-            lp_val = S_MISSING
-
-        sig = "|".join([
-            safe_str(parent_name),
-            safe_str(row_name),
-            safe_str(cat_type),
-            safe_str(w_proj),
-            safe_str(w_cut),
-            safe_str(rgb_sig),
-            safe_str(lp_val),
-        ])
-        return sig, w_proj, w_cut, rgb_sig
-
-    def row_sig_v2(cat_obj, parent_name, row_name, cat_type, w_proj, w_cut, rgb_sig):
-        """
-        v2 signature (contract semantic hash)
-
-        Exception (explicit): object_styles uses names as part of identity/definition.
-        Rationale: category/subcategory stable ids are not available or reliable cross-file.
-        """
-        # Block on unreadables / sentinel-like values (no partial coverage semantics)
-        # NOTE: Cut weight is legitimately not defined for many categories; treat as NOT_APPLICABLE.
-        if w_proj is None:
-            return None, "unreadable_line_weight"
-
-        if rgb_sig == S_MISSING:
-            return None, "unreadable_line_color"
-
-        # Line pattern mapping requirement (upstream v2 dependency)
-        try:
-            lp_id_v2 = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
-        except Exception as e:
-            lp_id_v2 = None
-
-        if lp_id_v2 is None:
-            return None, "unreadable_line_pattern_id"
-
-        try:
-            is_real = bool(lp_id_v2 and lp_id_v2.IntegerValue > 0)
-        except Exception as e:
-            is_real = False
-
-        if is_real:
-            if lp_map_v2 is None:
-                return None, "dependency_missing_line_patterns_v2"
-
-            try:
-                lp_elem_v2 = doc.GetElement(lp_id_v2)
-                lp_uid_v2 = getattr(lp_elem_v2, "UniqueId", None) if lp_elem_v2 else None
-            except Exception as e:
-                lp_uid_v2 = None
-
-            lp_hash_v2 = lp_map_v2.get(lp_uid_v2) if lp_uid_v2 else None
-            if not lp_hash_v2:
-                return None, "unmapped_line_pattern_v2"
-        else:
-            # SOLID is not a LinePatternElement; treat as a real semantic value in v2.
-            lp_hash_v2 = "SOLID"
-
-        sig_v2 = "|".join([
-            safe_str(parent_name),
-            safe_str(row_name),
-            safe_str(cat_type),
-            safe_str(w_proj),
-            safe_str(w_cut if w_cut is not None else S_NOT_APPLICABLE),
-            safe_str(rgb_sig),
-            safe_str(lp_hash_v2),
-        ])
-        return sig_v2, None
-
     names = []
-    records = []
-    row_hashes = []
-    per_parent_hashes = {}  # parent_name -> list(sig_hashes)
+    legacy_records = []
+    v2_records = []
+    v2_sig_hashes = []
+    v2_any_blocked = False
+    v2_block_reasons = {}
 
-    for cat in cats:
-        if cat is None:
-            continue
-
+    # Parent + children iteration
+    for cat in list(cats or []):
         info["debug_total_categories"] += 1
 
-        # Skip import categories
         try:
+            # Skip import categories
             if cat.CategoryType == CategoryType.Import:
                 info["debug_skipped_import"] += 1
                 continue
-        except Exception as e:
+        except Exception:
+            # If CategoryType can't be read, treat as non-import (fail open for legacy parity)
             pass
 
-        # Parent name
         try:
-            parent_name = canon_str(cat.Name)
-        except Exception as e:
+            parent_name = canon_str(getattr(cat, "Name", None))
+        except Exception:
+            parent_name = None
+
+        if not parent_name:
+            info["debug_skipped_no_name"] += 1
             continue
 
-        if (not include_cad_layer_categories) and _looks_like_cad_import_category(parent_name):
-            info["debug_skipped_cad_layers"] += 1
-            continue
-
-        # Category type
+        # Determine a stable cat_type string for legacy signature
         try:
-            cat_type = safe_str(cat.CategoryType)
-        except Exception as e:
+            cat_type = safe_str(getattr(cat, "CategoryType", None))
+        except Exception:
             cat_type = S_MISSING
 
-        # Emit the parent row ("self")
+        # Rows: parent "self" then each subcategory
+        rows = [("self", cat)]
         try:
-            sig, w_proj, w_cut, rgb_sig = row_sig_legacy(cat, parent_name, "self", cat_type)
-            row_key = "{}|{}".format(parent_name, "self")
-            names.append(row_key)
-            h = make_hash([sig])  # stable, deterministic
-            records.append(sig)
-            row_hashes.append(h)
-            row_pairs.append((sig, h))
-            per_parent_hashes.setdefault(parent_name, []).append(h)
-            info["debug_rows_emitted"] += 1
+            subs = list(getattr(cat, "SubCategories", []) or [])
+            for sc in subs:
+                try:
+                    rn = canon_str(getattr(sc, "Name", None))
+                except Exception:
+                    rn = None
+                if rn:
+                    rows.append((rn, sc))
+        except Exception:
+            pass
 
-            if not v2_blocked:
-                sig_v2, reason = row_sig_v2(cat, parent_name, "self", cat_type, w_proj, w_cut, rgb_sig)
-                if sig_v2 is None:
-                    v2_blocked = True
-                    v2_reasons[reason] = True
-                else:
-                    v2_records.append(sig_v2)
-        except Exception as e:
-            info["debug_fail_row"] += 1
-
-        # Emit each subcategory row
-        subs = []
-        try:
-            subs = list(cat.SubCategories)
-        except Exception as e:
-            subs = []
-
-        for sub in subs:
+        for row_name, cat_obj in rows:
             try:
-                sub_name = canon_str(getattr(sub, "Name", None))
-                if not sub_name:
-                    continue
-
-                sig, w_proj, w_cut, rgb_sig = row_sig_legacy(sub, parent_name, sub_name, cat_type)
-                row_key = "{}|{}".format(parent_name, sub_name)
+                row_key = "{}|{}".format(parent_name, row_name)
                 names.append(row_key)
-                h = make_hash([sig])
-                records.append(sig)
-                row_hashes.append(h)
-                per_parent_hashes.setdefault(parent_name, []).append(h)
-                info["debug_rows_emitted"] += 1
 
-                if not v2_blocked:
-                    sig_v2, reason = row_sig_v2(sub, parent_name, sub_name, cat_type, w_proj, w_cut, rgb_sig)
-                    if sig_v2 is None:
-                        v2_blocked = True
-                        v2_reasons[reason] = True
+                # -------------------------
+                # Legacy signature (UNCHANGED behavior)
+                # -------------------------
+                try:
+                    w_proj_legacy = cat_obj.GetLineWeight(GraphicsStyleType.Projection)
+                except Exception:
+                    w_proj_legacy = None
+                try:
+                    w_cut_legacy = cat_obj.GetLineWeight(GraphicsStyleType.Cut)
+                except Exception:
+                    w_cut_legacy = None
+
+                try:
+                    rgb_sig_legacy = rgb_sig_from_color(cat_obj.LineColor)
+                except Exception:
+                    rgb_sig_legacy = S_MISSING
+
+                # Line pattern (legacy): prefer def_hash via ctx map; else <LP:UNMAPPED> sentinel
+                try:
+                    lp_id = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
+                    lp_val = S_MISSING
+                    if lp_id and getattr(lp_id, "IntegerValue", 0) > 0:
+                        lp_e = doc.GetElement(lp_id)
+                        lp_uid = canon_str(getattr(lp_e, "UniqueId", None)) if lp_e else None
+                        lp_val = lp_uid_to_hash_legacy.get(lp_uid) or "<LP:UNMAPPED>"
+                except Exception:
+                    lp_val = S_MISSING
+
+                legacy_sig = "|".join([
+                    safe_str(parent_name),
+                    safe_str(row_name),
+                    safe_str(cat_type),
+                    safe_str(w_proj_legacy),
+                    safe_str(w_cut_legacy),
+                    safe_str(rgb_sig_legacy),
+                    safe_str(lp_val),
+                ])
+                legacy_records.append(legacy_sig)
+
+                # -------------------------
+                # record.v2 identity + sig_hash (NO sentinel literals; q marks missing/unreadable)
+                # -------------------------
+                status_reasons = []
+                status_v2 = STATUS_OK
+
+                identity_items = []
+
+                # Required: row key
+                rk_v, rk_q = canonicalize_str(row_key)
+                identity_items.append(make_identity_item("obj_style.row_key", rk_v, rk_q))
+                required_qs = [rk_q]
+
+                # Optional: projection weight
+                wproj_v, wproj_q = canonicalize_int(w_proj_legacy)
+                if wproj_q != ITEM_Q_OK:
+                    status_v2 = STATUS_DEGRADED
+                    status_reasons.append("weight_projection_missing_or_unreadable")
+                identity_items.append(make_identity_item("obj_style.weight.projection", wproj_v, wproj_q))
+
+                # Optional: cut weight (many categories legitimately lack cut -> treat as unsupported)
+                if w_cut_legacy is None:
+                    wcut_v, wcut_q = None, ITEM_Q_UNSUPPORTED
+                else:
+                    wcut_v, wcut_q = canonicalize_int(w_cut_legacy)
+                identity_items.append(make_identity_item("obj_style.weight.cut", wcut_v, wcut_q))
+
+                # Optional: color
+                rgb_v, rgb_q = canonicalize_str(None if rgb_sig_legacy in {S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE} else rgb_sig_legacy)
+                if rgb_q != ITEM_Q_OK:
+                    status_v2 = STATUS_DEGRADED
+                    status_reasons.append("color_rgb_missing_or_unreadable")
+                identity_items.append(make_identity_item("obj_style.color.rgb", rgb_v, rgb_q))
+
+                # Optional: pattern reference (sig_hash from line_patterns record.v2)
+                lp_kind_v = None
+                lp_sig_hash_v = None
+                lp_sig_hash_q = ITEM_Q_MISSING
+
+                lp_id_v2 = None
+                try:
+                    lp_id_v2 = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
+                except Exception:
+                    lp_id_v2 = None
+                    status_v2 = STATUS_DEGRADED
+                    status_reasons.append("get_line_pattern_id_failed")
+
+                if lp_id_v2 and getattr(lp_id_v2, "IntegerValue", 0) > 0:
+                    lp_kind_v = "ref"
+                    if lp_uid_to_sig_hash_v2 is None:
+                        status_v2 = STATUS_DEGRADED
+                        status_reasons.append("dependency_missing_line_patterns_v2_sig_hash")
                     else:
-                        v2_records.append(sig_v2)
-            except Exception as e:
-                info["debug_fail_row"] += 1
+                        try:
+                            lp_elem = doc.GetElement(lp_id_v2)
+                            lp_uid = canon_str(getattr(lp_elem, "UniqueId", None)) if lp_elem else None
+                        except Exception:
+                            lp_uid = None
+                            status_v2 = STATUS_DEGRADED
+                            status_reasons.append("get_line_pattern_element_failed")
+
+                        if lp_uid:
+                            lp_sig_hash_v = lp_uid_to_sig_hash_v2.get(lp_uid, None)
+                            if lp_sig_hash_v:
+                                lp_sig_hash_q = ITEM_Q_OK
+                            else:
+                                status_v2 = STATUS_DEGRADED
+                                status_reasons.append("dependency_unmapped_line_pattern_v2_sig_hash")
+                        else:
+                            status_v2 = STATUS_DEGRADED
+                            status_reasons.append("line_pattern_uid_missing")
+                else:
+                    lp_kind_v = "solid"
+
+                kind_v, kind_q = canonicalize_str(lp_kind_v)
+                if kind_q != ITEM_Q_OK:
+                    status_v2 = STATUS_DEGRADED
+                    status_reasons.append("pattern_kind_missing_or_unreadable")
+                identity_items.append(make_identity_item("obj_style.pattern_ref.kind", kind_v, kind_q))
+
+                if lp_sig_hash_q == ITEM_Q_OK:
+                    identity_items.append(make_identity_item("obj_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
+
+                # Enforce minima: required not-ok => blocked
+                if any(q != ITEM_Q_OK for q in required_qs):
+                    status_v2 = STATUS_BLOCKED
+                    status_reasons.append("required_identity_not_ok")
+
+                identity_items_sorted = sorted(identity_items, key=lambda d: str(d.get("k", "")))
+                preimage_v2 = serialize_identity_items(identity_items_sorted)
+                sig_hash_v2 = make_hash(preimage_v2)
+
+                rec_v2 = build_record_v2(
+                    domain="object_styles",
+                    record_id=safe_str(row_key),
+                    status=status_v2,
+                    status_reasons=sorted(set(status_reasons)),
+                    sig_hash=sig_hash_v2,
+                    identity_items=identity_items_sorted,
+                    required_qs=required_qs,
+                    label={
+                        "display": safe_str(row_key),
+                        "quality": "human",
+                        "provenance": "computed.path",
+                        "components": {"row_key": safe_str(row_key)},
+                    },
+                )
+
+                v2_records.append(rec_v2)
+                v2_sig_hashes.append(sig_hash_v2)
+                if status_v2 == STATUS_BLOCKED:
+                    v2_any_blocked = True
+
+            except Exception:
+                info["debug_fail_record_build"] += 1
                 continue
 
-    records_sorted = sorted(records)
-    row_hashes_sorted = sorted(row_hashes)
-
-    info["raw_count"] = len(names)
+    legacy_records_sorted = sorted(legacy_records)
+    info["legacy_records"] = legacy_records_sorted
     info["names"] = sorted(set(names))
-    info["count"] = len(info["names"])
-    info["records"] = records_sorted
-    info["signature_hashes"] = row_hashes_sorted
-    info["count"] = len(records_sorted)
-    info["hash"] = make_hash(row_hashes_sorted) if row_hashes_sorted else None
-    info["record_rows"] = []
-    if row_pairs:
-        row_pairs_sorted = sorted(row_pairs, key=lambda t: t[0])
-        info["record_rows"] = [{"record": s, "sig_hash": h} for (s, h) in row_pairs_sorted]
+    info["count"] = len(legacy_records_sorted)
+    info["raw_count"] = info["debug_total_categories"]
 
-    # Per-parent rollups
-    cat_hashes = {}
-    for pname, hs in per_parent_hashes.items():
-        hs_sorted = sorted(hs)
-        cat_hashes[pname] = make_hash(hs_sorted) if hs_sorted else None
-    info["category_hashes"] = cat_hashes
+    info["signature_hashes"] = [make_hash([r]) for r in legacy_records_sorted] if legacy_records_sorted else []
+    info["hash"] = make_hash(legacy_records_sorted) if legacy_records_sorted else None
 
-    # v2 hash (domain-level block; no partial coverage semantics)
-    info["debug_v2_blocked"] = bool(v2_blocked)
-    info["debug_v2_block_reasons"] = v2_reasons if v2_blocked else {}
-    if (not v2_blocked) and v2_records:
-        info["hash_v2"] = make_hash(sorted(v2_records))
+    info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
+    info["signature_hashes_v2"] = sorted(v2_sig_hashes)
+
+    if v2_any_blocked:
+        info["debug_v2_blocked"] = True
+        v2_block_reasons["one_or_more_records_blocked"] = True
+
+    if (not v2_any_blocked) and info["signature_hashes_v2"]:
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
     else:
+        if (not v2_any_blocked) and (not info["signature_hashes_v2"]):
+            info["debug_v2_blocked"] = True
+            v2_block_reasons["no_v2_records"] = True
         info["hash_v2"] = None
 
-    # Optional payload suppression (does not affect hash)
-    if not emit_records:
-        info["records"] = []
-        info["record_rows"] = []
+    if v2_block_reasons:
+        info["debug_v2_block_reasons"] = v2_block_reasons
+
+    info["record_rows"] = [
+        {"record_key": safe_str(r.get("record_id", "")), "sig_hash": r.get("sig_hash", None)}
+        for r in info["records"]
+    ]
 
     return info
