@@ -98,9 +98,7 @@ def extract(doc, ctx=None):
     }
 
     # Get context mappings (may be None if global domains not run)
-    filter_map = ctx.get("filter_uid_to_hash", {}) if ctx else {}
     phase_filter_map = ctx.get("phase_filter_uid_to_hash", {}) if ctx else {}
-    filter_map_v2 = ctx.get("filter_uid_to_hash_v2", {}) if ctx else {}
     phase_filter_map_v2 = ctx.get("phase_filter_uid_to_hash_v2", {}) if ctx else {}
     line_pattern_map_v2 = ctx.get("line_pattern_uid_to_hash_v2", {}) if ctx else {}
 
@@ -627,71 +625,110 @@ def extract(doc, ctx=None):
             include_app = False
         sig.append("appearance_included={}".format(int(bool(include_app))))
 
-        # View Filters (reference global view_filters domain)
-        # IMPORTANT: Filter order matters (filter stack is order-sensitive)
-        filter_hashes = []
-        filter_hashes_v2 = []
-        if not is_schedule:
-            try:
-                filter_ids = list(v.GetFilters())
-                if filter_ids:
-                    filter_hashes = []
-                    filter_hashes_v2 = []
-                    for i, fid in enumerate(filter_ids):
-                        try:
-                            f_elem = doc.GetElement(fid)
-                            f_uid = canon_str(getattr(f_elem, "UniqueId", None)) if f_elem else None
-                            f_hash = filter_map.get(f_uid, S_UNREADABLE) if f_uid else S_MISSING
-                            f_hash_v2 = None
-                            if v2_ok:
-                                try:
-                                    f_hash_v2 = filter_map_v2.get(f_uid) if f_uid else None
-                                except Exception as e:
-                                    f_hash_v2 = None
-                                if not f_hash_v2:
-                                    _v2_block("filter_unresolved")
-                                    v2_ok = False
+        # View Filters are split into a separate record.v2 domain:
+        #   view_filter_applications_view_templates
+        # This domain (view_templates) must not depend on filter definitions or applications.
 
-                            try:
-                                visibility = v.GetFilterVisibility(fid)
-                                vis_str = safe_str(visibility)
-                            except Exception as e:
-                                vis_str = S_MISSING
+        # Template filter stack identity (order matters)
+        # This references definitions by record.v2 sig_hash and includes per-template settings.
+        #
+        # NOTE: legacy hash may include sentinel strings; v2 must BLOCK if dependencies cannot resolve.
+        try:
+            filter_ids = list(v.GetFilters() or []) if hasattr(v, "GetFilters") else []
+            sig.append("filter_stack_count={}".format(len(filter_ids)))
+            if v2_ok:
+                sig_v2.append("vts.filter_stack_count={}".format(sig_val(len(filter_ids))))
+        except Exception:
+            filter_ids = None
+            sig.append("filter_stack_count=<UNREADABLE>")
+            if v2_ok:
+                _v2_block("filter_stack_unreadable")
+                v2_ok = False
 
-                            idx = "{:03d}".format(i)
-                            filter_hashes.append("filter[{}]={}|vis={}".format(idx, f_hash, vis_str))
-                            if v2_ok:
-                                filter_hashes_v2.append("filter[{}]={}|vis={}".format(idx, f_hash_v2, vis_str))
-                        except Exception as e:
-                            info["debug_fail_read"] += 1
-                            continue
-            except Exception as e:
-                info["debug_fail_read"] += 1
+        if filter_ids is not None:
+            # mapping published by view_filter_definitions domain
+            vf_map = ctx.get("view_filter_uid_to_sig_hash_v2", {}) if ctx else {}
 
-        if filter_hashes:
-            # Preserve order; do not sort
-            sig.append("filter_count={}".format(sig_val(len(filter_hashes))))
-            sig.extend(filter_hashes)
-        else:
-            sig.append("filter_count=0")
+            for i, fid in enumerate(filter_ids):
+                idx3 = "{:03d}".format(i)
 
-        # Finalize signature
-        # Split: stable entries + filter entries (order-sensitive)
-        other_entries = [s for s in sig if not s.startswith("filter[")]
-        filter_entries = [s for s in sig if s.startswith("filter[")]
+                # Resolve filter UniqueId -> definition sig_hash (stable ref)
+                f_uid = None
+                try:
+                    fe = doc.GetElement(fid)
+                    f_uid = canon_str(getattr(fe, "UniqueId", None)) if fe is not None else None
+                except Exception:
+                    f_uid = None
 
-        other_entries_sorted = sorted(other_entries)
-        sig_final = other_entries_sorted + filter_entries
+                def_sig = vf_map.get(f_uid) if f_uid else None
+
+                if def_sig:
+                    sig.append("filter[{}].def_sig={}".format(idx3, sig_val(def_sig)))
+                    if v2_ok:
+                        sig_v2.append("vts.filter[{}].def_sig_hash={}".format(idx3, sig_val(def_sig)))
+                else:
+                    # legacy: keep explicit unreadable marker
+                    sig.append("filter[{}].def_sig=<UNREADABLE>".format(idx3))
+                    # v2: cannot produce a correct semantic hash without stable dependency
+                    if v2_ok:
+                        _v2_block("view_filter_unresolved")
+                        v2_ok = False
+
+                # Visibility
+                try:
+                    vis = bool(v.GetFilterVisibility(fid)) if hasattr(v, "GetFilterVisibility") else None
+                except Exception:
+                    vis = None
+
+                if vis is None:
+                    sig.append("filter[{}].vis=<UNREADABLE>".format(idx3))
+                    if v2_ok:
+                        _v2_block("filter_visibility_unreadable")
+                        v2_ok = False
+                else:
+                    sig.append("filter[{}].vis={}".format(idx3, int(vis)))
+                    if v2_ok:
+                        sig_v2.append("vts.filter[{}].visibility={}".format(idx3, int(vis)))
+
+                # Overrides presence (bool-like)
+                try:
+                    ogs = v.GetFilterOverrides(fid) if hasattr(v, "GetFilterOverrides") else None
+                except Exception:
+                    ogs = None
+
+                try:
+                    # minimal and stable: just detect any readable non-default
+                    has_ovr = False
+                    if ogs is not None:
+                        if getattr(ogs, "Halftone", False):
+                            has_ovr = True
+                        for attr in ("ProjectionLineWeight", "CutLineWeight", "SurfaceTransparency"):
+                            vattr = getattr(ogs, attr, None)
+                            if vattr is not None and int(vattr) > 0:
+                                has_ovr = True
+                        for attr in ("ProjectionLinePatternId", "CutLinePatternId"):
+                            eid = getattr(ogs, attr, None)
+                            if eid is not None and int(getattr(eid, "IntegerValue", 0)) not in (0, -1):
+                                has_ovr = True
+
+                    sig.append("filter[{}].ovr={}".format(idx3, int(has_ovr)))
+                    if v2_ok:
+                        sig_v2.append("vts.filter[{}].overrides={}".format(idx3, int(has_ovr)))
+                except Exception:
+                    sig.append("filter[{}].ovr=<UNREADABLE>".format(idx3))
+                    if v2_ok:
+                        _v2_block("filter_overrides_unreadable")
+                        v2_ok = False
+
+        # Finalize signature (deterministic)
+        sig_final = sorted(sig)
 
         def_hash = make_hash(sig_final)
 
-        # v2 finalize (non-schedule)
+        # v2 finalize
         if v2_ok:
             try:
                 sig_v2.extend([s for s in sig_final if not s.startswith("name=")])
-                if filter_hashes_v2:
-                    sig_v2 = [s for s in sig_v2 if not s.startswith("filter[")]
-                    sig_v2.extend(filter_hashes_v2)
                 sig_v2_final = sorted(set(sig_v2))
                 def_hash_v2 = make_hash(sig_v2_final)
                 per_hashes_v2.append(def_hash_v2)

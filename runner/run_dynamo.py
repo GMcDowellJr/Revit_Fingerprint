@@ -19,11 +19,76 @@ import hashlib
 
 _SCRIPT_START = time.perf_counter()
 
-# Add parent directory to path for imports
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
+# --- ensure unsafe-location flags exist before use ---
+def _looks_like_unc_path(p):
+    try:
+        s = str(p)
+    except Exception:
+        return False
+    return s.startswith("\\\\")
+
+def _is_probably_sync_path(p):
+    try:
+        s = os.path.abspath(str(p))
+    except Exception:
+        return False
+    sl = s.lower()
+    for m in ("\\onedrive\\", "\\sharepoint\\", "\\microsoft teams\\"):
+        if m in sl:
+            return True
+    if "\\documents\\" in sl and ("- sharepoint" in sl or "sharepoint" in sl):
+        return True
+    return False
+
+# runner/.. is the repo root
+try:
+    _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+except Exception:
+    _SCRIPT_DIR = os.getcwd()
+
+_REPO_ROOT = os.path.dirname(_SCRIPT_DIR)
+
+_UNSAFE_REASONS = []
+if _looks_like_unc_path(_REPO_ROOT):
+    _UNSAFE_REASONS.append("repo_root_is_unc_path")
+if _is_probably_sync_path(_REPO_ROOT):
+    _UNSAFE_REASONS.append("repo_root_looks_like_sharepoint_onedrive_sync")
+
+def _read_tool_version(repo_root):
+    try:
+        p = os.path.join(repo_root, "VERSION.txt")
+        if not os.path.exists(p):
+            return None
+        with open(p, "r") as f:
+            s = f.read().strip()
+        return s if s else None
+    except Exception:
+        return None
+
+_TOOL_VERSION = _read_tool_version(_REPO_ROOT)
+# --- end unsafe-location flags ---
+
+if _UNSAFE_REASONS:
+    OUT = json.dumps(
+        {
+            "status": "blocked",
+            "error": "Unsafe execution location. Install locally and run from there (not SharePoint/OneDrive/UNC).",
+            "repo_root": _REPO_ROOT,
+            "unsafe_reasons": _UNSAFE_REASONS,
+            "_meta": {
+                "runner": "M5",
+                "runner_file": __file__,
+                "tool_version": _TOOL_VERSION,
+            },
+        },
+        indent=2,
+        sort_keys=True,
+    )
+    raise SystemExit
+
+# Add repo root to path for imports
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 # Contract + dependency utilities (must be imported after sys.path adjustment)
 from core import contracts
@@ -39,7 +104,8 @@ from RevitServices.Persistence import DocumentManager
 # Import domain extractors
 from domains import identity, units, object_styles, line_patterns, line_styles
 from domains import fill_patterns, text_types, dimension_types
-from domains import view_filters, phases, phase_filters, phase_graphics
+from domains import view_filter_definitions, view_filter_applications_view_templates
+from domains import phases, phase_filters, phase_graphics
 from domains import view_templates
 from core.manifest import build_manifest
 from core.features import build_features
@@ -419,10 +485,18 @@ def run_fingerprint(doc):
 
     # New global domains (M4) - run before contextual domains
     # These populate ctx with mappings for views/templates to reference
-    if _enabled("view_filters"):
-        legacy = _domain_run("view_filters", view_filters.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+    if _enabled("view_filter_definitions"):
+        legacy = _domain_run(
+            "view_filter_definitions",
+            view_filter_definitions.extract,
+            doc,
+            ctx,
+            contract_domains,
+            run_diag,
+            runner_notes,
+        )
         if legacy is not None:
-            fingerprint["view_filters"] = legacy
+            fingerprint["view_filter_definitions"] = legacy
 
     if _enabled("phases"):
         legacy = _domain_run("phases", phases.extract, doc, ctx, contract_domains, run_diag, runner_notes)
@@ -456,11 +530,24 @@ def run_fingerprint(doc):
         )
 
     # Contextual domains (can reference global domains via ctx)
+    if _enabled("view_filter_applications_view_templates"):
+        legacy = _domain_run(
+            "view_filter_applications_view_templates",
+            view_filter_applications_view_templates.extract,
+            doc,
+            ctx,
+            contract_domains,
+            run_diag,
+            runner_notes,
+        )
+        if legacy is not None:
+            fingerprint["view_filter_applications_view_templates"] = legacy
+
     if _enabled("view_templates"):
         # Hard dependencies: downstream must not run if upstream is missing or non-acceptable.
         try:
-            require_domain(contract_domains, "view_filters")
             require_domain(contract_domains, "phase_filters")
+            require_domain(contract_domains, "view_filter_definitions")
 
             legacy = _domain_run("view_templates", view_templates.extract, doc, ctx, contract_domains, run_diag, runner_notes)
             if legacy is not None:
@@ -566,6 +653,8 @@ try:
         domains_requested = list(ENABLED_DOMAINS)
 
     fingerprint["_meta"] = {
+        "repo_root": _REPO_ROOT,
+        "tool_version": _TOOL_VERSION,
         "runner": "M5",
         "elapsed_seconds": fingerprint.pop("_elapsed_seconds", None),
         "elapsed_seconds_total": round(time.perf_counter() - _SCRIPT_START, 3),
