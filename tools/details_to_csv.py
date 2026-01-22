@@ -86,7 +86,9 @@ def main():
         w = csv.writer(f)
         w.writerow([
             "file_a", "file_b", "domain",
-            "list_type", "rank", "sig_hash", "element_name", "count",
+            "list_type", "rank", "sig_hash",
+            "label_display", "label_quality", "label_provenance",
+            "count",
         ])
 
         for row in data:
@@ -94,7 +96,7 @@ def main():
             file_b = row.get("file_b")
             for d in row.get("domains", []) or []:
                 domain = d.get("domain")
-                label_map = d.get("sig_labels") or {}
+                label_meta = d.get("sig_label_meta") or {}
 
                 for list_type, key in (("matched", "top_matched"), ("added", "top_added"), ("removed", "top_removed")):
                     items = d.get(key)
@@ -102,6 +104,11 @@ def main():
                         continue
                     # items = [(sig_hash, count), ...]
                     for i, (sig_hash, count) in enumerate(items, start=1):
+                        meta = label_meta.get(sig_hash, {}) if isinstance(label_meta, dict) else {}
+                        disp = meta.get("display", "") if isinstance(meta, dict) else ""
+                        qual = meta.get("quality", "") if isinstance(meta, dict) else ""
+                        prov = meta.get("provenance", "") if isinstance(meta, dict) else ""
+
                         w.writerow([
                             file_a,
                             file_b,
@@ -109,7 +116,9 @@ def main():
                             list_type,
                             i,
                             sig_hash,
-                            label_map.get(sig_hash, ""),
+                            disp,
+                            qual,
+                            prov,
                             count,
                         ])
 
