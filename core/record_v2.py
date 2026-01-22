@@ -289,10 +289,9 @@ def make_identity_item(
         if not isinstance(v, str):
             raise ValueError("IdentityItem.v must be a string or None")
         vv = v.strip()
-        if vv == "":
-            # Empty string is not representable; use null + missing instead.
-            vv = None
-            q = ITEM_Q_MISSING
+        # IMPORTANT: empty string may be a valid semantic value for some keys (e.g. prefix/suffix).
+        # Do NOT collapse "" to None or rewrite q; the caller controls q via canonicalizers/policy.
+        # (If you want "blank means missing" semantics, use canonicalize_str(), not this constructor.)
 
     if isinstance(vv, str):
         for b in banned_substrings or []:
