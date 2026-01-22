@@ -64,6 +64,9 @@ def _param_ref_from_param_id(doc, param_id: Any) -> Tuple[Tuple[Optional[str], s
     """Return ((kind_v, kind_q), (id_v, id_q), status_reasons_additions)."""
     reasons: List[str] = []
 
+    if param_id is None:
+        return (None, ITEM_Q_MISSING), (None, ITEM_Q_MISSING), ["param_ref.id_missing"]
+
     try:
         pid = param_id
         if isinstance(pid, ElementId):
@@ -340,10 +343,16 @@ def extract(doc, ctx=None):
             op_v, op_q = _op_token_from_rule(r)
             identity_items.append(make_identity_item(f"vf.rule[{idx3}].op", op_v, op_q))
 
+            pid = None
+            # Revit rule classes differ by version; prefer method if available.
             try:
-                pid = getattr(r, "ParameterId", None)
+                if hasattr(r, "GetRuleParameter"):
+                    pid = r.GetRuleParameter()
+                elif hasattr(r, "ParameterId"):
+                    pid = getattr(r, "ParameterId", None)
             except Exception:
                 pid = None
+
             (pk_v, pk_q), (pi_v, pi_q), add_reasons = _param_ref_from_param_id(doc, pid)
             identity_items.append(make_identity_item(f"vf.rule[{idx3}].param_ref.kind", pk_v, pk_q))
             identity_items.append(make_identity_item(f"vf.rule[{idx3}].param_ref.id", pi_v, pi_q))

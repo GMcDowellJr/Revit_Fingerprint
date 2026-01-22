@@ -54,88 +54,12 @@ def _is_schedule_view(view) -> bool:
         return False
 
 
-def _has_any_override(ogs) -> Tuple[Optional[str], str]:
-    """Return (v, q) for vfa.stack[i].overrides as a bool-like string.
-
-    Policy:
-      - If we can positively detect any override -> ("true", ok)
-      - If we can inspect all checked knobs without exception and see no overrides -> ("false", ok)
-      - If any knob access throws (partial unreadable), but none prove overrides -> (None, unreadable)
-        (conservative: cannot assert false if some signals were unreadable)
-    """
-    if ogs is None:
-        return "false", ITEM_Q_OK
-
-    had_unreadable = False
-
-    try:
-        # Boolean-ish knobs
-        for attr in ("Halftone",):
-            try:
-                v = getattr(ogs, attr, None)
-                if v is True:
-                    return "true", ITEM_Q_OK
-            except Exception:
-                had_unreadable = True
-
-        # Integer-ish knobs
-        for attr in ("ProjectionLineWeight", "CutLineWeight", "SurfaceTransparency"):
-            try:
-                v = getattr(ogs, attr, None)
-                if v is not None and int(v) > 0:
-                    return "true", ITEM_Q_OK
-            except Exception:
-                had_unreadable = True
-
-        # ElementId-ish knobs (pattern ids)
-        for attr in (
-            "ProjectionLinePatternId",
-            "CutLinePatternId",
-            "SurfaceForegroundPatternId",
-            "SurfaceBackgroundPatternId",
-            "CutForegroundPatternId",
-            "CutBackgroundPatternId",
-        ):
-            try:
-                eid = getattr(ogs, attr, None)
-                if isinstance(eid, ElementId):
-                    iv = int(eid.IntegerValue)
-                    if iv != -1 and iv != 0:
-                        return "true", ITEM_Q_OK
-            except Exception:
-                had_unreadable = True
-
-        # Color-ish knobs
-        for attr in (
-            "ProjectionLineColor",
-            "CutLineColor",
-            "SurfaceForegroundPatternColor",
-            "SurfaceBackgroundPatternColor",
-            "CutForegroundPatternColor",
-            "CutBackgroundPatternColor",
-        ):
-            try:
-                c = getattr(ogs, attr, None)
-                if c is not None:
-                    r = getattr(c, "Red", 0)
-                    g = getattr(c, "Green", 0)
-                    b = getattr(c, "Blue", 0)
-                    if int(r) != 0 or int(g) != 0 or int(b) != 0:
-                        return "true", ITEM_Q_OK
-            except Exception:
-                had_unreadable = True
-
-        # If nothing indicated overrides:
-        if had_unreadable:
-            return None, ITEM_Q_UNREADABLE
-        return "false", ITEM_Q_OK
-
-    except Exception:
-        return None, ITEM_Q_UNREADABLE
-
-
 def extract(doc, ctx=None):
     """Extract record.v2 view filter application stacks for view templates."""
+
+    diag = None
+    if isinstance(ctx, dict):
+        diag = ctx.get("diag")
 
     result: Dict[str, Any] = {
         "count": 0,
@@ -150,6 +74,10 @@ def extract(doc, ctx=None):
     def_map = {}
     if isinstance(ctx, dict):
         def_map = ctx.get("view_filter_uid_to_sig_hash_v2", {}) or {}
+
+    diag = None
+    if isinstance(ctx, dict):
+        diag = ctx.get("diag")
 
     try:
         col = list(
@@ -232,6 +160,26 @@ def extract(doc, ctx=None):
                 stack_q = ITEM_Q_UNSUPPORTED
                 status_reasons.append("filter_stack.unsupported:exception")
 
+        # Normalize stack order to match dialog display: sort by filter name (then id) deterministically.
+        if filter_ids is not None and len(filter_ids) > 1:
+            decorated = []
+            for _fid in filter_ids:
+                _nm = ""
+                try:
+                    _fe = doc.GetElement(_fid)
+                    _nm_raw = getattr(_fe, "Name", None) if _fe is not None else None
+                    _nm_v, _ = canonicalize_str(_nm_raw)
+                    _nm = safe_str(_nm_v or "")
+                except Exception:
+                    _nm = ""
+                try:
+                    _iid = int(getattr(_fid, "IntegerValue", 0))
+                except Exception:
+                    _iid = 0
+                decorated.append((_nm.lower(), _iid, _fid))
+            decorated.sort(key=lambda t: (t[0], t[1]))
+            filter_ids = [t[2] for t in decorated]
+
         # Required: vfa.filter_stack_count
         if filter_ids is not None:
             sc_v, _ = canonicalize_int(len(filter_ids))
@@ -273,16 +221,22 @@ def extract(doc, ctx=None):
                         vis_v, vis_q = (None, ITEM_Q_UNSUPPORTED)
                 except Exception:
                     vis_v, vis_q = (None, ITEM_Q_UNREADABLE)
-                identity_items.append(make_identity_item(f"vfa.stack[{idx3}].visibility", vis_v, vis_q))
 
-                ogs = None
+                identity_items.append(make_identity_item(f"vfa.stack[{idx3}].filter_sig_hash", sig_v, sig_q))
+
+                en_v, en_q = (None, ITEM_Q_UNREADABLE)
                 try:
-                    if hasattr(v, "GetFilterOverrides"):
-                        ogs = v.GetFilterOverrides(fid)
+                    if hasattr(v, "GetIsFilterEnabled"):
+                        eb = bool(v.GetIsFilterEnabled(fid))
+                        en_v, en_q = canonicalize_bool(eb)
+                    else:
+                        en_v, en_q = (None, ITEM_Q_UNSUPPORTED)
+                        status_reasons.append("filter_enabled.unsupported:missing_api")
                 except Exception:
-                    ogs = None
-                ov_v, ov_q = _has_any_override(ogs)
-                identity_items.append(make_identity_item(f"vfa.stack[{idx3}].overrides", ov_v, ov_q))
+                    en_v, en_q = (None, ITEM_Q_UNREADABLE)
+                    status_reasons.append("filter_enabled.unreadable:exception")
+
+                identity_items.append(make_identity_item(f"vfa.stack[{idx3}].enabled", en_v, en_q))
 
         items_sorted = sorted(identity_items, key=lambda it: str(it.get("k", "")))
 
