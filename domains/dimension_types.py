@@ -359,39 +359,69 @@ def extract(doc, ctx=None):
         color_int, color_rgb = try_get_color_rgb_from_elem(d)
 
         # Tick Mark (arrowhead) – store UniqueId metadata + include NAME in signature (more stable than ids)
-        tick_name = _as_string(
-            first_param(
-                d,
-                bip_names=["DIM_LEADER_ARROWHEAD", "TICK_MARK", "DIM_TICK_MARK"],
-                ui_names=["Tick Mark"],
-            )
-        )
+        tick_param_present = False
+        tick_name = ""
         tick_uid = None
+        tick_exc = None
+
         try:
             p_tick = first_param(
                 d,
                 bip_names=["DIM_LEADER_ARROWHEAD", "TICK_MARK", "DIM_TICK_MARK"],
                 ui_names=["Tick Mark"],
             )
-            if p_tick and p_tick.HasValue:
-                tid = p_tick.AsElementId()
-                if tid and tid.IntegerValue > 0:
-                    te = doc.GetElement(tid)
-                    if te:
-                        tick_uid = te.UniqueId
-                        # prefer element.Name where available
-                        try:
-                            tick_name = tick_name or get_element_display_name(te)
-                            if tick_name is not None:
-                                tick_name = canon_str(tick_name)
-                        except Exception:
-                            pass
-        except Exception:
-            pass
+            tick_param_present = p_tick is not None
 
-        # Witness line control is common; keep as metadata + optional signature
-        witness = _as_string(first_param(d, ui_names=["Witness Line Control"]))
-        witness = canon_str(witness)
+            if p_tick is not None:
+                # ValueString is stable for legacy signature purposes (even if no ElementId)
+                try:
+                    tick_name = _as_string(p_tick)
+                except Exception:
+                    tick_name = ""
+
+                if getattr(p_tick, "HasValue", False):
+                    tid = None
+                    try:
+                        tid = p_tick.AsElementId()
+                    except Exception:
+                        tid = None
+
+                    if tid and getattr(tid, "IntegerValue", 0) > 0:
+                        te = None
+                        try:
+                            te = doc.GetElement(tid)
+                        except Exception:
+                            te = None
+
+                        if te is not None:
+                            tick_uid = getattr(te, "UniqueId", None)
+                            # Prefer a stable display name for legacy signature when available
+                            try:
+                                tick_name = tick_name or get_element_display_name(te) or tick_name
+                            except Exception:
+                                pass
+
+            # Canonicalize legacy signature value, but preserve explicit blank as blank
+            if tick_name:
+                tick_name = canon_str(tick_name)
+        except Exception as ex:
+            tick_exc = ex
+            tick_name = S_UNREADABLE
+
+        # Witness line control is family-conditional; absence must not be treated as missing.
+        witness_param_present = False
+        witness_raw = ""
+        try:
+            p_wit = first_param(d, ui_names=["Witness Line Control"])
+            witness_param_present = p_wit is not None
+            if p_wit is None:
+                witness = S_NOT_APPLICABLE
+            else:
+                witness_raw = _as_string(p_wit)
+                # Preserve explicit blank as blank for signature purposes
+                witness = canon_str(witness_raw) if witness_raw else ""
+        except Exception:
+            witness = S_UNREADABLE
 
         # --- additional likely-visible parameters (optional; will be S_MISSING if absent) ---
         def _p(ui_name):
@@ -542,17 +572,25 @@ def extract(doc, ctx=None):
             text_type_uid_v, text_type_uid_q = (None, ITEM_Q_UNREADABLE)
 
         # Optional: dim_type.tick_mark_uid
-        tick_uid_v, tick_uid_q = canonicalize_str(tick_uid if tick_uid else None)
+        # - If the parameter is absent for this family: unsupported.not_applicable
+        # - If present but explicitly none/invalid: ok with empty string
+        # - If present and resolvable: ok with referenced element UniqueId
+        tick_uid_v, tick_uid_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+        if tick_param_present:
+            if tick_uid:
+                tick_uid_v, tick_uid_q = canonicalize_str(tick_uid)
+            else:
+                tick_uid_v, tick_uid_q = ("", ITEM_Q_OK)
 
         # Optional: dim_type.witness_line_control
-        if witness in (S_MISSING, "", None):
-            witness_v, witness_q = (None, ITEM_Q_MISSING)
-        elif witness == S_UNREADABLE:
-            witness_v, witness_q = (None, ITEM_Q_UNREADABLE)
-        elif witness == S_NOT_APPLICABLE:
-            witness_v, witness_q = (None, ITEM_Q_UNSUPPORTED)
-        else:
-            witness_v, witness_q = canonicalize_str(witness)
+        # - If parameter is absent for this family: unsupported.not_applicable
+        # - If present: allow empty-as-ok
+        witness_v, witness_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+        if witness_param_present:
+            try:
+                witness_v, witness_q = canonicalize_str_allow_empty(witness_raw)
+            except Exception:
+                witness_v, witness_q = (None, ITEM_Q_UNREADABLE)
 
         # Optional: unit format identity fields from UnitsFormatOptions
         # If the dimension type uses project defaults (no per-type override), treat these as valid N/A
@@ -561,17 +599,26 @@ def extract(doc, ctx=None):
         rounding_v, rounding_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
         accuracy_v, accuracy_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
 
-        # Prefix/Suffix are DimensionType properties; empty string is a valid value (do not collapse to missing).
+        # Prefix/Suffix are DimensionType properties.
+        # Contract: if property exists and is readable, blank is OK and MUST NOT collapse to missing.
         prefix_v, prefix_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
         suffix_v, suffix_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+
         if hasattr(d, "Prefix"):
             try:
-                prefix_v, prefix_q = canonicalize_str_allow_empty(getattr(d, "Prefix", None))
+                raw = getattr(d, "Prefix", "")
+                if raw is None:
+                    raw = ""
+                prefix_v, prefix_q = (safe_str(raw), ITEM_Q_OK)
             except Exception:
                 prefix_v, prefix_q = (None, ITEM_Q_UNREADABLE)
+
         if hasattr(d, "Suffix"):
             try:
-                suffix_v, suffix_q = canonicalize_str_allow_empty(getattr(d, "Suffix", None))
+                raw = getattr(d, "Suffix", "")
+                if raw is None:
+                    raw = ""
+                suffix_v, suffix_q = (safe_str(raw), ITEM_Q_OK)
             except Exception:
                 suffix_v, suffix_q = (None, ITEM_Q_UNREADABLE)
 
@@ -620,7 +667,6 @@ def extract(doc, ctx=None):
         identity_items = [
             make_identity_item("dim_type.uid", uid_v, uid_q),
             make_identity_item("dim_type.shape", shape_v, shape_q),
-            make_identity_item("dim_type.text_type_uid", text_type_uid_v, text_type_uid_q),
             make_identity_item("dim_type.tick_mark_uid", tick_uid_v, tick_uid_q),
             make_identity_item("dim_type.witness_line_control", witness_v, witness_q),
             make_identity_item("dim_type.unit_format_id", unit_format_id_v, unit_format_id_q),
