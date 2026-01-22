@@ -29,7 +29,20 @@ ITEM_Q_OK = "ok"
 ITEM_Q_MISSING = "missing"
 ITEM_Q_UNREADABLE = "unreadable"
 ITEM_Q_UNSUPPORTED = "unsupported"
-VALID_ITEM_QS = {ITEM_Q_OK, ITEM_Q_MISSING, ITEM_Q_UNREADABLE, ITEM_Q_UNSUPPORTED}
+
+# "unsupported" needs subtyping to distinguish exporter gaps vs valid N/A.
+# These strings remain within IdentityItem.q to keep the meaning local to the item.
+ITEM_Q_UNSUPPORTED_NOT_APPLICABLE = "unsupported.not_applicable"
+ITEM_Q_UNSUPPORTED_NOT_IMPLEMENTED = "unsupported.not_implemented"
+
+VALID_ITEM_QS = {
+    ITEM_Q_OK,
+    ITEM_Q_MISSING,
+    ITEM_Q_UNREADABLE,
+    ITEM_Q_UNSUPPORTED,
+    ITEM_Q_UNSUPPORTED_NOT_APPLICABLE,
+    ITEM_Q_UNSUPPORTED_NOT_IMPLEMENTED,
+}
 
 STATUS_OK = "ok"
 STATUS_DEGRADED = "degraded"
@@ -87,6 +100,31 @@ def canonicalize_str(v: Any) -> Tuple[Optional[str], str]:
     if not s2:
         return None, ITEM_Q_MISSING
 
+    return s2, ITEM_Q_OK
+
+def canonicalize_str_allow_empty(v: Any) -> Tuple[Optional[str], str]:
+    """Canonicalize a string-like value, but preserve empty string as a valid value.
+
+    Returns:
+        (value_or_none, q)
+
+    Rules:
+      - None -> (None, "missing")
+      - Conversion error -> (None, "unreadable")
+      - Strip whitespace
+      - Empty-after-strip -> ("", "ok")
+    """
+    if v is None:
+        return None, ITEM_Q_MISSING
+
+    try:
+        s = str(v)
+    except Exception:
+        return None, ITEM_Q_UNREADABLE
+
+    s2 = s.strip()
+    if s2 == "":
+        return "", ITEM_Q_OK
     return s2, ITEM_Q_OK
 
 
