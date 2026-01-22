@@ -293,11 +293,11 @@ def load_fingerprint(path: str) -> FingerprintData:
     try:
         raw = json.loads(p.read_text(encoding="utf-8"))
     except Exception as e:
-        return FingerprintData(path=str(p), ok=False, error=f"unreadable_json: {type(e).__name__}: {e}", domains={})
+        return FingerprintData(path=os.path.basename(str(p)), ok=False, error=f"unreadable_json: {type(e).__name__}: {e}", domains={})
 
     domains_obj = _extract_domains_obj(raw)
     if domains_obj is None:
-        return FingerprintData(path=str(p), ok=False, error="missing_domains_object", domains={})
+        return FingerprintData(path=os.path.basename(str(p)), ok=False, error="missing_domains_object", domains={})
 
     # Detect whether this is the new contract (domains_obj == raw["_domains"])
     is_new_contract = isinstance(raw.get("_domains"), dict) and domains_obj is raw.get("_domains")
@@ -391,7 +391,7 @@ def load_fingerprint(path: str) -> FingerprintData:
             )
 
 
-        return FingerprintData(path=str(p), ok=True, error=None, domains=domains)
+        return FingerprintData(path=os.path.basename(str(p)), ok=True, error=None, domains=domains)
 
     # Legacy path: domains_obj is already per-domain payload
     for dname, dpayload in domains_obj.items():
@@ -684,7 +684,11 @@ class DomainDetail:
     top_added: Optional[DomainSigTopK]
     top_removed: Optional[DomainSigTopK]
 
-    # Optional sig_hash -> label meta map (record.v2 only)
+    # Optional sig_hash -> label meta maps (record.v2 only)
+    # - *_a / *_b preserve source-file attribution
+    # - merged is a deterministic union (prefer A on conflicts) for backward compatibility
+    sig_label_meta_a: Optional[Dict[str, Dict[str, str]]] = None
+    sig_label_meta_b: Optional[Dict[str, Dict[str, str]]] = None
     sig_label_meta: Optional[Dict[str, Dict[str, str]]] = None
 
 
@@ -701,6 +705,30 @@ def _topk_counter_items(c: Counter, top_k: int) -> List[Tuple[str, int]]:
     items = [(k, int(v)) for k, v in c.items() if isinstance(k, str) and k]
     items.sort(key=lambda kv: (-kv[1], kv[0]))
     return items[: max(0, int(top_k))]
+
+def _merge_sig_label_meta(
+    a: Optional[Dict[str, Dict[str, str]]],
+    b: Optional[Dict[str, Dict[str, str]]],
+) -> Optional[Dict[str, Dict[str, str]]]:
+    """
+    Deterministic union of sig->label maps.
+    Preference rule on conflict: keep A's entry, ignore B's.
+    Returns None if both are None/empty.
+    """
+    if not a and not b:
+        return None
+
+    out: Dict[str, Dict[str, str]] = {}
+    if isinstance(a, dict):
+        for k, v in a.items():
+            if isinstance(k, str) and k and isinstance(v, dict):
+                out[k] = v
+    if isinstance(b, dict):
+        for k, v in b.items():
+            if isinstance(k, str) and k and isinstance(v, dict) and k not in out:
+                out[k] = v
+
+    return out if out else None
 
 def _extract_sig_label_meta(domain_payload: Dict[str, Any]) -> Optional[Dict[str, Dict[str, str]]]:
     """
@@ -781,6 +809,9 @@ def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_
             top_matched=None,
             top_added=None,
             top_removed=None,
+            sig_label_meta_a=None,
+            sig_label_meta_b=None,
+            sig_label_meta=None,
         )
 
     if da.unreadable or db.unreadable:
@@ -801,6 +832,9 @@ def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_
             top_matched=None,
             top_added=None,
             top_removed=None,
+            sig_label_meta_a=None,
+            sig_label_meta_b=None,
+            sig_label_meta=None,
         )
 
     if da.status == STATUS_BLOCKED or db.status == STATUS_BLOCKED:
@@ -821,9 +855,12 @@ def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_
             top_matched=None,
             top_added=None,
             top_removed=None,
+            sig_label_meta_a=None,
+            sig_label_meta_b=None,
+            sig_label_meta=None,
         )
 
-    # Conservative: only compare records when both OK
+    # Conservative: only compare record-level signatures when both OK
     if da.status != STATUS_OK or db.status != STATUS_OK:
         return DomainDetail(
             domain=domain,
@@ -842,6 +879,9 @@ def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_
             top_matched=None,
             top_added=None,
             top_removed=None,
+            sig_label_meta_a=da.sig_label_meta,
+            sig_label_meta_b=db.sig_label_meta,
+            sig_label_meta=_merge_sig_label_meta(da.sig_label_meta, db.sig_label_meta),
         )
 
     if da.sig_hashes is None or db.sig_hashes is None:
@@ -863,6 +903,9 @@ def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_
             top_matched=None,
             top_added=None,
             top_removed=None,
+            sig_label_meta_a=da.sig_label_meta,
+            sig_label_meta_b=db.sig_label_meta,
+            sig_label_meta=_merge_sig_label_meta(da.sig_label_meta, db.sig_label_meta),
         )
 
     ca = Counter(da.sig_hashes)
@@ -892,7 +935,7 @@ def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_
         if a > b:
             removed[k] = a - b
 
-    label_meta = da.sig_label_meta or db.sig_label_meta
+    label_meta = _merge_sig_label_meta(da.sig_label_meta, db.sig_label_meta)
 
     return DomainDetail(
         domain=domain,
@@ -911,7 +954,9 @@ def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_
         top_matched=DomainSigTopK(items=_topk_counter_items(common, top_k)),
         top_added=DomainSigTopK(items=_topk_counter_items(added, top_k)),
         top_removed=DomainSigTopK(items=_topk_counter_items(removed, top_k)),
-        sig_label_meta=(da.sig_label_meta or db.sig_label_meta),
+        sig_label_meta_a=da.sig_label_meta,
+        sig_label_meta_b=db.sig_label_meta,
+        sig_label_meta=label_meta,
     )
 
 
@@ -992,6 +1037,8 @@ def write_details_json(details: List[SimilarityDetail], out_path: str) -> None:
                 "top_matched": (dd.top_matched.items if dd.top_matched else None),
                 "top_added": (dd.top_added.items if dd.top_added else None),
                 "top_removed": (dd.top_removed.items if dd.top_removed else None),
+                "sig_label_meta_a": dd.sig_label_meta_a,
+                "sig_label_meta_b": dd.sig_label_meta_b,
                 "sig_label_meta": dd.sig_label_meta,
             })
 
