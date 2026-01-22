@@ -57,9 +57,9 @@ class DomainData:
     missing: bool                    # explicitly indicates missing domain payload
     reason: Optional[str]            # why missing/unreadable/unknown
 
-    # Optional mapping from sig_hash -> human label (e.g., element/type name), when available.
+    # Optional mapping from sig_hash -> label metadata from record.v2 (display/quality/provenance).
     # None means unavailable/unknown; {} should not be emitted.
-    sig_labels: Optional[Dict[str, str]] = None
+    sig_label_meta: Optional[Dict[str, Dict[str, str]]] = None
 
 
 @dataclass(frozen=True)
@@ -148,63 +148,50 @@ def _extract_domains_obj(fp: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 def _extract_sig_hashes(domain_payload: Dict[str, Any]) -> Optional[List[str]]:
     """
+    Contract-aligned signature extraction.
+
     Return:
-      - None: signature hashes unavailable/unknown
-      - []: explicitly known empty
-      - [..]: list of signature-hash strings (may include duplicates)
+      - None: unavailable/unknown/unsupported (not contract-valid for similarity)
+      - []: explicitly known empty (contract-valid)
+      - [..]: list of sig_hash strings (may include duplicates)
 
-    Supported payload layouts:
-      A) New contract: "signature_hashes_v2" (preferred) or "signature_hashes"
-      B) Legacy: records/rows/items/elements list with per-row "sig_hash"
-      C) Nested legacy: payload["data"][...]
+    Contract source of truth:
+      - domain_payload["records"] containing record.v2 objects, each with:
+          schema_version == "record.v2"
+          status in {ok,degraded,blocked}
+          sig_hash: 32-hex for ok/degraded; null for blocked
     """
-    # New contract: explicit signature lists on the domain payload
-    for key in ("signature_hashes_v2", "signature_hashes"):
-        v = domain_payload.get(key)
-        if isinstance(v, list):
-            out: List[str] = []
-            for x in v:
-                if isinstance(x, str) and x:
-                    out.append(x)
-            # Important: list exists => known (even if empty)
-            return out
+    recs = domain_payload.get("records")
+    if not isinstance(recs, list):
+        return None
 
-    # Legacy: look for per-record sig_hash
-    for key in ("records", "rows", "items", "elements"):
-        recs = domain_payload.get(key)
-        if isinstance(recs, list):
-            out = []
-            saw_sig_field = False
-            for r in recs:
-                if isinstance(r, dict) and "sig_hash" in r:
-                    saw_sig_field = True
-                    sv = r.get("sig_hash")
-                    if isinstance(sv, str) and sv:
-                        out.append(sv)
-            if saw_sig_field:
-                return out
-            return None
+    out: List[str] = []
+    saw_v2 = False
 
-    # Nested legacy
-    data = domain_payload.get("data")
-    if isinstance(data, dict):
-        for key in ("records", "rows", "items", "elements"):
-            recs = data.get(key)
-            if isinstance(recs, list):
-                out = []
-                saw_sig_field = False
-                for r in recs:
-                    if isinstance(r, dict) and "sig_hash" in r:
-                        saw_sig_field = True
-                        sv = r.get("sig_hash")
-                        if isinstance(sv, str) and sv:
-                            out.append(sv)
-                if saw_sig_field:
-                    return out
-                return None
+    for r in recs:
+        if not isinstance(r, dict):
+            continue
+        if r.get("schema_version") != "record.v2":
+            continue
 
-    return None
+        saw_v2 = True
 
+        st = _norm_status(r.get("status"))
+        sig = r.get("sig_hash")
+
+        if st == STATUS_BLOCKED:
+            # Contract: sig_hash must be null when blocked; do not include.
+            continue
+
+        # ok/degraded must have a 32-hex string; if not, do not guess.
+        if isinstance(sig, str) and sig:
+            out.append(sig)
+
+    if not saw_v2:
+        return None
+
+    # If records exist, list existence is contract-valid even if empty.
+    return out
 
 def _extract_domain_status(domain_payload: Dict[str, Any]) -> str:
     for key in ("status", "run_status", "domain_status"):
@@ -375,7 +362,7 @@ def load_fingerprint(path: str) -> FingerprintData:
                 continue
 
             sigs = _extract_sig_hashes(payload)
-            sig_labels = _extract_sig_labels(payload)
+            sig_label_meta = _extract_sig_label_meta(payload)
 
             # Capture a reason string if present (meta first, then payload)
             reason = None
@@ -400,7 +387,7 @@ def load_fingerprint(path: str) -> FingerprintData:
                 unreadable=False,
                 missing=False,
                 reason=reason,
-                sig_labels=sig_labels,
+                sig_label_meta=sig_label_meta,
             )
 
 
@@ -438,7 +425,7 @@ def load_fingerprint(path: str) -> FingerprintData:
         status = _extract_domain_status(dpayload)
         dhash = _extract_domain_hash(dpayload)
         sigs = _extract_sig_hashes(dpayload)
-        sig_labels = _extract_sig_labels(dpayload)
+        sig_label_meta = _extract_sig_label_meta(dpayload)
 
         missing = False
         unreadable = False
@@ -457,7 +444,7 @@ def load_fingerprint(path: str) -> FingerprintData:
             unreadable=unreadable,
             missing=missing,
             reason=reason,
-            sig_labels=sig_labels,
+            sig_label_meta=sig_label_meta,
         )
 
 
@@ -697,9 +684,8 @@ class DomainDetail:
     top_added: Optional[DomainSigTopK]
     top_removed: Optional[DomainSigTopK]
 
-    # Optional sig_hash -> label map (when available)
-    sig_labels: Optional[Dict[str, str]] = None
-
+    # Optional sig_hash -> label meta map (record.v2 only)
+    sig_label_meta: Optional[Dict[str, Dict[str, str]]] = None
 
 
 @dataclass(frozen=True)
@@ -716,42 +702,62 @@ def _topk_counter_items(c: Counter, top_k: int) -> List[Tuple[str, int]]:
     items.sort(key=lambda kv: (-kv[1], kv[0]))
     return items[: max(0, int(top_k))]
 
-def _extract_sig_labels(domain_payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
+def _extract_sig_label_meta(domain_payload: Dict[str, Any]) -> Optional[Dict[str, Dict[str, str]]]:
     """
-    Return mapping sig_hash -> label/name if available.
+    Return mapping sig_hash -> label metadata extracted ONLY from record.v2 records.
 
-    Supported layouts (preferred first):
-      - domain_payload["record_rows"]: list of dicts containing {"sig_hash": "...", "name": "..."} (or label/type_name)
-      - domain_payload["data"]["record_rows"]: same nested under "data"
+    Contract source:
+      record.schema_version == "record.v2"
+      record.sig_hash
+      record.label.display / record.label.quality / record.label.provenance
 
-    Safe: returns None if schema does not support labels.
+    Safe:
+      - returns None if record.v2 records not present
+      - preserves first occurrence deterministically if duplicates occur
     """
-    def _from_record_rows(rr: Any) -> Optional[Dict[str, str]]:
-        if not isinstance(rr, list):
-            return None
-        out: Dict[str, str] = {}
-        for item in rr:
-            if not isinstance(item, dict):
-                continue
-            sig = item.get("sig_hash")
-            name = item.get("name") or item.get("label") or item.get("type_name")
-            if isinstance(sig, str) and sig and isinstance(name, str) and name:
-                # If duplicates occur, preserve first deterministically (input order is stable in JSON)
-                if sig not in out:
-                    out[sig] = name
-        return out if out else None
+    recs = domain_payload.get("records")
+    if not isinstance(recs, list):
+        return None
 
-    labels = _from_record_rows(domain_payload.get("record_rows"))
-    if labels:
-        return labels
+    out: Dict[str, Dict[str, str]] = {}
+    saw_v2 = False
 
-    data = domain_payload.get("data")
-    if isinstance(data, dict):
-        labels = _from_record_rows(data.get("record_rows"))
-        if labels:
-            return labels
+    for r in recs:
+        if not isinstance(r, dict):
+            continue
+        if r.get("schema_version") != "record.v2":
+            continue
 
-    return None
+        saw_v2 = True
+
+        sig = r.get("sig_hash")
+        if not isinstance(sig, str) or not sig:
+            # Contract: ok/degraded must have a 32-hex sig_hash; blocked must be null.
+            # If missing/invalid, do not guess; just omit.
+            continue
+
+        lab = r.get("label")
+        if not isinstance(lab, dict):
+            continue
+
+        disp = lab.get("display")
+        qual = lab.get("quality")
+        prov = lab.get("provenance")
+
+        if not isinstance(disp, str):
+            continue
+        if not isinstance(qual, str):
+            continue
+        if not isinstance(prov, str):
+            continue
+
+        if sig not in out:
+            out[sig] = {"display": disp, "quality": qual, "provenance": prov}
+
+    if not saw_v2:
+        return None
+
+    return out if out else None
 
 
 def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_k: int) -> DomainDetail:
@@ -886,7 +892,7 @@ def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_
         if a > b:
             removed[k] = a - b
 
-    labels = da.sig_labels or db.sig_labels
+    label_meta = da.sig_label_meta or db.sig_label_meta
 
     return DomainDetail(
         domain=domain,
@@ -896,18 +902,17 @@ def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_
         reason=None,
         set_jaccard=set_sim,
         multiset_jaccard=ms_sim,
-        a_total=sum(int(v) for v in ca.values()),
-        b_total=sum(int(v) for v in cb.values()),
+        a_total=sum(ca.values()),
+        b_total=sum(cb.values()),
         matched=matched,
-        added_in_b=sum(int(v) for v in added.values()),
-        removed_from_a=sum(int(v) for v in removed.values()),
+        added_in_b=sum(added.values()),
+        removed_from_a=sum(removed.values()),
         union_mass=union_mass,
-        top_matched=DomainSigTopK(_topk_counter_items(common, top_k)),
-        top_added=DomainSigTopK(_topk_counter_items(added, top_k)),
-        top_removed=DomainSigTopK(_topk_counter_items(removed, top_k)),
-        sig_labels=labels,
+        top_matched=DomainSigTopK(items=_topk_counter_items(common, top_k)),
+        top_added=DomainSigTopK(items=_topk_counter_items(added, top_k)),
+        top_removed=DomainSigTopK(items=_topk_counter_items(removed, top_k)),
+        sig_label_meta=(da.sig_label_meta or db.sig_label_meta),
     )
-
 
 
 def compare_two_detailed(fp_a: FingerprintData, fp_b: FingerprintData, top_k: int, domain_filter: Optional[set]) -> SimilarityDetail:
@@ -987,7 +992,7 @@ def write_details_json(details: List[SimilarityDetail], out_path: str) -> None:
                 "top_matched": (dd.top_matched.items if dd.top_matched else None),
                 "top_added": (dd.top_added.items if dd.top_added else None),
                 "top_removed": (dd.top_removed.items if dd.top_removed else None),
-                "sig_labels": dd.sig_labels,
+                "sig_label_meta": dd.sig_label_meta,
             })
 
 
