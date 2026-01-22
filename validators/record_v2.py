@@ -7,7 +7,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 _SIG_HASH_RE = re.compile(r"^[0-9a-f]{32}$")
 _STATUS_SET = {"ok", "degraded", "blocked"}
-_ITEM_Q_SET = {"ok", "missing", "unreadable", "unsupported"}
+_ITEM_Q_SET = {
+    "ok",
+    "missing",
+    "unreadable",
+    "unsupported",
+    "unsupported.not_applicable",
+    "unsupported.not_implemented",
+}
 _IDENTITY_QUALITY_SET = {
     "complete",
     "incomplete_missing",

@@ -47,12 +47,15 @@ from core.rows import (
 
 from core.record_v2 import (
     canonicalize_str,
+    canonicalize_str_allow_empty,
     canonicalize_enum,
     canonicalize_float,
     ITEM_Q_OK,
     ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
     ITEM_Q_UNSUPPORTED,
+    ITEM_Q_UNSUPPORTED_NOT_APPLICABLE,
+    ITEM_Q_UNSUPPORTED_NOT_IMPLEMENTED,
     build_record_v2,
     make_identity_item,
     serialize_identity_items,
@@ -552,46 +555,67 @@ def extract(doc, ctx=None):
             witness_v, witness_q = canonicalize_str(witness)
 
         # Optional: unit format identity fields from UnitsFormatOptions
-        unit_format_id_v, unit_format_id_q = (None, ITEM_Q_MISSING)
-        rounding_v, rounding_q = (None, ITEM_Q_MISSING)
-        accuracy_v, accuracy_q = (None, ITEM_Q_MISSING)
-        prefix_v, prefix_q = (None, ITEM_Q_UNSUPPORTED)
-        suffix_v, suffix_q = (None, ITEM_Q_UNSUPPORTED)
+        # If the dimension type uses project defaults (no per-type override), treat these as valid N/A
+        # instead of "missing"/"unreadable" to avoid spurious degradation.
+        unit_format_id_v, unit_format_id_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+        rounding_v, rounding_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+        accuracy_v, accuracy_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
 
+        # Prefix/Suffix are DimensionType properties; empty string is a valid value (do not collapse to missing).
+        prefix_v, prefix_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+        suffix_v, suffix_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+        if hasattr(d, "Prefix"):
+            try:
+                prefix_v, prefix_q = canonicalize_str_allow_empty(getattr(d, "Prefix", None))
+            except Exception:
+                prefix_v, prefix_q = (None, ITEM_Q_UNREADABLE)
+        if hasattr(d, "Suffix"):
+            try:
+                suffix_v, suffix_q = canonicalize_str_allow_empty(getattr(d, "Suffix", None))
+            except Exception:
+                suffix_v, suffix_q = (None, ITEM_Q_UNREADABLE)
+
+        def _units_fo_not_applicable(ex):
+            msg = safe_str(getattr(ex, "Message", None) or ex)
+            tname = safe_str(getattr(type(ex), "__name__", "")).lower()
+            msg_l = msg.lower()
+            return (
+                "notsupported" in tname
+                or "invalidoperation" in tname
+                or "not supported" in msg_l
+                or "not applicable" in msg_l
+                or "unsupported" in msg_l
+            )
+
+        fo = None
+        fo_exc = None
         try:
             fo = d.GetUnitsFormatOptions()
-        except Exception:
-            fo = None
+        except Exception as ex:
+            fo_exc = ex
 
         if fo is None:
-            unit_format_id_v, unit_format_id_q = (None, ITEM_Q_UNREADABLE)
-            rounding_v, rounding_q = (None, ITEM_Q_UNREADABLE)
-            accuracy_v, accuracy_q = (None, ITEM_Q_UNREADABLE)
-        else:
-            try:
-                unit_format_id_v, unit_format_id_q = canonicalize_str(safe_str(fo.GetUnitTypeId()))
-            except Exception:
+            if fo_exc is not None and (not _units_fo_not_applicable(fo_exc)):
                 unit_format_id_v, unit_format_id_q = (None, ITEM_Q_UNREADABLE)
-            try:
-                rounding_v, rounding_q = canonicalize_enum(getattr(fo, "RoundingMethod", None))
-            except Exception:
                 rounding_v, rounding_q = (None, ITEM_Q_UNREADABLE)
-            try:
-                # UnitsFormatOptions.Accuracy is stored as feet; identity key expects a string, so use inches string.
-                accuracy_v, accuracy_q = canonicalize_float(_fmt_in_from_ft(getattr(fo, "Accuracy", None)))
-            except Exception:
                 accuracy_v, accuracy_q = (None, ITEM_Q_UNREADABLE)
-            # Prefix/Suffix are version-dependent; mark unsupported when absent.
-            if hasattr(fo, "Prefix"):
+        else:
+            use_default = getattr(fo, "UseDefault", None)
+            if use_default is not True:
                 try:
-                    prefix_v, prefix_q = canonicalize_str(getattr(fo, "Prefix", None))
+                    unit_format_id_v, unit_format_id_q = canonicalize_str(safe_str(fo.GetUnitTypeId()))
                 except Exception:
-                    prefix_v, prefix_q = (None, ITEM_Q_UNREADABLE)
-            if hasattr(fo, "Suffix"):
+                    unit_format_id_v, unit_format_id_q = (None, ITEM_Q_UNREADABLE)
                 try:
-                    suffix_v, suffix_q = canonicalize_str(getattr(fo, "Suffix", None))
+                    rounding_v, rounding_q = canonicalize_enum(getattr(fo, "RoundingMethod", None))
                 except Exception:
-                    suffix_v, suffix_q = (None, ITEM_Q_UNREADABLE)
+                    rounding_v, rounding_q = (None, ITEM_Q_UNREADABLE)
+                try:
+                    # UnitsFormatOptions.Accuracy is stored as feet; identity key expects a string, so use inches string.
+                    accuracy_v, accuracy_q = canonicalize_float(_fmt_in_from_ft(getattr(fo, "Accuracy", None)))
+                except Exception:
+                    accuracy_v, accuracy_q = (None, ITEM_Q_UNREADABLE)
+
 
         identity_items = [
             make_identity_item("dim_type.uid", uid_v, uid_q),
@@ -614,9 +638,10 @@ def extract(doc, ctx=None):
         any_incomplete = False
         for it in identity_items:
             q = it.get("q")
-            if q != ITEM_Q_OK:
-                any_incomplete = True
-                status_reasons.append("identity.incomplete:{}:{}".format(q, it.get("k")))
+            if q in (ITEM_Q_OK, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE):
+                continue
+            any_incomplete = True
+            status_reasons.append("identity.incomplete:{}:{}".format(q, it.get("k")))
 
         # Label
         label_quality = "human"
