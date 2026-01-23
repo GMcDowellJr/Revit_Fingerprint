@@ -46,6 +46,11 @@ from core.record_v2 import (
     build_record_v2,
 )
 
+from core.phase2 import (
+    phase2_sorted_items,
+    phase2_qv_from_legacy_sentinel_str,
+    phase2_join_hash,
+)
 
 try:
     from Autodesk.Revit.DB import Category, BuiltInCategory, GraphicsStyleType, ElementId
@@ -55,6 +60,18 @@ except ImportError:
     GraphicsStyleType = None
     ElementId = None
 
+def _phase2_build_join_key_items(sc_name):
+    """Build Phase-2 join-key items for a line style record.
+
+    Hypothesis basis (no inference):
+      - Stable identity across files is represented by the subcategory name under Lines.
+      - We materialize this as the computed path used by identity (Lines|<name>).
+    """
+
+    # path is derived from the name; map through sentinel-safe helper defensively.
+    path_raw = "Lines|{}".format(safe_str(sc_name))
+    path_v, path_q = phase2_qv_from_legacy_sentinel_str(path_raw, allow_empty=False)
+    return [make_identity_item("line_style.path", path_v, path_q)]
 
 def extract(doc, ctx=None):
     """
@@ -317,6 +334,46 @@ def extract(doc, ctx=None):
                     "components": {"path": safe_str(path_v_raw)},
                 },
             )
+
+            # -------------------------
+            # Phase-2 additive surfaces (join_key + phase2)
+            # -------------------------
+            join_items = phase2_sorted_items(_phase2_build_join_key_items(sc_name))
+            rec_v2["join_key"] = {
+                "schema": "line_styles.join_key.v1",
+                "hash_alg": "md5_utf8_join_pipe",
+                "items": join_items,
+                "join_hash": phase2_join_hash(join_items),
+            }
+
+            # Hypothesis-only partitioning: semantic vs cosmetic vs unknown.
+            # No heuristics; these are emitted for empirical clustering and attribute stability analysis.
+            p2_semantic = []
+            p2_cosmetic = []
+            p2_unknown = []
+
+            # weights
+            p2_semantic.append(make_identity_item("line_style.weight.projection", wproj_v, wproj_q))
+
+            # pattern reference
+            p2_semantic.append(make_identity_item("line_style.pattern_ref.kind", kind_v, kind_q))
+            if lp_sig_hash_q == ITEM_Q_OK:
+                p2_semantic.append(make_identity_item("line_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
+
+            # color (appearance) and other ambiguous surfaces
+            rgb_p2_v, rgb_p2_q = phase2_qv_from_legacy_sentinel_str(rgb_sig, allow_empty=False)
+            p2_cosmetic.append(make_identity_item("line_style.color.rgb", rgb_p2_v, rgb_p2_q))
+
+            # cut weight is not surfaced for line styles; keep explicit as unknown partition for analysis.
+            p2_unknown.append(make_identity_item("line_style.weight.cut", wcut_v, wcut_q))
+
+            rec_v2["phase2"] = {
+                "schema": "phase2.line_styles.v1",
+                "grouping_basis": "phase2.hypothesis",
+                "semantic_items": phase2_sorted_items(p2_semantic),
+                "cosmetic_items": phase2_sorted_items(p2_cosmetic),
+                "unknown_items": phase2_sorted_items(p2_unknown),
+            }
 
             v2_records.append(rec_v2)
             v2_sig_hashes.append(sig_hash_v2)
