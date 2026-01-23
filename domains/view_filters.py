@@ -412,6 +412,17 @@ def _walk_elem_filter_v2(elem_filter, out_tokens, doc):
         pass
     return False, "leaf_unknown"
 
+def _phase2_build_join_key_items(*, filter_name):
+    """Domain-specific Phase-2 join-key identity items.
+
+    Hypothesis (explicit): filter name is the natural join key across files.
+    We do not embed any legacy sentinel literals in IdentityItem.v.
+    """
+    v, q = phase2_qv_from_legacy_sentinel_str(filter_name, allow_empty=False)
+    return phase2_sorted_items([
+        {"k": "vf.name", "q": q, "v": v},
+    ])
+
 def extract(doc, ctx=None):
     """
     Extract View Filters fingerprint from document.
@@ -614,12 +625,95 @@ def extract(doc, ctx=None):
             if v2_reason:
                 info["debug_v2_block_reasons"][v2_reason] = info["debug_v2_block_reasons"].get(v2_reason, 0) + 1
 
+        # -----------------------------
+        # Phase-2 (empirical, additive)
+        # -----------------------------
+        join_items = _phase2_build_join_key_items(filter_name=name)
+        join_key = {
+            "schema": "view_filters.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": join_items,
+            "join_hash": phase2_join_hash(join_items),
+        }
+
+        p2_semantic = []
+        p2_cosmetic = []
+        p2_unknown = []
+
+        # Cosmetic hypothesis: user-facing name
+        p2_cosmetic.extend(join_items)
+
+        # Semantic hypothesis: selection-ness
+        try:
+            is_selection_p2 = hasattr(f, "GetElementFilter") and f.GetElementFilter() is None
+            v, q = canonicalize_bool(is_selection_p2)
+        except Exception:
+            v, q = None, ITEM_Q_UNREADABLE
+        p2_semantic.append({"k": "vf.is_selection", "q": q, "v": v})
+
+        # Semantic hypothesis: negative category ids only; also track positive ids as unknown
+        try:
+            cat_ids_p2 = list(f.GetCategories())
+            neg_ids = []
+            pos_count = 0
+            for cid in cat_ids_p2:
+                iv = getattr(cid, "IntegerValue", cid)
+                iv = int(iv)
+                if iv < 0:
+                    neg_ids.append(str(iv))
+                else:
+                    pos_count += 1
+
+            neg_ids_sorted = sorted(set([x for x in neg_ids if x]))
+            if neg_ids_sorted:
+                p2_semantic.append({"k": "vf.categories.neg_ids_csv", "q": ITEM_Q_OK, "v": ",".join(neg_ids_sorted)})
+            else:
+                p2_semantic.append({"k": "vf.categories.neg_ids_csv", "q": ITEM_Q_MISSING, "v": None})
+
+            v, q = canonicalize_int(pos_count)
+            p2_unknown.append({"k": "vf.categories.pos_id_count", "q": q, "v": v})
+        except Exception:
+            p2_semantic.append({"k": "vf.categories.neg_ids_csv", "q": ITEM_Q_UNREADABLE, "v": None})
+            p2_unknown.append({"k": "vf.categories.pos_id_count", "q": ITEM_Q_UNREADABLE, "v": None})
+
+        # Semantic hypothesis: strict (v2) filter-tree tokenization when available
+        if v2_ok:
+            for i, t in enumerate(sig_v2):
+                # NOTE: `sig_v2` elements are already non-sentinel strings.
+                v, q = phase2_qv_from_legacy_sentinel_str(t, allow_empty=False)
+                p2_semantic.append({"k": "vf.v2.sig_token[{}]".format("{:03d}".format(i)), "q": q, "v": v})
+        else:
+            v, q = phase2_qv_from_legacy_sentinel_str(v2_reason or "", allow_empty=False)
+            p2_unknown.append({"k": "vf.v2.block_reason", "q": q, "v": v})
+
+        # Unknown: element-backed identifiers (expected to vary across files)
+        try:
+            v, q = canonicalize_int(getattr(f.Id, "IntegerValue", None))
+        except Exception:
+            v, q = None, ITEM_Q_UNREADABLE
+        p2_unknown.append({"k": "vf.elem_id", "q": q, "v": v})
+
+        v, q = phase2_qv_from_legacy_sentinel_str(uid or "", allow_empty=False)
+        p2_unknown.append({"k": "vf.unique_id", "q": q, "v": v})
+
+        phase2 = {
+            "schema": "phase2.view_filters.v1",
+            "grouping_basis": "phase2.hypothesis",
+            "semantic_items": phase2_sorted_items(p2_semantic),
+            "cosmetic_items": phase2_sorted_items(p2_cosmetic),
+            "unknown_items": phase2_sorted_items(p2_unknown),
+        }
+
         rec = {
             "id": safe_str(f.Id.IntegerValue),
             "uid": uid or "",
             "name": name,
             "def_hash": def_hash,
-            "def_signature": sig  # Include for explainability
+            "def_signature": sig,  # Include for explainability
+
+            # Phase-2 additive payloads
+            "join_key": join_key,
+            "phase2": phase2,
         }
 
         records.append(rec)
