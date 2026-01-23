@@ -208,6 +208,101 @@ def _fmt_in_from_ft(ft, places=6):
     except Exception as e:
         return None
 
+def _phase2_sorted_items(items):
+    """Return IdentityItem-like dicts sorted by key 'k'."""
+    return sorted(items or [], key=lambda it: it.get("k", ""))
+
+def _phase2_qv_from_legacy_sentinel_str(v, *, allow_empty=False):
+    """
+    Map legacy sentinel strings to record.v2-safe (v,q) without emitting sentinel literals.
+
+    - S_MISSING -> (None, missing)
+    - S_UNREADABLE -> (None, unreadable)
+    - S_NOT_APPLICABLE -> (None, unsupported_not_applicable)
+    - Otherwise: canonicalize via canonicalize_str / canonicalize_str_allow_empty
+    """
+    if v is None:
+        return None, ITEM_Q_MISSING
+
+    try:
+        sv = safe_str(v)
+    except Exception:
+        return None, ITEM_Q_UNREADABLE
+
+    if sv == S_MISSING:
+        return None, ITEM_Q_MISSING
+    if sv == S_UNREADABLE:
+        return None, ITEM_Q_UNREADABLE
+    if sv == S_NOT_APPLICABLE:
+        return None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE
+
+    if allow_empty:
+        return canonicalize_str_allow_empty(sv)
+    return canonicalize_str(sv)
+
+def _phase2_build_join_key_items(doc, d, shape_v, shape_q, witness_v, witness_q):
+    """
+    Phase-2 join key (coarse) for DimensionType records.
+
+    Hard rules:
+      - No heuristics.
+      - Explicit missing/unsupported/unreadable.
+      - Do not emit legacy sentinel literals in IdentityItem.v.
+    """
+    # Family Name (best-effort)
+    fam_v, fam_q = (None, ITEM_Q_MISSING)
+    try:
+        p_fam = first_param(
+            d,
+            bip_names=["SYMBOL_FAMILY_NAME_PARAM"],
+            ui_names=["Family Name"],
+        )
+        fam_v, fam_q = canonicalize_str(_as_string(p_fam) if p_fam is not None else None)
+    except Exception:
+        fam_v, fam_q = (None, ITEM_Q_UNREADABLE)
+
+    # UnitTypeId from UnitsFormatOptions (best-effort; not applicable is explicit)
+    unit_type_v, unit_type_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+
+    fo = None
+    fo_exc = None
+    try:
+        fo = d.GetUnitsFormatOptions()
+    except Exception as ex:
+        fo_exc = ex
+
+    if fo is None:
+        if fo_exc is not None:
+            try:
+                msg = safe_str(getattr(fo_exc, "Message", None) or fo_exc)
+                tname = safe_str(getattr(type(fo_exc), "__name__", "")).lower()
+                msg_l = msg.lower()
+                if (
+                    "notsupported" in tname
+                    or "invalidoperation" in tname
+                    or "not supported" in msg_l
+                    or "not applicable" in msg_l
+                    or "unsupported" in msg_l
+                ):
+                    unit_type_v, unit_type_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+                else:
+                    unit_type_v, unit_type_q = (None, ITEM_Q_UNREADABLE)
+            except Exception:
+                unit_type_v, unit_type_q = (None, ITEM_Q_UNREADABLE)
+    else:
+        try:
+            unit_type_v, unit_type_q = canonicalize_str(safe_str(fo.GetUnitTypeId()))
+        except Exception:
+            unit_type_v, unit_type_q = (None, ITEM_Q_UNREADABLE)
+
+    items = [
+        make_identity_item("dim_join.family_name", fam_v, fam_q),
+        make_identity_item("dim_join.shape", shape_v, shape_q),
+        make_identity_item("dim_join.unit_type_id", unit_type_v, unit_type_q),
+        make_identity_item("dim_join.witness_line_control", witness_v, witness_q),
+    ]
+    return _phase2_sorted_items(items)
+
 def _format_options_to_kv(fo):
     """
     Serialize Autodesk.Revit.DB.FormatOptions to a stable, hashable dict.
@@ -663,6 +758,48 @@ def extract(doc, ctx=None):
                 except Exception:
                     accuracy_v, accuracy_q = (None, ITEM_Q_UNREADABLE)
 
+        # ---------------------------
+        # Phase-2 instrumentation (additive, non-normative)
+        # ---------------------------
+
+        # Join key items (coarse; designed to over-join rather than infer)
+        phase2_join_items = _phase2_build_join_key_items(doc, d, shape_v, shape_q, witness_v, witness_q)
+        phase2_join_preimage = serialize_identity_items(phase2_join_items)
+        phase2_join_hash = make_hash(phase2_join_preimage) if phase2_join_preimage is not None else None
+
+        # Phase-2 attribute bags (explicit grouping is a hypothesis marker, not a standard)
+        # Important: do not emit legacy sentinel literals in IdentityItem.v.
+        type_name_v, type_name_q = _phase2_qv_from_legacy_sentinel_str(type_name, allow_empty=False)
+        text_font_v, text_font_q = _phase2_qv_from_legacy_sentinel_str(text_font, allow_empty=False)
+        tick_name_v, tick_name_q = _phase2_qv_from_legacy_sentinel_str(tick_name, allow_empty=True)
+
+        text_size_in_v, text_size_in_q = canonicalize_str(_fmt_in_from_ft(text_size_ft))
+        lw_v, lw_q = canonicalize_str(lw)
+        color_int_v, color_int_q = canonicalize_str(color_int)
+
+        phase2_semantic_items = _phase2_sorted_items([
+            make_identity_item("dim_attr.shape", shape_v, shape_q),
+            make_identity_item("dim_attr.unit_format_id", unit_format_id_v, unit_format_id_q),
+            make_identity_item("dim_attr.rounding", rounding_v, rounding_q),
+            make_identity_item("dim_attr.accuracy", accuracy_v, accuracy_q),
+            make_identity_item("dim_attr.witness_line_control", witness_v, witness_q),
+        ])
+
+        phase2_unknown_items = _phase2_sorted_items([
+            make_identity_item("dim_attr.prefix", prefix_v, prefix_q),
+            make_identity_item("dim_attr.suffix", suffix_v, suffix_q),
+        ])
+
+        phase2_cosmetic_items = _phase2_sorted_items([
+            make_identity_item("dim_attr.type_name", type_name_v, type_name_q),
+            make_identity_item("dim_attr.text_font", text_font_v, text_font_q),
+            make_identity_item("dim_attr.text_size_in", text_size_in_v, text_size_in_q),
+            make_identity_item("dim_attr.line_weight", lw_v, lw_q),
+            make_identity_item("dim_attr.color_int", color_int_v, color_int_q),
+            make_identity_item("dim_attr.tick_mark_name", tick_name_v, tick_name_q),
+            make_identity_item("dim_attr.tick_mark_uid", tick_uid_v, tick_uid_q),
+        ])
+
 
         identity_items = [
             make_identity_item("dim_type.uid", uid_v, uid_q),
@@ -720,6 +857,20 @@ def extract(doc, ctx=None):
                 required_qs=(),
                 label=label,
             )
+            # Phase-2 additive fields (do not affect record.v2 invariants)
+            rec_v2["join_key"] = {
+                "schema": "dimension_types.join_key.v1",
+                "hash_alg": "md5_utf8_join_pipe",
+                "items": phase2_join_items,
+                "join_hash": phase2_join_hash,
+            }
+            rec_v2["phase2"] = {
+                "schema": "phase2.dimension_types.v1",
+                "grouping_basis": "phase2.hypothesis",
+                "semantic_items": phase2_semantic_items,
+                "cosmetic_items": phase2_cosmetic_items,
+                "unknown_items": phase2_unknown_items,
+            }
         else:
             status = STATUS_DEGRADED if any_incomplete else STATUS_OK
             preimage = serialize_identity_items(identity_items)
@@ -735,6 +886,20 @@ def extract(doc, ctx=None):
                 required_qs=required_qs,
                 label=label,
             )
+            # Phase-2 additive fields (do not affect record.v2 invariants)
+            rec_v2["join_key"] = {
+                "schema": "dimension_types.join_key.v1",
+                "hash_alg": "md5_utf8_join_pipe",
+                "items": phase2_join_items,
+                "join_hash": phase2_join_hash,
+            }
+            rec_v2["phase2"] = {
+                "schema": "phase2.dimension_types.v1",
+                "grouping_basis": "phase2.hypothesis",
+                "semantic_items": phase2_semantic_items,
+                "cosmetic_items": phase2_cosmetic_items,
+                "unknown_items": phase2_unknown_items,
+            }
 
         v2_records.append(rec_v2)
         sig_hashes.append(sig_hash)
