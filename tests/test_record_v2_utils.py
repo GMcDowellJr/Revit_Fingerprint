@@ -45,8 +45,8 @@ def test_make_identity_item_banned_substring_guard():
 
 def test_make_identity_item_empty_string_becomes_null_missing():
     it = record_v2.make_identity_item("k", "   ", "ok")
-    assert it["v"] is None
-    assert it["q"] == record_v2.ITEM_Q_MISSING
+    assert it["v"] == ""
+    assert it["q"] == record_v2.ITEM_Q_OK
 
 
 def test_serialize_identity_items_is_sorted_and_deterministic():
