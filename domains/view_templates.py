@@ -40,6 +40,16 @@ from core.canon import (
     S_NOT_APPLICABLE,
 )
 
+from core.record_v2 import (
+    ITEM_Q_OK,
+    make_identity_item,
+)
+
+from core.phase2 import (
+    phase2_sorted_items,
+    phase2_qv_from_legacy_sentinel_str,
+    phase2_join_hash,
+)
 
 try:
     from Autodesk.Revit.DB import (
@@ -58,6 +68,115 @@ except Exception as e:
     Category = None
     CategoryType = None
 
+def _phase2_build_join_key_items(*, name, view_type, is_schedule):
+    """Build Phase-2 join-key IdentityItems (domain-specific, hypothesis-only).
+
+    Join-key hypothesis (reversible):
+      - view_template.name + view_template.view_type + view_template.is_schedule
+        are the natural join components for cross-file stability checks.
+    """
+    name_v, name_q = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
+    vt_v, vt_q = phase2_qv_from_legacy_sentinel_str(view_type, allow_empty=False)
+    sched_v, sched_q = phase2_qv_from_legacy_sentinel_str(str(int(bool(is_schedule))), allow_empty=False)
+
+    return [
+        make_identity_item("view_template.name", name_v, name_q),
+        make_identity_item("view_template.view_type", vt_v, vt_q),
+        make_identity_item("view_template.is_schedule", sched_v, sched_q),
+    ]
+
+
+def _phase2_items_from_def_signature(def_signature):
+    """Convert legacy def_signature entries ('k=v') into IdentityItems safely.
+
+    Hard rule: do not emit legacy sentinel literals into IdentityItem.v.
+    """
+    out = []
+    for s in (def_signature or []):
+        try:
+            ss = safe_str(s)
+        except Exception:
+            continue
+
+        if "=" not in ss:
+            # Keep explicit shape, but treat value as missing
+            k = "view_template.sig.{}".format(ss)
+            out.append(make_identity_item(k, None, "missing"))
+            continue
+
+        left, right = ss.split("=", 1)
+        k = "view_template.sig.{}".format(safe_str(left).strip())
+
+        rr = safe_str(right).strip()
+        # Mechanical unwrapping: some legacy signatures may serialize sentinels with quotes.
+        if len(rr) >= 2 and ((rr[0] == rr[-1] == "'") or (rr[0] == rr[-1] == '"')):
+            rr = rr[1:-1].strip()
+
+        # If RHS is a packed k=v|k=v|... payload (e.g., vg lines), expand into sub-items so
+        # legacy sentinel literals never appear as substrings inside IdentityItem.v.
+        if ("|" in rr) and ("=" in rr):
+            parts = [p.strip() for p in rr.split("|") if p.strip()]
+            for p in parts:
+                if "=" not in p:
+                    sk = "{}.part".format(k)
+                    out.append(make_identity_item(sk, None, "missing"))
+                    continue
+
+                subk_raw, subv_raw = p.split("=", 1)
+                subk = safe_str(subk_raw).strip()
+                subv = safe_str(subv_raw).strip()
+                if len(subv) >= 2 and ((subv[0] == subv[-1] == "'") or (subv[0] == subv[-1] == '"')):
+                    subv = subv[1:-1].strip()
+
+                sv, sq = phase2_qv_from_legacy_sentinel_str(subv, allow_empty=True)
+                out.append(make_identity_item("{}.{}".format(k, subk), sv, sq))
+        else:
+            v, q = phase2_qv_from_legacy_sentinel_str(rr, allow_empty=True)
+            out.append(make_identity_item(k, v, q))
+
+    return phase2_sorted_items(out)
+
+
+def _phase2_partition_items(items):
+    """Partition IdentityItems into semantic/cosmetic/unknown (hypotheses only)."""
+    semantic = []
+    cosmetic = []
+    unknown = []
+
+    for it in (items or []):
+        k = safe_str(it.get("k", ""))
+
+        # Cosmetic-ish signals (style / overrides / appearance)
+        if (
+            ".ovr" in k
+            or "appearance" in k
+            or "halftone" in k
+            or "pattern" in k
+            or "lineweight" in k
+            or "color" in k
+            or "transparency" in k
+        ):
+            cosmetic.append(it)
+            continue
+
+        # Semantic-ish signals (inclusion / visibility / filtering)
+        if (
+            k.startswith("view_template.sig.include_")
+            or k.startswith("view_template.sig.phase_filter")
+            or k.startswith("view_template.sig.filter[")
+            or k.startswith("view_template.sig.cat[")
+            or "visible" in k
+        ):
+            semantic.append(it)
+            continue
+
+        unknown.append(it)
+
+    return (
+        phase2_sorted_items(semantic),
+        phase2_sorted_items(cosmetic),
+        phase2_sorted_items(unknown),
+    )
 
 def extract(doc, ctx=None):
     """
@@ -311,14 +430,52 @@ def extract(doc, ctx=None):
                     _v2_block("schedule_finalize_failed")
                     v2_ok = False
 
-            records.append({
+            rec = {
                 "id": safe_str(v.Id.IntegerValue),
                 "uid": uid or "",
                 "name": name,
                 "view_type": safe_str(v.ViewType),
                 "def_hash": def_hash,
                 "def_signature": sig_final,
-            })
+            }
+
+            # -------------------------
+            # Phase-2 additions (additive, explanatory, reversible)
+            # -------------------------
+            join_key_items = _phase2_build_join_key_items(
+                name=name,
+                view_type=safe_str(v.ViewType),
+                is_schedule=True,
+            )
+            join_key_items_sorted = phase2_sorted_items(join_key_items)
+            rec["join_key"] = {
+                "schema": "view_templates.join_key.v1",
+                "hash_alg": "md5_utf8_join_pipe",
+                "items": join_key_items_sorted,
+                "join_hash": phase2_join_hash(join_key_items_sorted),
+            }
+
+            sig_items = _phase2_items_from_def_signature(sig_final)
+
+            # Add explicit file-local identifiers as unknown (do not affect identity_basis)
+            uid_v, uid_q = phase2_qv_from_legacy_sentinel_str(uid or None, allow_empty=False)
+            extra_unknown = [
+                make_identity_item("view_template.uid", uid_v, uid_q),
+                make_identity_item("view_template.element_id", safe_str(v.Id.IntegerValue), ITEM_Q_OK),
+            ]
+
+            semantic_items, cosmetic_items, unknown_items = _phase2_partition_items(sig_items)
+            unknown_items = phase2_sorted_items(list(unknown_items) + extra_unknown)
+
+            rec["phase2"] = {
+                "schema": "phase2.view_templates.v1",
+                "grouping_basis": "phase2.hypothesis",
+                "semantic_items": semantic_items,
+                "cosmetic_items": cosmetic_items,
+                "unknown_items": unknown_items,
+            }
+
+            records.append(rec)
 
             per_hashes.append(def_hash)
             info["debug_kept"] += 1
@@ -743,6 +900,42 @@ def extract(doc, ctx=None):
             "view_type": safe_str(v.ViewType),
             "def_hash": def_hash,
             "def_signature": sig_final,
+        }
+
+        # -------------------------
+        # Phase-2 additions (additive, explanatory, reversible)
+        # -------------------------
+        join_key_items = _phase2_build_join_key_items(
+            name=name,
+            view_type=safe_str(v.ViewType),
+            is_schedule=False,
+        )
+        join_key_items_sorted = phase2_sorted_items(join_key_items)
+        rec["join_key"] = {
+            "schema": "view_templates.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": join_key_items_sorted,
+            "join_hash": phase2_join_hash(join_key_items_sorted),
+        }
+
+        sig_items = _phase2_items_from_def_signature(sig_final)
+
+        # Add explicit file-local identifiers as unknown (do not affect identity_basis)
+        uid_v, uid_q = phase2_qv_from_legacy_sentinel_str(uid or None, allow_empty=False)
+        extra_unknown = [
+            make_identity_item("view_template.uid", uid_v, uid_q),
+            make_identity_item("view_template.element_id", safe_str(v.Id.IntegerValue), ITEM_Q_OK),
+        ]
+
+        semantic_items, cosmetic_items, unknown_items = _phase2_partition_items(sig_items)
+        unknown_items = phase2_sorted_items(list(unknown_items) + extra_unknown)
+
+        rec["phase2"] = {
+            "schema": "phase2.view_templates.v1",
+            "grouping_basis": "phase2.hypothesis",
+            "semantic_items": semantic_items,
+            "cosmetic_items": cosmetic_items,
+            "unknown_items": unknown_items,
         }
 
         # Optional VG debug
