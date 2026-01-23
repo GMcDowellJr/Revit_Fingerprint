@@ -43,6 +43,54 @@ try:
 except ImportError:
     Phase = None
 
+from core.phase2 import (
+    phase2_sorted_items,
+    phase2_qv_from_legacy_sentinel_str,
+    phase2_join_hash,
+)
+
+
+def _phase2_build_join_key_items(*, phase_name):
+    """
+    Phase-2 join key items (domain-specific).
+    Hypothesis: phase.name is the natural cross-file join axis for phases.
+    """
+    v_name, q_name = phase2_qv_from_legacy_sentinel_str(phase_name, allow_empty=False)
+    items = [
+        {"k": "phase.name", "q": q_name, "v": v_name},
+    ]
+    return phase2_sorted_items(items)
+
+
+def _phase2_build_phase2_payload(*, phase_name, seq, uid):
+    """
+    Phase-2 grouping (hypotheses only; no enforcement).
+    """
+    semantic_items = []
+    cosmetic_items = []
+    unknown_items = []
+
+    v_name, q_name = phase2_qv_from_legacy_sentinel_str(phase_name, allow_empty=False)
+    semantic_items.append({"k": "phase.name", "q": q_name, "v": v_name})
+
+    # seq is numeric-ish; canon_num emits legacy sentinels on None/failure, so map via helper.
+    seq_s = canon_num(seq, nd=0)
+    v_seq, q_seq = phase2_qv_from_legacy_sentinel_str(seq_s, allow_empty=False)
+    semantic_items.append({"k": "phase.sequence_number", "q": q_seq, "v": v_seq})
+
+    # uid is document-scoped; keep explicit but do not classify as semantic/cosmetic here.
+    uid_in = uid if uid else None
+    v_uid, q_uid = phase2_qv_from_legacy_sentinel_str(uid_in, allow_empty=False)
+    unknown_items.append({"k": "phase.uid", "q": q_uid, "v": v_uid})
+
+    return {
+        "schema": "phase2.phases.v1",
+        "grouping_basis": "phase2.hypothesis",
+        "semantic_items": phase2_sorted_items(semantic_items),
+        "cosmetic_items": phase2_sorted_items(cosmetic_items),
+        "unknown_items": phase2_sorted_items(unknown_items),
+    }
+
 
 def extract(doc, ctx=None):
     """
@@ -149,12 +197,32 @@ def extract(doc, ctx=None):
 
         def_hash = make_hash(sig)
 
+        # Phase-2 join key (additive; does not affect existing hashing/validators)
+        join_items = _phase2_build_join_key_items(phase_name=name)
+        join_key = {
+            "schema": "phases.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": join_items,  # already sorted by k
+            "join_hash": phase2_join_hash(join_items),
+        }
+
+        # Phase-2 attribute grouping (hypotheses only)
+        phase2_payload = _phase2_build_phase2_payload(
+            phase_name=name,
+            seq=seq,
+            uid=uid,
+        )
+
         rec = {
             "id": safe_str(p.Id.IntegerValue),
             "uid": uid or "",
             "name": name,
             "def_hash": def_hash,
-            "def_signature": sig
+            "def_signature": sig,
+
+            # Phase-2 additions (required)
+            "join_key": join_key,
+            "phase2": phase2_payload,
         }
 
         records.append(rec)
