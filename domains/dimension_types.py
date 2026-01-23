@@ -120,7 +120,7 @@ def get_type_display_name(elem_type):
       1) Family Name + ":" + Type Name   (matches Revit UI grouping)
       2) Type Name
       3) Family Name
-      4) id:<ElementId>
+      4) id:ElementId
     """
     if elem_type is None:
         return S_MISSING
