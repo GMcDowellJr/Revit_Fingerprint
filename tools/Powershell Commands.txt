@@ -1,16 +1,34 @@
-python tools/pairwise_drift.py --runs "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint"
+python tools/pairwise_drift.py --runs "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects"
 
 
-python tools/pairwise_drift.py --runs "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint" --baseline "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.json"
+python tools/pairwise_drift.py --runs "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects" --baseline "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.json"
 
 
 python tools\similarity_compare.py `
-  --baseline "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.json" `
-  --dir "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint" `
+  --baseline "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.json" `
+  --dir "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects" `
   --mode baseline `
   --out_baseline_json baseline_vs_dir.json `
   --out_pairwise_json pairwise.json `
   --details_json baseline_vs_dir.details.json
 
 
-python tools\details_to_csv.py --details_json "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\similarity\baseline_vs_dir.details.json" --out_dir "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\similarity" --prefix baseline_vs_dir
+python tools\details_to_csv.py --details_json "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\similarity\baseline_vs_dir.details.json" --out_dir "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\similarity" --prefix baseline_vs_dir
+
+
+python tools/phase1_domain_authority.py `
+  --input-dir "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects" `
+  --config "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\run_config.json" `
+  --seed-baseline "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.json" `
+  --out-dir "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1"
+
+python tools/phase1_population_framing.py `
+  --domain-clusters "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1\domain_cluster_summary.csv" `
+  --domain-authority "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1\domain_authority_summary.csv" `
+  --run-config "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1\run_config.resolved.json" `
+  --out "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1\domain_population_framing.csv"
+
+
+python tools/phase1_pairwise_analysis.py `
+  --baseline-coverage "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1\baseline_coverage_by_project.csv" `
+  --out-dir "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1"
