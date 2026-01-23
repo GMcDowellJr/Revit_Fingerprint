@@ -20,6 +20,13 @@ from core.record_v2 import (
     ITEM_Q_UNSUPPORTED_NOT_APPLICABLE,
 )
 
+from core.record_v2 import (
+    canonicalize_bool,
+    canonicalize_int,
+    ITEM_Q_UNREADABLE,
+    ITEM_Q_OK,
+    ITEM_Q_MISSING,
+)
 
 def phase2_sorted_items(items):
     """Return IdentityItem-like dicts sorted by key 'k'."""

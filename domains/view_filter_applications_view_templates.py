@@ -36,6 +36,22 @@ from core.record_v2 import (
     serialize_identity_items,
 )
 
+from core.phase2 import (
+    phase2_sorted_items,
+    phase2_qv_from_legacy_sentinel_str,
+    phase2_join_hash,
+)
+
+def _phase2_build_join_key_items(*, template_uid_or_namekey):
+    """
+    Phase-2 join-key hypothesis for view_filter_applications_view_templates.
+
+    Join axis: vfa.template_uid_or_namekey (UniqueId when available, else name fallback already used by v2 identity).
+    """
+    v, q = phase2_qv_from_legacy_sentinel_str(template_uid_or_namekey, allow_empty=False)
+    return phase2_sorted_items([
+        {"k": "vfa.template_uid_or_namekey", "q": q, "v": v},
+    ])
 
 def _is_schedule_view(view) -> bool:
     # Most reliable: schedule views/templates are ViewSchedule instances.
@@ -279,6 +295,39 @@ def extract(doc, ctx=None):
                 label=label,
             )
             v2_sig_hashes.append(sig_hash)
+
+        # -----------------------------
+        # Phase 2 (empirical, additive)
+        # -----------------------------
+        join_items = _phase2_build_join_key_items(template_uid_or_namekey=uid_v)
+        rec["join_key"] = {
+            "schema": "view_filter_applications_view_templates.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": join_items,
+            "join_hash": phase2_join_hash(join_items),
+        }
+
+        # Phase-2 item partitions (hypotheses only; no inference).
+        p2_semantic = list(items_sorted)
+
+        # Unknown: template element id may vary across files.
+        try:
+            _eid = int(getattr(v.Id, "IntegerValue", 0))
+            _eid_v, _eid_q = canonicalize_int(_eid)
+        except Exception:
+            _eid_v, _eid_q = (None, ITEM_Q_UNREADABLE)
+
+        p2_unknown = phase2_sorted_items([
+            {"k": "vfa.template_elem_id", "q": _eid_q, "v": _eid_v},
+        ])
+
+        rec["phase2"] = {
+            "schema": "phase2.view_filter_applications_view_templates.v1",
+            "grouping_basis": "phase2.hypothesis",
+            "semantic_items": phase2_sorted_items(p2_semantic),
+            "cosmetic_items": phase2_sorted_items([]),
+            "unknown_items": p2_unknown,
+        }
 
         v2_records.append(rec)
 

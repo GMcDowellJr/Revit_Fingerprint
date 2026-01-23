@@ -45,6 +45,22 @@ from core.record_v2 import (
     serialize_identity_items,
 )
 
+from core.phase2 import (
+    phase2_sorted_items,
+    phase2_qv_from_legacy_sentinel_str,
+    phase2_join_hash,
+)
+
+def _phase2_build_join_key_items(*, uid_or_namekey):
+    """
+    Phase-2 join-key hypothesis for view_filter_definitions.
+
+    Join axis: vf.uid_or_namekey (UniqueId when available, else name fallback already used by v2 identity).
+    """
+    v, q = phase2_qv_from_legacy_sentinel_str(uid_or_namekey, allow_empty=False)
+    return phase2_sorted_items([
+        {"k": "vf.uid_or_namekey", "q": q, "v": v},
+    ])
 
 def _logic_root_token(elem_filter) -> Tuple[Optional[str], str]:
     """Return (v, q) for vf.logic_root."""
@@ -404,6 +420,42 @@ def extract(doc, ctx=None):
             # Downstream mapping (UniqueId only)
             if uid_v is not None and uid_q == ITEM_Q_OK:
                 uid_to_sig_hash[uid_v] = sig_hash
+
+        # -----------------------------
+        # Phase 2 (empirical, additive)
+        # -----------------------------
+        # Join-key uses the same join axis as v2 identity (hypothesis only).
+        join_items = _phase2_build_join_key_items(uid_or_namekey=uid_v)
+        rec["join_key"] = {
+            "schema": "view_filter_definitions.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": join_items,
+            "join_hash": phase2_join_hash(join_items),
+        }
+
+        # Phase-2 item partitions (hypotheses only; no inference).
+        # Reuse the already-validated v2 identity items as semantic candidates.
+        # (We do not change identity_basis.items; this is an additive view.)
+        p2_semantic = list(items_sorted)
+
+        # Unknown: element-backed id may vary across files.
+        try:
+            _eid = int(getattr(f.Id, "IntegerValue", 0))
+            _eid_v, _eid_q = canonicalize_int(_eid)
+        except Exception:
+            _eid_v, _eid_q = (None, ITEM_Q_UNREADABLE)
+
+        p2_unknown = phase2_sorted_items([
+            {"k": "vf.elem_id", "q": _eid_q, "v": _eid_v},
+        ])
+
+        rec["phase2"] = {
+            "schema": "phase2.view_filter_definitions.v1",
+            "grouping_basis": "phase2.hypothesis",
+            "semantic_items": phase2_sorted_items(p2_semantic),
+            "cosmetic_items": phase2_sorted_items([]),
+            "unknown_items": p2_unknown,
+        }
 
         v2_records.append(rec)
 
