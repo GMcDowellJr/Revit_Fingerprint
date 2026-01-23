@@ -34,6 +34,25 @@ from core.canon import (
     S_NOT_APPLICABLE,
 )
 
+from core.phase2 import (
+    phase2_sorted_items,
+    phase2_qv_from_legacy_sentinel_str,
+    phase2_join_hash,
+)
+from core.record_v2 import (
+    canonicalize_int,
+    canonicalize_str_allow_empty,
+    ITEM_Q_UNREADABLE,
+)
+
+
+def _phase2_build_join_key_items(*, name):
+    """Domain-specific Phase-2 join key items for phase_filters."""
+    v_name, q_name = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
+    return phase2_sorted_items([
+        {"k": "phase_filter.name", "q": q_name, "v": v_name},
+    ])
+
 try:
     from Autodesk.Revit.DB import PhaseFilter, ElementOnPhaseStatus
 except ImportError:
@@ -165,12 +184,53 @@ def extract(doc, ctx=None):
             except Exception as e:
                 pass
 
+        # Phase-2 (empirical, explanatory, reversible): join_key + attribute buckets
+        join_key_items = _phase2_build_join_key_items(name=name)
+
+        phase2_semantic_items = []
+        for status_name, status_enum in statuses:
+            k = "phase_filter.{}.presentation_id".format(safe_str(status_name).lower())
+            try:
+                pres_p2 = pf.GetPhaseStatusPresentation(status_enum)
+                v_pres, q_pres = canonicalize_int(int(pres_p2))
+            except Exception:
+                v_pres, q_pres = None, ITEM_Q_UNREADABLE
+            phase2_semantic_items.append({"k": k, "q": q_pres, "v": v_pres})
+
+        v_uid, q_uid = canonicalize_str_allow_empty(uid)
+        v_id, q_id = canonicalize_int(getattr(pf.Id, "IntegerValue", None))
+
+        v_name_p2, q_name_p2 = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
+
+        phase2_unknown_items = phase2_sorted_items([
+            {"k": "phase_filter.uid", "q": q_uid, "v": v_uid},
+            {"k": "phase_filter.id.int", "q": q_id, "v": v_id},
+            {"k": "phase_filter.name", "q": q_name_p2, "v": v_name_p2},
+        ])
+
+        rec_join_key = {
+            "schema": "phase_filters.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": join_key_items,
+            "join_hash": phase2_join_hash(join_key_items),
+        }
+
+        rec_phase2 = {
+            "schema": "phase2.phase_filters.v1",
+            "grouping_basis": "phase2.hypothesis",
+            "semantic_items": phase2_sorted_items(phase2_semantic_items),
+            "cosmetic_items": [],
+            "unknown_items": phase2_unknown_items,
+        }
+
         rec = {
             "id": safe_str(pf.Id.IntegerValue),
             "uid": uid or "",
             "name": name,
             "def_hash": def_hash,
-            "def_signature": sig
+            "def_signature": sig,
+            "join_key": rec_join_key,
+            "phase2": rec_phase2,
         }
 
         records.append(rec)
