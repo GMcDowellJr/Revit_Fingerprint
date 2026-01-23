@@ -49,12 +49,32 @@ from core.record_v2 import (
     build_record_v2,
 )
 
+from core.phase2 import (
+    phase2_sorted_items,
+    phase2_qv_from_legacy_sentinel_str,
+    phase2_join_hash,
+)
 
 try:
     from Autodesk.Revit.DB import GraphicsStyleType, CategoryType
 except ImportError:
     GraphicsStyleType = None
     CategoryType = None
+
+def _phase2_build_join_key_items(*, parent_name, row_name):
+    """Build Phase-2 join-key IdentityItems (domain-specific, hypothesis-only).
+
+    Join-key hypothesis (reversible):
+      - obj_style.parent_name + obj_style.row_name is the natural join identity
+        for cross-file stability checks (matches legacy row_key construction).
+    """
+    parent_v, parent_q = phase2_qv_from_legacy_sentinel_str(parent_name, allow_empty=False)
+    row_v, row_q = phase2_qv_from_legacy_sentinel_str(row_name, allow_empty=False)
+
+    return [
+        make_identity_item("obj_style.parent_name", parent_v, parent_q),
+        make_identity_item("obj_style.row_name", row_v, row_q),
+    ]
 
 def extract(doc, ctx=None):
     """
@@ -327,7 +347,47 @@ def extract(doc, ctx=None):
                     },
                 )
 
+                # -------------------------
+                # Phase-2 additions (additive, explanatory, reversible)
+                # -------------------------
+                join_key_items = _phase2_build_join_key_items(
+                    parent_name=parent_name,
+                    row_name=row_name,
+                )
+                join_key_items_sorted = phase2_sorted_items(join_key_items)
+                rec_v2["join_key"] = {
+                    "schema": "object_styles.join_key.v1",
+                    "hash_alg": "md5_utf8_join_pipe",
+                    "items": join_key_items_sorted,
+                    "join_hash": phase2_join_hash(join_key_items_sorted),
+                }
+
+                semantic_items = []
+                cosmetic_items = []
+                unknown_items = []
+
+                # Hypothesis: Object Styles are graphics-driven; treat extracted attributes as cosmetic.
+                for it in (identity_items_sorted or []):
+                    k = safe_str(it.get("k", ""))
+                    if k == "obj_style.row_key":
+                        unknown_items.append(it)
+                    else:
+                        cosmetic_items.append(it)
+
+                # Add CategoryType as unknown context (not part of identity_basis)
+                ct_v, ct_q = phase2_qv_from_legacy_sentinel_str(cat_type, allow_empty=False)
+                unknown_items.append(make_identity_item("obj_style.category_type", ct_v, ct_q))
+
+                rec_v2["phase2"] = {
+                    "schema": "phase2.object_styles.v1",
+                    "grouping_basis": "phase2.hypothesis",
+                    "semantic_items": phase2_sorted_items(semantic_items),
+                    "cosmetic_items": phase2_sorted_items(cosmetic_items),
+                    "unknown_items": phase2_sorted_items(unknown_items),
+                }
+
                 v2_records.append(rec_v2)
+
                 v2_sig_hashes.append(sig_hash_v2)
                 if status_v2 == STATUS_BLOCKED:
                     v2_any_blocked = True
