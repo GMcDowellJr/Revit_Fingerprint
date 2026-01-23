@@ -51,6 +51,24 @@ try:
 except ImportError:
     SpecTypeId = None
 
+from core.phase2 import (
+    phase2_sorted_items,
+    phase2_qv_from_legacy_sentinel_str,
+    phase2_join_hash,
+)
+
+
+def _phase2_build_join_key_items(*, spec_label):
+    """
+    Phase-2 join-key components for units records.
+
+    Join intent (hypothesis only):
+    - Use the spec label (length/area/volume) as the stable identity for joining records across files.
+    """
+    spec_v, spec_q = phase2_qv_from_legacy_sentinel_str(spec_label, allow_empty=False)
+    items = [make_identity_item("units.spec", spec_v, spec_q)]
+    return phase2_sorted_items(items)
+
 
 def extract(doc, ctx=None):
     """
@@ -226,6 +244,44 @@ def extract(doc, ctx=None):
                 label=label,
             )
             v2_sig_hashes.append(sig_hash)
+
+        # ----------------------------
+        # Phase-2 additive emission (no effect on sig_hash / identity_basis)
+        # ----------------------------
+        join_items = _phase2_build_join_key_items(spec_label=label)
+
+        # Hypotheses only (grouping_basis=phase2.hypothesis):
+        # - semantic: spec identity + unit type + numeric formatting options
+        # - cosmetic: symbol selection (presentation-focused; may still affect downstream display)
+        # - unknown: (none currently declared)
+        semantic_keys = {
+            "units.spec",
+            "units.unit_type_id",
+            "units.accuracy",
+            "units.rounding_method",
+        }
+        cosmetic_keys = {
+            "units.symbol_type_id",
+        }
+
+        semantic_items = phase2_sorted_items([dict(it) for it in items_sorted if it.get("k") in semantic_keys])
+        cosmetic_items = phase2_sorted_items([dict(it) for it in items_sorted if it.get("k") in cosmetic_keys])
+        unknown_items = phase2_sorted_items([dict(it) for it in items_sorted if it.get("k") not in (semantic_keys | cosmetic_keys)])
+
+        rec["join_key"] = {
+            "schema": "units.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": join_items,
+            "join_hash": phase2_join_hash(join_items),
+        }
+
+        rec["phase2"] = {
+            "schema": "phase2.units.v1",
+            "grouping_basis": "phase2.hypothesis",
+            "semantic_items": semantic_items,
+            "cosmetic_items": cosmetic_items,
+            "unknown_items": unknown_items,
+        }
 
         v2_records.append(rec)
 
