@@ -1,0 +1,13 @@
+{
+  "analysis_run_id": "2026-01-22_phase1_domain_authority",
+  "seed_baseline_id": "fp__rvt-stn_i_arch_int_2025__00008178__fingerprint.json",
+  "domains_in_scope": [],
+  "status_comparable_set": ["ok"],
+  "status_blocked_set": ["blocked"],
+  "status_unsupported_set": ["unsupported"],
+  "status_failed_set": ["failed"],
+  "cluster_method": "domain_hash_exact",
+  "observability_min_comparable_rate": 0.6,
+  "convergence_thresholds": { "high": 0.8, "medium": 0.6 },
+  "ignored_thresholds": { "seed_match_max": 0.1, "hhi_max": 0.2 }
+}
