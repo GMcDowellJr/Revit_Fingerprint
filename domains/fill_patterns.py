@@ -34,6 +34,21 @@ from core.canon import (
     S_NOT_APPLICABLE,
 )
 
+from core.phase2 import (
+    phase2_sorted_items,
+    phase2_qv_from_legacy_sentinel_str,
+    phase2_join_hash,
+)
+from core.record_v2 import (
+    ITEM_Q_OK,
+    ITEM_Q_MISSING,
+    ITEM_Q_UNREADABLE,
+    canonicalize_str,
+    canonicalize_int,
+    canonicalize_bool,
+    canonicalize_float,
+)
+
 try:
     from Autodesk.Revit.DB import FillPatternElement
 except ImportError:
@@ -293,6 +308,235 @@ def extract(doc, ctx=None):
 
         return True, parts, None
 
+    # -------------------------
+    # Phase 2 (additive-only) builders
+    # -------------------------
+
+    def _phase2_build_join_key_items(name, fp):
+        items = []
+
+        # name (string)
+        v, q = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
+        items.append({"k": "fill_pattern.name", "v": v, "q": q})
+
+        # target_id (int) — keep explicit missing/unreadable
+        if fp is None:
+            items.append({"k": "fill_pattern.target_id", "v": None, "q": ITEM_Q_UNREADABLE})
+        else:
+            try:
+                t = fp.Target
+            except Exception:
+                items.append({"k": "fill_pattern.target_id", "v": None, "q": ITEM_Q_UNREADABLE})
+            else:
+                try:
+                    tid = int(t)
+                except Exception:
+                    items.append({"k": "fill_pattern.target_id", "v": None, "q": ITEM_Q_UNREADABLE})
+                else:
+                    v2, q2 = canonicalize_int(tid)
+                    items.append({"k": "fill_pattern.target_id", "v": v2, "q": q2})
+
+        return phase2_sorted_items(items)
+
+    def _phase2_try_get_grid(fp, i):
+        g = None
+        try:
+            if hasattr(fp, "GetFillPatternGrid"):
+                g = fp.GetFillPatternGrid(i)
+        except Exception:
+            g = None
+        if g is None:
+            try:
+                if hasattr(fp, "GetFillGrid"):
+                    g = fp.GetFillGrid(i)
+            except Exception:
+                g = None
+        return g
+
+    def _phase2_add_float(items, k, v, *, unreadable=False):
+        if unreadable:
+            items.append({"k": k, "v": None, "q": ITEM_Q_UNREADABLE})
+            return
+        v2, q2 = canonicalize_float(v)
+        items.append({"k": k, "v": v2, "q": q2})
+
+    def _phase2_add_int(items, k, v, *, unreadable=False):
+        if unreadable:
+            items.append({"k": k, "v": None, "q": ITEM_Q_UNREADABLE})
+            return
+        v2, q2 = canonicalize_int(v)
+        items.append({"k": k, "v": v2, "q": q2})
+
+    def _phase2_add_bool(items, k, v, *, unreadable=False):
+        if unreadable:
+            items.append({"k": k, "v": None, "q": ITEM_Q_UNREADABLE})
+            return
+        v2, q2 = canonicalize_bool(v)
+        items.append({"k": k, "v": v2, "q": q2})
+
+    def _phase2_add_str(items, k, v, *, allow_empty=False):
+        if allow_empty:
+            v2, q2 = phase2_qv_from_legacy_sentinel_str(v, allow_empty=True)
+        else:
+            v2, q2 = phase2_qv_from_legacy_sentinel_str(v, allow_empty=False)
+        items.append({"k": k, "v": v2, "q": q2})
+
+    def _phase2_build_phase2(name, uid, elem_id_str, fp):
+        semantic = []
+        cosmetic = []
+        unknown = []
+
+        # cosmetic
+        v_name, q_name = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
+        cosmetic.append({"k": "fill_pattern.name", "v": v_name, "q": q_name})
+
+        # unknown identifiers (do not affect semantic hypotheses)
+        v_uid, q_uid = canonicalize_str(uid)
+        unknown.append({"k": "fill_pattern.uid", "v": v_uid, "q": q_uid})
+        v_eid, q_eid = canonicalize_str(elem_id_str)
+        unknown.append({"k": "fill_pattern.elem_id", "v": v_eid, "q": q_eid})
+
+        if fp is None:
+            # Explicit unreadable (GetFillPattern failed)
+            _phase2_add_bool(semantic, "fill_pattern.is_solid", None, unreadable=True)
+            _phase2_add_int(semantic, "fill_pattern.target_id", None, unreadable=True)
+            _phase2_add_int(semantic, "fill_pattern.grid_count", None, unreadable=True)
+        else:
+            # is_solid
+            try:
+                is_solid = fp.IsSolidFill
+            except Exception:
+                _phase2_add_bool(semantic, "fill_pattern.is_solid", None, unreadable=True)
+            else:
+                _phase2_add_bool(semantic, "fill_pattern.is_solid", bool(is_solid))
+
+            # target_id
+            try:
+                t = fp.Target
+            except Exception:
+                _phase2_add_int(semantic, "fill_pattern.target_id", None, unreadable=True)
+                target_id = None
+            else:
+                try:
+                    target_id = int(t)
+                except Exception:
+                    _phase2_add_int(semantic, "fill_pattern.target_id", None, unreadable=True)
+                    target_id = None
+                else:
+                    _phase2_add_int(semantic, "fill_pattern.target_id", target_id)
+
+            # grid_count
+            try:
+                gc = fp.GridCount
+            except Exception:
+                _phase2_add_int(semantic, "fill_pattern.grid_count", None, unreadable=True)
+                gc_i = None
+            else:
+                if gc is None:
+                    _phase2_add_int(semantic, "fill_pattern.grid_count", None)
+                    gc_i = None
+                else:
+                    try:
+                        gc_i = int(gc)
+                    except Exception:
+                        _phase2_add_int(semantic, "fill_pattern.grid_count", None, unreadable=True)
+                        gc_i = None
+                    else:
+                        _phase2_add_int(semantic, "fill_pattern.grid_count", gc_i)
+
+            # grids (no inference; explicit kind for origin)
+            if gc_i:
+                for i in range(int(gc_i)):
+                    idx = "{:03d}".format(int(i))
+                    g = _phase2_try_get_grid(fp, i)
+                    if g is None:
+                        semantic.append({"k": "fill_pattern.grid[{}].angle".format(idx), "v": None, "q": ITEM_Q_UNREADABLE})
+                        semantic.append({"k": "fill_pattern.grid[{}].origin.kind".format(idx), "v": None, "q": ITEM_Q_UNREADABLE})
+                        semantic.append({"k": "fill_pattern.grid[{}].offset".format(idx), "v": None, "q": ITEM_Q_UNREADABLE})
+                        semantic.append({"k": "fill_pattern.grid[{}].shift".format(idx), "v": None, "q": ITEM_Q_UNREADABLE})
+                        continue
+
+                    # Angle / Offset / Shift
+                    try:
+                        _phase2_add_float(semantic, "fill_pattern.grid[{}].angle".format(idx), float(getattr(g, "Angle")))
+                    except Exception:
+                        semantic.append({"k": "fill_pattern.grid[{}].angle".format(idx), "v": None, "q": ITEM_Q_UNREADABLE})
+
+                    # Origin (explicit kind)
+                    origin_kind = None
+                    ox = oy = None
+
+                    # UV origin
+                    try:
+                        o = g.Origin
+                        u = getattr(o, "U", None)
+                        v = getattr(o, "V", None)
+                        if u is not None and v is not None:
+                            origin_kind = "uv"
+                            ox = float(u)
+                            oy = float(v)
+                    except Exception:
+                        pass
+
+                    # XY origin
+                    if origin_kind is None:
+                        try:
+                            o = g.Origin
+                            x = getattr(o, "X", None)
+                            y = getattr(o, "Y", None)
+                            if x is not None and y is not None:
+                                origin_kind = "xy"
+                                ox = float(x)
+                                oy = float(y)
+                        except Exception:
+                            pass
+
+                    # Scalar origin props
+                    if origin_kind is None:
+                        for u_name, v_name in [("OriginU", "OriginV"), ("UOrigin", "VOrigin")]:
+                            try:
+                                u2 = getattr(g, u_name)
+                                v2 = getattr(g, v_name)
+                                if u2 is None or v2 is None:
+                                    continue
+                                origin_kind = "uv"
+                                ox = float(u2)
+                                oy = float(v2)
+                                break
+                            except Exception:
+                                continue
+
+                    if origin_kind is None:
+                        semantic.append({"k": "fill_pattern.grid[{}].origin.kind".format(idx), "v": None, "q": ITEM_Q_UNREADABLE})
+                    else:
+                        v_kind, q_kind = canonicalize_str(origin_kind)
+                        semantic.append({"k": "fill_pattern.grid[{}].origin.kind".format(idx), "v": v_kind, "q": q_kind})
+
+                        if origin_kind == "uv":
+                            _phase2_add_float(semantic, "fill_pattern.grid[{}].origin.u".format(idx), ox)
+                            _phase2_add_float(semantic, "fill_pattern.grid[{}].origin.v".format(idx), oy)
+                        else:
+                            _phase2_add_float(semantic, "fill_pattern.grid[{}].origin.x".format(idx), ox)
+                            _phase2_add_float(semantic, "fill_pattern.grid[{}].origin.y".format(idx), oy)
+
+                    try:
+                        _phase2_add_float(semantic, "fill_pattern.grid[{}].offset".format(idx), float(getattr(g, "Offset")))
+                    except Exception:
+                        semantic.append({"k": "fill_pattern.grid[{}].offset".format(idx), "v": None, "q": ITEM_Q_UNREADABLE})
+
+                    try:
+                        _phase2_add_float(semantic, "fill_pattern.grid[{}].shift".format(idx), float(getattr(g, "Shift")))
+                    except Exception:
+                        semantic.append({"k": "fill_pattern.grid[{}].shift".format(idx), "v": None, "q": ITEM_Q_UNREADABLE})
+
+        return {
+            "schema": "phase2.fill_patterns.v1",
+            "grouping_basis": "phase2.hypothesis",
+            "semantic_items": phase2_sorted_items(semantic),
+            "cosmetic_items": phase2_sorted_items(cosmetic),
+            "unknown_items": phase2_sorted_items(unknown),
+        }
+
     records = []
     per_hashes = []
     per_hashes_v2 = []
@@ -439,12 +683,30 @@ def extract(doc, ctx=None):
         else:
             _bump_v2_reason(v2_reason or "unknown")
 
+        join_items = _phase2_build_join_key_items(name, fp)
+        join_key = {
+            "schema": "fill_patterns.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": join_items,
+            "join_hash": phase2_join_hash(join_items),
+        }
+
         rec = {
             "id": safe_str(e.Id.IntegerValue),
             "uid": uid,
             "name": name,          # metadata only
             "def_hash": def_hash,  # hashed legacy definition
+
+            # Phase 2 (additive-only; does not affect legacy/v2 hashing)
+            "join_key": join_key,
+            "phase2": _phase2_build_phase2(
+                name=name,
+                uid=uid,
+                elem_id_str=safe_str(e.Id.IntegerValue),
+                fp=fp,
+            ),
         }
+
         if DEBUG_INCLUDE_FILLPATTERN_SIGNATURES:
             rec["def_signature"] = sig_sorted
 
