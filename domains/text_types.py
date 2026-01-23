@@ -41,10 +41,66 @@ from core.rows import (
     get_type_display_name, get_element_display_name
 )
 
+from core.phase2 import (
+    phase2_sorted_items,
+    phase2_qv_from_legacy_sentinel_str,
+    phase2_join_hash,
+)
+
 try:
     from Autodesk.Revit.DB import TextNoteType
 except ImportError:
     TextNoteType = None
+
+def _phase2_item(k, raw_v, *, allow_empty=False):
+    v, q = phase2_qv_from_legacy_sentinel_str(raw_v, allow_empty=allow_empty)
+    return {"k": k, "q": q, "v": v}
+
+
+def _phase2_build_join_key_items(type_name):
+    # Hypothesis: type name is the best available cross-file join key for TextNoteType.
+    items = [
+        _phase2_item("text_type.name", type_name, allow_empty=True),
+    ]
+    return phase2_sorted_items(items)
+
+
+def _phase2_build_payload(rec):
+    # Hypotheses only: semantic vs cosmetic vs unknown buckets.
+    semantic_items = phase2_sorted_items([
+        _phase2_item("text_type.font", rec.get("font")),
+        _phase2_item("text_type.size_in", rec.get("text_size_in")),
+        _phase2_item("text_type.width_factor", rec.get("width_factor")),
+        _phase2_item("text_type.background_raw", rec.get("background_raw")),
+        _phase2_item("text_type.line_weight", rec.get("line_weight")),
+        _phase2_item("text_type.color_rgb", safe_str(rec.get("color_rgb"))),
+        _phase2_item("text_type.show_border", canon_bool(rec.get("show_border"))),
+        _phase2_item("text_type.leader_border_offset_in", rec.get("leader_border_offset_in")),
+        _phase2_item("text_type.tab_size_in", rec.get("tab_size_in")),
+        _phase2_item("text_type.bold", canon_bool(rec.get("bold"))),
+        _phase2_item("text_type.italic", canon_bool(rec.get("italic"))),
+        _phase2_item("text_type.underline", canon_bool(rec.get("underline"))),
+    ])
+
+    cosmetic_items = phase2_sorted_items([
+        _phase2_item("text_type.name", rec.get("type_name"), allow_empty=True),
+    ])
+
+    unknown_items = phase2_sorted_items([
+        _phase2_item("text_type.type_uid", rec.get("type_uid"), allow_empty=True),
+        _phase2_item("text_type.type_id", rec.get("type_id"), allow_empty=True),
+        _phase2_item("text_type.color_int", rec.get("color_int")),
+        _phase2_item("text_type.leader_arrowhead_uid", rec.get("leader_arrowhead_uid"), allow_empty=True),
+        _phase2_item("text_type.leader_arrowhead_name", rec.get("leader_arrowhead_name"), allow_empty=True),
+    ])
+
+    return {
+        "schema": "phase2.text_types.v1",
+        "grouping_basis": "phase2.hypothesis",
+        "semantic_items": semantic_items,
+        "cosmetic_items": cosmetic_items,
+        "unknown_items": unknown_items,
+    }
 
 def extract(doc, ctx=None):
     """
@@ -264,6 +320,19 @@ def extract(doc, ctx=None):
             "signature_tuple": signature_tuple,
             "signature_hash": sig_hash
         }
+
+        # ---------------------------
+        # Phase 2 (additive, explanatory, reversible)
+        # Emit even if v2 is domain-blocked.
+        # ---------------------------
+        _jk_items = _phase2_build_join_key_items(rec.get("type_name"))
+        rec["join_key"] = {
+            "schema": "text_types.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": phase2_sorted_items(_jk_items),
+            "join_hash": phase2_join_hash(_jk_items),
+        }
+        rec["phase2"] = _phase2_build_payload(rec)
 
         records.append(rec)
         sig_hashes.append(sig_hash)
