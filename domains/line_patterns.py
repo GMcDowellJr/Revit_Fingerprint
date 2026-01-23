@@ -47,6 +47,11 @@ from core.record_v2 import (
     build_record_v2,
 )
 
+from core.phase2 import (
+    phase2_sorted_items,
+    phase2_qv_from_legacy_sentinel_str,
+    phase2_join_hash,
+)
 
 try:
     from Autodesk.Revit.DB import LinePatternElement
@@ -94,6 +99,17 @@ def _lp_seg_type_id_and_name(seg):
         return None, None
 
     return st_id, _LP_SEG_TYPE_NAME.get(st_id, "Unknown")
+
+def _phase2_build_join_key_items(*, line_pattern_name):
+    """Build Phase-2 join-key IdentityItems (domain-specific, hypothesis-only).
+
+    Join-key hypothesis (reversible):
+      - line_pattern.name is the natural join component for cross-file stability checks.
+    """
+    name_v, name_q = phase2_qv_from_legacy_sentinel_str(line_pattern_name, allow_empty=False)
+    return [
+        make_identity_item("line_pattern.name", name_v, name_q),
+    ]
 
 def extract(doc, ctx=None):
     """
@@ -383,6 +399,48 @@ def extract(doc, ctx=None):
                 },
             },
         )
+        
+        # -------------------------
+        # Phase-2 additions (additive, explanatory, reversible)
+        # -------------------------
+        join_key_items = _phase2_build_join_key_items(line_pattern_name=name)
+        join_key_items_sorted = phase2_sorted_items(join_key_items)
+        rec_v2["join_key"] = {
+            "schema": "line_patterns.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": join_key_items_sorted,
+            "join_hash": phase2_join_hash(join_key_items_sorted),
+        }
+
+        semantic_items = []
+        cosmetic_items = []
+        unknown_items = []
+
+        # Hypothesis: segment definition is semantic; uid_or_namekey and element id are unknown (file-local)
+        for it in (identity_items_sorted or []):
+            k = safe_str(it.get("k", ""))
+            if k == "line_pattern.uid_or_namekey":
+                unknown_items.append(it)
+            elif k == "line_pattern.segment_count" or k.startswith("line_pattern.seg["):
+                semantic_items.append(it)
+
+        # Add explicit element id as unknown (file-local) without affecting identity_basis
+        unknown_items.append(
+            make_identity_item(
+                "line_pattern.element_id",
+                safe_str(getattr(getattr(e, "Id", None), "IntegerValue", "")),
+                ITEM_Q_OK,
+            )
+        )
+
+        rec_v2["phase2"] = {
+            "schema": "phase2.line_patterns.v1",
+            "grouping_basis": "phase2.hypothesis",
+            "semantic_items": phase2_sorted_items(semantic_items),
+            "cosmetic_items": phase2_sorted_items(cosmetic_items),
+            "unknown_items": phase2_sorted_items(unknown_items),
+        }
+        
         v2_records.append(rec_v2)
 
         # Only publish non-blocked records to dependency map (UID as lookup key)
