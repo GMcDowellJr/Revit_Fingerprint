@@ -6,8 +6,8 @@
   "status_blocked_set": ["blocked"],
   "status_unsupported_set": ["unsupported"],
   "status_failed_set": ["failed"],
-  "cluster_method": "domain_hash_exact",
+  "cluster_method": "semantic_multiset_exact",
   "observability_min_comparable_rate": 0.6,
   "convergence_thresholds": { "high": 0.8, "medium": 0.6 },
-  "ignored_thresholds": { "seed_match_max": 0.1, "hhi_max": 0.2 }
+  "ignored_thresholds": { "seed_match_max": 0.15, "hhi_max": 0.2 }
 }

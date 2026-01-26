@@ -46,6 +46,12 @@ STATUS_ALIASES = {
 
 RECOGNIZED_STATUSES = {STATUS_OK, STATUS_DEGRADED, STATUS_BLOCKED}
 
+# Domains where delete+recreate is considered equivalent (persistence authority)
+SEMANTIC_UID_DOMAINS = {
+    "dimension_types",
+    # future candidates go here explicitly
+}
+
 
 @dataclass(frozen=True)
 class DomainData:
@@ -100,6 +106,17 @@ class SimilarityResult:
 # Parsing helpers (tolerant, explicit)
 # -----------------------------
 
+def _strip_revit_uid_tail(v: Optional[str]) -> Optional[str]:
+    """
+    Revit UniqueId is typically GUID-ELEMENTID.
+    For persistence-based similarity, keep GUID only.
+    """
+    if not isinstance(v, str):
+        return v
+    if "-" not in v:
+        return v
+    return v.rsplit("-", 1)[0]
+
 def _as_str(x: Any) -> Optional[str]:
     if x is None:
         return None
@@ -146,7 +163,7 @@ def _extract_domains_obj(fp: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _extract_sig_hashes(domain_payload: Dict[str, Any]) -> Optional[List[str]]:
+def _extract_sig_hashes(domain_payload: Dict[str, Any], domain_name: str) -> Optional[List[str]]:
     """
     Contract-aligned signature extraction.
 
@@ -185,7 +202,10 @@ def _extract_sig_hashes(domain_payload: Dict[str, Any]) -> Optional[List[str]]:
 
         # ok/degraded must have a 32-hex string; if not, do not guess.
         if isinstance(sig, str) and sig:
-            out.append(sig)
+            if domain_name in SEMANTIC_UID_DOMAINS:
+                out.append(_strip_revit_uid_tail(sig))
+            else:
+                out.append(sig)
 
     if not saw_v2:
         return None
@@ -225,65 +245,6 @@ def _extract_domain_hash(domain_payload: Dict[str, Any]) -> Optional[str]:
             v = meta.get(key)
             if isinstance(v, str) and v:
                 return v
-
-    return None
-
-
-def _extract_sig_hashes(domain_payload: Dict[str, Any]) -> Optional[List[str]]:
-    """
-    Return:
-      - None: signature hashes unavailable/unknown
-      - []: explicitly known empty
-      - [..]: list of signature-hash strings (may include duplicates)
-
-    Supported payload layouts:
-      A) "signature_hashes_v2" (preferred) or "signature_hashes"
-      B) Legacy: records/rows/items/elements list with per-row "sig_hash"
-      C) Nested legacy: payload["data"][...]
-    """
-    # A) New contract: explicit signature lists
-    for key in ("signature_hashes_v2", "signature_hashes"):
-        v = domain_payload.get(key)
-        if isinstance(v, list):
-            out: List[str] = []
-            for x in v:
-                if isinstance(x, str) and x:
-                    out.append(x)
-            return out  # list exists => known (even if empty)
-
-    # B) Legacy: per-record sig_hash
-    for key in ("records", "rows", "items", "elements"):
-        recs = domain_payload.get(key)
-        if isinstance(recs, list):
-            out: List[str] = []
-            saw_sig_field = False
-            for r in recs:
-                if isinstance(r, dict) and "sig_hash" in r:
-                    saw_sig_field = True
-                    sv = r.get("sig_hash")
-                    if isinstance(sv, str) and sv:
-                        out.append(sv)
-            if saw_sig_field:
-                return out
-            return None
-
-    # C) Nested legacy
-    data = domain_payload.get("data")
-    if isinstance(data, dict):
-        for key in ("records", "rows", "items", "elements"):
-            recs = data.get(key)
-            if isinstance(recs, list):
-                out: List[str] = []
-                saw_sig_field = False
-                for r in recs:
-                    if isinstance(r, dict) and "sig_hash" in r:
-                        saw_sig_field = True
-                        sv = r.get("sig_hash")
-                        if isinstance(sv, str) and sv:
-                            out.append(sv)
-                if saw_sig_field:
-                    return out
-                return None
 
     return None
 
@@ -361,7 +322,7 @@ def load_fingerprint(path: str) -> FingerprintData:
                 )
                 continue
 
-            sigs = _extract_sig_hashes(payload)
+            sigs = _extract_sig_hashes(payload, dname)
             sig_label_meta = _extract_sig_label_meta(payload)
 
             # Capture a reason string if present (meta first, then payload)
@@ -424,7 +385,7 @@ def load_fingerprint(path: str) -> FingerprintData:
 
         status = _extract_domain_status(dpayload)
         dhash = _extract_domain_hash(dpayload)
-        sigs = _extract_sig_hashes(dpayload)
+        sigs = _extract_sig_hashes(dpayload, dname)
         sig_label_meta = _extract_sig_label_meta(dpayload)
 
         missing = False
