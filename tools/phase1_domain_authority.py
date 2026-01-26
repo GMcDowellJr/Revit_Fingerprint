@@ -7,6 +7,8 @@ import json
 import math
 import os
 from dataclasses import dataclass
+from collections import Counter
+import statistics
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -25,6 +27,10 @@ AUTHORITY_OUTCOMES = {
 SCOPE_RECS = {"retain", "narrow", "downgrade_to_advisory", "defer_not_observable"}
 CONF_LEVELS = {"high", "medium", "low"}
 
+SEMANTIC_UID_DOMAINS = {
+    "dimension_types",
+}
+
 
 @dataclass(frozen=True)
 class RunConfig:
@@ -35,7 +41,7 @@ class RunConfig:
     status_blocked_set: List[str]
     status_unsupported_set: List[str]
     status_failed_set: List[str]
-    cluster_method: str  # "domain_hash_exact" (phase 1)
+    cluster_method: str  # "semantic_multiset_exact" (phase 1 default) or "domain_hash_exact"
     observability_min_comparable_rate: float
     convergence_high: float
     convergence_medium: float
@@ -52,7 +58,7 @@ class RunConfig:
             status_blocked_set=list(d.get("status_blocked_set", ["blocked"])),
             status_unsupported_set=list(d.get("status_unsupported_set", ["unsupported"])),
             status_failed_set=list(d.get("status_failed_set", ["failed"])),
-            cluster_method=str(d.get("cluster_method", "domain_hash_exact")),
+            cluster_method=str(d.get("cluster_method", "semantic_multiset_exact")),
             observability_min_comparable_rate=float(d.get("observability_min_comparable_rate", 0.6)),
             convergence_high=float(d.get("convergence_thresholds", {}).get("high", 0.8)),
             convergence_medium=float(d.get("convergence_thresholds", {}).get("medium", 0.6)),
@@ -78,6 +84,222 @@ def project_id_from_fp(fp: Dict[str, Any], fallback: str) -> str:
         return title.strip()
     return fallback
 
+# -------------------------
+# Phase-1 semantic hashing (derived, order-independent)
+# -------------------------
+
+def _extract_record_sig_hashes_v2(fp: Optional[Dict[str, Any]], domain_name: str) -> Optional[List[str]]:
+    """
+    Contract source of truth (record.v2):
+      - domain_payload["records"] containing dicts with:
+          schema_version == "record.v2"
+          status in {ok,degraded,blocked}
+          sig_hash: 32-hex for ok/degraded; null for blocked
+    Return:
+      - None if domain payload missing / not record.v2
+      - [] if record.v2 list exists but no sigs (still "known empty")
+      - [..] list (may include duplicates)
+    """
+    if not isinstance(fp, dict):
+        return None
+
+    payload = fp.get(domain_name)
+    if not isinstance(payload, dict):
+        return None
+
+    recs = payload.get("records")
+    if not isinstance(recs, list):
+        return None
+
+    out: List[str] = []
+    saw_v2 = False
+
+    for r in recs:
+        if not isinstance(r, dict):
+            continue
+        if r.get("schema_version") != "record.v2":
+            continue
+
+        saw_v2 = True
+        st = str(r.get("status") or "").strip().lower()
+        if st == "blocked":
+            continue
+
+        sig = r.get("sig_hash")
+        if isinstance(sig, str) and sig:
+            if domain_name in SEMANTIC_UID_DOMAINS:
+                out.append(_strip_revit_uid_tail(sig))
+            else:
+                out.append(sig)
+
+    if not saw_v2:
+        return None
+
+    return out
+
+
+def _jaccard_set(a: Optional[List[str]], b: Optional[List[str]]) -> Optional[float]:
+    if a is None or b is None:
+        return None
+    sa = set(a)
+    sb = set(b)
+    if not sa and not sb:
+        return 1.0
+    if not sa and sb:
+        return 0.0
+    if sa and not sb:
+        return 0.0
+    inter = len(sa & sb)
+    uni = len(sa | sb)
+    return inter / uni if uni else 1.0
+
+
+def _jaccard_multiset(a: Optional[List[str]], b: Optional[List[str]]) -> Optional[float]:
+    if a is None or b is None:
+        return None
+    ca = Counter(a)
+    cb = Counter(b)
+    if not ca and not cb:
+        return 1.0
+    if not ca and cb:
+        return 0.0
+    if ca and not cb:
+        return 0.0
+    keys = set(ca.keys()) | set(cb.keys())
+    inter = 0
+    uni = 0
+    for k in keys:
+        inter += min(ca.get(k, 0), cb.get(k, 0))
+        uni += max(ca.get(k, 0), cb.get(k, 0))
+    return inter / uni if uni else 1.0
+
+
+import hashlib
+
+
+SEMANTIC_UID_KEYS_BY_DOMAIN = {
+    # Revit UniqueId is typically GUID-ELEMENTID. ElementId is file-local noise.
+    "dimension_types": {"dim_type.uid", "dim_type.tick_mark_uid"},
+}
+
+
+def _md5_utf8(s: str) -> str:
+    return hashlib.md5(s.encode("utf-8")).hexdigest()
+
+
+def _strip_revit_uid_tail(v: Any) -> Any:
+    """
+    Normalize Revit UniqueId-like strings: '{GUID}-{8hex elementId}' -> '{GUID}'.
+    Best-effort: split on last hyphen only.
+    """
+    if not isinstance(v, str):
+        return v
+    v = v.strip()
+    if "-" not in v:
+        return v
+    return v.rsplit("-", 1)[0]
+
+
+def _canonical_item_str(k: Any, q: Any, v: Any) -> str:
+    if v is None:
+        v_str = "null"
+    elif isinstance(v, bool):
+        v_str = "true" if v else "false"
+    else:
+        v_str = str(v)
+    return f"{k}={q}:{v_str}"
+
+
+def _semantic_record_sig_hash(domain: str, rec: Dict[str, Any]) -> Optional[str]:
+    """
+    Derived semantic signature hash for a single record:
+      - Prefer identity_basis.items when present (record.v2)
+      - Normalize any domain-specific UID keys by stripping ElementId tails
+      - Hash canonicalized items (order preserved as exported)
+    """
+    ib = rec.get("identity_basis")
+    if not isinstance(ib, dict):
+        return None
+
+    items = ib.get("items")
+    if not isinstance(items, list) or not items:
+        return None
+
+    uid_keys = SEMANTIC_UID_KEYS_BY_DOMAIN.get(domain, set())
+
+    parts: List[str] = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        k = it.get("k")
+        q = it.get("q")
+        v = it.get("v")
+
+        if isinstance(k, str) and k in uid_keys:
+            v = _strip_revit_uid_tail(v)
+
+        parts.append(_canonical_item_str(k, q, v))
+
+    if not parts:
+        return None
+
+    return _md5_utf8("|".join(parts))
+
+
+def _domain_payload_from_fp(fp: Dict[str, Any], dom: str) -> Optional[Dict[str, Any]]:
+    """
+    Best-effort extraction for record.v2 domain payloads, matching observed shapes:
+      - fp[dom] = {"records":[...]}
+      - fp["records"][dom] = [...]
+      - fp["domains"][dom]["records"] = [...]
+    """
+    v = fp.get(dom)
+    if isinstance(v, dict):
+        return v
+
+    recs = fp.get("records")
+    if isinstance(recs, dict) and isinstance(recs.get(dom), list):
+        return {"records": recs.get(dom)}
+
+    doms = fp.get("domains")
+    if isinstance(doms, dict):
+        dv = doms.get(dom)
+        if isinstance(dv, dict) and isinstance(dv.get("records"), list):
+            return dv
+
+    return None
+
+
+def _semantic_domain_multiset_hash(fp: Dict[str, Any], dom: str) -> Optional[str]:
+    """
+    Derived domain signature:
+      - Compute semantic record sig hashes for all records
+      - Sort (multiset, order-independent)
+      - Hash the joined list
+
+    NOTE: This intentionally treats delete+recreate as equivalent when identity_basis items match.
+    """
+    payload = _domain_payload_from_fp(fp, dom)
+    if not isinstance(payload, dict):
+        return None
+
+    records = payload.get("records")
+    if not isinstance(records, list) or not records:
+        return None
+
+    sigs: List[str] = []
+    for rec in records:
+        if not isinstance(rec, dict):
+            continue
+        h = _semantic_record_sig_hash(dom, rec)
+        if isinstance(h, str) and h:
+            sigs.append(h)
+
+    if not sigs:
+        return None
+
+    sigs.sort()
+    return _md5_utf8("|".join(sigs))
 
 def extract_domains_summary(fp: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """
@@ -257,54 +479,19 @@ def analyze(input_dir: Path, cfg: RunConfig, seed_path: Optional[Path], out_dir:
             status = d.get("status")
             h = d.get("hash")
             dv = d.get("domain_version")
+            sem_h = _semantic_domain_multiset_hash(pr["fp"], dom)
+
+            sigs = _extract_record_sig_hashes_v2(pr["fp"], dom)
+
             per.append(
                 {
                     "project_id": pr["project_id"],
                     "domain": dom,
                     "domain_status": status,
-                    "domain_hash": h,
+                    "domain_hash": h,                 # exporter-provided (raw)
+                    "domain_hash_semantic": sem_h,    # derived (record-level semantic multiset hash)
+                    "domain_sig_multiset": sigs,      # derived (record-level sig_hash multiset)
                     "domain_version": dv,
-                }
-            )
-
-        # Seed info
-        seed_rec = seed_domains.get(dom, {})
-        seed_hash = seed_rec.get("hash") if isinstance(seed_rec, dict) else None
-        seed_exists = isinstance(seed_hash, str) and bool(seed_hash)
-
-        # Baseline coverage table
-        for r in per:
-            status = r["domain_status"]
-            domain_hash = r["domain_hash"]
-
-            # Comparable requires BOTH: comparable status + a real domain hash.
-            comparable = (
-                isinstance(status, str)
-                and status in cfg.status_comparable_set
-                and isinstance(domain_hash, str)
-                and bool(domain_hash)
-            )
-
-            match = None
-            cluster_id = None
-
-            if comparable and seed_exists:
-                match = (domain_hash == seed_hash)
-
-            if comparable:
-                cluster_id = f"hash:{domain_hash}"
-
-            baseline_rows.append(
-                {
-                    "analysis_run_id": cfg.analysis_run_id,
-                    "project_id": r["project_id"],
-                    "domain": dom,
-                    "domain_status": status,
-                    "domain_hash": domain_hash,
-                    "seed_domain_hash": seed_hash if seed_exists else None,
-                    "seed_hash_match": match,
-                    "cluster_id": cluster_id,
-                    "domain_version": r["domain_version"],
                 }
             )
 
@@ -317,18 +504,23 @@ def analyze(input_dir: Path, cfg: RunConfig, seed_path: Optional[Path], out_dir:
             "failed": 0,
             "other": 0,
         }
-        comparable_items: List[Tuple[str, str]] = []  # (project_id, domain_hash)
+        comparable_items: List[Tuple[str, str]] = []  # (project_id, cluster_hash)
 
         for r in per:
             st = r["domain_status"]
-            dh = r["domain_hash"]
+            dh_raw = r["domain_hash"]
+            dh_sem = r.get("domain_hash_semantic")
+
+            dh = dh_raw
+            if cfg.cluster_method == "semantic_multiset_exact":
+                dh = dh_sem
 
             if not isinstance(st, str):
                 counts["other"] += 1
                 continue
 
             if st in cfg.status_comparable_set:
-                # Comparable requires a real hash; otherwise treat as "other" for authority inference.
+                # Comparable requires a real clustering hash; otherwise treat as "other" for authority inference.
                 if isinstance(dh, str) and bool(dh):
                     counts["comparable"] += 1
                     comparable_items.append((r["project_id"], dh))
@@ -350,11 +542,8 @@ def analyze(input_dir: Path, cfg: RunConfig, seed_path: Optional[Path], out_dir:
         # Observability gate (based on hashable comparable)
         observable = (projects_comparable > 0) and (comparable_rate >= cfg.observability_min_comparable_rate)
 
-        # Clustering (Phase 1: exact hash)
-        clusters: Dict[str, List[str]] = {}  # cluster_id -> [project_id]
-        if cfg.cluster_method != "domain_hash_exact":
-            raise SystemExit(f"Unsupported cluster_method for Phase 1: {cfg.cluster_method}")
-
+        # Build clusters from comparable_items (exact hash clusters)
+        clusters: Dict[str, List[str]] = {}
         for pid, dh in comparable_items:
             cid = f"hash:{dh}"
             clusters.setdefault(cid, []).append(pid)
@@ -362,44 +551,148 @@ def analyze(input_dir: Path, cfg: RunConfig, seed_path: Optional[Path], out_dir:
         cluster_count = len(clusters)
         dominant_cluster_id = ""
         dominant_cluster_share = 0.0
+        if clusters:
+            dominant_cluster_id, members = max(clusters.items(), key=lambda kv: len(kv[1]))
+            dominant_cluster_share = len(members) / projects_comparable if projects_comparable else 0.0
 
-        shares: List[float] = []
-        if projects_comparable > 0:
-            for cid, members in clusters.items():
+        # Concentration (HHI of cluster shares)
+        conc_hhi = 0.0
+        if projects_comparable:
+            for _, members in clusters.items():
                 share = len(members) / projects_comparable
-                shares.append(share)
-            dominant_cluster_id = max(clusters.items(), key=lambda kv: len(kv[1]))[0] if clusters else ""
-            dominant_cluster_share = max(shares) if shares else 0.0
+                conc_hhi += share * share
 
-        conc_hhi = hhi(shares) if shares else 0.0
-        conv = classify_convergence(dominant_cluster_share, cfg)
-        conf = authority_confidence(comparable_rate, dominant_cluster_share, conv)
+        # Seed info (must be defined before any seed-dependent logic)
+        seed_rec = seed_domains.get(dom, {})
+        seed_hash_raw = seed_rec.get("hash") if isinstance(seed_rec, dict) else None
+        seed_fp_hash_sem = _semantic_domain_multiset_hash(seed_fp, dom) if seed_fp else None
 
-        # Seed match rate (denominator = hashable comparable)
-        seed_match_count = 0
-        seed_match_rate: Optional[float] = None
-        if seed_exists and projects_comparable > 0:
+        if cfg.cluster_method == "semantic_multiset_exact":
+            seed_hash = seed_fp_hash_sem
+        else:
+            seed_hash = seed_hash_raw
+
+        seed_exists = isinstance(seed_hash, str) and bool(seed_hash)
+
+        # Seed record-level sig hashes (for similarity)
+        seed_sigs = _extract_record_sig_hashes_v2(seed_fp, dom) if seed_fp else None
+
+        # Seed match stats (exact-hash match)
+        seed_match_count = None
+        seed_match_rate = None
+        if seed_exists and projects_comparable:
+            seed_match_count = 0
             for _, dh in comparable_items:
                 if dh == seed_hash:
                     seed_match_count += 1
             seed_match_rate = seed_match_count / projects_comparable
 
-        outcome = classify_authority_outcome(
-            observable=observable,
-            seed_exists=seed_exists,
-            seed_match_rate=seed_match_rate,
-            dominant_share=dominant_cluster_share,
-            conc_hhi=conc_hhi,
-            cfg=cfg,
-        )
-        scope_rec = authority_scope_recommendation(outcome)
+        # Similarity-to-seed (record-level multiset Jaccard), and pairwise similarity (if not baseline, what)
+        seed_sigs = _extract_record_sig_hashes_v2(seed_fp, dom) if seed_fp else None
+
+        # Only compute similarity where we have per-project sig multisets.
+        comp_sigs: List[Tuple[str, List[str]]] = []
+        for r in per:
+            st = r["domain_status"]
+            if not (isinstance(st, str) and st in cfg.status_comparable_set):
+                continue
+            sm = r.get("domain_sig_multiset")
+            if isinstance(sm, list):
+                comp_sigs.append((r["project_id"], sm))
+
+        seed_ms_sims: List[float] = []
+        if seed_sigs is not None:
+            for _, sm in comp_sigs:
+                v = _jaccard_multiset(sm, seed_sigs)
+                if isinstance(v, float):
+                    seed_ms_sims.append(v)
+
+        pairwise_ms_sims: List[float] = []
+        medoid_project_id = None
+        medoid_avg_similarity = None
+        if len(comp_sigs) >= 2:
+            # Pairwise distribution + medoid (max avg similarity to others)
+            avg_by_pid: Dict[str, List[float]] = {pid: [] for pid, _ in comp_sigs}
+            n = len(comp_sigs)
+            for i in range(n):
+                pid_a, a = comp_sigs[i]
+                for j in range(i + 1, n):
+                    pid_b, b = comp_sigs[j]
+                    v = _jaccard_multiset(a, b)
+                    if isinstance(v, float):
+                        pairwise_ms_sims.append(v)
+                        avg_by_pid[pid_a].append(v)
+                        avg_by_pid[pid_b].append(v)
+
+            best_pid = None
+            best_avg = -1.0
+            for pid, vals in avg_by_pid.items():
+                if not vals:
+                    continue
+                av = sum(vals) / len(vals)
+                if av > best_avg:
+                    best_avg = av
+                    best_pid = pid
+
+            medoid_project_id = best_pid
+            medoid_avg_similarity = best_avg if best_avg >= 0.0 else None
+
+        seed_ms_median = statistics.median(seed_ms_sims) if seed_ms_sims else None
+        seed_ms_p25 = statistics.quantiles(seed_ms_sims, n=4)[0] if len(seed_ms_sims) >= 4 else None
+
+        pair_ms_median = statistics.median(pairwise_ms_sims) if pairwise_ms_sims else None
+        pair_ms_p90 = statistics.quantiles(pairwise_ms_sims, n=10)[8] if len(pairwise_ms_sims) >= 10 else None
+
+        # Convergence class (still driven by dominant cluster share for now)
+        if not observable:
+            conv = "not_observable"
+        elif dominant_cluster_share >= cfg.convergence_high:
+            conv = "high_convergence"
+        elif dominant_cluster_share >= cfg.convergence_medium:
+            conv = "medium_convergence"
+        else:
+            conv = "low_convergence"
+
+        # Authority outcome (unchanged logic, but we now have richer evidence columns)
+        if not observable:
+            outcome = "not_observable"
+            conf = "low"
+            scope_rec = "defer_not_observable"
+        else:
+            # Default “normative” reading is: strong convergence (cluster share) and/or strong similarity to seed
+            if dominant_cluster_share >= cfg.convergence_high:
+                outcome = "holds_by_default"
+                conf = "high"
+                scope_rec = "retain"
+            elif dominant_cluster_share >= cfg.convergence_medium:
+                outcome = "changed_but_convergent"
+                conf = "medium"
+                scope_rec = "narrow"
+            else:
+                # Low convergence: decide between "ignored" vs "divergent"
+                sm = seed_match_rate if seed_match_rate is not None else 0.0
+                
+                # "ignored" should mean: no baseline gravity AND no peer gravity.
+                has_baseline_gravity = isinstance(seed_ms_median, float) and (seed_ms_median >= 0.40)
+                has_peer_gravity = isinstance(pair_ms_p90, float) and (pair_ms_p90 >= 0.60)
+
+                if (sm <= cfg.ignored_seed_match_max) and (conc_hhi <= cfg.ignored_hhi_max) and (not has_baseline_gravity) and (not has_peer_gravity):
+                    outcome = "ignored_almost_everywhere"
+                    conf = "low"
+                    scope_rec = "downgrade_to_advisory"
+                else:
+                    outcome = "changed_and_divergent"
+                    conf = "low"
+                    scope_rec = "downgrade_to_advisory"
 
         # Rationale text: strictly metric-based
         if outcome == "not_observable":
             rationale = f"Comparable rate {comparable_rate:.2f} below threshold {cfg.observability_min_comparable_rate:.2f} or no comparable projects."
         else:
             sm = "n/a" if seed_match_rate is None else f"{seed_match_rate:.2f}"
-            rationale = f"Comparable rate {comparable_rate:.2f}; dominant cluster share {dominant_cluster_share:.2f} ({conv}); seed match {sm}; clusters={cluster_count}; HHI={conc_hhi:.2f}."
+            ssim = "n/a" if seed_ms_median is None else f"{seed_ms_median:.2f}"
+            psim = "n/a" if pair_ms_median is None else f"{pair_ms_median:.2f}"
+            rationale = f"Comparable rate {comparable_rate:.2f}; dominant cluster share {dominant_cluster_share:.2f} ({conv}); seed match {sm}; seed MS-Jaccard median {ssim}; pairwise MS-Jaccard median {psim}; clusters={cluster_count}; HHI={conc_hhi:.2f}."
 
         authority_rows.append(
             {
@@ -416,18 +709,131 @@ def analyze(input_dir: Path, cfg: RunConfig, seed_path: Optional[Path], out_dir:
                 "seed_baseline_id": cfg.seed_baseline_id,
                 "seed_match_count": seed_match_count if seed_exists else None,
                 "seed_match_rate": round(seed_match_rate, 6) if seed_match_rate is not None else None,
+                "seed_ms_jaccard_median": round(seed_ms_median, 6) if isinstance(seed_ms_median, float) else None,
+                "seed_ms_jaccard_p25": round(seed_ms_p25, 6) if isinstance(seed_ms_p25, float) else None,
+                "pairwise_ms_jaccard_median": round(pair_ms_median, 6) if isinstance(pair_ms_median, float) else None,
+                "pairwise_ms_jaccard_p90": round(pair_ms_p90, 6) if isinstance(pair_ms_p90, float) else None,
+                "medoid_project_id": medoid_project_id,
+                "medoid_avg_similarity": round(medoid_avg_similarity, 6) if isinstance(medoid_avg_similarity, float) else None,
                 "dominant_cluster_id": dominant_cluster_id,
                 "dominant_cluster_share": round(dominant_cluster_share, 6),
                 "cluster_count": cluster_count,
                 "cluster_concentration_hhi": round(conc_hhi, 6),
                 "convergence_class": conv,
+                "has_baseline_gravity": bool(has_baseline_gravity) if observable else False,
+                "has_peer_gravity": bool(has_peer_gravity) if observable else False,
+                "divergence_mode": (
+                    "not_observable"
+                    if not observable
+                    else ("lineage_normative" if (has_baseline_gravity or has_peer_gravity) else "chaotic")
+                ),
                 "authority_outcome": outcome,
                 "authority_confidence": conf,
                 "authority_scope_recommendation": scope_rec,
-                "rationale_short": rationale,
+                "rationale_short": (
+                    rationale
+                    if outcome == "not_observable"
+                    else f"{rationale} gravity(baseline={int(bool(has_baseline_gravity))}, peer={int(bool(has_peer_gravity))}); mode={('lineage_normative' if (has_baseline_gravity or has_peer_gravity) else 'chaotic')}."
+                ),
                 "notes": "",
             }
         )
+
+
+        # Baseline coverage table
+        for r in per:
+            status = r["domain_status"]
+            domain_hash_raw = r["domain_hash"]
+            domain_hash_sem = r.get("domain_hash_semantic")
+
+            cluster_hash = domain_hash_raw
+            if cfg.cluster_method == "semantic_multiset_exact":
+                cluster_hash = domain_hash_sem
+
+            # Comparable requires BOTH: comparable status + a real clustering hash.
+            comparable = (
+                isinstance(status, str)
+                and status in cfg.status_comparable_set
+                and isinstance(cluster_hash, str)
+                and bool(cluster_hash)
+            )
+
+            match = None
+            cluster_id = None
+
+            if comparable and seed_exists:
+                match = (cluster_hash == seed_hash)
+
+            if comparable:
+                cluster_id = f"hash:{cluster_hash}"
+
+            # Similarity to seed (record-level sig hashes); None if not available.
+            proj_sigs = r.get("domain_sig_multiset")
+            set_j = _jaccard_set(proj_sigs, seed_sigs) if seed_sigs is not None else None
+            ms_j = _jaccard_multiset(proj_sigs, seed_sigs) if seed_sigs is not None else None
+
+            baseline_rows.append(
+                {
+                    "analysis_run_id": cfg.analysis_run_id,
+                    "project_id": r["project_id"],
+                    "domain": dom,
+                    "domain_status": status,
+                    "domain_hash": cluster_hash,
+                    "seed_domain_hash": seed_hash if seed_exists else None,
+                    "seed_hash_match": match,
+                    "cluster_id": cluster_id,
+                    "domain_version": r["domain_version"],
+                    "seed_set_jaccard": round(set_j, 6) if isinstance(set_j, float) else None,
+                    "seed_multiset_jaccard": round(ms_j, 6) if isinstance(ms_j, float) else None,
+                }
+            )
+
+        # Counts
+        projects_total = len(projects)
+        counts = {
+            "comparable": 0,      # comparable status + NON-EMPTY hash (hashable comparable)
+            "blocked": 0,
+            "unsupported": 0,
+            "failed": 0,
+            "other": 0,
+        }
+        comparable_items: List[Tuple[str, str]] = []  # (project_id, cluster_hash)
+
+        for r in per:
+            st = r["domain_status"]
+            dh_raw = r["domain_hash"]
+            dh_sem = r.get("domain_hash_semantic")
+
+            dh = dh_raw
+            if cfg.cluster_method == "semantic_multiset_exact":
+                dh = dh_sem
+
+            if not isinstance(st, str):
+                counts["other"] += 1
+                continue
+
+            if st in cfg.status_comparable_set:
+                # Comparable requires a real clustering hash; otherwise treat as "other" for authority inference.
+                if isinstance(dh, str) and bool(dh):
+                    counts["comparable"] += 1
+                    comparable_items.append((r["project_id"], dh))
+                else:
+                    counts["other"] += 1
+
+            elif st in cfg.status_blocked_set:
+                counts["blocked"] += 1
+            elif st in cfg.status_unsupported_set:
+                counts["unsupported"] += 1
+            elif st in cfg.status_failed_set:
+                counts["failed"] += 1
+            else:
+                counts["other"] += 1
+
+        projects_comparable = counts["comparable"]
+        comparable_rate = projects_comparable / projects_total if projects_total else 0.0
+
+        # Observability gate (based on hashable comparable)
+        observable = (projects_comparable > 0) and (comparable_rate >= cfg.observability_min_comparable_rate)
 
         # Cluster rows
         for cid, members in sorted(clusters.items(), key=lambda kv: len(kv[1]), reverse=True):
@@ -464,6 +870,8 @@ def analyze(input_dir: Path, cfg: RunConfig, seed_path: Optional[Path], out_dir:
             "seed_hash_match",
             "cluster_id",
             "domain_version",
+            "seed_set_jaccard",
+            "seed_multiset_jaccard",
         ],
     )
     write_csv(
@@ -501,17 +909,27 @@ def analyze(input_dir: Path, cfg: RunConfig, seed_path: Optional[Path], out_dir:
             "seed_baseline_id",
             "seed_match_count",
             "seed_match_rate",
+            "seed_ms_jaccard_median",
+            "seed_ms_jaccard_p25",
+            "pairwise_ms_jaccard_median",
+            "pairwise_ms_jaccard_p90",
+            "medoid_project_id",
+            "medoid_avg_similarity",
             "dominant_cluster_id",
             "dominant_cluster_share",
             "cluster_count",
             "cluster_concentration_hhi",
             "convergence_class",
+            "has_baseline_gravity",
+            "has_peer_gravity",
+            "divergence_mode",
             "authority_outcome",
             "authority_confidence",
             "authority_scope_recommendation",
             "rationale_short",
             "notes",
         ],
+
     )
 
     # Also persist the run config for reproducibility
