@@ -53,7 +53,7 @@ except ImportError:
     ElementOnPhaseStatus = None
 
 
-def _phase2_build_join_key_items(*):
+def _phase2_build_join_key_items():
     """Build Phase-2 join-key IdentityItems (domain-specific, hypothesis-only).
 
     Join-key hypothesis (reversible):

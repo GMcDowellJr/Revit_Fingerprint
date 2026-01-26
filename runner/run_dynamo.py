@@ -184,6 +184,60 @@ def _selected_output_surfaces():
     out = {p for p in parts if p in allowed}
     return out if out else {"payload", "manifest", "features"}
 
+def _should_emit_index():
+    """
+    Whether to emit the index JSON file (canonical contract + hash_mode + identity).
+
+    Env var:
+      REVIT_FINGERPRINT_EMIT_INDEX
+
+    Values:
+      - unset / "" / "1" / "true" => True (default)
+      - "0" / "false"             => False
+    """
+    try:
+        v = os.environ.get("REVIT_FINGERPRINT_EMIT_INDEX", "1")
+    except Exception:
+        v = "1"
+    v = str(v).strip().lower()
+    return v not in ("0", "false", "no", "off", "n", "f")
+
+def _should_emit_details():
+    """
+    Whether to emit the details JSON file (all domain payloads with records).
+
+    Env var:
+      REVIT_FINGERPRINT_EMIT_DETAILS
+
+    Values:
+      - unset / "" / "1" / "true" => True (default)
+      - "0" / "false"             => False
+    """
+    try:
+        v = os.environ.get("REVIT_FINGERPRINT_EMIT_DETAILS", "1")
+    except Exception:
+        v = "1"
+    v = str(v).strip().lower()
+    return v not in ("0", "false", "no", "off", "n", "f")
+
+def _should_emit_legacy_bundle():
+    """
+    Whether to emit the legacy bundle JSON file (current monolithic payload).
+
+    Env var:
+      REVIT_FINGERPRINT_EMIT_LEGACY_BUNDLE
+
+    Values:
+      - unset / "" / "1" / "true" => True (default for backward compatibility)
+      - "0" / "false"             => False
+    """
+    try:
+        v = os.environ.get("REVIT_FINGERPRINT_EMIT_LEGACY_BUNDLE", "1")
+    except Exception:
+        v = "1"
+    v = str(v).strip().lower()
+    return v not in ("0", "false", "no", "off", "n", "f")
+
 def _extract_v2_hash(payload):
     """
     Best-effort extraction of the contract semantic hash (v2) without changing legacy behavior.
@@ -341,6 +395,13 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
         v2_reasons = _extract_v2_block_reasons(legacy)
         if v2_reasons:
             domain_diag["v2_block_reasons"] = v2_reasons
+
+        # Lift count/raw_count into the contract diag for index-only consumption.
+        quality = _extract_legacy_quality(legacy)
+        if "count" in quality:
+            domain_diag["count"] = quality["count"]
+        if "raw_count" in quality:
+            domain_diag["raw_count"] = quality["raw_count"]
 
         # Semantic mode is an authoritative contract: missing v2 hash must BLOCK for fingerprinted domains.
         if HASH_MODE == "semantic":
@@ -742,9 +803,93 @@ try:
             pass
         return bytes_written, round(time.perf_counter() - t0, 3)
 
+    def _build_index_payload(fingerprint_payload, details_filename):
+        """
+        Build the canonical index payload (small, tool-ingest surface).
+
+        Includes:
+          - _contract (with domain summaries including counts in diag)
+          - _hash_mode
+          - identity (if present)
+          - _meta (optional)
+          - _notes (optional)
+          - artifacts (pointer to details file)
+
+        Args:
+          fingerprint_payload: Full fingerprint dict
+          details_filename: Name of the details file (e.g., "basename.details.json")
+
+        Returns:
+          Index payload dict
+        """
+        index = {}
+
+        # Core contract envelope (authoritative)
+        if "_contract" in fingerprint_payload:
+            index["_contract"] = fingerprint_payload["_contract"]
+
+        # Hash mode (required for tools)
+        if "_hash_mode" in fingerprint_payload:
+            index["_hash_mode"] = fingerprint_payload["_hash_mode"]
+
+        # Identity (if present, keep stable)
+        if "identity" in fingerprint_payload:
+            index["identity"] = fingerprint_payload["identity"]
+
+        # Metadata (optional, non-duplicative)
+        if "_meta" in fingerprint_payload:
+            index["_meta"] = fingerprint_payload["_meta"]
+
+        # Runner notes (optional)
+        if "_notes" in fingerprint_payload:
+            index["_notes"] = fingerprint_payload["_notes"]
+
+        # Pointer to details file
+        index["artifacts"] = {
+            "details_href": details_filename
+        }
+
+        return index
+
+    def _build_details_payload(fingerprint_payload):
+        """
+        Build the details payload (all domain payloads with records).
+
+        Includes:
+          - All top-level domain payloads (identity, units, line_patterns, etc.)
+          - Excludes meta fields (_contract, _manifest, _features, _hash_mode, _meta, _notes, _domains)
+
+        Args:
+          fingerprint_payload: Full fingerprint dict
+
+        Returns:
+          Details payload dict
+        """
+        details = {}
+
+        # Meta field keys to exclude (these go in index or are derived)
+        meta_keys = {
+            "_contract", "_manifest", "_features", "_hash_mode",
+            "_meta", "_notes", "_domains", "artifacts"
+        }
+
+        # Extract all domain payloads
+        for key, value in fingerprint_payload.items():
+            if key not in meta_keys:
+                details[key] = value
+
+        return details
+
     def _write_sibling_artifacts(base_payload_path, fingerprint_payload):
         """
         Write payload + sibling stable surfaces.
+
+        Now supports:
+          - Legacy bundle (payload.json) - full monolithic export
+          - Index (payload.index.json) - canonical contract + identity + pointers
+          - Details (payload.details.json) - all domain payloads with records
+          - Manifest (payload.manifest.json) - stable comparison surface
+          - Features (payload.features.json) - cohort analysis surface
 
         Returns:
           (paths_dict, bytes_dict, sha256_dict, write_sec_total, write_errors_list)
@@ -752,13 +897,21 @@ try:
         import time as _time
 
         base_no_ext, _ext = os.path.splitext(base_payload_path)
+
+        # Build filenames for all possible outputs
         paths = {
             "payload": base_payload_path,
+            "index": base_no_ext + ".index.json",
+            "details": base_no_ext + ".details.json",
             "manifest": base_no_ext + ".manifest.json",
             "features": base_no_ext + ".features.json",
         }
 
+        # Determine which surfaces to write based on config flags
         surfaces = _selected_output_surfaces()
+        emit_index = _should_emit_index()
+        emit_details = _should_emit_details()
+        emit_legacy = _should_emit_legacy_bundle()
 
         bytes_written = {}
         sha256 = {}
@@ -780,9 +933,28 @@ try:
             except Exception as e:
                 errors.append({"surface": kind, "code": "write_failed", "message": str(e)})
 
-        if "payload" in surfaces:
+        # Write index file (canonical tool-ingest surface)
+        if emit_index:
+            try:
+                details_filename = os.path.basename(paths["details"])
+                index_payload = _build_index_payload(fingerprint_payload, details_filename)
+                _try_write("index", index_payload)
+            except Exception as e:
+                errors.append({"surface": "index", "code": "build_failed", "message": str(e)})
+
+        # Write details file (all domain payloads)
+        if emit_details:
+            try:
+                details_payload = _build_details_payload(fingerprint_payload)
+                _try_write("details", details_payload)
+            except Exception as e:
+                errors.append({"surface": "details", "code": "build_failed", "message": str(e)})
+
+        # Write legacy bundle (full payload, backward compatibility)
+        if emit_legacy and "payload" in surfaces:
             _try_write("payload", fingerprint_payload)
 
+        # Write manifest (stable comparison surface)
         if "manifest" in surfaces:
             m = None
             try:
@@ -794,6 +966,7 @@ try:
             else:
                 _try_write("manifest", m)
 
+        # Write features (cohort analysis surface)
         if "features" in surfaces:
             f = None
             try:

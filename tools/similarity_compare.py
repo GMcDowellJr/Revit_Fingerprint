@@ -1166,9 +1166,20 @@ def write_json(results: List[SimilarityResult], out_path: str) -> None:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--baseline", required=False, help="Baseline fingerprint JSON path")
-    ap.add_argument("--dir", required=True, help="Parent directory containing fingerprint JSON files (non-recursive)")
+    ap = argparse.ArgumentParser(
+        description="""
+Compare Revit fingerprint JSONs using domain hashes and record-level signatures.
+
+File format notes:
+  - For record-based similarity (signature_multiset_similarity metric), use
+    .details.json files which contain full domain payloads with records.
+  - Legacy .json bundle files also work (contains all data).
+  - .index.json files contain only contract metadata (no records) and should
+    not be used for this tool.
+"""
+    )
+    ap.add_argument("--baseline", required=False, help="Baseline fingerprint JSON path (use .details.json for record-level comparison)")
+    ap.add_argument("--dir", required=True, help="Parent directory containing fingerprint JSON files (non-recursive; use .details.json files for best results)")
     ap.add_argument("--mode", choices=["baseline", "pairwise", "both"], default="both")
 
     # Output base is always --dir/similarity unless user provides absolute paths.

@@ -84,9 +84,21 @@ def build_features(payload: Any) -> Dict[str, Any]:
             br = []
         br_sorted = sorted({str(x) for x in br})
 
-        # Pull minimal stable counts if legacy payload exists (top-level domain key).
-        legacy = p.get(name, None)
-        count, raw_count = _extract_counts_from_legacy(legacy)
+        # Pull counts from contract diag first (index-only workflow), then fall back to legacy payload.
+        # This enables build_features() to work with just the index.json file.
+        count = None
+        raw_count = None
+
+        # Preferred: read from contract.domains[name].diag (populated by runner for index.json)
+        diag = _as_dict(env.get("diag", None))
+        if diag:
+            count = _as_int(diag.get("count", None))
+            raw_count = _as_int(diag.get("raw_count", None))
+
+        # Fallback: read from legacy payload (backward compatibility)
+        if count is None and raw_count is None:
+            legacy = p.get(name, None)
+            count, raw_count = _extract_counts_from_legacy(legacy)
 
         out_domains[str(name)] = {
             "status": status,
