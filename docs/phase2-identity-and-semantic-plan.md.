@@ -1,0 +1,153 @@
+# Phase-2 Identity & Semantics Refactor Plan
+
+## Purpose
+
+Establish a durable, repeatable workflow for:
+- designing **join keys** (identity)
+- validating **semantic meaning** (via exporter `hash_v2`)
+- explaining and governing **drift**
+  
+…without premature exporter changes and without losing exploratory flexibility.
+
+This document captures the **near, intermediate, and long-term plan** so intent does not get lost.
+
+---
+
+## Core Principles
+
+1. **Identity and meaning are separate**
+   - *Join key* answers: “Is this the same thing?”
+   - *Semantic signature (`semantic_sig` / `hash_v2`)* answers: “Does it behave the same?”
+
+2. **Exploration ≠ Evidence**
+   - Exploration happens in **flat tables + DAX**
+   - Evidence and remediation details come from **deterministic Python artifacts**
+
+3. **Exporter changes are downstream and versioned**
+   - We experiment first
+   - We upstream only settled, justified conclusions
+
+---
+
+## NEAR TERM — Design the Join Key (No Exporter Changes)
+
+### Objective
+Determine the **correct join key** for high-variance domains (starting with `dimension_types`) using evidence, not intuition.
+
+### Workflow
+
+1. **Freeze exporter**
+   - Keep current `details.json`
+   - Treat `hash_v2` as canonical `semantic_sig`
+
+2. **Normalize exports to flat tables**
+   - Parse `details.json` into BI-friendly tables
+   - Include:
+     - candidate identity fields
+     - `semantic_sig`
+     - family discriminator (e.g. `dim_join.family_name`)
+   - No semantic or identity decisions baked in
+
+3. **Design join keys in Power Query / DAX**
+   - Create multiple join-key candidates as **readable strings**
+   - Slice by family, cohort, lineage as needed
+   - Evaluate candidates using **Pareto tradeoffs**:
+     - semantic collision (impurity)
+     - fragmentation (over-strict identity)
+     - complexity / brittleness
+
+4. **Generate evidence with Python artifacts**
+   - For shortlisted candidates:
+     - seed deltas
+     - collision examples with field-level diffs
+     - core vs optional sets
+   - These answer:
+     - “What exactly differs?”
+     - “What would need to change to fix it?”
+
+### Exit Criteria
+- One (or a very small set of) join-key recipe(s) clearly preferred
+- Artifacts support the choice
+
+---
+
+## INTERMEDIATE TERM — Lock Identity, Scale the Pattern
+
+### Objective
+Operationalize identity decisions and apply the pattern across domains.
+
+### Workflow
+
+1. **Upstream the chosen join key**
+   - Revise exporter join-key recipe (versioned, intentional)
+   - Re-export details
+   - Rebuild flat tables
+   - Re-run DAX + artifacts to confirm behavior
+
+2. **Introduce join-key health monitoring**
+   - Dashboard focused on **identity quality**, not project compliance:
+     - collision rate
+     - fragmentation rate
+     - modified vs added ratio
+     - stability expectations
+   - Used as an early warning system
+
+3. **Apply by domain tier**
+   - **Tier 1 (high variance):**
+     - Full DAX exploration + Python artifacts
+   - **Tier 2 (mostly obvious):**
+     - Light DAX validation + ongoing health monitoring
+   - **Tier 3 (enumerative):**
+     - Minimal checks + regression detection
+
+4. **Standardize artifacts**
+   - Deterministic CSV outputs
+   - Review- and governance-ready
+   - Comparable across runs
+
+### Exit Criteria
+- Join keys are explicit, versioned, and monitored
+- Most domains onboarded at an appropriate depth
+
+---
+
+## LONG TERM — Expand Semantic Insight Safely
+
+### Objective
+Evolve semantic understanding without destabilizing contracts or tools.
+
+### Workflow
+
+1. **Add a probe export mode (gated)**
+   - Optional, non-default export of broader parameter sets
+   - Used for:
+     - join-key discovery
+     - semantic recipe evaluation
+     - forensic diffs
+   - Does **not** replace canonical `details.json`
+
+2. **Revisit semantic hashing deliberately**
+   - Use probe data + artifacts to justify changes
+   - Version semantic recipes explicitly
+   - Preserve auditability and comparability
+
+3. **Automate remediation pathways**
+   - Use artifacts to:
+     - inform fix scripts
+     - define Guardian rules
+     - support guided cleanup
+
+4. **Institutionalize governance**
+   - Document identity + semantic contracts per domain
+   - Dashboards for monitoring
+   - Artifacts as standing evidence for decisions
+
+### Exit Criteria
+- Identity and semantics evolve intentionally, not reactively
+- Drift is explainable, actionable, and governed at scale
+
+---
+
+## One-Sentence Anchor
+
+> **Near term we design the join key; intermediate we lock and monitor it; long term we expand semantic capture safely—always separating exploration (DAX) from proof and governance (artifacts).**
