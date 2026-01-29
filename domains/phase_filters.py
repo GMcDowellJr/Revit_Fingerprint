@@ -40,9 +40,16 @@ from core.phase2 import (
     phase2_join_hash,
 )
 from core.record_v2 import (
-    canonicalize_int,
-    canonicalize_str_allow_empty,
+    STATUS_OK,
+    STATUS_BLOCKED,
+    ITEM_Q_OK,
     ITEM_Q_UNREADABLE,
+    canonicalize_int,
+    canonicalize_str,
+    canonicalize_str_allow_empty,
+    make_identity_item,
+    serialize_identity_items,
+    build_record_v2,
 )
 
 
@@ -111,6 +118,8 @@ def extract(doc, ctx=None):
     records = []
     per_hashes = []
     per_hashes_v2 = []
+    v2_records = []
+    v2_sig_hashes = []
     uid_to_hash_v2 = {}  # For downstream v2 mapping (only when record v2 is ok)
     uid_to_hash = {}  # For context population
 
@@ -171,6 +180,33 @@ def extract(doc, ctx=None):
 
         # Hash the definition (keep the deterministic order; do NOT sort)
         def_hash = make_hash(sig)
+        status_v2 = STATUS_OK
+        status_reasons_v2 = []
+        identity_items_v2 = []
+
+        name_v2, name_q = canonicalize_str(name)
+        identity_items_v2.append(make_identity_item("phase_filter.name", name_v2, name_q))
+        required_qs = [name_q]
+
+        for status_name, status_enum in statuses:
+            k = "phase_filter.{}.presentation_id".format(safe_str(status_name).lower())
+            try:
+                pres_v = pf.GetPhaseStatusPresentation(status_enum)
+                pres_int = int(pres_v)
+                v2, q2 = canonicalize_int(pres_int)
+            except Exception:
+                v2, q2 = (None, ITEM_Q_UNREADABLE)
+            identity_items_v2.append(make_identity_item(k, v2, q2))
+            required_qs.append(q2)
+
+        if any(q != ITEM_Q_OK for q in required_qs):
+            status_v2 = STATUS_BLOCKED
+            status_reasons_v2.append("required_identity_not_ok")
+
+        identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k","")))
+        sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
+        sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
+
         def_hash_v2 = None
         if v2_ok:
             def_hash_v2 = make_hash(sig_v2)
@@ -223,6 +259,33 @@ def extract(doc, ctx=None):
             "unknown_items": phase2_unknown_items,
         }
 
+        rec_v2 = build_record_v2(
+            domain="phase_filters",
+            record_id=safe_str(name) if safe_str(name) else safe_str(pf.Id.IntegerValue),
+            status=status_v2,
+            status_reasons=sorted(set(status_reasons_v2)),
+            sig_hash=sig_hash_v2,
+            identity_items=identity_items_v2_sorted,
+            required_qs=required_qs,
+            label={
+                "display": safe_str(name),
+                "quality": "human",
+                "provenance": "revit.PhaseFilter.Name",
+            },
+            debug={
+                "sig_preimage_sample": sig_preimage_v2[:6],
+                "uid_excluded_from_sig": True,
+            },
+        )
+        rec_v2["join_key"] = rec_join_key
+        rec_v2["phase2"] = rec_phase2
+
+        v2_records.append(rec_v2)
+        if sig_hash_v2 is not None:
+            v2_sig_hashes.append(sig_hash_v2)
+            if uid:
+                uid_to_hash_v2[uid] = sig_hash_v2
+
         rec = {
             "id": safe_str(pf.Id.IntegerValue),
             "uid": uid or "",
@@ -248,24 +311,20 @@ def extract(doc, ctx=None):
 
     info["names"] = sorted(set(names))
     info["count"] = len(records)
-    info["records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
+    info["legacy_records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
+    info["records"] = v2_records
     info["signature_hashes"] = sorted(per_hashes)
     info["hash"] = make_hash(info["signature_hashes"])
-    info["signature_hashes_v2"] = sorted(per_hashes_v2)
+    info["signature_hashes_v2"] = sorted(v2_sig_hashes)
     if info["debug_v2_blocked"] > 0:
         info["hash_v2"] = None
     else:
         info["hash_v2"] = make_hash(info["signature_hashes_v2"])
 
-    info["record_rows"] = []
-    try:
-        recs = info.get("records") or []
-        info["record_rows"] = [{
-            "record_key": safe_str(r.get("uid", "")),
-            "sig_hash":   safe_str(r.get("def_hash", "")),
-            "name":       safe_str(r.get("name", "")),
-        } for r in recs]
-    except Exception as e:
-        info["record_rows"] = []
+    info["record_rows"] = [{
+        "record_key": safe_str(r.get("record_id", "")),
+        "sig_hash":   safe_str(r.get("sig_hash", "")),
+        "name":       safe_str((r.get("label", {}) or {}).get("display", "")),
+    } for r in v2_records if isinstance(r, dict)]
 
     return info

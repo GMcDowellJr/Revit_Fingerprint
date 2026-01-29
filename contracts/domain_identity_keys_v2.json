@@ -160,6 +160,41 @@
         "vfa.stack[i].visibility": true,
         "vfa.stack[i].overrides": true
       }
+    },
+
+    "fill_patterns": {
+      "allowed_keys": ["fill_pattern.name", "fill_pattern.is_solid", "fill_pattern.target_id", "fill_pattern.grid_count"],
+      "allowed_key_prefixes": ["fill_pattern.grid["],
+      "required_keys": ["fill_pattern.name", "fill_pattern.is_solid", "fill_pattern.target_id", "fill_pattern.grid_count"],
+      "minima": {"block_if_any_required_not_ok": true},
+      "indexed_key_rules": {
+        "fill_pattern.grid[i].angle": true,
+        "fill_pattern.grid[i].origin_u": true,
+        "fill_pattern.grid[i].origin_v": true,
+        "fill_pattern.grid[i].shift": true,
+        "fill_pattern.grid[i].offset": true
+      }
+    },
+    "phases": {
+      "allowed_keys": ["phase.seq", "phase.name"],
+      "allowed_key_prefixes": [],
+      "required_keys": ["phase.seq", "phase.name"],
+      "minima": {"block_if_any_required_not_ok": true},
+      "indexed_key_rules": {}
+    },
+    "phase_filters": {
+      "allowed_keys": ["phase_filter.name", "phase_filter.new.presentation_id", "phase_filter.existing.presentation_id", "phase_filter.demolished.presentation_id", "phase_filter.temporary.presentation_id"],
+      "allowed_key_prefixes": [],
+      "required_keys": ["phase_filter.name", "phase_filter.new.presentation_id", "phase_filter.existing.presentation_id", "phase_filter.demolished.presentation_id", "phase_filter.temporary.presentation_id"],
+      "minima": {"block_if_any_required_not_ok": true},
+      "indexed_key_rules": {}
+    },
+    "text_types": {
+      "allowed_keys": ["text_type.name", "text_type.font", "text_type.size_in", "text_type.width_factor", "text_type.background", "text_type.line_weight", "text_type.color_rgb", "text_type.show_border", "text_type.leader_border_offset_in", "text_type.tab_size_in", "text_type.bold", "text_type.italic", "text_type.underline"],
+      "allowed_key_prefixes": [],
+      "required_keys": ["text_type.name", "text_type.font", "text_type.size_in", "text_type.width_factor", "text_type.background", "text_type.line_weight", "text_type.color_rgb", "text_type.show_border", "text_type.leader_border_offset_in", "text_type.tab_size_in", "text_type.bold", "text_type.italic", "text_type.underline"],
+      "minima": {"block_if_any_required_not_ok": true},
+      "indexed_key_rules": {}
     }
   }
 }

@@ -48,6 +48,16 @@ from core.phase2 import (
     phase2_qv_from_legacy_sentinel_str,
     phase2_join_hash,
 )
+from core.record_v2 import (
+    STATUS_OK,
+    STATUS_BLOCKED,
+    ITEM_Q_OK,
+    canonicalize_int,
+    canonicalize_str,
+    make_identity_item,
+    serialize_identity_items,
+    build_record_v2,
+)
 
 
 def _phase2_build_join_key_items(*, phase_name):
@@ -150,6 +160,9 @@ def extract(doc, ctx=None):
     
     # v2 build state (domain-level block; no partial coverage semantics)
     per_hashes_v2 = []
+    v2_records = []
+    v2_sig_hashes = []
+    uid_to_hash_v2 = {}
     v2_blocked = False
     v2_reasons = {}
 
@@ -213,6 +226,53 @@ def extract(doc, ctx=None):
             uid=uid,
         )
 
+        status_v2 = STATUS_OK
+        status_reasons_v2 = []
+        identity_items_v2 = []
+
+        seq_v2, seq_q = canonicalize_int(seq)
+        name_v2, name_q = canonicalize_str(name)
+
+        identity_items_v2.append(make_identity_item("phase.seq", seq_v2, seq_q))
+        identity_items_v2.append(make_identity_item("phase.name", name_v2, name_q))
+
+        required_qs = [seq_q, name_q]
+        if any(q != ITEM_Q_OK for q in required_qs):
+            status_v2 = STATUS_BLOCKED
+            status_reasons_v2.append("required_identity_not_ok")
+
+        identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k", "")))
+        sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
+        sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
+
+        rec_v2 = build_record_v2(
+            domain="phases",
+            record_id=safe_str(name) if safe_str(name) else safe_str(p.Id.IntegerValue),
+            status=status_v2,
+            status_reasons=sorted(set(status_reasons_v2)),
+            sig_hash=sig_hash_v2,
+            identity_items=identity_items_v2_sorted,
+            required_qs=required_qs,
+            label={
+                "display": safe_str(name),
+                "quality": "human",
+                "provenance": "revit.Phase.Name",
+                "components": {"seq": safe_str(seq)},
+            },
+            debug={
+                "sig_preimage_sample": sig_preimage_v2[:6],
+                "uid_excluded_from_sig": True,
+            },
+        )
+        rec_v2["join_key"] = join_key
+        rec_v2["phase2"] = phase2_payload
+
+        v2_records.append(rec_v2)
+        if sig_hash_v2 is not None:
+            v2_sig_hashes.append(sig_hash_v2)
+            if uid:
+                uid_to_hash_v2[uid] = sig_hash_v2
+
         rec = {
             "id": safe_str(p.Id.IntegerValue),
             "uid": uid or "",
@@ -238,7 +298,8 @@ def extract(doc, ctx=None):
 
     info["names"] = sorted(set(names))
     info["count"] = len(records)
-    info["records"] = records
+    info["legacy_records"] = records
+    info["records"] = v2_records
     info["signature_hashes"] = per_hashes
     info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
 
@@ -252,6 +313,7 @@ def extract(doc, ctx=None):
         info["debug_v2_blocked"] = False
         info["debug_v2_block_reasons"] = {}
 
+    info["signature_hashes_v2"] = sorted(v2_sig_hashes)
     info["record_rows"] = []
     try:
         recs = info.get("records") or []
