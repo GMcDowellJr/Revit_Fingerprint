@@ -48,21 +48,12 @@ from core.record_v2 import (
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
-    phase2_join_hash,
 )
 
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
+
 import json
-
-def _phase2_build_join_key_items(*, uid_or_namekey):
-    """
-    Phase-2 join-key hypothesis for view_filter_definitions.
-
-    Join axis: vf.uid_or_namekey (UniqueId when available, else name fallback already used by v2 identity).
-    """
-    v, q = phase2_qv_from_legacy_sentinel_str(uid_or_namekey, allow_empty=False)
-    return phase2_sorted_items([
-        {"k": "vf.uid_or_namekey", "q": q, "v": v},
-    ])
 
 def _logic_root_token(elem_filter) -> Tuple[Optional[str], str]:
     """Return (v, q) for vf.logic_root."""
@@ -453,14 +444,11 @@ def extract(doc, ctx=None):
         # -----------------------------
         # Phase 2 (empirical, additive)
         # -----------------------------
-        # Join-key uses the same join axis as v2 identity (hypothesis only).
-        join_items = _phase2_build_join_key_items(uid_or_namekey=uid_v)
-        rec["join_key"] = {
-            "schema": "view_filter_definitions.join_key.v1",
-            "hash_alg": "md5_utf8_join_pipe",
-            "items": join_items,
-            "join_hash": phase2_join_hash(join_items),
-        }
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "view_filter_definitions")
+        rec["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=items_sorted,
+        )
 
         # Phase-2 item partitions (hypotheses only; no inference).
         # Reuse the already-validated v2 identity items as semantic candidates.

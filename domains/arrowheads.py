@@ -47,6 +47,8 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
 
 try:
     from Autodesk.Revit.DB import ElementType, FilteredElementCollector
@@ -276,6 +278,12 @@ def extract(doc, ctx=None):
                 "name_may_be_null_for_system_types": True,
                 "uid_excluded_from_sig": True,
             },
+        )
+
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "arrowheads")
+        rec_v2["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=identity_items,
         )
 
         v2_records.append(rec_v2)

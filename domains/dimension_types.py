@@ -67,8 +67,10 @@ from core.record_v2 import (
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
-    phase2_join_hash,
 )
+
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
 
 try:
     from Autodesk.Revit.DB import DimensionType
@@ -747,10 +749,6 @@ def extract(doc, ctx=None):
         # Phase-2 instrumentation (additive, non-normative)
         # ---------------------------
 
-        # Join key items (coarse; designed to over-join rather than infer)
-        phase2_join_items = _phase2_build_join_key_items(doc, d, shape_v, shape_q, witness_v, witness_q)
-        join_hash = phase2_join_hash(phase2_join_items)
-
         # Phase-2 attribute bags (explicit grouping is a hypothesis marker, not a standard)
         # Important: do not emit legacy sentinel literals in IdentityItem.v.
         type_name_v, type_name_q = phase2_qv_from_legacy_sentinel_str(type_name, allow_empty=False)
@@ -805,6 +803,13 @@ def extract(doc, ctx=None):
         ]
         identity_items = sorted(identity_items, key=lambda it: it.get("k", ""))
 
+        # Policy-driven join_key is built from v2 identity_items only (no uid/name/id fallback)
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "dimension_types")
+        join_key_policy, _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=identity_items,
+        )
+
         required_qs = [shape_q]
         blocked = any(q != ITEM_Q_OK for q in required_qs)
 
@@ -849,12 +854,8 @@ def extract(doc, ctx=None):
                 label=label,
             )
             # Phase-2 additive fields (do not affect record.v2 invariants)
-            rec_v2["join_key"] = {
-                "schema": "dimension_types.join_key.v1",
-                "hash_alg": "md5_utf8_join_pipe",
-                "items": phase2_join_items,
-                "join_hash": join_hash,
-            }
+            rec_v2["join_key"] = join_key_policy
+
             rec_v2["phase2"] = {
                 "schema": "phase2.dimension_types.v1",
                 "grouping_basis": "phase2.hypothesis",
@@ -878,12 +879,8 @@ def extract(doc, ctx=None):
                 label=label,
             )
             # Phase-2 additive fields (do not affect record.v2 invariants)
-            rec_v2["join_key"] = {
-                "schema": "dimension_types.join_key.v1",
-                "hash_alg": "md5_utf8_join_pipe",
-                "items": phase2_join_items,
-                "join_hash": join_hash,
-            }
+            rec_v2["join_key"] = join_key_policy
+
             rec_v2["phase2"] = {
                 "schema": "phase2.dimension_types.v1",
                 "grouping_basis": "phase2.hypothesis",

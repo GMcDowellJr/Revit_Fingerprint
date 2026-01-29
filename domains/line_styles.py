@@ -49,8 +49,10 @@ from core.record_v2 import (
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
-    phase2_join_hash,
 )
+
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
 
 try:
     from Autodesk.Revit.DB import Category, BuiltInCategory, GraphicsStyleType, ElementId
@@ -338,13 +340,11 @@ def extract(doc, ctx=None):
             # -------------------------
             # Phase-2 additive surfaces (join_key + phase2)
             # -------------------------
-            join_items = phase2_sorted_items(_phase2_build_join_key_items(sc_name))
-            rec_v2["join_key"] = {
-                "schema": "line_styles.join_key.v1",
-                "hash_alg": "md5_utf8_join_pipe",
-                "items": join_items,
-                "join_hash": phase2_join_hash(join_items),
-            }
+            pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "line_styles")
+            rec_v2["join_key"], _missing = build_join_key_from_policy(
+                domain_policy=pol,
+                identity_items=identity_items_sorted,
+            )
 
             # Hypothesis-only partitioning: semantic vs cosmetic vs unknown.
             # No heuristics; these are emitted for empirical clustering and attribute stability analysis.

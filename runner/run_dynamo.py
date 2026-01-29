@@ -109,6 +109,7 @@ from domains import phases, phase_filters, phase_graphics
 from domains import view_templates
 from core.manifest import build_manifest
 from core.features import build_features
+from core.join_key_policy import load_join_key_policies
 
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
@@ -549,6 +550,10 @@ def run_fingerprint(doc):
     ctx = {}
     ctx["debug_vg_details"] = False
 
+    # Join-key policies (explicit ctx injection; no globals)
+    policy_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "policies", "domain_join_key_policies.json")
+    ctx["join_key_policies"] = load_join_key_policies(policy_path)
+
     # PR5: per-run collector cache + counters
     ctx["_collect"] = CollectCtx()
 
@@ -575,16 +580,16 @@ def run_fingerprint(doc):
             fingerprint["units"] = legacy
 
     # Global style domains (locked semantics)
-    # NOTE: line_patterns must run first to populate ctx mappings consumed by objectstyles/line_styles.
+    # NOTE: line_patterns must run first to populate ctx mappings consumed by object_styles/line_styles.
     if _enabled("line_patterns"):
         legacy = _domain_run("line_patterns", line_patterns.extract, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["line_patterns"] = legacy
 
-    if _enabled("objectstyles"):
-        legacy = _domain_run("objectstyles", object_styles.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+    if _enabled("object_styles"):
+        legacy = _domain_run("object_styles", object_styles.extract, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
-            fingerprint["objectstyles"] = legacy
+            fingerprint["object_styles"] = legacy
 
     if _enabled("line_styles"):
         legacy = _domain_run("line_styles", line_styles.extract, doc, ctx, contract_domains, run_diag, runner_notes)

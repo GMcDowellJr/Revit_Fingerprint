@@ -37,6 +37,8 @@ from core.canon import (
     S_UNREADABLE,
     S_NOT_APPLICABLE,
 )
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
 
 try:
     from Autodesk.Revit.DB import Phase
@@ -210,14 +212,9 @@ def extract(doc, ctx=None):
 
         def_hash = make_hash(sig)
 
-        # Phase-2 join key (additive; does not affect existing hashing/validators)
-        join_items = _phase2_build_join_key_items(phase_name=name)
-        join_key = {
-            "schema": "phases.join_key.v1",
-            "hash_alg": "md5_utf8_join_pipe",
-            "items": join_items,  # already sorted by k
-            "join_hash": phase2_join_hash(join_items),
-        }
+        # Phase-2 join key is policy-derived (no hard-coded join composition)
+        join_key = None
+
 
         # Phase-2 attribute grouping (hypotheses only)
         phase2_payload = _phase2_build_phase2_payload(
@@ -242,6 +239,19 @@ def extract(doc, ctx=None):
             status_reasons_v2.append("required_identity_not_ok")
 
         identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k", "")))
+
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "phases")
+        join_key_v2, _missing = build_join_key_from_policy(domain_policy=pol, identity_items=identity_items_v2_sorted)
+
+        # Legacy join_key remains legacy-shaped (no silent behavior drift in legacy surfaces)
+        join_key_items_legacy = _phase2_build_join_key_items(phase_name=name)
+        join_key_legacy = {
+            "schema": "phases.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": join_key_items_legacy,
+            "join_hash": phase2_join_hash(join_key_items_legacy),
+        }
+
         sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
 
@@ -264,7 +274,7 @@ def extract(doc, ctx=None):
                 "uid_excluded_from_sig": True,
             },
         )
-        rec_v2["join_key"] = join_key
+        rec_v2["join_key"] = join_key_v2
         rec_v2["phase2"] = phase2_payload
 
         v2_records.append(rec_v2)
@@ -281,7 +291,7 @@ def extract(doc, ctx=None):
             "def_signature": sig,
 
             # Phase-2 additions (required)
-            "join_key": join_key,
+            "join_key": join_key_legacy,
             "phase2": phase2_payload,
         }
 
@@ -314,15 +324,10 @@ def extract(doc, ctx=None):
         info["debug_v2_block_reasons"] = {}
 
     info["signature_hashes_v2"] = sorted(v2_sig_hashes)
-    info["record_rows"] = []
-    try:
-        recs = info.get("records") or []
-        info["record_rows"] = [{
-            "record_key": safe_str(r.get("uid", "")),
-            "sig_hash":   safe_str(r.get("def_hash", "")),
-            "name":       safe_str(r.get("name", "")),
-        } for r in recs]
-    except Exception as e:
-        info["record_rows"] = []
+    info["record_rows"] = [{
+        "record_key": safe_str(r.get("record_id", "")),
+        "sig_hash":   safe_str(r.get("sig_hash", "")),
+        "name":       safe_str((r.get("label", {}) or {}).get("display", "")),
+    } for r in v2_records if isinstance(r, dict)]
 
     return info

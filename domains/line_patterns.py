@@ -54,8 +54,10 @@ from core.record_v2 import (
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
-    phase2_join_hash,
 )
+
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
 
 try:
     from Autodesk.Revit.DB import LinePatternElement
@@ -435,28 +437,42 @@ def extract(doc, ctx=None):
         # -------------------------
         # Phase-2 additions (additive, explanatory, reversible)
         # -------------------------
-        # Join key uses structural segment data per Phase 2 architecture
-        join_key_items = _phase2_build_join_key_items(
-            segment_count=len(segs_v2) if (segs_ok and segs_v2 is not None) else None,
-            segments=segs_v2 if (segs_ok and segs_v2 is not None) else None,
+
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "line_patterns")
+        rec_v2["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=identity_items_sorted,
         )
-        join_key_items_sorted = phase2_sorted_items(join_key_items)
-        rec_v2["join_key"] = {
-            "schema": "line_patterns.join_key.v2",  # v2: structural segment-based
-            "hash_alg": "md5_utf8_join_pipe",
-            "items": join_key_items_sorted,
-            "join_hash": phase2_join_hash(join_key_items_sorted),
-        }
 
         semantic_items = []
         cosmetic_items = []
         unknown_items = []
 
-        # Phase-2 grouping: segment definition is semantic; uid, name, element id are unknown (file-local)
-        for it in (identity_items_sorted or []):
+        # Phase-2 grouping:
+        # - Keep a single pointer to the structural definition (definition-based; no name/UID)
+        # - Avoid duplicating the full seg[###] structure which already exists in identity_basis.items
+        seg_ct_it = None
+        seq_hash_it = None
+        for it in (join_key_items_sorted or []):
             k = safe_str(it.get("k", ""))
-            if k == "line_pattern.segment_count" or k.startswith("line_pattern.seg["):
-                semantic_items.append(it)
+            if k == "line_pattern.segment_count":
+                seg_ct_it = it
+            elif k == "line_pattern.sequence_hash":
+                seq_hash_it = it
+
+        # Breadcrumb: segment count (small scalar)
+        if seg_ct_it is not None:
+            semantic_items.append(seg_ct_it)
+
+        # Derived Phase-2 pointer (hash of ordered segment definition)
+        if seq_hash_it is not None:
+            semantic_items.append(
+                make_identity_item(
+                    "line_pattern.segments_def_hash",
+                    seq_hash_it.get("v", None),
+                    seq_hash_it.get("q", ITEM_Q_UNREADABLE),
+                )
+            )
 
         # Add file-local identifiers to unknown_items (not part of identity_basis)
         unknown_items.append(

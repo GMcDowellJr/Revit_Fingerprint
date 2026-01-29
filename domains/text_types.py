@@ -44,8 +44,8 @@ from core.rows import (
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
-    phase2_join_hash,
 )
+
 from core.record_v2 import (
     STATUS_OK,
     STATUS_BLOCKED,
@@ -59,6 +59,9 @@ from core.record_v2 import (
     build_record_v2,
 )
 
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
+
 try:
     from Autodesk.Revit.DB import TextNoteType
 except ImportError:
@@ -67,32 +70,6 @@ except ImportError:
 def _phase2_item(k, raw_v, *, allow_empty=False):
     v, q = phase2_qv_from_legacy_sentinel_str(raw_v, allow_empty=allow_empty)
     return {"k": k, "q": q, "v": v}
-
-
-def _phase2_build_join_key_items(rec):
-    """
-    Phase-2 join-key policy for text_types.
-
-    Definition-first join key (no name, no UID):
-    - Typography/styling core
-    - Color (promoted to primary by policy)
-    - Leader arrowhead by definition signature (from arrowheads domain ctx), not UID
-    """
-    items = [
-        _phase2_item("text_type.font", rec.get("font")),
-        _phase2_item("text_type.size_in", rec.get("text_size_in")),
-        _phase2_item("text_type.width_factor", rec.get("width_factor")),
-        _phase2_item("text_type.bold", canon_bool(rec.get("bold"))),
-        _phase2_item("text_type.italic", canon_bool(rec.get("italic"))),
-        _phase2_item("text_type.underline", canon_bool(rec.get("underline"))),
-
-        # Policy: color is definition-bearing for standards analysis
-        _phase2_item("text_type.color_rgb", safe_str(rec.get("color_rgb"))),
-
-        # Policy: arrowhead is definition-bearing, but only via definition hash (NOT uid/name)
-        _phase2_item("text_type.leader_arrowhead_sig_hash", rec.get("leader_arrowhead_sig_hash"), allow_empty=True),
-    ]
-    return phase2_sorted_items(items)
 
 
 def _phase2_build_payload(rec):
@@ -184,6 +161,9 @@ def extract(doc, ctx=None):
     v2_sig_hashes = []
     v2_blocked = False
     v2_reasons = {}
+    # Debug-only: keep the legacy pipe-delimited signature row out of records[]
+    # (records[] must contain only record.v2 objects). Bound for diff friendliness.
+    v2_sig_rows = []
 
     def _v2_block(reason_key):
         nonlocal v2_blocked
@@ -318,7 +298,7 @@ def extract(doc, ctx=None):
 
             if not v2_blocked:
                 # Use the already-normalized representations where applicable
-                v2_records.append("|".join([
+                v2_sig_rows.append("|".join([
                     "name={}".format(safe_str(type_name)),
                     "font={}".format(safe_str(font)),
                     "size_in={}".format(safe_str(size_in)),
@@ -369,13 +349,39 @@ def extract(doc, ctx=None):
         # Phase 2 (additive, explanatory, reversible)
         # Emit even if v2 is domain-blocked.
         # ---------------------------
-        _jk_items = _phase2_build_join_key_items(rec)
-        rec["join_key"] = {
-            "schema": "text_types.join_key.v2",
-            "hash_alg": "md5_utf8_join_pipe",
-            "items": phase2_sorted_items(_jk_items),
-            "join_hash": phase2_join_hash(_jk_items),
-        }
+        candidate_kqv = {}
+
+        v, q = canonicalize_str(rec.get("font"))
+        candidate_kqv["text_type.font"] = (v, q)
+
+        v, q = canonicalize_str(rec.get("text_size_in"))
+        candidate_kqv["text_type.size_in"] = (v, q)
+
+        v, q = canonicalize_float(rec.get("width_factor"))
+        candidate_kqv["text_type.width_factor"] = (v, q)
+
+        v, q = canonicalize_bool(rec.get("bold"))
+        candidate_kqv["text_type.bold"] = (v, q)
+
+        v, q = canonicalize_bool(rec.get("italic"))
+        candidate_kqv["text_type.italic"] = (v, q)
+
+        v, q = canonicalize_bool(rec.get("underline"))
+        candidate_kqv["text_type.underline"] = (v, q)
+
+        v, q = canonicalize_str(rec.get("color_rgb"))
+        candidate_kqv["text_type.color_rgb"] = (v, q)
+
+        # Explicit: allow empty; no uid/name/id fallback
+        v, q = canonicalize_str(rec.get("leader_arrowhead_sig_hash"))
+        candidate_kqv["text_type.leader_arrowhead_sig_hash"] = (v, q)
+
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "text_types")
+        rec["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=None,
+            candidate_kqv=candidate_kqv,
+        )
 
         rec["phase2"] = _phase2_build_payload(rec)
 
@@ -457,6 +463,9 @@ def extract(doc, ctx=None):
     info["records"] = v2_records
     info["signature_hashes"] = sorted(sig_hashes)
     info["hash"] = make_hash(sorted(sig_hashes)) if sig_hashes else None
+    # Bound debug payload (avoid large repeated strings in exports)
+    if v2_sig_rows:
+        info["debug_v2_sig_rows_sample"] = v2_sig_rows[:10]
 
     # v2 hash (domain-level block; no partial coverage semantics)
     info["debug_v2_blocked"] = bool(v2_blocked)
@@ -467,15 +476,10 @@ def extract(doc, ctx=None):
     else:
         info["hash_v2"] = None
 
-    info["record_rows"] = []
-    try:
-        recs = info.get("records") or []
-        info["record_rows"] = [{
-            "record_key": safe_str(r.get("type_uid", "")) or safe_str(r.get("uid", "")),
-            "sig_hash":  safe_str(r.get("signature_hash", "")),
-            "name":      safe_str(r.get("type_name", "")),   # optional metadata
-        } for r in recs]
-    except Exception as e:
-        info["record_rows"] = []
+    info["record_rows"] = [{
+        "record_key": safe_str(r.get("record_id", "")),
+        "sig_hash":   safe_str(r.get("sig_hash", "")),
+        "name":       safe_str((r.get("label", {}) or {}).get("display", "")),
+    } for r in v2_records if isinstance(r, dict)]
 
     return info

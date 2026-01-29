@@ -45,6 +45,8 @@ from core.record_v2 import (
     STATUS_DEGRADED,
     STATUS_BLOCKED,
 )
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
 
 try:
     from Autodesk.Revit.DB import SpecTypeId
@@ -54,20 +56,7 @@ except ImportError:
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
-    phase2_join_hash,
 )
-
-
-def _phase2_build_join_key_items(*, spec_label):
-    """
-    Phase-2 join-key components for units records.
-
-    Join intent (hypothesis only):
-    - Use the spec label (length/area/volume) as the stable identity for joining records across files.
-    """
-    spec_v, spec_q = phase2_qv_from_legacy_sentinel_str(spec_label, allow_empty=False)
-    items = [make_identity_item("units.spec", spec_v, spec_q)]
-    return phase2_sorted_items(items)
 
 
 def extract(doc, ctx=None):
@@ -248,7 +237,9 @@ def extract(doc, ctx=None):
         # ----------------------------
         # Phase-2 additive emission (no effect on sig_hash / identity_basis)
         # ----------------------------
-        join_items = _phase2_build_join_key_items(spec_label=label)
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "units")
+        rec["join_key"], _missing = build_join_key_from_policy(domain_policy=pol, identity_items=items_sorted)
+        join_items = rec["join_key"].get("items") or []
 
         # Hypotheses only (grouping_basis=phase2.hypothesis):
         # - semantic: spec identity + unit type + numeric formatting options
@@ -267,13 +258,6 @@ def extract(doc, ctx=None):
         semantic_items = phase2_sorted_items([dict(it) for it in items_sorted if it.get("k") in semantic_keys])
         cosmetic_items = phase2_sorted_items([dict(it) for it in items_sorted if it.get("k") in cosmetic_keys])
         unknown_items = phase2_sorted_items([dict(it) for it in items_sorted if it.get("k") not in (semantic_keys | cosmetic_keys)])
-
-        rec["join_key"] = {
-            "schema": "units.join_key.v1",
-            "hash_alg": "md5_utf8_join_pipe",
-            "items": join_items,
-            "join_hash": phase2_join_hash(join_items),
-        }
 
         rec["phase2"] = {
             "schema": "phase2.units.v1",

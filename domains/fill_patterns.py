@@ -37,8 +37,8 @@ from core.canon import (
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
-    phase2_join_hash,
 )
+
 from core.record_v2 import (
     STATUS_OK,
     STATUS_BLOCKED,
@@ -52,6 +52,9 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
+
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
 
 try:
     from Autodesk.Revit.DB import FillPatternElement
@@ -316,32 +319,6 @@ def extract(doc, ctx=None):
     # Phase 2 (additive-only) builders
     # -------------------------
 
-    def _phase2_build_join_key_items(name, fp):
-        items = []
-
-        # name (string)
-        v, q = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
-        items.append({"k": "fill_pattern.name", "v": v, "q": q})
-
-        # target_id (int) — keep explicit missing/unreadable
-        if fp is None:
-            items.append({"k": "fill_pattern.target_id", "v": None, "q": ITEM_Q_UNREADABLE})
-        else:
-            try:
-                t = fp.Target
-            except Exception:
-                items.append({"k": "fill_pattern.target_id", "v": None, "q": ITEM_Q_UNREADABLE})
-            else:
-                try:
-                    tid = int(t)
-                except Exception:
-                    items.append({"k": "fill_pattern.target_id", "v": None, "q": ITEM_Q_UNREADABLE})
-                else:
-                    v2, q2 = canonicalize_int(tid)
-                    items.append({"k": "fill_pattern.target_id", "v": v2, "q": q2})
-
-        return phase2_sorted_items(items)
-
     def _phase2_try_get_grid(fp, i):
         g = None
         try:
@@ -558,10 +535,20 @@ def extract(doc, ctx=None):
             # If we can't compute it, make the failure explicit (but keep it out of identity)
             semantic.append({"k": "fill_pattern.grids_def_hash", "v": None, "q": ITEM_Q_UNREADABLE})
 
+        # Phase-2 bloat control:
+        # The full grid definition is already present in identity_basis.items (for sig_hash reproducibility).
+        # Avoid duplicating per-grid items in phase2.semantic_items; keep only pointer + small scalars.
+        semantic_reduced = []
+        for it in (semantic or []):
+            k = safe_str(it.get("k", ""))
+            if k.startswith("fill_pattern.grid["):
+                continue
+            semantic_reduced.append(it)
+
         return {
             "schema": "phase2.fill_patterns.v1",
             "grouping_basis": "phase2.hypothesis",
-            "semantic_items": phase2_sorted_items(semantic),
+            "semantic_items": phase2_sorted_items(semantic_reduced),
             "cosmetic_items": phase2_sorted_items(cosmetic),
             "unknown_items": phase2_sorted_items(unknown),
         }
@@ -714,13 +701,30 @@ def extract(doc, ctx=None):
         else:
             _bump_v2_reason(v2_reason or "unknown")
 
-        join_items = _phase2_build_join_key_items(name, fp)
-        join_key = {
-            "schema": "fill_patterns.join_key.v1",
-            "hash_alg": "md5_utf8_join_pipe",
-            "items": join_items,
-            "join_hash": phase2_join_hash(join_items),
-        }
+        phase2_payload = _phase2_build_phase2(
+            name=name,
+            uid=uid,
+            elem_id_str=safe_str(e.Id.IntegerValue),
+            fp=fp,
+        )
+
+        # Policy-driven join_key is built from explicit candidate fields
+        # (fill_patterns policy requires fill_pattern.grids_def_hash, which is produced in phase2 semantic items)
+        candidate_kqv = {}
+        try:
+            for it in (phase2_payload.get("semantic_items") or []):
+                k = it.get("k")
+                if isinstance(k, str) and k not in candidate_kqv:
+                    candidate_kqv[k] = (it.get("v"), it.get("q"))
+        except Exception:
+            candidate_kqv = {}
+
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "fill_patterns")
+        join_key, _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=None,
+            candidate_kqv=candidate_kqv,
+        )
 
         rec = {
             "id": safe_str(e.Id.IntegerValue),
@@ -730,12 +734,7 @@ def extract(doc, ctx=None):
 
             # Phase 2 (additive-only; does not affect legacy/v2 hashing)
             "join_key": join_key,
-            "phase2": _phase2_build_phase2(
-                name=name,
-                uid=uid,
-                elem_id_str=safe_str(e.Id.IntegerValue),
-                fp=fp,
-            ),
+            "phase2": phase2_payload,
         }
 
         if DEBUG_INCLUDE_FILLPATTERN_SIGNATURES:
@@ -838,7 +837,7 @@ def extract(doc, ctx=None):
             },
         )
         rec_v2["join_key"] = join_key
-        rec_v2["phase2"] = _phase2_build_phase2(name=name, uid=uid, elem_id_str=safe_str(e.Id.IntegerValue), fp=fp)
+        rec_v2["phase2"] = phase2_payload
 
         v2_records.append(rec_v2)
         if sig_hash_v2 is not None:
@@ -869,15 +868,10 @@ def extract(doc, ctx=None):
         ctx["fill_pattern_uid_to_hash"] = uid_to_hash
         ctx["fill_pattern_uid_to_hash_v2"] = uid_to_hash_v2
 
-    info["record_rows"] = []
-    try:
-        recs = info.get("records") or []
-        info["record_rows"] = [{
-            "record_key": safe_str(r.get("uid", "")),        # <-- UniqueId
-            "sig_hash":   safe_str(r.get("def_hash", "")),
-            "name":       safe_str(r.get("name", "")),       # optional metadata
-        } for r in recs]
-    except Exception as e:
-        info["record_rows"] = []
+    info["record_rows"] = [{
+        "record_key": safe_str(r.get("record_id", "")),
+        "sig_hash":   safe_str(r.get("sig_hash", "")),
+        "name":       safe_str((r.get("label", {}) or {}).get("display", "")),
+    } for r in v2_records if isinstance(r, dict)]
 
     return info
