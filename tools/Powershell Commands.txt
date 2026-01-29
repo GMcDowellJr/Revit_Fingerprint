@@ -85,12 +85,12 @@ python -m tools.phase2_analysis.run_candidate_joinkey_simulation `
 	--domain line_patterns `
 	--out phase2_out
 
-$Domain     = "line_patterns"
+$Domain     = "dimension_types"
 $ExportsDir = "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2"
 $Baseline   = "fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.details.json"
 $OutRoot    = Join-Path $ExportsDir "_phase2_out"
 
-python -m tools.phase2_analysis.run_line_patterns_by_family $ExportsDir --domain $Domain --baseline $Baseline --out $OutRoot --families_from baseline
+python -m tools.phase2_analysis.run_dimension_types_by_family $ExportsDir --domain $Domain --baseline $Baseline --out $OutRoot --families_from baseline
 
 
 python tools/export_to_flat_tables.py `

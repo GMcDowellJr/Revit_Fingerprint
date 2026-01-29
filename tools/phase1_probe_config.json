@@ -1,10 +1,19 @@
 {
   "analysis_run_id": "phase1_probe_authority",
   "domains_in_scope": [
+	"arrowheads",
+    "dimension_types",
+	"fill_patterns",
     "line_patterns",
     "line_styles",
     "object_styles",
-    "dimension_types"
+	"phase_filters",
+	"phases",
+	"text_types",
+	"units",
+	"view_filter_applications_view_templates",
+	"view_filter_definitions",
+	"view_templates"
   ],
 
   "cluster_method": "semantic_multiset_exact",

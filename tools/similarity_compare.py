@@ -20,6 +20,7 @@ import csv
 import itertools
 import json
 import os
+import sys
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -1041,10 +1042,33 @@ def find_json_files(dir_path: str) -> List[str]:
     if not p.exists() or not p.is_dir():
         raise ValueError(f"not_a_directory: {dir_path}")
 
-    # Non-recursive by design: only the parent folder contents.
-    # This prevents picking up drift/pairwise outputs stored in subfolders.
-    files = [str(x) for x in p.glob("*.json") if x.is_file()]
+    # Prefer split exports (details first; index second). Ignore legacy by default.
+    details = [str(x) for x in p.glob("*.details.json") if x.is_file()]
+    index = [str(x) for x in p.glob("*.index.json") if x.is_file()]
+    legacy = [str(x) for x in p.glob("*.legacy.json") if x.is_file()]
+
+    if details:
+        if legacy:
+            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default (details present).\n")
+        details.sort()
+        return details
+
+    if index:
+        if legacy:
+            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default (index present).\n")
+        sys.stderr.write("[WARN similarity_compare] No *.details.json found; using *.index.json (signature multiset metric may be undefined).\n")
+        index.sort()
+        return index
+
+    # Last resort: any *.json except legacy (avoid implicit re-enable)
+    files = [str(x) for x in p.glob("*.json") if x.is_file() and not str(x).lower().endswith(".legacy.json")]
     files.sort()
+    if legacy and files:
+        sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default.\n")
+    if legacy and not files:
+        sys.stderr.write("[WARN similarity_compare] only legacy bundle(s) found; results may be incomplete.\n")
+        legacy.sort()
+        return legacy
     return files
 
 

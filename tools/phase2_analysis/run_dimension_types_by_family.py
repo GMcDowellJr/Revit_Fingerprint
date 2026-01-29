@@ -43,17 +43,34 @@ def _qv_to_v(x: Any) -> Optional[str]:
         return s or None
     return None
 
-
 def _family_shape(record: Dict[str, Any]) -> str:
     """
-    Return dimension family (Greg terminology: 'family'; Phase-2 earlier: 'shape').
+    Return dimension partition key.
 
-    In your dimension_types Phase-2 records, this is carried in join_key.items:
-      { "k": "dim_join.family_name", "v": "Linear Dimension Style" }
+    NOTE:
+    Current exporter emits shape as record.v2 identity:
+      - dim_type.shape
+    NOT dim_join.shape.
 
-    Fall back to other locations only if join_key is absent.
+    This function intentionally treats "family" == "shape" for now.
     """
-    # 1) Primary: join_key.items["dim_join.family_name"]
+
+    # 1) Primary: record.v2 identity_basis.items["dim_type.shape"]
+    ib = record.get("identity_basis")
+    if isinstance(ib, dict):
+        items = ib.get("items")
+        if isinstance(items, list):
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                if it.get("k") == "dim_type.shape":
+                    v = it.get("v")
+                    if v is not None:
+                        s = str(v).strip()
+                        if s:
+                            return s
+
+    # 2) Secondary: join_key.items (policy-built; not guaranteed)
     jk = record.get("join_key")
     if isinstance(jk, dict):
         items = jk.get("items")
@@ -61,19 +78,18 @@ def _family_shape(record: Dict[str, Any]) -> str:
             for it in items:
                 if not isinstance(it, dict):
                     continue
-                if it.get("k") == "dim_join.family_name":
+                if it.get("k") in ("dim_join.shape", "dim_join.shape_name"):
                     v = it.get("v")
                     if v is not None:
                         s = str(v).strip()
                         if s:
                             return s
 
-    # 2) Fallbacks (older/export-variant possibilities)
+    # 3) Legacy / last-resort fallbacks
     candidates = [
-        ["phase2", "semantic_items_map", "dim_join.family_name"],
-        ["phase2", "semantic_items_map", "shape"],
-        ["phase2", "semantic_items_map", "dim_attr.shape"],
         ["shape"],
+        ["dim_type", "shape"],
+        ["phase2", "semantic_items_map", "dim_attr.shape"],
     ]
     for path in candidates:
         v = _qv_to_v(_get(record, path))
@@ -164,7 +180,7 @@ def _prepare_filtered_dirs(
     exports_dir: str,
     out_root: str,
     domain: str,
-    baseline_file_id: str,
+    baseline_file_id: Optional[str],
     families: Iterable[str],
     keep_temp: bool,
 ) -> List[FamilyRun]:
@@ -174,6 +190,7 @@ def _prepare_filtered_dirs(
 
     # Clean temp root each run unless keep_temp requested
     temp_root = os.path.join(out_root, "_tmp_filtered_by_family", domain)
+
     def _on_rm_error(func, path, exc_info):
         # Windows: clear readonly bit then retry
         try:
@@ -205,43 +222,44 @@ def _prepare_filtered_dirs(
         os.makedirs(filtered_dir, exist_ok=True)
 
         # Write filtered copies of every export json
-        baseline_kept = 0
+        baseline_kept = None
         for e in exports:
             new_data, kept = _filter_export_domain_records(export_data=e.data, domain=domain, family_value=fam)
             out_path = os.path.join(filtered_dir, e.file_id)
             _write_json(out_path, new_data)
-            if e.file_id == baseline_file_id:
+            if baseline_file_id and e.file_id == baseline_file_id:
                 baseline_kept = kept
 
-        # Skip families not present in baseline (no meaningful seed deltas)
-        if baseline_kept == 0:
+        # If baseline is provided, preserve old behavior: skip families not present in baseline
+        if baseline_file_id and (baseline_kept == 0):
             if not keep_temp:
                 shutil.rmtree(filtered_dir, ignore_errors=True)
             continue
 
-        fam_out = os.path.join(out_root, domain, "by_family", fam_slug)
+        fam_out = os.path.join(out_root, "by_family", fam_slug)
         os.makedirs(fam_out, exist_ok=True)
 
         runs.append(FamilyRun(family_value=fam, family_slug=fam_slug, filtered_dir=filtered_dir, out_dir=fam_out))
 
     return runs
 
-
 def _run_all_phase2(
     *,
     filtered_exports_dir: str,
     domain: str,
-    baseline_file_id: str,
+    baseline_file_id: Optional[str],
     out_dir: str,
 ) -> None:
-    # Minimal set to reproduce your Phase-2 deliverables, per family
-    run_change_type(
-        exports_dir=filtered_exports_dir,
-        domain=domain,
-        baseline_file_id=baseline_file_id,
-        out_dir=out_dir,
-    )
+    # Baseline-anchored step (skip if no baseline provided)
+    if baseline_file_id:
+        run_change_type(
+            exports_dir=filtered_exports_dir,
+            domain=domain,
+            baseline_file_id=baseline_file_id,
+            out_dir=out_dir,
+        )
 
+    # Baseline-free deliverables (safe under "no legit baseline yet")
     run_population_stability(
         exports_dir=filtered_exports_dir,
         domain=domain,
@@ -292,7 +310,13 @@ def main() -> None:
     )
     p.add_argument("exports_dir", help="Directory containing *.details.json exports (non-recursive).")
     p.add_argument("--domain", default=DOMAIN_DEFAULT)
-    p.add_argument("--baseline", required=True, dest="baseline_file_id", help="Seed baseline filename (must exist in exports_dir).")
+    p.add_argument(
+        "--baseline",
+        required=False,
+        dest="baseline_file_id",
+        default=None,
+        help="Seed baseline filename (must exist in exports_dir). Optional: if omitted, baseline-anchored steps are skipped.",
+    )
     p.add_argument("--out", required=True, dest="out_root", help="Output root directory (will create per-family subfolders).")
 
     fam_group = p.add_mutually_exclusive_group()
@@ -314,15 +338,17 @@ def main() -> None:
     exports_dir = os.path.abspath(ns.exports_dir)
     out_root = os.path.abspath(ns.out_root)
     domain = str(ns.domain)
-    baseline = str(ns.baseline_file_id)
+    baseline = str(ns.baseline_file_id).strip() if ns.baseline_file_id else None
 
     if ns.families:
         families = [s.strip() for s in ns.families.split(",") if s.strip()]
     else:
-        if ns.families_from == "all":
-            families = sorted(_discover_families_from_exports(exports_dir, domain))
-        else:
+        if ns.families_from == "baseline":
+            if not baseline:
+                raise SystemExit("--families_from baseline requires --baseline.")
             families = sorted(_families_present_in_baseline(exports_dir, domain, baseline))
+        else:
+            families = sorted(_discover_families_from_exports(exports_dir, domain))
 
     if not families:
         raise SystemExit("No families discovered/selected.")
@@ -335,6 +361,9 @@ def main() -> None:
         families=families,
         keep_temp=bool(ns.keep_temp),
     )
+
+    # temp_root location must match _prepare_filtered_dirs()
+    temp_root = os.path.join(out_root, "_tmp_filtered_by_family", domain)
 
     if not runs:
         raise SystemExit("No families to run (baseline had zero records for selected families).")
@@ -350,7 +379,30 @@ def main() -> None:
         )
 
     print("\nDone.")
-    print(f"Outputs: {os.path.join(out_root, domain, 'by_family')}")
+    print(f"Outputs: {os.path.join(out_root, 'by_family')}")
+
+    if not bool(ns.keep_temp):
+        tmp_root = os.path.join(out_root, "_tmp_filtered_by_family")
+
+        def _on_rm_error(func, path, exc_info):
+            try:
+                os.chmod(path, 0o777)
+            except Exception:
+                pass
+            try:
+                func(path)
+            except Exception:
+                pass
+
+        if os.path.isdir(tmp_root):
+            # Windows can hold handles briefly (AV/Indexer/Explorer). Retry a few times.
+            for _ in range(5):
+                try:
+                    shutil.rmtree(tmp_root, onerror=_on_rm_error)
+                    break
+                except PermissionError:
+                    import time
+                    time.sleep(0.25)
 
 
 if __name__ == "__main__":

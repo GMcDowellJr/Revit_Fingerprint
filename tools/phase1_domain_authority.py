@@ -6,6 +6,7 @@ import csv
 import json
 import math
 import os
+import sys
 from dataclasses import dataclass
 from collections import Counter
 import statistics
@@ -437,9 +438,42 @@ def write_csv(path: Path, rows: List[Dict[str, Any]], fieldnames: List[str]) -> 
 # -------------------------
 
 def analyze(input_dir: Path, cfg: RunConfig, seed_path: Optional[Path], out_dir: Path) -> None:
-    json_paths = sorted([p for p in input_dir.glob("*.json") if p.is_file()])
+    details = sorted([p for p in input_dir.glob("*.details.json") if p.is_file()])
+    index = sorted([p for p in input_dir.glob("*.index.json") if p.is_file()])
+    legacy = sorted([p for p in input_dir.glob("*.legacy.json") if p.is_file()])
+
+    if details:
+        json_paths = details
+        if legacy:
+            sys.stderr.write(
+                "[WARN phase1_domain_authority] legacy bundle(s) present but ignored by default (details present).\n"
+            )
+    elif index:
+        json_paths = index
+        if legacy:
+            sys.stderr.write(
+                "[WARN phase1_domain_authority] legacy bundle(s) present but ignored by default (index present).\n"
+            )
+        sys.stderr.write(
+            "[WARN phase1_domain_authority] No *.details.json found; using *.index.json "
+            "(semantic multiset clustering may be degraded).\n"
+        )
+    else:
+        json_paths = sorted(
+            [p for p in input_dir.glob("*.json") if p.is_file() and not str(p).lower().endswith(".legacy.json")]
+        )
+        if legacy and not json_paths:
+            json_paths = legacy
+            sys.stderr.write(
+                "[WARN phase1_domain_authority] Only legacy bundle(s) found; results may be incomplete.\n"
+            )
+        else:
+            sys.stderr.write(
+                "[WARN phase1_domain_authority] No split exports found; falling back to *.json excluding legacy.\n"
+            )
+
     if not json_paths:
-        raise SystemExit(f"No .json files found in: {input_dir}")
+        raise SystemExit(f"No compatible export JSON files found in: {input_dir}")
 
     seed_fp: Optional[Dict[str, Any]] = load_json(seed_path) if seed_path else None
     seed_domains = extract_domains_summary(seed_fp) if seed_fp else {}

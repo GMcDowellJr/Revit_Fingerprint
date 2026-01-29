@@ -250,15 +250,16 @@ def _should_emit_legacy_bundle():
       REVIT_FINGERPRINT_EMIT_LEGACY_BUNDLE
 
     Values:
-      - unset / "" / "1" / "true" => True (default for backward compatibility)
-      - "0" / "false"             => False
+      - unset / "" / "0" / "false" => False (default)
+      - "1" / "true"               => True
     """
     try:
-        v = os.environ.get("REVIT_FINGERPRINT_EMIT_LEGACY_BUNDLE", "1")
+        # Default changed to OFF: legacy bundle must be explicitly requested
+        v = os.environ.get("REVIT_FINGERPRINT_EMIT_LEGACY_BUNDLE", "0")
     except Exception:
-        v = "1"
+        v = "0"
     v = str(v).strip().lower()
-    return v not in ("0", "false", "no", "off", "n", "f")
+    return v in ("1", "true", "yes", "on")
 
 def _extract_v2_hash(payload):
     """
