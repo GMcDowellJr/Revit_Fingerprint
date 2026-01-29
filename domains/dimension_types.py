@@ -761,6 +761,7 @@ def extract(doc, ctx=None):
         phase2_unknown_items = phase2_sorted_items([
             make_identity_item("dim_attr.prefix", prefix_v, prefix_q),
             make_identity_item("dim_attr.suffix", suffix_v, suffix_q),
+            make_identity_item("dim_type.uid", uid_v, uid_q),
         ])
 
         phase2_cosmetic_items = phase2_sorted_items([
@@ -775,7 +776,6 @@ def extract(doc, ctx=None):
 
 
         identity_items = [
-            make_identity_item("dim_type.uid", uid_v, uid_q),
             make_identity_item("dim_type.shape", shape_v, shape_q),
             make_identity_item("dim_type.tick_mark_uid", tick_uid_v, tick_uid_q),
             make_identity_item("dim_type.witness_line_control", witness_v, witness_q),
@@ -787,7 +787,7 @@ def extract(doc, ctx=None):
         ]
         identity_items = sorted(identity_items, key=lambda it: it.get("k", ""))
 
-        required_qs = [uid_q, shape_q]
+        required_qs = [shape_q]
         blocked = any(q != ITEM_Q_OK for q in required_qs)
 
         status_reasons = []

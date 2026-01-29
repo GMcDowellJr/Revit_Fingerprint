@@ -40,13 +40,17 @@ from core.phase2 import (
     phase2_join_hash,
 )
 from core.record_v2 import (
+    STATUS_OK,
+    STATUS_BLOCKED,
     ITEM_Q_OK,
-    ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
     canonicalize_str,
     canonicalize_int,
     canonicalize_bool,
     canonicalize_float,
+    make_identity_item,
+    serialize_identity_items,
+    build_record_v2,
 )
 
 try:
@@ -540,6 +544,8 @@ def extract(doc, ctx=None):
     records = []
     per_hashes = []
     per_hashes_v2 = []
+    v2_records = []
+    v2_sig_hashes = []
     names = []
     uid_to_hash_v2 = {}
     uid_to_hash = {}
@@ -710,6 +716,111 @@ def extract(doc, ctx=None):
         if DEBUG_INCLUDE_FILLPATTERN_SIGNATURES:
             rec["def_signature"] = sig_sorted
 
+        status_v2 = STATUS_OK
+        status_reasons_v2 = []
+        identity_items_v2 = []
+
+        name_v2, name_q = canonicalize_str(name)
+        identity_items_v2.append(make_identity_item("fill_pattern.name", name_v2, name_q))
+
+        if fp is None:
+            is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
+            target_v, target_q = (None, ITEM_Q_UNREADABLE)
+            gc_v, gc_q = (None, ITEM_Q_UNREADABLE)
+            gc_i = None
+        else:
+            try:
+                is_solid_v, is_solid_q = canonicalize_bool(bool(fp.IsSolidFill))
+            except Exception:
+                is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
+            try:
+                target_v, target_q = canonicalize_int(int(fp.Target))
+            except Exception:
+                target_v, target_q = (None, ITEM_Q_UNREADABLE)
+            try:
+                gc_i = int(fp.GridCount)
+                gc_v, gc_q = canonicalize_int(gc_i)
+            except Exception:
+                gc_i = None
+                gc_v, gc_q = (None, ITEM_Q_UNREADABLE)
+
+        identity_items_v2.append(make_identity_item("fill_pattern.is_solid", is_solid_v, is_solid_q))
+        identity_items_v2.append(make_identity_item("fill_pattern.target_id", target_v, target_q))
+        identity_items_v2.append(make_identity_item("fill_pattern.grid_count", gc_v, gc_q))
+        required_qs = [name_q, is_solid_q, target_q, gc_q]
+
+        if gc_i and gc_i > 0:
+            for i in range(gc_i):
+                g = _phase2_try_get_grid(fp, i)
+                if g is None:
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].angle", None, ITEM_Q_UNREADABLE))
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].origin_u", None, ITEM_Q_UNREADABLE))
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].origin_v", None, ITEM_Q_UNREADABLE))
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].shift", None, ITEM_Q_UNREADABLE))
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].offset", None, ITEM_Q_UNREADABLE))
+                    required_qs.extend([ITEM_Q_UNREADABLE] * 5)
+                    continue
+                try:
+                    ang_v, ang_q = canonicalize_float(getattr(g, "Angle", None))
+                except Exception:
+                    ang_v, ang_q = (None, ITEM_Q_UNREADABLE)
+                try:
+                    o = getattr(g, "Origin", None)
+                    ou_v, ou_q = canonicalize_float(getattr(o, "U", None))
+                    ov_v, ov_q = canonicalize_float(getattr(o, "V", None))
+                except Exception:
+                    ou_v, ou_q = (None, ITEM_Q_UNREADABLE)
+                    ov_v, ov_q = (None, ITEM_Q_UNREADABLE)
+                try:
+                    sh_v, sh_q = canonicalize_float(getattr(g, "Shift", None))
+                except Exception:
+                    sh_v, sh_q = (None, ITEM_Q_UNREADABLE)
+                try:
+                    off_v, off_q = canonicalize_float(getattr(g, "Offset", None))
+                except Exception:
+                    off_v, off_q = (None, ITEM_Q_UNREADABLE)
+                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].angle", ang_v, ang_q))
+                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].origin_u", ou_v, ou_q))
+                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].origin_v", ov_v, ov_q))
+                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].shift", sh_v, sh_q))
+                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].offset", off_v, off_q))
+                required_qs.extend([ang_q, ou_q, ov_q, sh_q, off_q])
+
+        if any(q != ITEM_Q_OK for q in required_qs):
+            status_v2 = STATUS_BLOCKED
+            status_reasons_v2.append("required_identity_not_ok")
+
+        identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k","")))
+        sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
+        sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
+
+        rec_v2 = build_record_v2(
+            domain="fill_patterns",
+            record_id=safe_str(name) if safe_str(name) else safe_str(e.Id.IntegerValue),
+            status=status_v2,
+            status_reasons=sorted(set(status_reasons_v2)),
+            sig_hash=sig_hash_v2,
+            identity_items=identity_items_v2_sorted,
+            required_qs=required_qs,
+            label={
+                "display": safe_str(name),
+                "quality": "human",
+                "provenance": "revit.FillPatternElement.Name",
+            },
+            debug={
+                "sig_preimage_sample": sig_preimage_v2[:6],
+                "uid_excluded_from_sig": True,
+            },
+        )
+        rec_v2["join_key"] = join_key
+        rec_v2["phase2"] = _phase2_build_phase2(name=name, uid=uid, elem_id_str=safe_str(e.Id.IntegerValue), fp=fp)
+
+        v2_records.append(rec_v2)
+        if sig_hash_v2 is not None:
+            v2_sig_hashes.append(sig_hash_v2)
+            if uid:
+                uid_to_hash_v2[uid] = sig_hash_v2
+
         records.append(rec)
         per_hashes.append(def_hash)
         info["debug_kept"] += 1
@@ -718,10 +829,11 @@ def extract(doc, ctx=None):
     info["names"] = sorted(set(names))
     info["count"] = len(info["names"])
     info["hash"] = make_hash(info["signature_hashes"])
-    info["records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
+    info["legacy_records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
+    info["records"] = v2_records
 
     # v2 finalize: block domain hash if any record blocked
-    info["signature_hashes_v2"] = sorted(per_hashes_v2)
+    info["signature_hashes_v2"] = sorted(v2_sig_hashes)
     if info["debug_v2_blocked"] > 0:
         info["hash_v2"] = None
     else:

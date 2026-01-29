@@ -321,6 +321,17 @@ def _extract_v2_block_reasons(payload):
     return {}
 
 
+def _looks_like_revit_unique_id(v):
+    """Heuristic: detect Revit UniqueId strings."""
+    try:
+        s = str(v or "")
+    except Exception:
+        return False
+    if not s or len(s) < 45:
+        return False
+    import re as _re
+    return bool(_re.match(r"^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}-[0-9A-Fa-f]{8}$", s))
+
 def _has_v2_surface(payload):
     """Return True if the domain payload appears to implement a v2 hash surface."""
     if not isinstance(payload, dict):
@@ -392,6 +403,36 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
 
         # Lift v2 diagnostics into the contract envelope.
         domain_diag["has_v2"] = bool(_has_v2_surface(legacy))
+        try:
+            recs = legacy.get("records", None) if isinstance(legacy, dict) else None
+            if isinstance(recs, list):
+                domain_diag["details_records_count"] = len(recs)
+                v2_count = 0
+                sample_items = None
+                uid_like_values = 0
+                uid_key_count = 0
+                for r in recs[:3]:
+                    if isinstance(r, dict) and r.get("schema_version", None) == "record.v2":
+                        v2_count += 1
+                        ib = r.get("identity_basis", {}) if isinstance(r.get("identity_basis", {}), dict) else {}
+                        items = ib.get("items", []) if isinstance(ib.get("items", []), list) else []
+                        if sample_items is None and items:
+                            sample_items = items
+                        for it in items:
+                            if not isinstance(it, dict):
+                                continue
+                            k = str(it.get("k", ""))
+                            if ("uid" in k) or k.endswith("_uid"):
+                                uid_key_count += 1
+                            if _looks_like_revit_unique_id(it.get("v", None)):
+                                uid_like_values += 1
+                domain_diag["records_v2_sample_count"] = v2_count
+                if sample_items is not None:
+                    domain_diag["v2_sample_identity_keys"] = [str(it.get("k", "")) for it in sample_items[:12]]
+                domain_diag["v2_uid_key_count_in_sample"] = int(uid_key_count)
+                domain_diag["v2_uid_like_values_in_sample"] = int(uid_like_values)
+        except Exception:
+            pass
         v2_reasons = _extract_v2_block_reasons(legacy)
         if v2_reasons:
             domain_diag["v2_block_reasons"] = v2_reasons

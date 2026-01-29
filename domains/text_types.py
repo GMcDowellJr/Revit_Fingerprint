@@ -46,6 +46,18 @@ from core.phase2 import (
     phase2_qv_from_legacy_sentinel_str,
     phase2_join_hash,
 )
+from core.record_v2 import (
+    STATUS_OK,
+    STATUS_BLOCKED,
+    ITEM_Q_OK,
+    canonicalize_str,
+    canonicalize_int,
+    canonicalize_float,
+    canonicalize_bool,
+    make_identity_item,
+    serialize_identity_items,
+    build_record_v2,
+)
 
 try:
     from Autodesk.Revit.DB import TextNoteType
@@ -150,6 +162,7 @@ def extract(doc, ctx=None):
 
     # v2 build state (domain-level block; no partial coverage semantics)
     v2_records = []
+    v2_sig_hashes = []
     v2_blocked = False
     v2_reasons = {}
 
@@ -334,21 +347,91 @@ def extract(doc, ctx=None):
         }
         rec["phase2"] = _phase2_build_payload(rec)
 
+        status_v2 = STATUS_OK
+        status_reasons_v2 = []
+        identity_items_v2 = []
+
+        name_v2, name_q = canonicalize_str(type_name)
+        font_v2, font_q = canonicalize_str(font)
+        size_in_v2, size_in_q = canonicalize_str(size_in)
+        width_v2, width_q = canonicalize_float(width_factor_n)
+        bg_v2, bg_q = canonicalize_int(background_i)
+        lw_v2, lw_q = canonicalize_int(line_weight)
+        rgb_v2, rgb_q = canonicalize_str(color_rgb)
+        show_v2, show_q = canonicalize_bool(show_border)
+        leader_off_v2, leader_off_q = canonicalize_str(leader_border_offset_in)
+        tab_v2, tab_q = canonicalize_str(tab_size_in)
+        bold_v2, bold_q = canonicalize_bool(bold)
+        italic_v2, italic_q = canonicalize_bool(italic)
+        underline_v2, underline_q = canonicalize_bool(underline)
+
+        identity_items_v2.append(make_identity_item("text_type.name", name_v2, name_q))
+        identity_items_v2.append(make_identity_item("text_type.font", font_v2, font_q))
+        identity_items_v2.append(make_identity_item("text_type.size_in", size_in_v2, size_in_q))
+        identity_items_v2.append(make_identity_item("text_type.width_factor", width_v2, width_q))
+        identity_items_v2.append(make_identity_item("text_type.background", bg_v2, bg_q))
+        identity_items_v2.append(make_identity_item("text_type.line_weight", lw_v2, lw_q))
+        identity_items_v2.append(make_identity_item("text_type.color_rgb", rgb_v2, rgb_q))
+        identity_items_v2.append(make_identity_item("text_type.show_border", show_v2, show_q))
+        identity_items_v2.append(make_identity_item("text_type.leader_border_offset_in", leader_off_v2, leader_off_q))
+        identity_items_v2.append(make_identity_item("text_type.tab_size_in", tab_v2, tab_q))
+        identity_items_v2.append(make_identity_item("text_type.bold", bold_v2, bold_q))
+        identity_items_v2.append(make_identity_item("text_type.italic", italic_v2, italic_q))
+        identity_items_v2.append(make_identity_item("text_type.underline", underline_v2, underline_q))
+
+        required_qs = [name_q, font_q, size_in_q, width_q, bg_q, lw_q, rgb_q, show_q, leader_off_q, tab_q, bold_q, italic_q, underline_q]
+
+        if any(q != ITEM_Q_OK for q in required_qs):
+            status_v2 = STATUS_BLOCKED
+            status_reasons_v2.append("required_identity_not_ok")
+
+        identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k","")))
+        sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
+        sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
+
+        rec_v2 = build_record_v2(
+            domain="text_types",
+            record_id=safe_str(type_name) if safe_str(type_name) else safe_str(t.Id.IntegerValue),
+            status=status_v2,
+            status_reasons=sorted(set(status_reasons_v2)),
+            sig_hash=sig_hash_v2,
+            identity_items=identity_items_v2_sorted,
+            required_qs=required_qs,
+            label={
+                "display": safe_str(type_name),
+                "quality": "human",
+                "provenance": "revit.TextNoteType.Name",
+            },
+            debug={
+                "sig_preimage_sample": sig_preimage_v2[:6],
+                "uid_excluded_from_sig": True,
+                "leader_arrowhead_uid_excluded_from_sig": True,
+            },
+        )
+        rec_v2["join_key"] = rec["join_key"]
+        rec_v2["phase2"] = rec["phase2"]
+
+        v2_records.append(rec_v2)
+        if sig_hash_v2 is not None:
+            v2_sig_hashes.append(sig_hash_v2)
+
         records.append(rec)
         sig_hashes.append(sig_hash)
 
     info["names"] = sorted(names)
     info["count"] = len(info["names"])
 
-    info["records"] = sorted(records, key=lambda r: safe_str(r.get("type_name", "")))
+    info["legacy_records"] = sorted(records, key=lambda r: safe_str(r.get("type_name", "")))
+    info["records"] = v2_records
     info["signature_hashes"] = sorted(sig_hashes)
     info["hash"] = make_hash(sorted(sig_hashes)) if sig_hashes else None
 
     # v2 hash (domain-level block; no partial coverage semantics)
     info["debug_v2_blocked"] = bool(v2_blocked)
     info["debug_v2_block_reasons"] = v2_reasons if v2_blocked else {}
-    if (not v2_blocked) and v2_records:
-        info["hash_v2"] = make_hash(sorted(v2_records))
+    info["signature_hashes_v2"] = sorted(v2_sig_hashes)
+    if (not v2_blocked) and info["signature_hashes_v2"]:
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
     else:
         info["hash_v2"] = None
 
