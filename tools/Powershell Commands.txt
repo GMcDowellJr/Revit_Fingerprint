@@ -34,73 +34,73 @@ python tools/phase1_pairwise_analysis.py `
 
 phase 2
 
-python -m tools.phase2_analysis.run_change_type "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\Phase2" --baseline "fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.details.json" --domain dimension_types --out phase2_out
+python -m tools.phase2_analysis.run_change_type "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\Phase2" --baseline "fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.details.json" --domain line_patterns --out phase2_out
 
 python -m tools.phase2_analysis.run_population_stability `
 	"C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\Projects\Phase2" `
-	--domain dimension_types `
+	--domain line_patterns `
 	--out phase2_out
 
 python -m tools.phase2_analysis.run_attribute_stress `
 	"C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\Projects\Phase2" `
-	--domain dimension_types `
+	--domain line_patterns `
 	--threshold 50 `
 	--out phase2_out
 
 python -m tools.phase2_analysis.run_attribute_stress_all_joinable `
 	"C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\Projects\Phase2" `
-	--domain dimension_types `
+	--domain line_patterns `
 	--min-presence-files 2 `
 	--out phase2_out
   
 python -m tools.phase2_analysis.run_identity_collision_diagnostics `
 	"C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\Projects\Phase2" `
-	--domain dimension_types `
+	--domain line_patterns `
 	--out phase2_out
 
 python -m tools.phase2_analysis.run_collision_differencing `
 	"C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\Projects\Phase2" `
-	--domain dimension_types `
+	--domain line_patterns `
 	--out phase2_out
 
 python -m tools.phase2_analysis.run_joinhash_label_population `
 	"C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\Projects\Phase2" `
-	--domain dimension_types `
+	--domain line_patterns `
 	--out phase2_out
 
 python -m tools.phase2_analysis.run_joinhash_parameter_population `
 	"C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\Projects\Phase2" `
-	--domain dimension_types `
+	--domain line_patterns `
 	--out phase2_out
   
 python -m tools.phase2_analysis.run_joinhash_parameter_population `
 "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\Projects\Phase2" `
-	--domain dimension_types `
+	--domain line_patterns `
 	--include-cosmetic `
 	--include-unknown `
 	--out phase2_out
 
 python -m tools.phase2_analysis.run_candidate_joinkey_simulation `
 	"C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\Projects\Phase2" `
-	--domain dimension_types `
+	--domain line_patterns `
 	--out phase2_out
 
-$Domain     = "dimension_types"
+$Domain     = "line_patterns"
 $ExportsDir = "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2"
 $Baseline   = "fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.details.json"
 $OutRoot    = Join-Path $ExportsDir "_phase2_out"
 
-python -m tools.phase2_analysis.run_dimension_types_by_family $ExportsDir --domain $Domain --baseline $Baseline --out $OutRoot --families_from baseline
+python -m tools.phase2_analysis.run_line_patterns_by_family $ExportsDir --domain $Domain --baseline $Baseline --out $OutRoot --families_from baseline
 
 
 python tools/export_to_flat_tables.py `
 --root_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2" `
 --out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out" `
---domains dimension_types
+--domains line_patterns
 
 python tools/export_to_flat_tables.py `
 	--root_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2" `
-	--out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out" `
+	--out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2" `
 	--emit records,identity_items `
 	--split_by_domain
 
@@ -113,21 +113,41 @@ python tools/pareto_joinkey_search.py `
 --out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out"
 
 python tools/pareto_make_shape_inputs.py `
-  --records "C:\Users\gmcdowell\Documents\Fingerprint_Out\records.csv" `
-  --items "C:\Users\gmcdowell\Documents\Fingerprint_Out\identity_items.csv" `
---out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out" `
-  --domain dimension_types
+	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\records__line_patterns.csv" `
+	--items "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\identity_items__line_patterns.csv" `
+	--out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2" `
+	--domain line_patterns
 
 python tools/pareto_joinkey_search.py `
-	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\records__view_filter_applications_view_templates.csv" `
-	--items "C:\Users\gmcdowell\Documents\Fingerprint_Out\identity_items__view_filter_applications_view_templates.csv" `
+	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\records__line_patterns.csv" `
+	--items "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\identity_items__line_patterns.csv" `
 	--max_k 4 `
-	--out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out" `
-	--pareto_name pareto_front__view_filter_applications_view_templates.csv
+	--out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2" `
+	--pareto_name pareto_front__line_patterns.csv
 
 
-Import-Csv "C:\Users\gmcdowell\Documents\Fingerprint_Out\records__line_patterns.csv" | Select-Object -Expand k -Unique | Sort-Object
+Import-Csv "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\identity_items__line_patterns.csv" | Select-Object -Expand k -Unique | Sort-Object
 
 Import-Csv "C:\Users\gmcdowell\Documents\Fingerprint_Out\identity_items__objectstyles.csv" |
   Select-Object -ExpandProperty k -Unique |
   Sort-Object
+
+
+python tools/pareto_joinkey_search.py `
+	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\records__view_filter_definitions.csv" `
+	--items   "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\identity_items__view_filter_definitions.csv" `
+	--max_k 4 `
+	--sample_candidates 30 `
+	--sample_records 10000 `
+	--seed 42 `
+	--out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2" `
+	--pareto_name pareto_front__view_filter_definitions__discovery.csv
+
+python tools/pareto_joinkey_search.py `
+	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\records__line_patterns.csv" `
+	--items   "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\identity_items__line_patterns.csv" `
+	--max_k 4 `
+	--sample_records 10000 `
+	--seed 42 `
+	--out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2" `
+	--pareto_name pareto_front__line_patterns__discovery.csv

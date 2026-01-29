@@ -52,29 +52,16 @@ from core.record_v2 import (
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
-    phase2_join_hash,
 )
+
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
 
 try:
     from Autodesk.Revit.DB import GraphicsStyleType, CategoryType
 except ImportError:
     GraphicsStyleType = None
     CategoryType = None
-
-def _phase2_build_join_key_items(*, parent_name, row_name):
-    """Build Phase-2 join-key IdentityItems (domain-specific, hypothesis-only).
-
-    Join-key hypothesis (reversible):
-      - obj_style.parent_name + obj_style.row_name is the natural join identity
-        for cross-file stability checks (matches legacy row_key construction).
-    """
-    parent_v, parent_q = phase2_qv_from_legacy_sentinel_str(parent_name, allow_empty=False)
-    row_v, row_q = phase2_qv_from_legacy_sentinel_str(row_name, allow_empty=False)
-
-    return [
-        make_identity_item("obj_style.parent_name", parent_v, parent_q),
-        make_identity_item("obj_style.row_name", row_v, row_q),
-    ]
 
 def extract(doc, ctx=None):
     """
@@ -350,17 +337,11 @@ def extract(doc, ctx=None):
                 # -------------------------
                 # Phase-2 additions (additive, explanatory, reversible)
                 # -------------------------
-                join_key_items = _phase2_build_join_key_items(
-                    parent_name=parent_name,
-                    row_name=row_name,
+                pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "object_styles")
+                rec_v2["join_key"], _missing = build_join_key_from_policy(
+                    domain_policy=pol,
+                    identity_items=identity_items_sorted,
                 )
-                join_key_items_sorted = phase2_sorted_items(join_key_items)
-                rec_v2["join_key"] = {
-                    "schema": "object_styles.join_key.v1",
-                    "hash_alg": "md5_utf8_join_pipe",
-                    "items": join_key_items_sorted,
-                    "join_hash": phase2_join_hash(join_key_items_sorted),
-                }
 
                 semantic_items = []
                 cosmetic_items = []

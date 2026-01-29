@@ -37,8 +37,8 @@ from core.canon import (
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
-    phase2_join_hash,
 )
+
 from core.record_v2 import (
     STATUS_OK,
     STATUS_BLOCKED,
@@ -51,14 +51,8 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
-
-
-def _phase2_build_join_key_items(*, name):
-    """Domain-specific Phase-2 join key items for phase_filters."""
-    v_name, q_name = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
-    return phase2_sorted_items([
-        {"k": "phase_filter.name", "q": q_name, "v": v_name},
-    ])
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
 
 try:
     from Autodesk.Revit.DB import PhaseFilter, ElementOnPhaseStatus
@@ -221,7 +215,9 @@ def extract(doc, ctx=None):
                 pass
 
         # Phase-2 (empirical, explanatory, reversible): join_key + attribute buckets
-        join_key_items = _phase2_build_join_key_items(name=name)
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "phase_filters")
+        rec_join_key, _missing = build_join_key_from_policy(domain_policy=pol, identity_items=identity_items_v2_sorted)
+        join_key_items = rec_join_key.get("items") or []
 
         phase2_semantic_items = []
         for status_name, status_enum in statuses:
@@ -243,13 +239,6 @@ def extract(doc, ctx=None):
             {"k": "phase_filter.id.int", "q": q_id, "v": v_id},
             {"k": "phase_filter.name", "q": q_name_p2, "v": v_name_p2},
         ])
-
-        rec_join_key = {
-            "schema": "phase_filters.join_key.v1",
-            "hash_alg": "md5_utf8_join_pipe",
-            "items": join_key_items,
-            "join_hash": phase2_join_hash(join_key_items),
-        }
 
         rec_phase2 = {
             "schema": "phase2.phase_filters.v1",

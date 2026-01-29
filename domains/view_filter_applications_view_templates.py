@@ -39,43 +39,11 @@ from core.record_v2 import (
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
-    phase2_join_hash,
 )
 
-def _phase2_build_join_key_items(*, items_sorted):
-    """
-    Phase-2 join-key hypothesis for view_filter_applications_view_templates.
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
 
-    Definition-based identity for standards analysis:
-      - required: vfa.filter_stack_count, vfa.stack[000].filter_sig_hash
-      - optional: vfa.stack[001].filter_sig_hash (if present + ok)
-    """
-    item_by_k = {safe_str(it.get("k", "")): it for it in (items_sorted or [])}
-
-    join = []
-
-    # Required: stack count
-    it = item_by_k.get("vfa.filter_stack_count")
-    if it is not None:
-        join.append({"k": "vfa.filter_stack_count", "q": it.get("q"), "v": it.get("v")})
-    else:
-        join.append({"k": "vfa.filter_stack_count", "q": ITEM_Q_MISSING, "v": None})
-
-    # Required: first filter sig hash
-    it = item_by_k.get("vfa.stack[000].filter_sig_hash")
-    if it is not None:
-        join.append({"k": "vfa.stack[000].filter_sig_hash", "q": it.get("q"), "v": it.get("v")})
-    else:
-        join.append({"k": "vfa.stack[000].filter_sig_hash", "q": ITEM_Q_MISSING, "v": None})
-
-    # Optional: second filter sig hash (strict mode extension when present+ok)
-    it = item_by_k.get("vfa.stack[001].filter_sig_hash")
-    if it is not None and safe_str(it.get("q")) == ITEM_Q_OK:
-        v = it.get("v")
-        if v is not None and safe_str(v) != "":
-            join.append({"k": "vfa.stack[001].filter_sig_hash", "q": it.get("q"), "v": v})
-
-    return phase2_sorted_items(join)
 
 def _is_schedule_view(view) -> bool:
     # Most reliable: schedule views/templates are ViewSchedule instances.
@@ -333,13 +301,14 @@ def extract(doc, ctx=None):
         # -----------------------------
         # Phase 2 (empirical, additive)
         # -----------------------------
-        join_items = _phase2_build_join_key_items(items_sorted=items_sorted)
-        rec["join_key"] = {
-            "schema": "view_filter_applications_view_templates.join_key.v1",
-            "hash_alg": "md5_utf8_join_pipe",
-            "items": join_items,
-            "join_hash": phase2_join_hash(join_items),
-        }
+        pol = get_domain_join_key_policy(
+            (ctx or {}).get("join_key_policies"),
+            "view_filter_applications_view_templates",
+        )
+        rec["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=items_sorted,
+        )
 
         # Phase-2 item partitions (hypotheses only; no inference).
         p2_semantic = list(items_sorted)
