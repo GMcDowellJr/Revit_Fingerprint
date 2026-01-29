@@ -451,9 +451,26 @@ def extract(doc, ctx=None):
         )
 
         # Phase-2 item partitions (hypotheses only; no inference).
-        # Reuse the already-validated v2 identity items as semantic candidates.
-        # (We do not change identity_basis.items; this is an additive view.)
-        p2_semantic = list(items_sorted)
+        # Avoid duplicating the full vf.rule[...] structure which already exists in identity_basis.items.
+        rule_items = []
+        p2_semantic = []
+        for it in (items_sorted or []):
+            k = safe_str(it.get("k", ""))
+            if k.startswith("vf.rule["):
+                rule_items.append(it)
+                continue
+            p2_semantic.append(it)
+
+        # Derived hash pointer for the rules definition (ordered + deterministic via phase2_sorted_items).
+        rule_items_sorted = phase2_sorted_items(rule_items)
+        if rule_items_sorted:
+            p2_semantic.append(
+                make_identity_item(
+                    "vf.rules_def_hash",
+                    phase2_join_hash(rule_items_sorted),
+                    ITEM_Q_OK,
+                )
+            )
 
         # Unknown: element-backed id may vary across files.
         try:
