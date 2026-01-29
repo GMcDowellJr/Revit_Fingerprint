@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import sys
+
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -16,21 +18,57 @@ class ExportFile:
 
 
 def iter_json_paths(root_dir: str) -> Iterator[str]:
-    """Yield *.json file paths in root_dir (non-recursive), sorted by basename."""
+    """Yield export JSON paths in root_dir (non-recursive), split-export safe.
+
+    Preference order:
+      1) *.details.json
+      2) *.index.json
+      3) *.json excluding *.legacy.json
+      4) legacy-only only if nothing else exists (warn loudly)
+    """
     root_dir = os.path.abspath(root_dir)
     if not os.path.isdir(root_dir):
         raise FileNotFoundError(f"Not a directory: {root_dir}")
 
-    paths: List[str] = []
-    for name in os.listdir(root_dir):
-        if not name.lower().endswith(".json"):
-            continue
+    names = [n for n in os.listdir(root_dir) if n.lower().endswith(".json")]
+    names.sort(key=lambda x: x.lower())
+
+    details = [n for n in names if n.lower().endswith(".details.json")]
+    index = [n for n in names if n.lower().endswith(".index.json")]
+    legacy = [n for n in names if n.lower().endswith(".legacy.json")]
+
+    if details:
+        if legacy:
+            sys.stderr.write(
+                "[WARN phase2.io] Found legacy bundle(s) but ignoring by default (details present).\n"
+            )
+        chosen = details
+    elif index:
+        if legacy:
+            sys.stderr.write(
+                "[WARN phase2.io] Found legacy bundle(s) but ignoring by default (index present).\n"
+            )
+        sys.stderr.write(
+            "[WARN phase2.io] No *.details.json found; falling back to *.index.json "
+            "(record-level metrics may be undefined).\n"
+        )
+        chosen = index
+    else:
+        chosen = [n for n in names if not n.lower().endswith(".legacy.json")]
+        if legacy and not chosen:
+            sys.stderr.write(
+                "[WARN phase2.io] Only legacy bundle(s) found; Phase-2 analysis may be incomplete/invalid under current defaults.\n"
+            )
+            chosen = legacy
+        else:
+            sys.stderr.write(
+                "[WARN phase2.io] No split exports found (*.details.json / *.index.json). Falling back to *.json excluding legacy.\n"
+            )
+
+    for name in chosen:
         p = os.path.join(root_dir, name)
         if os.path.isfile(p):
-            paths.append(p)
-
-    for p in sorted(paths, key=lambda x: os.path.basename(x).lower()):
-        yield p
+            yield p
 
 
 def load_export_file(path: str, *, file_id: Optional[str] = None) -> ExportFile:
