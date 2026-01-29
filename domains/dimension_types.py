@@ -775,9 +775,10 @@ def extract(doc, ctx=None):
         ])
 
 
+        # Phase-2 compliant: definition-based identity (no UID references)
+        # tick_mark_uid excluded per Phase 2 architecture (UIDs are file-local, not semantic)
         identity_items = [
             make_identity_item("dim_type.shape", shape_v, shape_q),
-            make_identity_item("dim_type.tick_mark_uid", tick_uid_v, tick_uid_q),
             make_identity_item("dim_type.witness_line_control", witness_v, witness_q),
             make_identity_item("dim_type.unit_format_id", unit_format_id_v, unit_format_id_q),
             make_identity_item("dim_type.rounding", rounding_v, rounding_q),

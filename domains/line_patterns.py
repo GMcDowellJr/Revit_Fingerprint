@@ -6,8 +6,12 @@ Fingerprints line pattern definitions including:
 - Segment count
 - Per-segment type and length (order-sensitive)
 
-Per-record identity: UniqueId
+Per-record identity: Structural segment definition (segment_count + per-segment kind/length)
+Join key: Definition-based (segment_count + initial segment kind/length pairs)
 Ordering: segment order is preserved (order-sensitive for segments)
+
+Note: Per Phase 2 architecture, identity is definition-based (no UID/name).
+UID and name are retained in unknown_items for context mappings but excluded from identity_basis.
 """
 
 import os
@@ -100,16 +104,45 @@ def _lp_seg_type_id_and_name(seg):
 
     return st_id, _LP_SEG_TYPE_NAME.get(st_id, "Unknown")
 
-def _phase2_build_join_key_items(*, line_pattern_name):
-    """Build Phase-2 join-key IdentityItems (domain-specific, hypothesis-only).
+def _phase2_build_join_key_items(*, segment_count, segments):
+    """Build Phase-2 join-key IdentityItems (domain-specific, definition-based).
 
-    Join-key hypothesis (reversible):
-      - line_pattern.name is the natural join component for cross-file stability checks.
+    Join-key per Phase 2 architecture:
+      - Identity is defined by the ordered segment sequence, not name/UID.
+      - Minimum effective key: segment_count + initial segment (kind, length) pairs.
+
+    Note: Per Phase 2 discovery, this may have residual prefix collision risk
+    if deeper segments differ, but provides definition-based cross-project identity.
     """
-    name_v, name_q = phase2_qv_from_legacy_sentinel_str(line_pattern_name, allow_empty=False)
-    return [
-        make_identity_item("line_pattern.name", name_v, name_q),
-    ]
+    items = []
+
+    # Segment count is required for join key
+    seg_count_v, seg_count_q = canonicalize_int(segment_count)
+    items.append(make_identity_item("line_pattern.segment_count", seg_count_v, seg_count_q))
+
+    # Include first few segments for structural identity (limit to avoid over-keying)
+    MAX_JOIN_SEGMENTS = 4  # Sufficient for most pattern differentiation
+    if segments is not None:
+        for idx, seg in enumerate(segments[:MAX_JOIN_SEGMENTS]):
+            idx3 = "{:03d}".format(idx)
+
+            # Segment kind (type)
+            st_id, _st_name = _lp_seg_type_id_and_name(seg)
+            if st_id is not None:
+                kind_v, kind_q = canonicalize_int(st_id)
+            else:
+                kind_v, kind_q = (None, ITEM_Q_UNREADABLE)
+            items.append(make_identity_item("line_pattern.seg[{}].kind".format(idx3), kind_v, kind_q))
+
+            # Segment length
+            try:
+                slen = getattr(seg, "Length", None)
+            except Exception:
+                slen = None
+            length_v, length_q = canonicalize_float(slen, nd=9)
+            items.append(make_identity_item("line_pattern.seg[{}].length".format(idx3), length_v, length_q))
+
+    return phase2_sorted_items(items)
 
 def extract(doc, ctx=None):
     """
@@ -279,25 +312,17 @@ def extract(doc, ctx=None):
         # -------------------------
         # record.v2 identity + sig_hash
         # -------------------------
+        # Phase-2 compliant: definition-based identity (no UID/name references)
+        # Identity is based on structural segment data per Phase 2 architecture
         identity_items = []
 
-        # Required: uid_or_namekey
+        # Capture UID for context mappings (valid use) but NOT for identity
         raw_uid = None
         try:
             raw_uid = getattr(e, "UniqueId", None)
         except Exception:
             raw_uid = None
-
         uid_v, uid_q = canonicalize_str(raw_uid)
-        if uid_v is None:
-            raw_name = None
-            try:
-                raw_name = getattr(e, "Name", None)
-            except Exception:
-                raw_name = None
-            uid_v, uid_q = canonicalize_str(raw_name)
-
-        identity_items.append(make_identity_item("line_pattern.uid_or_namekey", uid_v, uid_q))
 
         # Segments acquisition (v2)
         segs_v2 = None
@@ -348,7 +373,8 @@ def extract(doc, ctx=None):
         # ---- element-level finalize (once per element) ----
         identity_items_sorted = sorted(identity_items, key=lambda it: it.get("k", ""))
 
-        required_qs = [uid_q, seg_count_q]
+        # Phase-2 compliant: required identity is segment-based, not UID-based
+        required_qs = [seg_count_q]
         blocked_required = any(q != ITEM_Q_OK for q in required_qs)
 
         # Prefer fewer misses: segment item issues => degraded, not blocked
@@ -403,10 +429,14 @@ def extract(doc, ctx=None):
         # -------------------------
         # Phase-2 additions (additive, explanatory, reversible)
         # -------------------------
-        join_key_items = _phase2_build_join_key_items(line_pattern_name=name)
+        # Join key uses structural segment data per Phase 2 architecture
+        join_key_items = _phase2_build_join_key_items(
+            segment_count=len(segs_v2) if (segs_ok and segs_v2 is not None) else None,
+            segments=segs_v2 if (segs_ok and segs_v2 is not None) else None,
+        )
         join_key_items_sorted = phase2_sorted_items(join_key_items)
         rec_v2["join_key"] = {
-            "schema": "line_patterns.join_key.v1",
+            "schema": "line_patterns.join_key.v2",  # v2: structural segment-based
             "hash_alg": "md5_utf8_join_pipe",
             "items": join_key_items_sorted,
             "join_hash": phase2_join_hash(join_key_items_sorted),
@@ -416,15 +446,28 @@ def extract(doc, ctx=None):
         cosmetic_items = []
         unknown_items = []
 
-        # Hypothesis: segment definition is semantic; uid_or_namekey and element id are unknown (file-local)
+        # Phase-2 grouping: segment definition is semantic; uid, name, element id are unknown (file-local)
         for it in (identity_items_sorted or []):
             k = safe_str(it.get("k", ""))
-            if k == "line_pattern.uid_or_namekey":
-                unknown_items.append(it)
-            elif k == "line_pattern.segment_count" or k.startswith("line_pattern.seg["):
+            if k == "line_pattern.segment_count" or k.startswith("line_pattern.seg["):
                 semantic_items.append(it)
 
-        # Add explicit element id as unknown (file-local) without affecting identity_basis
+        # Add file-local identifiers to unknown_items (not part of identity_basis)
+        unknown_items.append(
+            make_identity_item(
+                "line_pattern.uid",
+                uid_v,
+                uid_q,
+            )
+        )
+        name_v, name_q = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
+        unknown_items.append(
+            make_identity_item(
+                "line_pattern.name",
+                name_v,
+                name_q,
+            )
+        )
         unknown_items.append(
             make_identity_item(
                 "line_pattern.element_id",
