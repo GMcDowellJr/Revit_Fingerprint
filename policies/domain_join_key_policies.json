@@ -1,0 +1,244 @@
+{
+  "domains": {
+    "phase_filters": {
+      "join_key_schema": "phase_filters.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "phase_filter.name"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "Pareto evidence showed zero fragmentation and zero collisions with name-only in the evaluated population.",
+        "This is a label-based join pending availability/export of definition-bearing identity fields for phase filters; treat as provisional."
+      ]
+    },
+    "phases": {
+      "join_key_schema": "phases.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "phase.name"
+      ],
+      "optional_items": [
+        "phase.seq"
+      ],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "Policy is provisional pending broader samples; current Pareto evidence shows zero fragmentation and zero collisions for both phase.name and phase.seq.",
+        "phase.name is treated as the definition-bearing identifier in current evidence; phase.seq may be added only if future datasets exhibit name collisions."
+      ]
+    },
+    "units": {
+      "join_key_schema": "units.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "units.spec"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "Identity is definition-based and fully determined by units.spec in Phase-2 evidence.",
+        "No collisions or fragmentation observed with units.spec alone.",
+        "Policy is strong but provisional pending validation on broader populations."
+      ]
+    },
+    "line_patterns": {
+      "join_key_schema": "line_patterns.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "line_pattern.segment_count",
+        "line_pattern.sequence_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "line_pattern.uid",
+        "line_pattern.name",
+        "line_pattern.element_id",
+        "line_pattern.uid_or_namekey"
+      ],
+      "notes": [
+        "Identity is definition-based via ordered segment (kind,length) sequence; segments are collapsed into line_pattern.sequence_hash.",
+        "line_pattern.sequence_hash must be derived only from segment kinds and lengths in order and must not incorporate UID, name, or element_id.",
+        "Names are labels only and must not participate in joins."
+      ]
+    },
+    "line_styles": {
+      "join_key_schema": "line_styles.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "line_style.path",
+        "line_style.pattern_ref.sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "line_style.pattern_ref.kind"
+      ],
+      "notes": [
+        "Identity is definition-based: line style path plus referenced line pattern definition via pattern_ref.sig_hash.",
+        "pattern_ref.kind is too coarse and produces high collisions; it must not be used for joins."
+      ]
+    },
+    "fill_patterns": {
+      "join_key_schema": "fill_patterns.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "fill_pattern.grids_def_hash"
+      ],
+      "optional_items": [
+        "fill_pattern.target_id",
+        "fill_pattern.is_solid",
+        "fill_pattern.grid_count"
+      ],
+      "explicitly_excluded_items": [
+        "fill_pattern.uid",
+        "fill_pattern.elem_id",
+        "fill_pattern.name"
+      ],
+      "notes": [
+        "Definition-based identity is structural: ordered grid parameter sequence; reduce to a single derived grids_def_hash for governance joins.",
+        "Sparse per-grid scalar keys (e.g., grid[i].shift/angle) are not acceptable for identity due to high collision evidence in Phase-2 Pareto exploration.",
+        "target_id/is_solid/grid_count are context/disambiguation only and must not replace grids_def_hash."
+      ]
+    },
+    "arrowheads": {
+      "join_key_schema": "arrowheads.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "arrowhead.style",
+        "arrowhead.tick_size_in",
+        "arrowhead.width_angle_deg",
+        "arrowhead.fill_tick",
+        "arrowhead.arrow_closed",
+        "arrowhead.tick_mark_centered",
+        "arrowhead.heavy_end_pen_weight"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "arrowhead.name",
+        "arrowhead.type_id"
+      ],
+      "notes": [
+        "Definition-based identity only; no referential identifiers in joins.",
+        "arrowhead.name is label-only and may be null for built-in/system arrowheads.",
+        "Downstream domains reference arrowhead identity via this domain signature, not by id or name."
+      ]
+    },
+    "dimension_types": {
+      "join_key_schema": "dimension_types.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "dim_type.tick_mark_uid",
+        "dim_attr.tick_mark_uid",
+        "dim_type.name",
+        "dim_type.shape"
+      ],
+      "notes": [
+        "Definition-based tick mark identity must be provided via referenced arrowheads domain signature (dim_type.tick_mark_sig_hash).",
+        "UID-based tick mark fields must never participate in joins, even if normalized.",
+        "Name is label-only and must not participate in joins."
+      ]
+    },
+    "text_types": {
+      "join_key_schema": "text_types.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "text_type.font",
+        "text_type.size_in",
+        "text_type.width_factor",
+        "text_type.bold",
+        "text_type.italic",
+        "text_type.underline",
+        "text_type.color_rgb",
+        "text_type.leader_arrowhead_sig_hash"
+      ],
+      "optional_items": [
+        "text_type.background_raw",
+        "text_type.line_weight",
+        "text_type.show_border",
+        "text_type.tab_size_in",
+        "text_type.leader_border_offset_in"
+      ],
+      "explicitly_excluded_items": [
+        "text_type.name",
+        "text_type.type_id",
+        "text_type.type_uid",
+        "text_type.leader_arrowhead_uid",
+        "text_type.leader_arrowhead_name",
+        "text_type.color_int"
+      ],
+      "notes": [
+        "Policy: color_rgb is definition-bearing.",
+        "Policy: arrowhead is definition-bearing only via arrowheads-domain signature hash (text_type.leader_arrowhead_sig_hash), not uid/name/id.",
+        "If text_type.leader_arrowhead_sig_hash is unavailable for some records, treat as lower confidence rather than substituting uid/name."
+      ]
+    },
+    "view_filter_definitions": {
+      "join_key_schema": "view_filter_definitions.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vf.categories",
+        "vf.logic_root",
+        "vf.rule_count",
+        "vf.rules[].sig"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vf.uid_or_namekey",
+        "vf.elem_id",
+        "label.components.name",
+        "label.display"
+      ],
+      "notes": [
+        "Definition-based identity is the ordered sequence of rule atoms plus logic_root and categories.",
+        "vf.rules[].sig means: include vf.rule[###].sig for indices 000..(vf.rule_count-1) in order (variable-length ordered sequence).",
+        "vf.rule[###].sig canonically binds vf.rule[###].kind + vf.rule[###].op + vf.rule[###].param_ref.id + vf.rule[###].value into a single atomic identity unit.",
+        "Names/labels and any UID-like identifiers are prohibited from joins for standards governance."
+      ]
+    },
+    "view_filter_applications_view_templates": {
+      "join_key_schema": "view_filter_applications_view_templates.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vfa.filter_stack_count",
+        "vfa.stack[].filter_sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vfa.template_uid_or_namekey",
+        "vfa.template_elem_id",
+        "vfa.stack[].enabled"
+      ],
+      "notes": [
+        "Identity is definition-based: ordered filter-stack composition via referenced filter_sig_hash values.",
+        "vfa.stack[].filter_sig_hash means: include vfa.stack[###].filter_sig_hash for indices 000..(vfa.filter_stack_count-1) in order (variable-length ordered sequence).",
+        "Template identifiers are linkage/label only and must not participate in joins.",
+        "Enabled flags are behavioral modifiers and are excluded from join identity for standards governance."
+      ]
+    },
+    "object_styles": {
+      "join_key_schema": "object_styles.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "obj_style.row_key",
+        "obj_style.pattern_ref.sig_hash",
+        "obj_style.weight.projection"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.kind",
+        "obj_style.weight.cut"
+      ],
+      "notes": [
+        "Identity is category-scoped via obj_style.row_key.",
+        "Definition includes referenced pattern via obj_style.pattern_ref.sig_hash.",
+        "obj_style.weight.projection is required to eliminate observed collisions under row_key + pattern_ref.sig_hash."
+      ]
+    }
+  }
+}

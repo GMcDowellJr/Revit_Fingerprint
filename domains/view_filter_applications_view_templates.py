@@ -42,16 +42,40 @@ from core.phase2 import (
     phase2_join_hash,
 )
 
-def _phase2_build_join_key_items(*, template_uid_or_namekey):
+def _phase2_build_join_key_items(*, items_sorted):
     """
     Phase-2 join-key hypothesis for view_filter_applications_view_templates.
 
-    Join axis: vfa.template_uid_or_namekey (UniqueId when available, else name fallback already used by v2 identity).
+    Definition-based identity for standards analysis:
+      - required: vfa.filter_stack_count, vfa.stack[000].filter_sig_hash
+      - optional: vfa.stack[001].filter_sig_hash (if present + ok)
     """
-    v, q = phase2_qv_from_legacy_sentinel_str(template_uid_or_namekey, allow_empty=False)
-    return phase2_sorted_items([
-        {"k": "vfa.template_uid_or_namekey", "q": q, "v": v},
-    ])
+    item_by_k = {safe_str(it.get("k", "")): it for it in (items_sorted or [])}
+
+    join = []
+
+    # Required: stack count
+    it = item_by_k.get("vfa.filter_stack_count")
+    if it is not None:
+        join.append({"k": "vfa.filter_stack_count", "q": it.get("q"), "v": it.get("v")})
+    else:
+        join.append({"k": "vfa.filter_stack_count", "q": ITEM_Q_MISSING, "v": None})
+
+    # Required: first filter sig hash
+    it = item_by_k.get("vfa.stack[000].filter_sig_hash")
+    if it is not None:
+        join.append({"k": "vfa.stack[000].filter_sig_hash", "q": it.get("q"), "v": it.get("v")})
+    else:
+        join.append({"k": "vfa.stack[000].filter_sig_hash", "q": ITEM_Q_MISSING, "v": None})
+
+    # Optional: second filter sig hash (strict mode extension when present+ok)
+    it = item_by_k.get("vfa.stack[001].filter_sig_hash")
+    if it is not None and safe_str(it.get("q")) == ITEM_Q_OK:
+        v = it.get("v")
+        if v is not None and safe_str(v) != "":
+            join.append({"k": "vfa.stack[001].filter_sig_hash", "q": it.get("q"), "v": v})
+
+    return phase2_sorted_items(join)
 
 def _is_schedule_view(view) -> bool:
     # Most reliable: schedule views/templates are ViewSchedule instances.
@@ -238,7 +262,17 @@ def extract(doc, ctx=None):
                 except Exception:
                     vis_v, vis_q = (None, ITEM_Q_UNREADABLE)
 
-                identity_items.append(make_identity_item(f"vfa.stack[{idx3}].filter_sig_hash", sig_v, sig_q))
+                vis_v, vis_q = (None, ITEM_Q_UNREADABLE)
+                try:
+                    if hasattr(v, "GetFilterVisibility"):
+                        vb = bool(v.GetFilterVisibility(fid))
+                        vis_v, vis_q = canonicalize_bool(vb)
+                    else:
+                        vis_v, vis_q = (None, ITEM_Q_UNSUPPORTED)
+                except Exception:
+                    vis_v, vis_q = (None, ITEM_Q_UNREADABLE)
+
+                identity_items.append(make_identity_item(f"vfa.stack[{idx3}].visible", vis_v, vis_q))
 
                 en_v, en_q = (None, ITEM_Q_UNREADABLE)
                 try:
@@ -299,7 +333,7 @@ def extract(doc, ctx=None):
         # -----------------------------
         # Phase 2 (empirical, additive)
         # -----------------------------
-        join_items = _phase2_build_join_key_items(template_uid_or_namekey=uid_v)
+        join_items = _phase2_build_join_key_items(items_sorted=items_sorted)
         rec["join_key"] = {
             "schema": "view_filter_applications_view_templates.join_key.v1",
             "hash_alg": "md5_utf8_join_pipe",
