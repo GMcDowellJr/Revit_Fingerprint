@@ -172,19 +172,23 @@ This mirrors actual Revit behavior and avoids double-counting settings.
 
 ---
 
-### D-010 — Phase Names Are Non-Behavioral
-**Status:** Accepted  
-**Date:** 2025-12-17
+### D-010 — Phase Names in Behavioral Hashes
+**Status:** Revised
+**Date:** 2025-12-17 (revised 2026-01-29)
 
-**Decision**  
-Phase names are metadata only and excluded from behavioral hashes.
+**Decision**
+Phase names ARE included in behavioral hashes for cross-project comparability.
+Phase UniqueId is used for identity/debug only (document-specific).
 
-**Rationale**  
-Renaming a phase should not be interpreted as a behavioral change.
+**Rationale**
+UniqueIds are document-specific and cannot be compared across projects.
+Phase names provide the semantic link needed for cross-project drift detection.
+This supersedes the original decision that treated names as metadata-only.
 
 **Consequences**
-- Phase identity and ordering may be hashed
-- Naming compliance, if needed, is handled separately
+- Phase name changes ARE considered behavioral changes
+- Cross-project comparison uses phase names as the comparability key
+- UniqueId remains for within-document identity only
 
 ---
 

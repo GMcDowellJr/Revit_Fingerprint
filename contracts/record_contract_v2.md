@@ -100,6 +100,20 @@ Then:
 - Else compute identity_quality over REQUIRED KEYS only using dominance order from:
   - `contracts/domain_identity_keys_v2.json`
 
+## Blocked Records
+
+When `status == "blocked"`:
+
+- `sig_hash` MUST be `null`
+- `identity_quality` MUST be `"none_blocked"`
+- `identity_basis.items` MUST contain at least one item explaining the block:
+  - Use `q: "unreadable"` for data that exists but cannot be read
+  - Use `q: "unsupported"` for data that the API does not expose
+  - Use `q: "missing"` for required data that is absent
+- `status_reasons` MUST contain at least one machine-readable reason code
+
+This ensures blocked records remain diagnosable and the block reason is traceable through the identity items.
+
 ## Domain key registry and minima
 
 Per-domain allowed keys, required keys, and minima/blocking rules are defined in:

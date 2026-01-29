@@ -38,7 +38,7 @@ core/           Pure Python utilities (no Revit API calls)
   collect.py    FilteredElementCollector caching
 
 domains/        One extract(doc, ctx) function per domain
-  identity.py   Project metadata (NO HASH - metadata only)
+  identity.py   Project metadata (NO HASH - metadata only, not fingerprinted)
   units.py      Length/area/volume format options
   object_styles.py, line_patterns.py, line_styles.py
   fill_patterns.py, text_types.py, dimension_types.py
@@ -120,6 +120,17 @@ Every commit message MUST state "no semantic change" OR describe the semantic ch
 ### CHANGELOG Discipline
 Log ONLY semantic changes (signature composition, ordering rules, identity rules, fail-soft behavior). Do NOT log pure refactors.
 
+### Hash Modes
+
+The system supports two hash modes, controlled via `REVIT_FINGERPRINT_HASH_MODE` environment variable:
+
+- `legacy` (default): Backward-compatible pipe-delimited signatures with sentinel literals
+- `semantic`: record.v2 identity-basis hashing (no sentinel literals, preferred for new integrations)
+
+Both hashes are always computed by domains. The mode determines which is authoritative in contract output.
+
+**Migration**: Run with `legacy`, compare `hash` vs `hash_v2` outputs, switch to `semantic` when ready.
+
 ### Domain Development Pattern
 ```python
 # domains/example.py
@@ -180,7 +191,7 @@ FINGERPRINT_JSON_PATH=/path/to/export.json pytest tests/test_record_contract_v2.
 | D-006 | Ordering rules explicit per domain |
 | D-007 | Global vs contextual domain split |
 | D-008 | View templates are behavioral, not nominal |
-| D-010 | Phase names are non-behavioral (metadata only) |
+| D-010 | Phase names ARE included in behavioral hashes (revised: cross-project comparability) |
 | D-011 | Domain-driven architecture |
 | D-013 | `phase_graphics` disabled (API limitation) |
 
