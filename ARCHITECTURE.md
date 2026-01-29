@@ -47,6 +47,35 @@ Responsible for:
 
 `ctx` is a plain dictionary.
 
+### Context Dictionary Schema
+
+The `ctx` dictionary flows through domain execution. Keys are populated by upstream domains and consumed by downstream domains.
+
+#### Runner-Populated Keys (guaranteed)
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `_collect` | CollectCtx | Collector cache instance (from `core/collect.py`) |
+| `_doc_view` | DocViewContext | Document + view context (from `core/context.py`) |
+| `debug_vg_details` | bool | Enable verbose VG debug output |
+
+#### Domain-Populated Keys
+
+| Key | Populated By | Consumed By | Type |
+|-----|--------------|-------------|------|
+| `phase_uid_to_hash` | phases | view_templates | dict[str, str] |
+| `phase_filter_uid_to_hash` | phase_filters | view_templates | dict[str, str] |
+| `view_filter_uid_to_hash` | view_filters | view_templates | dict[str, str] |
+| `view_filter_uid_to_sig_hash_v2` | view_filter_definitions | view_templates | dict[str, str] |
+| `line_pattern_uid_to_hash` | line_patterns | object_styles, line_styles | dict[str, str] |
+| `line_pattern_uid_to_hash_v2` | line_patterns | object_styles, line_styles | dict[str, str] |
+
+#### Dependency Contract
+
+- Downstream domains MUST use `require_domain()` from `core/deps.py` to validate upstream availability
+- Missing upstream keys result in `Blocked` status for the dependent domain
+- Domains MUST NOT modify keys populated by other domains
+
 ---
 
 ## Layer 3 — Runner (Host-specific)

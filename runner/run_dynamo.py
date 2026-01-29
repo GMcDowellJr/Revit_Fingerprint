@@ -113,6 +113,27 @@ from core.features import build_features
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
 ENABLED_DOMAINS = None  # None = all domains
+
+# HASH_MODE controls which hash is authoritative in contract output:
+#
+#   "legacy"   - Uses pipe-delimited signature strings with sentinel literals.
+#                Default mode for backward compatibility with existing tooling.
+#                Hash derived from legacy `hash` field in domain payloads.
+#
+#   "semantic" - Uses record.v2 identity_basis items (no sentinel literals).
+#                Preferred for new integrations and cross-project comparison.
+#                Hash derived from `hash_v2` field in domain payloads.
+#                Domains missing v2 hash will be BLOCKED in semantic mode.
+#
+# Both hashes are always computed by domains. HASH_MODE determines which
+# is surfaced as the authoritative hash in the contract envelope.
+#
+# Migration path:
+#   1. Run with HASH_MODE=legacy (default)
+#   2. Compare `hash` vs `hash_v2` for each domain
+#   3. When all domains produce matching or acceptable v2 hashes, switch to semantic
+#
+# Set via environment variable: REVIT_FINGERPRINT_HASH_MODE=semantic
 HASH_MODE = os.getenv("REVIT_FINGERPRINT_HASH_MODE", "legacy").strip().lower()
 if HASH_MODE not in ("legacy", "semantic"):
     HASH_MODE = "legacy"

@@ -217,14 +217,14 @@ def extract(doc, ctx=None):
                 except Exception:
                     rgb_sig_legacy = S_MISSING
 
-                # Line pattern (legacy): prefer def_hash via ctx map; else <LP:UNMAPPED> sentinel
+                # Line pattern (legacy): prefer def_hash via ctx map; else S_UNREADABLE (unmapped pattern)
                 try:
                     lp_id = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
                     lp_val = S_MISSING
                     if lp_id and getattr(lp_id, "IntegerValue", 0) > 0:
                         lp_e = doc.GetElement(lp_id)
                         lp_uid = canon_str(getattr(lp_e, "UniqueId", None)) if lp_e else None
-                        lp_val = lp_uid_to_hash_legacy.get(lp_uid) or "<LP:UNMAPPED>"
+                        lp_val = lp_uid_to_hash_legacy.get(lp_uid) or S_UNREADABLE
                 except Exception:
                     lp_val = S_MISSING
 
