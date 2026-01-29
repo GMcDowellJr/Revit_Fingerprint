@@ -311,7 +311,26 @@ def extract(doc, ctx=None):
         )
 
         # Phase-2 item partitions (hypotheses only; no inference).
-        p2_semantic = list(items_sorted)
+        # Avoid duplicating the full vfa.stack[...] structure which already exists in identity_basis.items.
+        stack_items = []
+        p2_semantic = []
+        for it in (items_sorted or []):
+            k = safe_str(it.get("k", ""))
+            if k.startswith("vfa.stack["):
+                stack_items.append(it)
+                continue
+            p2_semantic.append(it)
+
+        # Derived hash pointer for the stack definition (ordered + deterministic via phase2_sorted_items).
+        stack_items_sorted = phase2_sorted_items(stack_items)
+        if stack_items_sorted:
+            p2_semantic.append(
+                make_identity_item(
+                    "vfa.stack_def_hash",
+                    phase2_join_hash(stack_items_sorted),
+                    ITEM_Q_OK,
+                )
+            )
 
         # Unknown: template element id may vary across files.
         try:
