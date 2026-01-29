@@ -155,6 +155,28 @@ def build_wide_kv_table(records: pd.DataFrame, items: pd.DataFrame) -> pd.DataFr
 
     return df
 
+def sample_records(records: pd.DataFrame, items: pd.DataFrame, n: int, seed: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    if n <= 0:
+        return records, items
+
+    r = records.copy()
+    r["record_key"] = make_record_key(r)
+    unique_keys = r["record_key"].dropna().drop_duplicates()
+
+    if unique_keys.empty:
+        return records, items
+
+    n_eff = min(int(n), int(unique_keys.shape[0]))
+    sampled_keys = unique_keys.sample(n=n_eff, random_state=int(seed))
+
+    r = r[r["record_key"].isin(sampled_keys)].drop(columns=["record_key"], errors="ignore")
+
+    it = items.copy()
+    it["record_key"] = make_record_key(it)
+    it = it[it["record_key"].isin(sampled_keys)].drop(columns=["record_key"], errors="ignore")
+
+    return r, it
+
 
 def eval_subset(df: pd.DataFrame, keys: Tuple[str, ...]) -> dict:
     """
@@ -226,19 +248,73 @@ def main() -> None:
         help="output filename for Pareto front CSV (default: pareto_front.csv)",
     )
 
+    ap.add_argument("--seed", default=1337, type=int, help="random seed for sampling")
+    ap.add_argument(
+        "--sample_records",
+        default=None,
+        type=int,
+        help="optional: randomly sample N unique records (record_key) before analysis",
+    )
+    ap.add_argument(
+        "--sample_candidates",
+        default=None,
+        type=int,
+        help="optional: randomly sample N candidate keys after filtering (useful for large domains)",
+    )
+
     args = ap.parse_args()
 
     records = pd.read_csv(args.records)
     items = pd.read_csv(args.items)
 
+    # optional record sampling (must happen before pivot/wide build)
+    if args.sample_records is not None and args.sample_records > 0:
+        records, items = sample_records(records, items, int(args.sample_records), int(args.seed))
+
+    # auto-candidates from identity_items.k (not from records)
+    items_ks = (
+        items["k"].dropna().astype(str).str.strip()
+        if "k" in items.columns
+        else pd.Series([], dtype=str)
+    )
+    auto_candidates = sorted(set([k for k in items_ks.tolist() if k != ""]))
+
+    # candidate keys: explicit list wins, otherwise auto
+    if args.candidates and len(args.candidates) > 0:
+        candidates = [str(k).strip() for k in args.candidates if str(k).strip() != ""]
+    else:
+        candidates = auto_candidates[:]
+
+    if args.exclude_uid_like:
+        candidates = [k for k in candidates if "uid" not in str(k).lower()]
+
+    candidates = sorted(set(candidates))
+
+    # optional random downselect of candidates (after filtering)
+    if args.sample_candidates is not None and args.sample_candidates > 0 and len(candidates) > args.sample_candidates:
+        candidates = (
+            pd.Series(candidates)
+            .sample(n=int(args.sample_candidates), random_state=int(args.seed))
+            .tolist()
+        )
+        candidates = sorted(set(candidates))
+
+    # optional deterministic cap (after filtering / sampling)
+    if args.limit_candidates is not None and args.limit_candidates > 0:
+        candidates = candidates[: args.limit_candidates]
+
+    if len(candidates) == 0:
+        raise SystemExit("No candidates after filtering. Provide --candidates or remove filters.")
+
+    # build wide table AFTER candidate selection and sampling
     df = build_wide_kv_table(records, items)
 
-    # candidate keys
+    # ensure candidates exist in wide columns (some ks may be absent post-sample)
     all_ks = [c for c in df.columns if c != "sig_hash_no_uid"]
-    if args.candidates and len(args.candidates) > 0:
-        candidates = [k for k in args.candidates if k in all_ks]
-    else:
-        candidates = all_ks[:]
+    candidates = [k for k in candidates if k in all_ks]
+
+    if len(candidates) == 0:
+        raise SystemExit("No candidates present in sampled data. Increase --sample_records or adjust candidate filters.")
 
     if args.exclude_uid_like:
         candidates = [k for k in candidates if "uid" not in str(k).lower()]
@@ -251,14 +327,15 @@ def main() -> None:
     if len(candidates) == 0:
         raise SystemExit("No candidates after filtering. Provide --candidates or remove filters.")
 
-    # search
+    # search (stream subsets; do not materialize into a list)
     max_k = max(0, int(args.max_k))
-    subsets: List[Tuple[str, ...]] = []
-    for ksize in range(1, max_k + 1):
-        subsets.extend(itertools.combinations(candidates, ksize))
+
+    def iter_subsets(cands: List[str], mk: int) -> Iterable[Tuple[str, ...]]:
+        for ksize in range(1, mk + 1):
+            yield from itertools.combinations(cands, ksize)
 
     results: List[dict] = []
-    for keys in subsets:
+    for keys in iter_subsets(candidates, max_k):
         results.append(eval_subset(df, keys))
 
     # Pareto objectives (minimize)
