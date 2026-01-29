@@ -51,6 +51,8 @@ from core.phase2 import (
     phase2_join_hash,
 )
 
+import json
+
 def _phase2_build_join_key_items(*, uid_or_namekey):
     """
     Phase-2 join-key hypothesis for view_filter_definitions.
@@ -373,6 +375,33 @@ def extract(doc, ctx=None):
             identity_items.append(make_identity_item(f"vf.rule[{idx3}].param_ref.kind", pk_v, pk_q))
             identity_items.append(make_identity_item(f"vf.rule[{idx3}].param_ref.id", pi_v, pi_q))
             status_reasons.extend(add_reasons)
+
+            # Derived rule atom: bind op + param_ref.id + value (+ kind) into a single definition unit.
+            # Canonical form is JSON to avoid delimiter/escaping ambiguities.
+            if (
+                kind_cq == ITEM_Q_OK
+                and op_q == ITEM_Q_OK
+                and pi_q == ITEM_Q_OK
+                and val_q == ITEM_Q_OK
+                and kind_cv is not None
+                and op_v is not None
+                and pi_v is not None
+            ):
+                try:
+                    sig_obj = {"kind": kind_cv, "op": op_v, "param_ref.id": pi_v, "value": val_v}
+                    sig_v = json.dumps(sig_obj, separators=(",", ":"), ensure_ascii=True, sort_keys=True)
+                    sig_q = ITEM_Q_OK
+                except Exception:
+                    sig_v, sig_q = (None, ITEM_Q_UNREADABLE)
+            else:
+                # If the rule components are not all OK, the combined signature is not safely defined.
+                # Choose MISSING only if all are missing, otherwise UNREADABLE.
+                if (op_q == ITEM_Q_MISSING and pi_q == ITEM_Q_MISSING and val_q == ITEM_Q_MISSING):
+                    sig_v, sig_q = (None, ITEM_Q_MISSING)
+                else:
+                    sig_v, sig_q = (None, ITEM_Q_UNREADABLE)
+
+            identity_items.append(make_identity_item(f"vf.rule[{idx3}].sig", sig_v, sig_q))
 
         items_sorted = sorted(identity_items, key=lambda it: str(it.get("k", "")))
 

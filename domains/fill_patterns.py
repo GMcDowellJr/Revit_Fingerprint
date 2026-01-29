@@ -533,6 +533,31 @@ def extract(doc, ctx=None):
                     except Exception:
                         semantic.append({"k": "fill_pattern.grid[{}].shift".format(idx), "v": None, "q": ITEM_Q_UNREADABLE})
 
+        # Derived structural identity helper for Phase-2:
+        # Collapse all per-grid semantic items into a single hash so join-key discovery
+        # can treat the grid bundle as one "field" without losing the detailed items.
+        try:
+            grid_like = []
+            for it in (semantic or []):
+                k = it.get("k", "")
+                if k.startswith("fill_pattern.grid[") or k == "fill_pattern.grid_count":
+                    # Stable preimage: include k/q/v so unreadables affect the hash deterministically
+                    grid_like.append("k={}|q={}|v={}".format(
+                        safe_str(it.get("k", "")),
+                        safe_str(it.get("q", "")),
+                        safe_str(it.get("v", "")),
+                    ))
+            grid_like_sorted = sorted(grid_like)
+            grids_def_hash = make_hash(grid_like_sorted) if grid_like_sorted else None
+        except Exception:
+            grids_def_hash = None
+
+        if grids_def_hash:
+            semantic.append({"k": "fill_pattern.grids_def_hash", "v": grids_def_hash, "q": ITEM_Q_OK})
+        else:
+            # If we can't compute it, make the failure explicit (but keep it out of identity)
+            semantic.append({"k": "fill_pattern.grids_def_hash", "v": None, "q": ITEM_Q_UNREADABLE})
+
         return {
             "schema": "phase2.fill_patterns.v1",
             "grouping_basis": "phase2.hypothesis",

@@ -109,10 +109,12 @@ def _phase2_build_join_key_items(*, segment_count, segments):
 
     Join-key per Phase 2 architecture:
       - Identity is defined by the ordered segment sequence, not name/UID.
-      - Minimum effective key: segment_count + initial segment (kind, length) pairs.
+      - For Phase-2 grouping, collapse the correlated seg[###] structure into
+        a single definition-hash to avoid prefix collisions and reduce key width.
 
-    Note: Per Phase 2 discovery, this may have residual prefix collision risk
-    if deeper segments differ, but provides definition-based cross-project identity.
+    Join-key items:
+      - line_pattern.segment_count
+      - line_pattern.sequence_hash  (hash of ordered (kind,length) sequence)
     """
     items = []
 
@@ -120,27 +122,31 @@ def _phase2_build_join_key_items(*, segment_count, segments):
     seg_count_v, seg_count_q = canonicalize_int(segment_count)
     items.append(make_identity_item("line_pattern.segment_count", seg_count_v, seg_count_q))
 
-    # Include first few segments for structural identity (limit to avoid over-keying)
-    MAX_JOIN_SEGMENTS = 4  # Sufficient for most pattern differentiation
+    # Full sequence hash (definition-based; no UID/name)
+    seq_hash_v, seq_hash_q = (None, ITEM_Q_UNREADABLE)
     if segments is not None:
-        for idx, seg in enumerate(segments[:MAX_JOIN_SEGMENTS]):
-            idx3 = "{:03d}".format(idx)
+        try:
+            tokens = []
+            for idx, seg in enumerate(segments):
+                # kind
+                st_id, _st_name = _lp_seg_type_id_and_name(seg)
+                tokens.append("seg[{:03d}].kind={}".format(idx, safe_str(st_id)))
 
-            # Segment kind (type)
-            st_id, _st_name = _lp_seg_type_id_and_name(seg)
-            if st_id is not None:
-                kind_v, kind_q = canonicalize_int(st_id)
-            else:
-                kind_v, kind_q = (None, ITEM_Q_UNREADABLE)
-            items.append(make_identity_item("line_pattern.seg[{}].kind".format(idx3), kind_v, kind_q))
+                # length (canonicalized to same precision as identity_items)
+                try:
+                    slen = getattr(seg, "Length", None)
+                except Exception:
+                    slen = None
+                length_v, _length_q = canonicalize_float(slen, nd=9)
+                tokens.append("seg[{:03d}].length={}".format(idx, safe_str(length_v)))
 
-            # Segment length
-            try:
-                slen = getattr(seg, "Length", None)
-            except Exception:
-                slen = None
-            length_v, length_q = canonicalize_float(slen, nd=9)
-            items.append(make_identity_item("line_pattern.seg[{}].length".format(idx3), length_v, length_q))
+            # Deterministic preimage: preserve order in tokens
+            seq_hash = make_hash(tokens)
+            seq_hash_v, seq_hash_q = canonicalize_str(seq_hash)
+        except Exception:
+            seq_hash_v, seq_hash_q = (None, ITEM_Q_UNREADABLE)
+
+    items.append(make_identity_item("line_pattern.sequence_hash", seq_hash_v, seq_hash_q))
 
     return phase2_sorted_items(items)
 

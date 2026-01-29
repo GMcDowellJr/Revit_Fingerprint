@@ -69,10 +69,28 @@ def _phase2_item(k, raw_v, *, allow_empty=False):
     return {"k": k, "q": q, "v": v}
 
 
-def _phase2_build_join_key_items(type_name):
-    # Hypothesis: type name is the best available cross-file join key for TextNoteType.
+def _phase2_build_join_key_items(rec):
+    """
+    Phase-2 join-key policy for text_types.
+
+    Definition-first join key (no name, no UID):
+    - Typography/styling core
+    - Color (promoted to primary by policy)
+    - Leader arrowhead by definition signature (from arrowheads domain ctx), not UID
+    """
     items = [
-        _phase2_item("text_type.name", type_name, allow_empty=True),
+        _phase2_item("text_type.font", rec.get("font")),
+        _phase2_item("text_type.size_in", rec.get("text_size_in")),
+        _phase2_item("text_type.width_factor", rec.get("width_factor")),
+        _phase2_item("text_type.bold", canon_bool(rec.get("bold"))),
+        _phase2_item("text_type.italic", canon_bool(rec.get("italic"))),
+        _phase2_item("text_type.underline", canon_bool(rec.get("underline"))),
+
+        # Policy: color is definition-bearing for standards analysis
+        _phase2_item("text_type.color_rgb", safe_str(rec.get("color_rgb"))),
+
+        # Policy: arrowhead is definition-bearing, but only via definition hash (NOT uid/name)
+        _phase2_item("text_type.leader_arrowhead_sig_hash", rec.get("leader_arrowhead_sig_hash"), allow_empty=True),
     ]
     return phase2_sorted_items(items)
 
@@ -104,6 +122,7 @@ def _phase2_build_payload(rec):
         _phase2_item("text_type.color_int", rec.get("color_int")),
         _phase2_item("text_type.leader_arrowhead_uid", rec.get("leader_arrowhead_uid"), allow_empty=True),
         _phase2_item("text_type.leader_arrowhead_name", rec.get("leader_arrowhead_name"), allow_empty=True),
+        _phase2_item("text_type.leader_arrowhead_sig_hash", rec.get("leader_arrowhead_sig_hash"), allow_empty=True),
     ])
 
     return {
@@ -214,6 +233,8 @@ def extract(doc, ctx=None):
         # Leader Arrowhead (metadata only; do NOT put in core signature)
         leader_arrow_uid = None
         leader_arrow_name = None
+        leader_arrow_sig_hash = None
+
         try:
             p_arrow = first_param(t, bip_names=["LEADER_ARROWHEAD"], ui_names=["Leader Arrowhead"])
             if p_arrow:
@@ -222,6 +243,15 @@ def extract(doc, ctx=None):
                     arrow = doc.GetElement(arrow_id)
                     if arrow:
                         leader_arrow_uid = getattr(arrow, "UniqueId", None)
+
+                        try:
+                            ah_map = (ctx or {}).get("arrowheads_by_type_id", {}) if ctx is not None else {}
+                            k = safe_str(getattr(arrow_id, "IntegerValue", None))
+                            if k and isinstance(ah_map, dict) and k in ah_map:
+                                leader_arrow_sig_hash = ah_map.get(k, {}).get("sig_hash", None)
+                        except Exception:
+                            leader_arrow_sig_hash = None
+
                         leader_arrow_name = get_type_display_name(arrow) or getattr(arrow, "Name", None)
                         leader_arrow_name = canon_str(leader_arrow_name)
         except Exception as e:
@@ -329,6 +359,7 @@ def extract(doc, ctx=None):
 
             "leader_arrowhead_uid": leader_arrow_uid,
             "leader_arrowhead_name": leader_arrow_name,
+            "leader_arrowhead_sig_hash": safe_str(leader_arrow_sig_hash) if leader_arrow_sig_hash else "",
 
             "signature_tuple": signature_tuple,
             "signature_hash": sig_hash
@@ -338,13 +369,14 @@ def extract(doc, ctx=None):
         # Phase 2 (additive, explanatory, reversible)
         # Emit even if v2 is domain-blocked.
         # ---------------------------
-        _jk_items = _phase2_build_join_key_items(rec.get("type_name"))
+        _jk_items = _phase2_build_join_key_items(rec)
         rec["join_key"] = {
-            "schema": "text_types.join_key.v1",
+            "schema": "text_types.join_key.v2",
             "hash_alg": "md5_utf8_join_pipe",
             "items": phase2_sorted_items(_jk_items),
             "join_hash": phase2_join_hash(_jk_items),
         }
+
         rec["phase2"] = _phase2_build_payload(rec)
 
         status_v2 = STATUS_OK

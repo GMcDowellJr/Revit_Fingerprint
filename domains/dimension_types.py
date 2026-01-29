@@ -432,6 +432,7 @@ def extract(doc, ctx=None):
         tick_name = ""
         tick_uid = None
         tick_exc = None
+        tick_sig_hash = None
 
         try:
             p_tick = first_param(
@@ -464,6 +465,16 @@ def extract(doc, ctx=None):
 
                         if te is not None:
                             tick_uid = getattr(te, "UniqueId", None)
+
+                            try:
+                                # Prefer definition-based arrowhead signature via ctx (no UID).
+                                ah_map = (ctx or {}).get("arrowheads_by_type_id", {}) if ctx is not None else {}
+                                k = safe_str(getattr(tid, "IntegerValue", None))
+                                if k and isinstance(ah_map, dict) and k in ah_map:
+                                    tick_sig_hash = ah_map.get(k, {}).get("sig_hash", None)
+                            except Exception:
+                                tick_sig_hash = None
+
                             # Prefer a stable display name for legacy signature when available
                             try:
                                 tick_name = tick_name or get_element_display_name(te) or tick_name
@@ -772,6 +783,7 @@ def extract(doc, ctx=None):
             make_identity_item("dim_attr.color_int", color_int_v, color_int_q),
             make_identity_item("dim_attr.tick_mark_name", tick_name_v, tick_name_q),
             make_identity_item("dim_attr.tick_mark_uid", tick_uid_v, tick_uid_q),
+            make_identity_item("dim_attr.tick_mark_sig_hash", safe_str(tick_sig_hash) if tick_sig_hash else "", ITEM_Q_OK),
         ])
 
 
@@ -785,6 +797,11 @@ def extract(doc, ctx=None):
             make_identity_item("dim_type.accuracy", accuracy_v, accuracy_q),
             make_identity_item("dim_type.prefix", prefix_v, prefix_q),
             make_identity_item("dim_type.suffix", suffix_v, suffix_q),
+            make_identity_item(
+                "dim_type.tick_mark_sig_hash",
+                safe_str(tick_sig_hash) if tick_sig_hash else None,
+                ITEM_Q_OK if tick_sig_hash else ITEM_Q_UNSUPPORTED_NOT_APPLICABLE,
+            ),
         ]
         identity_items = sorted(identity_items, key=lambda it: it.get("k", ""))
 

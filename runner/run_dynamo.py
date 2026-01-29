@@ -103,7 +103,7 @@ from RevitServices.Persistence import DocumentManager
 
 # Import domain extractors
 from domains import identity, units, object_styles, line_patterns, line_styles
-from domains import fill_patterns, text_types, dimension_types
+from domains import fill_patterns, arrowheads, text_types, dimension_types
 from domains import view_filter_definitions, view_filter_applications_view_templates
 from domains import phases, phase_filters, phase_graphics
 from domains import view_templates
@@ -595,6 +595,11 @@ def run_fingerprint(doc):
         legacy = _domain_run("fill_patterns", fill_patterns.extract, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["fill_patterns"] = legacy
+
+    if _enabled("arrowheads"):
+        legacy = _domain_run("arrowheads", arrowheads.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["arrowheads"] = legacy
 
     if _enabled("text_types"):
         legacy = _domain_run("text_types", text_types.extract, doc, ctx, contract_domains, run_diag, runner_notes)
