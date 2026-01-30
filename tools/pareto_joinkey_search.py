@@ -24,12 +24,67 @@ from __future__ import annotations
 import argparse
 import itertools
 import math
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple
 
 import pandas as pd
 
+def _load_join_key_policy(policy_json: Path, domain: str) -> tuple[list[str], list[str], list[str]]:
+    """
+    Return (required_items, optional_items, explicitly_excluded_items) for a domain.
+    Expects domain_join_key_policies.json shape:
+      { "domains": { "<domain>": { "required_items": [...], "optional_items": [...], "explicitly_excluded_items": [...] } } }
+    """
+    with policy_json.open("r", encoding="utf-8") as f:
+        d = json.load(f)
+    doms = d.get("domains") if isinstance(d, dict) else None
+    dom = doms.get(domain) if isinstance(doms, dict) else None
+    if not isinstance(dom, dict):
+        raise SystemExit(f"Domain not found in policy_json: {domain}")
+
+    req = dom.get("required_items") if isinstance(dom.get("required_items"), list) else []
+    opt = dom.get("optional_items") if isinstance(dom.get("optional_items"), list) else []
+    exc = dom.get("explicitly_excluded_items") if isinstance(dom.get("explicitly_excluded_items"), list) else []
+
+    req = [str(x).strip() for x in req if str(x).strip()]
+    opt = [str(x).strip() for x in opt if str(x).strip()]
+    exc = [str(x).strip() for x in exc if str(x).strip()]
+
+    # de-dupe deterministically
+    req = sorted(set(req))
+    opt = sorted(set(opt))
+    exc = sorted(set(exc))
+
+    return req, opt, exc
+
+
+def _rank_challengers_from_wide(df: pd.DataFrame, keys: list[str]) -> list[str]:
+    """
+    Deterministically rank keys by a simple usefulness score:
+      score = coverage * log(1 + distinct_count)
+    where coverage is fraction of records with a non-null kv string for that key.
+    """
+    if df.empty or not keys:
+        return []
+
+    n = float(len(df.index))
+    out: list[tuple[float, str]] = []
+    for k in keys:
+        if k not in df.columns:
+            continue
+        col = df[k]
+        present = col.notna()
+        cov = float(present.sum()) / n if n > 0 else 0.0
+        if cov <= 0.0:
+            continue
+        distinct = int(col[present].nunique(dropna=True))
+        score = cov * math.log(1.0 + float(distinct))
+        out.append((score, k))
+
+    out.sort(key=lambda t: (-t[0], t[1].lower()))
+    return [k for _, k in out]
 
 # -------------------------
 # Normalization + utilities
@@ -236,6 +291,25 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--records", required=True, type=Path)
     ap.add_argument("--items", required=True, type=Path)
+    ap.add_argument("--domain", default=None, help="optional: filter to a single domain (recommended for combined flat tables)")
+    ap.add_argument(
+        "--policy_json",
+        default=None,
+        type=Path,
+        help="optional: domain_join_key_policies.json path (enables validate/harsh modes)",
+    )
+    ap.add_argument(
+        "--mode",
+        default="discover",
+        choices=["discover", "validate", "harsh"],
+        help="discover=unconstrained search; validate=policy-respecting; harsh=policy-seeded but allows omitting required",
+    )
+    ap.add_argument(
+        "--challenger_top_n",
+        default=0,
+        type=int,
+        help="optional: add top-N deterministic challenger keys outside policy (ranked by coverage*distinctness)",
+    )
     ap.add_argument("--max_k", default=4, type=int, help="max subset size to search")
     ap.add_argument("--candidates", nargs="*", default=None, help="explicit candidate k list; default = all ks found")
     ap.add_argument("--exclude_uid_like", action="store_true", help="exclude keys containing 'uid'")
@@ -266,12 +340,29 @@ def main() -> None:
 
     records = pd.read_csv(args.records)
     items = pd.read_csv(args.items)
+    # Optional domain filter (recommended if your CSVs include multiple domains)
+    if args.domain:
+        records = records[records["domain"].astype(str) == str(args.domain)]
+        items = items[items["domain"].astype(str) == str(args.domain)]
 
     # optional record sampling (must happen before pivot/wide build)
     if args.sample_records is not None and args.sample_records > 0:
         records, items = sample_records(records, items, int(args.sample_records), int(args.seed))
 
-    # auto-candidates from identity_items.k (not from records)
+    # build wide table early so we can rank challengers deterministically (and validate keys exist)
+    df = build_wide_kv_table(records, items)
+
+    # Candidate selection
+    policy_required: list[str] = []
+    policy_optional: list[str] = []
+    policy_excluded: list[str] = []
+
+    if args.policy_json is not None:
+        if not args.domain:
+            raise SystemExit("--policy_json requires --domain (policy is domain-scoped).")
+        policy_required, policy_optional, policy_excluded = _load_join_key_policy(Path(args.policy_json), str(args.domain))
+
+    # Auto-candidates from identity_items.k (not from records)
     items_ks = (
         items["k"].dropna().astype(str).str.strip()
         if "k" in items.columns
@@ -279,35 +370,80 @@ def main() -> None:
     )
     auto_candidates = sorted(set([k for k in items_ks.tolist() if k != ""]))
 
-    # candidate keys: explicit list wins, otherwise auto
-    if args.candidates and len(args.candidates) > 0:
-        candidates = [str(k).strip() for k in args.candidates if str(k).strip() != ""]
+    # In validate/harsh mode, candidates are policy-seeded (plus optional challengers).
+    if str(args.mode) in ("validate", "harsh"):
+        candidates = sorted(set(policy_required + policy_optional))
     else:
-        candidates = auto_candidates[:]
+        # discover mode: explicit list wins, otherwise auto
+        if args.candidates and len(args.candidates) > 0:
+            candidates = [str(k).strip() for k in args.candidates if str(k).strip() != ""]
+        else:
+            candidates = auto_candidates[:]
 
+    # Exclude UID-like keys if requested (all modes)
     if args.exclude_uid_like:
         candidates = [k for k in candidates if "uid" not in str(k).lower()]
 
+    # Exclude policy-explicit exclusions (validate/harsh)
+    if str(args.mode) in ("validate", "harsh") and policy_excluded:
+        excl = {k.lower() for k in policy_excluded}
+        candidates = [k for k in candidates if str(k).lower() not in excl]
+
     candidates = sorted(set(candidates))
 
-    # optional random downselect of candidates (after filtering)
-    if args.sample_candidates is not None and args.sample_candidates > 0 and len(candidates) > args.sample_candidates:
-        candidates = (
-            pd.Series(candidates)
-            .sample(n=int(args.sample_candidates), random_state=int(args.seed))
-            .tolist()
-        )
-        candidates = sorted(set(candidates))
+    # Optional challengers (validate/harsh): deterministic, ranked from wide df columns
+    if str(args.mode) in ("validate", "harsh") and int(args.challenger_top_n or 0) > 0:
+        wide_keys = [c for c in df.columns if c != "sig_hash_no_uid"]
+        ranked = _rank_challengers_from_wide(df, wide_keys)
 
-    # optional deterministic cap (after filtering / sampling)
+        # filter challengers: not already in candidates, not excluded, optionally UID-like already handled
+        cand_set = {k.lower() for k in candidates}
+        excl_set = {k.lower() for k in policy_excluded} if policy_excluded else set()
+
+        challengers: list[str] = []
+        for k in ranked:
+            kl = str(k).lower()
+            if kl in cand_set:
+                continue
+            if kl in excl_set:
+                continue
+            challengers.append(k)
+            if len(challengers) >= int(args.challenger_top_n):
+                break
+
+        candidates = sorted(set(candidates + challengers))
+
+    # Optional random downselect of candidates (discover mode only)
+    if str(args.mode) == "discover":
+        if args.sample_candidates is not None and args.sample_candidates > 0 and len(candidates) > args.sample_candidates:
+            candidates = (
+                pd.Series(candidates)
+                .sample(n=int(args.sample_candidates), random_state=int(args.seed))
+                .tolist()
+            )
+            candidates = sorted(set(candidates))
+
+    # Optional deterministic cap (after filtering / sampling)
+    if args.limit_candidates is not None and args.limit_candidates > 0:
+        candidates = candidates[: args.limit_candidates]
+
+    if len(candidates) == 0:
+        raise SystemExit("No candidates after filtering. Provide --candidates or remove filters / adjust policy.")
+
+    # ensure candidates exist in wide columns (some ks may be absent post-sample)
+    all_ks = [c for c in df.columns if c != "sig_hash_no_uid"]
+    candidates = [k for k in candidates if k in all_ks]
+
+    if len(candidates) == 0:
+        raise SystemExit("No candidates present in data. Check domain filter / exports / policy keys.")
+
+    candidates = sorted(set(candidates))
+
     if args.limit_candidates is not None and args.limit_candidates > 0:
         candidates = candidates[: args.limit_candidates]
 
     if len(candidates) == 0:
         raise SystemExit("No candidates after filtering. Provide --candidates or remove filters.")
-
-    # build wide table AFTER candidate selection and sampling
-    df = build_wide_kv_table(records, items)
 
     # ensure candidates exist in wide columns (some ks may be absent post-sample)
     all_ks = [c for c in df.columns if c != "sig_hash_no_uid"]
@@ -330,12 +466,101 @@ def main() -> None:
     # search (stream subsets; do not materialize into a list)
     max_k = max(0, int(args.max_k))
 
+    # Validate-mode requires that all policy required keys exist as columns in the wide table.
+    # If they don't, we cannot evaluate any policy-respecting subsets from Phase-0 identity_items.
+    if str(args.mode) == "validate" and policy_required:
+        missing_cols = [k for k in policy_required if k not in df.columns]
+        if missing_cols:
+            out_dir = args.out_dir
+            out_dir.mkdir(parents=True, exist_ok=True)
+
+            cols = [
+                "keys",
+                "k_count",
+                "max_sigcnt",
+                "collision_groups",
+                "collision_records",
+                "fragmentation_groups",
+                "fragmentation_records",
+            ]
+            pareto_path = out_dir / args.pareto_name
+            pd.DataFrame([], columns=cols).to_csv(pareto_path, index=False)
+
+            # Also write a small validation summary to make the reason unmissable
+
+            summary_name = f"validation_summary__{args.domain}__{args.mode}.csv"
+            summary_path = out_dir / summary_name
+
+            pd.DataFrame(
+                [
+                    {"kind": "validate_blocked_missing_required_columns", "value": "|".join(missing_cols)},
+                    {"kind": "note", "value": "Required policy keys not present in Phase-0 identity_items; cannot validate."},
+                ]
+            ).to_csv(summary_path, index=False)
+
+            print(
+                "[WARN pareto] validate mode blocked: required policy key(s) not present in data columns: "
+                + ", ".join(missing_cols)
+            )
+            print(f"Wrote empty Pareto front: {pareto_path}")
+            print(f"Wrote validation summary: {summary_path}")
+            return
+
+    # Auto-bump max_k in validate mode so required policy keys can be satisfied.
+    # (Without this, validate can evaluate zero subsets when len(required) > max_k.)
+    if str(args.mode) == "validate" and policy_required:
+        req_n = len(policy_required)
+        if max_k < req_n:
+            print(f"[WARN pareto] validate mode: max_k={max_k} < required_items={req_n}; auto-bumping max_k to {req_n}.")
+            max_k = req_n
+
+    required_set = set(policy_required) if str(args.mode) == "validate" else set()
+
     def iter_subsets(cands: List[str], mk: int) -> Iterable[Tuple[str, ...]]:
         for ksize in range(1, mk + 1):
             yield from itertools.combinations(cands, ksize)
 
+    def iter_subsets_policy_respecting(cands: List[str], mk: int, required: set[str]) -> Iterable[Tuple[str, ...]]:
+        """
+        Only yield subsets that include all required keys.
+        """
+        if not required:
+            yield from iter_subsets(cands, mk)
+            return
+
+        # If required alone exceeds max_k, nothing is possible.
+        if len(required) > mk:
+            return
+
+        req_sorted = tuple(sorted(required))
+        remaining = [k for k in cands if k not in required]
+        # Choose extra keys (0..mk-len(required))
+        for extra_size in range(0, (mk - len(required)) + 1):
+            for extra in itertools.combinations(remaining, extra_size):
+                keys = tuple(sorted(req_sorted + tuple(extra)))
+                yield keys
+
     results: List[dict] = []
-    for keys in iter_subsets(candidates, max_k):
+
+    # Always evaluate the policy key itself (if available) in validate/harsh mode
+    policy_key_tuple: Tuple[str, ...] = tuple()
+    if args.policy_json is not None and (policy_required or policy_optional):
+        policy_key_tuple = tuple(sorted(set(policy_required + policy_optional)))
+        # If policy key exists in data columns, evaluate even if it exceeds max_k (still useful)
+        policy_in_cols = all(k in df.columns for k in policy_key_tuple)
+        if policy_in_cols and len(policy_key_tuple) > 0:
+            results.append(eval_subset(df, policy_key_tuple))
+
+    # Main search
+    if str(args.mode) == "validate":
+        key_iter = iter_subsets_policy_respecting(candidates, max_k, required_set)
+    else:
+        key_iter = iter_subsets(candidates, max_k)
+
+    for keys in key_iter:
+        # Avoid duplicating the exact policy key if it already got evaluated
+        if policy_key_tuple and keys == policy_key_tuple:
+            continue
         results.append(eval_subset(df, keys))
 
     # Pareto objectives (minimize)
@@ -345,9 +570,77 @@ def main() -> None:
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    if not front:
+        # No evaluated subsets (or nothing survived to the Pareto filter). This can happen
+        # after domain filtering + sampling if no usable candidate columns exist in the data slice.
+        out_dir = args.out_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        cols = [
+            "keys",
+            "k_count",
+            "max_sigcnt",
+            "collision_groups",
+            "collision_records",
+            "fragmentation_groups",
+            "fragmentation_records",
+        ]
+        pareto_path = out_dir / args.pareto_name
+        pd.DataFrame([], columns=cols).to_csv(pareto_path, index=False)
+
+        print(
+            "No Pareto candidates evaluated (front is empty). "
+            "Try increasing --sample_records, removing --sample_records, "
+            "or reducing policy strictness / challenger_top_n for this domain slice."
+        )
+        print(f"Wrote empty Pareto front: {pareto_path}")
+        return
+
     pareto_df = pd.DataFrame(front).sort_values(objective_cols).reset_index(drop=True)
     pareto_path = out_dir / args.pareto_name
     pareto_df.to_csv(pareto_path, index=False)
+
+    # Optional validation summary
+    if str(args.mode) in ("validate", "harsh") and args.policy_json is not None:
+        summary_rows: List[Dict[str, object]] = []
+
+        if policy_key_tuple:
+            # Find the evaluated row for the policy key (may be absent if keys missing from data)
+            pol_key_str = "|".join(policy_key_tuple)
+            pol_rows = [r for r in results if r.get("keys") == pol_key_str]
+            if pol_rows:
+                pr = pol_rows[0]
+                summary_rows.append({
+                    "kind": "policy_key",
+                    "keys": pr.get("keys", ""),
+                    "k_count": pr.get("k_count", 0),
+                    "max_sigcnt": pr.get("max_sigcnt", 0),
+                    "collision_records": pr.get("collision_records", 0),
+                    "collision_groups": pr.get("collision_groups", 0),
+                    "fragmentation_records": pr.get("fragmentation_records", 0),
+                    "fragmentation_groups": pr.get("fragmentation_groups", 0),
+                })
+            else:
+                summary_rows.append({
+                    "kind": "policy_key",
+                    "keys": pol_key_str,
+                    "note": "policy_key_not_evaluated_missing_columns_or_empty",
+                })
+
+        # Record whether policy key is on Pareto front (exact match)
+        if policy_key_tuple:
+            pol_key_str = "|".join(policy_key_tuple)
+            on_front = int(any(str(r.get("keys", "")) == pol_key_str for r in front))
+            summary_rows.append({"kind": "policy_key_on_pareto_front", "value": on_front})
+
+        if summary_rows:
+            summary_df = pd.DataFrame(summary_rows)
+
+            summary_name = f"validation_summary__{args.domain}__{args.mode}.csv"
+            summary_path = out_dir / summary_name
+
+            summary_df.to_csv(summary_path, index=False)
+            print(f"Wrote validation summary: {summary_path}")
 
     print(f"Wrote Pareto front: {pareto_path} ({len(pareto_df)} rows)")
 
