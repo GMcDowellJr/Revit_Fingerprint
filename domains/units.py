@@ -7,7 +7,8 @@ Captures project units settings including:
 - Unit types and symbols
 - Accuracy settings
 
-Per-domain identity: N/A (single global hash)
+Identity is emitted as record.v2 per-spec records (length/area/volume),
+with per-record sig_hash derived from identity_items.
 """
 
 import os

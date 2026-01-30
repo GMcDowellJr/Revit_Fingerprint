@@ -8,8 +8,8 @@ Fingerprints dimension types including:
 - Tick mark (arrowhead)
 - Witness line control
 
-Per-record identity: UniqueId
-Ordering: order-insensitive (sorted before hashing)
+Per-record identity: sig_hash (UID-free) derived from identity_items.
+Ordering: order-insensitive (identity_items sorted before hashing)
 """
 
 import os
@@ -810,8 +810,19 @@ def extract(doc, ctx=None):
             identity_items=identity_items,
         )
 
-        required_qs = [shape_q]
+        # Block if any required authoritative identity field is not OK.
+        # Note: tick_mark_sig_hash is an identity item but is allowed to be UNSUPPORTED_NOT_APPLICABLE.
+        required_qs = [
+            shape_q,
+            witness_q,
+            unit_format_id_q,
+            rounding_q,
+            accuracy_q,
+            prefix_q,
+            suffix_q,
+        ]
         blocked = any(q != ITEM_Q_OK for q in required_qs)
+
 
         status_reasons = []
         any_incomplete = False

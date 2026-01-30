@@ -42,24 +42,39 @@ try:
 except ImportError:
     WorksharingUtils = None
 
-def _phase2_build_join_key_items(info):
+def _phase2_build_lineage_items(info):
     """
-    Phase-2 join-key hypothesis for identity domain.
+    Phase-2 lineage signals for identity domain (heuristic, non-authoritative).
 
-    Notes (Phase-2, non-prescriptive):
-    - identity domain emits a single metadata payload per file.
-    - join_key is intended to support stable joins across exports without
-      changing any existing domain hash behavior (identity has no hash_v2).
+    Purpose:
+    - Support file history / lineage hypotheses (moved/copied/renamed) without
+      presenting a domain join key that could be mistaken for identity.
     """
     items = []
 
-    # Candidate natural join components (hypotheses only):
-    # - central_path: best-available stable locator (may still vary in non-workshared cases)
-    # - project_title: human-readable but may change; included as a separate key component
-    for k in ("central_path", "project_title"):
-        v_raw = info.get(k, None)
-        v, q = phase2_qv_from_legacy_sentinel_str(v_raw, allow_empty=False)
-        items.append({"k": "identity.{}".format(k), "q": q, "v": v})
+    # Central path (raw) and a normalized variant (best-effort; still heuristic).
+    cp_raw = info.get("central_path", None)
+    v, q = phase2_qv_from_legacy_sentinel_str(cp_raw, allow_empty=False)
+    items.append({"k": "identity.central_path", "q": q, "v": v})
+
+    cp_norm = safe_str(cp_raw).strip().replace("\\", "/").lower()
+    v, q = phase2_qv_from_legacy_sentinel_str(cp_norm, allow_empty=False)
+    items.append({"k": "identity.central_path_norm", "q": q, "v": v})
+
+    # Filename (weak signal; helpful when paths move but names persist).
+    fn = os.path.basename(safe_str(cp_raw).replace("\\", "/").strip())
+    v, q = phase2_qv_from_legacy_sentinel_str(fn, allow_empty=False)
+    items.append({"k": "identity.filename", "q": q, "v": v})
+
+    # Workshared flag (context signal).
+    v_raw = "true" if bool(info.get("is_workshared", False)) else "false"
+    v, q = phase2_qv_from_legacy_sentinel_str(v_raw, allow_empty=False)
+    items.append({"k": "identity.is_workshared", "q": q, "v": v})
+
+    # Project title (very weak; include explicitly so it never “sneaks in” elsewhere).
+    pt_raw = info.get("project_title", None)
+    v, q = phase2_qv_from_legacy_sentinel_str(pt_raw, allow_empty=False)
+    items.append({"k": "identity.project_title", "q": q, "v": v})
 
     return phase2_sorted_items(items)
 
@@ -103,8 +118,8 @@ def extract(doc, ctx=None):
     # Phase-2 additive emission (single-record domain)
     # ---------------------------
 
-    phase2_join_items = _phase2_build_join_key_items(info)
-    join_hash = phase2_join_hash(phase2_join_items)
+    lineage_items = _phase2_build_lineage_items(info)
+    lineage_hash = phase2_join_hash(lineage_items)
 
     # Attribute hypotheses (Phase-2 only; no enforcement / no inference)
     semantic_items = []
@@ -131,19 +146,16 @@ def extract(doc, ctx=None):
     v, q = phase2_qv_from_legacy_sentinel_str(info.get("project_title", None), allow_empty=False)
     unknown_items.append({"k": "identity.project_title", "q": q, "v": v})
 
-    info["join_key"] = {
-        "schema": "identity.join_key.v1",
-        "hash_alg": "md5_utf8_join_pipe",
-        "items": phase2_join_items,
-        "join_hash": join_hash,
-    }
-
     info["phase2"] = {
         "schema": "phase2.identity.v1",
         "grouping_basis": "phase2.hypothesis",
         "semantic_items": phase2_sorted_items(semantic_items),
         "cosmetic_items": phase2_sorted_items(cosmetic_items),
         "unknown_items": phase2_sorted_items(unknown_items),
+
+        # lineage (heuristic): explicit non-authoritative correlation surface
+        "lineage_items": lineage_items,
+        "lineage_hash": lineage_hash,
     }
 
     return info

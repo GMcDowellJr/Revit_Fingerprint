@@ -8,7 +8,7 @@ Fingerprints phase filter definitions including:
 Phase filters define how elements in different phases are displayed.
 This is a GLOBAL domain - filters are defined once and referenced by views.
 
-Per-record identity: UniqueId (element-backed)
+Per-record identity: v2 sig_hash (definition-based, UID-free)
 Ordering: deterministic (status order is fixed); record list order-insensitive
 """
 
@@ -174,13 +174,11 @@ def extract(doc, ctx=None):
 
         # Hash the definition (keep the deterministic order; do NOT sort)
         def_hash = make_hash(sig)
+
         status_v2 = STATUS_OK
         status_reasons_v2 = []
         identity_items_v2 = []
-
-        name_v2, name_q = canonicalize_str(name)
-        identity_items_v2.append(make_identity_item("phase_filter.name", name_v2, name_q))
-        required_qs = [name_q]
+        required_qs = []
 
         for status_name, status_enum in statuses:
             k = "phase_filter.{}.presentation_id".format(safe_str(status_name).lower())
@@ -205,8 +203,7 @@ def extract(doc, ctx=None):
         if v2_ok:
             def_hash_v2 = make_hash(sig_v2)
             per_hashes_v2.append(def_hash_v2)
-            if uid:
-                uid_to_hash_v2[uid] = def_hash_v2
+
         else:
             info["debug_v2_blocked"] += 1
             try:

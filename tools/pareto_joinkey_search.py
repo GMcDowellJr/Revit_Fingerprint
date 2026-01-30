@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
+
 """
 Pareto join-key search for Revit Fingerprint exports.
 
 Inputs:
-  - records.csv: one row per record, includes sig_hash_no_uid
+  - records.csv: one row per record, includes sig_hash
   - identity_items.csv: many rows per record, includes k and v
 
 We compute:
   record_key = file_id|domain|record_id
-  v_norm: UID-like normalization (strip suffix after last '-' for keys containing 'uid')
 
 For any subset of candidate keys K:
-  composite_key(record) = "|".join(sorted(f"{k}={v_norm}" for k in K if present/nonblank))
-Then compute multi-objective metrics vs sig_hash_no_uid.
+  composite_key(record) = "|".join(sorted(f"{k}={v}" for k in K if present/nonblank))
 
-Outputs:
-  - all_results.csv (optional, can be large)
-  - pareto_front.csv (non-dominated solutions)
+Then compute multi-objective metrics vs sig_hash.
 """
 
 from __future__ import annotations
@@ -102,34 +99,23 @@ def make_record_key(df: pd.DataFrame) -> pd.Series:
 
 def compute_v_norm(identity_items: pd.DataFrame) -> pd.Series:
     """
-    Match your Power Query logic in spirit:
-      - UID-like keys: k contains "uid" (case-insensitive)
-      - If UID-like and value contains '-', strip suffix after the last '-'
-        (keeps prefix before last dash; excludes dash and suffix)
-      - Otherwise, pass through as string
-      - Preserve nulls / blanks
-    """
-    k_lower = identity_items["k"].astype(str).str.lower()
-    is_uid_like = k_lower.str.contains("uid", na=False)
+    Value normalization for join-key candidates.
 
+    Contract: signature hashing is handled upstream in the exporter.
+    This normalization is ONLY for candidate key values:
+      - stringify
+      - strip
+      - treat blanks as null
+    """
     v = identity_items["v"]
     out: List[str | None] = []
 
-    for val, is_uid in zip(v.tolist(), is_uid_like.tolist()):
+    for val in v.tolist():
         if pd.isna(val):
             out.append(None)
             continue
-
-        s = str(val)
-        if is_uid:
-            idx = s.rfind("-")
-            if idx >= 0:
-                s = s[:idx]
-        s = s.strip()
-        if s == "":
-            out.append(None)
-        else:
-            out.append(s)
+        s = str(val).strip()
+        out.append(None if s == "" else s)
 
     return pd.Series(out, index=identity_items.index)
 
@@ -191,7 +177,7 @@ def build_wide_kv_table(records: pd.DataFrame, items: pd.DataFrame) -> pd.DataFr
     """
     rec = records.copy()
     rec["record_key"] = make_record_key(rec)
-    rec = rec[["record_key", "sig_hash_no_uid"]].drop_duplicates()
+    rec = rec[["record_key", "sig_hash"]].drop_duplicates()
 
     it = items.copy()
     it["record_key"] = make_record_key(it)
@@ -254,7 +240,7 @@ def eval_subset(df: pd.DataFrame, keys: Tuple[str, ...]) -> dict:
 
     tmp = pd.DataFrame(
         {
-            "sig": df["sig_hash_no_uid"].astype(str),
+            "sig": df["sig_hash"].astype(str),
             "ck": ck.astype(str),
         },
         index=df.index,
@@ -393,7 +379,7 @@ def main() -> None:
 
     # Optional challengers (validate/harsh): deterministic, ranked from wide df columns
     if str(args.mode) in ("validate", "harsh") and int(args.challenger_top_n or 0) > 0:
-        wide_keys = [c for c in df.columns if c != "sig_hash_no_uid"]
+        wide_keys = [c for c in df.columns if c != "sig_hash"]
         ranked = _rank_challengers_from_wide(df, wide_keys)
 
         # filter challengers: not already in candidates, not excluded, optionally UID-like already handled

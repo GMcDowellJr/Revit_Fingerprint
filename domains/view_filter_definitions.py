@@ -141,14 +141,7 @@ def _value_token_from_rule(doc, rule) -> Tuple[Optional[str], str, Optional[str]
                 if iv < 0:
                     return f"eid:{iv}", ITEM_Q_OK, "element_id"
                 # Positive element ids are not stable without resolving to uid.
-                try:
-                    elem = doc.GetElement(rv)
-                    uid = getattr(elem, "UniqueId", None) if elem is not None else None
-                except Exception:
-                    uid = None
-                uv, uq = canonicalize_str(uid)
-                if uv is not None and uq == ITEM_Q_OK:
-                    return f"uid:{uv}", ITEM_Q_OK, "element_id"
+                # Contract: do not resolve to UID; treat as unreadable for identity.
                 return None, ITEM_Q_UNREADABLE, "element_id"
 
             # Prefer int if it is integral
@@ -277,15 +270,12 @@ def extract(doc, ctx=None):
         identity_items: List[Dict[str, Any]] = []
         status_reasons: List[str] = []
 
-        # Required: vf.uid_or_namekey
+        # UID is metadata only (must not participate in identity/sig_hash).
         try:
             uid_raw = getattr(f, "UniqueId", None)
         except Exception:
             uid_raw = None
         uid_v, uid_q = canonicalize_str(uid_raw)
-        if uid_v is None:
-            uid_v, uid_q = canonicalize_str(name_raw)
-        identity_items.append(make_identity_item("vf.uid_or_namekey", uid_v, uid_q))
 
         # vf.categories (negative ids only; positive ids are unstable)
         cats_v = None
@@ -397,7 +387,8 @@ def extract(doc, ctx=None):
         items_sorted = sorted(identity_items, key=lambda it: str(it.get("k", "")))
 
         # Minima: block if any required key q != ok
-        required_keys = ["vf.uid_or_namekey", "vf.logic_root", "vf.rule_count"]
+        required_keys = ["vf.logic_root", "vf.rule_count"]
+
         item_by_k = {it.get("k"): it for it in items_sorted}
         required_qs = [safe_str(item_by_k.get(rk, {}).get("q", ITEM_Q_MISSING)) for rk in required_keys]
         blocked = any(q != ITEM_Q_OK for q in required_qs)
@@ -444,33 +435,57 @@ def extract(doc, ctx=None):
         # -----------------------------
         # Phase 2 (empirical, additive)
         # -----------------------------
+        # Structured domain: semantic surface is the single derived definition hash.
+        # Leaf vf.rule[...] items remain identity-only.
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "view_filter_definitions")
-        rec["join_key"], _missing = build_join_key_from_policy(
-            domain_policy=pol,
-            identity_items=items_sorted,
-        )
 
-        # Phase-2 item partitions (hypotheses only; no inference).
-        # Avoid duplicating the full vf.rule[...] structure which already exists in identity_basis.items.
-        rule_items = []
-        p2_semantic = []
-        for it in (items_sorted or []):
-            k = safe_str(it.get("k", ""))
-            if k.startswith("vf.rule["):
-                rule_items.append(it)
-                continue
-            p2_semantic.append(it)
+        # Compute vf.def_hash from canonical definition bundle:
+        # vf.categories, vf.logic_root, vf.rule_count, ordered vf.rule[i].sig
+        item_by_k = {it.get("k"): it for it in items_sorted}
 
-        # Derived hash pointer for the rules definition (ordered + deterministic via phase2_sorted_items).
-        rule_items_sorted = phase2_sorted_items(rule_items)
-        if rule_items_sorted:
-            p2_semantic.append(
-                make_identity_item(
-                    "vf.rules_def_hash",
-                    phase2_join_hash(rule_items_sorted),
-                    ITEM_Q_OK,
-                )
-            )
+        cats_it = item_by_k.get("vf.categories", {})
+        logic_it = item_by_k.get("vf.logic_root", {})
+        rc_it = item_by_k.get("vf.rule_count", {})
+
+        cats_v, cats_q = cats_it.get("v"), cats_it.get("q", ITEM_Q_MISSING)
+        logic_v, logic_q = logic_it.get("v"), logic_it.get("q", ITEM_Q_MISSING)
+        rc_v, rc_q = rc_it.get("v"), rc_it.get("q", ITEM_Q_MISSING)
+
+        # Gather ordered rule sigs
+        rule_sig_vs = []
+        rule_sig_ok = True
+        for idx in range(len(rules)):
+            idx3 = "{:03d}".format(idx)
+            ksig = f"vf.rule[{idx3}].sig"
+            it = item_by_k.get(ksig, {})
+            v = it.get("v")
+            q = it.get("q", ITEM_Q_MISSING)
+            if q != ITEM_Q_OK or v is None:
+                rule_sig_ok = False
+            rule_sig_vs.append(safe_str(v or ""))
+
+        def_hash_v = None
+        def_hash_q = ITEM_Q_UNREADABLE
+
+        cats_ok = (cats_q != ITEM_Q_UNREADABLE)  # missing is allowed
+        if logic_q == ITEM_Q_OK and rc_q == ITEM_Q_OK and rule_sig_ok and cats_ok and logic_v is not None:
+            bundle_parts = [
+                safe_str(cats_v or ""),
+                safe_str(logic_v or ""),
+                safe_str(rc_v or ""),
+            ] + rule_sig_vs
+            def_hash_v = make_hash("|".join(bundle_parts))
+            def_hash_q = ITEM_Q_OK
+        else:
+            # If the bundle cannot be safely constructed, expose def_hash as unreadable/missing.
+            if logic_q == ITEM_Q_MISSING and rc_q == ITEM_Q_MISSING and cats_q == ITEM_Q_MISSING:
+                def_hash_q = ITEM_Q_MISSING
+            else:
+                def_hash_q = ITEM_Q_UNREADABLE
+
+        p2_semantic = [
+            make_identity_item("vf.def_hash", def_hash_v, def_hash_q),
+        ]
 
         # Unknown: element-backed id may vary across files.
         try:
@@ -490,6 +505,12 @@ def extract(doc, ctx=None):
             "cosmetic_items": phase2_sorted_items([]),
             "unknown_items": p2_unknown,
         }
+
+        # Join key is derived from semantic items only (policy should require vf.def_hash).
+        rec["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=rec["phase2"]["semantic_items"],
+        )
 
         v2_records.append(rec)
 

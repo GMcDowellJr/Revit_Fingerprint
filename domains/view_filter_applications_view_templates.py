@@ -37,9 +37,11 @@ from core.record_v2 import (
 )
 
 from core.phase2 import (
+    phase2_join_hash,
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
 )
+
 
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
@@ -230,16 +232,6 @@ def extract(doc, ctx=None):
                 except Exception:
                     vis_v, vis_q = (None, ITEM_Q_UNREADABLE)
 
-                vis_v, vis_q = (None, ITEM_Q_UNREADABLE)
-                try:
-                    if hasattr(v, "GetFilterVisibility"):
-                        vb = bool(v.GetFilterVisibility(fid))
-                        vis_v, vis_q = canonicalize_bool(vb)
-                    else:
-                        vis_v, vis_q = (None, ITEM_Q_UNSUPPORTED)
-                except Exception:
-                    vis_v, vis_q = (None, ITEM_Q_UNREADABLE)
-
                 identity_items.append(make_identity_item(f"vfa.stack[{idx3}].visible", vis_v, vis_q))
 
                 en_v, en_q = (None, ITEM_Q_UNREADABLE)
@@ -301,36 +293,43 @@ def extract(doc, ctx=None):
         # -----------------------------
         # Phase 2 (empirical, additive)
         # -----------------------------
-        pol = get_domain_join_key_policy(
-            (ctx or {}).get("join_key_policies"),
-            "view_filter_applications_view_templates",
-        )
-        rec["join_key"], _missing = build_join_key_from_policy(
-            domain_policy=pol,
-            identity_items=items_sorted,
-        )
 
         # Phase-2 item partitions (hypotheses only; no inference).
-        # Avoid duplicating the full vfa.stack[...] structure which already exists in identity_basis.items.
+        # Contract for structured domains:
+        #   - semantic_items contains ONLY the derived bundle hash pointer
+        #   - leaf members (vfa.stack[...].*) are excluded from semantic_items
         stack_items = []
-        p2_semantic = []
         for it in (items_sorted or []):
             k = safe_str(it.get("k", ""))
             if k.startswith("vfa.stack["):
                 stack_items.append(it)
-                continue
-            p2_semantic.append(it)
 
-        # Derived hash pointer for the stack definition (ordered + deterministic via phase2_sorted_items).
         stack_items_sorted = phase2_sorted_items(stack_items)
-        if stack_items_sorted:
+        stack_def_hash = phase2_join_hash(stack_items_sorted) if stack_items_sorted else None
+
+        p2_semantic = []
+        if stack_def_hash is not None:
             p2_semantic.append(
                 make_identity_item(
                     "vfa.stack_def_hash",
-                    phase2_join_hash(stack_items_sorted),
+                    stack_def_hash,
                     ITEM_Q_OK,
                 )
             )
+
+        # Build record-level join_key from policy using a synthetic item list that includes vfa.stack_def_hash.
+        # vfa.stack_def_hash must NOT appear in identity_basis.items.
+        pol = get_domain_join_key_policy(
+            (ctx or {}).get("join_key_policies"),
+            "view_filter_applications_view_templates",
+        )
+        join_items = list(items_sorted or [])
+        if stack_def_hash is not None:
+            join_items.append({"k": "vfa.stack_def_hash", "q": ITEM_Q_OK, "v": stack_def_hash})
+        rec["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=join_items,
+        )
 
         # Unknown: template element id may vary across files.
         try:

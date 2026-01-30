@@ -31,6 +31,9 @@ from core.rows import (
     format_len_inches,
     get_type_display_name,
 )
+from core.phase2 import (
+    phase2_sorted_items,
+)
 from core.record_v2 import (
     STATUS_OK,
     STATUS_DEGRADED,
@@ -253,6 +256,7 @@ def extract(doc, ctx=None):
         # Label is not identity; keep human if possible.
         label_display = nm if nm else "Arrowhead"
         label_quality = "human" if nm else "placeholder_missing"
+
         label = {
             "display": safe_str(label_display),
             "quality": label_quality,
@@ -280,10 +284,23 @@ def extract(doc, ctx=None):
             },
         )
 
+        # Phase-2 (join-key candidates live ONLY here; identity remains authoritative)
+        semantic_items = list(identity_items)  # flat parametric domain: candidates == curated scalar params
+        cosmetic_items = []
+        unknown_items = []
+
+        rec_v2["phase2"] = {
+            "schema": "phase2.arrowheads.v1",
+            "grouping_basis": "phase2.hypothesis",
+            "semantic_items": phase2_sorted_items(semantic_items),
+            "cosmetic_items": phase2_sorted_items(cosmetic_items),
+            "unknown_items": phase2_sorted_items(unknown_items),
+        }
+
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "arrowheads")
         rec_v2["join_key"], _missing = build_join_key_from_policy(
             domain_policy=pol,
-            identity_items=identity_items,
+            identity_items=phase2_sorted_items(semantic_items),
         )
 
         v2_records.append(rec_v2)

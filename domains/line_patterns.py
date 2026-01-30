@@ -372,6 +372,11 @@ def extract(doc, ctx=None):
                     slen = getattr(s, "Length", None)
                 except Exception:
                     slen = None
+
+                # Normalize Dot segment length to 0.0 for stability (matches legacy signature behavior)
+                if st_id == 2:
+                    slen = 0.0
+
                 length_v, length_q = canonicalize_float(slen, nd=9)
                 identity_items.append(make_identity_item("line_pattern.seg[{}].length".format(idx3), length_v, length_q))
 
@@ -380,6 +385,12 @@ def extract(doc, ctx=None):
 
         # ---- element-level finalize (once per element) ----
         identity_items_sorted = sorted(identity_items, key=lambda it: it.get("k", ""))
+
+        # Build join-key candidate item set (structured pointer surface; excludes full seg[###] leaf duplication)
+        join_key_items_sorted = _phase2_build_join_key_items(
+            segment_count=(len(segs_v2) if (segs_ok and segs_v2 is not None) else None),
+            segments=segs_v2 if (segs_ok and segs_v2 is not None) else None,
+        )
 
         # Phase-2 compliant: required identity is segment-based, not UID-based
         required_qs = [seg_count_q]
@@ -441,7 +452,7 @@ def extract(doc, ctx=None):
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "line_patterns")
         rec_v2["join_key"], _missing = build_join_key_from_policy(
             domain_policy=pol,
-            identity_items=identity_items_sorted,
+            identity_items=join_key_items_sorted,
         )
 
         semantic_items = []

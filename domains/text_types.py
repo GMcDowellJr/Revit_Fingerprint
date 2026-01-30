@@ -8,7 +8,7 @@ Fingerprints text note types including:
 - Line weight, color
 - Bold, italic, underline
 
-Per-record identity: UniqueId
+Per-record identity: sig_hash (UID-free by contract; UIDs are metadata only)
 Ordering: order-insensitive (sorted before hashing)
 """
 
@@ -360,6 +360,24 @@ def extract(doc, ctx=None):
         v, q = canonicalize_float(rec.get("width_factor"))
         candidate_kqv["text_type.width_factor"] = (v, q)
 
+        v, q = canonicalize_int(rec.get("background_raw"))
+        candidate_kqv["text_type.background_raw"] = (v, q)
+
+        v, q = canonicalize_int(rec.get("line_weight"))
+        candidate_kqv["text_type.line_weight"] = (v, q)
+
+        v, q = canonicalize_str(rec.get("color_rgb"))
+        candidate_kqv["text_type.color_rgb"] = (v, q)
+
+        v, q = canonicalize_bool(rec.get("show_border"))
+        candidate_kqv["text_type.show_border"] = (v, q)
+
+        v, q = canonicalize_str(rec.get("leader_border_offset_in"))
+        candidate_kqv["text_type.leader_border_offset_in"] = (v, q)
+
+        v, q = canonicalize_str(rec.get("tab_size_in"))
+        candidate_kqv["text_type.tab_size_in"] = (v, q)
+
         v, q = canonicalize_bool(rec.get("bold"))
         candidate_kqv["text_type.bold"] = (v, q)
 
@@ -368,9 +386,6 @@ def extract(doc, ctx=None):
 
         v, q = canonicalize_bool(rec.get("underline"))
         candidate_kqv["text_type.underline"] = (v, q)
-
-        v, q = canonicalize_str(rec.get("color_rgb"))
-        candidate_kqv["text_type.color_rgb"] = (v, q)
 
         # Explicit: allow empty; no uid/name/id fallback
         v, q = canonicalize_str(rec.get("leader_arrowhead_sig_hash"))
