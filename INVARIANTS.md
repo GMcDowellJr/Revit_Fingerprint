@@ -27,6 +27,19 @@ These rules are non-negotiable unless explicitly versioned.
 
 ---
 
+## Phase-2 Buckets
+
+- `semantic_items`: behavior-defining items exported for join-key discovery and Phase-2 comparisons.
+- `cosmetic_items`: non-behavioral labels and presentation attributes used for pattern detection.
+- `coordination_items`: name-based cross-model resolution contracts (e.g., ByHost lookups) that never participate in behavior hashing or join-key discovery.
+- `unknown_items`: file-local noise such as UIDs and ElementIds that are exported for traceability but excluded from behavior and join-key discovery.
+
+Phase-2 invariants:
+- `sig_hash` is authoritative and UID-free by contract.
+- `identity_basis.items` contains the full behavioral definition and drives `sig_hash`.
+
+---
+
 ## record_rows
 
 - Every record-based domain must emit `record_rows`

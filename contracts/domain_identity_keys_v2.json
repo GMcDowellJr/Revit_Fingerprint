@@ -64,15 +64,15 @@
 
     "line_styles": {
       "allowed_keys": [
-        "line_style.path",
-        "line_style.color.rgb",
-        "line_style.weight.projection",
+        "line_style.line_weight_projection",
+        "line_style.color_rgb",
         "line_style.weight.cut",
-        "line_style.pattern_ref.kind",
         "line_style.pattern_ref.sig_hash"
       ],
       "required_keys": [
-        "line_style.path"
+        "line_style.line_weight_projection",
+        "line_style.color_rgb",
+        "line_style.pattern_ref.sig_hash"
       ],
       "minima": {
         "block_if_any_required_not_ok": true

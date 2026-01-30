@@ -48,7 +48,7 @@ def _extract_features(record: Dict[str, Any]) -> Tuple[Optional[str], Optional[s
     NOTE: This is descriptive: values are strings or None (explicit missing).
     """
     # Name / label surface: top.type_name is stable and present in your variability summary
-    name = _get_top(record, "type_name") or _get_top(record, "label") or _get_p2_value(record, "cosmetic_items", "text_type.name")
+    name = _get_top(record, "type_name") or _get_top(record, "label")
 
     # Font / size / width factor: your variability summary shows these as top.* keys
     font = _get_top(record, "font") or _get_p2_value(record, "semantic_items", "text_type.font")

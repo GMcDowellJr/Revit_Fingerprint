@@ -26,7 +26,7 @@ from .index import DomainIndex
 @dataclass
 class AttrStabilityRow:
     domain: str
-    bucket: str  # semantic|cosmetic|unknown
+    bucket: str  # semantic|cosmetic|coordination|unknown
     k: str
     comparisons: int
     identical: int

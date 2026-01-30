@@ -443,6 +443,7 @@ def extract(doc, ctx=None):
                 "grouping_basis": "structured_sig_hash",
                 "semantic_items": semantic_items,
                 "cosmetic_items": [],
+                "coordination_items": [],
                 "unknown_items": unknown_items,
             }
 
@@ -904,6 +905,7 @@ def extract(doc, ctx=None):
             "grouping_basis": "structured_sig_hash",
             "semantic_items": semantic_items,
             "cosmetic_items": [],
+            "coordination_items": [],
             "unknown_items": unknown_items,
         }
 

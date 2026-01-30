@@ -104,6 +104,7 @@ def _iter_record_parameters(
     include_top_level: bool,
     include_phase2_semantic: bool,
     include_phase2_cosmetic: bool,
+    include_phase2_coordination: bool,
     include_phase2_unknown: bool,
 ) -> Tuple[List[Tuple[str, str, Optional[str]]], int]:
     """
@@ -161,6 +162,8 @@ def _iter_record_parameters(
         emit_bucket("semantic_items", "p2.semantic")
     if include_phase2_cosmetic:
         emit_bucket("cosmetic_items", "p2.cosmetic")
+    if include_phase2_coordination:
+        emit_bucket("coordination_items", "p2.coordination")
     if include_phase2_unknown:
         emit_bucket("unknown_items", "p2.unknown")
 
@@ -175,6 +178,7 @@ def run_joinhash_parameter_population(
     include_top_level: bool,
     include_semantic: bool,
     include_cosmetic: bool,
+    include_coordination: bool,
     include_unknown: bool,
     max_cell_chars: int,
 ) -> None:
@@ -220,6 +224,7 @@ def run_joinhash_parameter_population(
                 include_top_level=include_top_level,
                 include_phase2_semantic=include_semantic,
                 include_phase2_cosmetic=include_cosmetic,
+                include_phase2_coordination=include_coordination,
                 include_phase2_unknown=include_unknown,
             )
             ambiguous_dup_k_total += amb
@@ -376,6 +381,7 @@ def run_joinhash_parameter_population(
             "include_top_level": bool(include_top_level),
             "include_phase2_semantic": bool(include_semantic),
             "include_phase2_cosmetic": bool(include_cosmetic),
+            "include_phase2_coordination": bool(include_coordination),
             "include_phase2_unknown": bool(include_unknown),
             "max_cell_chars": int(max_cell_chars),
         },
@@ -412,6 +418,7 @@ def main() -> None:
     p.add_argument("--include-semantic", action="store_true", default=True)
     p.add_argument("--no-semantic", action="store_false", dest="include_semantic")
     p.add_argument("--include-cosmetic", action="store_true", default=False)
+    p.add_argument("--include-coordination", action="store_true", default=False)
     p.add_argument("--include-unknown", action="store_true", default=False)
     p.add_argument("--max-cell-chars", type=int, default=600, dest="max_cell_chars")
     ns = p.parse_args()
@@ -423,6 +430,7 @@ def main() -> None:
         include_top_level=ns.include_top_level,
         include_semantic=ns.include_semantic,
         include_cosmetic=ns.include_cosmetic,
+        include_coordination=ns.include_coordination,
         include_unknown=ns.include_unknown,
         max_cell_chars=ns.max_cell_chars,
     )

@@ -219,7 +219,7 @@ def extract(doc, ctx=None):
             if wproj_q != ITEM_Q_OK:
                 status_v2 = STATUS_DEGRADED
                 status_reasons.append("weight_projection_missing_or_unreadable")
-            identity_items.append(make_identity_item("line_style.weight.projection", wproj_v, wproj_q))
+            identity_items.append(make_identity_item("line_style.line_weight_projection", wproj_v, wproj_q))
 
             # Line styles (subcategories under Lines) do not have a Cut lineweight surface in Revit UI.
             # Treat as not applicable; do not degrade.
@@ -231,7 +231,7 @@ def extract(doc, ctx=None):
             if rgb_q != ITEM_Q_OK:
                 status_v2 = STATUS_DEGRADED
                 status_reasons.append("color_rgb_missing_or_unreadable")
-            identity_items.append(make_identity_item("line_style.color.rgb", rgb_v, rgb_q))
+            identity_items.append(make_identity_item("line_style.color_rgb", rgb_v, rgb_q))
 
             # Optional: pattern reference (sig_hash from line_patterns record.v2)
             lp_kind_v = None
@@ -305,8 +305,6 @@ def extract(doc, ctx=None):
             if kind_q != ITEM_Q_OK:
                 status_v2 = STATUS_DEGRADED
                 status_reasons.append("pattern_kind_missing_or_unreadable")
-            identity_items.append(make_identity_item("line_style.pattern_ref.kind", kind_v, kind_q))
-
             # sig_hash item is always present so downstream tables have a stable column surface.
             # For SOLID or unresolved refs, v=None with q=ITEM_Q_MISSING.
             if lp_sig_hash_q == ITEM_Q_OK:
@@ -357,7 +355,7 @@ def extract(doc, ctx=None):
             p2_unknown = []
 
             # weights
-            p2_semantic.append(make_identity_item("line_style.weight.projection", wproj_v, wproj_q))
+            p2_semantic.append(make_identity_item("line_style.line_weight_projection", wproj_v, wproj_q))
 
             # pattern reference
             p2_unknown.append(make_identity_item("line_style.pattern_ref.kind", kind_v, kind_q))
@@ -365,7 +363,7 @@ def extract(doc, ctx=None):
 
             # color is behavioral (affects visual appearance)
             rgb_p2_v, rgb_p2_q = phase2_qv_from_legacy_sentinel_str(rgb_sig, allow_empty=False)
-            p2_semantic.append(make_identity_item("line_style.color.rgb", rgb_p2_v, rgb_p2_q))
+            p2_semantic.append(make_identity_item("line_style.color_rgb", rgb_p2_v, rgb_p2_q))
 
             # path is cosmetic (category name)
             p2_cosmetic.extend(_phase2_build_join_key_items(sc_name))
@@ -378,6 +376,7 @@ def extract(doc, ctx=None):
                 "grouping_basis": "phase2.hypothesis",
                 "semantic_items": phase2_sorted_items(p2_semantic),
                 "cosmetic_items": phase2_sorted_items(p2_cosmetic),
+                "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_sorted_items(p2_unknown),
             }
 
