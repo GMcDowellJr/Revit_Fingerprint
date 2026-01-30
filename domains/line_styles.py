@@ -209,11 +209,10 @@ def extract(doc, ctx=None):
 
             identity_items = []
 
-            # Required: line_style.path
+            # Path for record_id and cosmetic reference only (not required for identity)
             path_v_raw = "Lines|{}".format(sc_name)
             path_v, path_q = canonicalize_str(path_v_raw)
-            identity_items.append(make_identity_item("line_style.path", path_v, path_q))
-            required_qs = [path_q]
+            required_qs = []
 
             # Optional: weights
             wproj_v, wproj_q = canonicalize_int(w_proj)
@@ -361,12 +360,15 @@ def extract(doc, ctx=None):
             p2_semantic.append(make_identity_item("line_style.weight.projection", wproj_v, wproj_q))
 
             # pattern reference
-            p2_semantic.append(make_identity_item("line_style.pattern_ref.kind", kind_v, kind_q))
+            p2_unknown.append(make_identity_item("line_style.pattern_ref.kind", kind_v, kind_q))
             p2_semantic.append(make_identity_item("line_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
 
-            # color (appearance) and other ambiguous surfaces
+            # color is behavioral (affects visual appearance)
             rgb_p2_v, rgb_p2_q = phase2_qv_from_legacy_sentinel_str(rgb_sig, allow_empty=False)
-            p2_cosmetic.append(make_identity_item("line_style.color.rgb", rgb_p2_v, rgb_p2_q))
+            p2_semantic.append(make_identity_item("line_style.color.rgb", rgb_p2_v, rgb_p2_q))
+
+            # path is cosmetic (category name)
+            p2_cosmetic.extend(_phase2_build_join_key_items(sc_name))
 
             # cut weight is not surfaced for line styles; keep explicit as unknown partition for analysis.
             p2_unknown.append(make_identity_item("line_style.weight.cut", wcut_v, wcut_q))

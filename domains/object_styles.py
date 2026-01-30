@@ -56,6 +56,7 @@ from core.phase2 import (
 
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
+from core.deps import require_domain, Blocked
 
 try:
     from Autodesk.Revit.DB import GraphicsStyleType, CategoryType
@@ -102,6 +103,16 @@ def extract(doc, ctx=None):
     if GraphicsStyleType is None or CategoryType is None:
         info["debug_v2_blocked"] = True
         info["debug_v2_block_reasons"] = {"revit_api_unavailable": True}
+        return info
+
+    try:
+        require_domain((ctx or {}).get("_domains", {}), "line_patterns")
+    except Blocked as b:
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {"dependency_blocked": "line_patterns: {}".format(b.reasons)}
+        info["count"] = 0
+        info["records"] = []
+        info["hash_v2"] = None
         return info
 
     # Dependency map: LinePatternElement.UniqueId -> line_patterns record.v2 sig_hash
@@ -347,27 +358,20 @@ def extract(doc, ctx=None):
                 cosmetic_items = []
                 unknown_items = []
 
-                # Phase-2 contract for object_styles:
-                # - semantic_items: curated Pareto candidate subset
-                # - cosmetic_items: non-join cosmetics
-                # - unknown_items: context-only or uncategorized
-                semantic_keys = {
-                    "obj_style.row_key",
-                    "obj_style.pattern_ref.sig_hash",
-                    "obj_style.weight.projection",
-                }
-                cosmetic_keys = {
-                    "obj_style.color.rgb",
-                    "obj_style.pattern_ref.kind",
-                    "obj_style.weight.cut",
-                }
-
+                # Graphics are behavioral (semantic), category name is cosmetic.
                 for it in (identity_items_sorted or []):
                     k = safe_str(it.get("k", ""))
-                    if k in semantic_keys:
+                    if k in [
+                        "obj_style.weight.projection",
+                        "obj_style.weight.cut",
+                        "obj_style.color.rgb",
+                        "obj_style.pattern_ref.sig_hash",
+                    ]:
                         semantic_items.append(it)
-                    elif k in cosmetic_keys:
+                    elif k == "obj_style.row_key":
                         cosmetic_items.append(it)
+                    elif k == "obj_style.pattern_ref.kind":
+                        unknown_items.append(it)
                     else:
                         unknown_items.append(it)
 

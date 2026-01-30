@@ -249,11 +249,11 @@ def extract(doc, ctx=None):
         semantic_keys = {
             "units.spec",
             "units.unit_type_id",
-            "units.accuracy",
             "units.rounding_method",
         }
         cosmetic_keys = {
             "units.symbol_type_id",
+            "units.accuracy",
         }
 
         semantic_items = phase2_sorted_items([dict(it) for it in items_sorted if it.get("k") in semantic_keys])

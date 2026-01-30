@@ -770,7 +770,6 @@ def extract(doc, ctx=None):
         phase2_unknown_items = phase2_sorted_items([
             make_identity_item("dim_attr.prefix", prefix_v, prefix_q),
             make_identity_item("dim_attr.suffix", suffix_v, suffix_q),
-            make_identity_item("dim_type.uid", uid_v, uid_q),
         ])
 
         phase2_cosmetic_items = phase2_sorted_items([
