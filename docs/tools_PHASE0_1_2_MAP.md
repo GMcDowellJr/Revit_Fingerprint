@@ -290,6 +290,49 @@ Baseline-free mode is correct right now.
 
 ---
 
+## 2.6 Join-key validation (policy-seeded Pareto)
+
+This mode confirms that an **existing join key** (as defined in `domain_join_key_policies.json`) remains valid against plausible alternatives.
+
+**Purpose**
+- Validate that the current policy join key is still non-dominated
+- Provide defensible evidence that “we tried others and these are still the best”
+- Detect early signals that a policy join key may need revision
+
+**Inputs**
+- Phase-0 flat tables (`records.csv`, `identity_items.csv`)
+- `domain_join_key_policies.json`
+- Target domain (explicit)
+
+**Modes**
+- **Validate (policy-respecting)**  
+  - Required items are always included  
+  - Optional items are varied in a bounded neighborhood  
+  - Deterministic challengers may be added
+- **Harsh (policy-seeded)**  
+  - Same candidate universe as validate  
+  - Required items may be omitted  
+  - Used to test whether policy assumptions still hold
+
+**Characteristics**
+- Deterministic (no random candidate sampling)
+- Bounded search space
+- Explicit comparison against:
+  - the policy key itself
+  - local neighborhood variants
+  - top-ranked challenger keys
+
+**Outputs**
+- Pareto front CSV
+- Validation summary indicating whether the policy key appears on the Pareto front
+
+**Notes**
+- This is distinct from join-key discovery
+- Shape-based partitioning (e.g. dimension types by shape) remains a separate preprocessing step
+- No baseline is required
+
+---
+
 # Recommended usage (current state)
 
 ### Use

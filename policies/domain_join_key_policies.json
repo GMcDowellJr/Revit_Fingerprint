@@ -153,10 +153,10 @@
         "text_type.bold",
         "text_type.italic",
         "text_type.underline",
-        "text_type.color_rgb",
-        "text_type.leader_arrowhead_sig_hash"
+        "text_type.color_rgb"
       ],
       "optional_items": [
+		"text_type.leader_arrowhead_sig_hash",
         "text_type.background_raw",
         "text_type.line_weight",
         "text_type.show_border",

@@ -151,3 +151,21 @@ python tools/pareto_joinkey_search.py `
 	--seed 42 `
 	--out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2" `
 	--pareto_name pareto_front__line_patterns__discovery.csv
+	
+	
+python tools/pareto_joinkey_search.py `
+	--records "...\phase0_flat\records.csv" `
+	--items   "...\phase0_flat\identity_items.csv" `
+	--domain view_filter_definitions `
+	--max_k 4 `
+	--sample_candidates 30 `
+	--sample_records 10000 `
+	--seed 42 `
+	--out_dir "...\Phase2" `
+	--pareto_name pareto_front__view_filter_definitions__discovery.csv
+
+python tools/pareto_make_shape_inputs.py `
+	--records phase0_flat\records.csv `
+	--items   phase0_flat\identity_items.csv `
+	--domain dimension_types `
+	--out_dir phase2\shape_inputs
