@@ -347,13 +347,29 @@ def extract(doc, ctx=None):
                 cosmetic_items = []
                 unknown_items = []
 
-                # Hypothesis: Object Styles are graphics-driven; treat extracted attributes as cosmetic.
+                # Phase-2 contract for object_styles:
+                # - semantic_items: curated Pareto candidate subset
+                # - cosmetic_items: non-join cosmetics
+                # - unknown_items: context-only or uncategorized
+                semantic_keys = {
+                    "obj_style.row_key",
+                    "obj_style.pattern_ref.sig_hash",
+                    "obj_style.weight.projection",
+                }
+                cosmetic_keys = {
+                    "obj_style.color.rgb",
+                    "obj_style.pattern_ref.kind",
+                    "obj_style.weight.cut",
+                }
+
                 for it in (identity_items_sorted or []):
                     k = safe_str(it.get("k", ""))
-                    if k == "obj_style.row_key":
-                        unknown_items.append(it)
-                    else:
+                    if k in semantic_keys:
+                        semantic_items.append(it)
+                    elif k in cosmetic_keys:
                         cosmetic_items.append(it)
+                    else:
+                        unknown_items.append(it)
 
                 # Add CategoryType as unknown context (not part of identity_basis)
                 ct_v, ct_q = phase2_qv_from_legacy_sentinel_str(cat_type, allow_empty=False)

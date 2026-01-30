@@ -308,9 +308,14 @@ def extract(doc, ctx=None):
                 status_reasons.append("pattern_kind_missing_or_unreadable")
             identity_items.append(make_identity_item("line_style.pattern_ref.kind", kind_v, kind_q))
 
-            # sig_hash item is present only when we have a mapped reference
+            # sig_hash item is always present so downstream tables have a stable column surface.
+            # For SOLID or unresolved refs, v=None with q=ITEM_Q_MISSING.
             if lp_sig_hash_q == ITEM_Q_OK:
-                identity_items.append(make_identity_item("line_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
+                lp_sig_hash_v, lp_sig_hash_q = canonicalize_str(lp_sig_hash_v)
+            else:
+                lp_sig_hash_v, lp_sig_hash_q = (None, ITEM_Q_MISSING)
+
+            identity_items.append(make_identity_item("line_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
 
             # Enforce minima: required not-ok => blocked
             if any(q != ITEM_Q_OK for q in required_qs):
@@ -357,8 +362,7 @@ def extract(doc, ctx=None):
 
             # pattern reference
             p2_semantic.append(make_identity_item("line_style.pattern_ref.kind", kind_v, kind_q))
-            if lp_sig_hash_q == ITEM_Q_OK:
-                p2_semantic.append(make_identity_item("line_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
+            p2_semantic.append(make_identity_item("line_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
 
             # color (appearance) and other ambiguous surfaces
             rgb_p2_v, rgb_p2_q = phase2_qv_from_legacy_sentinel_str(rgb_sig, allow_empty=False)

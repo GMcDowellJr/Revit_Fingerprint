@@ -5,12 +5,6 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-import hashlib
-import re
-
-
-_UID_KEY_RE = re.compile(r"uid", re.IGNORECASE)
-
 
 def _is_uid_like_key(k: str) -> bool:
     return bool(_UID_KEY_RE.search(k or ""))
@@ -197,9 +191,8 @@ def main() -> None:
                 identity_quality = _safe_str(r.get("identity_quality"))
                 sig_hash = _safe_str(r.get("sig_hash"))
 
-                # Recompute a "no-UID" signature hash from identity_basis.items
-                # without modifying the upstream sig_hash.
-                sig_hash_no_uid = ""
+                # Trust upstream exporter: sig_hash is already UID-free by contract.
+
                 ib = r.get("identity_basis") if isinstance(r.get("identity_basis"), dict) else None
                 items = ib.get("items") if isinstance(ib, dict) else None
                 if isinstance(items, list):
@@ -220,18 +213,17 @@ def main() -> None:
                     parts = sorted(parts, key=lambda p: p.lower())
                     sig_hash_no_uid = _md5_utf8_join_pipe(parts)
 
-                records_rows.append({
-                    "file_id": file_id,
-                    "domain": domain,
-                    "record_id": record_id,
-                    "status": status,
-                    "identity_quality": identity_quality,
-                    "sig_hash": sig_hash,
-                    "sig_hash_no_uid": sig_hash_no_uid,
-                    "label_display": _safe_str(r.get("label", {}).get("display")),
-                    "label_quality": _safe_str(r.get("label", {}).get("quality")),
-                    "label_provenance": _safe_str(r.get("label", {}).get("provenance")),
-                })
+                 records_rows.append({
+                     "file_id": file_id,
+                     "domain": domain,
+                     "record_id": record_id,
+                     "status": status,
+                     "identity_quality": identity_quality,
+                     "sig_hash": sig_hash,
+                     "label_display": _safe_str(r.get("label", {}).get("display")),
+                     "label_quality": _safe_str(r.get("label", {}).get("quality")),
+                     "label_provenance": _safe_str(r.get("label", {}).get("provenance")),
+                 })
 
                 # status_reasons
                 sr = r.get("status_reasons")
@@ -318,8 +310,8 @@ def main() -> None:
             wrote_paths.append(_write_csv(
                 "records.csv",
                 records_rows,
-                ["file_id", "domain", "record_id", "status", "identity_quality", "sig_hash", "sig_hash_no_uid",
-                 "label_display", "label_quality", "label_provenance"],
+                 ["file_id", "domain", "record_id", "status", "identity_quality", "sig_hash",
+                  "label_display", "label_quality", "label_provenance"],
             ))
 
         if "status_reasons" in emit_set:

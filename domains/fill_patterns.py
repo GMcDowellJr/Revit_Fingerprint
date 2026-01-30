@@ -513,19 +513,20 @@ def extract(doc, ctx=None):
         # Derived structural identity helper for Phase-2:
         # Collapse all per-grid semantic items into a single hash so join-key discovery
         # can treat the grid bundle as one "field" without losing the detailed items.
+        #
+        # IMPORTANT: grid order is identity-significant; do NOT sort the preimage.
         try:
             grid_like = []
             for it in (semantic or []):
-                k = it.get("k", "")
-                if k.startswith("fill_pattern.grid[") or k == "fill_pattern.grid_count":
+                k = safe_str(it.get("k", ""))
+                if k == "fill_pattern.grid_count" or k.startswith("fill_pattern.grid["):
                     # Stable preimage: include k/q/v so unreadables affect the hash deterministically
                     grid_like.append("k={}|q={}|v={}".format(
                         safe_str(it.get("k", "")),
                         safe_str(it.get("q", "")),
                         safe_str(it.get("v", "")),
                     ))
-            grid_like_sorted = sorted(grid_like)
-            grids_def_hash = make_hash(grid_like_sorted) if grid_like_sorted else None
+            grids_def_hash = make_hash(grid_like) if grid_like else None
         except Exception:
             grids_def_hash = None
 
@@ -742,10 +743,11 @@ def extract(doc, ctx=None):
 
         status_v2 = STATUS_OK
         status_reasons_v2 = []
+        
         identity_items_v2 = []
 
-        name_v2, name_q = canonicalize_str(name)
-        identity_items_v2.append(make_identity_item("fill_pattern.name", name_v2, name_q))
+        # NOTE: name/uid/elem_id are labels/metadata and MUST NOT participate in identity.
+        # Name is carried in label{} and in phase2 cosmetic/unknown surfaces.
 
         if fp is None:
             is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
@@ -771,44 +773,122 @@ def extract(doc, ctx=None):
         identity_items_v2.append(make_identity_item("fill_pattern.is_solid", is_solid_v, is_solid_q))
         identity_items_v2.append(make_identity_item("fill_pattern.target_id", target_v, target_q))
         identity_items_v2.append(make_identity_item("fill_pattern.grid_count", gc_v, gc_q))
-        required_qs = [name_q, is_solid_q, target_q, gc_q]
+        required_qs = [is_solid_q, target_q, gc_q]
 
         if gc_i and gc_i > 0:
             for i in range(gc_i):
+                idx = "{:03d}".format(int(i))
                 g = _phase2_try_get_grid(fp, i)
                 if g is None:
-                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].angle", None, ITEM_Q_UNREADABLE))
-                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].origin_u", None, ITEM_Q_UNREADABLE))
-                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].origin_v", None, ITEM_Q_UNREADABLE))
-                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].shift", None, ITEM_Q_UNREADABLE))
-                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].offset", None, ITEM_Q_UNREADABLE))
-                    required_qs.extend([ITEM_Q_UNREADABLE] * 5)
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].angle", None, ITEM_Q_UNREADABLE))
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].origin.kind", None, ITEM_Q_UNREADABLE))
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].offset", None, ITEM_Q_UNREADABLE))
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].shift", None, ITEM_Q_UNREADABLE))
+                    required_qs.extend([ITEM_Q_UNREADABLE] * 4)
                     continue
+
+                # angle / offset / shift
                 try:
                     ang_v, ang_q = canonicalize_float(getattr(g, "Angle", None))
                 except Exception:
                     ang_v, ang_q = (None, ITEM_Q_UNREADABLE)
-                try:
-                    o = getattr(g, "Origin", None)
-                    ou_v, ou_q = canonicalize_float(getattr(o, "U", None))
-                    ov_v, ov_q = canonicalize_float(getattr(o, "V", None))
-                except Exception:
-                    ou_v, ou_q = (None, ITEM_Q_UNREADABLE)
-                    ov_v, ov_q = (None, ITEM_Q_UNREADABLE)
-                try:
-                    sh_v, sh_q = canonicalize_float(getattr(g, "Shift", None))
-                except Exception:
-                    sh_v, sh_q = (None, ITEM_Q_UNREADABLE)
+
                 try:
                     off_v, off_q = canonicalize_float(getattr(g, "Offset", None))
                 except Exception:
                     off_v, off_q = (None, ITEM_Q_UNREADABLE)
-                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].angle", ang_v, ang_q))
-                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].origin_u", ou_v, ou_q))
-                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].origin_v", ov_v, ov_q))
-                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].shift", sh_v, sh_q))
-                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{i}].offset", off_v, off_q))
-                required_qs.extend([ang_q, ou_q, ov_q, sh_q, off_q])
+
+                try:
+                    sh_v, sh_q = canonicalize_float(getattr(g, "Shift", None))
+                except Exception:
+                    sh_v, sh_q = (None, ITEM_Q_UNREADABLE)
+
+                # origin: explicit kind + conditional leaf members (uv vs xy)
+                origin_kind = None
+                a = b = None
+
+                # UV origin
+                try:
+                    o = getattr(g, "Origin", None)
+                    u = getattr(o, "U", None)
+                    v = getattr(o, "V", None)
+                    if u is not None and v is not None:
+                        origin_kind = "uv"
+                        a = u
+                        b = v
+                except Exception:
+                    pass
+
+                # XY origin
+                if origin_kind is None:
+                    try:
+                        o = getattr(g, "Origin", None)
+                        x = getattr(o, "X", None)
+                        y = getattr(o, "Y", None)
+                        if x is not None and y is not None:
+                            origin_kind = "xy"
+                            a = x
+                            b = y
+                    except Exception:
+                        pass
+
+                # Scalar origin props (treated as uv)
+                if origin_kind is None:
+                    for u_name, v_name in [("OriginU", "OriginV"), ("UOrigin", "VOrigin")]:
+                        try:
+                            u2 = getattr(g, u_name)
+                            v2 = getattr(g, v_name)
+                            if u2 is None or v2 is None:
+                                continue
+                            origin_kind = "uv"
+                            a = u2
+                            b = v2
+                            break
+                        except Exception:
+                            continue
+
+                if origin_kind is None:
+                    ok_kind = (None, ITEM_Q_UNREADABLE)
+                else:
+                    ok_kind = canonicalize_str(origin_kind)
+
+                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].angle", ang_v, ang_q))
+                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].origin.kind", ok_kind[0], ok_kind[1]))
+
+                if origin_kind == "uv":
+                    try:
+                        ou_v, ou_q = canonicalize_float(a)
+                    except Exception:
+                        ou_v, ou_q = (None, ITEM_Q_UNREADABLE)
+                    try:
+                        ov_v, ov_q = canonicalize_float(b)
+                    except Exception:
+                        ov_v, ov_q = (None, ITEM_Q_UNREADABLE)
+
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].origin.u", ou_v, ou_q))
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].origin.v", ov_v, ov_q))
+                    required_qs.extend([ang_q, ok_kind[1], ou_q, ov_q, off_q, sh_q])
+
+                elif origin_kind == "xy":
+                    try:
+                        ox_v, ox_q = canonicalize_float(a)
+                    except Exception:
+                        ox_v, ox_q = (None, ITEM_Q_UNREADABLE)
+                    try:
+                        oy_v, oy_q = canonicalize_float(b)
+                    except Exception:
+                        oy_v, oy_q = (None, ITEM_Q_UNREADABLE)
+
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].origin.x", ox_v, ox_q))
+                    identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].origin.y", oy_v, oy_q))
+                    required_qs.extend([ang_q, ok_kind[1], ox_q, oy_q, off_q, sh_q])
+
+                else:
+                    # kind unreadable => identity blocked; no leaf members
+                    required_qs.extend([ang_q, ok_kind[1], off_q, sh_q])
+
+                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].offset", off_v, off_q))
+                identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].shift", sh_v, sh_q))
 
         if any(q != ITEM_Q_OK for q in required_qs):
             status_v2 = STATUS_BLOCKED
@@ -856,9 +936,9 @@ def extract(doc, ctx=None):
     info["legacy_records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
     info["records"] = v2_records
 
-    # v2 finalize: block domain hash if any record blocked
+    # v2 finalize: block domain hash if any record is blocked
     info["signature_hashes_v2"] = sorted(v2_sig_hashes)
-    if info["debug_v2_blocked"] > 0:
+    if any((r or {}).get("status") == STATUS_BLOCKED for r in (v2_records or [])):
         info["hash_v2"] = None
     else:
         info["hash_v2"] = make_hash(info["signature_hashes_v2"])
