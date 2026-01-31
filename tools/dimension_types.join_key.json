@@ -1,49 +1,213 @@
 {
-  "policy_id": "dimension_types.join_key",
-  "version": "1.0.0",
+  "join_key_schema": "dimension_types.join_key.v3",
+  "hash_alg": "md5_utf8_join_pipe",
   "domain": "dimension_types",
 
-  "base_keys": [
-    "dim_type.accuracy"
+  "required_items": [
+    "dim_type.shape",
+    "dim_type.accuracy",
+    "dim_type.tick_mark_sig_hash"
   ],
 
-  "shape_key": "dim_type.shape",
+  "optional_items": [
+    "dim_type.prefix",
+    "dim_type.suffix",
+    "dim_type.unit_format_id",
+    "dim_type.rounding"
+  ],
 
-  "shape_overrides": {
-    "0": [
-      "dim_type.witness_line_control",
-      "dim_type.prefix"
-    ],
-    "1": [
-      "dim_type.prefix",
-      "dim_type.suffix"
-    ],
-    "2": [
-      "dim_type.unit_format_id",
-      "dim_type.rounding"
-    ],
-    "4": [
-      "dim_type.unit_format_id"
-    ],
-    "5": [
-      "dim_type.prefix",
-      "dim_type.suffix"
-    ],
-    "8": [
-      "dim_type.witness_line_control",
-      "dim_type.witness_line_gap"
-    ],
-    "9": [],
-    "10": [
-      "dim_type.unit_format_id",
-      "dim_type.rounding"
-    ]
+  "explicitly_excluded_items": [
+    "dim_type.tick_mark_uid",
+    "dim_attr.tick_mark_uid",
+    "dim_type.name"
+  ],
+
+  "shape_gating": {
+    "discriminator_key": "dim_type.shape",
+    "shape_requirements": {
+      "Linear": {
+        "additional_required": ["dim_type.witness_line_control"],
+        "additional_optional": [],
+        "notes": "Linear dimensions must match on witness line control behavior"
+      },
+      "LinearFixed": {
+        "additional_required": ["dim_type.witness_line_control"],
+        "additional_optional": [],
+        "notes": "LinearFixed dimensions share witness line requirements with Linear"
+      },
+      "Radial": {
+        "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size"],
+        "additional_optional": [],
+        "notes": "Radial dimensions must match on center mark configuration"
+      },
+      "Diameter": {
+        "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size"],
+        "additional_optional": [],
+        "notes": "Diameter dimensions share center mark requirements with Radial"
+      },
+      "DiameterLinked": {
+        "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size"],
+        "additional_optional": [],
+        "notes": "DiameterLinked dimensions share center mark requirements with Radial"
+      },
+      "Angular": {
+        "additional_required": [],
+        "additional_optional": [],
+        "notes": "Angular dimensions use common properties only"
+      },
+      "ArcLength": {
+        "additional_required": [],
+        "additional_optional": [],
+        "notes": "ArcLength dimensions use common properties only"
+      },
+      "SpotElevation": {
+        "additional_required": [],
+        "additional_optional": [],
+        "notes": "Spot dimensions use common properties only"
+      },
+      "SpotCoordinate": {
+        "additional_required": [],
+        "additional_optional": [],
+        "notes": "Spot dimensions use common properties only"
+      },
+      "SpotSlope": {
+        "additional_required": [],
+        "additional_optional": [],
+        "notes": "Spot dimensions use common properties only"
+      },
+      "SpotElevationFixed": {
+        "additional_required": [],
+        "additional_optional": [],
+        "notes": "Spot dimensions use common properties only"
+      }
+    },
+    "default_shape_behavior": "common_only"
   },
 
-  "rules": {
-    "omit_missing_values": true,
-    "sort_keys": true,
-    "concat_delimiter": "|",
-    "kv_delimiter": "="
-  }
+  "rationale": {
+    "pareto_principle": "Required items are properties that would cause >80% of users to say 'these are different dimension types'. Optional items affect display but don't fundamentally change identity.",
+
+    "required_items_rationale": {
+      "dim_type.shape": {
+        "category": "REQUIRED",
+        "importance": "critical",
+        "reason": "Shape determines the fundamental category of dimension (Linear, Radial, Angular, Spot). Two dimensions with different shapes are inherently different types, regardless of other properties.",
+        "pareto_score": "100% - Every user would agree different shapes mean different dimension types"
+      },
+      "dim_type.accuracy": {
+        "category": "REQUIRED",
+        "importance": "high",
+        "reason": "Accuracy controls the precision of displayed values. A dimension showing 1/8\" vs 1\" precision fundamentally changes how users interpret and use the dimension.",
+        "pareto_score": "95% - Most users consider precision differences as distinct types"
+      },
+      "dim_type.tick_mark_sig_hash": {
+        "category": "REQUIRED",
+        "importance": "high",
+        "reason": "Tick mark (arrowhead) is a visually prominent indicator. Uses definition-based signature hash, not UID, for cross-file matching. Different tick marks indicate different dimension standards.",
+        "pareto_score": "85% - Tick mark style is a key visual differentiator"
+      }
+    },
+
+    "optional_items_rationale": {
+      "dim_type.prefix": {
+        "category": "OPTIONAL",
+        "importance": "low",
+        "reason": "Prefix text (like 'R=' for radii) is a display convention that varies by firm/project. Two dimension types that differ only in prefix are still functionally similar.",
+        "pareto_score": "40% - Some users care about prefix standardization, many don't"
+      },
+      "dim_type.suffix": {
+        "category": "OPTIONAL",
+        "importance": "low",
+        "reason": "Suffix text (like 'TYP') is a display convention that varies by firm/project. Often project-specific rather than standards-critical.",
+        "pareto_score": "40% - Similar to prefix - display convention"
+      },
+      "dim_type.unit_format_id": {
+        "category": "OPTIONAL",
+        "importance": "medium",
+        "reason": "Unit format affects how values are displayed (feet-inches vs decimal). Important for consistency but typically a project setting, not a type differentiator.",
+        "pareto_score": "60% - Unit display is important but often project-wide"
+      },
+      "dim_type.rounding": {
+        "category": "OPTIONAL",
+        "importance": "medium",
+        "reason": "Rounding method affects value display but is typically a refinement, not a fundamental difference. Often used with accuracy to fine-tune display.",
+        "pareto_score": "50% - Affects display, less critical than accuracy"
+      }
+    },
+
+    "shape_specific_rationale": {
+      "linear_family": {
+        "shapes": ["Linear", "LinearFixed"],
+        "additional_required": ["dim_type.witness_line_control"],
+        "reason": "Witness lines are fundamental to linear dimensions. The control setting (Gap to Element, Fixed to Dimension Line, etc.) affects how dimensions interact with geometry. Two linear dimensions with different witness line behavior are functionally different.",
+        "pareto_score": "90% - Witness line behavior is critical for linear dimension usability"
+      },
+      "radial_family": {
+        "shapes": ["Radial", "Diameter", "DiameterLinked"],
+        "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size"],
+        "reason": "Center marks are a defining visual characteristic of radial/diameter dimensions. The presence and size of center marks affects both appearance and usability on drawings.",
+        "pareto_score": "85% - Center marks are a key differentiator for radial dimensions"
+      },
+      "angular_family": {
+        "shapes": ["Angular", "ArcLength"],
+        "additional_required": [],
+        "reason": "Angular dimensions use only common properties. No additional shape-specific properties are required for identity matching.",
+        "pareto_score": "N/A - Common properties sufficient"
+      },
+      "spot_family": {
+        "shapes": ["SpotElevation", "SpotCoordinate", "SpotSlope", "SpotElevationFixed"],
+        "additional_required": [],
+        "reason": "Spot dimensions use only common properties. The shape itself (Elevation vs Coordinate vs Slope) is the primary differentiator.",
+        "pareto_score": "N/A - Common properties sufficient"
+      }
+    },
+
+    "excluded_items_rationale": {
+      "dim_type.tick_mark_uid": {
+        "category": "EXCLUDED",
+        "reason": "UIDs are file-local identifiers that don't translate across files. For cross-project comparison, definition-based matching via tick_mark_sig_hash is required.",
+        "evidence": "Phase-2 architecture decision: UIDs are file-local, signatures are semantic"
+      },
+      "dim_attr.tick_mark_uid": {
+        "category": "EXCLUDED",
+        "reason": "Same as dim_type.tick_mark_uid - UID-based matching is inappropriate for cross-file governance.",
+        "evidence": "Consistency with Phase-2 UID exclusion policy"
+      },
+      "dim_type.name": {
+        "category": "EXCLUDED",
+        "reason": "Names are labels only and must not participate in joins. Two dimension types can have the same definition but different names, or different definitions with the same name.",
+        "evidence": "D-001 decision: Behavior-first fingerprinting, not UI presentation"
+      }
+    }
+  },
+
+  "notes": [
+    "Schema v3: Shape-gated join key requirements for dimension types.",
+    "Pareto evidence: Required properties cause >80% of users to say 'these are different'.",
+    "Shape (dim_type.shape) is discriminator for shape-specific requirements.",
+    "Linear family (Linear, LinearFixed) requires witness_line_control.",
+    "Radial family (Radial, Diameter, DiameterLinked) requires center_marks and center_mark_size.",
+    "Angular and Spot families use common properties only - shape discriminates sufficiently.",
+    "Definition-based tick mark identity via dim_type.tick_mark_sig_hash - no UIDs.",
+    "UID-based tick mark fields must never participate in joins per Phase-2 architecture.",
+    "Names are labels only (D-001) and must never participate in identity matching."
+  ],
+
+  "version_history": [
+    {
+      "version": "v1",
+      "date": "2024-01-01",
+      "changes": "Initial policy with numeric shape overrides"
+    },
+    {
+      "version": "v2",
+      "date": "2024-12-01",
+      "changes": "Added tick_mark_sig_hash as required, excluded UID-based fields"
+    },
+    {
+      "version": "v3",
+      "date": "2025-01-01",
+      "changes": "Shape-gating schema extension with discriminator-based requirements, detailed Pareto rationale"
+    }
+  ]
 }
