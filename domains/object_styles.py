@@ -464,4 +464,30 @@ def extract(doc, ctx=None):
         for r in info["records"]
     ]
 
+    # Export baseline map for downstream domains (view_category_overrides, view_templates)
+    if ctx is not None:
+        category_to_sig_hash = {}
+        category_records = {}  # Full records for detailed comparison
+
+        records = info.get("records") or []
+        for rec in records:
+            row_key = rec.get("identity_basis", {}).get("items", [])
+            # Find row_key value (obj_style.row_key)
+            for item in row_key:
+                if item.get("k") == "obj_style.row_key":
+                    key = item.get("v")
+                    sig_hash = rec.get("sig_hash")
+
+                    if key and sig_hash:
+                        category_to_sig_hash[key] = sig_hash
+                        category_records[sig_hash] = rec
+                    break
+
+        # Export to context
+        ctx["object_styles_category_to_sig_hash"] = category_to_sig_hash
+        ctx["object_styles_records"] = category_records
+
+        # Debug info
+        info["debug_exported_baseline_count"] = len(category_to_sig_hash)
+
     return info
