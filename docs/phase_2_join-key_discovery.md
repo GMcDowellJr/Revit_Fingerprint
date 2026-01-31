@@ -74,11 +74,10 @@ For each domain:
 * **Finding:** Identity is defined by the ordered segment sequence, not name/UID.
 * **Minimum Effective Key:**
 
-  * `line_pattern.segment_count`
-  * `(seg[i].kind, seg[i].length)` for initial segments
-* **Residual Risk:** Prefix collisions if deeper segments differ.
-* **Policy Choice:** Either accept quantified ambiguity at a cutoff, or move to a full structural signature.
-* **Note:** Strong candidate for exporter evolution to emit a single `segment_signature`.
+  * `line_pattern.segments_def_hash`
+* **Residual Risk:** None when a full structural signature hash is available.
+* **Policy Choice:** Use the derived segment-definition hash for joins.
+* **Note:** Exporter emits a single structure hash to avoid prefix collisions and reduce key width.
 
 ---
 
@@ -89,11 +88,10 @@ For each domain:
 * **Finding:** Exact identity achievable without names/UIDs.
 * **Effective Key:**
 
-  * `line_style.color.rgb`
-  * `line_style.weight.projection`
+  * `line_style.color_rgb`
+  * `line_style.line_weight_projection`
   * `line_style.pattern_ref.sig_hash`
-  * `line_style.path` (category lineage)
-* **Conclusion:** Definition‑based identity; `path` retained to scope category context.
+* **Conclusion:** Definition‑based identity; category path is cosmetic only.
 
 ---
 

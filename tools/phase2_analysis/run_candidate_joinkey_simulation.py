@@ -31,7 +31,7 @@ def _extract_features(record: Dict[str, Any]) -> Dict[str, Tuple[str, str]]:
     return {
         "shape": _qv(_get(record, ["phase2", "semantic_items_map", "dim_attr.shape"])),
         "name": _qv(record.get("label")),
-        "tick": _qv(_get(record, ["phase2", "cosmetic_items_map", "dim_attr.tick_mark_uid"])),
+        "tick": _qv(_get(record, ["phase2", "semantic_items_map", "dim_attr.tick_mark_uid"])),
         "accuracy": _qv(_get(record, ["phase2", "semantic_items_map", "dim_attr.accuracy"])),
     }
 

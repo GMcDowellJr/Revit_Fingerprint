@@ -551,6 +551,7 @@ def extract(doc, ctx=None):
             "grouping_basis": "phase2.hypothesis",
             "semantic_items": phase2_sorted_items(semantic_reduced),
             "cosmetic_items": phase2_sorted_items(cosmetic),
+            "coordination_items": phase2_sorted_items([]),
             "unknown_items": phase2_sorted_items(unknown),
         }
 
@@ -747,7 +748,7 @@ def extract(doc, ctx=None):
         identity_items_v2 = []
 
         # NOTE: name/uid/elem_id are labels/metadata and MUST NOT participate in identity.
-        # Name is carried in label{} and in phase2 cosmetic/unknown surfaces.
+        # Name is carried in label{} and in the phase2 cosmetic surface.
 
         if fp is None:
             is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)

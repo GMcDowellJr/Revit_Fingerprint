@@ -83,7 +83,7 @@ def _phase2_build_phase2_payload(*, phase_name, seq, uid):
     unknown_items = []
 
     v_name, q_name = phase2_qv_from_legacy_sentinel_str(phase_name, allow_empty=False)
-    semantic_items.append({"k": "phase.name", "q": q_name, "v": v_name})
+    cosmetic_items.append({"k": "phase.name", "q": q_name, "v": v_name})
 
     # seq is numeric-ish; canon_num emits legacy sentinels on None/failure, so map via helper.
     seq_s = canon_num(seq, nd=0)
@@ -100,6 +100,7 @@ def _phase2_build_phase2_payload(*, phase_name, seq, uid):
         "grouping_basis": "phase2.hypothesis",
         "semantic_items": phase2_sorted_items(semantic_items),
         "cosmetic_items": phase2_sorted_items(cosmetic_items),
+        "coordination_items": phase2_sorted_items([]),
         "unknown_items": phase2_sorted_items(unknown_items),
     }
 

@@ -231,10 +231,13 @@ def extract(doc, ctx=None):
 
         v_name_p2, q_name_p2 = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
 
+        phase2_coordination_items = phase2_sorted_items([
+            {"k": "phase_filter.name", "q": q_name_p2, "v": v_name_p2},
+        ])
+
         phase2_unknown_items = phase2_sorted_items([
             {"k": "phase_filter.uid", "q": q_uid, "v": v_uid},
             {"k": "phase_filter.id.int", "q": q_id, "v": v_id},
-            {"k": "phase_filter.name", "q": q_name_p2, "v": v_name_p2},
         ])
 
         rec_phase2 = {
@@ -242,6 +245,7 @@ def extract(doc, ctx=None):
             "grouping_basis": "phase2.hypothesis",
             "semantic_items": phase2_sorted_items(phase2_semantic_items),
             "cosmetic_items": [],
+            "coordination_items": phase2_coordination_items,
             "unknown_items": phase2_unknown_items,
         }
 

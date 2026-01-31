@@ -265,6 +265,7 @@ def extract(doc, ctx=None):
             "grouping_basis": "phase2.hypothesis",
             "semantic_items": semantic_items,
             "cosmetic_items": cosmetic_items,
+            "coordination_items": phase2_sorted_items([]),
             "unknown_items": unknown_items,
         }
 

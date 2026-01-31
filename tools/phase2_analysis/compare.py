@@ -40,7 +40,7 @@ def _phase2_items_map(record: Dict[str, Any]) -> Tuple[Dict[str, Tuple[str, Opti
     out: Dict[str, Tuple[str, Optional[str]]] = {}
     dup = 0
 
-    for bucket in ("semantic_items", "cosmetic_items", "unknown_items"):
+    for bucket in ("semantic_items", "cosmetic_items", "coordination_items", "unknown_items"):
         items = p2.get(bucket)
         if not isinstance(items, list):
             continue

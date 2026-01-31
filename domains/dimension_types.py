@@ -774,6 +774,7 @@ def extract(doc, ctx=None):
 
         phase2_cosmetic_items = phase2_sorted_items([
             make_identity_item("dim_attr.type_name", type_name_v, type_name_q),
+            make_identity_item("dim_type.name", type_name_v, type_name_q),
             make_identity_item("dim_attr.text_font", text_font_v, text_font_q),
             make_identity_item("dim_attr.text_size_in", text_size_in_v, text_size_in_q),
             make_identity_item("dim_attr.line_weight", lw_v, lw_q),
@@ -871,6 +872,7 @@ def extract(doc, ctx=None):
                 "grouping_basis": "phase2.hypothesis",
                 "semantic_items": phase2_semantic_items,
                 "cosmetic_items": phase2_cosmetic_items,
+                "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_unknown_items,
             }
         else:
@@ -896,6 +898,7 @@ def extract(doc, ctx=None):
                 "grouping_basis": "phase2.hypothesis",
                 "semantic_items": phase2_semantic_items,
                 "cosmetic_items": phase2_cosmetic_items,
+                "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_unknown_items,
             }
 

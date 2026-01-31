@@ -494,7 +494,7 @@ def extract(doc, ctx=None):
             )
         )
         name_v, name_q = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
-        unknown_items.append(
+        cosmetic_items.append(
             make_identity_item(
                 "line_pattern.name",
                 name_v,
@@ -514,6 +514,7 @@ def extract(doc, ctx=None):
             "grouping_basis": "phase2.hypothesis",
             "semantic_items": phase2_sorted_items(semantic_items),
             "cosmetic_items": phase2_sorted_items(cosmetic_items),
+            "coordination_items": phase2_sorted_items([]),
             "unknown_items": phase2_sorted_items(unknown_items),
         }
         

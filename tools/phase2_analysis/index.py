@@ -59,7 +59,7 @@ def _phase2_items_by_k(record: Dict[str, Any]) -> Tuple[Dict[str, Tuple[str, Opt
         return {}, 0
 
     buckets = []
-    for key in ("semantic_items", "cosmetic_items", "unknown_items"):
+    for key in ("semantic_items", "cosmetic_items", "coordination_items", "unknown_items"):
         items = p2.get(key)
         if isinstance(items, list):
             buckets.append(items)

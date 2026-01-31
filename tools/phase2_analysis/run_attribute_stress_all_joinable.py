@@ -24,7 +24,7 @@ def _phase2_items_map_no_dups(record) -> Tuple[Dict[str, Tuple[str, str]], bool]
         return out, False
 
     dup = False
-    for bucket in ("semantic_items", "cosmetic_items", "unknown_items"):
+    for bucket in ("semantic_items", "cosmetic_items", "coordination_items", "unknown_items"):
         items = p2.get(bucket)
         if not isinstance(items, list):
             continue

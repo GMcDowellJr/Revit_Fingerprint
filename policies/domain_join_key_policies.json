@@ -51,8 +51,7 @@
       "join_key_schema": "line_patterns.join_key.v2",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "line_pattern.segment_count",
-        "line_pattern.sequence_hash"
+        "line_pattern.segments_def_hash"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
@@ -62,8 +61,8 @@
         "line_pattern.uid_or_namekey"
       ],
       "notes": [
-        "Identity is definition-based via ordered segment (kind,length) sequence; segments are collapsed into line_pattern.sequence_hash.",
-        "line_pattern.sequence_hash must be derived only from segment kinds and lengths in order and must not incorporate UID, name, or element_id.",
+        "Identity is definition-based via ordered segment (kind,length) sequence; segments are collapsed into line_pattern.segments_def_hash.",
+        "line_pattern.segments_def_hash must be derived only from segment kinds and lengths in order and must not incorporate UID, name, or element_id.",
         "Names are labels only and must not participate in joins."
       ]
     },
@@ -71,8 +70,8 @@
       "join_key_schema": "line_styles.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "line_style.weight.projection",
-        "line_style.color.rgb",
+        "line_style.line_weight_projection",
+        "line_style.color_rgb",
         "line_style.pattern_ref.sig_hash"
       ],
       "optional_items": [],
@@ -112,12 +111,7 @@
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
         "arrowhead.style",
-        "arrowhead.tick_size_in",
-        "arrowhead.width_angle_deg",
-        "arrowhead.fill_tick",
-        "arrowhead.arrow_closed",
-        "arrowhead.tick_mark_centered",
-        "arrowhead.heavy_end_pen_weight"
+        "arrowhead.tick_size_in"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
@@ -156,14 +150,14 @@
       "required_items": [
         "text_type.font",
         "text_type.size_in",
-        "text_type.width_factor",
         "text_type.bold",
         "text_type.italic",
         "text_type.underline",
-        "text_type.color_rgb"
+        "text_type.color_rgb",
+        "text_type.width_factor"
       ],
       "optional_items": [
-		"text_type.leader_arrowhead_sig_hash",
+        "text_type.leader_arrowhead_sig_hash",
         "text_type.background_raw",
         "text_type.line_weight",
         "text_type.show_border",

@@ -18,7 +18,7 @@ def extract_phase2_items(record) -> Dict[str, Tuple[str, str]]:
     """
     out = {}
     p2 = record.get("phase2", {})
-    for bucket in ("semantic_items", "cosmetic_items", "unknown_items"):
+    for bucket in ("semantic_items", "cosmetic_items", "coordination_items", "unknown_items"):
         for it in p2.get(bucket, []) or []:
             k = it.get("k")
             if k is None or k in out:
