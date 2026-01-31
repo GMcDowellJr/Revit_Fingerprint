@@ -53,6 +53,17 @@ from core.phase2 import phase2_join_hash
 _RE_BRACKETED_INDEX = re.compile(r"\[(\d+)\]")
 
 
+def _dedupe_preserve_order(items):
+    seen = set()
+    out = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
 def _items_to_kqv_map(items):
     """Map k -> (v,q) for identity_items-like dicts."""
     m = {}
@@ -218,8 +229,11 @@ def build_join_key_from_policy(*, domain_policy, identity_items=None, candidate_
     add_req, add_opt, shape_value, shape_matched = _get_shape_specific_requirements(
         domain_policy, kqv
     )
-    req = req + add_req
-    opt = opt + add_opt
+    req = _dedupe_preserve_order(req + add_req)
+    opt = _dedupe_preserve_order(opt + add_opt)
+    if req:
+        req_set = set(req)
+        opt = [k for k in opt if k not in req_set]
 
     missing_required = []
     items = []

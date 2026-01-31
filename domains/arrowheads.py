@@ -51,13 +51,13 @@ from core.record_v2 import (
     build_record_v2,
 )
 from core.join_key_policy import get_domain_join_key_policy
+from core.collect import collect_types
 from core.join_key_builder import build_join_key_from_policy
 
 try:
-    from Autodesk.Revit.DB import ElementType, FilteredElementCollector
+    from Autodesk.Revit.DB import ElementType
 except ImportError:
     ElementType = None
-    FilteredElementCollector = None
 
 
 def _fmt_deg_from_rad(rad):
@@ -86,6 +86,87 @@ def _canon_yesno_bool(v):
         except Exception:
             pass
     return None
+
+
+def _get_arrowhead_style(style_raw, style_q):
+    """Return a canonical arrowhead style label.
+
+    This is a conservative mapping because integer enum meanings can vary.
+    We only return Arrow/Tick/Dot when the raw enum name or value indicates it;
+    otherwise fall back to Other.
+    """
+    if style_q != ITEM_Q_OK:
+        return None, ITEM_Q_MISSING
+
+    if style_raw is None:
+        return None, ITEM_Q_MISSING
+
+    style_str = None
+    if isinstance(style_raw, str):
+        style_str = style_raw
+    else:
+        try:
+            style_str = str(style_raw)
+        except Exception:
+            style_str = None
+
+    if not style_str:
+        return None, ITEM_Q_MISSING
+
+    s = style_str.strip()
+    s_lower = s.lower()
+
+    if "arrow" in s_lower:
+        return "Arrow", ITEM_Q_OK
+    if "tick" in s_lower:
+        return "Tick", ITEM_Q_OK
+    if "dot" in s_lower:
+        return "Dot", ITEM_Q_OK
+
+    # Conservative fallback: avoid guessing enum codes without evidence.
+    return "Other", ITEM_Q_OK
+
+
+def _build_common_identity_items(
+    *,
+    style_v,
+    style_q,
+    tick_in_v,
+    tick_in_q,
+):
+    return [
+        make_identity_item("arrowhead.style", style_v, style_q),
+        make_identity_item("arrowhead.tick_size_in", tick_in_v, tick_in_q),
+    ]
+
+
+def _build_arrow_identity_items(
+    *,
+    width_angle_v,
+    width_angle_q,
+    fill_v,
+    fill_q,
+    closed_v,
+    closed_q,
+):
+    return [
+        make_identity_item("arrowhead.width_angle_deg", width_angle_v, width_angle_q),
+        make_identity_item("arrowhead.fill_tick", fill_v, fill_q),
+        make_identity_item("arrowhead.arrow_closed", closed_v, closed_q),
+    ]
+
+
+def _build_tick_identity_items(
+    *,
+    centered_v,
+    centered_q,
+    pen_v,
+    pen_q,
+):
+    return [
+        make_identity_item("arrowhead.tick_mark_centered", centered_v, centered_q),
+        make_identity_item("arrowhead.heavy_end_pen_weight", pen_v, pen_q),
+    ]
 
 
 def _is_arrowhead_type(doc, t):
@@ -122,17 +203,23 @@ def extract(doc, ctx=None):
 
     # Mapping for downstream domains:
     # key: stringified ElementId.IntegerValue
-    # val: {"sig_hash": <str|None>, "label": <str>, "name": <str|None>}
+    # val: {"sig_hash": str_or_none, "label": str, "name": str_or_none}
     ctx.setdefault("arrowheads_by_type_id", {})
 
-    if ElementType is None or FilteredElementCollector is None:
+    if ElementType is None:
         info["debug_v2_blocked"] = True
         info["debug_v2_block_reasons"] = {"api_unreachable": True}
         return info
 
     # Collect *all* ElementTypes, then filter by the presence of arrowhead params.
     try:
-        all_types = list(FilteredElementCollector(doc).OfClass(ElementType).ToElements())
+        all_types = list(
+            collect_types(
+                doc,
+                of_class=ElementType,
+                where_key="arrowheads.element_types",
+            )
+        )
     except Exception:
         all_types = []
 
@@ -173,8 +260,9 @@ def extract(doc, ctx=None):
         # Parameters (best-effort, explicit q states)
         # Arrow Style (enum/int)
         p_style = first_param(t, ui_names=["Arrow Style"])
-        style_raw = _as_int(p_style)
+        style_raw = _as_string(p_style)
         style_v, style_q = canonicalize_enum(style_raw if style_raw is not None else None)
+        style_label_v, style_label_q = _get_arrowhead_style(style_raw, style_q)
 
         # Tick Size (length) -> inches string
         p_tick = first_param(t, ui_names=["Tick Size"])
@@ -211,19 +299,57 @@ def extract(doc, ctx=None):
         pen_raw = _as_int(p_pen)
         pen_v, pen_q = canonicalize_int(pen_raw)
 
-        identity_items = [
-            make_identity_item("arrowhead.style", style_v, style_q),
-            make_identity_item("arrowhead.tick_size_in", tick_in_v, tick_in_q),
-            make_identity_item("arrowhead.width_angle_deg", ang_deg_v, ang_deg_q),
-            make_identity_item("arrowhead.fill_tick", fill_v, fill_q),
-            make_identity_item("arrowhead.arrow_closed", closed_v, closed_q),
-            make_identity_item("arrowhead.tick_mark_centered", center_v, center_q),
-            make_identity_item("arrowhead.heavy_end_pen_weight", pen_v, pen_q),
-        ]
-        identity_items = sorted(identity_items, key=lambda it: it.get("k", ""))
+        identity_items = []
+        identity_items.extend(
+            _build_common_identity_items(
+                style_v=style_label_v,
+                style_q=style_label_q,
+                tick_in_v=tick_in_v,
+                tick_in_q=tick_in_q,
+            )
+        )
+
+        if style_label_v == "Arrow":
+            identity_items.extend(
+                _build_arrow_identity_items(
+                    width_angle_v=ang_deg_v,
+                    width_angle_q=ang_deg_q,
+                    fill_v=fill_v,
+                    fill_q=fill_q,
+                    closed_v=closed_v,
+                    closed_q=closed_q,
+                )
+            )
+        elif style_label_v == "Tick":
+            identity_items.extend(
+                _build_tick_identity_items(
+                    centered_v=center_v,
+                    centered_q=center_q,
+                    pen_v=pen_v,
+                    pen_q=pen_q,
+                )
+            )
+        elif style_label_v == "Dot":
+            identity_items.extend(
+                _build_tick_identity_items(
+                    centered_v=center_v,
+                    centered_q=center_q,
+                    pen_v=pen_v,
+                    pen_q=pen_q,
+                )
+            )
+        elif style_label_v == "Other":
+            identity_items.extend(
+                _build_tick_identity_items(
+                    centered_v=center_v,
+                    centered_q=center_q,
+                    pen_v=pen_v,
+                    pen_q=pen_q,
+                )
+            )
 
         # Required qs: style + tick_size must be OK (classifier depends on their presence)
-        required_qs = [style_q, tick_in_q]
+        required_qs = [style_label_q, tick_in_q]
         if any(q != ITEM_Q_OK for q in required_qs):
             _v2_block("required_identity_not_ok")
 

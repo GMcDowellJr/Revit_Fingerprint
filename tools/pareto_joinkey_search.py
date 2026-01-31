@@ -28,7 +28,18 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 
 import pandas as pd
 
-def _load_join_key_policy(policy_json: Path, domain: str) -> tuple[list[str], list[str], list[str]]:
+def _dedupe_preserve_order(items: Sequence[str]) -> list[str]:
+    seen = set()
+    out = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+def _load_join_key_policy(policy_json: Path, domain: str) -> tuple[list[str], list[str], list[str], dict | None]:
     """
     Return (required_items, optional_items, explicitly_excluded_items) for a domain.
     Expects domain_join_key_policies.json shape:
@@ -49,12 +60,13 @@ def _load_join_key_policy(policy_json: Path, domain: str) -> tuple[list[str], li
     opt = [str(x).strip() for x in opt if str(x).strip()]
     exc = [str(x).strip() for x in exc if str(x).strip()]
 
-    # de-dupe deterministically
-    req = sorted(set(req))
-    opt = sorted(set(opt))
-    exc = sorted(set(exc))
+    req = _dedupe_preserve_order(req)
+    opt = _dedupe_preserve_order(opt)
+    exc = _dedupe_preserve_order(exc)
 
-    return req, opt, exc
+    shape_gating = dom.get("shape_gating") if isinstance(dom.get("shape_gating"), dict) else None
+
+    return req, opt, exc, shape_gating
 
 
 def _rank_challengers_from_wide(df: pd.DataFrame, keys: list[str]) -> list[str]:
@@ -223,7 +235,7 @@ def eval_subset(df: pd.DataFrame, keys: Tuple[str, ...]) -> dict:
     """
     Compute composite key, then multi-objective metrics.
     """
-    # composite key: join non-null kv strings for selected keys, sorted by k
+    # composite key: join non-null kv strings for selected keys, in policy order
     sub = df[list(keys)].copy() if len(keys) > 0 else pd.DataFrame(index=df.index)
 
     if len(keys) == 0:
@@ -232,8 +244,6 @@ def eval_subset(df: pd.DataFrame, keys: Tuple[str, ...]) -> dict:
         # Ensure consistent column order (keys already sorted in caller)
         def row_join(row: pd.Series) -> str:
             vals = [v for v in row.tolist() if isinstance(v, str) and v.strip() != ""]
-            # already "k=v", so sorting by k is equivalent to sorting by string
-            vals.sort()
             return "|".join(vals)
 
         ck = sub.apply(row_join, axis=1)
@@ -307,6 +317,12 @@ def main() -> None:
         default="pareto_front.csv",
         help="output filename for Pareto front CSV (default: pareto_front.csv)",
     )
+    ap.add_argument(
+        "--shape_mode",
+        default="off",
+        choices=["off", "per_shape"],
+        help="shape-gating mode: off (default) or per_shape evaluation",
+    )
 
     ap.add_argument("--seed", default=1337, type=int, help="random seed for sampling")
     ap.add_argument(
@@ -342,11 +358,17 @@ def main() -> None:
     policy_required: list[str] = []
     policy_optional: list[str] = []
     policy_excluded: list[str] = []
+    policy_shape_gating: dict | None = None
 
     if args.policy_json is not None:
         if not args.domain:
             raise SystemExit("--policy_json requires --domain (policy is domain-scoped).")
-        policy_required, policy_optional, policy_excluded = _load_join_key_policy(Path(args.policy_json), str(args.domain))
+        (
+            policy_required,
+            policy_optional,
+            policy_excluded,
+            policy_shape_gating,
+        ) = _load_join_key_policy(Path(args.policy_json), str(args.domain))
 
     # Auto-candidates from identity_items.k (not from records)
     items_ks = (
@@ -354,11 +376,11 @@ def main() -> None:
         if "k" in items.columns
         else pd.Series([], dtype=str)
     )
-    auto_candidates = sorted(set([k for k in items_ks.tolist() if k != ""]))
+    auto_candidates = _dedupe_preserve_order([k for k in items_ks.tolist() if k != ""])
 
     # In validate/harsh mode, candidates are policy-seeded (plus optional challengers).
     if str(args.mode) in ("validate", "harsh"):
-        candidates = sorted(set(policy_required + policy_optional))
+        candidates = _dedupe_preserve_order(policy_required + policy_optional)
     else:
         # discover mode: explicit list wins, otherwise auto
         if args.candidates and len(args.candidates) > 0:
@@ -375,7 +397,7 @@ def main() -> None:
         excl = {k.lower() for k in policy_excluded}
         candidates = [k for k in candidates if str(k).lower() not in excl]
 
-    candidates = sorted(set(candidates))
+    candidates = _dedupe_preserve_order(candidates)
 
     # Optional challengers (validate/harsh): deterministic, ranked from wide df columns
     if str(args.mode) in ("validate", "harsh") and int(args.challenger_top_n or 0) > 0:
@@ -397,7 +419,7 @@ def main() -> None:
             if len(challengers) >= int(args.challenger_top_n):
                 break
 
-        candidates = sorted(set(candidates + challengers))
+        candidates = _dedupe_preserve_order(candidates + challengers)
 
     # Optional random downselect of candidates (discover mode only)
     if str(args.mode) == "discover":
@@ -407,7 +429,7 @@ def main() -> None:
                 .sample(n=int(args.sample_candidates), random_state=int(args.seed))
                 .tolist()
             )
-            candidates = sorted(set(candidates))
+            candidates = _dedupe_preserve_order(candidates)
 
     # Optional deterministic cap (after filtering / sampling)
     if args.limit_candidates is not None and args.limit_candidates > 0:
@@ -423,7 +445,7 @@ def main() -> None:
     if len(candidates) == 0:
         raise SystemExit("No candidates present in data. Check domain filter / exports / policy keys.")
 
-    candidates = sorted(set(candidates))
+    candidates = _dedupe_preserve_order(candidates)
 
     if args.limit_candidates is not None and args.limit_candidates > 0:
         candidates = candidates[: args.limit_candidates]
@@ -441,7 +463,7 @@ def main() -> None:
     if args.exclude_uid_like:
         candidates = [k for k in candidates if "uid" not in str(k).lower()]
 
-    candidates = sorted(set(candidates))
+    candidates = _dedupe_preserve_order(candidates)
 
     if args.limit_candidates is not None and args.limit_candidates > 0:
         candidates = candidates[: args.limit_candidates]
@@ -502,6 +524,12 @@ def main() -> None:
 
     required_set = set(policy_required) if str(args.mode) == "validate" else set()
 
+    shape_disc = None
+    if isinstance(policy_shape_gating, dict):
+        disc = policy_shape_gating.get("discriminator_key")
+        if isinstance(disc, str) and disc:
+            shape_disc = disc
+
     def iter_subsets(cands: List[str], mk: int) -> Iterable[Tuple[str, ...]]:
         for ksize in range(1, mk + 1):
             yield from itertools.combinations(cands, ksize)
@@ -518,36 +546,91 @@ def main() -> None:
         if len(required) > mk:
             return
 
-        req_sorted = tuple(sorted(required))
+        req_sorted = tuple(_dedupe_preserve_order(list(required)))
         remaining = [k for k in cands if k not in required]
         # Choose extra keys (0..mk-len(required))
         for extra_size in range(0, (mk - len(required)) + 1):
             for extra in itertools.combinations(remaining, extra_size):
-                keys = tuple(sorted(req_sorted + tuple(extra)))
+                keys = tuple(req_sorted + tuple(extra))
                 yield keys
-
-    results: List[dict] = []
 
     # Always evaluate the policy key itself (if available) in validate/harsh mode
     policy_key_tuple: Tuple[str, ...] = tuple()
+    policy_eval: dict | None = None
     if args.policy_json is not None and (policy_required or policy_optional):
-        policy_key_tuple = tuple(sorted(set(policy_required + policy_optional)))
+        policy_key_tuple = tuple(_dedupe_preserve_order(policy_required + policy_optional))
         # If policy key exists in data columns, evaluate even if it exceeds max_k (still useful)
         policy_in_cols = all(k in df.columns for k in policy_key_tuple)
         if policy_in_cols and len(policy_key_tuple) > 0:
-            results.append(eval_subset(df, policy_key_tuple))
+            policy_eval = eval_subset(df, policy_key_tuple)
 
-    # Main search
-    if str(args.mode) == "validate":
-        key_iter = iter_subsets_policy_respecting(candidates, max_k, required_set)
+    def _run_search(
+        *,
+        df_slice: pd.DataFrame,
+        candidates_slice: List[str],
+        max_k_slice: int,
+        required_slice: set[str],
+        policy_key: Tuple[str, ...],
+        disc_key: str | None,
+    ) -> tuple[List[dict], int]:
+        # Main search
+        if str(args.mode) == "validate":
+            key_iter = iter_subsets_policy_respecting(candidates_slice, max_k_slice, required_slice)
+        else:
+            key_iter = iter_subsets(candidates_slice, max_k_slice)
+
+        local_results: List[dict] = []
+        skipped_missing = 0
+        for keys in key_iter:
+            if policy_key and keys == policy_key:
+                continue
+            if disc_key and disc_key not in keys:
+                skipped_missing += 1
+                continue
+            local_results.append(eval_subset(df_slice, keys))
+        return local_results, skipped_missing
+
+    results = []
+    skipped_shape_missing = 0
+    per_shape_results: dict[str, List[dict]] = {}
+
+    if str(args.shape_mode) == "per_shape" and shape_disc and shape_disc in df.columns:
+        shape_series = df[shape_disc]
+        shape_values = _dedupe_preserve_order(
+            [_shape_label(v) for v in shape_series.dropna().tolist()] + ["unknown"]
+        )
+        for shape_label in shape_values:
+            if shape_label == "unknown":
+                mask = shape_series.isna() | (shape_series.astype(str).str.strip() == "")
+            else:
+                mask = shape_series.astype(str).apply(_shape_label) == shape_label
+            df_slice = df[mask]
+            if df_slice.empty:
+                per_shape_results[shape_label] = []
+                continue
+            local_results, skipped = _run_search(
+                df_slice=df_slice,
+                candidates_slice=candidates,
+                max_k_slice=max_k,
+                required_slice=required_set,
+                policy_key=policy_key_tuple,
+                disc_key=shape_disc,
+            )
+            per_shape_results[shape_label] = local_results
+            skipped_shape_missing += skipped
+            results.extend(local_results)
     else:
-        key_iter = iter_subsets(candidates, max_k)
+        results, skipped_shape_missing = _run_search(
+            df_slice=df,
+            candidates_slice=candidates,
+            max_k_slice=max_k,
+            required_slice=required_set,
+            policy_key=policy_key_tuple,
+            disc_key=shape_disc,
+        )
 
-    for keys in key_iter:
-        # Avoid duplicating the exact policy key if it already got evaluated
-        if policy_key_tuple and keys == policy_key_tuple:
-            continue
-        results.append(eval_subset(df, keys))
+    if policy_eval is not None:
+        results.append(policy_eval)
 
     # Pareto objectives (minimize)
     objective_cols = ["max_sigcnt", "collision_records", "collision_groups", "k_count"]
@@ -579,12 +662,45 @@ def main() -> None:
             "Try increasing --sample_records, removing --sample_records, "
             "or reducing policy strictness / challenger_top_n for this domain slice."
         )
+        if skipped_shape_missing:
+            print(
+                f"[INFO pareto] skipped {skipped_shape_missing} candidate subsets missing discriminator '{shape_disc}'."
+            )
         print(f"Wrote empty Pareto front: {pareto_path}")
         return
 
     pareto_df = pd.DataFrame(front).sort_values(objective_cols).reset_index(drop=True)
     pareto_path = out_dir / args.pareto_name
     pareto_df.to_csv(pareto_path, index=False)
+
+    if str(args.shape_mode) == "per_shape" and shape_disc and per_shape_results:
+        rollup_rows: List[Dict[str, object]] = []
+        for shape_label, shape_rows in per_shape_results.items():
+            shape_front = pareto_front(shape_rows, objective_cols)
+            shape_df = pd.DataFrame(shape_front).sort_values(objective_cols).reset_index(drop=True)
+            shape_path = out_dir / f"pareto__{args.domain}__shape__{shape_label}.csv"
+            shape_df.to_csv(shape_path, index=False)
+
+            top_n = min(5, len(shape_df.index))
+            best_keys = ""
+            if top_n > 0:
+                best_keys = " || ".join(shape_df.head(top_n)["keys"].tolist())
+
+            note = ""
+            if shape_label == "unknown":
+                note = "unrecognized_or_blank_shape"
+
+            rollup_rows.append(
+                {
+                    "shape": shape_label,
+                    "population": int(len(shape_rows)),
+                    "best_candidates": best_keys,
+                    "note": note,
+                }
+            )
+
+        rollup_path = out_dir / f"pareto__{args.domain}__shape_rollup.csv"
+        pd.DataFrame(rollup_rows).to_csv(rollup_path, index=False)
 
     # Optional validation summary
     if str(args.mode) in ("validate", "harsh") and args.policy_json is not None:
@@ -619,6 +735,14 @@ def main() -> None:
             on_front = int(any(str(r.get("keys", "")) == pol_key_str for r in front))
             summary_rows.append({"kind": "policy_key_on_pareto_front", "value": on_front})
 
+        if skipped_shape_missing:
+            summary_rows.append(
+                {
+                    "kind": "skipped_missing_discriminator",
+                    "value": skipped_shape_missing,
+                }
+            )
+
         if summary_rows:
             summary_df = pd.DataFrame(summary_rows)
 
@@ -640,6 +764,20 @@ def main() -> None:
     best = pareto_df.head(10)
     print("\nTop Pareto candidates (first 10):")
     print(best.to_string(index=False))
+
+    if skipped_shape_missing:
+        print(
+            f"[INFO pareto] skipped {skipped_shape_missing} candidate subsets missing discriminator '{shape_disc}'."
+        )
+
+
+def _shape_label(shape_val: str) -> str:
+    if shape_val is None:
+        return "unknown"
+    s = str(shape_val).strip()
+    if not s:
+        return "unknown"
+    return "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in s)
 
 
 if __name__ == "__main__":

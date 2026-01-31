@@ -113,15 +113,61 @@
         "arrowhead.style",
         "arrowhead.tick_size_in"
       ],
-      "optional_items": [],
+      "optional_items": [
+        "arrowhead.width_angle_deg",
+        "arrowhead.fill_tick",
+        "arrowhead.arrow_closed",
+        "arrowhead.tick_mark_centered",
+        "arrowhead.heavy_end_pen_weight"
+      ],
       "explicitly_excluded_items": [
         "arrowhead.name",
         "arrowhead.type_id"
       ],
+      "shape_gating": {
+        "discriminator_key": "arrowhead.style",
+        "shape_requirements": {
+          "Arrow": {
+            "additional_required": [
+              "arrowhead.width_angle_deg",
+              "arrowhead.fill_tick",
+              "arrowhead.arrow_closed"
+            ],
+            "additional_optional": [],
+            "notes": "Arrow styles require arrow-specific geometry + fill/closed flags"
+          },
+          "Tick": {
+            "additional_required": [
+              "arrowhead.tick_mark_centered",
+              "arrowhead.heavy_end_pen_weight"
+            ],
+            "additional_optional": [],
+            "notes": "Tick styles require centered/pen weight parameters"
+          },
+          "Dot": {
+            "additional_required": [
+              "arrowhead.tick_mark_centered",
+              "arrowhead.heavy_end_pen_weight"
+            ],
+            "additional_optional": [],
+            "notes": "Dot styles share tick parameters for definition"
+          },
+          "Other": {
+            "additional_required": [
+              "arrowhead.tick_mark_centered",
+              "arrowhead.heavy_end_pen_weight"
+            ],
+            "additional_optional": [],
+            "notes": "Fallback: include a minimal tick flag to preserve definition"
+          }
+        },
+        "default_shape_behavior": "common_only"
+      },
       "notes": [
         "Definition-based identity only; no referential identifiers in joins.",
         "arrowhead.name is label-only and may be null for built-in/system arrowheads.",
-        "Downstream domains reference arrowhead identity via this domain signature, not by id or name."
+        "Downstream domains reference arrowhead identity via this domain signature, not by id or name.",
+        "Shape-gated join keys ensure only applicable style parameters are required."
       ]
     },
     "dimension_types": {
@@ -136,7 +182,10 @@
         "dim_type.prefix",
         "dim_type.suffix",
         "dim_type.unit_format_id",
-        "dim_type.rounding"
+        "dim_type.rounding",
+        "dim_type.witness_line_control",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size"
       ],
       "explicitly_excluded_items": [
         "dim_type.tick_mark_uid",
@@ -172,32 +221,32 @@
             "notes": "DiameterLinked dimensions share center mark requirements with Radial"
           },
           "Angular": {
-            "additional_required": [],
+            "additional_required": ["dim_type.unit_format_id"],
             "additional_optional": [],
             "notes": "Angular dimensions use common properties only"
           },
           "ArcLength": {
-            "additional_required": [],
+            "additional_required": ["dim_type.unit_format_id"],
             "additional_optional": [],
             "notes": "ArcLength dimensions use common properties only"
           },
           "SpotElevation": {
-            "additional_required": [],
+            "additional_required": ["dim_type.unit_format_id"],
             "additional_optional": [],
             "notes": "Spot dimensions use common properties only"
           },
           "SpotCoordinate": {
-            "additional_required": [],
+            "additional_required": ["dim_type.unit_format_id"],
             "additional_optional": [],
             "notes": "Spot dimensions use common properties only"
           },
           "SpotSlope": {
-            "additional_required": [],
+            "additional_required": ["dim_type.unit_format_id"],
             "additional_optional": [],
             "notes": "Spot dimensions use common properties only"
           },
           "SpotElevationFixed": {
-            "additional_required": [],
+            "additional_required": ["dim_type.unit_format_id"],
             "additional_optional": [],
             "notes": "Spot dimensions use common properties only"
           }

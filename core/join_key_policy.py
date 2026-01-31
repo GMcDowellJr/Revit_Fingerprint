@@ -105,6 +105,131 @@ def _validate_shape_gating(domain_name, shape_gating):
         )
 
 
+def validate_domain_join_key_policy(domain_name, pol, *, exported_keys=None):
+    """Validate shape-gating semantics and return structured issues.
+
+    Args:
+        domain_name: Name of domain for error messages
+        pol: Policy dict
+        exported_keys: Optional set of exported keys for orphan checks
+
+    Returns:
+        list[dict]: Issue dicts with severity, code, message, hint, path
+    """
+    issues = []
+
+    def add_issue(severity, code, message, hint, path):
+        issues.append(
+            {
+                "severity": severity,
+                "code": code,
+                "message": message,
+                "hint": hint,
+                "path": path,
+            }
+        )
+
+    required_items = list(pol.get("required_items") or [])
+    optional_items = list(pol.get("optional_items") or [])
+
+    shape_gating = pol.get("shape_gating")
+    if isinstance(shape_gating, dict):
+        discriminator_key = shape_gating.get("discriminator_key")
+        shape_requirements = shape_gating.get("shape_requirements")
+
+        # Rule A1 — discriminator first required
+        if discriminator_key not in required_items:
+            add_issue(
+                "error",
+                "A1_DISCRIMINATOR_FIRST",
+                "shape_gating.discriminator_key must appear in required_items",
+                "Add discriminator_key to required_items as the first entry.",
+                "required_items",
+            )
+        elif required_items and required_items[0] != discriminator_key:
+            add_issue(
+                "error",
+                "A1_DISCRIMINATOR_FIRST",
+                "shape_gating.discriminator_key must be the first required item",
+                "Reorder required_items so the discriminator is first.",
+                "required_items",
+            )
+
+        all_additional_required = []
+        all_additional_optional = []
+
+        if isinstance(shape_requirements, dict):
+            # Rule A4 — shapes must declare non-empty additional_required
+            for shape_name, shape_req in shape_requirements.items():
+                if not isinstance(shape_req, dict):
+                    add_issue(
+                        "error",
+                        "A4_SHAPE_REQUIRED_EMPTY",
+                        "shape requirement must be an object with additional_required",
+                        "Ensure each shape entry is an object with a non-empty additional_required list.",
+                        f"shape_gating.shape_requirements.{shape_name}",
+                    )
+                    continue
+
+                add_req = shape_req.get("additional_required")
+                if not _is_list_of_str(add_req) or len(add_req) == 0:
+                    add_issue(
+                        "error",
+                        "A4_SHAPE_REQUIRED_EMPTY",
+                        "shape requirement must define a non-empty additional_required list",
+                        "Provide at least one required key for this shape or remove the entry.",
+                        f"shape_gating.shape_requirements.{shape_name}.additional_required",
+                    )
+                else:
+                    all_additional_required.extend(list(add_req))
+
+                add_opt = shape_req.get("additional_optional")
+                if _is_list_of_str(add_opt):
+                    all_additional_optional.extend(list(add_opt))
+
+        # Rule A2 — no overlap: common required vs additional_required
+        overlap = [k for k in all_additional_required if k in required_items]
+        for k in overlap:
+            add_issue(
+                "error",
+                "A2_OVERLAP_COMMON_REQUIRED",
+                "additional_required must not overlap required_items",
+                "Remove the key from common required_items or from the shape-specific additional_required list.",
+                "required_items",
+            )
+
+        # Rule A3 — additional_required must exist in optional_items
+        for k in all_additional_required:
+            if k not in optional_items:
+                add_issue(
+                    "error",
+                    "A3_REQUIRED_NOT_OPTIONAL",
+                    "additional_required keys must also appear in optional_items",
+                    "Add the key to optional_items so it remains available for scoring/analytics.",
+                    "optional_items",
+                )
+
+        referenced_keys = set(required_items + optional_items)
+        referenced_keys.update(all_additional_required)
+        referenced_keys.update(all_additional_optional)
+    else:
+        referenced_keys = set(required_items + optional_items)
+
+    # Rule A5 — orphaned keys (warning only)
+    if exported_keys is not None:
+        for k in referenced_keys:
+            if k not in exported_keys:
+                add_issue(
+                    "warning",
+                    "A5_ORPHANED_KEY",
+                    "policy references a key not present in exported_keys",
+                    "Verify the exporter emits this key or remove it from the policy.",
+                    f"policy:{k}",
+                )
+
+    return issues
+
+
 def load_join_key_policies(policy_path):
     """Load and minimally validate the join-key policy JSON.
 
@@ -148,6 +273,14 @@ def load_join_key_policies(policy_path):
         shape_gating = pol.get("shape_gating")
         if shape_gating is not None:
             _validate_shape_gating(domain_name, shape_gating)
+            issues = validate_domain_join_key_policy(domain_name, pol)
+            error_issues = [i for i in issues if i.get("severity") == "error"]
+            if error_issues:
+                lines = [
+                    "%s %s: %s" % (domain_name, i.get("code"), i.get("message"))
+                    for i in error_issues
+                ]
+                raise ValueError("join-key policy validation errors:\n  - " + "\n  - ".join(lines))
 
     return data
 
