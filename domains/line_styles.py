@@ -67,7 +67,7 @@ def _phase2_build_join_key_items(sc_name):
 
     Hypothesis basis (no inference):
       - Stable identity across files is represented by the subcategory name under Lines.
-      - We materialize this as the computed path used by identity (Lines|<name>).
+      - We materialize this as the computed path used by identity (Lines|name).
     """
 
     # path is derived from the name; map through sentinel-safe helper defensively.

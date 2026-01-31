@@ -131,4 +131,12 @@ This document does **not**:
 - Require exporter changes
 
 It exists to preserve intent, assumptions, and empirical constraints for future analysis.
- a **machine-readable mirror** (`contracts/domain_phase2_hypotheses.json`) directly from this doc.
+A **machine-readable mirror** (`contracts/domain_phase2_hypotheses.json`) is generated directly from this doc.
+
+## Shape gating authoring rules
+
+- discriminator_key must be the first item in required_items.
+- additional_required keys must not overlap required_items.
+- additional_required keys must also appear in optional_items so they remain available for scoring/analytics.
+- default_shape_behavior controls how unknown shapes behave: common_only uses only common keys; block rejects unknown shapes.
+- Common pitfalls: analysis tools that sort required_items or emit N/A placeholders can break discriminator-first ordering and shape gating; omit non-applicable keys instead of emitting missing/unreadable placeholders.

@@ -39,11 +39,12 @@ from core.graphic_overrides import (
 )
 
 try:
-    from Autodesk.Revit.DB import View, OverrideGraphicSettings, FilteredElementCollector
+    from Autodesk.Revit.DB import View, OverrideGraphicSettings
 except ImportError:
     View = None
     OverrideGraphicSettings = None
-    FilteredElementCollector = None
+
+from core.collect import collect_instances
 
 
 def _phase2_build_join_key_items(category_path):
@@ -176,12 +177,15 @@ def extract(doc, ctx=None):
 
     templates = []
     try:
-        if FilteredElementCollector is not None:
-            templates = list(FilteredElementCollector(doc).OfClass(View))
-        else:
-            templates = list(getattr(doc, "AllViews", []) or [])
+        templates = list(
+            collect_instances(
+                doc,
+                of_class=View,
+                where_key="view_category_overrides.views",
+            )
+        )
     except Exception:
-        templates = []
+        templates = list(getattr(doc, "AllViews", []) or [])
 
     templates = [v for v in templates if getattr(v, "IsTemplate", False)]
     info["debug_templates_processed"] = len(templates)
