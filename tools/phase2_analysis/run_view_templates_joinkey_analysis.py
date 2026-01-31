@@ -1,10 +1,7 @@
 """
 View Templates Join Key Discovery
 
-Tests three hypotheses:
-A) Override stack only (visual treatment defines identity)
-B) Functional properties (settings define identity)
-C) Combined (both define identity)
+Evaluates policy-driven join keys for view template reuse.
 
 Measures:
 - Fragmentation: how many groups are created
@@ -17,34 +14,17 @@ import argparse
 import json
 from collections import Counter, defaultdict
 from statistics import mean, median
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 
-def _identity_items(record: Dict[str, object]) -> Dict[str, str]:
-    items = record.get("identity_basis", {}).get("items", [])
-    return {
-        item.get("k"): item.get("v")
-        for item in items
-        if isinstance(item, dict) and item.get("k") is not None
-    }
-
-
-def _build_join_key(
-    identity_items: Dict[str, str],
-    required_keys: Iterable[str],
-    optional_keys: Iterable[str],
-) -> Optional[str]:
-    join_parts: List[str] = []
-    for key in required_keys:
-        if key not in identity_items:
-            return None
-        join_parts.append(f"{key}={identity_items[key]}")
-
-    for key in optional_keys:
-        if key in identity_items:
-            join_parts.append(f"{key}={identity_items[key]}")
-
-    return "|".join(sorted(join_parts)) if join_parts else None
+def _join_key_from_record(record: Dict[str, object]) -> Optional[str]:
+    join_key = record.get("join_key")
+    if isinstance(join_key, dict):
+        join_hash = join_key.get("join_hash")
+        return join_hash if isinstance(join_hash, str) and join_hash else None
+    if isinstance(join_key, str):
+        return join_key or None
+    return None
 
 
 def _detect_demo_plan(record: Dict[str, object]) -> bool:
@@ -85,13 +65,9 @@ def _pareto_cover(counts: List[int], target_ratio: float = 0.8) -> int:
     return len(counts)
 
 
-def test_join_key(
-    records: List[Dict[str, object]],
-    required_keys: Iterable[str],
-    optional_keys: Iterable[str] = (),
-) -> Dict[str, object]:
+def test_join_key(records: List[Dict[str, object]]) -> Dict[str, object]:
     """
-    Simulate join key grouping.
+    Analyze policy-driven join key grouping.
 
     Returns:
         - groups: dict of join_key → list of sig_hashes
@@ -107,8 +83,7 @@ def test_join_key(
     demo_plan_groups: Dict[str, List[str]] = defaultdict(list)
 
     for rec in records:
-        identity_items = _identity_items(rec)
-        join_key = _build_join_key(identity_items, required_keys, optional_keys)
+        join_key = _join_key_from_record(rec)
         if join_key is None:
             continue
 
@@ -167,27 +142,6 @@ def _print_option_summary(label: str, result: Dict[str, object]) -> None:
     print()
 
 
-def _recommend_option(options: List[Tuple[str, Dict[str, object]]]) -> Tuple[str, str]:
-    """
-    Rank by collision rate, then fragmentation, then demo plan cross-project coverage.
-    """
-    ranked = sorted(
-        options,
-        key=lambda item: (
-            item[1]["collision_rate"],
-            item[1]["fragmentation"],
-            -item[1]["demo_plan_cross_project"],
-        ),
-    )
-    best_label, best_result = ranked[0]
-    explanation = (
-        f"Lowest collision rate ({best_result['collision_rate']:.1%}) "
-        f"with {best_result['fragmentation']} groups; "
-        f"demo-plan cross-project clusters: {best_result['demo_plan_cross_project']}."
-    )
-    return best_label, explanation
-
-
 def _print_sample_interpretation() -> None:
     print("Sample output interpretation")
     print("-" * 48)
@@ -195,15 +149,11 @@ def _print_sample_interpretation() -> None:
     print("- Lower fragmentation means fewer distinct groups to track.")
     print("- Pareto coverage indicates reuse concentration (smaller is better).")
     print("- Demo Plan cross-project clusters show reusable patterns across projects.")
-    print(
-        "- Prefer the option that minimizes collisions while keeping fragmentation "
-        "reasonable and still capturing cross-project Demo Plan clusters."
-    )
     print()
 
 
 def analyze_view_templates(export_path: str) -> None:
-    """Run analysis on all three join key options."""
+    """Run analysis on policy-driven join keys."""
 
     with open(export_path, "r", encoding="utf-8") as handle:
         data = json.load(handle)
@@ -230,43 +180,8 @@ def analyze_view_templates(export_path: str) -> None:
         )
         print()
 
-    result_a = test_join_key(
-        records,
-        ["view_template.category_overrides_def_hash"],
-    )
-    _print_option_summary("OPTION A: Override Stack Only", result_a)
-
-    result_b = test_join_key(
-        records,
-        ["view_template.detail_level", "view_template.discipline"],
-        ["view_template.category_overrides_def_hash"],
-    )
-    _print_option_summary("OPTION B: Functional Properties", result_b)
-
-    result_c = test_join_key(
-        records,
-        [
-            "view_template.detail_level",
-            "view_template.discipline",
-            "view_template.category_overrides_def_hash",
-        ],
-        ["view_template.scale"],
-    )
-    _print_option_summary("OPTION C: Combined", result_c)
-
-    best_label, explanation = _recommend_option(
-        [
-            ("A", result_a),
-            ("B", result_b),
-            ("C", result_c),
-        ]
-    )
-
-    print("RECOMMENDATION")
-    print("-" * 48)
-    print(f"Best option: {best_label}")
-    print(f"Reasoning: {explanation}")
-    print()
+    result = test_join_key(records)
+    _print_option_summary("POLICY JOIN KEY", result)
 
     _print_sample_interpretation()
 
