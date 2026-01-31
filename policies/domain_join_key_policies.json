@@ -125,23 +125,93 @@
       ]
     },
     "dimension_types": {
-      "join_key_schema": "dimension_types.join_key.v2",
+      "join_key_schema": "dimension_types.join_key.v3",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
+        "dim_type.shape",
         "dim_type.accuracy",
         "dim_type.tick_mark_sig_hash"
       ],
-      "optional_items": [],
+      "optional_items": [
+        "dim_type.prefix",
+        "dim_type.suffix",
+        "dim_type.unit_format_id",
+        "dim_type.rounding"
+      ],
       "explicitly_excluded_items": [
         "dim_type.tick_mark_uid",
         "dim_attr.tick_mark_uid",
-        "dim_type.name",
-        "dim_type.shape"
+        "dim_type.name"
       ],
+      "shape_gating": {
+        "discriminator_key": "dim_type.shape",
+        "shape_requirements": {
+          "Linear": {
+            "additional_required": ["dim_type.witness_line_control"],
+            "additional_optional": [],
+            "notes": "Linear dimensions must match on witness line control behavior"
+          },
+          "LinearFixed": {
+            "additional_required": ["dim_type.witness_line_control"],
+            "additional_optional": [],
+            "notes": "LinearFixed dimensions share witness line requirements with Linear"
+          },
+          "Radial": {
+            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size"],
+            "additional_optional": [],
+            "notes": "Radial dimensions must match on center mark configuration"
+          },
+          "Diameter": {
+            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size"],
+            "additional_optional": [],
+            "notes": "Diameter dimensions share center mark requirements with Radial"
+          },
+          "DiameterLinked": {
+            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size"],
+            "additional_optional": [],
+            "notes": "DiameterLinked dimensions share center mark requirements with Radial"
+          },
+          "Angular": {
+            "additional_required": [],
+            "additional_optional": [],
+            "notes": "Angular dimensions use common properties only"
+          },
+          "ArcLength": {
+            "additional_required": [],
+            "additional_optional": [],
+            "notes": "ArcLength dimensions use common properties only"
+          },
+          "SpotElevation": {
+            "additional_required": [],
+            "additional_optional": [],
+            "notes": "Spot dimensions use common properties only"
+          },
+          "SpotCoordinate": {
+            "additional_required": [],
+            "additional_optional": [],
+            "notes": "Spot dimensions use common properties only"
+          },
+          "SpotSlope": {
+            "additional_required": [],
+            "additional_optional": [],
+            "notes": "Spot dimensions use common properties only"
+          },
+          "SpotElevationFixed": {
+            "additional_required": [],
+            "additional_optional": [],
+            "notes": "Spot dimensions use common properties only"
+          }
+        },
+        "default_shape_behavior": "common_only"
+      },
       "notes": [
-        "Definition-based tick mark identity must be provided via referenced arrowheads domain signature (dim_type.tick_mark_sig_hash).",
-        "UID-based tick mark fields must never participate in joins, even if normalized.",
-        "Name is label-only and must not participate in joins."
+        "Schema v3: Shape-gated join key requirements.",
+        "dim_type.shape is now REQUIRED and used as discriminator for shape-specific requirements.",
+        "Linear family (Linear, LinearFixed) requires witness_line_control.",
+        "Radial family (Radial, Diameter, DiameterLinked) requires center_marks and center_mark_size.",
+        "Angular and Spot families use common properties only.",
+        "Definition-based tick mark identity via dim_type.tick_mark_sig_hash.",
+        "UID-based tick mark fields must never participate in joins."
       ]
     },
     "text_types": {
