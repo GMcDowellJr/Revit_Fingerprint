@@ -32,14 +32,19 @@
       "join_key_schema": "units.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "units.spec"
+        "units.spec",
+        "units.unit_type_id",
+        "units.rounding_method"
       ],
-      "optional_items": [],
+      "optional_items": [
+        "units.accuracy"
+      ],
       "explicitly_excluded_items": [],
       "notes": [
-        "Identity is definition-based and fully determined by units.spec in Phase-2 evidence.",
-        "No collisions or fragmentation observed with units.spec alone.",
-        "Policy is strong but provisional pending validation on broader populations."
+        "Accuracy moved to optional - display precision preference, not behavioral identity.",
+        "Spec + type + rounding define the unit system (feet-inches, metric, etc.).",
+        "Accuracy variance (0.01 vs 1.0) is display formatting, not calculation behavior.",
+        "DECISION: Accuracy affects display only, not technical behavior - treat as refinement."
       ]
     },
     "line_patterns": {
@@ -66,15 +71,17 @@
       "join_key_schema": "line_styles.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "line_style.path",
+        "line_style.weight.projection",
+        "line_style.color.rgb",
         "line_style.pattern_ref.sig_hash"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
+        "line_style.path",
         "line_style.pattern_ref.kind"
       ],
       "notes": [
-        "Identity is definition-based: line style path plus referenced line pattern definition via pattern_ref.sig_hash.",
+        "Identity is definition-based: projection weight + color + referenced line pattern definition via pattern_ref.sig_hash.",
         "pattern_ref.kind is too coarse and produces high collisions; it must not be used for joins."
       ]
     },
