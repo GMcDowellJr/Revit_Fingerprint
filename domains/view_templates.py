@@ -44,6 +44,7 @@ from core.canon import (
 from core.record_v2 import (
     ITEM_Q_OK,
     make_identity_item,
+    serialize_identity_items,
 )
 
 from core.phase2 import (
@@ -51,23 +52,23 @@ from core.phase2 import (
     phase2_qv_from_legacy_sentinel_str,
     phase2_join_hash,
 )
+from core.graphic_overrides import (
+    extract_projection_graphics,
+    extract_cut_graphics,
+    extract_halftone,
+    extract_transparency,
+)
 
 try:
     from Autodesk.Revit.DB import (
         View,
         ViewSchedule,
         BuiltInParameter,
-        OverrideGraphicSettings,
-        Category,
-        CategoryType,
     )
 except Exception as e:
     View = None
     ViewSchedule = None
     BuiltInParameter = None
-    OverrideGraphicSettings = None
-    Category = None
-    CategoryType = None
 
 
 def _phase2_items_from_def_signature(def_signature):
@@ -130,30 +131,27 @@ def _phase2_partition_items(items):
     for it in (items or []):
         k = safe_str(it.get("k", ""))
 
-        # Cosmetic-ish signals (style / overrides / appearance)
-        if (
-            ".ovr" in k
-            or "appearance" in k
-            or "halftone" in k
-            or "pattern" in k
-            or "lineweight" in k
-            or "color" in k
-            or "transparency" in k
-        ):
-            cosmetic.append(it)
-            continue
-
-        # Semantic-ish signals (inclusion / visibility / filtering)
-        if (
-            k.startswith("view_template.sig.include_")
-            or k.startswith("view_template.sig.phase_filter")
-            or k.startswith("view_template.sig.filter[")
-            or k.startswith("view_template.sig.cat[")
-            or "visible" in k
-        ):
+        # Category override references are SEMANTIC (behavioral)
+        if "category_overrides" in k:
             semantic.append(it)
             continue
 
+        # Template settings are SEMANTIC
+        if any(setting in k for setting in ["detail_level", "discipline", "phase_filter_ref", "filter_stack"]):
+            semantic.append(it)
+            continue
+
+        # Names are COSMETIC
+        if k == "view_template.name":
+            cosmetic.append(it)
+            continue
+
+        # UIDs are UNKNOWN
+        if k == "view_template.uid":
+            unknown.append(it)
+            continue
+
+        # Default: unknown
         unknown.append(it)
 
     return (
@@ -161,6 +159,32 @@ def _phase2_partition_items(items):
         phase2_sorted_items(cosmetic),
         phase2_sorted_items(unknown),
     )
+
+
+def _compute_delta_items(override_items, baseline_record):
+    """
+    Compare override to baseline, return only changed properties.
+    Same logic as view_category_overrides domain.
+    """
+    delta_items = []
+
+    baseline_items = (baseline_record or {}).get("identity_basis", {}).get("items", []) or []
+    baseline_map = {item.get("k"): item.get("v") for item in baseline_items}
+
+    for override_item in (override_items or []):
+        override_key = safe_str(override_item.get("k", ""))
+        if not override_key:
+            continue
+
+        baseline_key = override_key.replace("vco.", "obj_style.")
+
+        baseline_value = baseline_map.get(baseline_key)
+        override_value = override_item.get("v")
+
+        if override_value != baseline_value:
+            delta_items.append(override_item)
+
+    return delta_items
 
 def extract(doc, ctx=None):
     """
@@ -599,201 +623,104 @@ def extract(doc, ctx=None):
             sig.append("phase_filter={S_MISSING}")
 
         # Visibility/Graphics (VG) signature
-        # Contract: avoid names + avoid positive element ids in hash.
-        # We hash only negative category ids (BuiltInCategory-style) for hidden + overridden categories.
+        # Referential architecture: compare overrides to object_styles baseline and record deltas only.
         try:
             cats = doc.Settings.Categories
         except Exception as e:
             cats = None
 
-        vg_sig_records = []
+        category_override_items = []
         vg_records = []
+        override_idx = 0
+        override_stack_hash = None
+
         if cats:
             try:
-                default_ogs = OverrideGraphicSettings()
-            except Exception as e:
-                default_ogs = None
+                categories = list(cats)
+            except Exception:
+                categories = []
 
-            # Iterate all categories; keep deterministic ordering by category id
-            try:
-                cats_list = list(cats)
-            except Exception as e:
-                cats_list = []
+            for category in categories:
+                category_name = canon_str(getattr(category, "Name", None))
+                category_path = "{}|self".format(category_name)
 
-            def cat_int_id(c):
-                try:
-                    return int(c.Id.IntegerValue)
-                except Exception as e:
-                    return None
-
-            cats_list = [c for c in cats_list if c is not None]
-            cats_list = sorted(cats_list, key=lambda c: (cat_int_id(c) is None, cat_int_id(c) or 0))
-
-            for c in cats_list:
-                cid_int = cat_int_id(c)
-                if cid_int is None:
+                baseline_sig_hash = baseline_map.get(category_path)
+                if not baseline_sig_hash:
+                    info["debug_category_no_baseline"] += 1
                     continue
 
-                # Only include negative category ids (built-in categories)
-                if cid_int >= 0:
+                try:
+                    ogs = v.GetCategoryOverrides(category.Id)
+                except Exception:
                     continue
-
-                # Skip import categories when possible
-                try:
-                    if CategoryType and c.CategoryType == CategoryType.Import:
-                        continue
-                except Exception as e:
-                    pass
-
-                # Hidden?
-                try:
-                    hidden = bool(v.GetCategoryHidden(c.Id))
-                except Exception as e:
-                    hidden = False
-
-                # Overrides
-                try:
-                    ogs = v.GetCategoryOverrides(c.Id)
-                except Exception as e:
-                    ogs = None
 
                 if not ogs:
-                    # Record hidden-only categories (optional; still deterministic)
-                    if hidden:
-                        line = "cat={}|hidden=1|ovr=0".format(cid_int)
-                        vg_sig_records.append(line)
-                        if debug_vg_details:
-                            vg_records.append(line)
                     continue
 
-                # Extract stable primitives
-                try:
-                    try:
-                        dl = ogs.DetailLevel
-                        dl_int = int(dl)
-                    except Exception as e:
-                        dl_int = None
+                override_items = []
+                override_items.extend(extract_projection_graphics(doc, ogs, ctx_map, "vco.projection"))
+                override_items.extend(extract_cut_graphics(doc, ogs, ctx_map, "vco.cut"))
+                override_items.extend(extract_halftone(ogs, "vco.halftone"))
+                override_items.extend(extract_transparency(ogs, "vco.transparency"))
 
-                    try:
-                        proj_wt = ogs.ProjectionLineWeight
-                    except Exception as e:
-                        proj_wt = None
-                    try:
-                        cut_wt = ogs.CutLineWeight
-                    except Exception as e:
-                        cut_wt = None
-                    try:
-                        proj_col = ogs.ProjectionLineColor
-                    except Exception as e:
-                        proj_col = None
-                    try:
-                        cut_col = ogs.CutLineColor
-                    except Exception as e:
-                        cut_col = None
-                    try:
-                        halftone = ogs.Halftone
-                    except Exception as e:
-                        halftone = False
-                    try:
-                        trans = ogs.Transparency
-                    except Exception as e:
-                        trans = None
+                baseline_record = baseline_records.get(baseline_sig_hash)
+                if not baseline_record:
+                    info["debug_category_no_baseline"] += 1
+                    continue
 
-                    # Pattern overrides as boolean flags (never record ElementId)
-                    try:
-                        proj_pat_ovr = (ogs.ProjectionLinePatternId != default_ogs.ProjectionLinePatternId) if default_ogs else False
-                    except Exception as e:
-                        proj_pat_ovr = False
-                    try:
-                        cut_pat_ovr = (ogs.CutLinePatternId != default_ogs.CutLinePatternId) if default_ogs else False
-                    except Exception as e:
-                        cut_pat_ovr = False
+                delta_items = _compute_delta_items(override_items, baseline_record)
 
-                    def _rgb(cobj):
-                        try:
-                            return (int(cobj.Red), int(cobj.Green), int(cobj.Blue))
-                        except Exception:
-                            return None
+                if not delta_items:
+                    info["debug_category_no_override"] += 1
+                    continue
 
-                    proj_rgb = _rgb(proj_col)
-                    cut_rgb = _rgb(cut_col)
-                    def_proj_rgb = _rgb(default_ogs.ProjectionLineColor) if default_ogs else None
-                    def_cut_rgb = _rgb(default_ogs.CutLineColor) if default_ogs else None
+                override_identity = [
+                    make_identity_item("vco.baseline_sig_hash", baseline_sig_hash, ITEM_Q_OK),
+                    *delta_items,
+                ]
+                override_sig_hash = make_hash(serialize_identity_items(override_identity))
 
-                    # Determine "has override" by comparing stable primitives + pattern override flags
-                    has_override = False
-                    try:
-                        if dl_int is not None:
-                            has_override = True
-                        if proj_wt is not None and int(proj_wt) >= 0:
-                            has_override = True
-                        if cut_wt is not None and int(cut_wt) >= 0:
-                            has_override = True
-                            
-                        if proj_rgb is not None and (def_proj_rgb is None or proj_rgb != def_proj_rgb):
-                            has_override = True
-                        if cut_rgb is not None and (def_cut_rgb is None or cut_rgb != def_cut_rgb):
-                            has_override = True
-                        if halftone:
-                            has_override = True
-                        if trans is not None and int(trans) >= 0:
-                            has_override = True
-                        if proj_pat_ovr:
-                            has_override = True
-                        if cut_pat_ovr:
-                            has_override = True
-                    except Exception as e:
-                        pass
+                info["debug_category_overrides_found"] += 1
 
-                    if not has_override:
-                        if hidden:
-                            line = "cat={}|hidden=1|ovr=0".format(cid_int)
-                            vg_sig_records.append(line)
-                            if debug_vg_details:
-                                vg_records.append(line)
-                        continue
+                category_override_items.append(
+                    make_identity_item(
+                        "view_template.category_overrides[{0:03d}].category_path".format(override_idx),
+                        category_path,
+                        ITEM_Q_OK,
+                    )
+                )
+                category_override_items.append(
+                    make_identity_item(
+                        "view_template.category_overrides[{0:03d}].baseline_sig_hash".format(override_idx),
+                        baseline_sig_hash,
+                        ITEM_Q_OK,
+                    )
+                )
+                category_override_items.append(
+                    make_identity_item(
+                        "view_template.category_overrides[{0:03d}].override_sig_hash".format(override_idx),
+                        override_sig_hash,
+                        ITEM_Q_OK,
+                    )
+                )
 
-                    # Pack (avoid ids; colors are packed as RGB triples)
-                    try:
-                        proj_col_s = "{}-{}-{}".format(*proj_rgb) if proj_rgb is not None else S_NOT_APPLICABLE
-                    except Exception:
-                        proj_col_s = S_UNREADABLE
-                    try:
-                        cut_col_s = "{}-{}-{}".format(*cut_rgb) if cut_rgb is not None else S_NOT_APPLICABLE
-                    except Exception:
-                        cut_col_s = S_UNREADABLE
-
-                    line = (
-                        "cat={}|hidden={}|ovr=1|dl={}|proj_wt={}|cut_wt={}|proj_col={}|cut_col={}|half={}|trans={}|"
-                        "proj_pat_ovr={}|cut_pat_ovr={}"
-                    ).format(
-                        cid_int,
-                        int(bool(hidden)),
-                        sig_val(dl_int),
-                        sig_val(proj_wt),
-                        sig_val(cut_wt),
-                        sig_val(proj_col_s),
-                        sig_val(cut_col_s),
-                        int(bool(halftone)),
-                        sig_val(trans),
-                        int(bool(proj_pat_ovr)),
-                        int(bool(cut_pat_ovr)),
+                if debug_vg_details:
+                    vg_records.append(
+                        "category_path={}|baseline_sig_hash={}|override_sig_hash={}".format(
+                            category_path,
+                            baseline_sig_hash,
+                            override_sig_hash,
+                        )
                     )
 
-                    vg_sig_records.append(line)
-                    if debug_vg_details:
-                        vg_records.append(line)
-                except Exception as e:
-                    info["debug_fail_read"] += 1
-                    continue
+                override_idx += 1
 
-        if vg_sig_records:
-            vg_sig_sorted = sorted(vg_sig_records)
-            sig.append("vg_count={}".format(sig_val(len(vg_sig_sorted))))
-            for i, line in enumerate(vg_sig_sorted):
-                sig.append("vg[{}]={}".format("{:04d}".format(i), sig_val(line)))
+        if category_override_items:
+            override_stack_hash = make_hash(serialize_identity_items(category_override_items))
+            sig.append("category_overrides_def_hash={}".format(sig_val(override_stack_hash)))
+            sig.append("category_overrides_count={}".format(sig_val(override_idx)))
         else:
-            sig.append("vg_count=0")
+            sig.append("category_overrides_count=0")
 
         # Appearance (placeholder surface; legacy keeps minimal)
         # This can be expanded later with stable primitives as available.
@@ -928,9 +855,18 @@ def extract(doc, ctx=None):
         #   - semantic_items is the ONLY surface for join-key candidates
         #   - structured domain => single bundle key: view_template.def_hash
         # -------------------------
-        semantic_items = phase2_sorted_items([
+        semantic_items = [
             make_identity_item("view_template.def_hash", def_hash, ITEM_Q_OK),
-        ])
+        ]
+        if override_stack_hash:
+            semantic_items.append(
+                make_identity_item(
+                    "view_template.category_overrides_def_hash",
+                    override_stack_hash,
+                    ITEM_Q_OK,
+                )
+            )
+        semantic_items = phase2_sorted_items(semantic_items)
 
         uid_v, uid_q = phase2_qv_from_legacy_sentinel_str(uid or None, allow_empty=False)
         unknown_items = phase2_sorted_items([
