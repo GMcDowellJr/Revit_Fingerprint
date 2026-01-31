@@ -3,6 +3,45 @@
 
 Inputs are explicit (policy + provided field/value sources).
 No inference/fallback to uid/name/id when policy excludes them.
+
+Schema Extension (v2): Shape-Gated Requirements
+-----------------------------------------------
+Policies can define shape-specific required items via `shape_gating`:
+
+{
+  "join_key_schema": "dimension_types.join_key.v3",
+  "required_items": ["dim_type.accuracy"],  // Common required (all shapes)
+  "optional_items": [...],
+  "shape_gating": {
+    "discriminator_key": "dim_type.shape",  // Key used to determine shape
+    "shape_requirements": {
+      "Linear": {
+        "additional_required": ["dim_type.witness_line_control"],
+        "additional_optional": []
+      },
+      "LinearFixed": {
+        "additional_required": ["dim_type.witness_line_control"],
+        "additional_optional": []
+      },
+      "Radial": {
+        "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size"],
+        "additional_optional": []
+      }
+    },
+    "default_shape_behavior": "common_only"  // "common_only" | "block"
+  }
+}
+
+Join Matching Algorithm:
+1. Extract shape value from discriminator_key
+2. Always include common required_items
+3. If shape matches a key in shape_requirements:
+   - Add additional_required items for that shape
+   - Add additional_optional items for that shape
+4. If shape doesn't match and default_shape_behavior == "common_only":
+   - Only use common required/optional (no shape-specific items)
+5. If shape doesn't match and default_shape_behavior == "block":
+   - Mark record as blocked (shape not recognized)
 """
 
 import re
@@ -94,14 +133,75 @@ Supports:
     return out
 
 
+def _get_shape_specific_requirements(domain_policy, kqv):
+    """Extract shape-specific required/optional items based on discriminator value.
+
+    Args:
+        domain_policy: Policy dict with optional shape_gating section
+        kqv: Key-value-quality map from identity_items
+
+    Returns:
+        tuple: (additional_required, additional_optional, shape_value, shape_matched)
+            - additional_required: List of additional required keys for this shape
+            - additional_optional: List of additional optional keys for this shape
+            - shape_value: The detected shape value (or None)
+            - shape_matched: True if shape matched a defined shape_requirement
+    """
+    shape_gating = (domain_policy or {}).get("shape_gating")
+    if not isinstance(shape_gating, dict):
+        return [], [], None, False
+
+    discriminator_key = shape_gating.get("discriminator_key")
+    if not isinstance(discriminator_key, str):
+        return [], [], None, False
+
+    shape_requirements = shape_gating.get("shape_requirements")
+    if not isinstance(shape_requirements, dict):
+        return [], [], None, False
+
+    # Get shape value from kqv
+    shape_v, shape_q = kqv.get(discriminator_key, (None, None))
+    if shape_q != ITEM_Q_OK or shape_v is None:
+        return [], [], None, False
+
+    shape_value = str(shape_v).strip()
+    if not shape_value:
+        return [], [], None, False
+
+    # Look up shape-specific requirements
+    shape_req = shape_requirements.get(shape_value)
+    if not isinstance(shape_req, dict):
+        # Shape not found in requirements - use default behavior
+        return [], [], shape_value, False
+
+    additional_required = list(shape_req.get("additional_required") or [])
+    additional_optional = list(shape_req.get("additional_optional") or [])
+
+    return additional_required, additional_optional, shape_value, True
+
+
 def build_join_key_from_policy(*, domain_policy, identity_items=None, candidate_kqv=None):
     """Build join_key dict from a policy and available value sources.
 
-    - identity_items: list of {k,q,v}
-    - candidate_kqv: optional dict k -> (v,q) that can supplement identity_items
+    Supports shape-gated requirements via the `shape_gating` policy section.
+
+    Args:
+        domain_policy: Policy dict with required_items, optional_items, and optional shape_gating
+        identity_items: list of {k,q,v} identity items
+        candidate_kqv: optional dict k -> (v,q) that can supplement identity_items
 
     Returns:
-      (join_key_dict, missing_required_keys)
+        tuple: (join_key_dict, missing_required_keys)
+            - join_key_dict: Dict with schema, hash_alg, items, join_hash, and metadata
+            - missing_required_keys: List of required keys that were not found
+
+    Shape-gating behavior:
+        1. Always includes common required_items
+        2. If shape_gating is defined and shape matches a shape_requirement:
+           - Adds additional_required items for that shape
+           - Adds additional_optional items for that shape
+        3. If shape doesn't match any shape_requirement:
+           - Uses common required/optional only (default behavior)
     """
     kqv = _items_to_kqv_map(identity_items)
     if isinstance(candidate_kqv, dict):
@@ -110,8 +210,16 @@ def build_join_key_from_policy(*, domain_policy, identity_items=None, candidate_
             if k not in kqv and isinstance(vq, tuple) and len(vq) == 2:
                 kqv[k] = vq
 
+    # Get common required/optional items
     req = list((domain_policy or {}).get("required_items") or [])
     opt = list((domain_policy or {}).get("optional_items") or [])
+
+    # Get shape-specific requirements
+    add_req, add_opt, shape_value, shape_matched = _get_shape_specific_requirements(
+        domain_policy, kqv
+    )
+    req = req + add_req
+    opt = opt + add_opt
 
     missing_required = []
     items = []
@@ -141,4 +249,15 @@ def build_join_key_from_policy(*, domain_policy, identity_items=None, candidate_
     }
     if missing_required:
         join_key["missing_required"] = missing_required
+
+    # Add shape-gating metadata if active
+    shape_gating = (domain_policy or {}).get("shape_gating")
+    if isinstance(shape_gating, dict) and shape_value is not None:
+        join_key["shape_gating"] = {
+            "discriminator_key": shape_gating.get("discriminator_key"),
+            "shape_value": shape_value,
+            "shape_matched": shape_matched,
+            "additional_required_keys": add_req if shape_matched else [],
+        }
+
     return join_key, missing_required
