@@ -297,6 +297,243 @@ def _is_spot_family(shape_family):
     return shape_family == FAMILY_SPOT
 
 
+# ---------------------------------------------------------------------------
+# Shape-Gated Identity Item Builders
+# ---------------------------------------------------------------------------
+#
+# These functions build identity_items based on shape family.
+# Properties are organized into:
+#   - COMMON: Exported for all shapes (shape, unit formatting, prefix/suffix, tick mark)
+#   - LINEAR_SPECIFIC: witness_line_control (only for linear family)
+#   - RADIAL_SPECIFIC: center_marks, center_mark_size (only for radial family)
+#   - ANGULAR_SPECIFIC: (currently none unique - uses common properties)
+#
+# The shape-gating approach:
+#   - Never export properties with ITEM_Q_UNSUPPORTED_NOT_APPLICABLE
+#   - Only include properties applicable to the detected shape
+#   - This results in cleaner identity_items that vary by shape
+# ---------------------------------------------------------------------------
+
+
+def _build_common_identity_items(
+    shape_v,
+    shape_q,
+    unit_format_id_v,
+    unit_format_id_q,
+    rounding_v,
+    rounding_q,
+    accuracy_v,
+    accuracy_q,
+    prefix_v,
+    prefix_q,
+    suffix_v,
+    suffix_q,
+    tick_sig_hash,
+):
+    """
+    Build identity items common to ALL dimension shapes.
+
+    Common properties:
+      - dim_type.shape: Shape discriminator (always first)
+      - dim_type.unit_format_id: Unit format type ID
+      - dim_type.rounding: Rounding method
+      - dim_type.accuracy: Accuracy setting
+      - dim_type.prefix: Prefix string
+      - dim_type.suffix: Suffix string
+      - dim_type.tick_mark_sig_hash: Tick mark signature hash
+
+    Returns:
+        list: List of identity item dicts
+    """
+    items = [
+        make_identity_item("dim_type.shape", shape_v, shape_q),
+        make_identity_item("dim_type.unit_format_id", unit_format_id_v, unit_format_id_q),
+        make_identity_item("dim_type.rounding", rounding_v, rounding_q),
+        make_identity_item("dim_type.accuracy", accuracy_v, accuracy_q),
+        make_identity_item("dim_type.prefix", prefix_v, prefix_q),
+        make_identity_item("dim_type.suffix", suffix_v, suffix_q),
+        make_identity_item(
+            "dim_type.tick_mark_sig_hash",
+            safe_str(tick_sig_hash) if tick_sig_hash else None,
+            ITEM_Q_OK if tick_sig_hash else ITEM_Q_MISSING,
+        ),
+    ]
+    return items
+
+
+def _build_linear_identity_items(witness_v, witness_q):
+    """
+    Build identity items specific to LINEAR dimension shapes.
+
+    Linear-specific properties (Linear, LinearFixed):
+      - dim_type.witness_line_control: Witness line behavior setting
+
+    Note: Witness lines are ONLY applicable to linear dimensions.
+    Other shapes do not have this parameter.
+
+    Returns:
+        list: List of identity item dicts for linear shapes
+    """
+    items = [
+        make_identity_item("dim_type.witness_line_control", witness_v, witness_q),
+    ]
+    return items
+
+
+def _build_radial_identity_items(center_marks_v, center_marks_q, center_mark_size_v, center_mark_size_q):
+    """
+    Build identity items specific to RADIAL dimension shapes.
+
+    Radial-specific properties (Radial, Diameter, DiameterLinked):
+      - dim_type.center_marks: Center marks enabled/disabled
+      - dim_type.center_mark_size: Size of center marks
+
+    Note: Center marks are ONLY applicable to radial/diameter dimensions.
+    Linear and angular shapes do not have these parameters.
+
+    Returns:
+        list: List of identity item dicts for radial shapes
+    """
+    items = [
+        make_identity_item("dim_type.center_marks", center_marks_v, center_marks_q),
+        make_identity_item("dim_type.center_mark_size", center_mark_size_v, center_mark_size_q),
+    ]
+    return items
+
+
+def _build_angular_identity_items():
+    """
+    Build identity items specific to ANGULAR dimension shapes.
+
+    Angular-specific properties (Angular, ArcLength):
+      - Currently no unique properties beyond common ones
+
+    Returns:
+        list: Empty list (angular uses only common properties)
+    """
+    return []
+
+
+def _build_spot_identity_items():
+    """
+    Build identity items specific to SPOT dimension shapes.
+
+    Spot-specific properties (SpotElevation, SpotCoordinate, SpotSlope, etc.):
+      - Currently no unique properties beyond common ones
+
+    Returns:
+        list: Empty list (spot uses only common properties)
+    """
+    return []
+
+
+def _build_identity_items(
+    shape_family,
+    shape_v,
+    shape_q,
+    unit_format_id_v,
+    unit_format_id_q,
+    rounding_v,
+    rounding_q,
+    accuracy_v,
+    accuracy_q,
+    prefix_v,
+    prefix_q,
+    suffix_v,
+    suffix_q,
+    tick_sig_hash,
+    witness_v=None,
+    witness_q=None,
+    center_marks_v=None,
+    center_marks_q=None,
+    center_mark_size_v=None,
+    center_mark_size_q=None,
+):
+    """
+    Build complete identity_items list with shape-gated property inclusion.
+
+    This function implements shape-gating:
+      1. Always includes common properties for all shapes
+      2. Conditionally includes shape-specific properties based on shape_family
+      3. Never includes properties that would be UNSUPPORTED_NOT_APPLICABLE
+
+    Args:
+        shape_family: Shape family constant (FAMILY_LINEAR, FAMILY_RADIAL, etc.)
+        shape_v, shape_q: Shape value and quality
+        unit_format_id_v/q, rounding_v/q, accuracy_v/q: Unit format properties
+        prefix_v/q, suffix_v/q: Prefix/suffix properties
+        tick_sig_hash: Tick mark signature hash (or None)
+        witness_v/q: Witness line control (only used for LINEAR)
+        center_marks_v/q, center_mark_size_v/q: Center mark properties (only used for RADIAL)
+
+    Returns:
+        tuple: (identity_items, required_qualities)
+            - identity_items: Sorted list of identity item dicts
+            - required_qualities: List of quality values to check for blocking
+    """
+    # 1. Start with common properties
+    items = _build_common_identity_items(
+        shape_v=shape_v,
+        shape_q=shape_q,
+        unit_format_id_v=unit_format_id_v,
+        unit_format_id_q=unit_format_id_q,
+        rounding_v=rounding_v,
+        rounding_q=rounding_q,
+        accuracy_v=accuracy_v,
+        accuracy_q=accuracy_q,
+        prefix_v=prefix_v,
+        prefix_q=prefix_q,
+        suffix_v=suffix_v,
+        suffix_q=suffix_q,
+        tick_sig_hash=tick_sig_hash,
+    )
+
+    # Track required qualities for blocking determination
+    # Common required qualities (shape, unit formatting, prefix/suffix)
+    required_qs = [
+        shape_q,
+        unit_format_id_q,
+        rounding_q,
+        accuracy_q,
+        prefix_q,
+        suffix_q,
+    ]
+
+    # 2. Add shape-specific properties
+    if _is_linear_family(shape_family):
+        items.extend(_build_linear_identity_items(witness_v, witness_q))
+        # witness_line_control is required for linear shapes
+        if witness_q is not None:
+            required_qs.append(witness_q)
+
+    elif _is_radial_family(shape_family):
+        items.extend(_build_radial_identity_items(
+            center_marks_v, center_marks_q,
+            center_mark_size_v, center_mark_size_q,
+        ))
+        # center mark properties are required for radial shapes
+        if center_marks_q is not None:
+            required_qs.append(center_marks_q)
+        if center_mark_size_q is not None:
+            required_qs.append(center_mark_size_q)
+
+    elif _is_angular_family(shape_family):
+        items.extend(_build_angular_identity_items())
+        # No additional required qualities for angular
+
+    elif _is_spot_family(shape_family):
+        items.extend(_build_spot_identity_items())
+        # No additional required qualities for spot
+
+    # Unknown shape family: only common properties, but mark as degraded
+    # (required_qs already contains common qualities)
+
+    # 3. Sort items by key for deterministic ordering
+    items = sorted(items, key=lambda it: it.get("k", ""))
+
+    return items, required_qs
+
+
 # --- v2 helpers: Units / Alternate Units FormatOptions ---
 
 def _as_string(v):
@@ -832,17 +1069,8 @@ def extract(doc, ctx=None):
         uid_v, uid_q = canonicalize_str(uid_raw)
 
         # Required: dim_type.shape
-        # Revit API varies by version; prefer any stable style/shape enum we can read.
-        shape_raw = None
-        for _attr in ("Shape", "StyleType", "DimensionShape", "DimensionStyleType"):
-            try:
-                if hasattr(d, _attr):
-                    shape_raw = getattr(d, _attr, None)
-                    if shape_raw is not None:
-                        break
-            except Exception:
-                continue
-        shape_v, shape_q = canonicalize_enum(shape_raw)
+        # Use shape detection helper for consistent shape detection and family classification
+        shape_v, shape_family, shape_q = _get_dimension_shape(d)
 
         # Optional: dim_type.text_type_uid (ElementId -> element.UniqueId)
         text_type_uid_v, text_type_uid_q = (None, ITEM_Q_MISSING)
@@ -883,15 +1111,34 @@ def extract(doc, ctx=None):
             else:
                 tick_uid_v, tick_uid_q = ("", ITEM_Q_OK)
 
-        # Optional: dim_type.witness_line_control
-        # - If parameter is absent for this family: unsupported.not_applicable
+        # Shape-gated: dim_type.witness_line_control (LINEAR_FAMILY only)
+        # - Only extracted for linear shapes (Linear, LinearFixed)
+        # - If parameter is absent: missing (not applicable doesn't apply since we only extract for linear)
         # - If present: allow empty-as-ok
-        witness_v, witness_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
-        if witness_param_present:
+        witness_v, witness_q = (None, ITEM_Q_MISSING)
+        if _is_linear_family(shape_family) and witness_param_present:
             try:
                 witness_v, witness_q = canonicalize_str_allow_empty(witness_raw)
             except Exception:
                 witness_v, witness_q = (None, ITEM_Q_UNREADABLE)
+
+        # Shape-gated: dim_type.center_marks and dim_type.center_mark_size (RADIAL_FAMILY only)
+        # - Only extracted for radial shapes (Radial, Diameter, DiameterLinked)
+        # - Uses integer (center_marks) and float (center_mark_size) already read above
+        center_marks_v, center_marks_q = (None, ITEM_Q_MISSING)
+        center_mark_size_v, center_mark_size_q = (None, ITEM_Q_MISSING)
+        if _is_radial_family(shape_family):
+            # center_marks is already extracted as _as_int(_p("Center Marks"))
+            if center_marks is not None:
+                center_marks_v, center_marks_q = canonicalize_str(safe_str(center_marks)), ITEM_Q_OK
+                if center_marks_v is None:
+                    center_marks_q = ITEM_Q_UNREADABLE
+            # center_mark_size is already extracted as _as_double(_p("Center Mark Size"))
+            if center_mark_size is not None:
+                try:
+                    center_mark_size_v, center_mark_size_q = canonicalize_float(_fmt_in_from_ft(center_mark_size))
+                except Exception:
+                    center_mark_size_v, center_mark_size_q = (None, ITEM_Q_UNREADABLE)
 
         # Optional: unit format identity fields from UnitsFormatOptions
         # If the dimension type uses project defaults (no per-type override), treat these as valid N/A
@@ -978,13 +1225,26 @@ def extract(doc, ctx=None):
         lw_v, lw_q = canonicalize_str(lw)
         color_int_v, color_int_q = canonicalize_str(color_int)
 
-        phase2_semantic_items = phase2_sorted_items([
+        # Build phase2_semantic_items with shape-gating
+        _phase2_semantic = [
             make_identity_item("dim_attr.shape", shape_v, shape_q),
             make_identity_item("dim_attr.unit_format_id", unit_format_id_v, unit_format_id_q),
             make_identity_item("dim_attr.rounding", rounding_v, rounding_q),
             make_identity_item("dim_attr.accuracy", accuracy_v, accuracy_q),
-            make_identity_item("dim_attr.witness_line_control", witness_v, witness_q),
-        ])
+        ]
+        # Shape-specific semantic items
+        if _is_linear_family(shape_family):
+            _phase2_semantic.append(
+                make_identity_item("dim_attr.witness_line_control", witness_v, witness_q)
+            )
+        elif _is_radial_family(shape_family):
+            _phase2_semantic.append(
+                make_identity_item("dim_attr.center_marks", center_marks_v, center_marks_q)
+            )
+            _phase2_semantic.append(
+                make_identity_item("dim_attr.center_mark_size", center_mark_size_v, center_mark_size_q)
+            )
+        phase2_semantic_items = phase2_sorted_items(_phase2_semantic)
 
         phase2_unknown_items = phase2_sorted_items([
             make_identity_item("dim_attr.prefix", prefix_v, prefix_q),
@@ -1004,23 +1264,40 @@ def extract(doc, ctx=None):
         ])
 
 
-        # Phase-2 compliant: definition-based identity (no UID references)
+        # ---------------------------
+        # Shape-gated identity_items (Phase-2 compliant, definition-based)
+        # ---------------------------
         # tick_mark_uid excluded per Phase 2 architecture (UIDs are file-local, not semantic)
-        identity_items = [
-            make_identity_item("dim_type.shape", shape_v, shape_q),
-            make_identity_item("dim_type.witness_line_control", witness_v, witness_q),
-            make_identity_item("dim_type.unit_format_id", unit_format_id_v, unit_format_id_q),
-            make_identity_item("dim_type.rounding", rounding_v, rounding_q),
-            make_identity_item("dim_type.accuracy", accuracy_v, accuracy_q),
-            make_identity_item("dim_type.prefix", prefix_v, prefix_q),
-            make_identity_item("dim_type.suffix", suffix_v, suffix_q),
-            make_identity_item(
-                "dim_type.tick_mark_sig_hash",
-                safe_str(tick_sig_hash) if tick_sig_hash else None,
-                ITEM_Q_OK if tick_sig_hash else ITEM_Q_UNSUPPORTED_NOT_APPLICABLE,
-            ),
-        ]
-        identity_items = sorted(identity_items, key=lambda it: it.get("k", ""))
+        #
+        # Shape-gating approach:
+        #   - Common properties are included for ALL shapes
+        #   - Shape-specific properties are only included for applicable shapes
+        #   - No ITEM_Q_UNSUPPORTED_NOT_APPLICABLE for shape-gated properties
+        #   - required_qs varies by shape (only includes qualities for included properties)
+        identity_items, required_qs = _build_identity_items(
+            shape_family=shape_family,
+            shape_v=shape_v,
+            shape_q=shape_q,
+            unit_format_id_v=unit_format_id_v,
+            unit_format_id_q=unit_format_id_q,
+            rounding_v=rounding_v,
+            rounding_q=rounding_q,
+            accuracy_v=accuracy_v,
+            accuracy_q=accuracy_q,
+            prefix_v=prefix_v,
+            prefix_q=prefix_q,
+            suffix_v=suffix_v,
+            suffix_q=suffix_q,
+            tick_sig_hash=tick_sig_hash,
+            # Linear-specific (only used if shape_family == FAMILY_LINEAR)
+            witness_v=witness_v,
+            witness_q=witness_q,
+            # Radial-specific (only used if shape_family == FAMILY_RADIAL)
+            center_marks_v=center_marks_v,
+            center_marks_q=center_marks_q,
+            center_mark_size_v=center_mark_size_v,
+            center_mark_size_q=center_mark_size_q,
+        )
 
         # Policy-driven join_key is built from v2 identity_items only (no uid/name/id fallback)
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "dimension_types")
@@ -1030,27 +1307,26 @@ def extract(doc, ctx=None):
         )
 
         # Block if any required authoritative identity field is not OK.
-        # Note: tick_mark_sig_hash is an identity item but is allowed to be UNSUPPORTED_NOT_APPLICABLE.
-        required_qs = [
-            shape_q,
-            witness_q,
-            unit_format_id_q,
-            rounding_q,
-            accuracy_q,
-            prefix_q,
-            suffix_q,
-        ]
-        blocked = any(q != ITEM_Q_OK for q in required_qs)
+        # Note: tick_mark_sig_hash quality is ITEM_Q_MISSING (not in required_qs) when not present.
+        # Shape-specific required qualities are determined by _build_identity_items based on shape_family.
+        blocked = any(q not in (ITEM_Q_OK, ITEM_Q_MISSING) for q in required_qs)
 
 
         status_reasons = []
         any_incomplete = False
         for it in identity_items:
             q = it.get("q")
-            if q in (ITEM_Q_OK, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE):
+            k = it.get("k", "")
+            # With shape-gating, we no longer use ITEM_Q_UNSUPPORTED_NOT_APPLICABLE
+            # for shape-specific properties - they simply aren't included.
+            # ITEM_Q_MISSING is acceptable for tick_mark_sig_hash (not all types have tick marks)
+            if q == ITEM_Q_OK:
+                continue
+            if q == ITEM_Q_MISSING and k == "dim_type.tick_mark_sig_hash":
+                # tick_mark_sig_hash missing is acceptable
                 continue
             any_incomplete = True
-            status_reasons.append("identity.incomplete:{}:{}".format(q, it.get("k")))
+            status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
         # Label
         label_quality = "human"
