@@ -78,6 +78,225 @@ except ImportError:
     DimensionType = None
 
 
+# ---------------------------------------------------------------------------
+# Shape Detection Constants and Helper
+# ---------------------------------------------------------------------------
+#
+# Revit DimensionStyleType enum values (API 2020+):
+#   Linear = 0
+#   Angular = 1
+#   Radial = 2
+#   Diameter = 3
+#   ArcLength = 4
+#   SpotElevation = 5
+#   SpotCoordinate = 6
+#   SpotSlope = 7
+#   LinearFixed = 8
+#   SpotElevationFixed = 9
+#   (DiameterLinked = 10 in some versions)
+#
+# Shape families for property gating:
+#   LINEAR_FAMILY: Linear, LinearFixed - have witness lines
+#   RADIAL_FAMILY: Radial, Diameter, DiameterLinked - have center marks
+#   ANGULAR_FAMILY: Angular, ArcLength - angle measurements
+#   SPOT_FAMILY: SpotElevation, SpotCoordinate, SpotSlope, SpotElevationFixed
+# ---------------------------------------------------------------------------
+
+# Canonical shape names (normalized from DimensionStyleType enum)
+SHAPE_LINEAR = "Linear"
+SHAPE_ANGULAR = "Angular"
+SHAPE_RADIAL = "Radial"
+SHAPE_DIAMETER = "Diameter"
+SHAPE_ARC_LENGTH = "ArcLength"
+SHAPE_SPOT_ELEVATION = "SpotElevation"
+SHAPE_SPOT_COORDINATE = "SpotCoordinate"
+SHAPE_SPOT_SLOPE = "SpotSlope"
+SHAPE_LINEAR_FIXED = "LinearFixed"
+SHAPE_SPOT_ELEVATION_FIXED = "SpotElevationFixed"
+SHAPE_DIAMETER_LINKED = "DiameterLinked"
+SHAPE_UNKNOWN = "Unknown"
+
+# Shape family constants for property gating
+FAMILY_LINEAR = "linear"
+FAMILY_RADIAL = "radial"
+FAMILY_ANGULAR = "angular"
+FAMILY_SPOT = "spot"
+FAMILY_UNKNOWN = "unknown"
+
+# Map canonical shape names to shape families
+SHAPE_TO_FAMILY = {
+    SHAPE_LINEAR: FAMILY_LINEAR,
+    SHAPE_LINEAR_FIXED: FAMILY_LINEAR,
+    SHAPE_RADIAL: FAMILY_RADIAL,
+    SHAPE_DIAMETER: FAMILY_RADIAL,
+    SHAPE_DIAMETER_LINKED: FAMILY_RADIAL,
+    SHAPE_ANGULAR: FAMILY_ANGULAR,
+    SHAPE_ARC_LENGTH: FAMILY_ANGULAR,
+    SHAPE_SPOT_ELEVATION: FAMILY_SPOT,
+    SHAPE_SPOT_COORDINATE: FAMILY_SPOT,
+    SHAPE_SPOT_SLOPE: FAMILY_SPOT,
+    SHAPE_SPOT_ELEVATION_FIXED: FAMILY_SPOT,
+    SHAPE_UNKNOWN: FAMILY_UNKNOWN,
+}
+
+# Map integer enum values to canonical shape names (fallback for non-enum access)
+SHAPE_INT_TO_NAME = {
+    0: SHAPE_LINEAR,
+    1: SHAPE_ANGULAR,
+    2: SHAPE_RADIAL,
+    3: SHAPE_DIAMETER,
+    4: SHAPE_ARC_LENGTH,
+    5: SHAPE_SPOT_ELEVATION,
+    6: SHAPE_SPOT_COORDINATE,
+    7: SHAPE_SPOT_SLOPE,
+    8: SHAPE_LINEAR_FIXED,
+    9: SHAPE_SPOT_ELEVATION_FIXED,
+    10: SHAPE_DIAMETER_LINKED,
+}
+
+
+def _get_dimension_shape(dim_type):
+    """
+    Detect dimension shape from a Revit DimensionType object.
+
+    Revit exposes shape via multiple API paths depending on version:
+      - DimensionType.StyleType (preferred, returns DimensionStyleType enum)
+      - DimensionType.Shape (some versions)
+      - DimensionType.DimensionShape (legacy)
+      - DimensionType.DimensionStyleType (redundant accessor)
+
+    Returns:
+        tuple: (shape_name, shape_family, quality)
+            - shape_name: str - Canonical shape name (e.g., "Linear", "Radial")
+            - shape_family: str - Shape family for property gating (e.g., "linear", "radial")
+            - quality: str - ITEM_Q_OK, ITEM_Q_MISSING, or ITEM_Q_UNREADABLE
+
+    Fail-soft behavior:
+        - If shape cannot be read, returns (None, FAMILY_UNKNOWN, ITEM_Q_UNREADABLE)
+        - If shape is None/empty, returns (None, FAMILY_UNKNOWN, ITEM_Q_MISSING)
+        - Unknown enum values return (str(value), FAMILY_UNKNOWN, ITEM_Q_OK)
+
+    Example:
+        >>> shape_name, shape_family, quality = _get_dimension_shape(dim_type)
+        >>> if shape_family == FAMILY_LINEAR:
+        ...     # Export witness line properties
+        ...     pass
+    """
+    if dim_type is None:
+        return (None, FAMILY_UNKNOWN, ITEM_Q_MISSING)
+
+    # Try multiple API paths in order of preference
+    shape_raw = None
+    read_exception = None
+
+    for attr_name in ("StyleType", "Shape", "DimensionShape", "DimensionStyleType"):
+        try:
+            if hasattr(dim_type, attr_name):
+                val = getattr(dim_type, attr_name, None)
+                if val is not None:
+                    shape_raw = val
+                    break
+        except Exception as ex:
+            # Record first exception for diagnostics but continue trying
+            if read_exception is None:
+                read_exception = ex
+            continue
+
+    # Handle missing shape
+    if shape_raw is None:
+        if read_exception is not None:
+            return (None, FAMILY_UNKNOWN, ITEM_Q_UNREADABLE)
+        return (None, FAMILY_UNKNOWN, ITEM_Q_MISSING)
+
+    # Extract canonical shape name from enum or value
+    shape_name = None
+
+    # Try 1: Enum with .name attribute (preferred - gives string like "Linear")
+    try:
+        enum_name = getattr(shape_raw, "name", None)
+        if isinstance(enum_name, str) and enum_name.strip():
+            shape_name = enum_name.strip()
+    except Exception:
+        pass
+
+    # Try 2: Enum with .Name attribute (some .NET enums use PascalCase)
+    if shape_name is None:
+        try:
+            enum_name = getattr(shape_raw, "Name", None)
+            if isinstance(enum_name, str) and enum_name.strip():
+                shape_name = enum_name.strip()
+        except Exception:
+            pass
+
+    # Try 3: Integer value lookup
+    if shape_name is None:
+        try:
+            # Get integer value from enum
+            int_val = None
+            for int_attr in ("value", "Value", "value__", "__int__"):
+                try:
+                    if int_attr == "__int__":
+                        int_val = int(shape_raw)
+                    elif hasattr(shape_raw, int_attr):
+                        int_val = getattr(shape_raw, int_attr)
+                        if callable(int_val):
+                            int_val = int_val()
+                    if int_val is not None:
+                        break
+                except Exception:
+                    continue
+
+            if int_val is not None and int_val in SHAPE_INT_TO_NAME:
+                shape_name = SHAPE_INT_TO_NAME[int_val]
+        except Exception:
+            pass
+
+    # Try 4: String conversion fallback
+    if shape_name is None:
+        try:
+            str_val = str(shape_raw).strip()
+            if str_val:
+                # Check if it matches a known shape name
+                for known_name in SHAPE_TO_FAMILY.keys():
+                    if str_val.lower() == known_name.lower():
+                        shape_name = known_name
+                        break
+                # If not matched, use the string value as-is
+                if shape_name is None:
+                    shape_name = str_val
+        except Exception:
+            pass
+
+    # Final fallback
+    if shape_name is None:
+        return (None, FAMILY_UNKNOWN, ITEM_Q_UNREADABLE)
+
+    # Determine shape family
+    shape_family = SHAPE_TO_FAMILY.get(shape_name, FAMILY_UNKNOWN)
+
+    return (shape_name, shape_family, ITEM_Q_OK)
+
+
+def _is_linear_family(shape_family):
+    """Check if shape family supports witness line properties."""
+    return shape_family == FAMILY_LINEAR
+
+
+def _is_radial_family(shape_family):
+    """Check if shape family supports center mark properties."""
+    return shape_family == FAMILY_RADIAL
+
+
+def _is_angular_family(shape_family):
+    """Check if shape family supports angular-specific properties."""
+    return shape_family == FAMILY_ANGULAR
+
+
+def _is_spot_family(shape_family):
+    """Check if shape family is a spot dimension type."""
+    return shape_family == FAMILY_SPOT
+
+
 # --- v2 helpers: Units / Alternate Units FormatOptions ---
 
 def _as_string(v):
