@@ -27,6 +27,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.deps import require_domain, Blocked
 from core.collect import collect_instances
 from core.canon import (
     canon_str,
@@ -197,14 +198,54 @@ def extract(doc, ctx=None):
         "debug_view_context_problem": 0,
         "debug_view_context_reasons": {},
         "debug_collect_types_failed": 0,
+
+        # NEW counters for referential architecture
+        "debug_category_overrides_found": 0,
+        "debug_category_no_baseline": 0,
+        "debug_category_no_override": 0,
+        "debug_baseline_map_size": 0,
     }
 
-    # Get context mappings (may be None if global domains not run)
-    phase_filter_map = ctx.get("phase_filter_uid_to_hash", {}) if ctx else {}
-    phase_filter_map_v2 = ctx.get("phase_filter_uid_to_hash_v2", {}) if ctx else {}
-    line_pattern_map_v2 = ctx.get("line_pattern_uid_to_hash_v2", {}) if ctx else {}
+    ctx_map = ctx or {}
 
-    debug_vg_details = bool(ctx.get("debug_vg_details", False)) if ctx else False
+    # CRITICAL DEPENDENCIES - view templates cannot work without these
+    try:
+        require_domain(ctx_map.get("_domains", {}), "object_styles")
+        require_domain(ctx_map.get("_domains", {}), "view_category_overrides")
+        require_domain(ctx_map.get("_domains", {}), "phase_filters")
+        require_domain(ctx_map.get("_domains", {}), "view_filter_definitions")
+        require_domain(ctx_map.get("_domains", {}), "line_patterns")
+        require_domain(ctx_map.get("_domains", {}), "fill_patterns")
+    except Blocked as b:
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {"dependency_blocked": str(b.reasons)}
+        info["count"] = 0
+        info["records"] = []
+        info["hash_v2"] = None
+        return info
+
+    # Get baseline maps
+    baseline_map = ctx_map.get("object_styles_category_to_sig_hash", {})
+    baseline_records = ctx_map.get("object_styles_records", {})
+
+    # Get override map
+    override_map = ctx_map.get("view_category_overrides_sig_hash", {})
+
+    # Get existing maps (already in code)
+    phase_filter_map_v2 = ctx_map.get("phase_filter_uid_to_hash_v2", {})
+    view_filter_map = ctx_map.get("view_filter_uid_to_sig_hash_v2", {})
+    line_pattern_map_v2 = ctx_map.get("line_pattern_uid_to_hash_v2", {})
+    fill_pattern_map_v2 = ctx_map.get("fill_pattern_uid_to_hash_v2", {})
+
+    info["debug_baseline_map_size"] = len(baseline_map)
+    if not baseline_map:
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"]["missing_baseline_map"] = "object_styles not run"
+
+    # Get context mappings (may be None if global domains not run)
+    phase_filter_map = ctx_map.get("phase_filter_uid_to_hash", {})
+
+    debug_vg_details = bool(ctx_map.get("debug_vg_details", False))
 
     try:
         col = list(
@@ -784,7 +825,7 @@ def extract(doc, ctx=None):
 
         if filter_ids is not None:
             # mapping published by view_filter_definitions domain
-            vf_map = ctx.get("view_filter_uid_to_sig_hash_v2", {}) if ctx else {}
+            vf_map = view_filter_map
 
             for i, fid in enumerate(filter_ids):
                 idx3 = "{:03d}".format(i)
