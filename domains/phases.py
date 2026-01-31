@@ -48,7 +48,6 @@ except ImportError:
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
-    phase2_join_hash,
 )
 from core.record_v2 import (
     STATUS_OK,
@@ -60,18 +59,6 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
-
-
-def _phase2_build_join_key_items(*, phase_name):
-    """
-    Phase-2 join key items (domain-specific).
-    Hypothesis: phase.name is the natural cross-file join axis for phases.
-    """
-    v_name, q_name = phase2_qv_from_legacy_sentinel_str(phase_name, allow_empty=False)
-    items = [
-        {"k": "phase.name", "q": q_name, "v": v_name},
-    ]
-    return phase2_sorted_items(items)
 
 
 def _phase2_build_phase2_payload(*, phase_name, seq, uid):
@@ -213,10 +200,6 @@ def extract(doc, ctx=None):
 
         def_hash = make_hash(sig)
 
-        # Phase-2 join key is policy-derived (no hard-coded join composition)
-        join_key = None
-
-
         # Phase-2 attribute grouping (hypotheses only)
         phase2_payload = _phase2_build_phase2_payload(
             phase_name=name,
@@ -243,15 +226,6 @@ def extract(doc, ctx=None):
 
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "phases")
         join_key_v2, _missing = build_join_key_from_policy(domain_policy=pol, identity_items=identity_items_v2_sorted)
-
-        # Legacy join_key remains legacy-shaped (no silent behavior drift in legacy surfaces)
-        join_key_items_legacy = _phase2_build_join_key_items(phase_name=name)
-        join_key_legacy = {
-            "schema": "phases.join_key.v1",
-            "hash_alg": "md5_utf8_join_pipe",
-            "items": join_key_items_legacy,
-            "join_hash": phase2_join_hash(join_key_items_legacy),
-        }
 
         sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
@@ -292,7 +266,6 @@ def extract(doc, ctx=None):
             "def_signature": sig,
 
             # Phase-2 additions (required)
-            "join_key": join_key_legacy,
             "phase2": phase2_payload,
         }
 

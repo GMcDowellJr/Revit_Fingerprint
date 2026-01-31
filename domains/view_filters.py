@@ -412,17 +412,6 @@ def _walk_elem_filter_v2(elem_filter, out_tokens, doc):
         pass
     return False, "leaf_unknown"
 
-def _phase2_build_join_key_items(*, filter_name):
-    """Domain-specific Phase-2 join-key identity items.
-
-    Hypothesis (explicit): filter name is the natural join key across files.
-    We do not embed any legacy sentinel literals in IdentityItem.v.
-    """
-    v, q = phase2_qv_from_legacy_sentinel_str(filter_name, allow_empty=False)
-    return phase2_sorted_items([
-        {"k": "vf.name", "q": q, "v": v},
-    ])
-
 def extract(doc, ctx=None):
     """
     Extract View Filters fingerprint from document.
@@ -628,20 +617,13 @@ def extract(doc, ctx=None):
         # -----------------------------
         # Phase-2 (empirical, additive)
         # -----------------------------
-        join_items = _phase2_build_join_key_items(filter_name=name)
-        join_key = {
-            "schema": "view_filters.join_key.v1",
-            "hash_alg": "md5_utf8_join_pipe",
-            "items": join_items,
-            "join_hash": phase2_join_hash(join_items),
-        }
-
         p2_semantic = []
         p2_cosmetic = []
         p2_unknown = []
 
         # Cosmetic hypothesis: user-facing name
-        p2_cosmetic.extend(join_items)
+        v, q = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
+        p2_cosmetic.append({"k": "vf.name", "q": q, "v": v})
 
         # Semantic hypothesis: selection-ness
         try:
@@ -713,7 +695,6 @@ def extract(doc, ctx=None):
             "def_signature": sig,  # Include for explainability
 
             # Phase-2 additive payloads
-            "join_key": join_key,
             "phase2": phase2,
         }
 
