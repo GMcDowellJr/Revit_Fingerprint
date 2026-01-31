@@ -33,6 +33,11 @@ from core.canon import (
     S_UNREADABLE,
     S_NOT_APPLICABLE,
 )
+from core.graphic_overrides import (
+    extract_projection_graphics,
+    extract_cut_graphics,
+    extract_halftone,
+)
 
 from core.record_v2 import (
     STATUS_OK,
@@ -250,8 +255,31 @@ def extract(doc, ctx=None):
                 identity_items.append(make_identity_item("obj_style.row_key", rk_v, rk_q))
                 required_qs = [rk_q]
 
+                # Extract graphics using shared helpers (category surface)
+                proj_items = extract_projection_graphics(
+                    doc,
+                    cat_obj,
+                    ctx,
+                    key_prefix="obj_style.projection",
+                )
+                cut_items = extract_cut_graphics(
+                    doc,
+                    cat_obj,
+                    ctx,
+                    key_prefix="obj_style.cut",
+                )
+                # Keep halftone extraction centralized (not part of legacy identity set).
+                _halftone_items = extract_halftone(cat_obj, key_prefix="obj_style.halftone")
+
+                proj_items_by_key = {it.get("k"): it for it in (proj_items or [])}
+                cut_items_by_key = {it.get("k"): it for it in (cut_items or [])}
+
                 # Optional: projection weight
-                wproj_v, wproj_q = canonicalize_int(w_proj_legacy)
+                proj_weight_item = proj_items_by_key.get("obj_style.projection.line_weight", {}) or {}
+                wproj_v = proj_weight_item.get("v", None)
+                wproj_q = proj_weight_item.get("q", ITEM_Q_MISSING)
+                if w_proj_legacy is None and wproj_q != ITEM_Q_OK:
+                    wproj_v, wproj_q = None, ITEM_Q_MISSING
                 if wproj_q != ITEM_Q_OK:
                     status_v2 = STATUS_DEGRADED
                     status_reasons.append("weight_projection_missing_or_unreadable")
@@ -261,11 +289,17 @@ def extract(doc, ctx=None):
                 if w_cut_legacy is None:
                     wcut_v, wcut_q = None, ITEM_Q_UNSUPPORTED
                 else:
-                    wcut_v, wcut_q = canonicalize_int(w_cut_legacy)
+                    cut_weight_item = cut_items_by_key.get("obj_style.cut.line_weight", {}) or {}
+                    wcut_v = cut_weight_item.get("v", None)
+                    wcut_q = cut_weight_item.get("q", ITEM_Q_MISSING)
                 identity_items.append(make_identity_item("obj_style.weight.cut", wcut_v, wcut_q))
 
                 # Optional: color
-                rgb_v, rgb_q = canonicalize_str(None if rgb_sig_legacy in {S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE} else rgb_sig_legacy)
+                proj_color_item = proj_items_by_key.get("obj_style.projection.color.rgb", {}) or {}
+                rgb_v = proj_color_item.get("v", None)
+                rgb_q = proj_color_item.get("q", ITEM_Q_MISSING)
+                if rgb_sig_legacy in {S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE}:
+                    rgb_v, rgb_q = None, ITEM_Q_MISSING
                 if rgb_q != ITEM_Q_OK:
                     status_v2 = STATUS_DEGRADED
                     status_reasons.append("color_rgb_missing_or_unreadable")
