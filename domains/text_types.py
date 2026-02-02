@@ -97,9 +97,21 @@ def _phase2_build_payload(rec):
         _phase2_item("text_type.type_uid", rec.get("type_uid"), allow_empty=True),
         _phase2_item("text_type.type_id", rec.get("type_id"), allow_empty=True),
         _phase2_item("text_type.color_int", rec.get("color_int")),
-        _phase2_item("text_type.leader_arrowhead_uid", rec.get("leader_arrowhead_uid"), allow_empty=True),
-        _phase2_item("text_type.leader_arrowhead_name", rec.get("leader_arrowhead_name"), allow_empty=True),
-        _phase2_item("text_type.leader_arrowhead_sig_hash", rec.get("leader_arrowhead_sig_hash"), allow_empty=True),
+
+        # Tri-state:
+        # - q="ok", v=None => explicit “no arrowhead” (valid, joinable state)
+        # - q="ok", v=<hash/name> => arrowhead present
+        _phase2_item("text_type.leader_arrowhead_uid", rec.get("leader_arrowhead_uid"), allow_empty=True)
+        if rec.get("leader_arrowhead_sig_hash") not in (None, "")
+        else {"k": "text_type.leader_arrowhead_uid", "q": "ok", "v": None},
+
+        _phase2_item("text_type.leader_arrowhead_name", rec.get("leader_arrowhead_name"), allow_empty=True)
+        if rec.get("leader_arrowhead_sig_hash") not in (None, "")
+        else {"k": "text_type.leader_arrowhead_name", "q": "ok", "v": None},
+
+        _phase2_item("text_type.leader_arrowhead_sig_hash", rec.get("leader_arrowhead_sig_hash"), allow_empty=True)
+        if rec.get("leader_arrowhead_sig_hash") not in (None, "")
+        else {"k": "text_type.leader_arrowhead_sig_hash", "q": "ok", "v": None},
     ])
 
     return {
@@ -198,6 +210,33 @@ def extract(doc, ctx=None):
         line_weight = _as_int(p_lw)
 
         color_int, color_rgb = try_get_color_rgb_from_elem(t)
+
+        # Canonicalize RGB to a stable string (avoid Python dict repr drift)
+        # Accepts dict/tuple/list/"r-g-b" strings; emits "r-g-b" or None.
+        def _canon_rgb(v):
+            if v is None:
+                return None
+            if isinstance(v, dict):
+                try:
+                    r = int(v.get("r", 0))
+                    g = int(v.get("g", 0))
+                    b = int(v.get("b", 0))
+                    return "{}-{}-{}".format(r, g, b)
+                except Exception:
+                    return safe_str(v)
+            if isinstance(v, (list, tuple)) and len(v) == 3:
+                try:
+                    r, g, b = [int(x) for x in v]
+                    return "{}-{}-{}".format(r, g, b)
+                except Exception:
+                    return safe_str(v)
+            s = safe_str(v)
+            # If already "r-g-b", keep as-is
+            if isinstance(s, str) and s.count("-") == 2:
+                return s
+            return s
+
+        color_rgb = _canon_rgb(color_rgb)
 
         # Border / tabs / styles
         show_border = _as_bool_from_param(first_param(t, ui_names=["Show Border", "Show border"]))
@@ -340,8 +379,7 @@ def extract(doc, ctx=None):
 
             "leader_arrowhead_uid": leader_arrow_uid,
             "leader_arrowhead_name": leader_arrow_name,
-            "leader_arrowhead_sig_hash": safe_str(leader_arrow_sig_hash) if leader_arrow_sig_hash else "",
-
+            "leader_arrowhead_sig_hash": safe_str(leader_arrow_sig_hash) if leader_arrow_sig_hash else None,
             "signature_tuple": signature_tuple,
             "signature_hash": sig_hash
         }
@@ -358,7 +396,8 @@ def extract(doc, ctx=None):
         v, q = canonicalize_str(rec.get("text_size_in"))
         candidate_kqv["text_type.size_in"] = (v, q)
 
-        v, q = canonicalize_float(rec.get("width_factor"))
+        # Keep width_factor as normalized string (avoid 6 vs 9 drift)
+        v, q = canonicalize_str(rec.get("width_factor"))
         candidate_kqv["text_type.width_factor"] = (v, q)
 
         v, q = canonicalize_int(rec.get("background_raw"))
@@ -388,9 +427,13 @@ def extract(doc, ctx=None):
         v, q = canonicalize_bool(rec.get("underline"))
         candidate_kqv["text_type.underline"] = (v, q)
 
-        # Explicit: allow empty; no uid/name/id fallback
-        v, q = canonicalize_str(rec.get("leader_arrowhead_sig_hash"))
-        candidate_kqv["text_type.leader_arrowhead_sig_hash"] = (v, q)
+        # Tri-state: q="ok", v=None means explicit “no arrowhead” (valid, joinable state)
+        _raw_ah = rec.get("leader_arrowhead_sig_hash")
+        if _raw_ah in (None, ""):
+            candidate_kqv["text_type.leader_arrowhead_sig_hash"] = (None, ITEM_Q_OK)
+        else:
+            v, q = canonicalize_str(_raw_ah)
+            candidate_kqv["text_type.leader_arrowhead_sig_hash"] = (v, q)
 
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "text_types")
         rec["join_key"], _missing = build_join_key_from_policy(
@@ -408,7 +451,8 @@ def extract(doc, ctx=None):
         name_v2, name_q = canonicalize_str(type_name)
         font_v2, font_q = canonicalize_str(font)
         size_in_v2, size_in_q = canonicalize_str(size_in)
-        width_v2, width_q = canonicalize_float(width_factor_n)
+        # Keep width_factor as the already-normalized fixed-precision string (avoid 6 vs 9 drift)
+        width_v2, width_q = canonicalize_str(width_factor_n)
         bg_v2, bg_q = canonicalize_int(background_i)
         lw_v2, lw_q = canonicalize_int(line_weight)
         rgb_v2, rgb_q = canonicalize_str(color_rgb)

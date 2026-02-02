@@ -116,7 +116,8 @@ def _phase2_build_join_key_items(*, segment_count, segments):
 
     Join-key items:
       - line_pattern.segment_count
-      - line_pattern.sequence_hash  (hash of ordered (kind,length) sequence)
+      - line_pattern.segments_def_hash (preferred contract key)
+      - line_pattern.sequence_hash     (legacy/internal alias; kept for compatibility)
     """
     items = []
 
@@ -139,6 +140,11 @@ def _phase2_build_join_key_items(*, segment_count, segments):
                     slen = getattr(seg, "Length", None)
                 except Exception:
                     slen = None
+
+                # Normalize Dot segment length to 0.0 for stability
+                if st_id == 2:
+                    slen = 0.0
+
                 length_v, _length_q = canonicalize_float(slen, nd=9)
                 tokens.append("seg[{:03d}].length={}".format(idx, safe_str(length_v)))
 
@@ -148,6 +154,10 @@ def _phase2_build_join_key_items(*, segment_count, segments):
         except Exception:
             seq_hash_v, seq_hash_q = (None, ITEM_Q_UNREADABLE)
 
+    # Phase-2 structural pointer (preferred join-key key name for this domain)
+    items.append(make_identity_item("line_pattern.segments_def_hash", seq_hash_v, seq_hash_q))
+
+    # Internal alias (kept for compatibility with downstream builder)
     items.append(make_identity_item("line_pattern.sequence_hash", seq_hash_v, seq_hash_q))
 
     return phase2_sorted_items(items)

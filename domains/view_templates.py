@@ -517,15 +517,6 @@ def extract(doc, ctx=None):
             info["debug_kept"] += 1
             continue
 
-        rec = {
-            "id": safe_str(v.Id.IntegerValue),
-            "uid": uid or "",
-            "name": name,
-            "view_type": safe_str(v.ViewType),
-            "def_hash": def_hash,
-            "def_signature": sig_final,
-        }
-
         # -----------------------------------------
         # NON-SCHEDULE templates
         # -----------------------------------------

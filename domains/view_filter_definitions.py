@@ -435,57 +435,29 @@ def extract(doc, ctx=None):
         # -----------------------------
         # Phase 2 (empirical, additive)
         # -----------------------------
-        # Structured domain: semantic surface is the single derived definition hash.
-        # Leaf vf.rule[...] items remain identity-only.
-        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "view_filter_definitions")
 
-        # Compute vf.def_hash from canonical definition bundle:
-        # vf.categories, vf.logic_root, vf.rule_count, ordered vf.rule[i].sig
-        item_by_k = {it.get("k"): it for it in items_sorted}
-
-        cats_it = item_by_k.get("vf.categories", {})
-        logic_it = item_by_k.get("vf.logic_root", {})
-        rc_it = item_by_k.get("vf.rule_count", {})
-
-        cats_v, cats_q = cats_it.get("v"), cats_it.get("q", ITEM_Q_MISSING)
-        logic_v, logic_q = logic_it.get("v"), logic_it.get("q", ITEM_Q_MISSING)
-        rc_v, rc_q = rc_it.get("v"), rc_it.get("q", ITEM_Q_MISSING)
-
-        # Gather ordered rule sigs
-        rule_sig_vs = []
-        rule_sig_ok = True
-        for idx in range(len(rules)):
-            idx3 = "{:03d}".format(idx)
-            ksig = f"vf.rule[{idx3}].sig"
-            it = item_by_k.get(ksig, {})
-            v = it.get("v")
-            q = it.get("q", ITEM_Q_MISSING)
-            if q != ITEM_Q_OK or v is None:
-                rule_sig_ok = False
-            rule_sig_vs.append(safe_str(v or ""))
-
-        def_hash_v = None
-        def_hash_q = ITEM_Q_UNREADABLE
-
-        cats_ok = (cats_q != ITEM_Q_UNREADABLE)  # missing is allowed
-        if logic_q == ITEM_Q_OK and rc_q == ITEM_Q_OK and rule_sig_ok and cats_ok and logic_v is not None:
-            bundle_parts = [
-                safe_str(cats_v or ""),
-                safe_str(logic_v or ""),
-                safe_str(rc_v or ""),
-            ] + rule_sig_vs
-            def_hash_v = make_hash("|".join(bundle_parts))
+        # Structured domain strategy:
+        # - semantic_items exposes ONLY a single derived definition hash (vf.def_hash)
+        # - leaf members remain in identity_basis.items for forensic diffs
+        def_items_sorted = phase2_sorted_items(items_sorted or [])
+        if def_items_sorted:
+            # Deterministic hash over the canonicalized definition bundle items.
+            def_hash_v = make_hash(serialize_identity_items(def_items_sorted))
             def_hash_q = ITEM_Q_OK
         else:
-            # If the bundle cannot be safely constructed, expose def_hash as unreadable/missing.
-            if logic_q == ITEM_Q_MISSING and rc_q == ITEM_Q_MISSING and cats_q == ITEM_Q_MISSING:
-                def_hash_q = ITEM_Q_MISSING
-            else:
-                def_hash_q = ITEM_Q_UNREADABLE
+            def_hash_v = None
+            def_hash_q = ITEM_Q_MISSING
 
-        p2_semantic = [
+        p2_semantic = phase2_sorted_items([
             make_identity_item("vf.def_hash", def_hash_v, def_hash_q),
-        ]
+        ])
+
+        # Join key must be built ONLY from policy-visible candidate surfaces (Phase 2 semantic items).
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "view_filter_definitions")
+        rec["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=p2_semantic,
+        )
 
         # Unknown: element-backed id may vary across files.
         try:
@@ -501,17 +473,10 @@ def extract(doc, ctx=None):
         rec["phase2"] = {
             "schema": "phase2.view_filter_definitions.v1",
             "grouping_basis": "phase2.hypothesis",
-            "semantic_items": phase2_sorted_items(p2_semantic),
+            "semantic_items": p2_semantic,
             "cosmetic_items": phase2_sorted_items([]),
-            "coordination_items": phase2_sorted_items([]),
             "unknown_items": p2_unknown,
         }
-
-        # Join key is derived from semantic items only (policy should require vf.def_hash).
-        rec["join_key"], _missing = build_join_key_from_policy(
-            domain_policy=pol,
-            identity_items=rec["phase2"]["semantic_items"],
-        )
 
         v2_records.append(rec)
 

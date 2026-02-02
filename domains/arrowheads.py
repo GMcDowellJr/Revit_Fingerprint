@@ -87,34 +87,45 @@ def _canon_yesno_bool(v):
             pass
     return None
 
+def _as_value_string(param):
+    """Best-effort Revit Parameter.AsValueString() accessor.
+
+    Needed for integer/enum parameters where AsString() is typically None.
+    """
+    if param is None:
+        return None
+    try:
+        s = param.AsValueString()
+        if s is None:
+            return None
+        s = str(s).strip()
+        return s if s else None
+    except Exception:
+        return None
 
 def _get_arrowhead_style(style_raw, style_q):
     """Return a canonical arrowhead style label.
 
-    This is a conservative mapping because integer enum meanings can vary.
-    We only return Arrow/Tick/Dot when the raw enum name or value indicates it;
+    This is a conservative mapping because enum meanings can vary.
+    We only return Arrow/Tick/Dot when the raw value indicates it;
     otherwise fall back to Other.
     """
     if style_q != ITEM_Q_OK:
-        return None, ITEM_Q_MISSING
+        return None, style_q
 
     if style_raw is None:
         return None, ITEM_Q_MISSING
 
-    style_str = None
-    if isinstance(style_raw, str):
-        style_str = style_raw
-    else:
-        try:
-            style_str = str(style_raw)
-        except Exception:
-            style_str = None
+    try:
+        style_str = str(style_raw)
+    except Exception:
+        return None, ITEM_Q_UNREADABLE
 
+    style_str = style_str.strip()
     if not style_str:
         return None, ITEM_Q_MISSING
 
-    s = style_str.strip()
-    s_lower = s.lower()
+    s_lower = style_str.lower()
 
     if "arrow" in s_lower:
         return "Arrow", ITEM_Q_OK
@@ -260,9 +271,17 @@ def extract(doc, ctx=None):
         # Parameters (best-effort, explicit q states)
         # Arrow Style (enum/int)
         p_style = first_param(t, ui_names=["Arrow Style"])
-        style_raw = _as_string(p_style)
-        style_v, style_q = canonicalize_enum(style_raw if style_raw is not None else None)
-        style_label_v, style_label_q = _get_arrowhead_style(style_raw, style_q)
+
+        # Prefer display string (e.g. "Arrow"); fallback to raw int.
+        style_disp = _as_value_string(p_style)
+        style_raw_int = _as_int(p_style) if style_disp is None else None
+
+        # Canonical enum source: display if available, else int-as-string.
+        style_src = style_disp if style_disp is not None else (str(style_raw_int) if style_raw_int is not None else None)
+        _style_v, _style_q = canonicalize_enum(style_src)
+
+        # Stable label for identity/join: derive from display when possible.
+        style_label_v, style_label_q = _get_arrowhead_style(style_disp if style_disp is not None else style_raw_int, _style_q)
 
         # Tick Size (length) -> inches string
         p_tick = first_param(t, ui_names=["Tick Size"])
@@ -271,8 +290,44 @@ def extract(doc, ctx=None):
         tick_in_v, tick_in_q = canonicalize_str_allow_empty(tick_in)
 
         # Width Angle (rad) -> degrees float
-        p_ang = first_param(t, ui_names=["Width Angle"])
+        p_ang = first_param(t, ui_names=["Arrow Width Angle", "Width Angle"])
+
+        if p_ang is None:
+            try:
+                names = []
+                params = getattr(t, "Parameters", None)
+                if params is not None:
+                    for p in params:
+                        try:
+                            d = getattr(p, "Definition", None)
+                            nm = getattr(d, "Name", None) if d is not None else None
+                            if nm:
+                                names.append(str(nm))
+                        except Exception:
+                            continue
+                # keep bounded; stable ordering for debug
+                names = sorted(set(names))
+                debug_param_names = ";".join(names[:80])
+            except Exception:
+                debug_param_names = ""
+        else:
+            debug_param_names = ""
+
         ang_rad = _as_double(p_ang)
+        if ang_rad is None and p_ang is not None:
+            # Fallback: read directly from Revit Parameter
+            try:
+                ang_rad = p_ang.AsDouble()
+            except Exception:
+                ang_rad = None
+
+        # Debug evidence for what Revit is returning
+        width_angle_disp = None
+        try:
+            width_angle_disp = p_ang.AsValueString() if p_ang is not None else None
+        except Exception:
+            width_angle_disp = None
+
         ang_deg = _fmt_deg_from_rad(ang_rad)
         ang_deg_v, ang_deg_q = canonicalize_float(ang_deg)
 
@@ -299,54 +354,15 @@ def extract(doc, ctx=None):
         pen_raw = _as_int(p_pen)
         pen_v, pen_q = canonicalize_int(pen_raw)
 
-        identity_items = []
-        identity_items.extend(
-            _build_common_identity_items(
-                style_v=style_label_v,
-                style_q=style_label_q,
-                tick_in_v=tick_in_v,
-                tick_in_q=tick_in_q,
-            )
-        )
-
-        if style_label_v == "Arrow":
-            identity_items.extend(
-                _build_arrow_identity_items(
-                    width_angle_v=ang_deg_v,
-                    width_angle_q=ang_deg_q,
-                    fill_v=fill_v,
-                    fill_q=fill_q,
-                    closed_v=closed_v,
-                    closed_q=closed_q,
-                )
-            )
-        elif style_label_v == "Tick":
-            identity_items.extend(
-                _build_tick_identity_items(
-                    centered_v=center_v,
-                    centered_q=center_q,
-                    pen_v=pen_v,
-                    pen_q=pen_q,
-                )
-            )
-        elif style_label_v == "Dot":
-            identity_items.extend(
-                _build_tick_identity_items(
-                    centered_v=center_v,
-                    centered_q=center_q,
-                    pen_v=pen_v,
-                    pen_q=pen_q,
-                )
-            )
-        elif style_label_v == "Other":
-            identity_items.extend(
-                _build_tick_identity_items(
-                    centered_v=center_v,
-                    centered_q=center_q,
-                    pen_v=pen_v,
-                    pen_q=pen_q,
-                )
-            )
+        identity_items = [
+            make_identity_item("arrowhead.style", style_label_v, style_label_q),
+            make_identity_item("arrowhead.tick_size_in", tick_in_v, tick_in_q),
+            make_identity_item("arrowhead.width_angle_deg", ang_deg_v, ang_deg_q),
+            make_identity_item("arrowhead.fill_tick", fill_v, fill_q),
+            make_identity_item("arrowhead.arrow_closed", closed_v, closed_q),
+            make_identity_item("arrowhead.tick_mark_centered", center_v, center_q),
+            make_identity_item("arrowhead.heavy_end_pen_weight", pen_v, pen_q),
+        ]
 
         # Required qs: style + tick_size must be OK (classifier depends on their presence)
         required_qs = [style_label_q, tick_in_q]
@@ -407,6 +423,13 @@ def extract(doc, ctx=None):
             debug={
                 "name_may_be_null_for_system_types": True,
                 "uid_excluded_from_sig": True,
+                "arrow_style_display": safe_str(style_disp) if style_disp else "",
+                "arrow_style_raw_int": safe_str(style_raw_int) if style_raw_int is not None else "",
+                "arrow_style_label": safe_str(style_label_v) if style_label_v else "",
+                "arrow_style_label_q": safe_str(style_label_q) if style_label_q else "",
+                "width_angle_raw_rad": safe_str(ang_rad) if ang_rad is not None else "",
+                "width_angle_display": safe_str(width_angle_disp) if width_angle_disp else "",
+                "width_angle_param_names": safe_str(debug_param_names) if debug_param_names else "",
             },
         )
 
