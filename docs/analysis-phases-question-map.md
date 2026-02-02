@@ -29,13 +29,14 @@ These are **descriptive, non-judgmental** questions.
 ## Phase 1 — Baseline Gravity & Population Shape  
 **“What is common?”**
 
-These questions are about **frequency and gravity**, not correctness.
+These questions are about **frequency and gravity**, not correctness. Phase 1 operates on frequency and overlap, not authoritative identity.
 
 - Which items appear most frequently across projects?
 - Is there a visible baseline (template gravity)?
 - Are there multiple competing baselines?
 - How skewed or flat is the population distribution?
 - Do projects cluster around certain variants?
+- Do projects partially overlap in their element sets, even if full domains never match?
 
 **Outputs**
 - Frequency tables
