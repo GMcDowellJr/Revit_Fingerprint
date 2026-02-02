@@ -360,6 +360,56 @@
         "Definition includes referenced pattern via obj_style.pattern_ref.sig_hash.",
         "obj_style.weight.projection is required to eliminate observed collisions under row_key + pattern_ref.sig_hash."
       ]
+    },
+    "view_category_overrides": {
+      "join_key_schema": "view_category_overrides.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vco.category_path",
+        "vco.projection.line_weight",
+        "vco.projection.line_pattern_ref.sig_hash",
+        "vco.projection.line_color.rgb",
+        "vco.cut.line_weight",
+        "vco.cut.line_pattern_ref.sig_hash",
+        "vco.cut.line_color.rgb",
+        "vco.halftone",
+        "vco.transparency"
+      ],
+      "notes": [
+        "Join-key identity captures the override pattern, not where it's used.",
+        "vco.baseline_category_path identifies WHICH category is being overridden.",
+        "vco.baseline_sig_hash identifies the object_styles baseline definition being overridden.",
+        "vco.override_properties_hash collapses all delta properties into a single behavioral signature.",
+        "Individual delta properties (line_weight, color, etc.) are forensic detail, excluded from joins."
+      ]
+    },
+    "view_templates": {
+      "join_key_schema": "view_templates.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "view_template.def_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "view_template.name",
+        "view_template.uid",
+        "view_template.element_id",
+        "view_template.view_type",
+        "view_template.is_schedule",
+        "view_template.category_overrides_def_hash"
+      ],
+      "notes": [
+        "Structured domain: join identity is the definition bundle hash (def_hash).",
+        "def_hash captures complete template behavioral definition including referenced filters and phases.",
+        "Names, UIDs, and element IDs are labels/linkage only and must not participate in joins.",
+        "category_overrides_def_hash is semantic context but excluded from v1 join for simplicity."
+      ]
     }
   }
 }
