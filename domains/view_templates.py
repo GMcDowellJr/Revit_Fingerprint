@@ -505,11 +505,27 @@ def extract(doc, ctx=None):
 
             rec["phase2"] = {
                 "schema": "phase2.view_templates.v2",
-                "grouping_basis": "structured_sig_hash",
+                "grouping_basis": "join_key.join_hash",
                 "semantic_items": semantic_items,
                 "cosmetic_items": [],
                 "coordination_items": [],
                 "unknown_items": unknown_items,
+            }
+
+            # Build join_key following policy view_templates.join_key.v1
+            # For baseline-only v1: join_hash equals def_hash
+            join_key_items = [
+                {
+                    "k": "view_template.def_hash",
+                    "q": ITEM_Q_OK,
+                    "v": def_hash
+                }
+            ]
+            rec["join_key"] = {
+                "schema": "view_templates.join_key.v1",
+                "hash_alg": "md5_utf8_join_pipe",
+                "items": join_key_items,
+                "join_hash": def_hash
             }
 
             records.append(rec)
@@ -870,11 +886,27 @@ def extract(doc, ctx=None):
 
         rec["phase2"] = {
             "schema": "phase2.view_templates.v2",
-            "grouping_basis": "structured_sig_hash",
+            "grouping_basis": "join_key.join_hash",
             "semantic_items": semantic_items,
             "cosmetic_items": [],
             "coordination_items": [],
             "unknown_items": unknown_items,
+        }
+
+        # Build join_key following policy view_templates.join_key.v1
+        # For baseline-only v1: join_hash equals def_hash
+        join_key_items = [
+            {
+                "k": "view_template.def_hash",
+                "q": ITEM_Q_OK,
+                "v": def_hash
+            }
+        ]
+        rec["join_key"] = {
+            "schema": "view_templates.join_key.v1",
+            "hash_alg": "md5_utf8_join_pipe",
+            "items": join_key_items,
+            "join_hash": def_hash
         }
 
         # Optional VG debug

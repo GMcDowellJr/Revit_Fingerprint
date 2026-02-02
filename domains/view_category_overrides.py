@@ -47,6 +47,47 @@ except ImportError:
 from core.collect import collect_instances
 
 
+def _compute_override_properties_hash(identity_items):
+    """
+    Compute canonical hash of ALL override properties as a behavioral unit.
+
+    Two records with the same set of overrides but different templates/categories
+    will have the same override_properties_hash, enabling pattern detection.
+
+    Args:
+        identity_items: List of IdentityItem dicts (full identity_basis items)
+
+    Returns:
+        str: MD5 hash of canonical override signature
+    """
+    import hashlib
+
+    # Extract only delta properties (exclude baseline references)
+    override_items = [
+        item for item in identity_items
+        if not item.get('k', '').startswith('vco.baseline')
+           and item.get('k', '').startswith('vco.')
+    ]
+
+    # Sort by key for canonical ordering
+    sorted_items = sorted(override_items, key=lambda x: x.get('k', ''))
+
+    # Build canonical signature (same format as other domains)
+    signature_parts = []
+    for item in sorted_items:
+        k = item.get('k', '')
+        q = item.get('q', '')
+        v = item.get('v')
+        # Handle None values explicitly
+        v_str = '' if v is None else str(v)
+        signature_parts.append("{}={}:{}".format(k, q, v_str))
+
+    signature = "|".join(signature_parts)
+
+    # Compute MD5 hash matching hash_alg policy
+    return hashlib.md5(signature.encode('utf-8')).hexdigest()
+
+
 def _phase2_build_join_key_items(category_path):
     """Build Phase-2 join-key IdentityItems (domain-specific, hypothesis-only).
 
@@ -60,7 +101,12 @@ def _phase2_build_join_key_items(category_path):
 
 
 def _phase2_partition_items(items):
-    """Partition IdentityItems into semantic/cosmetic/unknown buckets (hypothesis-only)."""
+    """Partition IdentityItems into semantic/cosmetic/unknown buckets.
+
+    Semantic: Baseline references + override hash (defines the pattern)
+    Cosmetic: Individual delta properties (forensic detail)
+    Unknown: Template/category context
+    """
     semantic = []
     cosmetic = []
     unknown = []
@@ -68,19 +114,26 @@ def _phase2_partition_items(items):
     for it in (items or []):
         k = safe_str(it.get("k", ""))
 
-        if k.startswith("vco.baseline_"):
+        # SEMANTIC: Baseline refs and derived override hash
+        # These define WHAT the override pattern is
+        if k in ["vco.baseline_category_path",
+                 "vco.baseline_sig_hash",
+                 "vco.override_properties_hash"]:
             semantic.append(it)
             continue
 
+        # COSMETIC: Individual delta properties
+        # These are forensic detail ABOUT the pattern
         if (
             k.startswith("vco.projection.")
             or k.startswith("vco.cut.")
-            or k.startswith("vco.halftone.")
-            or k.startswith("vco.transparency.")
+            or k.startswith("vco.halftone")
+            or k.startswith("vco.transparency")
         ):
             cosmetic.append(it)
             continue
 
+        # UNKNOWN: Everything else (should be minimal)
         unknown.append(it)
 
     return (
@@ -257,11 +310,21 @@ def extract(doc, ctx=None):
             ]
             identity_items.extend(delta_items)
 
+            # Compute override_properties_hash before sorting
+            override_props_hash = _compute_override_properties_hash(identity_items)
+            identity_items.append(
+                make_identity_item(
+                    "vco.override_properties_hash",
+                    override_props_hash,
+                    ITEM_Q_OK
+                )
+            )
+
             identity_items_sorted = sorted(identity_items, key=lambda it: str(it.get("k", "")))
             preimage = serialize_identity_items(identity_items_sorted)
             sig_hash = make_hash(preimage) if preimage is not None else None
 
-            required_keys = ["vco.baseline_category_path", "vco.baseline_sig_hash"]
+            required_keys = ["vco.baseline_category_path", "vco.baseline_sig_hash", "vco.override_properties_hash"]
             item_by_k = {it.get("k"): it for it in identity_items_sorted}
             required_qs = [safe_str(item_by_k.get(rk, {}).get("q", ITEM_Q_MISSING)) for rk in required_keys]
 
@@ -319,15 +382,47 @@ def extract(doc, ctx=None):
                 signature_hashes_v2.append(sig_hash)
 
             p2_semantic, p2_cosmetic, p2_unknown = _phase2_partition_items(identity_items_sorted)
-            p2_semantic.extend(_phase2_build_join_key_items(category_path))
 
             rec["phase2"] = {
                 "schema": "phase2.view_category_overrides.v1",
-                "grouping_basis": "phase2.hypothesis",
+                "grouping_basis": "join_key.join_hash",
                 "semantic_items": phase2_sorted_items(p2_semantic),
                 "cosmetic_items": phase2_sorted_items(p2_cosmetic),
                 "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_sorted_items(p2_unknown),
+            }
+
+            # Build join_key following policy view_category_overrides.join_key.v1
+            import hashlib
+            join_key_items = []
+            for item in identity_items_sorted:
+                k = item.get('k', '')
+                # Include only policy-required items
+                if k in ['vco.baseline_category_path',
+                         'vco.baseline_sig_hash',
+                         'vco.override_properties_hash']:
+                    join_key_items.append({
+                        'k': item['k'],
+                        'q': item['q'],
+                        'v': item.get('v')
+                    })
+
+            # Sort for canonical ordering
+            join_key_items_sorted = sorted(join_key_items, key=lambda x: x['k'])
+
+            # Compute join_hash
+            join_signature = "|".join([
+                "k={}|q={}|v={}".format(item['k'], item['q'], item.get('v') or '')
+                for item in join_key_items_sorted
+            ])
+            join_hash = hashlib.md5(join_signature.encode('utf-8')).hexdigest()
+
+            # Add join_key to record
+            rec["join_key"] = {
+                "schema": "view_category_overrides.join_key.v1",
+                "hash_alg": "md5_utf8_join_pipe",
+                "items": join_key_items_sorted,
+                "join_hash": join_hash
             }
 
     records = list(override_patterns.values()) + blocked_records
