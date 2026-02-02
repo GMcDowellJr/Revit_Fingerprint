@@ -286,9 +286,11 @@ def _run_all_phase2(
         include_top_level=True,
         include_semantic=True,
         include_cosmetic=True,
+        include_coordination=True,
         include_unknown=True,
         max_cell_chars=240,
     )
+
 
     run_collision_differencing(
         exports_dir=filtered_exports_dir,

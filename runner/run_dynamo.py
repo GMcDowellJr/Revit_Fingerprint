@@ -106,6 +106,7 @@ from domains import identity, units, object_styles, line_patterns, line_styles
 from domains import fill_patterns, arrowheads, text_types, dimension_types
 from domains import view_filter_definitions, view_filter_applications_view_templates
 from domains import phases, phase_filters, phase_graphics
+from domains import view_category_overrides
 from domains import view_templates
 from core.manifest import build_manifest
 from core.features import build_features
@@ -568,6 +569,10 @@ def run_fingerprint(doc):
     contract_domains = {}
     run_diag = contracts.new_run_diag()
     runner_notes = []
+    
+    # Expose authoritative domain envelopes to extractors for dependency gating.
+    # contract_domains is mutated as domains run; ctx sees the live dict.
+    ctx["_domains"] = contract_domains
 
     # Metadata domains (no behavioral hash)
     if _enabled("identity"):
@@ -677,11 +682,51 @@ def run_fingerprint(doc):
         if legacy is not None:
             fingerprint["view_filter_applications_view_templates"] = legacy
 
+    if _enabled("view_category_overrides"):
+        # Hard dependencies: must run after object_styles + pattern domains
+        try:
+            require_domain(contract_domains, "object_styles")
+            require_domain(contract_domains, "line_patterns")
+            require_domain(contract_domains, "fill_patterns")
+
+            legacy = _domain_run(
+                "view_category_overrides",
+                view_category_overrides.extract,
+                doc,
+                ctx,
+                contract_domains,
+                run_diag,
+                runner_notes,
+            )
+            if legacy is not None:
+                fingerprint["view_category_overrides"] = legacy
+        except Blocked as b:
+            contract_domains["view_category_overrides"] = contracts.new_domain_envelope(
+                domain="view_category_overrides",
+                domain_version=_DOMAIN_VERSION,
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                block_reasons=list(b.reasons),
+                diag={
+                    "blocked_code": b.code,
+                    "upstream": b.upstream,
+                },
+                records=None,
+                hash_value=None,
+            )
+            contracts.add_bounded_error(
+                run_diag,
+                domain="view_category_overrides",
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                code=b.code,
+                message=";".join(list(b.reasons)),
+            )
+
     if _enabled("view_templates"):
         # Hard dependencies: downstream must not run if upstream is missing or non-acceptable.
         try:
             require_domain(contract_domains, "phase_filters")
             require_domain(contract_domains, "view_filter_definitions")
+            require_domain(contract_domains, "view_category_overrides")
 
             legacy = _domain_run("view_templates", view_templates.extract, doc, ctx, contract_domains, run_diag, runner_notes)
             if legacy is not None:

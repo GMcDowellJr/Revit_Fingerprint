@@ -1127,10 +1127,11 @@ def extract(doc, ctx=None):
         # - Uses integer (center_marks) and float (center_mark_size) already read above
         center_marks_v, center_marks_q = (None, ITEM_Q_MISSING)
         center_mark_size_v, center_mark_size_q = (None, ITEM_Q_MISSING)
+
         if _is_radial_family(shape_family):
             # center_marks is already extracted as _as_int(_p("Center Marks"))
             if center_marks is not None:
-                center_marks_v, center_marks_q = canonicalize_str(safe_str(center_marks)), ITEM_Q_OK
+                center_marks_v, center_marks_q = canonicalize_str(safe_str(center_marks))
                 if center_marks_v is None:
                     center_marks_q = ITEM_Q_UNREADABLE
             # center_mark_size is already extracted as _as_double(_p("Center Mark Size"))
@@ -1196,15 +1197,25 @@ def extract(doc, ctx=None):
                 accuracy_v, accuracy_q = (None, ITEM_Q_UNREADABLE)
         else:
             use_default = getattr(fo, "UseDefault", None)
-            if use_default is not True:
+
+            # If the type uses project defaults, treat that as deterministic identity
+            # (do NOT mark as unsupported/not_applicable, which blocks sig_hash).
+            if use_default is True:
+                unit_format_id_v, unit_format_id_q = ("use_default", ITEM_Q_OK)
+                rounding_v, rounding_q = ("use_default", ITEM_Q_OK)
+                accuracy_v, accuracy_q = ("use_default", ITEM_Q_OK)
+
+            else:
                 try:
                     unit_format_id_v, unit_format_id_q = canonicalize_str(safe_str(fo.GetUnitTypeId()))
                 except Exception:
                     unit_format_id_v, unit_format_id_q = (None, ITEM_Q_UNREADABLE)
+
                 try:
                     rounding_v, rounding_q = canonicalize_enum(getattr(fo, "RoundingMethod", None))
                 except Exception:
                     rounding_v, rounding_q = (None, ITEM_Q_UNREADABLE)
+
                 try:
                     # UnitsFormatOptions.Accuracy is stored as feet; identity key expects a string, so use inches string.
                     accuracy_v, accuracy_q = canonicalize_float(_fmt_in_from_ft(getattr(fo, "Accuracy", None)))
@@ -1307,10 +1318,8 @@ def extract(doc, ctx=None):
         )
 
         # Block if any required authoritative identity field is not OK.
-        # Note: tick_mark_sig_hash quality is ITEM_Q_MISSING (not in required_qs) when not present.
         # Shape-specific required qualities are determined by _build_identity_items based on shape_family.
-        blocked = any(q not in (ITEM_Q_OK, ITEM_Q_MISSING) for q in required_qs)
-
+        blocked = any(q != ITEM_Q_OK for q in required_qs)
 
         status_reasons = []
         any_incomplete = False

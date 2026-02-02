@@ -255,12 +255,27 @@ def build_join_key_from_policy(*, domain_policy, identity_items=None, candidate_
             if k in kqv:
                 items.append(emit_key(k))
 
+    # Compute join_hash
+    join_hash = None
+    if (
+        len(items) == 1
+        and isinstance(items[0].get("k"), str)
+        and items[0]["k"].endswith("_def_hash")
+        and isinstance(items[0].get("v"), str)
+        and re.match(r"^[0-9a-f]{32}$", items[0]["v"])
+    ):
+        # Structured-domain invariant: def_hash IS the join_hash
+        join_hash = items[0]["v"]
+    else:
+        join_hash = phase2_join_hash(items)
+
     join_key = {
         "schema": (domain_policy or {}).get("join_key_schema"),
         "hash_alg": (domain_policy or {}).get("hash_alg"),
         "items": items,
-        "join_hash": phase2_join_hash(items),
+        "join_hash": join_hash,
     }
+
     if missing_required:
         join_key["missing_required"] = missing_required
 

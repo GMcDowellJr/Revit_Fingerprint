@@ -209,29 +209,33 @@ def extract(doc, ctx=None):
 
             identity_items = []
 
-            # Path for record_id and cosmetic reference only (not required for identity)
+            # Path is part of authoritative identity for this domain (name-derived, but required to reproduce sig_hash).
             path_v_raw = "Lines|{}".format(sc_name)
             path_v, path_q = canonicalize_str(path_v_raw)
+
+            identity_items = []
             required_qs = []
+
+            identity_items.append(make_identity_item("line_style.path", path_v, path_q))
 
             # Optional: weights
             wproj_v, wproj_q = canonicalize_int(w_proj)
             if wproj_q != ITEM_Q_OK:
                 status_v2 = STATUS_DEGRADED
                 status_reasons.append("weight_projection_missing_or_unreadable")
-            identity_items.append(make_identity_item("line_style.line_weight_projection", wproj_v, wproj_q))
+            identity_items.append(make_identity_item("line_style.weight.projection", wproj_v, wproj_q))
 
             # Line styles (subcategories under Lines) do not have a Cut lineweight surface in Revit UI.
             # Treat as not applicable; do not degrade.
-            wcut_v, wcut_q = (None, ITEM_Q_UNSUPPORTED)
-            identity_items.append(make_identity_item("line_style.weight.cut", wcut_v, wcut_q))
+            # wcut_v, wcut_q = (None, ITEM_Q_UNSUPPORTED)
+            # identity_items.append(make_identity_item("line_style.weight.cut", wcut_v, wcut_q))
 
             # Optional: color rgb
             rgb_v, rgb_q = canonicalize_str(None if rgb_sig in {S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE} else rgb_sig)
             if rgb_q != ITEM_Q_OK:
                 status_v2 = STATUS_DEGRADED
                 status_reasons.append("color_rgb_missing_or_unreadable")
-            identity_items.append(make_identity_item("line_style.color_rgb", rgb_v, rgb_q))
+            identity_items.append(make_identity_item("line_style.color.rgb", rgb_v, rgb_q))
 
             # Optional: pattern reference (sig_hash from line_patterns record.v2)
             lp_kind_v = None
@@ -277,6 +281,10 @@ def extract(doc, ctx=None):
 
             if is_solid:
                 lp_kind_v = "solid"
+                # Deterministic, non-referential sentinel so SOLID can join cleanly.
+                # This is NOT a UID/name/id and is stable across files.
+                lp_sig_hash_v = "SOLID"
+                lp_sig_hash_q = ITEM_Q_OK
             else:
                 lp_kind_v = "ref"
                 if lp_uid_to_sig_hash_v2 is None:
@@ -300,11 +308,13 @@ def extract(doc, ctx=None):
                         status_v2 = STATUS_DEGRADED
                         status_reasons.append("line_pattern_uid_missing")
 
-            # kind always present (optional key, but stable surface)
+            # kind always present (stable surface)
             kind_v, kind_q = canonicalize_str(lp_kind_v)
             if kind_q != ITEM_Q_OK:
                 status_v2 = STATUS_DEGRADED
                 status_reasons.append("pattern_kind_missing_or_unreadable")
+            identity_items.append(make_identity_item("line_style.pattern_ref.kind", kind_v, kind_q))
+
             # sig_hash item is always present so downstream tables have a stable column surface.
             # For SOLID or unresolved refs, v=None with q=ITEM_Q_MISSING.
             if lp_sig_hash_q == ITEM_Q_OK:
@@ -355,21 +365,21 @@ def extract(doc, ctx=None):
             p2_unknown = []
 
             # weights
-            p2_semantic.append(make_identity_item("line_style.line_weight_projection", wproj_v, wproj_q))
+            p2_semantic.append(make_identity_item("line_style.weight.projection", wproj_v, wproj_q))
 
             # pattern reference
-            p2_unknown.append(make_identity_item("line_style.pattern_ref.kind", kind_v, kind_q))
+            p2_semantic.append(make_identity_item("line_style.pattern_ref.kind", kind_v, kind_q))
             p2_semantic.append(make_identity_item("line_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
 
-            # color is behavioral (affects visual appearance)
+            # color is cosmetic (visual only; excluded from join-key candidates)
             rgb_p2_v, rgb_p2_q = phase2_qv_from_legacy_sentinel_str(rgb_sig, allow_empty=False)
-            p2_semantic.append(make_identity_item("line_style.color_rgb", rgb_p2_v, rgb_p2_q))
+            p2_cosmetic.append(make_identity_item("line_style.color.rgb", rgb_p2_v, rgb_p2_q))
 
-            # path is cosmetic (category name)
+            # path is cosmetic (name-derived) but emitted for clustering/labeling
             p2_cosmetic.extend(_phase2_build_join_key_items(sc_name))
 
             # cut weight is not surfaced for line styles; keep explicit as unknown partition for analysis.
-            p2_unknown.append(make_identity_item("line_style.weight.cut", wcut_v, wcut_q))
+            # p2_unknown.append(make_identity_item("line_style.weight.cut", wcut_v, wcut_q))
 
             rec_v2["phase2"] = {
                 "schema": "phase2.line_styles.v1",

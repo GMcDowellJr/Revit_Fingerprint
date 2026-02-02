@@ -305,7 +305,8 @@ def extract(doc, ctx=None):
                 stack_items.append(it)
 
         stack_items_sorted = phase2_sorted_items(stack_items)
-        stack_def_hash = phase2_join_hash(stack_items_sorted) if stack_items_sorted else None
+        # NOTE: empty stack is a valid definition state; emit a deterministic empty def_hash.
+        stack_def_hash = phase2_join_hash(stack_items_sorted) if stack_items_sorted is not None else None
 
         p2_semantic = []
         if stack_def_hash is not None:

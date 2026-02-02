@@ -37,8 +37,21 @@ from core.record_v2 import (
 from core.canon import canon_str
 
 
-_spec = importlib.util.find_spec("Autodesk.Revit.DB")
-if _spec is not None:
+import sys
+import importlib.util
+
+# Revit API detection:
+# In pythonnet / embedded contexts, Autodesk.Revit.DB may exist in sys.modules
+# with __spec__ unset, which causes importlib.util.find_spec to raise ValueError.
+_HAS_REVIT = "Autodesk.Revit.DB" in sys.modules
+if not _HAS_REVIT:
+    try:
+        _spec = importlib.util.find_spec("Autodesk.Revit.DB")
+    except ValueError:
+        _spec = None
+    _HAS_REVIT = _spec is not None
+
+if _HAS_REVIT:
     from Autodesk.Revit.DB import GraphicsStyleType, Category, OverrideGraphicSettings
 else:
     GraphicsStyleType = None

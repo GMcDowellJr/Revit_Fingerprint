@@ -4,27 +4,13 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+import hashlib
+import re
 
 
-def _is_uid_like_key(k: str) -> bool:
-    return bool(_UID_KEY_RE.search(k or ""))
-
-
-def _strip_last_dash_suffix(s: str) -> str:
-    """
-    If s contains dashes, remove the last dash and everything after it.
-    Example: 'aaa-bbb-ccc' -> 'aaa-bbb'
-    If no dash is present, return s unchanged.
-    """
-    if not s:
-        return s
-    i = s.rfind("-")
-    return s[:i] if i > -1 else s
-
-
-def _md5_utf8_join_pipe(parts: List[str]) -> str:
-    joined = "|".join(parts)
-    return hashlib.md5(joined.encode("utf-8")).hexdigest()
+# UID-ish key detection (best-effort). Used only to normalize UID-like values in identity items.
+# Note: exporter contract says sig_hash is already UID-free; this is for legacy/forensic normalization only.
+_UID_KEY_RE = re.compile(r"(?:^|[._-])uid(?:$|[._-])|uniqueid|unique_id", re.IGNORECASE)
 
 
 def _is_scalar(v: Any) -> bool:
@@ -193,37 +179,18 @@ def main() -> None:
 
                 # Trust upstream exporter: sig_hash is already UID-free by contract.
 
-                ib = r.get("identity_basis") if isinstance(r.get("identity_basis"), dict) else None
-                items = ib.get("items") if isinstance(ib, dict) else None
-                if isinstance(items, list):
-                    parts: List[str] = []
-                    for it in items:
-                        if not isinstance(it, dict):
-                            continue
-                        k = _safe_str(it.get("k"))
-                        v = _safe_str(it.get("v"))
+                records_rows.append({
+                    "file_id": file_id,
+                    "domain": domain,
+                    "record_id": record_id,
+                    "status": status,
+                    "identity_quality": identity_quality,
+                    "sig_hash": sig_hash,
+                    "label_display": _safe_str(r.get("label", {}).get("display")),
+                    "label_quality": _safe_str(r.get("label", {}).get("quality")),
+                    "label_provenance": _safe_str(r.get("label", {}).get("provenance")),
+                })
 
-                        # Normalize UID-like values by removing the last dash suffix
-                        if _is_uid_like_key(k):
-                            v = _strip_last_dash_suffix(v)
-
-                        parts.append(f"{k}={v}")
-
-                    # Deterministic order: sort by k then by full part string
-                    parts = sorted(parts, key=lambda p: p.lower())
-                    sig_hash_no_uid = _md5_utf8_join_pipe(parts)
-
-                 records_rows.append({
-                     "file_id": file_id,
-                     "domain": domain,
-                     "record_id": record_id,
-                     "status": status,
-                     "identity_quality": identity_quality,
-                     "sig_hash": sig_hash,
-                     "label_display": _safe_str(r.get("label", {}).get("display")),
-                     "label_quality": _safe_str(r.get("label", {}).get("quality")),
-                     "label_provenance": _safe_str(r.get("label", {}).get("provenance")),
-                 })
 
                 # status_reasons
                 sr = r.get("status_reasons")
@@ -310,8 +277,8 @@ def main() -> None:
             wrote_paths.append(_write_csv(
                 "records.csv",
                 records_rows,
-                 ["file_id", "domain", "record_id", "status", "identity_quality", "sig_hash",
-                  "label_display", "label_quality", "label_provenance"],
+                ["file_id", "domain", "record_id", "status", "identity_quality", "sig_hash",
+                 "label_display", "label_quality", "label_provenance"],
             ))
 
         if "status_reasons" in emit_set:

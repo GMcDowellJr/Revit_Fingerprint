@@ -70,8 +70,8 @@
       "join_key_schema": "line_styles.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "line_style.line_weight_projection",
-        "line_style.color_rgb",
+        "line_style.weight.projection",
+        "line_style.color.rgb",
         "line_style.pattern_ref.sig_hash"
       ],
       "optional_items": [],
@@ -297,49 +297,50 @@
         "If text_type.leader_arrowhead_sig_hash is unavailable for some records, treat as lower confidence rather than substituting uid/name."
       ]
     },
-    "view_filter_definitions": {
-      "join_key_schema": "view_filter_definitions.join_key.v2",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "vf.categories",
-        "vf.logic_root",
-        "vf.rule_count",
-        "vf.rules[].sig"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "vf.uid_or_namekey",
-        "vf.elem_id",
-        "label.components.name",
-        "label.display"
-      ],
-      "notes": [
-        "Definition-based identity is the ordered sequence of rule atoms plus logic_root and categories.",
-        "vf.rules[].sig means: include vf.rule[###].sig for indices 000..(vf.rule_count-1) in order (variable-length ordered sequence).",
-        "vf.rule[###].sig canonically binds vf.rule[###].kind + vf.rule[###].op + vf.rule[###].param_ref.id + vf.rule[###].value into a single atomic identity unit.",
-        "Names/labels and any UID-like identifiers are prohibited from joins for standards governance."
-      ]
-    },
-    "view_filter_applications_view_templates": {
-      "join_key_schema": "view_filter_applications_view_templates.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "vfa.filter_stack_count",
-        "vfa.stack[].filter_sig_hash"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "vfa.template_uid_or_namekey",
-        "vfa.template_elem_id",
-        "vfa.stack[].enabled"
-      ],
-      "notes": [
-        "Identity is definition-based: ordered filter-stack composition via referenced filter_sig_hash values.",
-        "vfa.stack[].filter_sig_hash means: include vfa.stack[###].filter_sig_hash for indices 000..(vfa.filter_stack_count-1) in order (variable-length ordered sequence).",
-        "Template identifiers are linkage/label only and must not participate in joins.",
-        "Enabled flags are behavioral modifiers and are excluded from join identity for standards governance."
-      ]
-    },
+	"view_filter_definitions": {
+	  "join_key_schema": "view_filter_definitions.join_key.v2",
+	  "hash_alg": "md5_utf8_join_pipe",
+	  "required_items": [
+		"vf.def_hash"
+	  ],
+	  "optional_items": [],
+	  "explicitly_excluded_items": [
+		"vf.uid_or_namekey",
+		"vf.elem_id",
+		"vf.categories",
+		"vf.logic_root",
+		"vf.rule_count",
+		"vf.rules[].sig",
+		"label.components.name",
+		"label.display"
+	  ],
+	  "notes": [
+		"Structured domain: join is performed on vf.def_hash only (definition bundle hash).",
+		"vf.def_hash is computed from canonical vf.categories + vf.logic_root + vf.rule_count + ordered vf.rule[###].sig, but those leaf inputs remain identity-only for forensics.",
+		"Names/labels and any UID-like identifiers are prohibited from joins for standards governance."
+	  ]
+	},
+	"view_filter_applications_view_templates": {
+	  "join_key_schema": "view_filter_applications_view_templates.join_key.v2",
+	  "hash_alg": "md5_utf8_join_pipe",
+	  "required_items": [
+		"vfa.stack_def_hash"
+	  ],
+	  "optional_items": [],
+	  "explicitly_excluded_items": [
+		"vfa.template_uid_or_namekey",
+		"vfa.template_elem_id",
+		"vfa.filter_stack_count",
+		"vfa.stack[].filter_sig_hash",
+		"vfa.stack[].visible",
+		"vfa.stack[].enabled"
+	  ],
+	  "notes": [
+		"Structured-sequence domain: join identity is the ordered filter-stack definition collapsed into vfa.stack_def_hash.",
+		"Leaf stack members and counts are authoritative identity (identity_basis) but must not participate in joins.",
+		"Template identifiers are labels/linkage only and are prohibited from joins."
+	  ]
+	},
     "object_styles": {
       "join_key_schema": "object_styles.join_key.v2",
       "hash_alg": "md5_utf8_join_pipe",
