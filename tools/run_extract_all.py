@@ -7,7 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def _ensure_dir(p: Path) -> None:
@@ -36,21 +36,51 @@ def _detect_surfaces(exports_dir: Path) -> Dict[str, int]:
     return {"details": details, "index": index, "legacy": legacy, "plain_json": plain, "total_json": len(names)}
 
 
-def _pick_sample_file(exports_dir: Path) -> Optional[Path]:
-    # Prefer details, then index, then non-legacy json, then legacy.
+def _merge_index_details(index_fp: Dict[str, Any], details_fp: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge index (metadata) and details (domain payloads) into a single fingerprint object."""
+    merged = {**index_fp}
+    for key, value in details_fp.items():
+        # Domain payloads don't start with underscore; index metadata does
+        if not key.startswith("_") and key not in merged:
+            merged[key] = value
+    return merged
+
+
+def _pick_sample_file(exports_dir: Path) -> Tuple[Optional[Path], Optional[Path]]:
+    """Pick sample files for domain inference.
+
+    Returns (index_path, details_path) tuple. Both may be None if no files found.
+    For split exports, returns both index and details paths.
+    For legacy/plain exports, returns (path, None).
+    """
     details = sorted(exports_dir.glob("*.details.json"))
-    if details:
-        return details[0]
     index = sorted(exports_dir.glob("*.index.json"))
+
+    if index and details:
+        # Split export: return first matching pair
+        index_by_stem = {p.stem.lower().replace('.index', ''): p for p in index}
+        details_by_stem = {p.stem.lower().replace('.details', ''): p for p in details}
+        for stem in sorted(index_by_stem.keys()):
+            if stem in details_by_stem:
+                return (index_by_stem[stem], details_by_stem[stem])
+        # Fallback: return first index even without matching details
+        return (index[0], details_by_stem.get(index[0].stem.lower().replace('.index', '')))
+
     if index:
-        return index[0]
+        return (index[0], None)
+
+    if details:
+        return (None, details[0])
+
     plain = sorted([p for p in exports_dir.glob("*.json") if not p.name.lower().endswith(".legacy.json")])
     if plain:
-        return plain[0]
+        return (plain[0], None)
+
     legacy = sorted(exports_dir.glob("*.legacy.json"))
     if legacy:
-        return legacy[0]
-    return None
+        return (legacy[0], None)
+
+    return (None, None)
 
 
 def _read_json(path: Path) -> Dict[str, Any]:
@@ -62,21 +92,41 @@ def _read_json(path: Path) -> Dict[str, Any]:
 
 
 def _infer_domains(exports_dir: Path) -> List[str]:
-    sample = _pick_sample_file(exports_dir)
-    if sample is None:
-        return []
-    fp = _read_json(sample)
+    """Infer domain names from sample export files.
 
+    Handles split exports by merging index + details for reliable domain discovery.
+    """
+    index_path, details_path = _pick_sample_file(exports_dir)
+
+    if index_path is None and details_path is None:
+        return []
+
+    # Load and potentially merge files
+    fp: Dict[str, Any] = {}
+    if index_path and details_path:
+        # Split export: merge index + details
+        sys.stderr.write("[INFO run_extract_all] Found split exports. Merging index + details for domain inference.\n")
+        index_fp = _read_json(index_path)
+        details_fp = _read_json(details_path)
+        fp = _merge_index_details(index_fp, details_fp)
+    elif index_path:
+        fp = _read_json(index_path)
+    elif details_path:
+        fp = _read_json(details_path)
+
+    # Try contract first (most reliable)
     c = fp.get("_contract")
     if isinstance(c, dict):
         doms = c.get("domains")
         if isinstance(doms, dict):
             return sorted([str(k) for k in doms.keys()])
 
+    # Try _domains (back-compat surface)
     d = fp.get("_domains")
     if isinstance(d, dict):
         return sorted([str(k) for k in d.keys()])
 
+    # Fallback: scan top-level keys for domain-like payloads
     out: List[str] = []
     for k, v in fp.items():
         if not isinstance(k, str) or k.startswith("_"):
