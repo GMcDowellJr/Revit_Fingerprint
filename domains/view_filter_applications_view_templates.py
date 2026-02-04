@@ -29,10 +29,14 @@ from core.record_v2 import (
     STATUS_DEGRADED,
     STATUS_OK,
     build_record_v2,
+    canonical_structural_fields,
     canonicalize_bool,
     canonicalize_int,
     canonicalize_str,
+    finalize_record_ids_for_domain,
     make_identity_item,
+    make_record_id_from_element,
+    make_record_id_structural,
     serialize_identity_items,
 )
 
@@ -108,17 +112,11 @@ def extract(doc, ctx=None):
 
     result["raw_count"] = len(col)
 
-    v2_records: List[Dict[str, Any]] = []
+    record_specs: List[Dict[str, Any]] = []
     v2_sig_hashes: List[str] = []
     v2_block_reasons: Dict[str, Any] = {}
 
     for v in col:
-        try:
-            elem_id = safe_str(getattr(getattr(v, "Id", None), "IntegerValue", ""))
-        except Exception:
-            elem_id = ""
-        record_id = elem_id or safe_str(id(v))
-
         try:
             name_raw = getattr(v, "Name", None)
         except Exception:
@@ -264,31 +262,35 @@ def extract(doc, ctx=None):
                 status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
         if blocked:
-            rec = build_record_v2(
-                domain="view_filter_applications_view_templates",
-                record_id=record_id,
-                status=STATUS_BLOCKED,
-                status_reasons=sorted(set(status_reasons)) or ["minima.required_not_ok"],
-                sig_hash=None,
-                identity_items=items_sorted,
-                required_qs=(),
-                label=label,
-            )
-            v2_block_reasons[f"record_blocked:{record_id}"] = True
+            status = STATUS_BLOCKED
+            status_reasons = sorted(set(status_reasons)) or ["minima.required_not_ok"]
+            sig_hash = None
         else:
             status = STATUS_DEGRADED if any_incomplete else STATUS_OK
             sig_hash = make_hash(serialize_identity_items(items_sorted))
-            rec = build_record_v2(
-                domain="view_filter_applications_view_templates",
-                record_id=record_id,
-                status=status,
-                status_reasons=sorted(set(status_reasons)),
-                sig_hash=sig_hash,
-                identity_items=items_sorted,
-                required_qs=required_qs,
-                label=label,
-            )
             v2_sig_hashes.append(sig_hash)
+
+        record_id = None
+        record_id_alg = None
+        record_id_base = None
+        record_id_sort_key = None
+
+        rid_info = make_record_id_from_element(v)
+        if rid_info:
+            record_id, record_id_alg = rid_info
+        else:
+            structural_fields = {
+                "template_name": safe_str(name_v or ""),
+                "identity_preimage": serialize_identity_items(items_sorted),
+            }
+            record_id_base, record_id_alg, _canon = make_record_id_structural(structural_fields)
+            record_id = record_id_base
+            record_id_sort_key = canonical_structural_fields(
+                {
+                    "label": label_display,
+                    "structural": structural_fields,
+                }
+            )
 
         # -----------------------------
         # Phase 2 (empirical, additive)
@@ -327,10 +329,6 @@ def extract(doc, ctx=None):
         join_items = list(items_sorted or [])
         if stack_def_hash is not None:
             join_items.append({"k": "vfa.stack_def_hash", "q": ITEM_Q_OK, "v": stack_def_hash})
-        rec["join_key"], _missing = build_join_key_from_policy(
-            domain_policy=pol,
-            identity_items=join_items,
-        )
 
         # Unknown: template element id may vary across files.
         try:
@@ -343,6 +341,57 @@ def extract(doc, ctx=None):
             {"k": "vfa.template_elem_id", "q": _eid_q, "v": _eid_v},
         ])
 
+        record_specs.append(
+            {
+                "domain": "view_filter_applications_view_templates",
+                "record_id": record_id,
+                "record_id_alg": record_id_alg,
+                "record_id_base": record_id_base,
+                "record_id_sort_key": record_id_sort_key,
+                "status": status,
+                "status_reasons": sorted(set(status_reasons)),
+                "sig_hash": sig_hash,
+                "identity_items": items_sorted,
+                "required_qs": required_qs,
+                "label": label,
+                "phase2_payload": {
+                    "stack_items": stack_items,
+                    "stack_def_hash": stack_def_hash,
+                    "p2_unknown": p2_unknown,
+                    "p2_semantic": p2_semantic,
+                    "join_key_policy": pol,
+                },
+                "join_items": join_items,
+            }
+        )
+
+    finalize_record_ids_for_domain(record_specs)
+
+    v2_records: List[Dict[str, Any]] = []
+    for spec in record_specs:
+        rec = build_record_v2(
+            domain=spec["domain"],
+            record_id=spec["record_id"],
+            record_id_alg=spec["record_id_alg"],
+            status=spec["status"],
+            status_reasons=spec["status_reasons"],
+            sig_hash=spec["sig_hash"],
+            identity_items=spec["identity_items"],
+            required_qs=spec["required_qs"],
+            label=spec["label"],
+        )
+
+        pol = spec["phase2_payload"]["join_key_policy"]
+        rec["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=spec["join_items"],
+        )
+
+        stack_items_sorted = phase2_sorted_items(spec["phase2_payload"]["stack_items"])
+        stack_def_hash = spec["phase2_payload"]["stack_def_hash"]
+        p2_semantic = spec["phase2_payload"].get("p2_semantic", [])
+        p2_unknown = spec["phase2_payload"]["p2_unknown"]
+
         rec["phase2"] = {
             "schema": "phase2.view_filter_applications_view_templates.v1",
             "grouping_basis": "phase2.hypothesis",
@@ -351,6 +400,9 @@ def extract(doc, ctx=None):
             "coordination_items": phase2_sorted_items([]),
             "unknown_items": p2_unknown,
         }
+
+        if rec["status"] == STATUS_BLOCKED:
+            v2_block_reasons[f"record_blocked:{rec['record_id']}"] = True
 
         v2_records.append(rec)
 

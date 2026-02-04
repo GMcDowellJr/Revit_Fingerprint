@@ -39,9 +39,13 @@ from core.record_v2 import (
     STATUS_DEGRADED,
     STATUS_OK,
     build_record_v2,
+    canonical_structural_fields,
     canonicalize_int,
     canonicalize_str,
+    finalize_record_ids_for_domain,
     make_identity_item,
+    make_record_id_from_element,
+    make_record_id_structural,
     serialize_identity_items,
 )
 
@@ -52,8 +56,6 @@ from core.phase2 import (
 
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
-
-import json
 
 def _logic_root_token(elem_filter) -> Tuple[Optional[str], str]:
     """Return (v, q) for vf.logic_root."""
@@ -240,20 +242,12 @@ def extract(doc, ctx=None):
 
     result["raw_count"] = len(col)
 
-    v2_records: List[Dict[str, Any]] = []
+    record_specs: List[Dict[str, Any]] = []
     v2_sig_hashes: List[str] = []
     v2_block_reasons: Dict[str, Any] = {}
-
     uid_to_sig_hash: Dict[str, str] = {}
 
     for f in col:
-        try:
-            elem_id = safe_str(getattr(getattr(f, "Id", None), "IntegerValue", ""))
-        except Exception:
-            elem_id = ""
-
-        record_id = elem_id or safe_str(id(f))
-
         try:
             name_raw = getattr(f, "Name", None)
         except Exception:
@@ -318,6 +312,7 @@ def extract(doc, ctx=None):
 
         # Rules
         rules: List[Dict[str, Any]] = []
+        structural_rules: List[Dict[str, Any]] = []
         ok_tree, tree_reason = _walk_rules(elem_filter, rules, doc)
         if not ok_tree and tree_reason:
             status_reasons.append(tree_reason)
@@ -356,6 +351,17 @@ def extract(doc, ctx=None):
             identity_items.append(make_identity_item(f"vf.rule[{idx3}].param_ref.kind", pk_v, pk_q))
             identity_items.append(make_identity_item(f"vf.rule[{idx3}].param_ref.id", pi_v, pi_q))
             status_reasons.extend(add_reasons)
+            structural_rules.append(
+                {
+                    "kind": safe_str(kind_cv or ""),
+                    "value": val_v,
+                    "value_q": safe_str(val_q),
+                    "op": safe_str(op_v or ""),
+                    "param_kind": safe_str(pk_v or ""),
+                    "param_id": safe_str(pi_v or ""),
+                    "param_id_q": safe_str(pi_q),
+                }
+            )
 
             # Derived rule atom: bind op + param_ref.id + value (+ kind) into a single definition unit.
             # Canonical form is JSON to avoid delimiter/escaping ambiguities.
@@ -402,35 +408,43 @@ def extract(doc, ctx=None):
                 status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
         if blocked:
-            rec = build_record_v2(
-                domain="view_filter_definitions",
-                record_id=record_id,
-                status=STATUS_BLOCKED,
-                status_reasons=sorted(set(status_reasons)) or ["minima.required_not_ok"],
-                sig_hash=None,
-                identity_items=items_sorted,
-                required_qs=(),
-                label=label,
-            )
-            v2_block_reasons[f"record_blocked:{record_id}"] = True
+            status = STATUS_BLOCKED
+            status_reasons = sorted(set(status_reasons)) or ["minima.required_not_ok"]
+            sig_hash = None
         else:
             status = STATUS_DEGRADED if any_incomplete else STATUS_OK
             sig_hash = make_hash(serialize_identity_items(items_sorted))
-            rec = build_record_v2(
-                domain="view_filter_definitions",
-                record_id=record_id,
-                status=status,
-                status_reasons=sorted(set(status_reasons)),
-                sig_hash=sig_hash,
-                identity_items=items_sorted,
-                required_qs=required_qs,
-                label=label,
-            )
             v2_sig_hashes.append(sig_hash)
 
-            # Downstream mapping (UniqueId only)
-            if uid_v is not None and uid_q == ITEM_Q_OK:
-                uid_to_sig_hash[uid_v] = sig_hash
+        record_id = None
+        record_id_alg = None
+        record_id_base = None
+        record_id_sort_key = None
+
+        rid_info = make_record_id_from_element(f)
+        if rid_info:
+            record_id, record_id_alg = rid_info
+        else:
+            structural_fields = {
+                "name": safe_str(name_v or ""),
+                "categories": safe_str(cats_v or ""),
+                "logic_root": safe_str(logic_v or ""),
+                "rule_count": safe_str(rc_v or ""),
+                "rules": structural_rules,
+            }
+            record_id_base, record_id_alg, _canon = make_record_id_structural(structural_fields)
+            record_id = record_id_base
+            record_id_sort_key = canonical_structural_fields(
+                {
+                    "label": label_display,
+                    "structural": structural_fields,
+                    "identity_preimage": serialize_identity_items(items_sorted),
+                }
+            )
+
+        # Downstream mapping (UniqueId only)
+        if uid_v is not None and uid_q == ITEM_Q_OK and sig_hash:
+            uid_to_sig_hash[uid_v] = sig_hash
 
         # -----------------------------
         # Phase 2 (empirical, additive)
@@ -454,10 +468,6 @@ def extract(doc, ctx=None):
 
         # Join key must be built ONLY from policy-visible candidate surfaces (Phase 2 semantic items).
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "view_filter_definitions")
-        rec["join_key"], _missing = build_join_key_from_policy(
-            domain_policy=pol,
-            identity_items=p2_semantic,
-        )
 
         # Unknown: element-backed id may vary across files.
         try:
@@ -470,6 +480,51 @@ def extract(doc, ctx=None):
             {"k": "vf.elem_id", "q": _eid_q, "v": _eid_v},
         ])
 
+        record_specs.append(
+            {
+                "domain": "view_filter_definitions",
+                "record_id": record_id,
+                "record_id_alg": record_id_alg,
+                "record_id_base": record_id_base,
+                "record_id_sort_key": record_id_sort_key,
+                "status": status,
+                "status_reasons": sorted(set(status_reasons)),
+                "sig_hash": sig_hash,
+                "identity_items": items_sorted,
+                "required_qs": required_qs,
+                "label": label,
+                "phase2_payload": {
+                    "p2_semantic": p2_semantic,
+                    "p2_unknown": p2_unknown,
+                    "join_key_policy": pol,
+                },
+            }
+        )
+
+    finalize_record_ids_for_domain(record_specs)
+
+    v2_records: List[Dict[str, Any]] = []
+    for spec in record_specs:
+        rec = build_record_v2(
+            domain=spec["domain"],
+            record_id=spec["record_id"],
+            record_id_alg=spec["record_id_alg"],
+            status=spec["status"],
+            status_reasons=spec["status_reasons"],
+            sig_hash=spec["sig_hash"],
+            identity_items=spec["identity_items"],
+            required_qs=spec["required_qs"],
+            label=spec["label"],
+        )
+        if rec["status"] == STATUS_BLOCKED:
+            v2_block_reasons[f"record_blocked:{rec['record_id']}"] = True
+        pol = spec["phase2_payload"]["join_key_policy"]
+        p2_semantic = spec["phase2_payload"]["p2_semantic"]
+        p2_unknown = spec["phase2_payload"]["p2_unknown"]
+        rec["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=p2_semantic,
+        )
         rec["phase2"] = {
             "schema": "phase2.view_filter_definitions.v1",
             "grouping_basis": "phase2.hypothesis",

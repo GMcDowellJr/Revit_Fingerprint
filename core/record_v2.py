@@ -14,8 +14,12 @@ It must NOT change existing domain outputs by itself.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+from core.hashing import safe_str
 
 
 # =========================
@@ -258,6 +262,153 @@ def canonicalize_enum(v: Any) -> Tuple[Optional[str], str]:
 
 
 # =========================
+# Record ID helpers
+# =========================
+
+def make_record_id_from_element(elem: Any) -> Optional[Tuple[str, str]]:
+    """Create a stable record_id from a Revit element.
+
+    Priority:
+      1) UniqueId -> "uid:<UniqueId>"
+      2) ElementId.IntegerValue -> "eid:<int>"
+
+    Returns:
+        (record_id, record_id_alg) or None if unavailable.
+    """
+    if elem is None:
+        return None
+
+    uid_raw = None
+    try:
+        uid_raw = getattr(elem, "UniqueId", None)
+    except Exception:
+        uid_raw = None
+    uid_v, uid_q = canonicalize_str(uid_raw)
+    if uid_q == ITEM_Q_OK and uid_v:
+        return f"uid:{uid_v}", "revit_uniqueid_v1"
+
+    eid_raw = None
+    try:
+        eid_raw = getattr(getattr(elem, "Id", None), "IntegerValue", None)
+    except Exception:
+        eid_raw = None
+    eid_v, eid_q = canonicalize_int(eid_raw)
+    if eid_q == ITEM_Q_OK and eid_v:
+        return f"eid:{eid_v}", "revit_elementid_v1"
+
+    return None
+
+
+def _canonical_structural_value(v: Any) -> Any:
+    if v is None or isinstance(v, (str, int, bool)):
+        return v
+
+    if isinstance(v, float):
+        if not math.isfinite(v):
+            raise ValueError("non-finite float in structural fields")
+        return format(v, ".9f")
+
+    if isinstance(v, (list, tuple)):
+        return [_canonical_structural_value(x) for x in v]
+
+    if isinstance(v, (set, frozenset)):
+        canon = [_canonical_structural_value(x) for x in v]
+        return sorted(canon, key=lambda x: json.dumps(x, sort_keys=True, separators=(",", ":"), ensure_ascii=True))
+
+    if isinstance(v, dict):
+        out: Dict[str, Any] = {}
+        for k in sorted(v.keys(), key=lambda x: str(x)):
+            out[str(k)] = _canonical_structural_value(v[k])
+        return out
+
+    raise ValueError(f"unsupported structural field type: {type(v)}")
+
+
+def canonical_structural_fields(fields: Dict[str, Any]) -> str:
+    """Canonicalize structural fields into a deterministic JSON string."""
+    if not isinstance(fields, dict):
+        raise TypeError("structural fields must be a dict")
+    canon = _canonical_structural_value(fields)
+    return json.dumps(canon, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def make_record_id_structural(structural_fields: Dict[str, Any]) -> Tuple[str, str, str]:
+    """Create a structural-hash record_id base and canonical preimage."""
+    canon = canonical_structural_fields(structural_fields)
+    digest = hashlib.md5(canon.encode("utf-8")).hexdigest()
+    return f"sh1:{digest}", "structural_hash_v1", canon
+
+
+def _default_record_id_secondary_key(rec: Dict[str, Any]) -> str:
+    items = rec.get("identity_items")
+    preimage = serialize_identity_items(items) if isinstance(items, (list, tuple)) else []
+    label = rec.get("label", {}) if isinstance(rec.get("label"), dict) else {}
+    label_display = safe_str(label.get("display", ""))
+    return canonical_structural_fields(
+        {
+            "label_display": label_display,
+            "identity_preimage": preimage,
+            "status": safe_str(rec.get("status", "")),
+            "status_reasons": sorted([safe_str(x) for x in rec.get("status_reasons", []) if x]),
+        }
+    )
+
+
+def finalize_record_ids_for_domain(records: List[Dict[str, Any]]) -> None:
+    """Assign dup_index for structural record_id groups deterministically.
+
+    Mutates records in-place. Expects structural candidates to include:
+      - record_id_alg == "structural_hash_v1"
+      - record_id_base
+      - record_id_sort_key (string)
+    """
+    groups: Dict[str, List[Dict[str, Any]]] = {}
+    for rec in records:
+        if rec.get("record_id_alg") == "structural_hash_v1":
+            base_id = rec.get("record_id_base") or rec.get("record_id")
+            if base_id:
+                rec["record_id_base"] = base_id
+                groups.setdefault(base_id, []).append(rec)
+
+    for base_id, group in groups.items():
+        if len(group) == 1:
+            group[0]["record_id"] = base_id
+            continue
+
+        for rec in group:
+            if not isinstance(rec.get("record_id_sort_key"), str):
+                rec["record_id_sort_key"] = None
+            if not isinstance(rec.get("record_id_sort_key_secondary"), str):
+                rec["record_id_sort_key_secondary"] = _default_record_id_secondary_key(rec)
+
+        keys = [
+            (rec.get("record_id_sort_key"), rec.get("record_id_sort_key_secondary"))
+            for rec in group
+        ]
+        if any(k[0] is None or k[1] is None for k in keys):
+            for rec in group:
+                _block_record_for_unstable_id(rec)
+            continue
+
+        if len(set(keys)) < len(group):
+            for rec in group:
+                _block_record_for_unstable_id(rec)
+            continue
+
+        group_sorted = sorted(group, key=lambda r: (r["record_id_sort_key"], r["record_id_sort_key_secondary"]))
+        for idx, rec in enumerate(group_sorted):
+            rec["record_id"] = f"{base_id}:{idx:03d}"
+
+
+def _block_record_for_unstable_id(rec: Dict[str, Any]) -> None:
+    reasons = set([safe_str(x) for x in rec.get("status_reasons", []) if x])
+    reasons.add("unstable_record_id_no_structural_key")
+    rec["status"] = STATUS_BLOCKED
+    rec["status_reasons"] = sorted(reasons)
+    rec["sig_hash"] = None
+
+
+# =========================
 # Identity item construction + serialization
 # =========================
 
@@ -380,6 +531,8 @@ def build_record_v2(
     *,
     domain: str,
     record_id: str,
+    record_id_alg: str = "legacy_unspecified_v1",
+    record_id_scope: str = "file_local",
     status: str,
     status_reasons: Sequence[str],
     sig_hash: Optional[str],
@@ -421,6 +574,8 @@ def build_record_v2(
         "schema_version": schema_version,
         "domain": str(domain),
         "record_id": str(record_id),
+        "record_id_alg": str(record_id_alg),
+        "record_id_scope": str(record_id_scope),
         "status": status,
         "status_reasons": [str(x) for x in status_reasons],
         "sig_hash": sig_hash,
