@@ -437,28 +437,101 @@ def write_csv(path: Path, rows: List[Dict[str, Any]], fieldnames: List[str]) -> 
 # Main analysis
 # -------------------------
 
+def _merge_index_details(index_fp: Dict[str, Any], details_fp: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge index (metadata) and details (domain payloads) into a single fingerprint object."""
+    merged = {**index_fp}
+    for key, value in details_fp.items():
+        # Domain payloads don't start with underscore; index metadata does
+        if not key.startswith("_") and key not in merged:
+            merged[key] = value
+    return merged
+
+
 def analyze(input_dir: Path, cfg: RunConfig, seed_path: Optional[Path], out_dir: Path) -> None:
     details = sorted([p for p in input_dir.glob("*.details.json") if p.is_file()])
     index = sorted([p for p in input_dir.glob("*.index.json") if p.is_file()])
     legacy = sorted([p for p in input_dir.glob("*.legacy.json") if p.is_file()])
 
-    if details:
-        json_paths = details
+    # Load seed fingerprint (may need merge if split)
+    seed_fp: Optional[Dict[str, Any]] = None
+    if seed_path:
+        seed_fp = load_json(seed_path)
+        # Check if seed is a split export and needs merging
+        seed_stem = seed_path.stem.replace('.index', '').replace('.details', '')
+        if seed_path.name.endswith('.index.json'):
+            # Look for matching details
+            seed_details_path = seed_path.parent / f"{seed_stem}.details.json"
+            if seed_details_path.exists():
+                seed_fp = _merge_index_details(seed_fp, load_json(seed_details_path))
+        elif seed_path.name.endswith('.details.json'):
+            # Look for matching index
+            seed_index_path = seed_path.parent / f"{seed_stem}.index.json"
+            if seed_index_path.exists():
+                seed_fp = _merge_index_details(load_json(seed_index_path), seed_fp)
+    seed_domains = extract_domains_summary(seed_fp) if seed_fp else {}
+
+    # Load all projects
+    projects: List[Dict[str, Any]] = []
+
+    if details and index:
+        # SPLIT EXPORT: Load both and merge
+        sys.stderr.write("[INFO phase1_domain_authority] Found split exports. Merging index + details.\n")
+        if legacy:
+            sys.stderr.write(
+                "[WARN phase1_domain_authority] legacy bundle(s) present but ignored by default (split exports present).\n"
+            )
+
+        index_by_stem = {p.stem.replace('.index', ''): p for p in index}
+        details_by_stem = {p.stem.replace('.details', ''): p for p in details}
+
+        for stem in sorted(set(index_by_stem.keys()) | set(details_by_stem.keys())):
+            if stem not in index_by_stem:
+                sys.stderr.write(f"[WARN phase1_domain_authority] Missing index for '{stem}', skipping.\n")
+                continue
+
+            index_fp = load_json(index_by_stem[stem])
+            details_fp = load_json(details_by_stem[stem]) if stem in details_by_stem else {}
+
+            # Merge: index provides metadata, details provides domain payloads
+            fp = _merge_index_details(index_fp, details_fp)
+
+            pid = project_id_from_fp(fp, fallback=stem)
+            domains = extract_domains_summary(fp)
+            projects.append({"project_id": pid, "path": str(index_by_stem[stem]), "fp": fp, "domains": domains})
+
+    elif details:
+        # DETAILS ONLY: Domain payloads without metadata (degraded mode)
+        sys.stderr.write(
+            "[WARN phase1_domain_authority] Found details but no index. Metadata extraction may fail.\n"
+        )
         if legacy:
             sys.stderr.write(
                 "[WARN phase1_domain_authority] legacy bundle(s) present but ignored by default (details present).\n"
             )
+        for p in details:
+            fp = load_json(p)
+            pid = project_id_from_fp(fp, fallback=p.stem.replace('.details', ''))
+            domains = extract_domains_summary(fp)
+            projects.append({"project_id": pid, "path": str(p), "fp": fp, "domains": domains})
+
     elif index:
-        json_paths = index
+        # INDEX ONLY: Metadata but no records (degraded mode)
+        sys.stderr.write(
+            "[WARN phase1_domain_authority] No *.details.json found; using *.index.json "
+            "(semantic multiset clustering will be degraded).\n"
+        )
         if legacy:
             sys.stderr.write(
                 "[WARN phase1_domain_authority] legacy bundle(s) present but ignored by default (index present).\n"
             )
-        sys.stderr.write(
-            "[WARN phase1_domain_authority] No *.details.json found; using *.index.json "
-            "(semantic multiset clustering may be degraded).\n"
-        )
+        for p in index:
+            fp = load_json(p)
+            pid = project_id_from_fp(fp, fallback=p.stem.replace('.index', ''))
+            domains = extract_domains_summary(fp)
+            projects.append({"project_id": pid, "path": str(p), "fp": fp, "domains": domains})
+
     else:
+        # FALLBACK: Generic *.json (legacy/monolithic)
         json_paths = sorted(
             [p for p in input_dir.glob("*.json") if p.is_file() and not str(p).lower().endswith(".legacy.json")]
         )
@@ -472,19 +545,17 @@ def analyze(input_dir: Path, cfg: RunConfig, seed_path: Optional[Path], out_dir:
                 "[WARN phase1_domain_authority] No split exports found; falling back to *.json excluding legacy.\n"
             )
 
-    if not json_paths:
+        if not json_paths:
+            raise SystemExit(f"No compatible export JSON files found in: {input_dir}")
+
+        for p in json_paths:
+            fp = load_json(p)
+            pid = project_id_from_fp(fp, fallback=p.stem)
+            domains = extract_domains_summary(fp)
+            projects.append({"project_id": pid, "path": str(p), "fp": fp, "domains": domains})
+
+    if not projects:
         raise SystemExit(f"No compatible export JSON files found in: {input_dir}")
-
-    seed_fp: Optional[Dict[str, Any]] = load_json(seed_path) if seed_path else None
-    seed_domains = extract_domains_summary(seed_fp) if seed_fp else {}
-
-    # Load all projects
-    projects: List[Dict[str, Any]] = []
-    for p in json_paths:
-        fp = load_json(p)
-        pid = project_id_from_fp(fp, fallback=p.stem)
-        domains = extract_domains_summary(fp)
-        projects.append({"project_id": pid, "path": str(p), "fp": fp, "domains": domains})
 
     # Determine domains in scope
     if cfg.domains_in_scope:

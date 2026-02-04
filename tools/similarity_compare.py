@@ -1037,7 +1037,22 @@ def write_details_json(details: List[SimilarityDetail], out_path: str) -> None:
 # Batch drivers
 # -----------------------------
 
+def _merge_index_details_raw(index_raw: Dict[str, Any], details_raw: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge index (metadata) and details (domain payloads) into a single fingerprint object."""
+    merged = {**index_raw}
+    for key, value in details_raw.items():
+        # Domain payloads don't start with underscore; index metadata does
+        if not key.startswith("_") and key not in merged:
+            merged[key] = value
+    return merged
+
+
 def find_json_files(dir_path: str) -> List[str]:
+    """Find JSON files in a directory.
+
+    NOTE: For split exports (index + details), consider using load_fingerprints_from_dir()
+    instead which properly merges split files.
+    """
     p = Path(dir_path)
     if not p.exists() or not p.is_dir():
         raise ValueError(f"not_a_directory: {dir_path}")
@@ -1070,6 +1085,247 @@ def find_json_files(dir_path: str) -> List[str]:
         legacy.sort()
         return legacy
     return files
+
+
+def load_fingerprints_from_dir(dir_path: str) -> Dict[str, FingerprintData]:
+    """Load all fingerprints from a directory, handling split exports by merging index + details."""
+    p = Path(dir_path)
+    if not p.exists() or not p.is_dir():
+        raise ValueError(f"not_a_directory: {dir_path}")
+
+    details = sorted([x for x in p.glob("*.details.json") if x.is_file()])
+    index = sorted([x for x in p.glob("*.index.json") if x.is_file()])
+    legacy = sorted([x for x in p.glob("*.legacy.json") if x.is_file()])
+
+    fps: Dict[str, FingerprintData] = {}
+
+    if details and index:
+        # SPLIT EXPORT: Merge index + details
+        sys.stderr.write("[INFO similarity_compare] Found split exports. Merging index + details.\n")
+        if legacy:
+            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default (split exports present).\n")
+
+        # Build stem-to-path mappings
+        index_by_stem = {x.stem.lower().replace('.index', ''): x for x in index}
+        details_by_stem = {x.stem.lower().replace('.details', ''): x for x in details}
+
+        for stem in sorted(set(index_by_stem.keys()) | set(details_by_stem.keys())):
+            if stem not in index_by_stem:
+                sys.stderr.write(f"[WARN similarity_compare] Missing index for '{stem}', skipping.\n")
+                continue
+
+            index_path = index_by_stem[stem]
+            try:
+                index_raw = json.loads(index_path.read_text(encoding="utf-8"))
+            except Exception as e:
+                fps[str(index_path)] = FingerprintData(
+                    path=os.path.basename(str(index_path)),
+                    ok=False,
+                    error=f"unreadable_index_json: {type(e).__name__}: {e}",
+                    domains={}
+                )
+                continue
+
+            details_raw: Dict[str, Any] = {}
+            if stem in details_by_stem:
+                details_path = details_by_stem[stem]
+                try:
+                    details_raw = json.loads(details_path.read_text(encoding="utf-8"))
+                except Exception as e:
+                    sys.stderr.write(f"[WARN similarity_compare] Could not load details for '{stem}': {e}\n")
+
+            # Merge index + details
+            merged_raw = _merge_index_details_raw(index_raw, details_raw)
+
+            # Parse the merged fingerprint
+            fp = _parse_fingerprint_data(merged_raw, str(index_path))
+            fps[str(index_path)] = fp
+
+    elif details:
+        # DETAILS ONLY: Domain payloads without metadata (degraded mode)
+        sys.stderr.write("[WARN similarity_compare] Found details but no index. Metadata extraction may fail.\n")
+        if legacy:
+            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default (details present).\n")
+        for fpath in details:
+            fps[str(fpath)] = load_fingerprint(str(fpath))
+
+    elif index:
+        # INDEX ONLY: Metadata but no records (degraded mode)
+        sys.stderr.write("[WARN similarity_compare] No *.details.json found; using *.index.json (signature multiset metric may be undefined).\n")
+        if legacy:
+            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default (index present).\n")
+        for fpath in index:
+            fps[str(fpath)] = load_fingerprint(str(fpath))
+
+    else:
+        # FALLBACK: Generic *.json (legacy/monolithic)
+        files = sorted([x for x in p.glob("*.json") if x.is_file() and not str(x).lower().endswith(".legacy.json")])
+        if legacy and files:
+            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default.\n")
+        if legacy and not files:
+            sys.stderr.write("[WARN similarity_compare] only legacy bundle(s) found; results may be incomplete.\n")
+            files = legacy
+        for fpath in files:
+            fps[str(fpath)] = load_fingerprint(str(fpath))
+
+    return fps
+
+
+def _parse_fingerprint_data(raw: Dict[str, Any], path: str) -> FingerprintData:
+    """Parse raw JSON dict into FingerprintData (extracted for reuse with merged data)."""
+    p = Path(path)
+    domains_obj = _extract_domains_obj(raw)
+    if domains_obj is None:
+        return FingerprintData(path=os.path.basename(str(p)), ok=False, error="missing_domains_object", domains={})
+
+    # Detect whether this is the new contract (domains_obj == raw["_domains"])
+    is_new_contract = isinstance(raw.get("_domains"), dict) and domains_obj is raw.get("_domains")
+
+    domains: Dict[str, DomainData] = {}
+
+    if is_new_contract:
+        # domains_obj provides meta (status/hash/reasons); per-domain payload is at top-level key with same name.
+        for dname, meta in domains_obj.items():
+            if not isinstance(dname, str):
+                dname = str(dname)
+
+            if not isinstance(meta, dict):
+                domains[dname] = DomainData(
+                    name=dname,
+                    status=STATUS_BLOCKED,
+                    domain_hash=None,
+                    sig_hashes=None,
+                    unreadable=True,
+                    missing=False,
+                    reason=f"domain_meta_not_object:{type(meta).__name__}",
+                )
+                continue
+
+            status = _extract_domain_status(meta)
+            dhash = _extract_domain_hash(meta)
+
+            payload = raw.get(dname, None)
+            if payload is None:
+                # Domain exists in _domains but has no payload key (distinct from blocked/unreadable)
+                reason = None
+                for rk in ("reason", "block_reason", "degrade_reason", "error"):
+                    rv = meta.get(rk)
+                    if isinstance(rv, str) and rv.strip():
+                        reason = rv.strip()
+                        break
+                if reason is None:
+                    br = meta.get("block_reasons")
+                    if isinstance(br, list) and br:
+                        reason = f"block_reasons:{br[0]}"
+                domains[dname] = DomainData(
+                    name=dname,
+                    status=status,
+                    domain_hash=dhash,
+                    sig_hashes=None,
+                    unreadable=False,
+                    missing=True,
+                    reason=reason or "missing_domain_payload_key",
+                )
+                continue
+
+            if not isinstance(payload, dict):
+                domains[dname] = DomainData(
+                    name=dname,
+                    status=status,
+                    domain_hash=dhash,
+                    sig_hashes=None,
+                    unreadable=True,
+                    missing=False,
+                    reason=f"domain_payload_not_object:{type(payload).__name__}",
+                )
+                continue
+
+            sigs = _extract_sig_hashes(payload, dname)
+            sig_label_meta = _extract_sig_label_meta(payload)
+
+            # Capture a reason string if present (meta first, then payload)
+            reason = None
+            for src in (meta, payload):
+                for rk in ("reason", "block_reason", "degrade_reason", "error"):
+                    rv = src.get(rk)
+                    if isinstance(rv, str) and rv.strip():
+                        reason = rv.strip()
+                        break
+                if reason:
+                    break
+            if reason is None:
+                br = meta.get("block_reasons")
+                if isinstance(br, list) and br:
+                    reason = f"block_reasons:{br[0]}"
+
+            domains[dname] = DomainData(
+                name=dname,
+                status=status,
+                domain_hash=dhash,
+                sig_hashes=sigs,
+                unreadable=False,
+                missing=False,
+                reason=reason,
+                sig_label_meta=sig_label_meta,
+            )
+
+        return FingerprintData(path=os.path.basename(str(p)), ok=True, error=None, domains=domains)
+
+    # Legacy path: domains_obj is already per-domain payload
+    for dname, dpayload in domains_obj.items():
+        if not isinstance(dname, str):
+            dname = str(dname)
+
+        if dpayload is None:
+            domains[dname] = DomainData(
+                name=dname,
+                status=STATUS_BLOCKED,
+                domain_hash=None,
+                sig_hashes=None,
+                unreadable=False,
+                missing=True,
+                reason="domain_payload_null",
+            )
+            continue
+
+        if not isinstance(dpayload, dict):
+            domains[dname] = DomainData(
+                name=dname,
+                status=STATUS_BLOCKED,
+                domain_hash=None,
+                sig_hashes=None,
+                unreadable=True,
+                missing=False,
+                reason=f"domain_payload_not_object:{type(dpayload).__name__}",
+            )
+            continue
+
+        status = _extract_domain_status(dpayload)
+        dhash = _extract_domain_hash(dpayload)
+        sigs = _extract_sig_hashes(dpayload, dname)
+        sig_label_meta = _extract_sig_label_meta(dpayload)
+
+        missing = False
+        unreadable = False
+        reason = None
+        for rk in ("reason", "block_reason", "degrade_reason", "error"):
+            rv = dpayload.get(rk)
+            if isinstance(rv, str) and rv.strip():
+                reason = rv.strip()
+                break
+
+        domains[dname] = DomainData(
+            name=dname,
+            status=status,
+            domain_hash=dhash,
+            sig_hashes=sigs,
+            unreadable=unreadable,
+            missing=missing,
+            reason=reason,
+            sig_label_meta=sig_label_meta,
+        )
+
+    return FingerprintData(path=str(p), ok=True, error=None, domains=domains)
 
 
 def write_csv(results: List[SimilarityResult], out_path: str) -> None:
@@ -1182,12 +1438,9 @@ File format notes:
 
     args = ap.parse_args()
 
-    # Discover only direct children JSONs (non-recursive)
-    json_files = find_json_files(args.dir)
-
-    fps: Dict[str, FingerprintData] = {}
-    for fpath in json_files:
-        fps[fpath] = load_fingerprint(fpath)
+    # Discover and load all fingerprints (handles split export merging)
+    fps = load_fingerprints_from_dir(args.dir)
+    json_files = sorted(fps.keys())
 
     out_base = Path(args.dir) / "similarity"
     out_base.mkdir(parents=True, exist_ok=True)
