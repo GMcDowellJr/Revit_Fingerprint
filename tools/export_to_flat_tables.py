@@ -171,11 +171,29 @@ def main() -> None:
 
         for domain in domains:
             recs = _get_domain_records(data, domain)
-            for r in recs:
-                record_id = _safe_str(r.get("record_id"))
+            for rec_ordinal, r in enumerate(recs):
+                record_ordinal = f"{rec_ordinal:06d}"
+                record_pk = f"{file_id}|{domain}|{record_ordinal}"
+
+                record_id = _safe_str(r.get("record_id") or r.get("id") or r.get("name"))
                 status = _safe_str(r.get("status"))
                 identity_quality = _safe_str(r.get("identity_quality"))
-                sig_hash = _safe_str(r.get("sig_hash"))
+                sig_hash = _safe_str(
+                    r.get("sig_hash")
+                    or (
+                        r.get("identity_basis", {}).get("sig_hash")
+                        if isinstance(r.get("identity_basis"), dict)
+                        else None
+                    )
+                )
+
+                join_key = r.get("join_key")
+
+                join_hash = None
+                join_key_schema = None
+                if isinstance(join_key, dict):
+                    join_hash = _safe_str(join_key.get("join_hash"))
+                    join_key_schema = _safe_str(join_key.get("schema"))
 
                 # Trust upstream exporter: sig_hash is already UID-free by contract.
 
@@ -183,13 +201,18 @@ def main() -> None:
                     "file_id": file_id,
                     "domain": domain,
                     "record_id": record_id,
+                    "record_ordinal": record_ordinal,
+                    "record_pk": record_pk,
                     "status": status,
                     "identity_quality": identity_quality,
                     "sig_hash": sig_hash,
+                    "join_hash": join_hash,
+                    "join_key_schema": join_key_schema,
                     "label_display": _safe_str(r.get("label", {}).get("display")),
                     "label_quality": _safe_str(r.get("label", {}).get("quality")),
                     "label_provenance": _safe_str(r.get("label", {}).get("provenance")),
                 })
+
 
 
                 # status_reasons
@@ -201,6 +224,8 @@ def main() -> None:
                                 "file_id": file_id,
                                 "domain": domain,
                                 "record_id": record_id,
+                                "record_ordinal": record_ordinal,
+                                "record_pk": record_pk,
                                 "reason": reason,
                             })
 
@@ -215,6 +240,8 @@ def main() -> None:
                             "file_id": file_id,
                             "domain": domain,
                             "record_id": record_id,
+                            "record_ordinal": record_ordinal,
+                            "record_pk": record_pk,
                             "item_index": str(idx),
                             "k": _safe_str(it.get("k")),
                             "q": _safe_str(it.get("q")),
@@ -236,9 +263,12 @@ def main() -> None:
                             "file_id": file_id,
                             "domain": domain,
                             "record_id": record_id,
+                            "record_ordinal": record_ordinal,
+                            "record_pk": record_pk,
                             "component_key": ck,
                             "component_value": _safe_str(cv),
                         })
+
 
     def _write_csv(name: str, rows: List[Dict[str, str]], fieldnames: List[str]) -> str:
         p = out_dir / name
@@ -277,7 +307,9 @@ def main() -> None:
             wrote_paths.append(_write_csv(
                 "records.csv",
                 records_rows,
-                ["file_id", "domain", "record_id", "status", "identity_quality", "sig_hash",
+                ["file_id", "domain", "record_id", "record_ordinal", "record_pk",
+                 "status", "identity_quality", "sig_hash",
+                 "join_hash", "join_key_schema",
                  "label_display", "label_quality", "label_provenance"],
             ))
 
@@ -285,21 +317,21 @@ def main() -> None:
             wrote_paths.append(_write_csv(
                 "status_reasons.csv",
                 reasons_rows,
-                ["file_id", "domain", "record_id", "reason"],
+                ["file_id", "domain", "record_id", "record_ordinal", "record_pk", "reason"],
             ))
 
         if "identity_items" in emit_set:
             wrote_paths.append(_write_csv(
                 "identity_items.csv",
                 items_rows,
-                ["file_id", "domain", "record_id", "item_index", "k", "q", "v"],
+                ["file_id", "domain", "record_id", "record_ordinal", "record_pk", "item_index", "k", "q", "v"],
             ))
 
         if "label_components" in emit_set:
             wrote_paths.append(_write_csv(
                 "label_components.csv",
                 label_comp_rows,
-                ["file_id", "domain", "record_id", "component_key", "component_value"],
+                ["file_id", "domain", "record_id", "record_ordinal", "record_pk", "component_key", "component_value"],
             ))
 
     else:
@@ -322,33 +354,39 @@ def main() -> None:
                 wrote_paths.append(_write_csv(
                     f"records__{dom_safe}.csv",
                     dom_records,
-                    ["file_id", "domain", "record_id", "status", "identity_quality", "sig_hash", "sig_hash_no_uid",
+                    ["file_id", "domain", "record_id", "record_ordinal", "record_pk",
+                     "status", "identity_quality", "sig_hash",
+                     "join_hash", "join_key_schema",
                      "label_display", "label_quality", "label_provenance"],
                 ))
+
 
             if "status_reasons" in emit_set:
                 dom_reasons = [r for r in reasons_rows if r.get("domain") == dom]
                 wrote_paths.append(_write_csv(
                     f"status_reasons__{dom_safe}.csv",
                     dom_reasons,
-                    ["file_id", "domain", "record_id", "reason"],
+                    ["file_id", "domain", "record_id", "record_ordinal", "record_pk", "reason"],
                 ))
+
 
             if "identity_items" in emit_set:
                 dom_items = [r for r in items_rows if r.get("domain") == dom]
                 wrote_paths.append(_write_csv(
                     f"identity_items__{dom_safe}.csv",
                     dom_items,
-                    ["file_id", "domain", "record_id", "item_index", "k", "q", "v"],
+                    ["file_id", "domain", "record_id", "record_ordinal", "record_pk", "item_index", "k", "q", "v"],
                 ))
+
 
             if "label_components" in emit_set:
                 dom_comps = [r for r in label_comp_rows if r.get("domain") == dom]
                 wrote_paths.append(_write_csv(
                     f"label_components__{dom_safe}.csv",
                     dom_comps,
-                    ["file_id", "domain", "record_id", "component_key", "component_value"],
+                    ["file_id", "domain", "record_id", "record_ordinal", "record_pk", "component_key", "component_value"],
                 ))
+
 
     print("Wrote:")
     for p in wrote_paths:
