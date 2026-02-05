@@ -1,5 +1,41 @@
 {
   "domains": {
+    "identity": {
+      "join_key_schema": "identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "identity.is_workshared"
+      ],
+      "optional_items": [
+        "identity.revit_version_number",
+        "identity.revit_build",
+        "identity.revit_version_name"
+      ],
+      "explicitly_excluded_items": [
+        "identity.central_path",
+        "identity.central_path_norm",
+        "identity.filename",
+        "identity.project_title"
+      ],
+      "shape_gating": {
+        "discriminator_key": "identity.is_workshared",
+        "shape_requirements": {
+          "true": {
+            "additional_required": [
+              "identity.revit_version_number"
+            ],
+            "additional_optional": [],
+            "notes": "Workshared identity joins include version number as discriminator-gated required context."
+          }
+        },
+        "default_shape_behavior": "common_only"
+      },
+      "notes": [
+        "Pilot for canonical evidence superset + selectors in the identity domain.",
+        "join_hash uses policy-required items only; optional items remain in identity_basis.items for future exploration.",
+        "File-local identifiers remain excluded from canonical identity evidence and join-key hashing."
+      ]
+    },
     "phase_filters": {
       "join_key_schema": "phase_filters.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
