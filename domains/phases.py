@@ -229,11 +229,11 @@ def extract(doc, ctx=None):
         join_key_v2, _missing = build_join_key_from_policy(
             domain_policy=pol,
             identity_items=identity_items_v2_sorted,
-            # Pilot: join hash from base required (+ gated required) only.
-            # Optional keys remain available in identity_basis.items for future exploration.
             include_optional_items=False,
             emit_keys_used=True,
             hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
         )
 
         sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)

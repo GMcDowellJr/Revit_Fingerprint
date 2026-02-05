@@ -199,34 +199,12 @@ def build_join_key_from_policy(
     include_optional_items=True,
     emit_keys_used=False,
     hash_optional_items=True,
-    preserve_single_def_hash_passthrough=True,
+    emit_items=True,
+    emit_selectors=False,
 ):
     """Build join_key dict from a policy and available value sources.
 
     Supports shape-gated requirements via the `shape_gating` policy section.
-
-    Args:
-        domain_policy: Policy dict with required_items, optional_items, and optional shape_gating
-        identity_items: list of {k,q,v} identity items
-        candidate_kqv: optional dict k -> (v,q) that can supplement identity_items
-        include_optional_items: if True, include optional items in join_key.items
-        emit_keys_used: if True, add join_key.keys_used list for hash provenance
-        hash_optional_items: if True, include optional items in join_hash computation
-        preserve_single_def_hash_passthrough: if True, keep legacy invariant where
-            a lone *_def_hash required item is used directly as join_hash
-
-    Returns:
-        tuple: (join_key_dict, missing_required_keys)
-            - join_key_dict: Dict with schema, hash_alg, items, join_hash, and metadata
-            - missing_required_keys: List of required keys that were not found
-
-    Shape-gating behavior:
-        1. Always includes common required_items
-        2. If shape_gating is defined and shape matches a shape_requirement:
-           - Adds additional_required items for that shape
-           - Adds additional_optional items for that shape
-        3. If shape doesn't match any shape_requirement:
-           - Uses common required/optional only (default behavior)
     """
     kqv = _items_to_kqv_map(identity_items)
     if isinstance(candidate_kqv, dict):
@@ -253,6 +231,9 @@ def build_join_key_from_policy(
     required_items = []
     optional_items = []
 
+    required_keys = []
+    optional_keys = []
+
     def emit_key(k):
         v, q = kqv.get(k, (None, None))
         if q is None:
@@ -261,6 +242,7 @@ def build_join_key_from_policy(
 
     for pol_key in req:
         for k in _expand_sequence_key(pol_key, kqv):
+            required_keys.append(k)
             if k not in kqv:
                 missing_required.append(k)
             required_items.append(emit_key(k))
@@ -269,23 +251,20 @@ def build_join_key_from_policy(
         for pol_key in opt:
             for k in _expand_sequence_key(pol_key, kqv):
                 if k in kqv:
+                    optional_keys.append(k)
                     optional_items.append(emit_key(k))
 
     items = required_items + optional_items
-
     hash_items = items if hash_optional_items else required_items
 
     # Compute join_hash
     join_hash = None
     if (
-        preserve_single_def_hash_passthrough
-        and (
         len(hash_items) == 1
         and isinstance(hash_items[0].get("k"), str)
         and hash_items[0]["k"].endswith("_def_hash")
         and isinstance(hash_items[0].get("v"), str)
         and re.match(r"^[0-9a-f]{32}$", hash_items[0]["v"])
-        )
     ):
         # Structured-domain invariant: def_hash IS the join_hash
         join_hash = hash_items[0]["v"]
@@ -294,15 +273,25 @@ def build_join_key_from_policy(
 
     keys_used = None
     if emit_keys_used:
-        keys = sorted({it.get("k") for it in hash_items if isinstance(it.get("k"), str)})
-        keys_used = keys
+        keys_used = sorted(
+            {it.get("k") for it in hash_items if isinstance(it.get("k"), str)}
+        )
 
     join_key = {
         "schema": (domain_policy or {}).get("join_key_schema"),
         "hash_alg": (domain_policy or {}).get("hash_alg"),
-        "items": items,
         "join_hash": join_hash,
     }
+
+    if emit_items:
+        join_key["items"] = items
+
+    if emit_selectors:
+        join_key["selectors"] = {
+            "required_keys": required_keys,
+            "optional_keys": optional_keys,
+        }
+
     if keys_used is not None:
         join_key["keys_used"] = keys_used
 
