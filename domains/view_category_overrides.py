@@ -31,6 +31,8 @@ from core.record_v2 import (
 )
 from core.phase2 import phase2_sorted_items
 from core.deps import require_domain, Blocked
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
 from core.graphic_overrides import (
     extract_projection_graphics,
     extract_cut_graphics,
@@ -86,18 +88,6 @@ def _compute_override_properties_hash(identity_items):
 
     # Compute MD5 hash matching hash_alg policy
     return hashlib.md5(signature.encode('utf-8')).hexdigest()
-
-
-def _phase2_build_join_key_items(category_path):
-    """Build Phase-2 join-key IdentityItems (domain-specific, hypothesis-only).
-
-    Hypothesis basis (reversible):
-      - Overrides are keyed by the baseline category path (row_key).
-    """
-    path_v, path_q = canonicalize_str(category_path)
-    return [
-        make_identity_item("vco.category_path", path_v, path_q),
-    ]
 
 
 def _phase2_partition_items(items):
@@ -320,8 +310,13 @@ def extract(doc, ctx=None):
                 )
             )
 
+            # Canonical evidence source for this domain is identity_basis.items.
+            # Selectors (join_key.keys_used, phase2.semantic_keys, sig_basis.keys_used)
+            # reference subsets without duplicating k/q/v payloads.
             identity_items_sorted = sorted(identity_items, key=lambda it: str(it.get("k", "")))
-            preimage = serialize_identity_items(identity_items_sorted)
+            semantic_keys = sorted({safe_str(it.get("k", "")) for it in identity_items_sorted if safe_str(it.get("k", ""))})
+            semantic_items = [it for it in identity_items_sorted if safe_str(it.get("k", "")) in set(semantic_keys)]
+            preimage = serialize_identity_items(semantic_items)
             sig_hash = make_hash(preimage) if preimage is not None else None
 
             required_keys = ["vco.baseline_category_path", "vco.baseline_sig_hash", "vco.override_properties_hash"]
@@ -386,43 +381,26 @@ def extract(doc, ctx=None):
             rec["phase2"] = {
                 "schema": "phase2.view_category_overrides.v1",
                 "grouping_basis": "join_key.join_hash",
-                "semantic_items": phase2_sorted_items(p2_semantic),
+                # Semantic selector references identity_basis.items.
+                # Deprecated direction: semantic_items should not duplicate canonical evidence.
+                "semantic_keys": semantic_keys,
                 "cosmetic_items": phase2_sorted_items(p2_cosmetic),
                 "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_sorted_items(p2_unknown),
             }
 
-            # Build join_key following policy view_category_overrides.join_key.v1
-            import hashlib
-            join_key_items = []
-            for item in identity_items_sorted:
-                k = item.get('k', '')
-                # Include only policy-required items
-                if k in ['vco.baseline_category_path',
-                         'vco.baseline_sig_hash',
-                         'vco.override_properties_hash']:
-                    join_key_items.append({
-                        'k': item['k'],
-                        'q': item['q'],
-                        'v': item.get('v')
-                    })
-
-            # Sort for canonical ordering
-            join_key_items_sorted = sorted(join_key_items, key=lambda x: x['k'])
-
-            # Compute join_hash
-            join_signature = "|".join([
-                "k={}|q={}|v={}".format(item['k'], item['q'], item.get('v') or '')
-                for item in join_key_items_sorted
-            ])
-            join_hash = hashlib.md5(join_signature.encode('utf-8')).hexdigest()
-
-            # Add join_key to record
-            rec["join_key"] = {
-                "schema": "view_category_overrides.join_key.v1",
-                "hash_alg": "md5_utf8_join_pipe",
-                "items": join_key_items_sorted,
-                "join_hash": join_hash
+            pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "view_category_overrides")
+            rec["join_key"], _missing = build_join_key_from_policy(
+                domain_policy=pol,
+                identity_items=identity_items_sorted,
+                include_optional_items=False,
+                emit_keys_used=True,
+                hash_optional_items=False,
+                preserve_single_def_hash_passthrough=False,
+            )
+            rec["sig_basis"] = {
+                "schema": "view_category_overrides.sig_basis.v1",
+                "keys_used": semantic_keys,
             }
 
     records = list(override_patterns.values()) + blocked_records
