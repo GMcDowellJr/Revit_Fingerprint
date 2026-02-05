@@ -1,0 +1,216 @@
+[
+  {
+    "domain": "phase_filters",
+    "kind": "inventory",
+    "records": [
+      {
+        "discovery": {
+          "modeled_on_exporter": true,
+          "notes": [
+            "collector: OfClass(PhaseFilter)"
+          ]
+        },
+        "domain": "phase_filters",
+        "example": {
+          "display": "By Category",
+          "norm": "By Category",
+          "q": "ok",
+          "raw": "By Category",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "New=Not Displayed|Existing=Not Displayed|Demolished=By Category|Temporary=By Category"
+          ],
+          "observed_on_names": [
+            "Show Complete"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "phase_filter.demolished.presentation_id",
+        "selected_phase_filter_sample_count": 7
+      },
+      {
+        "discovery": {
+          "modeled_on_exporter": true,
+          "notes": [
+            "collector: OfClass(PhaseFilter)"
+          ]
+        },
+        "domain": "phase_filters",
+        "example": {
+          "display": "Not Displayed",
+          "norm": "Not Displayed",
+          "q": "ok",
+          "raw": "Not Displayed",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "New=Not Displayed|Existing=Not Displayed|Demolished=By Category|Temporary=By Category"
+          ],
+          "observed_on_names": [
+            "Show Complete"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "phase_filter.existing.presentation_id",
+        "selected_phase_filter_sample_count": 7
+      },
+      {
+        "discovery": {
+          "modeled_on_exporter": true,
+          "notes": [
+            "collector: OfClass(PhaseFilter)"
+          ]
+        },
+        "domain": "phase_filters",
+        "example": {
+          "display": "Show Previous Phase",
+          "norm": "Show Previous Phase",
+          "q": "ok",
+          "raw": "Show Previous Phase",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "New=By Category|Existing=Overridden|Demolished=By Category|Temporary=By Category",
+            "New=By Category|Existing=Overridden|Demolished=Overridden|Temporary=By Category",
+            "New=Not Displayed|Existing=By Category|Demolished=By Category|Temporary=By Category",
+            "New=Not Displayed|Existing=By Category|Demolished=Overridden|Temporary=Overridden",
+            "New=Not Displayed|Existing=Not Displayed|Demolished=By Category|Temporary=By Category",
+            "New=Not Displayed|Existing=Overridden|Demolished=By Category|Temporary=By Category",
+            "New=Not Displayed|Existing=Overridden|Demolished=Overridden|Temporary=Overridden"
+          ],
+          "observed_on_names": [
+            "Show All",
+            "Show Complete",
+            "Show Demo + New",
+            "Show New",
+            "Show Previous + Demo",
+            "Show Previous + New",
+            "Show Previous Phase"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 7,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "phase_filter.name",
+        "selected_phase_filter_sample_count": 7
+      },
+      {
+        "discovery": {
+          "modeled_on_exporter": true,
+          "notes": [
+            "collector: OfClass(PhaseFilter)"
+          ]
+        },
+        "domain": "phase_filters",
+        "example": {
+          "display": "Not Displayed",
+          "norm": "Not Displayed",
+          "q": "ok",
+          "raw": "Not Displayed",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "New=Not Displayed|Existing=Not Displayed|Demolished=By Category|Temporary=By Category"
+          ],
+          "observed_on_names": [
+            "Show Complete"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "phase_filter.new.presentation_id",
+        "selected_phase_filter_sample_count": 7
+      },
+      {
+        "discovery": {
+          "modeled_on_exporter": true,
+          "notes": [
+            "collector: OfClass(PhaseFilter)"
+          ]
+        },
+        "domain": "phase_filters",
+        "example": {
+          "display": "By Category",
+          "norm": "By Category",
+          "q": "ok",
+          "raw": "By Category",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "New=Not Displayed|Existing=Not Displayed|Demolished=By Category|Temporary=By Category"
+          ],
+          "observed_on_names": [
+            "Show Complete"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "phase_filter.temporary.presentation_id",
+        "selected_phase_filter_sample_count": 7
+      }
+    ]
+  },
+  {
+    "domain": "phase_filters",
+    "kind": "crosswalk",
+    "records": [
+      {
+        "phase_filter.id": 1912,
+        "phase_filter.name": "Show All",
+        "phase_filter.resolved": true,
+        "phase_filter_param": {
+          "display": "Show All",
+          "norm": 1912,
+          "q": "ok",
+          "raw": 1912,
+          "storage": "ElementId"
+        },
+        "phase_filter_param.matched_name": "-1012103",
+        "view.id": 1106,
+        "view.name": "Project View"
+      }
+    ]
+  }
+]

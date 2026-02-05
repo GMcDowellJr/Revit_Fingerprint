@@ -1,0 +1,366 @@
+[
+  {
+    "domain": "line_styles",
+    "kind": "inventory",
+    "records": [
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "-2009504",
+          "norm": -2009504,
+          "q": "ok",
+          "raw": -2009504,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "v.cat.id",
+        "selected_style_sample_count": 5
+      },
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "<Hidden Lines>",
+          "norm": "<Hidden Lines>",
+          "q": "ok",
+          "raw": "<Hidden Lines>",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.cat.name",
+        "selected_style_sample_count": 5
+      },
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "195",
+          "norm": 195,
+          "q": "ok",
+          "raw": 195,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "v.gs.id",
+        "selected_style_sample_count": 5
+      },
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "<Hidden Lines>",
+          "norm": "<Hidden Lines>",
+          "q": "ok",
+          "raw": "<Hidden Lines>",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.gs.name",
+        "selected_style_sample_count": 5
+      },
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "1",
+          "norm": "1",
+          "q": "ok",
+          "raw": "1",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.gs.type",
+        "selected_style_sample_count": 5
+      },
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "#00A600",
+          "norm": "#00A600",
+          "q": "ok",
+          "raw": "#00A600",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.line_color.hex",
+        "selected_style_sample_count": 5
+      },
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "0|166|0",
+          "norm": "0|166|0",
+          "q": "ok",
+          "raw": "0|166|0",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.line_color.rgb",
+        "selected_style_sample_count": 5
+      },
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "27",
+          "norm": 27,
+          "q": "ok",
+          "raw": 27,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "v.line_pattern.id",
+        "selected_style_sample_count": 5
+      },
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "Dash",
+          "norm": "Dash",
+          "q": "ok",
+          "raw": "Dash",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.line_pattern.name",
+        "selected_style_sample_count": 5
+      },
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "2",
+          "norm": 2,
+          "q": "ok",
+          "raw": 2,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "v.line_weight.projection",
+        "selected_style_sample_count": 5
+      },
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "-2000051",
+          "norm": -2000051,
+          "q": "ok",
+          "raw": -2000051,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "v.parent_cat.id",
+        "selected_style_sample_count": 5
+      },
+      {
+        "domain": "line_styles",
+        "example": {
+          "display": "Lines",
+          "norm": "Lines",
+          "q": "ok",
+          "raw": "Lines",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|Lines"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.parent_cat.name",
+        "selected_style_sample_count": 5
+      }
+    ]
+  },
+  {
+    "domain": "line_styles",
+    "kind": "crosswalk",
+    "records": [
+      {
+        "line_pattern.id": 27,
+        "line_pattern.name": "Dash",
+        "line_pattern.resolved": true,
+        "line_style.id": 195,
+        "line_style.name": "<Hidden Lines>",
+        "line_style.type": "1"
+      },
+      {
+        "line_pattern.id": -1,
+        "line_pattern.name": null,
+        "line_pattern.resolved": false,
+        "line_style.id": 196,
+        "line_style.name": "<Room Separation>",
+        "line_style.type": "1"
+      },
+      {
+        "line_pattern.id": -3000010,
+        "line_pattern.name": null,
+        "line_pattern.resolved": false,
+        "line_style.id": 198,
+        "line_style.name": "<Insulation Batting Lines>",
+        "line_style.type": "1"
+      },
+      {
+        "line_pattern.id": 29,
+        "line_pattern.name": "Center",
+        "line_pattern.resolved": true,
+        "line_style.id": 207,
+        "line_style.name": "Railing Rail Path Extension Lines",
+        "line_style.type": "1"
+      },
+      {
+        "line_pattern.id": 35,
+        "line_pattern.name": "Overhead",
+        "line_pattern.resolved": true,
+        "line_style.id": 212,
+        "line_style.name": "<Overhead>",
+        "line_style.type": "1"
+      }
+    ]
+  }
+]

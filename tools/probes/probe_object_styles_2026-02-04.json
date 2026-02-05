@@ -1,0 +1,669 @@
+[
+  {
+    "domain": "object_styles",
+    "kind": "inventory",
+    "records": [
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "missing",
+          "raw": null,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 175,
+            "ok": 0,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "c.allows_visibility_control",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "-2000223",
+          "norm": "-2000223",
+          "q": "ok",
+          "raw": "-2000223",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "c.builtin_category",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "True",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "c.can_add_subcategory",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "AnalyticalModel",
+          "norm": "AnalyticalModel",
+          "q": "ok",
+          "raw": "AnalyticalModel",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "c.category_type",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "False",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "c.has_material_quantities",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "False",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "c.is_cuttable",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "0",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "c.is_subcategory",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "#000000",
+          "norm": "#000000",
+          "q": "ok",
+          "raw": "#000000",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "c.line_color.hex",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "0|0|0",
+          "norm": "0|0|0",
+          "q": "ok",
+          "raw": "0|0|0",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "c.line_color.rgb",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "c.line_pattern_cut",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "Dash",
+          "norm": 27,
+          "q": "ok",
+          "raw": 27,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "c.line_pattern_projection",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "2",
+          "norm": 2,
+          "q": "ok",
+          "raw": 2,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 163,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "c.line_weight_cut",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "3",
+          "norm": 3,
+          "q": "ok",
+          "raw": 3,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "c.line_weight_projection",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 160,
+            "ok": 15,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "c.material",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "Displacement Path",
+          "norm": "Displacement Path",
+          "q": "ok",
+          "raw": "Displacement Path",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "c.name",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "Electrical Fixtures",
+          "norm": "Electrical Fixtures",
+          "q": "ok",
+          "raw": "Electrical Fixtures",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 84,
+            "ok": 91,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "c.parent_name",
+        "selected_category_sample_count": 175
+      },
+      {
+        "domain": "object_styles",
+        "example": {
+          "display": "Analytical",
+          "norm": "Analytical",
+          "q": "ok",
+          "raw": "Analytical",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "1|tab=Annotation|sub=0",
+            "1|tab=Annotation|sub=1",
+            "1|tab=Imported|sub=0",
+            "2|tab=Analytical|sub=0",
+            "2|tab=Analytical|sub=1",
+            "4|tab=Other|sub=0",
+            "4|tab=Other|sub=1",
+            "5|tab=Analytical|sub=0",
+            "5|tab=Other|sub=0",
+            "5|tab=Other|sub=1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 175,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "c.tab",
+        "selected_category_sample_count": 175
+      }
+    ]
+  },
+  {
+    "domain": "object_styles",
+    "kind": "crosswalk",
+    "records": [
+      {
+        "category.is_subcategory": false,
+        "category.name": "Displacement Path",
+        "category.parent_name": null,
+        "category.type": "2",
+        "cut.line_pattern": null,
+        "material": null,
+        "projection.line_pattern": {
+          "name": "Dash",
+          "type_id": 27
+        }
+      },
+      {
+        "category.is_subcategory": false,
+        "category.name": "Analytical Nodes",
+        "category.parent_name": null,
+        "category.type": "5",
+        "cut.line_pattern": null,
+        "material": null,
+        "projection.line_pattern": {
+          "name": null,
+          "type_id": -3000010
+        }
+      },
+      {
+        "category.is_subcategory": true,
+        "category.name": "<Hidden Lines>",
+        "category.parent_name": "Electrical Fixtures",
+        "category.type": "1",
+        "cut.line_pattern": null,
+        "material": null,
+        "projection.line_pattern": {
+          "name": "0_Hidden2",
+          "type_id": 23692
+        }
+      },
+      {
+        "category.is_subcategory": false,
+        "category.name": "Zone Equipment",
+        "category.parent_name": null,
+        "category.type": "1",
+        "cut.line_pattern": null,
+        "material": null,
+        "projection.line_pattern": {
+          "name": null,
+          "type_id": -3000010
+        }
+      },
+      {
+        "category.is_subcategory": false,
+        "category.name": "Medical Equipment Tags",
+        "category.parent_name": null,
+        "category.type": "2",
+        "cut.line_pattern": null,
+        "material": null,
+        "projection.line_pattern": {
+          "name": null,
+          "type_id": -3000010
+        }
+      }
+    ]
+  }
+]

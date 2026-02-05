@@ -1,0 +1,4161 @@
+[
+  {
+    "domain": "phase_graphics",
+    "kind": "inventory",
+    "records": [
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Annotation Crop",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|Schedule",
+            "view|<Revision Schedule>",
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|View List - QC"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 6,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Appearance",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Appears In Sheet List",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Approver",
+          "norm": "Approver",
+          "q": "ok",
+          "raw": "Approver",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Approved By",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Level 1",
+          "norm": "Level 1",
+          "q": "ok",
+          "raw": "Level 1",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Associated Level",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Checker",
+          "norm": "Checker",
+          "q": "ok",
+          "raw": "Checker",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Checked By",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Color Scheme",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Background",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Color Scheme Location",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "1'-0\"",
+          "norm": 11.999999999999998,
+          "q": "ok",
+          "raw": 1.0,
+          "storage": "Double"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ]
+        },
+        "param_key": "p.Column Symbolic Offset",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Crop Region Visible",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Crop View",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Current Revision",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Current Revision Date",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Current Revision Description",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Current Revision Issued",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Current Revision Issued By",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Current Revision Issued To",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.Default Analysis Display Style",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Independent",
+          "norm": "Independent",
+          "q": "ok",
+          "raw": "Independent",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|<Revision Schedule>",
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|Drawing Index Submission Matrix Legend",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|General Notes",
+            "view|General Symbols Legend",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|Level 1",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|Project View",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|Sync with Central View (SWC)",
+            "view|System Browser"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 28,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Dependency",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "0",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Depth Clipping",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Designer",
+          "norm": "Designer",
+          "q": "ok",
+          "raw": "Designer",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Designed By",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Coarse",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Drawing Index Submission Matrix Legend",
+            "view|General Notes",
+            "view|General Symbols Legend",
+            "view|Level 1",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 11,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Detail Level",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Coordination",
+          "norm": 4095,
+          "q": "ok",
+          "raw": 4095,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|Level 1",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 20,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer",
+            "String"
+          ]
+        },
+        "param_key": "p.Discipline",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "0",
+          "norm": 0.0,
+          "q": "ok",
+          "raw": 0.0,
+          "storage": "Double"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ]
+        },
+        "param_key": "p.Discipline Sort Order",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "0",
+          "norm": 0.0,
+          "q": "ok",
+          "raw": 0.0,
+          "storage": "Double"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ]
+        },
+        "param_key": "p.Discipline Sub-Sort Order",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Normal",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Display Model",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Drawing Number Levels/Locations",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Drawing Number Originator",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Drawing Number Project Number",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Drawing Number Role",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Drawing Number Status Code",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Drawing Number Status Description",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Drawing Number Type",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Drawing Number Volume/System",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Drawing_Included_In_Set",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Author",
+          "norm": "Author",
+          "q": "ok",
+          "raw": "Author",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Drawn By",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "By Type",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|<Revision Schedule>",
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|View List - QC"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Export to IFC",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|<Revision Schedule>",
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|View List - QC"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Fields",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Y:\\content\\shared\\Revit\\2025\\NA-EN\\Project_Templates\\01_Generic\\stn_i_generic_2025.rte",
+          "norm": "Y:\\content\\shared\\Revit\\2025\\NA-EN\\Project_Templates\\01_Generic\\stn_i_generic_2025.rte",
+          "q": "ok",
+          "raw": "Y:\\content\\shared\\Revit\\2025\\NA-EN\\Project_Templates\\01_Generic\\stn_i_generic_2025.rte",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.File Path",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|View List - QC"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Filter",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|<Revision Schedule>",
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|View List - QC"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Formatting",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Graphic Display Options",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.Guide Grid",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Lighting",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Model Display",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|<Revision Schedule>",
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|Drawing Index Submission Matrix Legend",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|General Notes",
+            "view|General Symbols Legend",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|Level 1",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|Project View",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|Sync with Central View (SWC)",
+            "view|System Browser"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 28,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.None",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Project North",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Orientation",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.PE_01_IssueStatus",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.PE_02_IssueStatus",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.PE_03_IssueStatus",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.PE_04_IssueStatus",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.PE_05_IssueStatus",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.PE_06_IssueStatus",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.PE_07_IssueStatus",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Show Original",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Parts Visibility",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "New Construction",
+          "norm": 3,
+          "q": "ok",
+          "raw": 3,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Level 1",
+            "view|Project View",
+            "view|System Browser"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.Phase",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Show All",
+          "norm": 1912,
+          "q": "ok",
+          "raw": 1912,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|Schedule",
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1",
+            "view|Project View",
+            "view|System Browser"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 7,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.Phase Filter",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Photographic Exposure",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.Range: Base Level",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.Range: Top Level",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|Level 1",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 18,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Referencing Detail",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|Level 1",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 18,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Referencing Sheet",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|Level 1",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 18,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.Referencing Sheet Collection",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Revisions on Sheet",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": " ",
+          "norm": " ",
+          "q": "ok",
+          "raw": " ",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Scale",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "96",
+          "norm": 96,
+          "q": "ok",
+          "raw": 96,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Drawing Index Submission Matrix Legend",
+            "view|General Notes",
+            "view|General Symbols Legend",
+            "view|Level 1",
+            "view|Project View",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|System Browser"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 13,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Scale Value    1:",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.Scope Box",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Shadows",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "99-Stantec Information Sheets",
+          "norm": "99-Stantec Information Sheets",
+          "q": "ok",
+          "raw": "99-Stantec Information Sheets",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Sheet Classification",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.Sheet Collection",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "04/11/15",
+          "norm": "04/11/15",
+          "q": "ok",
+          "raw": "04/11/15",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Sheet Issue Date",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Sync with Central View (SWC)",
+          "norm": "Sync with Central View (SWC)",
+          "q": "ok",
+          "raw": "Sync with Central View (SWC)",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Sheet Name",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "0000",
+          "norm": "0000",
+          "q": "ok",
+          "raw": "0000",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Sheet Number",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "0",
+          "norm": 0.0,
+          "q": "ok",
+          "raw": 0.0,
+          "storage": "Double"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ]
+        },
+        "param_key": "p.Sheet Number Of",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Sheet Sub-Classification",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "By Discipline",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Show Hidden Lines",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Sketch Reference Sheet",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Sketch Submission Description",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Sketchy Lines",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|<Revision Schedule>",
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|View List - QC"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Sorting/Grouping",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Sun Path",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.System Color Schemes",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Drawing Index Submission Matrix Legend",
+            "view|General Notes",
+            "view|General Symbols Legend",
+            "view|Level 1",
+            "view|Project View",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|System Browser"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 11,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Title on Sheet",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Look down",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Underlay Orientation",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.V/G Overrides Analytical Model",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.V/G Overrides Annotation",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.V/G Overrides Filters",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.V/G Overrides Import",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.V/G Overrides Model",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "~Do Not Rename",
+          "norm": "~Do Not Rename",
+          "q": "ok",
+          "raw": "~Do Not Rename",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|<Revision Schedule>",
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|Drawing Index Submission Matrix Legend",
+            "view|General Notes",
+            "view|General Symbols Legend",
+            "view|Level 1",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|View List - QC"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 16,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.View Classification",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "???",
+          "norm": "???",
+          "q": "ok",
+          "raw": "???",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|<Revision Schedule>",
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|Drawing Index Submission Matrix Legend",
+            "view|General Notes",
+            "view|General Symbols Legend",
+            "view|Level 1",
+            "view|Project View",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|System Browser",
+            "view|View List - QC"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 16,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.View Name",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.View Range",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": " 1/8\" = 1'-0\" ",
+          "norm": 96,
+          "q": "ok",
+          "raw": 96,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|Drawing Index Submission Matrix Legend",
+            "view|General Notes",
+            "view|General Symbols Legend",
+            "view|Level 1",
+            "view|Project View",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|System Browser"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 13,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.View Scale",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "~Coordination",
+          "norm": "~Coordination",
+          "q": "ok",
+          "raw": "~Coordination",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view_template|z_Ceiling Plan - Do Not Rename",
+            "view_template|z_Floor Plan - Do Not Rename",
+            "view|<Revision Schedule>",
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|Drawing Index Submission Matrix Legend",
+            "view|General Notes",
+            "view|General Symbols Legend",
+            "view|Level 1",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|View List - QC"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 16,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.View Sub-Classification",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|<Revision Schedule>",
+            "view|Drawing Index - QC",
+            "view|Drawing Index - Simple",
+            "view|Drawing Index - Submission Matrix",
+            "view|Drawing Index Submission Matrix Legend",
+            "view|General Notes",
+            "view|General Symbols Legend",
+            "view|Level 1",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|View List - QC"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 14,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.View Template",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|Drawing Index Submission Matrix Legend",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|General Notes",
+            "view|General Symbols Legend",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|Level 1",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 21,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "None"
+          ]
+        },
+        "param_key": "p.Visibility/Graphics Overrides",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Hidden Line",
+          "norm": 2,
+          "q": "ok",
+          "raw": 2,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Stantec Graphic Standards - Filled Region Types",
+            "view|Stantec Graphic Standards - Line Styles",
+            "view|Stantec Graphic Standards - Text & Dim Styles (Imperial)",
+            "view|Start Here Drafting View - Origin Point"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Visual Style",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "Clean all wall joins",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|Level 1"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Wall Join Display",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      },
+      {
+        "domain": "phase_graphics",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "diagnostics": {
+            "notes": [],
+            "phasefilter_class_available": true,
+            "phasefilters_collected": 7,
+            "view_templates_collected": 3,
+            "views_collected": 31
+          },
+          "observed_on_buckets": [
+            "view|ARCHITECTURE PLACEHOLDER",
+            "view|CIVIL PLACEHOLDER",
+            "view|ELECTRICAL PLACEHOLDER",
+            "view|EQUIPMENT CONSULTANT PLACEHOLDER",
+            "view|FIRE PROTECTION PLACEHOLDER",
+            "view|GENERAL INFORMATION PLACEHOLDER",
+            "view|LANDSCAPE ARCHITECTURE PLACEHOLDER",
+            "view|MECHANICAL PLACEHOLDER",
+            "view|PLUMBING PLACEHOLDER",
+            "view|STRUCTURAL PLACEHOLDER",
+            "view|Sync with Central View (SWC)",
+            "view|TECHNOLOGY PLACEHOLDER"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p._Not_To_Scale_Text",
+        "selected_phasefilter_sample_count": 7,
+        "selected_view_sample_count": 31
+      }
+    ]
+  },
+  {
+    "domain": "phase_graphics",
+    "kind": "crosswalk",
+    "records": [
+      {
+        "phase_filter_param": {
+          "display": "Show All",
+          "norm": 1912,
+          "q": "ok",
+          "raw": 1912,
+          "storage": "ElementId"
+        },
+        "phase_filter_param.matched_name": "BuiltInParameter.VIEW_PHASE_FILTER",
+        "phasefilter.id": 1912,
+        "phasefilter.name": "Show All",
+        "phasefilter.resolved": true,
+        "view_template.id": 81144,
+        "view_template.name": "z_Floor Plan - Do Not Rename"
+      }
+    ]
+  }
+]

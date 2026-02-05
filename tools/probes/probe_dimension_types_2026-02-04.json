@@ -1,0 +1,2492 @@
+[
+  {
+    "diagnostics": {
+      "discovered_type_count": 51,
+      "discovery_notes": [],
+      "format_signature_crosswalk_count": 0,
+      "format_surface_member_samples": [],
+      "selected_type_sample_count": 14
+    },
+    "domain": "dimension_types",
+    "kind": "inventory",
+    "records": [
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "None",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Alternate Units",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "unsupported",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 0,
+            "unreadable": 0,
+            "unsupported": 1
+          },
+          "storage_types": [
+            "None"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Alternate Units Format",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Alternate Units Prefix",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Alternate Units Suffix",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Bold",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "East / West",
+          "norm": 2,
+          "q": "ok",
+          "raw": 2,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Bottom Coordinate",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "SpotElevation|4"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Bottom Indicator",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Prefix",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "SpotElevation|4"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Bottom Indicator as Prefix/Suffix",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "3/32\"",
+          "norm": 0.00781266404199475,
+          "q": "ok",
+          "raw": 0.00781266404199475,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Center Mark Size",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Yes",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Center Marks",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "-3000010",
+          "norm": -3000010,
+          "q": "ok",
+          "raw": -3000010,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Centerline Pattern",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 1,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Centerline Symbol",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "-2",
+          "norm": -2,
+          "q": "ok",
+          "raw": -2,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Centerline Tick Mark",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "0",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Color",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Survey Point",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Coordinate Base",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "After Value",
+          "norm": 2,
+          "q": "ok",
+          "raw": 2,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "diameter"
+          ],
+          "observed_on_shapes": [
+            "Diameter|9"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Diameter Symbol Location",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "\u00f8",
+          "norm": "\u00f8",
+          "q": "ok",
+          "raw": "\u00f8",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "diameter"
+          ],
+          "observed_on_shapes": [
+            "Diameter|9"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Diameter Symbol Text",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "0\"",
+          "norm": 0.0,
+          "q": "ok",
+          "raw": 0.0,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Dimension Line Extension",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "0\"",
+          "norm": 0.0,
+          "q": "ok",
+          "raw": 0.0,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Dimension Line Snap Distance",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Dimension Prefix",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Dimension Suffix",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "E",
+          "norm": "E",
+          "q": "ok",
+          "raw": "E",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.East / West Indicator",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Survey Point",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "SpotElevation|4"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Elevation Base",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "EL=",
+          "norm": "EL=",
+          "q": "ok",
+          "raw": "EL=",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5",
+            "SpotElevation|4"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Elevation Indicator",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Prefix",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "SpotElevation|4"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Elevation Indicator as Prefix/Suffix",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "unsupported",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 0,
+            "unreadable": 0,
+            "unsupported": 1
+          },
+          "storage_types": [
+            "None"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Equality Formula",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "EQ",
+          "norm": "EQ",
+          "q": "ok",
+          "raw": "EQ",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Equality Text",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Tick and Line",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Equality Witness Display",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "1/16\"",
+          "norm": 0.005208333333333333,
+          "q": "ok",
+          "raw": 0.005208333333333333,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Flipped Dimension Line Extension",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Yes",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Include Elevation",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Yes",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Include Station",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Prefix",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Indicator as Prefix / Suffix",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Diagonal-Medium",
+          "norm": 16144,
+          "q": "ok",
+          "raw": 16144,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Interior Tick Mark",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Dynamic",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Interior Tick Mark Display",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Italic",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Dot Filled-Small",
+          "norm": 16298,
+          "q": "ok",
+          "raw": 16298,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 1,
+          "q_counts": {
+            "missing": 0,
+            "ok": 3,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ],
+          "unique_value_count": 3
+        },
+        "param_key": "p.Leader Arrowhead",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "1",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Leader Arrowhead Line Weight",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "1/2\"",
+          "norm": 0.041666666666666664,
+          "q": "ok",
+          "raw": 0.041666666666666664,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Leader Line Length",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "2",
+          "norm": 2,
+          "q": "ok",
+          "raw": 2,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Leader Line Weight",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 1,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Leader Tick Mark",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Arc",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Leader Type",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "2",
+          "norm": 2,
+          "q": "ok",
+          "raw": 2,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Line Weight",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "N",
+          "norm": "N",
+          "q": "ok",
+          "raw": "N",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.North / South Indicator",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "None",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Radius Symbol Location",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "R",
+          "norm": "R",
+          "q": "ok",
+          "raw": "R",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Radius Symbol Text",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Up, then Left",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Read Convention",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Rotate with Component",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Beyond Witness Lines",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Show Leader When Text Moves",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Down",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [],
+          "observed_on_shapes": [
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Slope Direction",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "STA",
+          "norm": "STA",
+          "q": "ok",
+          "raw": "STA",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Station Indicator",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Suppress Spaces",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Medium-Top",
+          "norm": 28925,
+          "q": "ok",
+          "raw": 28925,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5",
+            "SpotElevation|4"
+          ],
+          "ok_but_unset_count": 1,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Symbol",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Opaque",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Text Background",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Arial Narrow",
+          "norm": "Arial Narrow",
+          "q": "ok",
+          "raw": "Arial Narrow",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Text Font",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Above Leader",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5",
+            "SpotElevation|4"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Text Location",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "3/64\"",
+          "norm": 0.003906167979002625,
+          "q": "ok",
+          "raw": 0.003906167979002625,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Text Offset",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "1/64\"",
+          "norm": 0.0013021653543307085,
+          "q": "ok",
+          "raw": 0.0013021653543307085,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Text Offset from Leader",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "3/16\"",
+          "norm": 0.015625,
+          "q": "ok",
+          "raw": 0.015625,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5",
+            "SpotElevation|4"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Text Offset from Symbol",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Horizontal",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5",
+            "SpotElevation|4"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Text Orientation",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "3/32\"",
+          "norm": 0.0078125,
+          "q": "ok",
+          "raw": 0.0078125,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 2
+        },
+        "param_key": "p.Text Size",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "22 Degree Filled Arrow-Medium",
+          "norm": 2584,
+          "q": "ok",
+          "raw": 2584,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Tick Mark",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "1",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "radial"
+          ],
+          "observed_on_shapes": [
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Tick Mark Line Weight",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "North / South",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "other"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "SpotCoordinate|5"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Top Coordinate",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_families": [
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "SpotElevation|4"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Top Indicator",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Prefix",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "SpotElevation|4"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Top Indicator as Prefix/Suffix",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Underline",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "unsupported",
+          "raw": null,
+          "storage": "None"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 0,
+            "unreadable": 0,
+            "unsupported": 1
+          },
+          "storage_types": [
+            "None"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Units Format",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "1",
+          "norm": 1.0,
+          "q": "ok",
+          "raw": 1.0,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular",
+            "diameter",
+            "other",
+            "radial",
+            "spot"
+          ],
+          "observed_on_shapes": [
+            "AlignmentStationLabel|10",
+            "Angular|1",
+            "Diameter|9",
+            "Radial|2",
+            "SpotCoordinate|5",
+            "SpotElevation|4",
+            "SpotSlope|8"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Width Factor",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "Gap to Element",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Witness Line Control",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "1/16\"",
+          "norm": 0.005208333333333333,
+          "q": "ok",
+          "raw": 0.005208333333333333,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Witness Line Extension",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "1/16\"",
+          "norm": 0.005208333333333333,
+          "q": "ok",
+          "raw": 0.005208333333333333,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Witness Line Gap to Element",
+        "selected_type_sample_count": 14
+      },
+      {
+        "domain": "dimension_types",
+        "example": {
+          "display": "3/32\"",
+          "norm": 0.0078125,
+          "q": "ok",
+          "raw": 0.0078125,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_families": [
+            "angular"
+          ],
+          "observed_on_shapes": [
+            "Angular|1"
+          ],
+          "ok_but_unset_count": 0,
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ],
+          "unique_value_count": 1
+        },
+        "param_key": "p.Witness Line Length",
+        "selected_type_sample_count": 14
+      }
+    ]
+  },
+  {
+    "domain": "dimension_types",
+    "kind": "crosswalk",
+    "records": [
+      {
+        "arrowhead.name": "22 Degree Filled Arrow-Medium",
+        "arrowhead.resolved": true,
+        "arrowhead.type_id": 2584,
+        "dim_type.id": 18877,
+        "dim_type.name": "Medium-Arrow-Round-1/8",
+        "dim_type.shape": "Radial|2",
+        "dim_type.shape_family": "radial",
+        "dim_type.shape_label": "Radial",
+        "tick_param": {
+          "display": "22 Degree Filled Arrow-Medium",
+          "norm": 2584,
+          "q": "ok",
+          "raw": 2584,
+          "storage": "ElementId"
+        },
+        "tick_param.matched_name": "Tick Mark"
+      }
+    ]
+  }
+]

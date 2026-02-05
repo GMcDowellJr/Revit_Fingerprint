@@ -1,0 +1,3073 @@
+[
+  {
+    "domain": "identity",
+    "kind": "inventory",
+    "records": [
+      {
+        "domain": "identity",
+        "example": {
+          "display": "Greg.McDowellJr",
+          "norm": "Greg.McDowellJr",
+          "q": "ok",
+          "raw": "Greg.McDowellJr",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "source": "Application"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "app.username",
+        "provenance_layer": "runtime_context",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "25.4.0.32",
+          "norm": "25.4.0.32",
+          "q": "ok",
+          "raw": "25.4.0.32",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "source": "Application"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "app.version_build",
+        "provenance_layer": "runtime_context",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "Autodesk Revit 2025",
+          "norm": "Autodesk Revit 2025",
+          "q": "ok",
+          "raw": "Autodesk Revit 2025",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "source": "Application"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "app.version_name",
+        "provenance_layer": "runtime_context",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "2025",
+          "norm": "2025",
+          "q": "ok",
+          "raw": "2025",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "source": "Application"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "app.version_number",
+        "provenance_layer": "runtime_context",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "missing",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "source": "Worksharing"
+          },
+          "q_counts": {
+            "missing": 1,
+            "ok": 0,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "doc.central_path",
+        "provenance_layer": "core_project_identity",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "False",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "breadth": {
+            "source": "Document"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "doc.is_workshared",
+        "provenance_layer": "core_project_identity",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "C:\\Users\\gmcdowell\\Documents\\containers\\EN_0000_Stantec\\stn_i_1779_arch_int_container_2025.rvt",
+          "norm": "C:\\Users\\gmcdowell\\Documents\\containers\\EN_0000_Stantec\\stn_i_1779_arch_int_container_2025.rvt",
+          "q": "ok",
+          "raw": "C:\\Users\\gmcdowell\\Documents\\containers\\EN_0000_Stantec\\stn_i_1779_arch_int_container_2025.rvt",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "source": "Document"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "doc.path_name",
+        "provenance_layer": "core_project_identity",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "stn_i_1779_arch_int_container_2025",
+          "norm": "stn_i_1779_arch_int_container_2025",
+          "q": "ok",
+          "raw": "stn_i_1779_arch_int_container_2025",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "source": "Document"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "doc.title",
+        "provenance_layer": "core_project_identity",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "33144",
+          "norm": 33144,
+          "q": "ok",
+          "raw": 33144,
+          "storage": "Integer"
+        },
+        "observed": {
+          "breadth": {
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "project_info.element_id",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "6f6ad092-7acd-4518-8902-7bd1554f118f",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Acoustical Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "f0125ace-0997-4391-a09e-c5442abf95f6",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Acoustical Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Author",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "BUILDING NAME",
+          "norm": "BUILDING NAME",
+          "q": "ok",
+          "raw": "BUILDING NAME",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Building Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Client Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "edee45f3-196a-4427-b91f-21d669aec90b",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Code Consultant Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "fd32fd68-f68a-43ff-a2cd-e56aaf8171e8",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Code Consultant Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "d7de20ba-7012-4acf-88bc-472a57295925",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Const. Manager Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "0ffb2dd1-35ed-449b-9e9f-1cf8bee90a00",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Const. Manager Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "07dde7d4-c460-4e8a-a474-3a1eb1ecb42d",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.CvlSite Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "1ff8fa7e-894e-4956-89dd-9a20347a5838",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.CvlSite Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "170c478c-9fd2-4d34-8ac1-24e23670afbf",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Electrial Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "497b8f4d-dec4-4c4e-bbe9-c63a8f9ba773",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Electrical Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "03812309-7b81-4859-b323-d14d0b704f0f",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Envelope Consultant Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "cbc4f096-85ba-4803-afb8-1b2ab3813092",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Envelope Consultant Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "6dfd96e2-8368-44fc-8cfc-bde309757308",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Food Service Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "60a5c263-ccf7-466c-b750-e2bdb5456315",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Food Service Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.IfcBuilding GUID",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.IfcProject GUID",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.IfcSite GUID",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "837f9fdf-c60c-441f-9ffb-f3c56d9154b8",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Lighting Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "0617d7e3-5c5c-409d-a924-e0289e0d71ca",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Lighting Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "1cdb2004-5511-42b0-b2ac-c059034825d6",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Lndscp Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "5783114b-183a-404c-b22b-1b76b261b691",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Lndscp Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "8ed2b09d-f506-4dd9-9b17-798af0446c22",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.MEP Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "db815a91-39b6-4cf8-85a6-27175d98fe88",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.MEP Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "Philadelphia PA",
+          "norm": "Philadelphia PA",
+          "q": "ok",
+          "raw": "Philadelphia PA",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "6b61afc7-13eb-4af5-8b65-889f978af4f3",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "1779",
+          "norm": "1779",
+          "q": "ok",
+          "raw": "1779",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "ea076206-3fa1-4747-ad31-419974233bc1",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office Address Line 1",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "a6c4833b-0f2e-4cb4-86a5-0037fbd11013",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office Address Line 2",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "018055fa-562b-4bb8-aa78-41552671b169",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office Address Line 3",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "183ba41b-b164-4e95-8bb8-12a1e7ab3c23",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office Address Line 4",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "1181da6e-47a5-4282-afea-eef3bae4800c",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office City",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "5bcd5ed8-b0db-4819-978f-da63f32b4610",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office Country",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "(215) 665-7001",
+          "norm": "(215) 665-7001",
+          "q": "ok",
+          "raw": "(215) 665-7001",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "e4d07db8-b519-4a35-92a1-6edf78136909",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office Fax",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "Stantec Consulting Services Inc.",
+          "norm": "Stantec Consulting Services Inc.",
+          "q": "ok",
+          "raw": "Stantec Consulting Services Inc.",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "b2013bf2-ef8c-4379-bdd2-cd8b04f665b3",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office Legal Entity",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "910761d4-bf04-417b-8a67-3c7bac9e0c0b",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office State/Province",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "(215) 665-7000",
+          "norm": "(215) 665-7000",
+          "q": "ok",
+          "raw": "(215) 665-7000",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "9ca675ff-da3f-499e-9cba-0b947069a4d7",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office Telephone",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "efd73726-3386-46cb-91f6-4cffa0725f08",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Office Zip/Postal Code",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Organization Description",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "Stantec",
+          "norm": "Stantec",
+          "q": "ok",
+          "raw": "Stantec",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Organization Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "b6be486d-2837-4130-b478-907f4b9488ad",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Other1 Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "767e6dd5-a738-4d94-a503-8e7e4d05c6f9",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Other1 Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "417dae85-c8fb-410d-bae4-1fb628a3f3db",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Other2 Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "2b9347d9-1836-4681-a1cb-f5327e448927",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Other2 Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "b4a515c8-14ba-4c68-98b9-26335ff311c5",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Other3 Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "59863445-8a60-4f56-bb45-7045cf6ea363",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Other3 Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "2f174908-2e9e-4c9f-a0cd-bc524f0939c1",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Owner Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "3c4248d9-4fb7-4dcf-9e4b-74044d087e81",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Owner Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "d32d4c95-2cb8-4f58-82bf-a5212b3f5e7e",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_01_IssuedBy",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "PACKAGE A",
+          "norm": "PACKAGE A",
+          "q": "ok",
+          "raw": "PACKAGE A",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "6b3494de-efcc-4b6a-8eb4-6f8481f13ceb",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_01_Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "6e1dab53-f466-440e-b66d-2f2b0e05407e",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_02_IssuedBy",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "PACKAGE B",
+          "norm": "PACKAGE B",
+          "q": "ok",
+          "raw": "PACKAGE B",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "ad1c4ac6-6154-4bab-88f6-1fb6457c9285",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_02_Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "4c175a62-7cbe-49f9-8400-5a04c167667b",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_03_IssuedBy",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "PACKAGE C",
+          "norm": "PACKAGE C",
+          "q": "ok",
+          "raw": "PACKAGE C",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "9a53e15f-3272-406a-9aaf-e9e17cf76463",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_03_Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "e22694e1-a6be-41c2-b71a-a485b5cfe90b",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_04_IssuedBy",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "PACKAGE D",
+          "norm": "PACKAGE D",
+          "q": "ok",
+          "raw": "PACKAGE D",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "9777205d-2619-4ce1-9f80-e1e47aaa8606",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_04_Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "a384b5c3-9424-43fb-aa67-954fdbec3f43",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_05_IssuedBy",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "PACKAGE E",
+          "norm": "PACKAGE E",
+          "q": "ok",
+          "raw": "PACKAGE E",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "e863f36d-54a5-4cb9-84c8-ba52a645cf2e",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_05_Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "bedda8dc-57ea-4af6-9166-0fa2c9be3141",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_06_IssuedBy",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "PACKAGE F",
+          "norm": "PACKAGE F",
+          "q": "ok",
+          "raw": "PACKAGE F",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "8ed19f0a-fd7a-4796-b5cb-44ddbd1e5b44",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_06_Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "0967d37a-c1a7-40ad-8ef5-8e3f5625bca1",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_07_IssuedBy",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "PACKAGE G",
+          "norm": "PACKAGE G",
+          "q": "ok",
+          "raw": "PACKAGE G",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "501709a1-07b6-47a4-87f6-a435d7eb405f",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_07_Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "40521ba9-e938-44ae-9c2f-595282da4b6c",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_Active_ApprovedBy",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "15bcf8a1-00b6-48a5-8f91-f4c27364a6fb",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_Active_Date",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "35d7857f-5a93-4270-9175-691f660ad18f",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_Active_IssuedBy",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "PACKAGE A",
+          "norm": "PACKAGE A",
+          "q": "ok",
+          "raw": "PACKAGE A",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "51fa216e-7fa8-41df-9bb1-c0e85b8347f5",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_Active_Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "01",
+          "norm": "01",
+          "q": "ok",
+          "raw": "01",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "e4e5246a-5f9a-441f-8b25-e9f46baca2a4",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_Active_Number",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "\\\\corp.ads\\data\\Content\\CONTENT\\SHARED\\REVIT\\SHARED PARAMETERS\\STN_PE_Shared Parameters.txt",
+          "norm": "\\\\corp.ads\\data\\Content\\CONTENT\\SHARED\\REVIT\\SHARED PARAMETERS\\STN_PE_Shared Parameters.txt",
+          "q": "ok",
+          "raw": "\\\\corp.ads\\data\\Content\\CONTENT\\SHARED\\REVIT\\SHARED PARAMETERS\\STN_PE_Shared Parameters.txt",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "61455c3e-be52-4118-88af-2d41f607babf",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_SPFile",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "\u25cf",
+          "norm": "\u25cf",
+          "q": "ok",
+          "raw": "\u25cf",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "210ea8dd-7526-4007-8c9f-add77cfc9ca2",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_Symbol_Issued",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "\u25cb",
+          "norm": "\u25cb",
+          "q": "ok",
+          "raw": "\u25cb",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "3a18339e-2d89-43a6-a984-7734a251a080",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_Symbol_IssuedforRef",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "\u2500",
+          "norm": "\u2500",
+          "q": "ok",
+          "raw": "\u2500",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "1a7245a5-d28a-429d-84f2-6b466f9c7ba1",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.PE_Symbol_NotIssued",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "a5bbd52e-e956-4bdb-8f76-bac8c03c1daa",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Planning and Zoning Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "5392804b-5a4d-45d7-9a16-9e8978616bb1",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Planning and Zoning Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Project Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "f60b3edc-8e4a-43e1-9c8d-356ac058bf32",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Project Description",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Project Issue Date",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Project Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Project Number",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Project Status",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "A.Engle",
+          "norm": "A.Engle",
+          "q": "ok",
+          "raw": "A.Engle",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "33bf285a-3ec7-41be-8919-c81bb7eea22d",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Project_Template_Revision_By",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "2023.04.02",
+          "norm": "2023.04.02",
+          "q": "ok",
+          "raw": "2023.04.02",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "a71130f2-7559-495c-8208-aa6c234662ca",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Project_Template_Revision_Date",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "unsupported",
+          "raw": null,
+          "storage": "0"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "built_in",
+            "is_shared": false,
+            "shared_guid": null,
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 0,
+            "unreadable": 0,
+            "unsupported": 1
+          },
+          "storage_types": [
+            "0"
+          ]
+        },
+        "param_key": "project_info.p.Route Analysis Settings",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "9b41c4f9-eaf7-45d6-9293-b4606c1dface",
+          "norm": "9b41c4f9-eaf7-45d6-9293-b4606c1dface",
+          "q": "ok",
+          "raw": "9b41c4f9-eaf7-45d6-9293-b4606c1dface",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "cfb13538-9829-4045-9731-a140bd29e560",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.SR Document GUID",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "9ea57c54-1371-42a8-948f-5fb631b5ce05",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Struct Address",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": null,
+          "norm": null,
+          "q": "ok",
+          "raw": null,
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "0d977d14-0bd6-4950-9853-453595c95a9e",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p.Struct Name",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "99",
+          "norm": 99.0,
+          "q": "ok",
+          "raw": 99.0,
+          "storage": "Double"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "0db15bab-1d61-4523-a9fe-ca4101d13efa",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ]
+        },
+        "param_key": "project_info.p.Total Number of Sheets",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "www.stantec.com",
+          "norm": "www.stantec.com",
+          "q": "ok",
+          "raw": "www.stantec.com",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "baaf7531-335e-4180-962d-fcf77fbb0259",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p._Company_Website",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "YYYY.MM.DD, Issued for SD\r\nYYYY.MM.DD, Issued for DD\r\nYYYY.MM.DD, Issued for 60% CD\r\nYYYY.MM.DD, Issued for 90% CD\r\nYYYY.MM.DD, Issued for Construction/Tender",
+          "norm": "YYYY.MM.DD, Issued for SD\r\nYYYY.MM.DD, Issued for DD\r\nYYYY.MM.DD, Issued for 60% CD\r\nYYYY.MM.DD, Issued for 90% CD\r\nYYYY.MM.DD, Issued for Construction/Tender",
+          "q": "ok",
+          "raw": "YYYY.MM.DD, Issued for SD\r\nYYYY.MM.DD, Issued for DD\r\nYYYY.MM.DD, Issued for 60% CD\r\nYYYY.MM.DD, Issued for 90% CD\r\nYYYY.MM.DD, Issued for Construction/Tender",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "25039eb8-7c9a-4c80-94ba-95dc0ebc77d6",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p._Important_Dates",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "First Last, Phone, Timezone\r\nFirst Last, Phone, Timezone",
+          "norm": "First Last, Phone, Timezone\r\nFirst Last, Phone, Timezone",
+          "q": "ok",
+          "raw": "First Last, Phone, Timezone\r\nFirst Last, Phone, Timezone",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "68580643-e612-4293-96aa-54d11af0b55f",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p._Linked_Model_Managers",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "",
+          "norm": "",
+          "q": "ok",
+          "raw": "",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "54e946e6-f04c-48a4-a656-f6ba933da403",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p._Model_Description",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "<Pick location in Project Information>",
+          "norm": "<Pick location in Project Information>",
+          "q": "ok",
+          "raw": "<Pick location in Project Information>",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "ce08dee5-5ae2-4957-a368-23b614cc0091",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p._Model_File_Path",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "First Last, Phone, Timezone",
+          "norm": "First Last, Phone, Timezone",
+          "q": "ok",
+          "raw": "First Last, Phone, Timezone",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "9e926285-c8f8-44f0-a6d3-5d53c99fd1f3",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p._Model_Manager",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      },
+      {
+        "domain": "identity",
+        "example": {
+          "display": "First Last, Phone, Timezone\r\nFirst Last, Phone, Timezone",
+          "norm": "First Last, Phone, Timezone\r\nFirst Last, Phone, Timezone",
+          "q": "ok",
+          "raw": "First Last, Phone, Timezone\r\nFirst Last, Phone, Timezone",
+          "storage": "String"
+        },
+        "observed": {
+          "breadth": {
+            "definition_origin": "shared",
+            "is_shared": true,
+            "shared_guid": "9475e013-7cda-4f14-978b-5c56efdd691c",
+            "source": "ProjectInformation"
+          },
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "project_info.p._Team_Members",
+        "provenance_layer": "project_metadata",
+        "selected_type_sample_count": 1
+      }
+    ]
+  },
+  {
+    "domain": "identity",
+    "kind": "crosswalk",
+    "records": []
+  }
+]
