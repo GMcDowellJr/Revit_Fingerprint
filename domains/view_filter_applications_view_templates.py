@@ -394,7 +394,6 @@ def extract(doc, ctx=None):
             include_optional_items=False,
             emit_keys_used=True,
             hash_optional_items=False,
-            preserve_single_def_hash_passthrough=False,
         )
 
         semantic_keys = spec["phase2_payload"].get("semantic_keys", [])

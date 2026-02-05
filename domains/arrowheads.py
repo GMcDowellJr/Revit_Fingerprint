@@ -106,9 +106,8 @@ def _as_value_string(param):
 def _get_arrowhead_style(style_raw, style_q):
     """Return a canonical arrowhead style label.
 
-    This is a conservative mapping because enum meanings can vary.
-    We only return Arrow/Tick/Dot when the raw value indicates it;
-    otherwise fall back to Other.
+    Prefer the Revit display string from AsValueString() when available.
+    If we only have an int enum code, map known observed codes; otherwise "Other".
     """
     if style_q != ITEM_Q_OK:
         return None, style_q
@@ -116,25 +115,38 @@ def _get_arrowhead_style(style_raw, style_q):
     if style_raw is None:
         return None, ITEM_Q_MISSING
 
+    # If display string exists (common case), it's already the canonical style label.
     try:
-        style_str = str(style_raw)
+        if isinstance(style_raw, str):
+            s = style_raw.strip()
+            if s:
+                return s, ITEM_Q_OK
+    except Exception:
+        pass
+
+    # Otherwise treat as enum int (best-effort mapping based on probe evidence)
+    try:
+        iv = int(style_raw)
     except Exception:
         return None, ITEM_Q_UNREADABLE
 
-    style_str = style_str.strip()
-    if not style_str:
-        return None, ITEM_Q_MISSING
+    # Observed mapping from probe inventory (Arrow Style raw -> display)
+    # 0 Diagonal, 3 Dot, 7 Heavy end tick mark, 8 Arrow, 9 Datum triangle,
+    # 10 Box, 11 Elevation Target, 12 Loop
+    known = {
+        0: "Diagonal",
+        3: "Dot",
+        7: "Heavy end tick mark",
+        8: "Arrow",
+        9: "Datum triangle",
+        10: "Box",
+        11: "Elevation Target",
+        12: "Loop",
+    }
 
-    s_lower = style_str.lower()
+    if iv in known:
+        return known[iv], ITEM_Q_OK
 
-    if "arrow" in s_lower:
-        return "Arrow", ITEM_Q_OK
-    if "tick" in s_lower:
-        return "Tick", ITEM_Q_OK
-    if "dot" in s_lower:
-        return "Dot", ITEM_Q_OK
-
-    # Conservative fallback: avoid guessing enum codes without evidence.
     return "Other", ITEM_Q_OK
 
 
@@ -272,13 +284,20 @@ def extract(doc, ctx=None):
         # Arrow Style (enum/int)
         p_style = first_param(t, ui_names=["Arrow Style"])
 
-        # Prefer display string (e.g. "Arrow"); fallback to raw int.
+        # Capture BOTH display and raw int when possible
         style_disp = _as_value_string(p_style)
-        style_raw_int = _as_int(p_style) if style_disp is None else None
+        style_raw_int = _as_int(p_style)
 
         # Canonical enum source: display if available, else int-as-string.
         style_src = style_disp if style_disp is not None else (str(style_raw_int) if style_raw_int is not None else None)
         _style_v, _style_q = canonicalize_enum(style_src)
+
+        # Canonical style label for identity/join (prefer display; map known ints)
+        style_label_v, style_label_q = _get_arrowhead_style(style_disp if style_disp is not None else style_raw_int, _style_q)
+
+        # Also emit raw/display as explicit identity evidence
+        style_raw_v, style_raw_q = canonicalize_int(style_raw_int)
+        style_disp_v, style_disp_q = canonicalize_str_allow_empty(style_disp)
 
         # Stable label for identity/join: derive from display when possible.
         style_label_v, style_label_q = _get_arrowhead_style(style_disp if style_disp is not None else style_raw_int, _style_q)
@@ -356,6 +375,8 @@ def extract(doc, ctx=None):
 
         identity_items = [
             make_identity_item("arrowhead.style", style_label_v, style_label_q),
+            make_identity_item("arrowhead.arrow_style_raw_int", style_raw_v, style_raw_q),
+            make_identity_item("arrowhead.arrow_style_display", style_disp_v, style_disp_q),
             make_identity_item("arrowhead.tick_size_in", tick_in_v, tick_in_q),
             make_identity_item("arrowhead.width_angle_deg", ang_deg_v, ang_deg_q),
             make_identity_item("arrowhead.fill_tick", fill_v, fill_q),
@@ -363,6 +384,7 @@ def extract(doc, ctx=None):
             make_identity_item("arrowhead.tick_mark_centered", center_v, center_q),
             make_identity_item("arrowhead.heavy_end_pen_weight", pen_v, pen_q),
         ]
+
         semantic_keys = sorted({it.get("k") for it in identity_items if isinstance(it.get("k"), str)})
 
         # Required qs: style + tick_size must be OK (classifier depends on their presence)
