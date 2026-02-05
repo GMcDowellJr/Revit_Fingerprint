@@ -1,0 +1,447 @@
+[
+  {
+    "domain": "line_patterns",
+    "kind": "inventory",
+    "records": [
+      {
+        "domain": "line_patterns",
+        "example": {
+          "display": "False",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "bucket_counts": {
+            "0|solid=True": 2,
+            "2|solid=False": 5,
+            "4|solid=False": 5,
+            "6|solid=False": 5,
+            "8|solid=False": 2
+          },
+          "observed_on_buckets": [
+            "0|solid=True",
+            "2|solid=False",
+            "4|solid=False",
+            "6|solid=False",
+            "8|solid=False"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 19,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "prop.is_solid",
+        "selected_sample_count": 19
+      },
+      {
+        "domain": "line_patterns",
+        "example": {
+          "display": "Center",
+          "norm": "Center",
+          "q": "ok",
+          "raw": "Center",
+          "storage": "String"
+        },
+        "observed": {
+          "bucket_counts": {
+            "0|solid=True": 2,
+            "2|solid=False": 5,
+            "4|solid=False": 5,
+            "6|solid=False": 5,
+            "8|solid=False": 2
+          },
+          "observed_on_buckets": [
+            "0|solid=True",
+            "2|solid=False",
+            "4|solid=False",
+            "6|solid=False",
+            "8|solid=False"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 19,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "prop.name",
+        "selected_sample_count": 19
+      },
+      {
+        "domain": "line_patterns",
+        "example": {
+          "display": "4",
+          "norm": 4,
+          "q": "ok",
+          "raw": 4,
+          "storage": "Integer"
+        },
+        "observed": {
+          "bucket_counts": {
+            "0|solid=True": 2,
+            "2|solid=False": 5,
+            "4|solid=False": 5,
+            "6|solid=False": 5,
+            "8|solid=False": 2
+          },
+          "observed_on_buckets": [
+            "0|solid=True",
+            "2|solid=False",
+            "4|solid=False",
+            "6|solid=False",
+            "8|solid=False"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 19,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "prop.segment_count",
+        "selected_sample_count": 19
+      },
+      {
+        "domain": "line_patterns",
+        "example": {
+          "display": "seg[000].kind=0;len=0.250000|seg[001].kind=1;len=0.187500|seg[002].kind=0;len=0.625000|seg[003].kind=1;len=0.187500",
+          "norm": "seg[000].kind=0;len=0.250000|seg[001].kind=1;len=0.187500|seg[002].kind=0;len=0.625000|seg[003].kind=1;len=0.187500",
+          "q": "ok",
+          "raw": "seg[000].kind=0;len=0.250000|seg[001].kind=1;len=0.187500|seg[002].kind=0;len=0.625000|seg[003].kind=1;len=0.187500",
+          "storage": "String"
+        },
+        "observed": {
+          "bucket_counts": {
+            "0|solid=True": 2,
+            "2|solid=False": 5,
+            "4|solid=False": 5,
+            "6|solid=False": 5,
+            "8|solid=False": 2
+          },
+          "observed_on_buckets": [
+            "0|solid=True",
+            "2|solid=False",
+            "4|solid=False",
+            "6|solid=False",
+            "8|solid=False"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 19,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "prop.sequence",
+        "selected_sample_count": 19
+      },
+      {
+        "domain": "line_patterns",
+        "example": {
+          "display": "f0fbd9ea7d28714fcc8b16a820d4ee7b",
+          "norm": "f0fbd9ea7d28714fcc8b16a820d4ee7b",
+          "q": "ok",
+          "raw": "f0fbd9ea7d28714fcc8b16a820d4ee7b",
+          "storage": "String"
+        },
+        "observed": {
+          "bucket_counts": {
+            "0|solid=True": 2,
+            "2|solid=False": 5,
+            "4|solid=False": 5,
+            "6|solid=False": 5,
+            "8|solid=False": 2
+          },
+          "observed_on_buckets": [
+            "0|solid=True",
+            "2|solid=False",
+            "4|solid=False",
+            "6|solid=False",
+            "8|solid=False"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 19,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "prop.sequence_hash",
+        "selected_sample_count": 19
+      }
+    ]
+  },
+  {
+    "domain": "line_patterns",
+    "kind": "crosswalk",
+    "records": [
+      {
+        "linestyle.category_id": 1060505,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "1-Hidden2",
+        "pattern.id": 5146794,
+        "pattern.name": "0_Hidden2",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 1624186,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "EOS - Foundation Wall",
+        "pattern.id": 1565250,
+        "pattern.name": "Dash 3/32\"",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 902209,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "2-Hidden4-Grey",
+        "pattern.id": 23693,
+        "pattern.name": "0_Hidden4",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 902203,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "5-Dashed",
+        "pattern.id": 23676,
+        "pattern.name": "0_Dashed",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 141125,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "(FR) 1 Hour Rated",
+        "pattern.id": 23761,
+        "pattern.name": "0_FR_1 Hour Rated",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": -2000288,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "<Centerline>",
+        "pattern.id": 29,
+        "pattern.name": "Center",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 6496127,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "L1_Dash 1/16\" 192-192-192",
+        "pattern.id": 355642,
+        "pattern.name": "Dash 1/16\"",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 1504537,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "Centerline-1/8\"-1",
+        "pattern.id": 1504542,
+        "pattern.name": "Center 1/8\"",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": -2000284,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "<Overhead>",
+        "pattern.id": 35,
+        "pattern.name": "Overhead",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 141133,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "(FR) Non-Rated Smoke Partition",
+        "pattern.id": 23765,
+        "pattern.name": "0_FR_Non-Rated Smoke Barrier",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 1624190,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "Rating-1HR",
+        "pattern.id": 262635,
+        "pattern.name": "Dash dot",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": -2009018,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "<Fabric Envelope>",
+        "pattern.id": 5146795,
+        "pattern.name": "Dash 1/8\"",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 141131,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "(FR) 3 Hour Rated",
+        "pattern.id": 23764,
+        "pattern.name": "0_FR_3 Hour Rated",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 5682957,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "Path of Travel (TTD)",
+        "pattern.id": 5082294,
+        "pattern.name": "Dash Dot 3/16\"",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 1592570,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "Centerline-1/4\"-4",
+        "pattern.id": 1163828,
+        "pattern.name": "Center 1/4\"",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 1060499,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "4-Dot4",
+        "pattern.id": 5161648,
+        "pattern.name": "Dot 1/32\"",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 5766866,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "Dash Dot",
+        "pattern.id": 5766868,
+        "pattern.name": "Dash Dot 1/16\"",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": -2000286,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "<Hidden>",
+        "pattern.id": 37,
+        "pattern.name": "Demolished",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 144465,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "(Anno) Grid Line",
+        "pattern.id": 38,
+        "pattern.name": "Grid Line",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 4533683,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "Callout",
+        "pattern.id": 4533686,
+        "pattern.name": "Callout",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 5886734,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "QF_Equipment_Below",
+        "pattern.id": 5849021,
+        "pattern.name": "Dash",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 1624198,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "Rating-Smoke",
+        "pattern.id": 1784272,
+        "pattern.name": "Dot 3/16\"",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 141129,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "(FR) 2 Hour Rated",
+        "pattern.id": 23763,
+        "pattern.name": "0_FR_2 Hour Rated",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 1624194,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "Rating-2HR",
+        "pattern.id": 266923,
+        "pattern.name": "Dash dot dot",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 5886732,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "ADA Clearance",
+        "pattern.id": 5886736,
+        "pattern.name": "_Overhead",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 6496133,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "Detailing - Fine - Dashed",
+        "pattern.id": 5900131,
+        "pattern.name": "Hidden 1/16\"",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 1342022,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "5-Triple-Dash2",
+        "pattern.id": 1342040,
+        "pattern.name": "0_Triple_Dash2",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 4533681,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "1-Phantom",
+        "pattern.id": 4533685,
+        "pattern.name": "Double Dash 3/16\"",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 1060501,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "2-Hidden6",
+        "pattern.id": 1060507,
+        "pattern.name": "0_Hidden6",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 68817,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "(Anno) Matchline",
+        "pattern.id": 23597,
+        "pattern.name": "0_Dashdotdot",
+        "pattern.resolved": true
+      },
+      {
+        "linestyle.category_id": 921107,
+        "linestyle.graphics_style_type": "Projection",
+        "linestyle.name": "4-DashDot - (Wall Protection)",
+        "pattern.id": 262637,
+        "pattern.name": "0_Dashdot4",
+        "pattern.resolved": true
+      }
+    ]
+  }
+]

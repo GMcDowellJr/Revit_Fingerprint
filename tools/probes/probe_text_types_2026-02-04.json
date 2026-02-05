@@ -1,0 +1,614 @@
+[
+  {
+    "domain": "text_types",
+    "kind": "inventory",
+    "records": [
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "Opaque",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Background",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Bold",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "0",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Color",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Italic",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "22 Degree Filled Arrow-Medium",
+          "norm": 2584,
+          "q": "ok",
+          "raw": 2584,
+          "storage": "ElementId"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 4,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "ElementId"
+          ]
+        },
+        "param_key": "p.Leader Arrowhead",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "1/32\"",
+          "norm": 0.002604166666666667,
+          "q": "ok",
+          "raw": 0.002604166666666667,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ]
+        },
+        "param_key": "p.Leader/Border Offset",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "4",
+          "norm": 4,
+          "q": "ok",
+          "raw": 4,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Line Weight",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Show Border",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "1/4\"",
+          "norm": 0.020833333333333336,
+          "q": "ok",
+          "raw": 0.020833333333333336,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ]
+        },
+        "param_key": "p.Tab Size",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "Arial Narrow",
+          "norm": "Arial Narrow",
+          "q": "ok",
+          "raw": "Arial Narrow",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 5,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "p.Text Font",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "3/32\"",
+          "norm": 0.0078125,
+          "q": "ok",
+          "raw": 0.0078125,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 7,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ]
+        },
+        "param_key": "p.Text Size",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 1,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Underline",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "1",
+          "norm": 1.0,
+          "q": "ok",
+          "raw": 1.0,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ]
+        },
+        "param_key": "p.Width Factor",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "#000000",
+          "norm": "#000000",
+          "q": "ok",
+          "raw": "#000000",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.color.color.hex_bbgrr",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "#000000",
+          "norm": "#000000",
+          "q": "ok",
+          "raw": "#000000",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.color.color.hex_rrggbb",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "0x00000000",
+          "norm": "0x00000000",
+          "q": "ok",
+          "raw": "0x00000000",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.color.color.raw_hex32",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "0|0|0",
+          "norm": "0|0|0",
+          "q": "ok",
+          "raw": "0|0|0",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.color.color.rgb_bbgrr",
+        "selected_type_sample_count": 9
+      },
+      {
+        "domain": "text_types",
+        "example": {
+          "display": "0|0|0",
+          "norm": "0|0|0",
+          "q": "ok",
+          "raw": "0|0|0",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_fonts": [
+            "Arial Narrow|Arial Narrow",
+            "Arial|Arial",
+            "Comic Sans MS|Comic Sans MS",
+            "Simplex|Simplex",
+            "Swis721 Cn BT|Swis721 Cn BT"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "v.color.color.rgb_rrggbb",
+        "selected_type_sample_count": 9
+      }
+    ]
+  },
+  {
+    "domain": "text_types",
+    "kind": "crosswalk",
+    "records": [
+      {
+        "arrowhead.name": "22 Degree Filled Arrow-Medium",
+        "arrowhead.resolved": true,
+        "arrowhead.type_id": 2584,
+        "leader_arrow_param": {
+          "display": "22 Degree Filled Arrow-Medium",
+          "norm": 2584,
+          "q": "ok",
+          "raw": 2584,
+          "storage": "ElementId"
+        },
+        "leader_arrow_param.matched_name": "Leader Arrowhead",
+        "text_type.id": 1643,
+        "text_type.name": "Notes-Medium"
+      },
+      {
+        "arrowhead.name": "22 Degree Filled Arrow-Large",
+        "arrowhead.resolved": true,
+        "arrowhead.type_id": 16290,
+        "leader_arrow_param": {
+          "display": "22 Degree Filled Arrow-Large",
+          "norm": 16290,
+          "q": "ok",
+          "raw": 16290,
+          "storage": "ElementId"
+        },
+        "leader_arrow_param.matched_name": "Leader Arrowhead",
+        "text_type.id": 27913,
+        "text_type.name": "Redlines"
+      },
+      {
+        "arrowhead.name": "Arrow Filled 15 Degree",
+        "arrowhead.resolved": true,
+        "arrowhead.type_id": 849726,
+        "leader_arrow_param": {
+          "display": "Arrow Filled 15 Degree",
+          "norm": 849726,
+          "q": "ok",
+          "raw": 849726,
+          "storage": "ElementId"
+        },
+        "leader_arrow_param.matched_name": "Leader Arrowhead",
+        "text_type.id": 849795,
+        "text_type.name": "X-Signage-Arial - 9/64\""
+      },
+      {
+        "arrowhead.name": "Arrow 30 Degree",
+        "arrowhead.resolved": true,
+        "arrowhead.type_id": 343144,
+        "leader_arrow_param": {
+          "display": "Arrow 30 Degree",
+          "norm": 343144,
+          "q": "ok",
+          "raw": 343144,
+          "storage": "ElementId"
+        },
+        "leader_arrow_param.matched_name": "Leader Arrowhead",
+        "text_type.id": 1576763,
+        "text_type.name": "ZZ-Signage-Simplex - 3/16 (T)"
+      }
+    ]
+  }
+]

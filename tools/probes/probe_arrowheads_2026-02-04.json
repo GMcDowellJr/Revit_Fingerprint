@@ -1,0 +1,290 @@
+[
+  {
+    "domain": "arrowheads",
+    "kind": "inventory",
+    "records": [
+      {
+        "domain": "arrowheads",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_styles": [
+            "0|Diagonal",
+            "10|Box",
+            "11|Elevation Target",
+            "12|Loop",
+            "3|Dot",
+            "7|Heavy end tick mark",
+            "8|Arrow",
+            "9|Datum triangle"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Arrow Closed",
+        "selected_type_sample_count": 12
+      },
+      {
+        "domain": "arrowheads",
+        "example": {
+          "display": "Diagonal",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_styles": [
+            "0|Diagonal",
+            "10|Box",
+            "11|Elevation Target",
+            "12|Loop",
+            "3|Dot",
+            "7|Heavy end tick mark",
+            "8|Arrow",
+            "9|Datum triangle"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Arrow Style",
+        "selected_type_sample_count": 12
+      },
+      {
+        "domain": "arrowheads",
+        "example": {
+          "display": "30.000000000000\u00b0",
+          "norm": 30.0,
+          "q": "ok",
+          "raw": 0.5235987755982984,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_styles": [
+            "0|Diagonal",
+            "10|Box",
+            "11|Elevation Target",
+            "12|Loop",
+            "3|Dot",
+            "7|Heavy end tick mark",
+            "8|Arrow",
+            "9|Datum triangle"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ]
+        },
+        "param_key": "p.Arrow Width Angle",
+        "selected_type_sample_count": 12
+      },
+      {
+        "domain": "arrowheads",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_styles": [
+            "0|Diagonal",
+            "10|Box",
+            "11|Elevation Target",
+            "12|Loop",
+            "3|Dot",
+            "7|Heavy end tick mark",
+            "8|Arrow",
+            "9|Datum triangle"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Fill Tick",
+        "selected_type_sample_count": 12
+      },
+      {
+        "domain": "arrowheads",
+        "example": {
+          "display": "5",
+          "norm": 5,
+          "q": "ok",
+          "raw": 5,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_styles": [
+            "0|Diagonal",
+            "10|Box",
+            "11|Elevation Target",
+            "12|Loop",
+            "3|Dot",
+            "7|Heavy end tick mark",
+            "8|Arrow",
+            "9|Datum triangle"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Heavy End Pen Weight",
+        "selected_type_sample_count": 12
+      },
+      {
+        "domain": "arrowheads",
+        "example": {
+          "display": "No",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_styles": [
+            "0|Diagonal",
+            "10|Box",
+            "11|Elevation Target",
+            "12|Loop",
+            "3|Dot",
+            "7|Heavy end tick mark",
+            "8|Arrow",
+            "9|Datum triangle"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "p.Tick Mark Centered",
+        "selected_type_sample_count": 12
+      },
+      {
+        "domain": "arrowheads",
+        "example": {
+          "display": "1/64\"",
+          "norm": 0.0013020833333333333,
+          "q": "ok",
+          "raw": 0.0013020833333333333,
+          "storage": "Double"
+        },
+        "observed": {
+          "observed_on_styles": [
+            "0|Diagonal",
+            "10|Box",
+            "11|Elevation Target",
+            "12|Loop",
+            "3|Dot",
+            "7|Heavy end tick mark",
+            "8|Arrow",
+            "9|Datum triangle"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 12,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Double"
+          ]
+        },
+        "param_key": "p.Tick Size",
+        "selected_type_sample_count": 12
+      }
+    ]
+  },
+  {
+    "domain": "arrowheads",
+    "kind": "crosswalk",
+    "records": [
+      {
+        "arrowhead.name": "22 Degree Filled Arrow-Medium",
+        "arrowhead.resolved": true,
+        "arrowhead.type_id": 2584,
+        "dim_type.id": 18877,
+        "dim_type.name": "Medium-Arrow-Round-1/8",
+        "tick_param": {
+          "display": "22 Degree Filled Arrow-Medium",
+          "norm": 2584,
+          "q": "ok",
+          "raw": 2584,
+          "storage": "ElementId"
+        },
+        "tick_param.matched_name": "Tick Mark"
+      },
+      {
+        "arrowhead.name": "Diagonal-Medium",
+        "arrowhead.resolved": true,
+        "arrowhead.type_id": 16144,
+        "dim_type.id": 18964,
+        "dim_type.name": "Medium-Tick",
+        "tick_param": {
+          "display": "Diagonal-Medium",
+          "norm": 16144,
+          "q": "ok",
+          "raw": 16144,
+          "storage": "ElementId"
+        },
+        "tick_param.matched_name": "Tick Mark"
+      },
+      {
+        "arrowhead.name": "22 Degree Filled Arrow-Small",
+        "arrowhead.resolved": true,
+        "arrowhead.type_id": 16287,
+        "dim_type.id": 19068,
+        "dim_type.name": "Small-Arrow-Round-1/8",
+        "tick_param": {
+          "display": "22 Degree Filled Arrow-Small",
+          "norm": 16287,
+          "q": "ok",
+          "raw": 16287,
+          "storage": "ElementId"
+        },
+        "tick_param.matched_name": "Tick Mark"
+      }
+    ]
+  }
+]

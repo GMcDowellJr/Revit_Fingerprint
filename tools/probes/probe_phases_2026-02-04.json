@@ -1,0 +1,97 @@
+[
+  {
+    "domain": "phases",
+    "kind": "inventory",
+    "records": [
+      {
+        "domain": "phases",
+        "example": {
+          "display": "Existing",
+          "norm": "Existing",
+          "q": "ok",
+          "raw": "Existing",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_phases": [
+            "seq=1|name=Existing|uid=e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001",
+            "seq=2|name=New Construction|uid=e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000003"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "raw_phase_count": 2,
+          "selected_phase_sample_count": 2,
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "phase.name"
+      },
+      {
+        "domain": "phases",
+        "example": {
+          "display": "1",
+          "norm": 1,
+          "q": "unreadable",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_phases": [
+            "seq=1|name=Existing|uid=e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001",
+            "seq=2|name=New Construction|uid=e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000003"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 0,
+            "unreadable": 2,
+            "unsupported": 0
+          },
+          "raw_phase_count": 2,
+          "selected_phase_sample_count": 2,
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "phase.sequence_number"
+      },
+      {
+        "domain": "phases",
+        "example": {
+          "display": "e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001",
+          "norm": "e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001",
+          "q": "ok",
+          "raw": "e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_phases": [
+            "seq=1|name=Existing|uid=e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001",
+            "seq=2|name=New Construction|uid=e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000003"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 2,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "raw_phase_count": 2,
+          "selected_phase_sample_count": 2,
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "phase.uid"
+      }
+    ]
+  },
+  {
+    "domain": "phases",
+    "kind": "crosswalk",
+    "records": []
+  }
+]

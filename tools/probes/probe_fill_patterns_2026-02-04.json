@@ -1,0 +1,463 @@
+[
+  {
+    "domain": "fill_patterns",
+    "kind": "inventory",
+    "records": [
+      {
+        "domain": "fill_patterns",
+        "example": {
+          "display": "0",
+          "norm": 0,
+          "q": "ok",
+          "raw": 0,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "0|solid=False|grids=1",
+            "0|solid=False|grids=10",
+            "0|solid=False|grids=103",
+            "0|solid=False|grids=13",
+            "0|solid=False|grids=144",
+            "0|solid=False|grids=147",
+            "0|solid=False|grids=16",
+            "0|solid=False|grids=17",
+            "0|solid=False|grids=18",
+            "0|solid=False|grids=2",
+            "0|solid=False|grids=20",
+            "0|solid=False|grids=22",
+            "0|solid=False|grids=272",
+            "0|solid=False|grids=2757",
+            "0|solid=False|grids=282",
+            "0|solid=False|grids=2849",
+            "0|solid=False|grids=29",
+            "0|solid=False|grids=2936",
+            "0|solid=False|grids=3",
+            "0|solid=False|grids=316",
+            "0|solid=False|grids=365",
+            "0|solid=False|grids=38",
+            "0|solid=False|grids=4",
+            "0|solid=False|grids=41",
+            "0|solid=False|grids=415"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 99,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "fp.grid_count",
+        "selected_element_sample_count": 99
+      },
+      {
+        "domain": "fill_patterns",
+        "example": {
+          "display": "[]",
+          "norm": "[]",
+          "q": "ok",
+          "raw": "[]",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "0|solid=False|grids=1",
+            "0|solid=False|grids=10",
+            "0|solid=False|grids=103",
+            "0|solid=False|grids=13",
+            "0|solid=False|grids=144",
+            "0|solid=False|grids=147",
+            "0|solid=False|grids=16",
+            "0|solid=False|grids=17",
+            "0|solid=False|grids=18",
+            "0|solid=False|grids=2",
+            "0|solid=False|grids=20",
+            "0|solid=False|grids=22",
+            "0|solid=False|grids=272",
+            "0|solid=False|grids=2757",
+            "0|solid=False|grids=282",
+            "0|solid=False|grids=2849",
+            "0|solid=False|grids=29",
+            "0|solid=False|grids=2936",
+            "0|solid=False|grids=3",
+            "0|solid=False|grids=316",
+            "0|solid=False|grids=365",
+            "0|solid=False|grids=38",
+            "0|solid=False|grids=4",
+            "0|solid=False|grids=41",
+            "0|solid=False|grids=415"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 99,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "fp.grids.angles_deg",
+        "selected_element_sample_count": 99
+      },
+      {
+        "domain": "fill_patterns",
+        "example": {
+          "display": "[]",
+          "norm": "[]",
+          "q": "ok",
+          "raw": "[]",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "0|solid=False|grids=1",
+            "0|solid=False|grids=10",
+            "0|solid=False|grids=103",
+            "0|solid=False|grids=13",
+            "0|solid=False|grids=144",
+            "0|solid=False|grids=147",
+            "0|solid=False|grids=16",
+            "0|solid=False|grids=17",
+            "0|solid=False|grids=18",
+            "0|solid=False|grids=2",
+            "0|solid=False|grids=20",
+            "0|solid=False|grids=22",
+            "0|solid=False|grids=272",
+            "0|solid=False|grids=2757",
+            "0|solid=False|grids=282",
+            "0|solid=False|grids=2849",
+            "0|solid=False|grids=29",
+            "0|solid=False|grids=2936",
+            "0|solid=False|grids=3",
+            "0|solid=False|grids=316",
+            "0|solid=False|grids=365",
+            "0|solid=False|grids=38",
+            "0|solid=False|grids=4",
+            "0|solid=False|grids=41",
+            "0|solid=False|grids=415"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 99,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "fp.grids.line_pattern_ids",
+        "selected_element_sample_count": 99
+      },
+      {
+        "domain": "fill_patterns",
+        "example": {
+          "display": "[]",
+          "norm": "[]",
+          "q": "ok",
+          "raw": "[]",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "0|solid=False|grids=1",
+            "0|solid=False|grids=10",
+            "0|solid=False|grids=103",
+            "0|solid=False|grids=13",
+            "0|solid=False|grids=144",
+            "0|solid=False|grids=147",
+            "0|solid=False|grids=16",
+            "0|solid=False|grids=17",
+            "0|solid=False|grids=18",
+            "0|solid=False|grids=2",
+            "0|solid=False|grids=20",
+            "0|solid=False|grids=22",
+            "0|solid=False|grids=272",
+            "0|solid=False|grids=2757",
+            "0|solid=False|grids=282",
+            "0|solid=False|grids=2849",
+            "0|solid=False|grids=29",
+            "0|solid=False|grids=2936",
+            "0|solid=False|grids=3",
+            "0|solid=False|grids=316",
+            "0|solid=False|grids=365",
+            "0|solid=False|grids=38",
+            "0|solid=False|grids=4",
+            "0|solid=False|grids=41",
+            "0|solid=False|grids=415"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 99,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "fp.grids.offsets_in",
+        "selected_element_sample_count": 99
+      },
+      {
+        "domain": "fill_patterns",
+        "example": {
+          "display": "[]",
+          "norm": "[]",
+          "q": "ok",
+          "raw": "[]",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "0|solid=False|grids=1",
+            "0|solid=False|grids=10",
+            "0|solid=False|grids=103",
+            "0|solid=False|grids=13",
+            "0|solid=False|grids=144",
+            "0|solid=False|grids=147",
+            "0|solid=False|grids=16",
+            "0|solid=False|grids=17",
+            "0|solid=False|grids=18",
+            "0|solid=False|grids=2",
+            "0|solid=False|grids=20",
+            "0|solid=False|grids=22",
+            "0|solid=False|grids=272",
+            "0|solid=False|grids=2757",
+            "0|solid=False|grids=282",
+            "0|solid=False|grids=2849",
+            "0|solid=False|grids=29",
+            "0|solid=False|grids=2936",
+            "0|solid=False|grids=3",
+            "0|solid=False|grids=316",
+            "0|solid=False|grids=365",
+            "0|solid=False|grids=38",
+            "0|solid=False|grids=4",
+            "0|solid=False|grids=41",
+            "0|solid=False|grids=415"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 99,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "fp.grids.origins_in",
+        "selected_element_sample_count": 99
+      },
+      {
+        "domain": "fill_patterns",
+        "example": {
+          "display": "[]",
+          "norm": "[]",
+          "q": "ok",
+          "raw": "[]",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "0|solid=False|grids=1",
+            "0|solid=False|grids=10",
+            "0|solid=False|grids=103",
+            "0|solid=False|grids=13",
+            "0|solid=False|grids=144",
+            "0|solid=False|grids=147",
+            "0|solid=False|grids=16",
+            "0|solid=False|grids=17",
+            "0|solid=False|grids=18",
+            "0|solid=False|grids=2",
+            "0|solid=False|grids=20",
+            "0|solid=False|grids=22",
+            "0|solid=False|grids=272",
+            "0|solid=False|grids=2757",
+            "0|solid=False|grids=282",
+            "0|solid=False|grids=2849",
+            "0|solid=False|grids=29",
+            "0|solid=False|grids=2936",
+            "0|solid=False|grids=3",
+            "0|solid=False|grids=316",
+            "0|solid=False|grids=365",
+            "0|solid=False|grids=38",
+            "0|solid=False|grids=4",
+            "0|solid=False|grids=41",
+            "0|solid=False|grids=415"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 99,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "fp.grids.shifts_in",
+        "selected_element_sample_count": 99
+      },
+      {
+        "domain": "fill_patterns",
+        "example": {
+          "display": "True",
+          "norm": 1,
+          "q": "ok",
+          "raw": 1,
+          "storage": "Integer"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "0|solid=False|grids=1",
+            "0|solid=False|grids=10",
+            "0|solid=False|grids=103",
+            "0|solid=False|grids=13",
+            "0|solid=False|grids=144",
+            "0|solid=False|grids=147",
+            "0|solid=False|grids=16",
+            "0|solid=False|grids=17",
+            "0|solid=False|grids=18",
+            "0|solid=False|grids=2",
+            "0|solid=False|grids=20",
+            "0|solid=False|grids=22",
+            "0|solid=False|grids=272",
+            "0|solid=False|grids=2757",
+            "0|solid=False|grids=282",
+            "0|solid=False|grids=2849",
+            "0|solid=False|grids=29",
+            "0|solid=False|grids=2936",
+            "0|solid=False|grids=3",
+            "0|solid=False|grids=316",
+            "0|solid=False|grids=365",
+            "0|solid=False|grids=38",
+            "0|solid=False|grids=4",
+            "0|solid=False|grids=41",
+            "0|solid=False|grids=415"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 99,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "Integer"
+          ]
+        },
+        "param_key": "fp.is_solid",
+        "selected_element_sample_count": 99
+      },
+      {
+        "domain": "fill_patterns",
+        "example": {
+          "display": "<Solid fill>",
+          "norm": "<Solid fill>",
+          "q": "ok",
+          "raw": "<Solid fill>",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "0|solid=False|grids=1",
+            "0|solid=False|grids=10",
+            "0|solid=False|grids=103",
+            "0|solid=False|grids=13",
+            "0|solid=False|grids=144",
+            "0|solid=False|grids=147",
+            "0|solid=False|grids=16",
+            "0|solid=False|grids=17",
+            "0|solid=False|grids=18",
+            "0|solid=False|grids=2",
+            "0|solid=False|grids=20",
+            "0|solid=False|grids=22",
+            "0|solid=False|grids=272",
+            "0|solid=False|grids=2757",
+            "0|solid=False|grids=282",
+            "0|solid=False|grids=2849",
+            "0|solid=False|grids=29",
+            "0|solid=False|grids=2936",
+            "0|solid=False|grids=3",
+            "0|solid=False|grids=316",
+            "0|solid=False|grids=365",
+            "0|solid=False|grids=38",
+            "0|solid=False|grids=4",
+            "0|solid=False|grids=41",
+            "0|solid=False|grids=415"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 99,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "fp.name",
+        "selected_element_sample_count": 99
+      },
+      {
+        "domain": "fill_patterns",
+        "example": {
+          "display": "Drafting",
+          "norm": "Drafting",
+          "q": "ok",
+          "raw": "Drafting",
+          "storage": "String"
+        },
+        "observed": {
+          "observed_on_buckets": [
+            "0|solid=False|grids=1",
+            "0|solid=False|grids=10",
+            "0|solid=False|grids=103",
+            "0|solid=False|grids=13",
+            "0|solid=False|grids=144",
+            "0|solid=False|grids=147",
+            "0|solid=False|grids=16",
+            "0|solid=False|grids=17",
+            "0|solid=False|grids=18",
+            "0|solid=False|grids=2",
+            "0|solid=False|grids=20",
+            "0|solid=False|grids=22",
+            "0|solid=False|grids=272",
+            "0|solid=False|grids=2757",
+            "0|solid=False|grids=282",
+            "0|solid=False|grids=2849",
+            "0|solid=False|grids=29",
+            "0|solid=False|grids=2936",
+            "0|solid=False|grids=3",
+            "0|solid=False|grids=316",
+            "0|solid=False|grids=365",
+            "0|solid=False|grids=38",
+            "0|solid=False|grids=4",
+            "0|solid=False|grids=41",
+            "0|solid=False|grids=415"
+          ],
+          "q_counts": {
+            "missing": 0,
+            "ok": 99,
+            "unreadable": 0,
+            "unsupported": 0
+          },
+          "storage_types": [
+            "String"
+          ]
+        },
+        "param_key": "fp.target",
+        "selected_element_sample_count": 99
+      }
+    ]
+  },
+  {
+    "domain": "fill_patterns",
+    "kind": "crosswalk",
+    "records": []
+  }
+]
