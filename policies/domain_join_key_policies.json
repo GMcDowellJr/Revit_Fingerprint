@@ -211,10 +211,10 @@
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
         "dim_type.shape",
-        "dim_type.accuracy",
-        "dim_type.tick_mark_sig_hash"
+        "dim_type.accuracy"
       ],
       "optional_items": [
+		"dim_type.tick_mark_sig_hash",
         "dim_type.prefix",
         "dim_type.suffix",
         "dim_type.unit_format_id",
@@ -232,37 +232,37 @@
         "discriminator_key": "dim_type.shape",
         "shape_requirements": {
           "Linear": {
-            "additional_required": ["dim_type.witness_line_control"],
+            "additional_required": ["dim_type.witness_line_control","dim_type.tick_mark_sig_hash"],
             "additional_optional": [],
             "notes": "Linear dimensions must match on witness line control behavior"
           },
           "LinearFixed": {
-            "additional_required": ["dim_type.witness_line_control"],
+            "additional_required": ["dim_type.witness_line_control","dim_type.tick_mark_sig_hash"],
             "additional_optional": [],
             "notes": "LinearFixed dimensions share witness line requirements with Linear"
           },
           "Radial": {
-            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size"],
+            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size","dim_type.tick_mark_sig_hash"],
             "additional_optional": [],
             "notes": "Radial dimensions must match on center mark configuration"
           },
           "Diameter": {
-            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size"],
+            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size","dim_type.tick_mark_sig_hash"],
             "additional_optional": [],
             "notes": "Diameter dimensions share center mark requirements with Radial"
           },
           "DiameterLinked": {
-            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size"],
+            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size","dim_type.tick_mark_sig_hash"],
             "additional_optional": [],
             "notes": "DiameterLinked dimensions share center mark requirements with Radial"
           },
           "Angular": {
-            "additional_required": ["dim_type.unit_format_id"],
+            "additional_required": ["dim_type.unit_format_id","dim_type.tick_mark_sig_hash"],
             "additional_optional": [],
             "notes": "Angular dimensions use common properties only"
           },
           "ArcLength": {
-            "additional_required": ["dim_type.unit_format_id"],
+            "additional_required": ["dim_type.unit_format_id","dim_type.tick_mark_sig_hash"],
             "additional_optional": [],
             "notes": "ArcLength dimensions use common properties only"
           },
@@ -272,12 +272,12 @@
             "notes": "Spot dimensions use common properties only"
           },
           "SpotCoordinate": {
-            "additional_required": ["dim_type.unit_format_id"],
+            "additional_required": ["dim_type.unit_format_id","dim_type.tick_mark_sig_hash"],
             "additional_optional": [],
             "notes": "Spot dimensions use common properties only"
           },
           "SpotSlope": {
-            "additional_required": ["dim_type.unit_format_id"],
+            "additional_required": ["dim_type.unit_format_id","dim_type.tick_mark_sig_hash"],
             "additional_optional": [],
             "notes": "Spot dimensions use common properties only"
           },
@@ -377,26 +377,49 @@
 		"Template identifiers are labels/linkage only and are prohibited from joins."
 	  ]
 	},
-    "object_styles": {
-      "join_key_schema": "object_styles.join_key.v2",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "obj_style.row_key",
-        "obj_style.pattern_ref.sig_hash",
-        "obj_style.weight.projection"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "obj_style.color.rgb",
-        "obj_style.pattern_ref.kind",
-        "obj_style.weight.cut"
-      ],
-      "notes": [
-        "Identity is category-scoped via obj_style.row_key.",
-        "Definition includes referenced pattern via obj_style.pattern_ref.sig_hash.",
-        "obj_style.weight.projection is required to eliminate observed collisions under row_key + pattern_ref.sig_hash."
-      ]
-    },
+	"object_styles": {
+	  "join_key_schema": "object_styles.join_key.v3",
+	  "hash_alg": "md5_utf8_join_pipe",
+	  "required_items": [
+		"obj_style.pattern_ref.kind"
+	  ],
+	  "optional_items": [
+		"obj_style.row_key",
+		"obj_style.weight.projection",
+		"obj_style.pattern_ref.sig_hash"
+	  ],
+	  "explicitly_excluded_items": [
+		"obj_style.color.rgb",
+		"obj_style.weight.cut"
+	  ],
+	  "shape_gating": {
+		"discriminator_key": "obj_style.pattern_ref.kind",
+		"shape_requirements": {
+		  "ref": {
+			"additional_required": [
+			  "obj_style.row_key",
+			  "obj_style.weight.projection",
+			  "obj_style.pattern_ref.sig_hash"
+			],
+			"additional_optional": [],
+			"notes": "Referenced patterns must join via line pattern sig_hash."
+		  },
+		  "solid": {
+			"additional_required": [
+			  "obj_style.row_key",
+			  "obj_style.weight.projection"
+			],
+			"additional_optional": [],
+			"notes": "Solid has no referenced line pattern; do not require sig_hash."
+		  }
+		},
+		"default_shape_behavior": "common_only"
+	  },
+	  "notes": [
+		"Schema v3: discriminator is the only common required item; per-shape additional_required supplies the real join keys.",
+		"Passes A1/A2/A3/A4 while keeping solids joinable without pattern sig_hash."
+	  ]
+	},
     "view_category_overrides": {
       "join_key_schema": "view_category_overrides.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
