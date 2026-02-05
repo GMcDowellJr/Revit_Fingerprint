@@ -42,6 +42,7 @@ from core.canon import (
 )
 
 from core.record_v2 import (
+    ITEM_Q_MISSING,
     ITEM_Q_OK,
     make_identity_item,
     serialize_identity_items,
@@ -185,6 +186,64 @@ def _compute_delta_items(override_items, baseline_record):
             delta_items.append(override_item)
 
     return delta_items
+
+
+def _canonical_identity_items_from_signature(def_hash, def_signature, override_stack_hash=None):
+    """Canonical evidence superset for view_templates.
+
+    Pilot rule: identity_basis.items is the single source of k/q/v evidence.
+    Join and semantic surfaces should point at this superset via key selectors.
+    """
+    items = [make_identity_item("view_template.def_hash", def_hash, ITEM_Q_OK)]
+    if override_stack_hash:
+        items.append(
+            make_identity_item("view_template.category_overrides_def_hash", override_stack_hash, ITEM_Q_OK)
+        )
+    items.extend(_phase2_items_from_def_signature(def_signature))
+    return phase2_sorted_items(items)
+
+
+def _semantic_keys_from_identity_items(identity_items):
+    """Semantic selector list over canonical evidence.
+
+    Keep join-key material separate from sig_hash basis for strict join/identity separation.
+    """
+    keys = sorted(
+        {
+            safe_str(it.get("k", ""))
+            for it in (identity_items or [])
+            if isinstance(it.get("k"), str)
+            and safe_str(it.get("k", ""))
+            and safe_str(it.get("k", "")) != "view_template.def_hash"
+        }
+    )
+    return [k for k in keys if k]
+
+
+def _join_key_from_canonical_items(identity_items):
+    """Compute join_key from policy-required selectors over canonical evidence.
+
+    v1 policy for view_templates uses only base required key `view_template.def_hash`.
+    `items` is retained for back-compat and contains only hashed items.
+    """
+    keys_used = ["view_template.def_hash"]
+    k_to_item = {it.get("k"): it for it in (identity_items or []) if isinstance(it.get("k"), str)}
+
+    hashed_items = []
+    for k in keys_used:
+        item = k_to_item.get(k)
+        if item is None:
+            hashed_items.append({"k": k, "q": ITEM_Q_MISSING, "v": None})
+        else:
+            hashed_items.append({"k": k, "q": item.get("q"), "v": item.get("v")})
+
+    return {
+        "schema": "view_templates.join_key.v1",
+        "hash_alg": "md5_utf8_join_pipe",
+        "keys_used": sorted(keys_used),
+        "items": phase2_sorted_items(hashed_items),
+        "join_hash": phase2_join_hash(hashed_items),
+    }
 
 def extract(doc, ctx=None):
     """
@@ -490,43 +549,33 @@ def extract(doc, ctx=None):
             # -------------------------
             # Phase-2 (contract-aligned)
             # -------------------------
-            semantic_items = phase2_sorted_items([
-                make_identity_item("view_template.def_hash", def_hash, ITEM_Q_OK),
-            ])
+            identity_items = _canonical_identity_items_from_signature(def_hash, sig_final)
+            rec["identity_basis"] = {
+                "hash_alg": "md5_utf8_join_pipe",
+                "item_schema": "identity_item.v1",
+                "items": identity_items,
+            }
 
-            uid_v, uid_q = phase2_qv_from_legacy_sentinel_str(uid or None, allow_empty=False)
-            unknown_items = phase2_sorted_items([
-                make_identity_item("view_template.uid", uid_v, uid_q),
-                make_identity_item("view_template.element_id", safe_str(v.Id.IntegerValue), ITEM_Q_OK),
-                make_identity_item("view_template.name", name, ITEM_Q_OK),
-                make_identity_item("view_template.view_type", safe_str(v.ViewType), ITEM_Q_OK),
-                make_identity_item("view_template.is_schedule", "1", ITEM_Q_OK),
-            ])
-
+            semantic_keys = _semantic_keys_from_identity_items(identity_items)
             rec["phase2"] = {
                 "schema": "phase2.view_templates.v2",
                 "grouping_basis": "join_key.join_hash",
-                "semantic_items": semantic_items,
+                # Selector over canonical identity evidence; avoids duplicating k/q/v payload.
+                "semantic_keys": semantic_keys,
                 "cosmetic_items": [],
                 "coordination_items": [],
-                "unknown_items": unknown_items,
+                "unknown_items": [],
             }
 
-            # Build join_key following policy view_templates.join_key.v1
-            # For baseline-only v1: join_hash equals def_hash
-            join_key_items = [
-                {
-                    "k": "view_template.def_hash",
-                    "q": ITEM_Q_OK,
-                    "v": def_hash
-                }
-            ]
-            rec["join_key"] = {
-                "schema": "view_templates.join_key.v1",
+            semantic_items = [it for it in identity_items if it.get("k") in set(semantic_keys)]
+            rec["sig"] = {
                 "hash_alg": "md5_utf8_join_pipe",
-                "items": join_key_items,
-                "join_hash": def_hash
+                "keys_used": semantic_keys,
             }
+            rec["sig_hash"] = make_hash(serialize_identity_items(semantic_items))
+
+            # Back-compat: join_key.items retained, but contains hashed items only.
+            rec["join_key"] = _join_key_from_canonical_items(identity_items)
 
             records.append(rec)
             per_hashes.append(def_hash)
@@ -859,55 +908,34 @@ def extract(doc, ctx=None):
 
         # -------------------------
         # Phase-2 (contract-aligned)
-        #   - semantic_items is the ONLY surface for join-key candidates
-        #   - structured domain => single bundle key: view_template.def_hash
         # -------------------------
-        semantic_items = [
-            make_identity_item("view_template.def_hash", def_hash, ITEM_Q_OK),
-        ]
-        if override_stack_hash:
-            semantic_items.append(
-                make_identity_item(
-                    "view_template.category_overrides_def_hash",
-                    override_stack_hash,
-                    ITEM_Q_OK,
-                )
-            )
-        semantic_items = phase2_sorted_items(semantic_items)
+        identity_items = _canonical_identity_items_from_signature(def_hash, sig_final, override_stack_hash)
+        rec["identity_basis"] = {
+            "hash_alg": "md5_utf8_join_pipe",
+            "item_schema": "identity_item.v1",
+            "items": identity_items,
+        }
 
-        uid_v, uid_q = phase2_qv_from_legacy_sentinel_str(uid or None, allow_empty=False)
-        unknown_items = phase2_sorted_items([
-            make_identity_item("view_template.uid", uid_v, uid_q),
-            make_identity_item("view_template.element_id", safe_str(v.Id.IntegerValue), ITEM_Q_OK),
-            make_identity_item("view_template.name", name, ITEM_Q_OK),
-            make_identity_item("view_template.view_type", safe_str(v.ViewType), ITEM_Q_OK),
-            make_identity_item("view_template.is_schedule", "0", ITEM_Q_OK),
-        ])
-
+        semantic_keys = _semantic_keys_from_identity_items(identity_items)
         rec["phase2"] = {
             "schema": "phase2.view_templates.v2",
             "grouping_basis": "join_key.join_hash",
-            "semantic_items": semantic_items,
+            # Selector-based semantic basis over canonical evidence (pilot pattern).
+            "semantic_keys": semantic_keys,
             "cosmetic_items": [],
             "coordination_items": [],
-            "unknown_items": unknown_items,
+            "unknown_items": [],
         }
 
-        # Build join_key following policy view_templates.join_key.v1
-        # For baseline-only v1: join_hash equals def_hash
-        join_key_items = [
-            {
-                "k": "view_template.def_hash",
-                "q": ITEM_Q_OK,
-                "v": def_hash
-            }
-        ]
-        rec["join_key"] = {
-            "schema": "view_templates.join_key.v1",
+        semantic_items = [it for it in identity_items if it.get("k") in set(semantic_keys)]
+        rec["sig"] = {
             "hash_alg": "md5_utf8_join_pipe",
-            "items": join_key_items,
-            "join_hash": def_hash
+            "keys_used": semantic_keys,
         }
+        rec["sig_hash"] = make_hash(serialize_identity_items(semantic_items))
+
+        # Back-compat: join_key.items retained, but contains hashed items only.
+        rec["join_key"] = _join_key_from_canonical_items(identity_items)
 
         # Optional VG debug
         if debug_vg_details:
