@@ -180,6 +180,12 @@ def extract(doc, ctx=None):
         identity_items_v2 = []
         required_qs = []
 
+        # Required by join-key policy: keep name in canonical identity evidence
+        # so join_hash is derivable from identity_basis.items + policy alone.
+        name_v2, name_q2 = canonicalize_str(name)
+        identity_items_v2.append(make_identity_item("phase_filter.name", name_v2, name_q2))
+        required_qs.append(name_q2)
+
         for status_name, status_enum in statuses:
             k = "phase_filter.{}.presentation_id".format(safe_str(status_name).lower())
             try:
