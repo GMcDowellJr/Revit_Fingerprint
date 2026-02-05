@@ -74,21 +74,6 @@ def _phase2_item(k, raw_v, *, allow_empty=False):
 
 def _phase2_build_payload(rec):
     # Hypotheses only: semantic vs cosmetic vs unknown buckets.
-    semantic_items = phase2_sorted_items([
-        _phase2_item("text_type.font", rec.get("font")),
-        _phase2_item("text_type.size_in", rec.get("text_size_in")),
-        _phase2_item("text_type.width_factor", rec.get("width_factor")),
-        _phase2_item("text_type.background_raw", rec.get("background_raw")),
-        _phase2_item("text_type.line_weight", rec.get("line_weight")),
-        _phase2_item("text_type.color_rgb", safe_str(rec.get("color_rgb"))),
-        _phase2_item("text_type.show_border", canon_bool(rec.get("show_border"))),
-        _phase2_item("text_type.leader_border_offset_in", rec.get("leader_border_offset_in")),
-        _phase2_item("text_type.tab_size_in", rec.get("tab_size_in")),
-        _phase2_item("text_type.bold", canon_bool(rec.get("bold"))),
-        _phase2_item("text_type.italic", canon_bool(rec.get("italic"))),
-        _phase2_item("text_type.underline", canon_bool(rec.get("underline"))),
-    ])
-
     cosmetic_items = phase2_sorted_items([
         _phase2_item("text_type.name", rec.get("type_name"), allow_empty=True),
     ])
@@ -117,11 +102,30 @@ def _phase2_build_payload(rec):
     return {
         "schema": "phase2.text_types.v1",
         "grouping_basis": "phase2.hypothesis",
-        "semantic_items": semantic_items,
+        # Selector-based semantic basis; canonical evidence lives in identity_basis.items.
+        # Deprecated direction: semantic_items should not duplicate canonical k/q/v evidence.
+        "semantic_keys": TEXT_TYPE_SEMANTIC_KEYS,
         "cosmetic_items": cosmetic_items,
         "coordination_items": phase2_sorted_items([]),
         "unknown_items": unknown_items,
     }
+
+
+TEXT_TYPE_SEMANTIC_KEYS = sorted([
+    "text_type.name",
+    "text_type.font",
+    "text_type.size_in",
+    "text_type.width_factor",
+    "text_type.background",
+    "text_type.line_weight",
+    "text_type.color_rgb",
+    "text_type.show_border",
+    "text_type.leader_border_offset_in",
+    "text_type.tab_size_in",
+    "text_type.bold",
+    "text_type.italic",
+    "text_type.underline",
+])
 
 def extract(doc, ctx=None):
     """
@@ -388,59 +392,9 @@ def extract(doc, ctx=None):
         # Phase 2 (additive, explanatory, reversible)
         # Emit even if v2 is domain-blocked.
         # ---------------------------
-        candidate_kqv = {}
-
-        v, q = canonicalize_str(rec.get("font"))
-        candidate_kqv["text_type.font"] = (v, q)
-
-        v, q = canonicalize_str(rec.get("text_size_in"))
-        candidate_kqv["text_type.size_in"] = (v, q)
-
-        # Keep width_factor as normalized string (avoid 6 vs 9 drift)
-        v, q = canonicalize_str(rec.get("width_factor"))
-        candidate_kqv["text_type.width_factor"] = (v, q)
-
-        v, q = canonicalize_int(rec.get("background_raw"))
-        candidate_kqv["text_type.background_raw"] = (v, q)
-
-        v, q = canonicalize_int(rec.get("line_weight"))
-        candidate_kqv["text_type.line_weight"] = (v, q)
-
-        v, q = canonicalize_str(rec.get("color_rgb"))
-        candidate_kqv["text_type.color_rgb"] = (v, q)
-
-        v, q = canonicalize_bool(rec.get("show_border"))
-        candidate_kqv["text_type.show_border"] = (v, q)
-
-        v, q = canonicalize_str(rec.get("leader_border_offset_in"))
-        candidate_kqv["text_type.leader_border_offset_in"] = (v, q)
-
-        v, q = canonicalize_str(rec.get("tab_size_in"))
-        candidate_kqv["text_type.tab_size_in"] = (v, q)
-
-        v, q = canonicalize_bool(rec.get("bold"))
-        candidate_kqv["text_type.bold"] = (v, q)
-
-        v, q = canonicalize_bool(rec.get("italic"))
-        candidate_kqv["text_type.italic"] = (v, q)
-
-        v, q = canonicalize_bool(rec.get("underline"))
-        candidate_kqv["text_type.underline"] = (v, q)
-
-        # Tri-state: q="ok", v=None means explicit “no arrowhead” (valid, joinable state)
-        _raw_ah = rec.get("leader_arrowhead_sig_hash")
-        if _raw_ah in (None, ""):
-            candidate_kqv["text_type.leader_arrowhead_sig_hash"] = (None, ITEM_Q_OK)
-        else:
-            v, q = canonicalize_str(_raw_ah)
-            candidate_kqv["text_type.leader_arrowhead_sig_hash"] = (v, q)
-
+        # Canonical evidence source for this pilot is identity_basis.items.
+        # join_key and semantic selectors reference subsets without duplicating k/q/v payloads.
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "text_types")
-        rec["join_key"], _missing = build_join_key_from_policy(
-            domain_policy=pol,
-            identity_items=None,
-            candidate_kqv=candidate_kqv,
-        )
 
         rec["phase2"] = _phase2_build_payload(rec)
 
@@ -484,7 +438,11 @@ def extract(doc, ctx=None):
             status_reasons_v2.append("required_identity_not_ok")
 
         identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k","")))
-        sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
+        semantic_items_v2 = [
+            it for it in identity_items_v2_sorted
+            if safe_str(it.get("k", "")) in set(TEXT_TYPE_SEMANTIC_KEYS)
+        ]
+        sig_preimage_v2 = serialize_identity_items(semantic_items_v2)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
 
         rec_v2 = build_record_v2(
@@ -506,8 +464,19 @@ def extract(doc, ctx=None):
                 "leader_arrowhead_uid_excluded_from_sig": True,
             },
         )
-        rec_v2["join_key"] = rec["join_key"]
+        rec_v2["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=identity_items_v2_sorted,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            preserve_single_def_hash_passthrough=False,
+        )
         rec_v2["phase2"] = rec["phase2"]
+        rec_v2["sig_basis"] = {
+            "schema": "text_types.sig_basis.v1",
+            "keys_used": TEXT_TYPE_SEMANTIC_KEYS,
+        }
 
         v2_records.append(rec_v2)
         if sig_hash_v2 is not None:
