@@ -240,6 +240,8 @@ def extract(doc, ctx=None):
             include_optional_items=False,
             emit_keys_used=True,
             hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
         )
 
         v_uid, q_uid = canonicalize_str_allow_empty(uid)

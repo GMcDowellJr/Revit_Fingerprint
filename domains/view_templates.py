@@ -229,13 +229,18 @@ def _join_key_from_canonical_items(identity_items):
     """Compute join_key from policy-required selectors over canonical evidence.
 
     v1 policy for view_templates uses only base required key `view_template.def_hash`.
-    `items` is retained for back-compat and contains only hashed items.
     """
-    keys_used = ["view_template.def_hash"]
-    k_to_item = {it.get("k"): it for it in (identity_items or []) if isinstance(it.get("k"), str)}
+    required_keys = ["view_template.def_hash"]
+    optional_keys = []
+
+    k_to_item = {
+        it.get("k"): it
+        for it in (identity_items or [])
+        if isinstance(it.get("k"), str)
+    }
 
     hashed_items = []
-    for k in keys_used:
+    for k in required_keys:
         item = k_to_item.get(k)
         if item is None:
             hashed_items.append({"k": k, "q": ITEM_Q_MISSING, "v": None})
@@ -245,8 +250,11 @@ def _join_key_from_canonical_items(identity_items):
     return {
         "schema": "view_templates.join_key.v1",
         "hash_alg": "md5_utf8_join_pipe",
-        "keys_used": sorted(keys_used),
-        "items": phase2_sorted_items(hashed_items),
+        "keys_used": sorted(required_keys),
+        "selectors": {
+            "required_keys": required_keys,
+            "optional_keys": optional_keys,
+        },
         "join_hash": phase2_join_hash(hashed_items),
     }
 

@@ -126,12 +126,6 @@ python tools/pareto_joinkey_search.py `
 	--pareto_name pareto_front__line_patterns.csv
 
 
-Import-Csv "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\identity_items__line_patterns.csv" | Select-Object -Expand k -Unique | Sort-Object
-
-Import-Csv "C:\Users\gmcdowell\Documents\Fingerprint_Out\identity_items__objectstyles.csv" |
-  Select-Object -ExpandProperty k -Unique |
-  Sort-Object
-
 
 python tools/pareto_joinkey_search.py `
 	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\records__view_filter_definitions.csv" `
@@ -222,3 +216,9 @@ python tools/pareto_joinkey_search.py `
 	--seed 47 `
 	--out_dir C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase2_pareto `
 	--pareto_name pareto_front__arrowheads__validate.csv
+	
+python tools\join_key_derivation_phase05.py `
+  --details "C:\Users\gmcdowell\Documents\Fingerprint_Out\fp__*fingerprint.details.json" `
+  --policy  "C:\Users\gmcdowell\Documents\Revit_Fingerprint\policies\domain_join_key_policies.json" `
+  --out-dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results" `
+  --mode validate

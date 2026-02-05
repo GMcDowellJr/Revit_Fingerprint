@@ -212,6 +212,8 @@ def extract(doc, ctx=None):
         include_optional_items=False,
         emit_keys_used=True,
         hash_optional_items=False,
+        emit_items=False,
+        emit_selectors=True,
     )
 
     semantic_keys = sorted(["identity.is_workshared", "identity.revit_version_number", "identity.revit_build"])

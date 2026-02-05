@@ -299,9 +299,6 @@ def extract(doc, ctx=None):
         style_raw_v, style_raw_q = canonicalize_int(style_raw_int)
         style_disp_v, style_disp_q = canonicalize_str_allow_empty(style_disp)
 
-        # Stable label for identity/join: derive from display when possible.
-        style_label_v, style_label_q = _get_arrowhead_style(style_disp if style_disp is not None else style_raw_int, _style_q)
-
         # Tick Size (length) -> inches string
         p_tick = first_param(t, ui_names=["Tick Size"])
         tick_ft = _as_double(p_tick)
@@ -476,6 +473,8 @@ def extract(doc, ctx=None):
             include_optional_items=False,
             emit_keys_used=True,
             hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
         )
         rec_v2["sig_basis"] = {
             "schema": "arrowheads.sig_basis.v1",

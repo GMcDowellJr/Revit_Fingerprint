@@ -396,8 +396,10 @@ def extract(doc, ctx=None):
                 include_optional_items=False,
                 emit_keys_used=True,
                 hash_optional_items=False,
-                preserve_single_def_hash_passthrough=False,
+                emit_items=False,
+                emit_selectors=True,
             )
+
             rec["sig_basis"] = {
                 "schema": "view_category_overrides.sig_basis.v1",
                 "keys_used": semantic_keys,

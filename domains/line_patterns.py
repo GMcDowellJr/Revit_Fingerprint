@@ -450,6 +450,8 @@ def extract(doc, ctx=None):
             include_optional_items=False,
             emit_keys_used=True,
             hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
         )
 
         cosmetic_items = []
