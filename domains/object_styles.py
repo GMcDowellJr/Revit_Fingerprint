@@ -69,6 +69,18 @@ except ImportError:
     GraphicsStyleType = None
     CategoryType = None
 
+
+# Canonical semantic selector for object_styles sig_hash.
+# Canonical evidence source remains identity_basis.items; selector lists avoid
+# duplicating k/q/v payloads into additional evidence arrays.
+OBJECT_STYLE_SEMANTIC_KEYS = sorted([
+    "obj_style.color.rgb",
+    "obj_style.pattern_ref.kind",
+    "obj_style.pattern_ref.sig_hash",
+    "obj_style.weight.cut",
+    "obj_style.weight.projection",
+])
+
 def extract(doc, ctx=None):
     """
     Extract Object Styles fingerprint from document.
@@ -359,8 +371,15 @@ def extract(doc, ctx=None):
                     status_v2 = STATUS_BLOCKED
                     status_reasons.append("required_identity_not_ok")
 
+                # Canonical evidence source for this domain is identity_basis.items.
+                # Selectors (join_key.keys_used, phase2.semantic_keys, sig_basis.keys_used)
+                # define hash subsets without duplicating k/q/v payloads.
                 identity_items_sorted = sorted(identity_items, key=lambda d: str(d.get("k", "")))
-                preimage_v2 = serialize_identity_items(identity_items_sorted)
+                semantic_items = [
+                    it for it in identity_items_sorted
+                    if safe_str(it.get("k", "")) in set(OBJECT_STYLE_SEMANTIC_KEYS)
+                ]
+                preimage_v2 = serialize_identity_items(semantic_items)
                 sig_hash_v2 = make_hash(preimage_v2)
 
                 rec_v2 = build_record_v2(
@@ -386,26 +405,20 @@ def extract(doc, ctx=None):
                 rec_v2["join_key"], _missing = build_join_key_from_policy(
                     domain_policy=pol,
                     identity_items=identity_items_sorted,
+                    include_optional_items=False,
+                    emit_keys_used=True,
+                    hash_optional_items=False,
+                    preserve_single_def_hash_passthrough=False,
                 )
 
-                semantic_items = []
                 cosmetic_items = []
                 unknown_items = []
 
                 # Graphics are behavioral (semantic), category name is cosmetic.
                 for it in (identity_items_sorted or []):
                     k = safe_str(it.get("k", ""))
-                    if k in [
-                        "obj_style.weight.projection",
-                        "obj_style.weight.cut",
-                        "obj_style.color.rgb",
-                        "obj_style.pattern_ref.sig_hash",
-                    ]:
-                        semantic_items.append(it)
-                    elif k == "obj_style.row_key":
+                    if k == "obj_style.row_key":
                         cosmetic_items.append(it)
-                    elif k == "obj_style.pattern_ref.kind":
-                        unknown_items.append(it)
                     else:
                         unknown_items.append(it)
 
@@ -416,10 +429,16 @@ def extract(doc, ctx=None):
                 rec_v2["phase2"] = {
                     "schema": "phase2.object_styles.v1",
                     "grouping_basis": "phase2.hypothesis",
-                    "semantic_items": phase2_sorted_items(semantic_items),
+                    # Semantic selector references identity_basis.items.
+                    # Deprecated direction: do not duplicate semantic k/q/v evidence here.
+                    "semantic_keys": OBJECT_STYLE_SEMANTIC_KEYS,
                     "cosmetic_items": phase2_sorted_items(cosmetic_items),
                     "coordination_items": phase2_sorted_items([]),
                     "unknown_items": phase2_sorted_items(unknown_items),
+                }
+                rec_v2["sig_basis"] = {
+                    "schema": "object_styles.sig_basis.v1",
+                    "keys_used": OBJECT_STYLE_SEMANTIC_KEYS,
                 }
 
                 v2_records.append(rec_v2)
