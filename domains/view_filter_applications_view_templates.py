@@ -14,7 +14,7 @@ Hard constraints:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from Autodesk.Revit.DB import ElementId, View, ViewSchedule
 
@@ -43,7 +43,6 @@ from core.record_v2 import (
 from core.phase2 import (
     phase2_join_hash,
     phase2_sorted_items,
-    phase2_qv_from_legacy_sentinel_str,
 )
 
 
@@ -66,6 +65,20 @@ def _is_schedule_view(view) -> bool:
         return s == "Schedule" or s.endswith(".Schedule") or (".Schedule" in s)
     except Exception:
         return False
+
+
+def _semantic_keys_from_identity_items(identity_items: List[Dict[str, Any]]) -> List[str]:
+    """Declare semantic sig basis as selectors over canonical identity evidence."""
+    keys = sorted(
+        {
+            safe_str(it.get("k", ""))
+            for it in (identity_items or [])
+            if isinstance(it.get("k"), str)
+            # Keep join-key material separate from semantic signature basis.
+            and safe_str(it.get("k", "")) != "vfa.stack_def_hash"
+        }
+    )
+    return [k for k in keys if k]
 
 
 def extract(doc, ctx=None):
@@ -261,15 +274,6 @@ def extract(doc, ctx=None):
                 k = it.get("k")
                 status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
-        if blocked:
-            status = STATUS_BLOCKED
-            status_reasons = sorted(set(status_reasons)) or ["minima.required_not_ok"]
-            sig_hash = None
-        else:
-            status = STATUS_DEGRADED if any_incomplete else STATUS_OK
-            sig_hash = make_hash(serialize_identity_items(items_sorted))
-            v2_sig_hashes.append(sig_hash)
-
         record_id = None
         record_id_alg = None
         record_id_base = None
@@ -310,25 +314,30 @@ def extract(doc, ctx=None):
         # NOTE: empty stack is a valid definition state; emit a deterministic empty def_hash.
         stack_def_hash = phase2_join_hash(stack_items_sorted) if stack_items_sorted is not None else None
 
-        p2_semantic = []
+        # Canonical evidence superset is identity_basis.items.
+        # Keep derived stack hash as canonical evidence once, then select subsets via keys_used/semantic_keys.
         if stack_def_hash is not None:
-            p2_semantic.append(
-                make_identity_item(
-                    "vfa.stack_def_hash",
-                    stack_def_hash,
-                    ITEM_Q_OK,
-                )
-            )
+            identity_items.append(make_identity_item("vfa.stack_def_hash", stack_def_hash, ITEM_Q_OK))
+            items_sorted = sorted(identity_items, key=lambda it: str(it.get("k", "")))
 
-        # Build record-level join_key from policy using a synthetic item list that includes vfa.stack_def_hash.
-        # vfa.stack_def_hash must NOT appear in identity_basis.items.
+        semantic_keys = _semantic_keys_from_identity_items(items_sorted)
+        semantic_key_set = set(semantic_keys)
+        semantic_items_for_sig = [it for it in items_sorted if it.get("k") in semantic_key_set]
+
+        if blocked:
+            status = STATUS_BLOCKED
+            status_reasons = sorted(set(status_reasons)) or ["minima.required_not_ok"]
+            sig_hash = None
+        else:
+            status = STATUS_DEGRADED if any_incomplete else STATUS_OK
+            sig_hash = make_hash(serialize_identity_items(semantic_items_for_sig))
+            v2_sig_hashes.append(sig_hash)
+
+        # Build record-level join_key from canonical identity evidence via policy selectors.
         pol = get_domain_join_key_policy(
             (ctx or {}).get("join_key_policies"),
             "view_filter_applications_view_templates",
         )
-        join_items = list(items_sorted or [])
-        if stack_def_hash is not None:
-            join_items.append({"k": "vfa.stack_def_hash", "q": ITEM_Q_OK, "v": stack_def_hash})
 
         # Unknown: template element id may vary across files.
         try:
@@ -355,13 +364,10 @@ def extract(doc, ctx=None):
                 "required_qs": required_qs,
                 "label": label,
                 "phase2_payload": {
-                    "stack_items": stack_items,
-                    "stack_def_hash": stack_def_hash,
                     "p2_unknown": p2_unknown,
-                    "p2_semantic": p2_semantic,
+                    "semantic_keys": semantic_keys,
                     "join_key_policy": pol,
                 },
-                "join_items": join_items,
             }
         )
 
@@ -384,18 +390,21 @@ def extract(doc, ctx=None):
         pol = spec["phase2_payload"]["join_key_policy"]
         rec["join_key"], _missing = build_join_key_from_policy(
             domain_policy=pol,
-            identity_items=spec["join_items"],
+            identity_items=spec["identity_items"],
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            preserve_single_def_hash_passthrough=False,
         )
 
-        stack_items_sorted = phase2_sorted_items(spec["phase2_payload"]["stack_items"])
-        stack_def_hash = spec["phase2_payload"]["stack_def_hash"]
-        p2_semantic = spec["phase2_payload"].get("p2_semantic", [])
+        semantic_keys = spec["phase2_payload"].get("semantic_keys", [])
         p2_unknown = spec["phase2_payload"]["p2_unknown"]
 
         rec["phase2"] = {
             "schema": "phase2.view_filter_applications_view_templates.v1",
             "grouping_basis": "phase2.hypothesis",
-            "semantic_items": phase2_sorted_items(p2_semantic),
+            # Selector-only: semantic basis is declared by keys, evidence remains canonical in identity_basis.items.
+            "semantic_keys": semantic_keys,
             "cosmetic_items": phase2_sorted_items([]),
             "coordination_items": phase2_sorted_items([]),
             "unknown_items": p2_unknown,
