@@ -65,17 +65,17 @@ def _phase2_build_phase2_payload(*, phase_name, seq, uid):
     """
     Phase-2 grouping (hypotheses only; no enforcement).
     """
-    semantic_items = []
+    # Selector-only semantic basis (no duplicated k/q/v evidence).
+    # Canonical evidence lives in record.identity_basis.items.
+    semantic_keys = ["phase.name", "phase.seq"]
     cosmetic_items = []
     unknown_items = []
 
     v_name, q_name = phase2_qv_from_legacy_sentinel_str(phase_name, allow_empty=False)
     cosmetic_items.append({"k": "phase.name", "q": q_name, "v": v_name})
 
-    # seq is numeric-ish; canon_num emits legacy sentinels on None/failure, so map via helper.
-    seq_s = canon_num(seq, nd=0)
-    v_seq, q_seq = phase2_qv_from_legacy_sentinel_str(seq_s, allow_empty=False)
-    semantic_items.append({"k": "phase.sequence_number", "q": q_seq, "v": v_seq})
+    # seq is retained as semantic selector key only; avoid duplicating k/q/v here.
+    _ = canon_num(seq, nd=0)
 
     # uid is document-scoped; keep explicit but do not classify as semantic/cosmetic here.
     uid_in = uid if uid else None
@@ -85,7 +85,8 @@ def _phase2_build_phase2_payload(*, phase_name, seq, uid):
     return {
         "schema": "phase2.phases.v1",
         "grouping_basis": "phase2.hypothesis",
-        "semantic_items": phase2_sorted_items(semantic_items),
+        # Selector-based semantic declaration; values come from identity_basis.items.
+        "semantic_keys": sorted(semantic_keys),
         "cosmetic_items": phase2_sorted_items(cosmetic_items),
         "coordination_items": phase2_sorted_items([]),
         "unknown_items": phase2_sorted_items(unknown_items),
@@ -225,7 +226,15 @@ def extract(doc, ctx=None):
         identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k", "")))
 
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "phases")
-        join_key_v2, _missing = build_join_key_from_policy(domain_policy=pol, identity_items=identity_items_v2_sorted)
+        join_key_v2, _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=identity_items_v2_sorted,
+            # Pilot: join hash from base required (+ gated required) only.
+            # Optional keys remain available in identity_basis.items for future exploration.
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+        )
 
         sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
