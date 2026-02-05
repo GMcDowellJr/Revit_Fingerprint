@@ -196,7 +196,18 @@ def extract(doc, ctx=None):
             status_reasons_v2.append("required_identity_not_ok")
 
         identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k","")))
-        sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
+        semantic_keys = sorted([
+            "phase_filter.demolished.presentation_id",
+            "phase_filter.existing.presentation_id",
+            "phase_filter.new.presentation_id",
+            "phase_filter.temporary.presentation_id",
+        ])
+        semantic_key_set = set(semantic_keys)
+        sig_basis_items_v2 = [
+            it for it in identity_items_v2_sorted
+            if safe_str(it.get("k", "")) in semantic_key_set
+        ]
+        sig_preimage_v2 = serialize_identity_items(sig_basis_items_v2)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
 
         def_hash_v2 = None
@@ -211,20 +222,20 @@ def extract(doc, ctx=None):
             except Exception as e:
                 pass
 
+        # Canonical evidence superset for this pilot is identity_basis.items.
+        # Selectors (join_key.keys_used, phase2.semantic_keys, sig_basis.keys_used)
+        # define hashed/semantic subsets without duplicating k/q/v evidence.
+
         # Phase-2 (empirical, explanatory, reversible): join_key + attribute buckets
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "phase_filters")
-        rec_join_key, _missing = build_join_key_from_policy(domain_policy=pol, identity_items=identity_items_v2_sorted)
-        join_key_items = rec_join_key.get("items") or []
-
-        phase2_semantic_items = []
-        for status_name, status_enum in statuses:
-            k = "phase_filter.{}.presentation_id".format(safe_str(status_name).lower())
-            try:
-                pres_p2 = pf.GetPhaseStatusPresentation(status_enum)
-                v_pres, q_pres = canonicalize_int(int(pres_p2))
-            except Exception:
-                v_pres, q_pres = None, ITEM_Q_UNREADABLE
-            phase2_semantic_items.append({"k": k, "q": q_pres, "v": v_pres})
+        rec_join_key, _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=identity_items_v2_sorted,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            preserve_single_def_hash_passthrough=False,
+        )
 
         v_uid, q_uid = canonicalize_str_allow_empty(uid)
         v_id, q_id = canonicalize_int(getattr(pf.Id, "IntegerValue", None))
@@ -243,7 +254,8 @@ def extract(doc, ctx=None):
         rec_phase2 = {
             "schema": "phase2.phase_filters.v1",
             "grouping_basis": "phase2.hypothesis",
-            "semantic_items": phase2_sorted_items(phase2_semantic_items),
+            # Selector-based semantic basis; canonical evidence lives in identity_basis.items.
+            "semantic_keys": semantic_keys,
             "cosmetic_items": [],
             "coordination_items": phase2_coordination_items,
             "unknown_items": phase2_unknown_items,
@@ -269,6 +281,10 @@ def extract(doc, ctx=None):
         )
         rec_v2["join_key"] = rec_join_key
         rec_v2["phase2"] = rec_phase2
+        rec_v2["sig_basis"] = {
+            "schema": "phase_filters.sig_basis.v1",
+            "keys_used": semantic_keys,
+        }
 
         v2_records.append(rec_v2)
         if sig_hash_v2 is not None:
