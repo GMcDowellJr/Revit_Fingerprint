@@ -106,26 +106,8 @@ def _lp_seg_type_id_and_name(seg):
 
     return st_id, _LP_SEG_TYPE_NAME.get(st_id, "Unknown")
 
-def _phase2_build_join_key_items(*, segment_count, segments):
-    """Build Phase-2 join-key IdentityItems (domain-specific, definition-based).
-
-    Join-key per Phase 2 architecture:
-      - Identity is defined by the ordered segment sequence, not name/UID.
-      - For Phase-2 grouping, collapse the correlated seg[###] structure into
-        a single definition-hash to avoid prefix collisions and reduce key width.
-
-    Join-key items:
-      - line_pattern.segment_count
-      - line_pattern.segments_def_hash (preferred contract key)
-      - line_pattern.sequence_hash     (legacy/internal alias; kept for compatibility)
-    """
-    items = []
-
-    # Segment count is required for join key
-    seg_count_v, seg_count_q = canonicalize_int(segment_count)
-    items.append(make_identity_item("line_pattern.segment_count", seg_count_v, seg_count_q))
-
-    # Full sequence hash (definition-based; no UID/name)
+def _line_pattern_segments_def_hash(*, segments):
+    """Return (v, q) for line_pattern.segments_def_hash from ordered segments only."""
     seq_hash_v, seq_hash_q = (None, ITEM_Q_UNREADABLE)
     if segments is not None:
         try:
@@ -153,14 +135,7 @@ def _phase2_build_join_key_items(*, segment_count, segments):
             seq_hash_v, seq_hash_q = canonicalize_str(seq_hash)
         except Exception:
             seq_hash_v, seq_hash_q = (None, ITEM_Q_UNREADABLE)
-
-    # Phase-2 structural pointer (preferred join-key key name for this domain)
-    items.append(make_identity_item("line_pattern.segments_def_hash", seq_hash_v, seq_hash_q))
-
-    # Internal alias (kept for compatibility with downstream builder)
-    items.append(make_identity_item("line_pattern.sequence_hash", seq_hash_v, seq_hash_q))
-
-    return phase2_sorted_items(items)
+    return seq_hash_v, seq_hash_q
 
 def extract(doc, ctx=None):
     """
@@ -393,14 +368,19 @@ def extract(doc, ctx=None):
                 if kind_q != ITEM_Q_OK or length_q != ITEM_Q_OK:
                     any_segment_incomplete = True
 
-        # ---- element-level finalize (once per element) ----
-        identity_items_sorted = sorted(identity_items, key=lambda it: it.get("k", ""))
-
-        # Build join-key candidate item set (structured pointer surface; excludes full seg[###] leaf duplication)
-        join_key_items_sorted = _phase2_build_join_key_items(
-            segment_count=(len(segs_v2) if (segs_ok and segs_v2 is not None) else None),
+        # Canonical evidence superset for this pilot is identity_basis.items.
+        # Selectors (join_key.keys_used, phase2.semantic_keys, sig_basis.keys_used)
+        # describe hashed/semantic subsets without duplicating k/q/v evidence.
+        segments_def_hash_v, segments_def_hash_q = _line_pattern_segments_def_hash(
             segments=segs_v2 if (segs_ok and segs_v2 is not None) else None,
         )
+        identity_items.append(
+            make_identity_item("line_pattern.segments_def_hash", segments_def_hash_v, segments_def_hash_q)
+        )
+
+        # ---- element-level finalize (once per element) ----
+        identity_items_sorted = sorted(identity_items, key=lambda it: it.get("k", ""))
+        semantic_keys = sorted(["line_pattern.segment_count", "line_pattern.segments_def_hash"])
 
         # Phase-2 compliant: required identity is segment-based, not UID-based
         required_qs = [seg_count_q]
@@ -428,7 +408,11 @@ def extract(doc, ctx=None):
         else:
             status_v2 = STATUS_OK
 
-        preimage_v2 = serialize_identity_items(identity_items_sorted)
+        sig_basis_items = [
+            it for it in identity_items_sorted
+            if safe_str(it.get("k", "")) in set(semantic_keys)
+        ]
+        preimage_v2 = serialize_identity_items(sig_basis_items)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(preimage_v2)
 
         label_display = safe_str(getattr(e, "Name", None) or "")
@@ -462,38 +446,15 @@ def extract(doc, ctx=None):
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "line_patterns")
         rec_v2["join_key"], _missing = build_join_key_from_policy(
             domain_policy=pol,
-            identity_items=join_key_items_sorted,
+            identity_items=identity_items_sorted,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            preserve_single_def_hash_passthrough=False,
         )
 
-        semantic_items = []
         cosmetic_items = []
         unknown_items = []
-
-        # Phase-2 grouping:
-        # - Keep a single pointer to the structural definition (definition-based; no name/UID)
-        # - Avoid duplicating the full seg[###] structure which already exists in identity_basis.items
-        seg_ct_it = None
-        seq_hash_it = None
-        for it in (join_key_items_sorted or []):
-            k = safe_str(it.get("k", ""))
-            if k == "line_pattern.segment_count":
-                seg_ct_it = it
-            elif k == "line_pattern.sequence_hash":
-                seq_hash_it = it
-
-        # Breadcrumb: segment count (small scalar)
-        if seg_ct_it is not None:
-            semantic_items.append(seg_ct_it)
-
-        # Derived Phase-2 pointer (hash of ordered segment definition)
-        if seq_hash_it is not None:
-            semantic_items.append(
-                make_identity_item(
-                    "line_pattern.segments_def_hash",
-                    seq_hash_it.get("v", None),
-                    seq_hash_it.get("q", ITEM_Q_UNREADABLE),
-                )
-            )
 
         # Add file-local identifiers to unknown_items (not part of identity_basis)
         unknown_items.append(
@@ -522,10 +483,15 @@ def extract(doc, ctx=None):
         rec_v2["phase2"] = {
             "schema": "phase2.line_patterns.v1",
             "grouping_basis": "phase2.hypothesis",
-            "semantic_items": phase2_sorted_items(semantic_items),
+            # Selector-based semantic basis; canonical evidence lives in identity_basis.items.
+            "semantic_keys": semantic_keys,
             "cosmetic_items": phase2_sorted_items(cosmetic_items),
             "coordination_items": phase2_sorted_items([]),
             "unknown_items": phase2_sorted_items(unknown_items),
+        }
+        rec_v2["sig_basis"] = {
+            "schema": "line_patterns.sig_basis.v1",
+            "keys_used": semantic_keys,
         }
         
         v2_records.append(rec_v2)
