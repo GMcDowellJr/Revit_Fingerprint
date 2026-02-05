@@ -710,33 +710,11 @@ def extract(doc, ctx=None):
             fp=fp,
         )
 
-        # Policy-driven join_key is built from explicit candidate fields
-        # (fill_patterns policy requires fill_pattern.grids_def_hash, which is produced in phase2 semantic items)
-        candidate_kqv = {}
-        try:
-            for it in (phase2_payload.get("semantic_items") or []):
-                k = it.get("k")
-                if isinstance(k, str) and k not in candidate_kqv:
-                    candidate_kqv[k] = (it.get("v"), it.get("q"))
-        except Exception:
-            candidate_kqv = {}
-
-        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "fill_patterns")
-        join_key, _missing = build_join_key_from_policy(
-            domain_policy=pol,
-            identity_items=None,
-            candidate_kqv=candidate_kqv,
-        )
-
         rec = {
             "id": safe_str(e.Id.IntegerValue),
             "uid": uid,
             "name": name,          # metadata only
             "def_hash": def_hash,  # hashed legacy definition
-
-            # Phase 2 (additive-only; does not affect legacy/v2 hashing)
-            "join_key": join_key,
-            "phase2": phase2_payload,
         }
 
         if DEBUG_INCLUDE_FILLPATTERN_SIGNATURES:
@@ -891,6 +869,29 @@ def extract(doc, ctx=None):
                 identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].offset", off_v, off_q))
                 identity_items_v2.append(make_identity_item(f"fill_pattern.grid[{idx}].shift", sh_v, sh_q))
 
+        # Derived join helper (policy-required key): capture the entire grid definition bundle.
+        # Canonical evidence source is identity_basis.items; selectors reference subsets.
+        # Keep preimage order-sensitive so grid index order remains identity-significant.
+        try:
+            grid_like = []
+            for it in (identity_items_v2 or []):
+                k = safe_str(it.get("k", ""))
+                if k == "fill_pattern.grid_count" or k.startswith("fill_pattern.grid["):
+                    grid_like.append("k={}|q={}|v={}".format(
+                        safe_str(it.get("k", "")),
+                        safe_str(it.get("q", "")),
+                        safe_str(it.get("v", "")),
+                    ))
+            grids_def_hash_v, grids_def_hash_q = (
+                (make_hash(grid_like), ITEM_Q_OK) if grid_like else (None, ITEM_Q_UNREADABLE)
+            )
+        except Exception:
+            grids_def_hash_v, grids_def_hash_q = (None, ITEM_Q_UNREADABLE)
+
+        identity_items_v2.append(
+            make_identity_item("fill_pattern.grids_def_hash", grids_def_hash_v, grids_def_hash_q)
+        )
+
         if any(q != ITEM_Q_OK for q in required_qs):
             status_v2 = STATUS_BLOCKED
             status_reasons_v2.append("required_identity_not_ok")
@@ -898,6 +899,23 @@ def extract(doc, ctx=None):
         identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k","")))
         sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
+
+        # Selector-only phase2 semantic surface: no duplicated k/q/v evidence.
+        semantic_keys = sorted({it.get("k") for it in identity_items_v2_sorted if isinstance(it.get("k"), str)})
+        phase2_payload.pop("semantic_items", None)
+        phase2_payload["semantic_keys"] = semantic_keys
+
+        # Policy-driven join_key from canonical evidence (identity_basis.items) only.
+        # Optional keys stay in identity evidence for future exploration but are not hashed by default.
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "fill_patterns")
+        join_key, _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=identity_items_v2_sorted,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            preserve_single_def_hash_passthrough=False,
+        )
 
         rec_v2 = build_record_v2(
             domain="fill_patterns",
@@ -919,6 +937,14 @@ def extract(doc, ctx=None):
         )
         rec_v2["join_key"] = join_key
         rec_v2["phase2"] = phase2_payload
+        rec_v2["sig_basis"] = {
+            "schema": "fill_patterns.sig_basis.v1",
+            "keys_used": semantic_keys,
+        }
+
+        # Keep legacy record additive payload aligned with record.v2 selectors.
+        rec["join_key"] = join_key
+        rec["phase2"] = phase2_payload
 
         v2_records.append(rec_v2)
         if sig_hash_v2 is not None:
