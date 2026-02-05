@@ -169,3 +169,56 @@ python tools/pareto_make_shape_inputs.py `
 	--items   phase0_flat\identity_items.csv `
 	--domain dimension_types `
 	--out_dir phase2\shape_inputs
+
+
+python tools/run_extract_all.py "C:\Users\gmcdowell\Documents\Fingerprint_Out" `
+	--out-root "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results" `
+	--config "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\run_config.json" `
+	--seed-baseline fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.details.json
+
+
+python tools/run_extract_all.py "<ExportsDir>" 
+	--out-root "<OutRoot>" 
+	--config "<Phase1RunConfig.json>"
+
+python tools/run_extract_all.py "<ExportsDir>" 
+--out-root "<OutRoot>" 
+--config "<Phase1RunConfig.json>" 
+--no-dimtypes-by-family
+
+python tools/run_extract_all.py "<ExportsDir>" --out-root "<OutRoot>" --config "<Phase1RunConfig.json>" --baseline "<BaselineExportFilename.details.json>"
+
+
+python tools/run_extract_all.py "C:\Users\gmcdowell\Documents\Fingerprint_Out\templates" `
+  --out-root "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results" `
+  --config "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\phase1_probe_config.json"
+
+python tools/diagnose_phase1_empty.py `
+    --exports "C:\Users\gmcdowell\Documents\Fingerprint_Out\templates" `
+    --config "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\phase1_probe_config.json" `
+    --phase1-out "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase1_authority"
+	
+python tools/pareto_joinkey_search.py `
+	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase0_flat\records.csv" `
+	--items   "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase0_flat\identity_items.csv" `
+	--domain view_filter_definitions `
+	--policy_json "C:\Users\gmcdowell\Documents\Revit_Fingerprint\policies\domain_join_key_policies.json" `
+	--mode discover `
+	--max_k 4 `
+	--challenger_top_n 25 `
+	--sample_records 10000 `
+	--seed 47 `
+	--out_dir C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase2_pareto `
+	--pareto_name pareto_front__view_filter_definitions__discover.csv
+
+python tools/pareto_joinkey_search.py `
+	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase0_flat\records.csv" `
+	--items   "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase0_flat\identity_items.csv" `
+	--domain arrowheads `
+	--policy_json "C:\Users\gmcdowell\Documents\Revit_Fingerprint\policies\domain_join_key_policies.json" `
+	--mode validate `
+	--max_k 4 `
+	--challenger_top_n 25 `
+	--seed 47 `
+	--out_dir C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase2_pareto `
+	--pareto_name pareto_front__arrowheads__validate.csv

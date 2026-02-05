@@ -470,7 +470,6 @@ def extract(doc, ctx=None):
             include_optional_items=False,
             emit_keys_used=True,
             hash_optional_items=False,
-            preserve_single_def_hash_passthrough=False,
         )
         rec_v2["phase2"] = rec["phase2"]
         rec_v2["sig_basis"] = {
