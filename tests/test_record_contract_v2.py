@@ -61,3 +61,16 @@ def test_blocked_records_have_no_sig_hash(exported_fingerprint_json):
         for rec in payload.get("records", []):
             if rec.get("status") == "blocked":
                 assert rec.get("sig_hash") is None, f"{domain}:{rec.get('record_id')} blocked but sig_hash present"
+
+
+def test_exported_records_have_unique_record_id_per_file_and_domain(exported_fingerprint_json):
+    seen = set()
+    dupes = []
+    for domain, payload in exported_fingerprint_json.get("domains", {}).items():
+        for rec in payload.get("records", []):
+            key = (rec.get("file_id"), domain, rec.get("record_id"))
+            if key in seen:
+                dupes.append(key)
+            seen.add(key)
+
+    assert not dupes, f"duplicate record_id within (file_id, domain): {dupes}"
