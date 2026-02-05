@@ -60,6 +60,21 @@ from core.phase2 import (
 )
 
 
+# Pilot: use identity_basis.items as the single canonical evidence superset.
+# sig_hash is derived from these semantic selectors (not from join-key material).
+UNITS_SEMANTIC_KEYS = tuple(
+    sorted(
+        {
+            "units.accuracy",
+            "units.rounding_method",
+            "units.spec",
+            "units.symbol_type_id",
+            "units.unit_type_id",
+        }
+    )
+)
+
+
 def extract(doc, ctx=None):
     """
     Extract Units fingerprint from document.
@@ -206,6 +221,9 @@ def extract(doc, ctx=None):
             "components": {"spec": spec_name},
         }
 
+        # Semantic basis selector for sig_hash; evidence remains canonical in identity_basis.items.
+        semantic_items = [it for it in items_sorted if it.get("k") in set(UNITS_SEMANTIC_KEYS)]
+
         if blocked:
             rec = build_record_v2(
                 domain="units",
@@ -221,7 +239,7 @@ def extract(doc, ctx=None):
             v2_block_reasons["record_blocked:{}".format(label)] = True
         else:
             status = STATUS_DEGRADED if any_incomplete else STATUS_OK
-            preimage = serialize_identity_items(items_sorted)
+            preimage = serialize_identity_items(semantic_items)
             sig_hash = make_hash(preimage)
             rec = build_record_v2(
                 domain="units",
@@ -239,8 +257,14 @@ def extract(doc, ctx=None):
         # Phase-2 additive emission (no effect on sig_hash / identity_basis)
         # ----------------------------
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "units")
-        rec["join_key"], _missing = build_join_key_from_policy(domain_policy=pol, identity_items=items_sorted)
-        join_items = rec["join_key"].get("items") or []
+        rec["join_key"], _missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=items_sorted,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            preserve_single_def_hash_passthrough=False,
+        )
 
         # Hypotheses only (grouping_basis=phase2.hypothesis):
         # - semantic: spec identity + unit type + numeric formatting options
@@ -256,14 +280,15 @@ def extract(doc, ctx=None):
             "units.accuracy",
         }
 
-        semantic_items = phase2_sorted_items([dict(it) for it in items_sorted if it.get("k") in semantic_keys])
+        # Selector-based explainability: use key lists instead of duplicating k/q/v evidence.
         cosmetic_items = phase2_sorted_items([dict(it) for it in items_sorted if it.get("k") in cosmetic_keys])
         unknown_items = phase2_sorted_items([dict(it) for it in items_sorted if it.get("k") not in (semantic_keys | cosmetic_keys)])
 
         rec["phase2"] = {
             "schema": "phase2.units.v1",
             "grouping_basis": "phase2.hypothesis",
-            "semantic_items": semantic_items,
+            # Deprecated duplication path: semantic evidence is canonical in identity_basis.items.
+            "semantic_keys": list(UNITS_SEMANTIC_KEYS),
             "cosmetic_items": cosmetic_items,
             "coordination_items": phase2_sorted_items([]),
             "unknown_items": unknown_items,
