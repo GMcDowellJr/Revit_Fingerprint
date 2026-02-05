@@ -1236,27 +1236,6 @@ def extract(doc, ctx=None):
         lw_v, lw_q = canonicalize_str(lw)
         color_int_v, color_int_q = canonicalize_str(color_int)
 
-        # Build phase2_semantic_items with shape-gating
-        _phase2_semantic = [
-            make_identity_item("dim_attr.shape", shape_v, shape_q),
-            make_identity_item("dim_attr.unit_format_id", unit_format_id_v, unit_format_id_q),
-            make_identity_item("dim_attr.rounding", rounding_v, rounding_q),
-            make_identity_item("dim_attr.accuracy", accuracy_v, accuracy_q),
-        ]
-        # Shape-specific semantic items
-        if _is_linear_family(shape_family):
-            _phase2_semantic.append(
-                make_identity_item("dim_attr.witness_line_control", witness_v, witness_q)
-            )
-        elif _is_radial_family(shape_family):
-            _phase2_semantic.append(
-                make_identity_item("dim_attr.center_marks", center_marks_v, center_marks_q)
-            )
-            _phase2_semantic.append(
-                make_identity_item("dim_attr.center_mark_size", center_mark_size_v, center_mark_size_q)
-            )
-        phase2_semantic_items = phase2_sorted_items(_phase2_semantic)
-
         phase2_unknown_items = phase2_sorted_items([
             make_identity_item("dim_attr.prefix", prefix_v, prefix_q),
             make_identity_item("dim_attr.suffix", suffix_v, suffix_q),
@@ -1310,11 +1289,18 @@ def extract(doc, ctx=None):
             center_mark_size_q=center_mark_size_q,
         )
 
+        # Canonical evidence source for this domain is identity_basis.items.
+        # Selectors (join_key.keys_used, phase2.semantic_keys) define subsets without duplicating k/q/v evidence.
+        semantic_keys = sorted([it.get("k", "") for it in identity_items if isinstance(it.get("k"), str) and it.get("k")])
+
         # Policy-driven join_key is built from v2 identity_items only (no uid/name/id fallback)
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "dimension_types")
         join_key_policy, _missing = build_join_key_from_policy(
             domain_policy=pol,
             identity_items=identity_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
         )
 
         # Block if any required authoritative identity field is not OK.
@@ -1374,7 +1360,8 @@ def extract(doc, ctx=None):
             rec_v2["phase2"] = {
                 "schema": "phase2.dimension_types.v1",
                 "grouping_basis": "phase2.hypothesis",
-                "semantic_items": phase2_semantic_items,
+                # Deprecated direction: semantic selectors should reference canonical identity_basis.items.
+                "semantic_keys": semantic_keys,
                 "cosmetic_items": phase2_cosmetic_items,
                 "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_unknown_items,
@@ -1400,7 +1387,8 @@ def extract(doc, ctx=None):
             rec_v2["phase2"] = {
                 "schema": "phase2.dimension_types.v1",
                 "grouping_basis": "phase2.hypothesis",
-                "semantic_items": phase2_semantic_items,
+                # Deprecated direction: semantic selectors should reference canonical identity_basis.items.
+                "semantic_keys": semantic_keys,
                 "cosmetic_items": phase2_cosmetic_items,
                 "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_unknown_items,
