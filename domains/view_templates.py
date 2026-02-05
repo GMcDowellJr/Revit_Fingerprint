@@ -42,9 +42,14 @@ from core.canon import (
 )
 
 from core.record_v2 import (
+    STATUS_OK,
+    STATUS_DEGRADED,
+    STATUS_BLOCKED,
     ITEM_Q_MISSING,
     ITEM_Q_OK,
+    build_record_v2,
     make_identity_item,
+    make_record_id_from_element,
     serialize_identity_items,
 )
 
@@ -537,26 +542,51 @@ def extract(doc, ctx=None):
                     _v2_block("schedule_finalize_failed")
                     v2_ok = False
 
-            rec = {
-                "id": safe_str(v.Id.IntegerValue),
-                "uid": uid or "",
-                "name": name,
-                "view_type": safe_str(v.ViewType),
-                "def_hash": def_hash,
-                "def_signature": sig_final,
-            }
-
             # -------------------------
-            # Phase-2 (contract-aligned)
+            # record.v2 + Phase-2 (contract-aligned)
             # -------------------------
             identity_items = _canonical_identity_items_from_signature(def_hash, sig_final)
-            rec["identity_basis"] = {
-                "hash_alg": "md5_utf8_join_pipe",
-                "item_schema": "identity_item.v1",
-                "items": identity_items,
-            }
-
             semantic_keys = _semantic_keys_from_identity_items(identity_items)
+            semantic_items = [it for it in identity_items if it.get("k") in set(semantic_keys)]
+            sig_hash = make_hash(serialize_identity_items(semantic_items))
+
+            rid_info = make_record_id_from_element(v)
+            if rid_info:
+                record_id, record_id_alg = rid_info
+            else:
+                record_id = "eid:{}".format(safe_str(getattr(getattr(v, "Id", None), "IntegerValue", "")))
+                record_id_alg = "revit_elementid_v1"
+
+            status = STATUS_OK
+            status_reasons = []
+            for it in identity_items:
+                if it.get("q") != ITEM_Q_OK:
+                    status = STATUS_DEGRADED
+                    status_reasons.append("identity.incomplete:{}:{}".format(it.get("q"), it.get("k")))
+            if not v2_ok:
+                status = STATUS_BLOCKED
+                status_reasons.append("semantic_v2_unresolved_dependency")
+                sig_hash = None
+
+            rec = build_record_v2(
+                domain="view_templates",
+                record_id=record_id,
+                record_id_alg=record_id_alg,
+                status=status,
+                status_reasons=sorted(set(status_reasons)),
+                sig_hash=sig_hash,
+                identity_items=identity_items,
+                required_qs=tuple(it.get("q") for it in identity_items),
+                label={
+                    "display": safe_str(name),
+                    "quality": "human" if safe_str(name) and safe_str(name) != S_MISSING else "placeholder_missing",
+                    "provenance": "revit.ViewName",
+                    "components": {
+                        "view_type": safe_str(v.ViewType),
+                    },
+                },
+            )
+
             rec["phase2"] = {
                 "schema": "phase2.view_templates.v2",
                 "grouping_basis": "join_key.join_hash",
@@ -567,15 +597,16 @@ def extract(doc, ctx=None):
                 "unknown_items": [],
             }
 
-            semantic_items = [it for it in identity_items if it.get("k") in set(semantic_keys)]
-            rec["sig"] = {
+            rec["sig_basis"] = {
                 "hash_alg": "md5_utf8_join_pipe",
                 "keys_used": semantic_keys,
             }
-            rec["sig_hash"] = make_hash(serialize_identity_items(semantic_items))
 
             # Back-compat: join_key.items retained, but contains hashed items only.
             rec["join_key"] = _join_key_from_canonical_items(identity_items)
+
+            rec["def_hash"] = def_hash
+            rec["def_signature"] = sig_final
 
             records.append(rec)
             per_hashes.append(def_hash)
@@ -897,26 +928,51 @@ def extract(doc, ctx=None):
                 _v2_block("template_finalize_failed")
                 v2_ok = False
 
-        rec = {
-            "id": safe_str(v.Id.IntegerValue),
-            "uid": uid or "",
-            "name": name,
-            "view_type": safe_str(v.ViewType),
-            "def_hash": def_hash,
-            "def_signature": sig_final,
-        }
-
         # -------------------------
-        # Phase-2 (contract-aligned)
+        # record.v2 + Phase-2 (contract-aligned)
         # -------------------------
         identity_items = _canonical_identity_items_from_signature(def_hash, sig_final, override_stack_hash)
-        rec["identity_basis"] = {
-            "hash_alg": "md5_utf8_join_pipe",
-            "item_schema": "identity_item.v1",
-            "items": identity_items,
-        }
-
         semantic_keys = _semantic_keys_from_identity_items(identity_items)
+        semantic_items = [it for it in identity_items if it.get("k") in set(semantic_keys)]
+        sig_hash = make_hash(serialize_identity_items(semantic_items))
+
+        rid_info = make_record_id_from_element(v)
+        if rid_info:
+            record_id, record_id_alg = rid_info
+        else:
+            record_id = "eid:{}".format(safe_str(getattr(getattr(v, "Id", None), "IntegerValue", "")))
+            record_id_alg = "revit_elementid_v1"
+
+        status = STATUS_OK
+        status_reasons = []
+        for it in identity_items:
+            if it.get("q") != ITEM_Q_OK:
+                status = STATUS_DEGRADED
+                status_reasons.append("identity.incomplete:{}:{}".format(it.get("q"), it.get("k")))
+        if not v2_ok:
+            status = STATUS_BLOCKED
+            status_reasons.append("semantic_v2_unresolved_dependency")
+            sig_hash = None
+
+        rec = build_record_v2(
+            domain="view_templates",
+            record_id=record_id,
+            record_id_alg=record_id_alg,
+            status=status,
+            status_reasons=sorted(set(status_reasons)),
+            sig_hash=sig_hash,
+            identity_items=identity_items,
+            required_qs=tuple(it.get("q") for it in identity_items),
+            label={
+                "display": safe_str(name),
+                "quality": "human" if safe_str(name) and safe_str(name) != S_MISSING else "placeholder_missing",
+                "provenance": "revit.ViewName",
+                "components": {
+                    "view_type": safe_str(v.ViewType),
+                },
+            },
+        )
+
         rec["phase2"] = {
             "schema": "phase2.view_templates.v2",
             "grouping_basis": "join_key.join_hash",
@@ -927,15 +983,15 @@ def extract(doc, ctx=None):
             "unknown_items": [],
         }
 
-        semantic_items = [it for it in identity_items if it.get("k") in set(semantic_keys)]
-        rec["sig"] = {
+        rec["sig_basis"] = {
             "hash_alg": "md5_utf8_join_pipe",
             "keys_used": semantic_keys,
         }
-        rec["sig_hash"] = make_hash(serialize_identity_items(semantic_items))
 
         # Back-compat: join_key.items retained, but contains hashed items only.
         rec["join_key"] = _join_key_from_canonical_items(identity_items)
+        rec["def_hash"] = def_hash
+        rec["def_signature"] = sig_final
 
         # Optional VG debug
         if debug_vg_details:
@@ -954,7 +1010,13 @@ def extract(doc, ctx=None):
     # IMPORTANT: count should represent templates captured, not unique names
     info["count"] = len(records)
 
-    info["records"] = sorted(records, key=lambda r: (r.get("name", ""), r.get("id", "")))
+    info["records"] = sorted(
+        records,
+        key=lambda r: (
+            safe_str(((r.get("label", {}) or {}).get("display", ""))),
+            safe_str(r.get("record_id", "")),
+        ),
+    )
     info["signature_hashes"] = sorted(per_hashes)
     info["hash"] = make_hash(info["signature_hashes"])
 
@@ -968,10 +1030,10 @@ def extract(doc, ctx=None):
     try:
         recs = info.get("records") or []
         info["record_rows"] = [{
-            "record_key": safe_str(r.get("uid", "")),
-            "sig_hash":   safe_str(r.get("def_hash", "")),
-            "name":       safe_str(r.get("name", "")),      # metadata
-            "view_type":  safe_str(r.get("view_type", "")), # metadata
+            "record_key": safe_str(r.get("record_id", "")),
+            "sig_hash":   safe_str(r.get("sig_hash", "")),
+            "name":       safe_str((r.get("label", {}) or {}).get("display", "")),
+            "view_type":  safe_str(((r.get("label", {}) or {}).get("components", {}) or {}).get("view_type", "")),
         } for r in recs]
     except Exception as e:
         info["record_rows"] = []
