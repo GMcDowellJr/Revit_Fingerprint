@@ -233,7 +233,7 @@ def extract(doc, ctx=None):
                 sig_hash=None,
                 identity_items=items_sorted,
                 required_qs=(),
-                label=label,
+                label=rec_label,
             )
             # Domain-level signal: v2 cannot be complete if any required key unreadable/missing.
             v2_block_reasons["record_blocked:{}".format(label)] = True
@@ -249,7 +249,7 @@ def extract(doc, ctx=None):
                 sig_hash=sig_hash,
                 identity_items=items_sorted,
                 required_qs=required_qs,
-                label=label,
+                label=rec_label,
             )
             v2_sig_hashes.append(sig_hash)
 
@@ -291,6 +291,10 @@ def extract(doc, ctx=None):
             "cosmetic_items": cosmetic_items,
             "coordination_items": phase2_sorted_items([]),
             "unknown_items": unknown_items,
+        }
+        rec["sig_basis"] = {
+            "schema": "units.sig_basis.v1",
+            "keys_used": list(UNITS_SEMANTIC_KEYS),
         }
 
         v2_records.append(rec)
