@@ -199,6 +199,7 @@ def build_join_key_from_policy(
     include_optional_items=True,
     emit_keys_used=False,
     hash_optional_items=True,
+    preserve_single_def_hash_passthrough=True,
 ):
     """Build join_key dict from a policy and available value sources.
 
@@ -211,6 +212,8 @@ def build_join_key_from_policy(
         include_optional_items: if True, include optional items in join_key.items
         emit_keys_used: if True, add join_key.keys_used list for hash provenance
         hash_optional_items: if True, include optional items in join_hash computation
+        preserve_single_def_hash_passthrough: if True, keep legacy invariant where
+            a lone *_def_hash required item is used directly as join_hash
 
     Returns:
         tuple: (join_key_dict, missing_required_keys)
@@ -275,11 +278,14 @@ def build_join_key_from_policy(
     # Compute join_hash
     join_hash = None
     if (
+        preserve_single_def_hash_passthrough
+        and (
         len(hash_items) == 1
         and isinstance(hash_items[0].get("k"), str)
         and hash_items[0]["k"].endswith("_def_hash")
         and isinstance(hash_items[0].get("v"), str)
         and re.match(r"^[0-9a-f]{32}$", hash_items[0]["v"])
+        )
     ):
         # Structured-domain invariant: def_hash IS the join_hash
         join_hash = hash_items[0]["v"]
