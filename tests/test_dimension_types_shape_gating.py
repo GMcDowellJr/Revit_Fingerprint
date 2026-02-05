@@ -18,6 +18,7 @@ try:
 except ImportError:
     pytest = None
 
+from core.hashing import make_hash
 from core.record_v2 import (
     ITEM_Q_OK,
     ITEM_Q_MISSING,
@@ -25,6 +26,7 @@ from core.record_v2 import (
     ITEM_Q_UNSUPPORTED,
     ITEM_Q_UNSUPPORTED_NOT_APPLICABLE,
     make_identity_item,
+    serialize_identity_items,
 )
 from core.join_key_policy import load_join_key_policies, get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
@@ -565,3 +567,48 @@ class TestPolicyLoadPattern:
         # 2. Verify shape-specific keys present/absent based on shape
         # 3. Validate join key construction across shapes
         assert True
+
+
+class TestCanonicalEvidenceSelectors:
+    """Pilot checks for canonical evidence + selectors behavior."""
+
+    def test_join_key_uses_required_and_shape_gated_keys_only(self):
+        policies = load_join_key_policies("policies/domain_join_key_policies.json")
+        pol = get_domain_join_key_policy(policies, "dimension_types")
+
+        identity_items = [
+            make_identity_item("dim_type.shape", "Linear", ITEM_Q_OK),
+            make_identity_item("dim_type.accuracy", "0.010000000", ITEM_Q_OK),
+            make_identity_item("dim_type.tick_mark_sig_hash", "1" * 32, ITEM_Q_OK),
+            make_identity_item("dim_type.witness_line_control", "Gap to Element", ITEM_Q_OK),
+            # Optional evidence stays in canonical identity superset, but is not hashed in join_key.
+            make_identity_item("dim_type.prefix", "PFX", ITEM_Q_OK),
+            make_identity_item("dim_type.suffix", "SFX", ITEM_Q_OK),
+            make_identity_item("dim_type.rounding", "Nearest", ITEM_Q_OK),
+            make_identity_item("dim_type.unit_format_id", "autodesk.unit.formatOption:length", ITEM_Q_OK),
+        ]
+
+        join_key, missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=identity_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+        )
+
+        assert missing == []
+        assert join_key["keys_used"] == [
+            "dim_type.accuracy",
+            "dim_type.shape",
+            "dim_type.tick_mark_sig_hash",
+            "dim_type.witness_line_control",
+        ]
+        assert sorted([it["k"] for it in join_key["items"]]) == join_key["keys_used"]
+        assert "dim_type.prefix" not in join_key["keys_used"]
+
+        join_preimage = serialize_identity_items([it for it in identity_items if it["k"] in join_key["keys_used"]])
+        assert join_key["join_hash"] == make_hash(join_preimage)
+
+        # Semantic signature uses the canonical superset (identity_items), so it diverges from join hash.
+        sig_hash = make_hash(serialize_identity_items(identity_items))
+        assert sig_hash != join_key["join_hash"]
