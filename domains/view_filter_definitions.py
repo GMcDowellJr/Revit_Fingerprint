@@ -18,6 +18,8 @@ This domain must remain independent of view templates and their application stac
 
 from __future__ import annotations
 
+import json
+
 from typing import Any, Dict, List, Optional, Tuple
 
 from Autodesk.Revit.DB import (
@@ -390,6 +392,26 @@ def extract(doc, ctx=None):
 
             identity_items.append(make_identity_item(f"vf.rule[{idx3}].sig", sig_v, sig_q))
 
+        # Canonical evidence superset for this pilot is identity_basis.items.
+        # Selectors (join_key.keys_used, phase2.semantic_keys, sig_basis.keys_used)
+        # define hashed/semantic subsets without duplicating k/q/v evidence.
+        semantic_keys = sorted({it.get("k") for it in identity_items if isinstance(it.get("k"), str)})
+        semantic_key_set = set(semantic_keys)
+        semantic_basis_items = sorted(
+            [it for it in identity_items if it.get("k") in semantic_key_set],
+            key=lambda it: str(it.get("k", "")),
+        )
+
+        # Backward-compat pointer retained for current join-key policy (vf.def_hash required).
+        # Future direction is selector-based joins directly from canonical evidence.
+        if semantic_basis_items:
+            def_hash_v = make_hash(serialize_identity_items(semantic_basis_items))
+            def_hash_q = ITEM_Q_OK
+        else:
+            def_hash_v = None
+            def_hash_q = ITEM_Q_MISSING
+        identity_items.append(make_identity_item("vf.def_hash", def_hash_v, def_hash_q))
+
         items_sorted = sorted(identity_items, key=lambda it: str(it.get("k", "")))
 
         # Minima: block if any required key q != ok
@@ -413,7 +435,8 @@ def extract(doc, ctx=None):
             sig_hash = None
         else:
             status = STATUS_DEGRADED if any_incomplete else STATUS_OK
-            sig_hash = make_hash(serialize_identity_items(items_sorted))
+            # sig_hash is semantic-basis derived (not join-key-material derived).
+            sig_hash = make_hash(serialize_identity_items(semantic_basis_items))
             v2_sig_hashes.append(sig_hash)
 
         record_id = None
@@ -450,23 +473,7 @@ def extract(doc, ctx=None):
         # Phase 2 (empirical, additive)
         # -----------------------------
 
-        # Structured domain strategy:
-        # - semantic_items exposes ONLY a single derived definition hash (vf.def_hash)
-        # - leaf members remain in identity_basis.items for forensic diffs
-        def_items_sorted = phase2_sorted_items(items_sorted or [])
-        if def_items_sorted:
-            # Deterministic hash over the canonicalized definition bundle items.
-            def_hash_v = make_hash(serialize_identity_items(def_items_sorted))
-            def_hash_q = ITEM_Q_OK
-        else:
-            def_hash_v = None
-            def_hash_q = ITEM_Q_MISSING
-
-        p2_semantic = phase2_sorted_items([
-            make_identity_item("vf.def_hash", def_hash_v, def_hash_q),
-        ])
-
-        # Join key must be built ONLY from policy-visible candidate surfaces (Phase 2 semantic items).
+        # Join key must be built from the canonical evidence superset via policy selectors.
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "view_filter_definitions")
 
         # Unknown: element-backed id may vary across files.
@@ -494,7 +501,7 @@ def extract(doc, ctx=None):
                 "required_qs": required_qs,
                 "label": label,
                 "phase2_payload": {
-                    "p2_semantic": p2_semantic,
+                    "semantic_keys": semantic_keys,
                     "p2_unknown": p2_unknown,
                     "join_key_policy": pol,
                 },
@@ -519,18 +526,26 @@ def extract(doc, ctx=None):
         if rec["status"] == STATUS_BLOCKED:
             v2_block_reasons[f"record_blocked:{rec['record_id']}"] = True
         pol = spec["phase2_payload"]["join_key_policy"]
-        p2_semantic = spec["phase2_payload"]["p2_semantic"]
+        semantic_keys = spec["phase2_payload"]["semantic_keys"]
         p2_unknown = spec["phase2_payload"]["p2_unknown"]
         rec["join_key"], _missing = build_join_key_from_policy(
             domain_policy=pol,
-            identity_items=p2_semantic,
+            identity_items=spec["identity_items"],
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
         )
         rec["phase2"] = {
             "schema": "phase2.view_filter_definitions.v1",
             "grouping_basis": "phase2.hypothesis",
-            "semantic_items": p2_semantic,
+            # Selector-based semantic basis; canonical evidence lives in identity_basis.items.
+            "semantic_keys": semantic_keys,
             "cosmetic_items": phase2_sorted_items([]),
             "unknown_items": p2_unknown,
+        }
+        rec["sig_basis"] = {
+            "schema": "view_filter_definitions.sig_basis.v1",
+            "keys_used": semantic_keys,
         }
 
         v2_records.append(rec)
