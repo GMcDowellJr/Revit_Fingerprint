@@ -62,18 +62,11 @@ except ImportError:
     GraphicsStyleType = None
     ElementId = None
 
-def _phase2_build_join_key_items(sc_name):
-    """Build Phase-2 join-key items for a line style record.
-
-    Hypothesis basis (no inference):
-      - Stable identity across files is represented by the subcategory name under Lines.
-      - We materialize this as the computed path used by identity (Lines|name).
-    """
-
-    # path is derived from the name; map through sentinel-safe helper defensively.
-    path_raw = "Lines|{}".format(safe_str(sc_name))
-    path_v, path_q = phase2_qv_from_legacy_sentinel_str(path_raw, allow_empty=False)
-    return [make_identity_item("line_style.path", path_v, path_q)]
+LINE_STYLE_SEMANTIC_KEYS = sorted([
+    "line_style.pattern_ref.kind",
+    "line_style.pattern_ref.sig_hash",
+    "line_style.weight.projection",
+])
 
 def extract(doc, ctx=None):
     """
@@ -329,8 +322,15 @@ def extract(doc, ctx=None):
                 status_v2 = STATUS_BLOCKED
                 status_reasons.append("required_identity_not_ok")
 
+            # Canonical evidence source for this domain is identity_basis.items.
+            # Selectors (join_key.keys_used, phase2.semantic_keys, sig_basis.keys_used)
+            # define subsets without duplicating k/q/v payloads.
             identity_items_sorted = sorted(identity_items, key=lambda d: str(d.get("k", "")))
-            preimage_v2 = serialize_identity_items(identity_items_sorted)
+            semantic_items = [
+                it for it in identity_items_sorted
+                if safe_str(it.get("k", "")) in set(LINE_STYLE_SEMANTIC_KEYS)
+            ]
+            preimage_v2 = serialize_identity_items(semantic_items)
             sig_hash_v2 = make_hash(preimage_v2)
 
             rec_v2 = build_record_v2(
@@ -356,27 +356,23 @@ def extract(doc, ctx=None):
             rec_v2["join_key"], _missing = build_join_key_from_policy(
                 domain_policy=pol,
                 identity_items=identity_items_sorted,
+                include_optional_items=False,
+                emit_keys_used=True,
+                hash_optional_items=False,
+                preserve_single_def_hash_passthrough=False,
             )
 
             # Hypothesis-only partitioning: semantic vs cosmetic vs unknown.
             # No heuristics; these are emitted for empirical clustering and attribute stability analysis.
-            p2_semantic = []
             p2_cosmetic = []
             p2_unknown = []
-
-            # weights
-            p2_semantic.append(make_identity_item("line_style.weight.projection", wproj_v, wproj_q))
-
-            # pattern reference
-            p2_semantic.append(make_identity_item("line_style.pattern_ref.kind", kind_v, kind_q))
-            p2_semantic.append(make_identity_item("line_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
 
             # color is cosmetic (visual only; excluded from join-key candidates)
             rgb_p2_v, rgb_p2_q = phase2_qv_from_legacy_sentinel_str(rgb_sig, allow_empty=False)
             p2_cosmetic.append(make_identity_item("line_style.color.rgb", rgb_p2_v, rgb_p2_q))
 
             # path is cosmetic (name-derived) but emitted for clustering/labeling
-            p2_cosmetic.extend(_phase2_build_join_key_items(sc_name))
+            p2_cosmetic.append(make_identity_item("line_style.path", path_v, path_q))
 
             # cut weight is not surfaced for line styles; keep explicit as unknown partition for analysis.
             # p2_unknown.append(make_identity_item("line_style.weight.cut", wcut_v, wcut_q))
@@ -384,10 +380,16 @@ def extract(doc, ctx=None):
             rec_v2["phase2"] = {
                 "schema": "phase2.line_styles.v1",
                 "grouping_basis": "phase2.hypothesis",
-                "semantic_items": phase2_sorted_items(p2_semantic),
+                # Semantic selector references canonical identity_basis.items.
+                # Deprecated direction: semantic_items should not duplicate canonical evidence.
+                "semantic_keys": LINE_STYLE_SEMANTIC_KEYS,
                 "cosmetic_items": phase2_sorted_items(p2_cosmetic),
                 "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_sorted_items(p2_unknown),
+            }
+            rec_v2["sig_basis"] = {
+                "schema": "line_styles.sig_basis.v1",
+                "keys_used": LINE_STYLE_SEMANTIC_KEYS,
             }
 
             v2_records.append(rec_v2)
