@@ -114,6 +114,7 @@ SHAPE_SPOT_SLOPE = "SpotSlope"
 SHAPE_LINEAR_FIXED = "LinearFixed"
 SHAPE_SPOT_ELEVATION_FIXED = "SpotElevationFixed"
 SHAPE_DIAMETER_LINKED = "DiameterLinked"
+SHAPE_ALIGNMENT_STATION_LABEL = "AlignmentStationLabel"
 SHAPE_UNKNOWN = "Unknown"
 
 # Shape family constants for property gating
@@ -136,6 +137,7 @@ SHAPE_TO_FAMILY = {
     SHAPE_SPOT_COORDINATE: FAMILY_SPOT,
     SHAPE_SPOT_SLOPE: FAMILY_SPOT,
     SHAPE_SPOT_ELEVATION_FIXED: FAMILY_SPOT,
+    SHAPE_ALIGNMENT_STATION_LABEL: FAMILY_SPOT,
     SHAPE_UNKNOWN: FAMILY_UNKNOWN,
 }
 
@@ -152,6 +154,7 @@ SHAPE_INT_TO_NAME = {
     8: SHAPE_LINEAR_FIXED,
     9: SHAPE_SPOT_ELEVATION_FIXED,
     10: SHAPE_DIAMETER_LINKED,
+    11: SHAPE_ALIGNMENT_STATION_LABEL,
 }
 
 
@@ -266,6 +269,15 @@ def _get_dimension_shape(dim_type):
                     shape_name = str_val
         except Exception:
             pass
+
+    # Explicit handling for AlignmentStationLabel (spot-like)
+    # Normalize to guard against casing / spacing differences
+    try:
+        _sn = safe_str(shape_name).lower().replace(" ", "")
+        if _sn == "alignmentstationlabel":
+            return (SHAPE_ALIGNMENT_STATION_LABEL, FAMILY_SPOT, ITEM_Q_OK)
+    except Exception:
+        pass
 
     # Final fallback
     if shape_name is None:
@@ -1071,6 +1083,30 @@ def extract(doc, ctx=None):
         # Required: dim_type.shape
         # Use shape detection helper for consistent shape detection and family classification
         shape_v, shape_family, shape_q = _get_dimension_shape(d)
+
+        # Heuristic override: if the type display-name family indicates a Spot family,
+        # force Spot classification so linear-only gating (witness line control) does not apply.
+        try:
+            # Prefer the uneditable FamilyName; fall back to the composite type_name string.
+            family_name = getattr(d, "FamilyName", None)
+            basis = family_name if family_name else type_name
+            bn_l = safe_str(basis).strip().lower()
+
+            # FamilyName is typically "Spot Slopes" / "Spot Elevations" / "Spot Coordinates"
+            if bn_l.startswith("spot slopes"):
+                shape_v = SHAPE_SPOT_SLOPE
+                shape_family = FAMILY_SPOT
+                shape_q = ITEM_Q_OK
+            elif bn_l.startswith("spot elevations"):
+                shape_v = SHAPE_SPOT_ELEVATION
+                shape_family = FAMILY_SPOT
+                shape_q = ITEM_Q_OK
+            elif bn_l.startswith("spot coordinates"):
+                shape_v = SHAPE_SPOT_COORDINATE
+                shape_family = FAMILY_SPOT
+                shape_q = ITEM_Q_OK
+        except Exception:
+            pass
 
         # Optional: dim_type.text_type_uid (ElementId -> element.UniqueId)
         text_type_uid_v, text_type_uid_q = (None, ITEM_Q_MISSING)
