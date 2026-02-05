@@ -1394,6 +1394,11 @@ def extract(doc, ctx=None):
                 "unknown_items": phase2_unknown_items,
             }
 
+        rec_v2["sig_basis"] = {
+            "schema": "dimension_types.sig_basis.v1",
+            "keys_used": semantic_keys,
+        }
+
         v2_records.append(rec_v2)
         sig_hashes.append(sig_hash)
 

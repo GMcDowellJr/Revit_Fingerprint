@@ -408,6 +408,10 @@ def extract(doc, ctx=None):
             "coordination_items": phase2_sorted_items([]),
             "unknown_items": p2_unknown,
         }
+        rec["sig_basis"] = {
+            "schema": "view_filter_applications_view_templates.sig_basis.v1",
+            "keys_used": semantic_keys,
+        }
 
         if rec["status"] == STATUS_BLOCKED:
             v2_block_reasons[f"record_blocked:{rec['record_id']}"] = True

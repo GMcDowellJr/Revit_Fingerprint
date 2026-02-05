@@ -260,6 +260,10 @@ def extract(doc, ctx=None):
         )
         rec_v2["join_key"] = join_key_v2
         rec_v2["phase2"] = phase2_payload
+        rec_v2["sig_basis"] = {
+            "schema": "phases.sig_basis.v1",
+            "keys_used": ["phase.name", "phase.seq"],
+        }
 
         v2_records.append(rec_v2)
         if sig_hash_v2 is not None:

@@ -242,7 +242,17 @@ def validate_record_v2(record: Dict[str, Any], registry: Dict[str, Any]) -> List
     if status != "blocked":
         hash_alg = identity_basis.get("hash_alg")
         if isinstance(hash_alg, str) and hash_alg:
-            preimage = serialize_identity_items(items)
+            # Prefer explicit sig basis selectors when present.
+            # Fallback to full identity item set for legacy records.
+            sig_basis = record.get("sig_basis") if isinstance(record.get("sig_basis"), dict) else {}
+            keys_used = sig_basis.get("keys_used")
+            if isinstance(keys_used, list) and all(isinstance(k, str) for k in keys_used):
+                keyset = set(keys_used)
+                basis_items = [it for it in items if isinstance(it, dict) and it.get("k") in keyset]
+                preimage = serialize_identity_items(basis_items)
+            else:
+                preimage = serialize_identity_items(items)
+
             recomputed = _hash_preimage(preimage, hash_alg)
             if isinstance(sig_hash, str) and recomputed != sig_hash:
                 violations.append("sig_hash.mismatch")
