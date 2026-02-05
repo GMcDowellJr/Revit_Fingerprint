@@ -556,6 +556,13 @@ def build_record_v2(
     if status not in VALID_STATUSES:
         raise ValueError(f"Invalid status: {status!r}")
 
+    if not isinstance(record_id, str) or not record_id.strip():
+        raise ValueError("record_id must be a non-empty string")
+    if not isinstance(record_id_alg, str) or not record_id_alg.strip():
+        raise ValueError("record_id_alg must be a non-empty string")
+    if record_id_scope != "file_local":
+        raise ValueError("record_id_scope must be 'file_local'")
+
     # Enforce sig_hash nullability rule.
     if status == STATUS_BLOCKED:
         if sig_hash is not None:

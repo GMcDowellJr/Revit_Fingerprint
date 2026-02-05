@@ -448,20 +448,18 @@ def extract(doc, ctx=None):
         if rid_info:
             record_id, record_id_alg = rid_info
         else:
+            identity_preimage = serialize_identity_items(items_sorted)
             structural_fields = {
-                "name": safe_str(name_v or ""),
-                "categories": safe_str(cats_v or ""),
-                "logic_root": safe_str(logic_v or ""),
-                "rule_count": safe_str(rc_v or ""),
-                "rules": structural_rules,
+                "identity_preimage": identity_preimage,
+                "structural_rules": structural_rules,
             }
             record_id_base, record_id_alg, _canon = make_record_id_structural(structural_fields)
             record_id = record_id_base
             record_id_sort_key = canonical_structural_fields(
                 {
-                    "label": label_display,
-                    "structural": structural_fields,
-                    "identity_preimage": serialize_identity_items(items_sorted),
+                    "identity_preimage": identity_preimage,
+                    "status": status,
+                    "status_reasons": sorted(set(status_reasons)),
                 }
             )
 

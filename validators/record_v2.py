@@ -271,18 +271,22 @@ def validate_records_v2(
     Returns a list of (record_id, violation_code) tuples.
     """
     out: List[Tuple[str, str]] = []
-    seen: Dict[Tuple[str, str], int] = {}
+    seen: Dict[Tuple[str, str, str], int] = {}
     for rec in records:
         rid = rec.get("record_id", "<no_record_id>")
         domain = rec.get("domain", "<no_domain>")
-        key = (str(domain), str(rid))
+        file_id = rec.get("file_id")
+        if not isinstance(file_id, str) or not file_id:
+            out.append((rid, "file_id.missing_or_invalid"))
+            file_id = "<no_file_id>"
+        key = (str(file_id), str(domain), str(rid))
         seen[key] = seen.get(key, 0) + 1
         for v in validate_record_v2(rec, registry):
             out.append((rid, v))
 
-    for (domain, rid), count in seen.items():
+    for (file_id, domain, rid), count in seen.items():
         if count > 1:
-            out.append((rid, f"record_id.duplicate:{domain}"))
+            out.append((rid, f"record_id.duplicate:{file_id}:{domain}"))
     return out
 
 
