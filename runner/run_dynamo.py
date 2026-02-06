@@ -96,6 +96,7 @@ from core.collect import CollectCtx
 from core.context import DocViewContext
 from core.deps import Blocked, require_domain
 from core import naming as fp_naming
+from core.timing_collector import TimingCollector
 
 # Revit/Dynamo plumbing
 clr.AddReference("RevitServices")
@@ -382,7 +383,18 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
 
     domain_name = str(domain_name)
 
+    # Timing instrumentation: wrap domain extraction
+    _tc = ctx.get("_timing") if isinstance(ctx, dict) else None
+    _timing_label = "domain:{}".format(domain_name)
+
     try:
+        if _tc is not None:
+            try:
+                _tc.set_active_domain(domain_name)
+                _tc.start_timer(_timing_label)
+            except Exception:
+                pass
+
         legacy = fn(doc, ctx)
 
         # Domains may optionally emit contract signals into their legacy payload.
@@ -490,9 +502,25 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
         )
         contract_domains[domain_name] = env
 
+        # End timing on success
+        if _tc is not None:
+            try:
+                _tc.end_timer(_timing_label)
+                _tc.set_active_domain(None)
+            except Exception:
+                pass
+
         return legacy
 
     except Exception as e:
+        # End timing on failure
+        if _tc is not None:
+            try:
+                _tc.end_timer(_timing_label)
+                _tc.set_active_domain(None)
+            except Exception:
+                pass
+
         # Hard fail: downstream must not infer success.
         contracts.add_bounded_error(
             run_diag,
@@ -558,6 +586,20 @@ def run_fingerprint(doc):
 
     # PR5: per-run collector cache + counters
     ctx["_collect"] = CollectCtx()
+
+    # Timing instrumentation: create collector and wire into subsystems
+    _timing = TimingCollector()
+    ctx["_timing"] = _timing
+    ctx["_collect"].timing = _timing
+
+    # Wire timing into hashing module (module-level ref, never affects hash output)
+    try:
+        from core import hashing as _hashing_mod
+        _hashing_mod._timing_collector = _timing
+    except Exception:
+        pass
+
+    _timing.start_timer("total_extraction")
 
     # PR6: shared document + view context (domains can use for consistent view reads)
     ctx["_doc_view"] = DocViewContext(doc)
@@ -752,6 +794,19 @@ def run_fingerprint(doc):
                 message=";".join(list(b.reasons)),
             )
 
+    # End total extraction timer
+    try:
+        _timing.end_timer("total_extraction")
+    except Exception:
+        pass
+
+    # Clean up hashing module timing reference
+    try:
+        from core import hashing as _hashing_mod
+        _hashing_mod._timing_collector = None
+    except Exception:
+        pass
+
     # PR5: merge collector counters into contract run_diag for acceptance verification
     try:
         _c = ctx.get("_collect")
@@ -760,6 +815,14 @@ def run_fingerprint(doc):
                 run_diag["counters"][str(_k)] = int(_v)
     except Exception:
         # Do not change run outcome if diagnostics merge fails.
+        pass
+
+    # Merge timing report into run_diag (timing does not affect hashes or stable surfaces)
+    try:
+        timing_report = _timing.get_report()
+        if isinstance(timing_report, dict):
+            run_diag["timings"] = timing_report
+    except Exception:
         pass
 
     # Hash mode participates in stable surfaces; timing does not.
@@ -1023,6 +1086,7 @@ try:
             "details": base_no_ext + ".details.json",
             "manifest": base_no_ext + ".manifest.json",
             "features": base_no_ext + ".features.json",
+            "timings": base_no_ext + ".timings.json",
         }
 
         # Determine which surfaces to write based on config flags
@@ -1095,6 +1159,22 @@ try:
                 errors.append({"surface": "features", "code": "missing_features", "message": "payload missing _features"})
             else:
                 _try_write("features", f)
+
+        # Write timing report (always emitted when timing data is available)
+        try:
+            _contract = fingerprint_payload.get("_contract", {}) if isinstance(fingerprint_payload, dict) else {}
+            _rd = _contract.get("run_diag", {}) if isinstance(_contract, dict) else {}
+            timing_data = _rd.get("timings", None) if isinstance(_rd, dict) else None
+            if isinstance(timing_data, dict) and timing_data:
+                from datetime import datetime as _dt
+                timing_payload = {
+                    "export_timestamp": _dt.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                    "total_execution_seconds": round(_time.perf_counter() - _SCRIPT_START, 3),
+                }
+                timing_payload.update(timing_data)
+                _try_write("timings", timing_payload)
+        except Exception as e:
+            errors.append({"surface": "timings", "code": "write_failed", "message": str(e)})
 
         total_write_sec = round(_time.perf_counter() - t0, 3)
 
