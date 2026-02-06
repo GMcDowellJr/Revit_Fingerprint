@@ -6,6 +6,11 @@ Provides deterministic, stable hash generation using .NET MD5
 for IronPython compatibility.
 """
 
+# Module-level timing collector reference. Set by the runner to enable
+# ``processing:make_hash`` instrumentation. Never affects hash output.
+_timing_collector = None
+
+
 def safe_str(x):
     """
     Convert any value to a string representation safely.
@@ -36,6 +41,26 @@ def make_hash(values):
       - Revit/pythonnet: use CLR MD5 (streaming)
       - Plain CPython (pytest): fall back to hashlib (streaming)
     """
+    # Timing instrumentation (never affects hash output)
+    _tc = _timing_collector
+    if _tc is not None:
+        try:
+            _tc.start_timer("processing:make_hash")
+        except Exception:
+            pass
+
+    try:
+        return _make_hash_impl(values)
+    finally:
+        if _tc is not None:
+            try:
+                _tc.end_timer("processing:make_hash")
+            except Exception:
+                pass
+
+
+def _make_hash_impl(values):
+    """Inner hash implementation (separated for timing wrapper clarity)."""
     # First try CLR backend (Revit / pythonnet). If not available, use hashlib.
     try:
         from System.Text import Encoding  # type: ignore

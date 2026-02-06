@@ -36,9 +36,11 @@ class CollectCtx:
 
     - collector_cache maps semantic query keys to a list of ElementId integer values.
     - counters are stable names used for PR5 acceptance verification.
+    - timing holds an optional TimingCollector reference for API call instrumentation.
     """
     collector_cache: Dict[CacheKey, List[int]] = field(default_factory=dict)
     counters: Dict[str, int] = field(default_factory=dict)
+    timing: Any = None  # Optional TimingCollector reference
 
     def inc(self, key: str, n: int = 1) -> None:
         try:
@@ -145,6 +147,14 @@ def _collect_id_ints_uncached(
     if cctx is not None:
         cctx.inc("collect.calls_total", 1)
 
+    # Timing: instrument FilteredElementCollector creation + execution
+    _tc = getattr(cctx, "timing", None) if cctx is not None else None
+    if _tc is not None:
+        try:
+            _tc.start_timer("api:filter_elements")
+        except Exception:
+            pass
+
     fec = FilteredElementCollector(doc)
 
     if of_class is not None:
@@ -157,10 +167,21 @@ def _collect_id_ints_uncached(
     elif kind == "instances":
         fec = fec.WhereElementIsNotElementType()
     else:
+        if _tc is not None:
+            try:
+                _tc.end_timer("api:filter_elements")
+            except Exception:
+                pass
         raise ValueError("Unknown collect kind: {}".format(kind))
 
     # ToElements() exists; iterating fec also works. Keep it explicit.
     elems = list(fec.ToElements())
+
+    if _tc is not None:
+        try:
+            _tc.end_timer("api:filter_elements")
+        except Exception:
+            pass
 
     out: List[int] = []
     for e in elems:
