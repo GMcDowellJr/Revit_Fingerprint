@@ -378,6 +378,20 @@ def extract(doc, ctx=None):
             # cut weight is not surfaced for line styles; keep explicit as unknown partition for analysis.
             # p2_unknown.append(make_identity_item("line_style.weight.cut", wcut_v, wcut_q))
 
+            # Traceability fields (metadata only — never in hash/sig/join)
+            try:
+                _eid_raw = getattr(getattr(sc, "Id", None), "IntegerValue", None)
+                _eid_v, _eid_q = canonicalize_int(_eid_raw)
+            except Exception:
+                _eid_v, _eid_q = (None, ITEM_Q_UNREADABLE)
+            try:
+                _uid_raw = getattr(sc, "UniqueId", None)
+                _uid_v, _uid_q = canonicalize_str(_uid_raw)
+            except Exception:
+                _uid_v, _uid_q = (None, ITEM_Q_UNREADABLE)
+            p2_unknown.append(make_identity_item("line_style.source_element_id", _eid_v, _eid_q))
+            p2_unknown.append(make_identity_item("line_style.source_unique_id", _uid_v, _uid_q))
+
             rec_v2["phase2"] = {
                 "schema": "phase2.line_styles.v1",
                 "grouping_basis": "phase2.hypothesis",

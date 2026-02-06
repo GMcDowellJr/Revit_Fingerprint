@@ -253,9 +253,23 @@ def extract(doc, ctx=None):
             {"k": "phase_filter.name", "q": q_name_p2, "v": v_name_p2},
         ])
 
+        # Traceability fields (metadata only — never in hash/sig/join)
+        try:
+            _trace_eid_raw = getattr(getattr(pf, "Id", None), "IntegerValue", None)
+            _trace_eid_v, _trace_eid_q = canonicalize_int(_trace_eid_raw)
+        except Exception:
+            _trace_eid_v, _trace_eid_q = (None, ITEM_Q_UNREADABLE)
+        try:
+            _trace_uid_raw = getattr(pf, "UniqueId", None)
+            _trace_uid_v, _trace_uid_q = canonicalize_str(_trace_uid_raw)
+        except Exception:
+            _trace_uid_v, _trace_uid_q = (None, ITEM_Q_UNREADABLE)
+
         phase2_unknown_items = phase2_sorted_items([
             {"k": "phase_filter.uid", "q": q_uid, "v": v_uid},
             {"k": "phase_filter.id.int", "q": q_id, "v": v_id},
+            {"k": "phase_filter.source_element_id", "q": _trace_eid_q, "v": _trace_eid_v},
+            {"k": "phase_filter.source_unique_id", "q": _trace_uid_q, "v": _trace_uid_v},
         ])
 
         rec_phase2 = {

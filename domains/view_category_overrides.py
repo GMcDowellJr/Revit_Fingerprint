@@ -24,10 +24,12 @@ from core.record_v2 import (
     ITEM_Q_OK,
     ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
+    ITEM_Q_UNSUPPORTED_NOT_APPLICABLE,
     make_identity_item,
     serialize_identity_items,
     build_record_v2,
     canonicalize_str,
+    canonicalize_int,
 )
 from core.phase2 import phase2_sorted_items
 from core.deps import require_domain, Blocked
@@ -377,6 +379,26 @@ def extract(doc, ctx=None):
                 signature_hashes_v2.append(sig_hash)
 
             p2_semantic, p2_cosmetic, p2_unknown = _phase2_partition_items(identity_items_sorted)
+
+            # Traceability fields (metadata only — never in hash/sig/join)
+            try:
+                _tpl_eid_raw = getattr(getattr(template, "Id", None), "IntegerValue", None)
+                _tpl_eid_v, _tpl_eid_q = canonicalize_int(_tpl_eid_raw)
+            except Exception:
+                _tpl_eid_v, _tpl_eid_q = (None, ITEM_Q_UNREADABLE)
+            try:
+                _tpl_uid_raw = getattr(template, "UniqueId", None)
+                _tpl_uid_v, _tpl_uid_q = canonicalize_str(_tpl_uid_raw)
+            except Exception:
+                _tpl_uid_v, _tpl_uid_q = (None, ITEM_Q_UNREADABLE)
+            try:
+                _cat_eid_raw = getattr(getattr(category, "Id", None), "IntegerValue", None)
+                _cat_eid_v, _cat_eid_q = canonicalize_int(_cat_eid_raw)
+            except Exception:
+                _cat_eid_v, _cat_eid_q = (None, ITEM_Q_UNREADABLE)
+            p2_unknown.append({"k": "vco.category_source_element_id", "q": _cat_eid_q, "v": _cat_eid_v})
+            p2_unknown.append({"k": "vco.template_source_element_id", "q": _tpl_eid_q, "v": _tpl_eid_v})
+            p2_unknown.append({"k": "vco.template_source_unique_id", "q": _tpl_uid_q, "v": _tpl_uid_v})
 
             rec["phase2"] = {
                 "schema": "phase2.view_category_overrides.v1",

@@ -53,6 +53,7 @@ from core.record_v2 import (
     STATUS_OK,
     STATUS_BLOCKED,
     ITEM_Q_OK,
+    ITEM_Q_UNREADABLE,
     canonicalize_int,
     canonicalize_str,
     make_identity_item,
@@ -61,7 +62,7 @@ from core.record_v2 import (
 )
 
 
-def _phase2_build_phase2_payload(*, phase_name, seq, uid):
+def _phase2_build_phase2_payload(*, phase_name, seq, uid, elem):
     """
     Phase-2 grouping (hypotheses only; no enforcement).
     """
@@ -81,6 +82,20 @@ def _phase2_build_phase2_payload(*, phase_name, seq, uid):
     uid_in = uid if uid else None
     v_uid, q_uid = phase2_qv_from_legacy_sentinel_str(uid_in, allow_empty=False)
     unknown_items.append({"k": "phase.uid", "q": q_uid, "v": v_uid})
+
+    # Traceability fields (metadata only — never in hash/sig/join)
+    try:
+        _eid_raw = getattr(getattr(elem, "Id", None), "IntegerValue", None)
+        _eid_v, _eid_q = canonicalize_int(_eid_raw)
+    except Exception:
+        _eid_v, _eid_q = (None, ITEM_Q_UNREADABLE)
+    try:
+        _uid_raw = getattr(elem, "UniqueId", None)
+        _uid_v, _uid_q = canonicalize_str(_uid_raw)
+    except Exception:
+        _uid_v, _uid_q = (None, ITEM_Q_UNREADABLE)
+    unknown_items.append({"k": "phase.source_element_id", "q": _eid_q, "v": _eid_v})
+    unknown_items.append({"k": "phase.source_unique_id", "q": _uid_q, "v": _uid_v})
 
     return {
         "schema": "phase2.phases.v1",
@@ -206,6 +221,7 @@ def extract(doc, ctx=None):
             phase_name=name,
             seq=seq,
             uid=uid,
+            elem=p,
         )
 
         status_v2 = STATUS_OK

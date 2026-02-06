@@ -50,6 +50,7 @@ from core.record_v2 import (
     STATUS_OK,
     STATUS_BLOCKED,
     ITEM_Q_OK,
+    ITEM_Q_UNREADABLE,
     canonicalize_str,
     canonicalize_int,
     canonicalize_float,
@@ -72,19 +73,19 @@ def _phase2_item(k, raw_v, *, allow_empty=False):
     return {"k": k, "q": q, "v": v}
 
 
-def _phase2_build_payload(rec):
+def _phase2_build_payload(rec, elem=None):
     # Hypotheses only: semantic vs cosmetic vs unknown buckets.
     cosmetic_items = phase2_sorted_items([
         _phase2_item("text_type.name", rec.get("type_name"), allow_empty=True),
     ])
 
-    unknown_items = phase2_sorted_items([
+    unknown_list = [
         _phase2_item("text_type.type_uid", rec.get("type_uid"), allow_empty=True),
         _phase2_item("text_type.type_id", rec.get("type_id"), allow_empty=True),
         _phase2_item("text_type.color_int", rec.get("color_int")),
 
         # Tri-state:
-        # - q="ok", v=None => explicit “no arrowhead” (valid, joinable state)
+        # - q="ok", v=None => explicit "no arrowhead" (valid, joinable state)
         # - q="ok", v=<hash/name> => arrowhead present
         _phase2_item("text_type.leader_arrowhead_uid", rec.get("leader_arrowhead_uid"), allow_empty=True)
         if rec.get("leader_arrowhead_sig_hash") not in (None, "")
@@ -97,7 +98,24 @@ def _phase2_build_payload(rec):
         _phase2_item("text_type.leader_arrowhead_sig_hash", rec.get("leader_arrowhead_sig_hash"), allow_empty=True)
         if rec.get("leader_arrowhead_sig_hash") not in (None, "")
         else {"k": "text_type.leader_arrowhead_sig_hash", "q": "ok", "v": None},
-    ])
+    ]
+
+    # Traceability fields (metadata only — never in hash/sig/join)
+    if elem is not None:
+        try:
+            _eid_raw = getattr(getattr(elem, "Id", None), "IntegerValue", None)
+            _eid_v, _eid_q = canonicalize_int(_eid_raw)
+        except Exception:
+            _eid_v, _eid_q = (None, ITEM_Q_UNREADABLE)
+        try:
+            _uid_raw = getattr(elem, "UniqueId", None)
+            _uid_v, _uid_q = canonicalize_str(_uid_raw)
+        except Exception:
+            _uid_v, _uid_q = (None, ITEM_Q_UNREADABLE)
+        unknown_list.append({"k": "text_type.source_element_id", "q": _eid_q, "v": _eid_v})
+        unknown_list.append({"k": "text_type.source_unique_id", "q": _uid_q, "v": _uid_v})
+
+    unknown_items = phase2_sorted_items(unknown_list)
 
     return {
         "schema": "phase2.text_types.v1",
@@ -396,7 +414,7 @@ def extract(doc, ctx=None):
         # join_key and semantic selectors reference subsets without duplicating k/q/v payloads.
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "text_types")
 
-        rec["phase2"] = _phase2_build_payload(rec)
+        rec["phase2"] = _phase2_build_payload(rec, elem=t)
 
         status_v2 = STATUS_OK
         status_reasons_v2 = []

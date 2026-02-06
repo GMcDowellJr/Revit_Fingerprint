@@ -41,6 +41,7 @@ from core.record_v2 import (
     ITEM_Q_OK,
     ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
+    canonicalize_str,
     canonicalize_str_allow_empty,
     canonicalize_int,
     canonicalize_float,
@@ -456,6 +457,20 @@ def extract(doc, ctx=None):
         # Phase-2 (join-key candidates live ONLY here; identity remains authoritative)
         cosmetic_items = []
         unknown_items = []
+
+        # Traceability fields (metadata only — never in hash/sig/join)
+        try:
+            _eid_raw = getattr(getattr(t, "Id", None), "IntegerValue", None)
+            _eid_v, _eid_q = canonicalize_int(_eid_raw)
+        except Exception:
+            _eid_v, _eid_q = (None, ITEM_Q_UNREADABLE)
+        try:
+            _uid_raw = getattr(t, "UniqueId", None)
+            _uid_v, _uid_q = canonicalize_str(_uid_raw)
+        except Exception:
+            _uid_v, _uid_q = (None, ITEM_Q_UNREADABLE)
+        unknown_items.append(make_identity_item("arrowhead.source_element_id", _eid_v, _eid_q))
+        unknown_items.append(make_identity_item("arrowhead.source_unique_id", _uid_v, _uid_q))
 
         rec_v2["phase2"] = {
             "schema": "phase2.arrowheads.v1",

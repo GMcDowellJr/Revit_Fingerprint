@@ -481,6 +481,20 @@ def extract(doc, ctx=None):
             )
         )
 
+        # Traceability fields (metadata only — never in hash/sig/join)
+        try:
+            _eid_raw = getattr(getattr(e, "Id", None), "IntegerValue", None)
+            _eid_v, _eid_q = canonicalize_int(_eid_raw)
+        except Exception:
+            _eid_v, _eid_q = (None, ITEM_Q_UNREADABLE)
+        try:
+            _uid_raw = getattr(e, "UniqueId", None)
+            _uid_v, _uid_q = canonicalize_str(_uid_raw)
+        except Exception:
+            _uid_v, _uid_q = (None, ITEM_Q_UNREADABLE)
+        unknown_items.append(make_identity_item("line_pattern.source_element_id", _eid_v, _eid_q))
+        unknown_items.append(make_identity_item("line_pattern.source_unique_id", _uid_v, _uid_q))
+
         rec_v2["phase2"] = {
             "schema": "phase2.line_patterns.v1",
             "grouping_basis": "phase2.hypothesis",

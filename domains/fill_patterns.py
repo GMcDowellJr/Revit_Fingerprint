@@ -362,7 +362,7 @@ def extract(doc, ctx=None):
             v2, q2 = phase2_qv_from_legacy_sentinel_str(v, allow_empty=False)
         items.append({"k": k, "v": v2, "q": q2})
 
-    def _phase2_build_phase2(name, uid, elem_id_str, fp):
+    def _phase2_build_phase2(name, uid, elem_id_str, fp, elem):
         semantic = []
         cosmetic = []
         unknown = []
@@ -376,6 +376,20 @@ def extract(doc, ctx=None):
         unknown.append({"k": "fill_pattern.uid", "v": v_uid, "q": q_uid})
         v_eid, q_eid = canonicalize_str(elem_id_str)
         unknown.append({"k": "fill_pattern.elem_id", "v": v_eid, "q": q_eid})
+
+        # Traceability fields (metadata only — never in hash/sig/join)
+        try:
+            _eid_raw = getattr(getattr(elem, "Id", None), "IntegerValue", None)
+            _eid_v, _eid_q = canonicalize_int(_eid_raw)
+        except Exception:
+            _eid_v, _eid_q = (None, ITEM_Q_UNREADABLE)
+        try:
+            _uid_raw = getattr(elem, "UniqueId", None)
+            _uid_v, _uid_q = canonicalize_str(_uid_raw)
+        except Exception:
+            _uid_v, _uid_q = (None, ITEM_Q_UNREADABLE)
+        unknown.append({"k": "fill_pattern.source_element_id", "v": _eid_v, "q": _eid_q})
+        unknown.append({"k": "fill_pattern.source_unique_id", "v": _uid_v, "q": _uid_q})
 
         if fp is None:
             # Explicit unreadable (GetFillPattern failed)
@@ -708,6 +722,7 @@ def extract(doc, ctx=None):
             uid=uid,
             elem_id_str=safe_str(e.Id.IntegerValue),
             fp=fp,
+            elem=e,
         )
 
         rec = {
