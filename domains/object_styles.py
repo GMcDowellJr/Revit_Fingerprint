@@ -47,6 +47,7 @@ from core.record_v2 import (
     ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
     ITEM_Q_UNSUPPORTED,
+    ITEM_Q_UNSUPPORTED_NOT_APPLICABLE,
     canonicalize_str,
     canonicalize_int,
     make_identity_item,
@@ -426,6 +427,22 @@ def extract(doc, ctx=None):
                 # Add CategoryType as unknown context (not part of identity_basis)
                 ct_v, ct_q = phase2_qv_from_legacy_sentinel_str(cat_type, allow_empty=False)
                 unknown_items.append(make_identity_item("obj_style.category_type", ct_v, ct_q))
+
+                # Traceability fields (metadata only — never in hash/sig/join)
+                try:
+                    _eid_raw = getattr(getattr(cat_obj, "Id", None), "IntegerValue", None)
+                    _eid_v, _eid_q = canonicalize_int(_eid_raw)
+                except Exception:
+                    _eid_v, _eid_q = (None, ITEM_Q_UNREADABLE)
+                try:
+                    _uid_raw = getattr(cat_obj, "UniqueId", None)
+                    _uid_v, _uid_q = canonicalize_str(_uid_raw)
+                    if _uid_raw is None:
+                        _uid_v, _uid_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+                except Exception:
+                    _uid_v, _uid_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+                unknown_items.append(make_identity_item("obj_style.source_element_id", _eid_v, _eid_q))
+                unknown_items.append(make_identity_item("obj_style.source_unique_id", _uid_v, _uid_q))
 
                 rec_v2["phase2"] = {
                     "schema": "phase2.object_styles.v1",

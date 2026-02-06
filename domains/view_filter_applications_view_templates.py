@@ -346,8 +346,22 @@ def extract(doc, ctx=None):
         except Exception:
             _eid_v, _eid_q = (None, ITEM_Q_UNREADABLE)
 
+        # Traceability fields (metadata only — never in hash/sig/join)
+        try:
+            _trace_eid_raw = getattr(getattr(v, "Id", None), "IntegerValue", None)
+            _trace_eid_v, _trace_eid_q = canonicalize_int(_trace_eid_raw)
+        except Exception:
+            _trace_eid_v, _trace_eid_q = (None, ITEM_Q_UNREADABLE)
+        try:
+            _trace_uid_raw = getattr(v, "UniqueId", None)
+            _trace_uid_v, _trace_uid_q = canonicalize_str(_trace_uid_raw)
+        except Exception:
+            _trace_uid_v, _trace_uid_q = (None, ITEM_Q_UNREADABLE)
+
         p2_unknown = phase2_sorted_items([
             {"k": "vfa.template_elem_id", "q": _eid_q, "v": _eid_v},
+            {"k": "vfa.source_element_id", "q": _trace_eid_q, "v": _trace_eid_v},
+            {"k": "vfa.source_unique_id", "q": _trace_uid_q, "v": _trace_uid_v},
         ])
 
         record_specs.append(

@@ -47,6 +47,9 @@ from core.record_v2 import (
     STATUS_BLOCKED,
     ITEM_Q_MISSING,
     ITEM_Q_OK,
+    ITEM_Q_UNREADABLE,
+    canonicalize_int,
+    canonicalize_str,
     build_record_v2,
     make_identity_item,
     make_record_id_from_element,
@@ -257,6 +260,24 @@ def _join_key_from_canonical_items(identity_items):
         },
         "join_hash": phase2_join_hash(hashed_items),
     }
+
+def _traceability_unknown_items(elem):
+    """Build traceability unknown_items for a view element (metadata only)."""
+    items = []
+    try:
+        _eid_raw = getattr(getattr(elem, "Id", None), "IntegerValue", None)
+        _eid_v, _eid_q = canonicalize_int(_eid_raw)
+    except Exception:
+        _eid_v, _eid_q = (None, ITEM_Q_UNREADABLE)
+    try:
+        _uid_raw = getattr(elem, "UniqueId", None)
+        _uid_v, _uid_q = canonicalize_str(_uid_raw)
+    except Exception:
+        _uid_v, _uid_q = (None, ITEM_Q_UNREADABLE)
+    items.append({"k": "vt.source_element_id", "q": _eid_q, "v": _eid_v})
+    items.append({"k": "vt.source_unique_id", "q": _uid_q, "v": _uid_v})
+    return phase2_sorted_items(items)
+
 
 def extract(doc, ctx=None):
     """
@@ -602,7 +623,7 @@ def extract(doc, ctx=None):
                 "semantic_keys": semantic_keys,
                 "cosmetic_items": [],
                 "coordination_items": [],
-                "unknown_items": [],
+                "unknown_items": _traceability_unknown_items(v),
             }
 
             rec["sig_basis"] = {
@@ -988,7 +1009,7 @@ def extract(doc, ctx=None):
             "semantic_keys": semantic_keys,
             "cosmetic_items": [],
             "coordination_items": [],
-            "unknown_items": [],
+            "unknown_items": _traceability_unknown_items(v),
         }
 
         rec["sig_basis"] = {

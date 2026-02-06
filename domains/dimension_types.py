@@ -48,6 +48,7 @@ from core.rows import (
 from core.record_v2 import (
     canonicalize_str,
     canonicalize_str_allow_empty,
+    canonicalize_int,
     canonicalize_enum,
     canonicalize_float,
     ITEM_Q_OK,
@@ -1272,9 +1273,23 @@ def extract(doc, ctx=None):
         lw_v, lw_q = canonicalize_str(lw)
         color_int_v, color_int_q = canonicalize_str(color_int)
 
+        # Traceability fields (metadata only — never in hash/sig/join)
+        try:
+            _trace_eid_raw = getattr(getattr(d, "Id", None), "IntegerValue", None)
+            _trace_eid_v, _trace_eid_q = canonicalize_int(_trace_eid_raw)
+        except Exception:
+            _trace_eid_v, _trace_eid_q = (None, ITEM_Q_UNREADABLE)
+        try:
+            _trace_uid_raw = getattr(d, "UniqueId", None)
+            _trace_uid_v, _trace_uid_q = canonicalize_str(_trace_uid_raw)
+        except Exception:
+            _trace_uid_v, _trace_uid_q = (None, ITEM_Q_UNREADABLE)
+
         phase2_unknown_items = phase2_sorted_items([
             make_identity_item("dim_attr.prefix", prefix_v, prefix_q),
             make_identity_item("dim_attr.suffix", suffix_v, suffix_q),
+            make_identity_item("dim_type.source_element_id", _trace_eid_v, _trace_eid_q),
+            make_identity_item("dim_type.source_unique_id", _trace_uid_v, _trace_uid_q),
         ])
 
         phase2_cosmetic_items = phase2_sorted_items([
