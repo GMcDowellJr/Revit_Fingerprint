@@ -41,7 +41,10 @@ def test_object_styles_canonical_evidence_selectors_and_hashing():
     )
 
     assert missing == []
+    # v3 policy: pattern_ref.kind is common required (discriminator);
+    # ref shape adds row_key, weight.projection, pattern_ref.sig_hash.
     assert join_key["keys_used"] == [
+        "obj_style.pattern_ref.kind",
         "obj_style.pattern_ref.sig_hash",
         "obj_style.row_key",
         "obj_style.weight.projection",

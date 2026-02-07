@@ -85,7 +85,9 @@ def test_join_key_builder_additional_required_only_for_shape():
 
 
 def test_get_arrowhead_style_fallback():
-    style_v, style_q = _get_arrowhead_style("UnknownStyle", ITEM_Q_OK)
+    # String inputs are returned as-is (display strings are canonical).
+    # The "Other" fallback only applies to unrecognized integer enum codes.
+    style_v, style_q = _get_arrowhead_style(999, ITEM_Q_OK)
     assert style_v == "Other"
     assert style_q == ITEM_Q_OK
 

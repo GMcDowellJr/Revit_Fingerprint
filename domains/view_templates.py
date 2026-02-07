@@ -254,6 +254,7 @@ def _join_key_from_canonical_items(identity_items):
         "schema": "view_templates.join_key.v1",
         "hash_alg": "md5_utf8_join_pipe",
         "keys_used": sorted(required_keys),
+        "items": hashed_items,
         "selectors": {
             "required_keys": required_keys,
             "optional_keys": optional_keys,

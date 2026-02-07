@@ -40,7 +40,7 @@ def test_phases_join_hash_uses_policy_required_only_and_semantic_selector_is_sep
     assert join_key["join_hash"] == make_hash(serialize_identity_items(hashed_items))
 
     # Semantic basis is declared via selector keys (not duplicated semantic_items k/q/v).
-    phase2 = _phase2_build_phase2_payload(phase_name="Existing", seq=2, uid="uid-1")
+    phase2 = _phase2_build_phase2_payload(phase_name="Existing", seq=2, uid="uid-1", elem=None)
     assert phase2["semantic_keys"] == ["phase.name", "phase.seq"]
     assert "semantic_items" not in phase2
 
