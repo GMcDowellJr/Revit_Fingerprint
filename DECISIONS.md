@@ -274,6 +274,43 @@ Revisit this decision if:
 
 ---
 
+## D-014 — Hash Mode Migration Timeline
+
+**Status:** Accepted
+**Date:** 2026-02-07
+
+### Context
+The system computes two hashes for every domain: `hash` (legacy pipe-delimited with sentinel
+literals) and `hash_v2` (record.v2 identity-basis, no sentinel literals). The `REVIT_FINGERPRINT_HASH_MODE`
+environment variable selects which is authoritative. Legacy remains the default.
+
+All 14 active domains now compute both hashes. The canonical evidence selector rollout
+(PRs #106–#119) established policy-driven join-key composition for all domains, making
+semantic mode viable.
+
+### Decision
+The legacy hash mode will be maintained as default until the following criteria are met:
+
+1. A comparison run across the current model population confirms `hash` and `hash_v2` produce
+   equivalent governance signals (same drift/deviation detection).
+2. All downstream consumers (if any) have been notified of the format change.
+3. The comparison results are documented in this repository.
+
+Once criteria are satisfied, `semantic` becomes the default and `legacy` enters a deprecation
+period of at least one extraction cycle before removal.
+
+### Rationale
+- Dual computation adds complexity to every domain but is necessary for safe migration.
+- Setting explicit criteria prevents indefinite deferral while protecting against premature switching.
+- The comparison run is the minimum evidence required for confidence.
+
+### Consequences
+- Legacy mode remains default until criteria are met.
+- No new domains should add legacy hash support — new domains use semantic mode only.
+- The comparison run becomes a blocking prerequisite for the switch.
+
+---
+
 ## Notes
 
 - This document is **append-only**.

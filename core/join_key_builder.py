@@ -201,6 +201,7 @@ def build_join_key_from_policy(
     hash_optional_items=True,
     emit_items=True,
     emit_selectors=False,
+    preserve_single_def_hash_passthrough=True,
 ):
     """Build join_key dict from a policy and available value sources.
 
@@ -260,7 +261,8 @@ def build_join_key_from_policy(
     # Compute join_hash
     join_hash = None
     if (
-        len(hash_items) == 1
+        preserve_single_def_hash_passthrough
+        and len(hash_items) == 1
         and isinstance(hash_items[0].get("k"), str)
         and hash_items[0]["k"].endswith("_def_hash")
         and isinstance(hash_items[0].get("v"), str)

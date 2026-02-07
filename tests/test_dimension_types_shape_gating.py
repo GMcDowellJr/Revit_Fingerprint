@@ -420,7 +420,7 @@ class TestJoinKeyShapeGating:
         jk, missing = build_join_key_from_policy(domain_policy=dim_policy, identity_items=items)
 
         assert "dim_type.unit_format_id" in missing
-        assert jk["shape_gating"]["additional_required_keys"] == ["dim_type.unit_format_id"]
+        assert jk["shape_gating"]["additional_required_keys"] == ["dim_type.unit_format_id", "dim_type.tick_mark_sig_hash"]
 
     def test_angular_with_unit_format_id(self):
         """Angular shape with unit_format_id should have no missing."""

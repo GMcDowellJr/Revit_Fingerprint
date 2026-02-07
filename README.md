@@ -26,21 +26,32 @@ No product guarantees are implied at this stage.
 
 ## Scope (Current)
 
-### Global Domains
-- Object Styles
+### Metadata Domains
+- Identity (project metadata, no hash)
+- Units (length/area/volume format options)
+
+### Global Style Domains
 - Line Patterns
+- Object Styles
 - Line Styles
 - Fill Patterns
+- Arrowheads
 - Text Types
 - Dimension Types
-- View Filters *(in progress)*
-- Phases *(in progress)*
-- Phase Filters *(in progress)*
-- Phase Graphics *(in progress)*
+
+### Global Filter / Phase Domains
+- View Filter Definitions
+- Phases
+- Phase Filters
+- Phase Graphics *(disabled — API limitation, see D-013)*
 
 ### Contextual Domains
-- View Templates *(behavioral refactor in progress)*
-- Views *(planned)*
+- View Filter Applications (view templates)
+- View Category Overrides
+- View Templates
+
+### Planned
+- Views *(not yet implemented)*
 
 ---
 
@@ -59,6 +70,7 @@ Revit API access is isolated so non-Dynamo runners can be added later.
 ## Status
 
 This repository is **not yet a product**.
-It is a governed extractor under active refactor.
+It is a governed extractor with an active baseline (M5 complete).
 
 Semantic changes are deliberate and explicit.
+See `CHANGELOG.md` for semantic change history and `DECISIONS.md` for architectural decisions.
