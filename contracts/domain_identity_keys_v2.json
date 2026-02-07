@@ -195,6 +195,71 @@
       "required_keys": ["text_type.name", "text_type.font", "text_type.size_in", "text_type.width_factor", "text_type.background", "text_type.line_weight", "text_type.color_rgb", "text_type.show_border", "text_type.leader_border_offset_in", "text_type.tab_size_in", "text_type.bold", "text_type.italic", "text_type.underline"],
       "minima": {"block_if_any_required_not_ok": true},
       "indexed_key_rules": {}
+    },
+
+    "arrowheads": {
+      "allowed_keys": [
+        "arrowhead.style",
+        "arrowhead.arrow_style_raw_int",
+        "arrowhead.arrow_style_display",
+        "arrowhead.tick_size_in",
+        "arrowhead.width_angle_deg",
+        "arrowhead.fill_tick",
+        "arrowhead.arrow_closed",
+        "arrowhead.tick_mark_centered",
+        "arrowhead.heavy_end_pen_weight"
+      ],
+      "required_keys": [
+        "arrowhead.style",
+        "arrowhead.tick_size_in"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "identity": {
+      "allowed_keys": [
+        "identity.is_workshared",
+        "identity.revit_version_number",
+        "identity.revit_version_name",
+        "identity.revit_build"
+      ],
+      "required_keys": [
+        "identity.is_workshared"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "view_category_overrides": {
+      "allowed_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "required_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "view_templates": {
+      "allowed_keys": [
+        "view_template.def_hash",
+        "view_template.category_overrides_def_hash"
+      ],
+      "required_keys": [
+        "view_template.def_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
     }
   }
 }

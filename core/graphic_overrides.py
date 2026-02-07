@@ -47,7 +47,7 @@ _HAS_REVIT = "Autodesk.Revit.DB" in sys.modules
 if not _HAS_REVIT:
     try:
         _spec = importlib.util.find_spec("Autodesk.Revit.DB")
-    except ValueError:
+    except (ValueError, ModuleNotFoundError):
         _spec = None
     _HAS_REVIT = _spec is not None
 
