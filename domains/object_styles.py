@@ -86,24 +86,17 @@ def extract(doc, ctx=None):
     """
     Extract Object Styles fingerprint from document.
 
-    Legacy surfaces:
-      - info["hash"], info["legacy_records"], info["signature_hashes"]
-
     record.v2 surfaces:
       - info["hash_v2"], info["records"] (record.v2 dicts), info["signature_hashes_v2"]
 
     Pattern references:
-      - Uses line_patterns record.v2 sig_hash via ctx["line_pattern_uid_to_hash_v2"].
+      - Uses line_patterns record.v2 sig_hash via ctx["line_pattern_uid_to_hash"].
       - No sentinel literals are injected into identity items.
     """
     info = {
         "count": 0,
         "raw_count": 0,
         "names": [],
-        "legacy_records": [],
-        "signature_hashes": [],
-        "hash": None,
-
         # record.v2
         "records": [],
         "signature_hashes_v2": [],
@@ -136,20 +129,11 @@ def extract(doc, ctx=None):
     # Dependency map: LinePatternElement.UniqueId -> line_patterns record.v2 sig_hash
     lp_uid_to_sig_hash_v2 = None
     try:
-        lp_uid_to_sig_hash_v2 = (ctx or {}).get("line_pattern_uid_to_hash_v2", None) if ctx is not None else None
+        lp_uid_to_sig_hash_v2 = (ctx or {}).get("line_pattern_uid_to_hash", None) if ctx is not None else None
         if not isinstance(lp_uid_to_sig_hash_v2, dict) or not lp_uid_to_sig_hash_v2:
             lp_uid_to_sig_hash_v2 = None
     except Exception:
         lp_uid_to_sig_hash_v2 = None
-
-    # Legacy map (def_hash) used for legacy signature only
-    lp_uid_to_hash_legacy = {}
-    try:
-        lp_uid_to_hash_legacy = (ctx or {}).get("line_pattern_uid_to_hash", {}) if ctx is not None else {}
-        if not isinstance(lp_uid_to_hash_legacy, dict):
-            lp_uid_to_hash_legacy = {}
-    except Exception:
-        lp_uid_to_hash_legacy = {}
 
     def rgb_sig_from_color(c):
         try:
@@ -163,7 +147,6 @@ def extract(doc, ctx=None):
         return info
 
     names = []
-    legacy_records = []
     v2_records = []
     v2_sig_hashes = []
     v2_any_blocked = False
@@ -216,9 +199,6 @@ def extract(doc, ctx=None):
                 row_key = "{}|{}".format(parent_name, row_name)
                 names.append(row_key)
 
-                # -------------------------
-                # Legacy signature (UNCHANGED behavior)
-                # -------------------------
                 try:
                     w_proj_legacy = cat_obj.GetLineWeight(GraphicsStyleType.Projection)
                 except Exception:
@@ -232,28 +212,6 @@ def extract(doc, ctx=None):
                     rgb_sig_legacy = rgb_sig_from_color(cat_obj.LineColor)
                 except Exception:
                     rgb_sig_legacy = S_MISSING
-
-                # Line pattern (legacy): prefer def_hash via ctx map; else S_UNREADABLE (unmapped pattern)
-                try:
-                    lp_id = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
-                    lp_val = S_MISSING
-                    if lp_id and getattr(lp_id, "IntegerValue", 0) > 0:
-                        lp_e = doc.GetElement(lp_id)
-                        lp_uid = canon_str(getattr(lp_e, "UniqueId", None)) if lp_e else None
-                        lp_val = lp_uid_to_hash_legacy.get(lp_uid) or S_UNREADABLE
-                except Exception:
-                    lp_val = S_MISSING
-
-                legacy_sig = "|".join([
-                    safe_str(parent_name),
-                    safe_str(row_name),
-                    safe_str(cat_type),
-                    safe_str(w_proj_legacy),
-                    safe_str(w_cut_legacy),
-                    safe_str(rgb_sig_legacy),
-                    safe_str(lp_val),
-                ])
-                legacy_records.append(legacy_sig)
 
                 # -------------------------
                 # record.v2 identity + sig_hash (NO sentinel literals; q marks missing/unreadable)
@@ -449,7 +407,6 @@ def extract(doc, ctx=None):
                     "grouping_basis": "phase2.hypothesis",
                     # Semantic selector references identity_basis.items.
                     # Deprecated direction: do not duplicate semantic k/q/v evidence here.
-                    "semantic_keys": OBJECT_STYLE_SEMANTIC_KEYS,
                     "cosmetic_items": phase2_sorted_items(cosmetic_items),
                     "coordination_items": phase2_sorted_items([]),
                     "unknown_items": phase2_sorted_items(unknown_items),
@@ -469,14 +426,9 @@ def extract(doc, ctx=None):
                 info["debug_fail_record_build"] += 1
                 continue
 
-    legacy_records_sorted = sorted(legacy_records)
-    info["legacy_records"] = legacy_records_sorted
     info["names"] = sorted(set(names))
-    info["count"] = len(legacy_records_sorted)
+    info["count"] = len(v2_records)
     info["raw_count"] = info["debug_total_categories"]
-
-    info["signature_hashes"] = [make_hash([r]) for r in legacy_records_sorted] if legacy_records_sorted else []
-    info["hash"] = make_hash(legacy_records_sorted) if legacy_records_sorted else None
 
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
     info["signature_hashes_v2"] = sorted(v2_sig_hashes)

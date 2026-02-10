@@ -17,7 +17,6 @@ Update workflow:
 Environment vars:
 - REVIT_FP_TEST_CONFIG: path to config.json (defaults to tests/revit/config.json beside this file)
 - REVIT_FP_UPDATE_GOLDEN: "1" enables updating goldens
-- REVIT_FP_HASH_MODE: forwarded to runner behavior via existing env var REVIT_FINGERPRINT_HASH_MODE
 """
 
 from __future__ import annotations

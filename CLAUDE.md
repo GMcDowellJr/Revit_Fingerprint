@@ -86,7 +86,6 @@ tools/                  Analysis & comparison utilities
   phase1_domain_authority.py         Phase-1: Authority analysis
   phase1_pairwise_analysis.py        Phase-1: Pairwise comparison
   phase1_population_framing.py       Phase-1: Population analysis
-  phase1_semantic_sig_dimension_types.py  Phase-1: Dimension type semantics
 
   phase2_analysis/                   Phase-2 analysis package
     attributes.py, compare.py, index.py, io.py, report.py, stability.py
@@ -233,14 +232,11 @@ Log ONLY semantic changes (signature composition, ordering rules, identity rules
 
 ### Hash Modes
 
-The system supports two hash modes, controlled via `REVIT_FINGERPRINT_HASH_MODE` environment variable:
+The system uses semantic hashing (record.v2 identity-basis) exclusively as of PR #XXX.
+Legacy pipe-delimited signature mode was removed after validation confirmed equivalence.
 
-- `legacy` (default): Backward-compatible pipe-delimited signatures with sentinel literals
-- `semantic`: record.v2 identity-basis hashing (no sentinel literals, preferred for new integrations)
-
-Both hashes are always computed by domains. The mode determines which is authoritative in contract output.
-
-**Migration**: Run with `legacy`, compare `hash` vs `hash_v2` outputs, switch to `semantic` when ready.
+**Migration note:** If comparing old exports to new ones, legacy exports contained a `hash` 
+field; new exports contain only `hash_v2` (which is now the canonical hash).
 
 ### Domain Development Pattern
 ```python
@@ -309,7 +305,7 @@ The runner populates context (`ctx`) for domain cross-references:
 - `view_filter_uid_to_hash` - view_filters → view_templates
 - `view_filter_uid_to_sig_hash_v2` - view_filter_definitions → templates
 - `line_pattern_uid_to_hash` - line_patterns → object_styles, line_styles
-- `line_pattern_uid_to_hash_v2` - line_patterns → object_styles, line_styles (v2)
+- `line_pattern_uid_to_hash` - line_patterns → object_styles, line_styles (v2)
 
 ## Key Decisions Reference
 

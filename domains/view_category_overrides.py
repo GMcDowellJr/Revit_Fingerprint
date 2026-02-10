@@ -405,8 +405,7 @@ def extract(doc, ctx=None):
                 "grouping_basis": "join_key.join_hash",
                 # Semantic selector references identity_basis.items.
                 # Deprecated direction: semantic_items should not duplicate canonical evidence.
-                "semantic_keys": semantic_keys,
-                "cosmetic_items": phase2_sorted_items(p2_cosmetic),
+                                "cosmetic_items": phase2_sorted_items(p2_cosmetic),
                 "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_sorted_items(p2_unknown),
             }

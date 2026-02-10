@@ -30,8 +30,6 @@ from core.canon import (
     canon_num,
     canon_bool,
     canon_id,
-    sig_val,
-    fnum,
     S_MISSING,
     S_UNREADABLE,
     S_NOT_APPLICABLE,
@@ -146,7 +144,7 @@ def extract(doc, ctx=None):
         ctx: Context dictionary (unused for this domain)
 
     Returns:
-        Dictionary with count, hash, signature_hashes, records,
+        Dictionary with count, hash_v2, signature_hashes_v2, records,
         record_rows, and debug counters
     """
     info = {
@@ -154,9 +152,6 @@ def extract(doc, ctx=None):
         "raw_count": 0,
         "names": [],
         "records": [],
-        "signature_hashes": [],
-        "hash": None,
-
         # debug counters
         "debug_missing_name": 0,
         "debug_fail_getpattern": 0,
@@ -191,20 +186,11 @@ def extract(doc, ctx=None):
     info["raw_count"] = len(col)
 
     names = []
-    legacy_records = []
     v2_records = []
-    per_hashes = []
     v2_sig_hashes = []
-    uid_to_hash = {}
     uid_to_hash_v2 = {}
 
-    def _fnum_local(v, nd=9):
-        if v is None:
-            return S_MISSING
-        try:
-            return format(float(v), ".{}f".format(nd))
-        except Exception:
-            return sig_val(v)
+
 
     for e in col:
         # ---- name metadata ----
@@ -246,61 +232,6 @@ def extract(doc, ctx=None):
                         }
                     )
                 lp = None
-
-        # -------------------------
-        # Legacy signature (UNCHANGED behavior)
-        # -------------------------
-        sig = []
-        if lp is None:
-            sig.append("error=GetLinePatternFailed")
-        else:
-            segs = None
-            try:
-                if hasattr(lp, "GetSegments"):
-                    segs = list(lp.GetSegments() or [])
-                else:
-                    segs = list(getattr(lp, "Segments", None) or [])
-            except Exception as ex:
-                info["debug_fail_segment_read"] += 1
-                t = ex.__class__.__name__
-                info["debug_segment_ex_types"][t] = info["debug_segment_ex_types"].get(t, 0) + 1
-                if len(info["debug_segment_ex_samples"]) < 5:
-                    info["debug_segment_ex_samples"].append(
-                        {
-                            "name": name,
-                            "id": safe_str(e.Id.IntegerValue),
-                            "uid": uid,
-                            "ex_type": t,
-                            "ex_msg": safe_str(str(ex)),
-                        }
-                    )
-                segs = None
-
-            if segs is None:
-                sig.append("error=SegmentsUnreadable")
-            else:
-                sig.append("seg_count={}".format(sig_val(len(segs))))
-                for idx, s in enumerate(segs):
-                    try:
-                        st_id, st_name = _lp_seg_type_id_and_name(s)
-                        try:
-                            slen = getattr(s, "Length", None)
-                        except Exception:
-                            slen = None
-
-                        if st_id == 2:
-                            slen = 0.0
-
-                        sig.append("seg[{}].type_id={}".format(idx, sig_val(st_id)))
-                        sig.append("seg[{}].type={}".format(idx, sig_val(st_name)))
-                        sig.append("seg[{}].len={}".format(idx, sig_val(_fnum_local(slen, 9))))
-                    except Exception:
-                        info["debug_fail_segment_read"] += 1
-                        sig.append("seg[{}].error=SegmentReadFailed".format(idx))
-
-        def_hash = make_hash(sig)
-        if uid:
-            uid_to_hash[uid] = def_hash
 
         # -------------------------
         # record.v2 identity + sig_hash
@@ -499,7 +430,6 @@ def extract(doc, ctx=None):
             "schema": "phase2.line_patterns.v1",
             "grouping_basis": "phase2.hypothesis",
             # Selector-based semantic basis; canonical evidence lives in identity_basis.items.
-            "semantic_keys": semantic_keys,
             "cosmetic_items": phase2_sorted_items(cosmetic_items),
             "coordination_items": phase2_sorted_items([]),
             "unknown_items": phase2_sorted_items(unknown_items),
@@ -519,34 +449,16 @@ def extract(doc, ctx=None):
             info["debug_v2_blocked"] += 1
             info["debug_v2_block_reasons"]["blocked_record"] = info["debug_v2_block_reasons"].get("blocked_record", 0) + 1
 
-        # legacy record (per element)
-        rec = {
-            "id": safe_str(e.Id.IntegerValue),
-            "name": name,          # metadata only
-            "uid": uid,            # metadata only
-            "def_hash": def_hash,  # hashed definition (or failure-signature)
-        }
-        if DEBUG_INCLUDE_LINEPATTERN_SIGNATURES:
-            rec["def_signature"] = sig
-
-        legacy_records.append(rec)
-        per_hashes.append(def_hash)
-        info["debug_kept"] += 1
 
     # ---- domain-level finalize (once) ----
     info["names"] = sorted(set(names))
     info["count"] = len(v2_records)
-    info["legacy_records"] = sorted(legacy_records, key=lambda r: (r.get("name", ""), r.get("id", "")))
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
-    info["signature_hashes"] = sorted(per_hashes)
-    info["hash"] = make_hash(info["signature_hashes"])
-
     info["signature_hashes_v2"] = sorted(v2_sig_hashes)
     info["hash_v2"] = None if info["debug_v2_blocked"] > 0 else make_hash(info["signature_hashes_v2"])
 
     if ctx is not None:
-        ctx["line_pattern_uid_to_hash"] = uid_to_hash
-        ctx["line_pattern_uid_to_hash_v2"] = uid_to_hash_v2
+        ctx["line_pattern_uid_to_hash"] = uid_to_hash_v2
 
     try:
         recs = info.get("records") or []

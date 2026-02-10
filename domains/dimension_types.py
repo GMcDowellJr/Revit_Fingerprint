@@ -28,7 +28,7 @@ from core.canon import (
     canon_num,
     canon_bool,
     canon_id,
-    sig_val,
+   
     fnum,
     S_MISSING,
     S_UNREADABLE,
@@ -810,11 +810,9 @@ def extract(doc, ctx=None):
     info = {
         "count": 0,
         "names": [],
-        "hash": None,
-
+        
         # new
         "records": [],
-        "signature_hashes": [],
         "raw_count": 0,
         "debug_missing_name": 0,
 
@@ -839,8 +837,7 @@ def extract(doc, ctx=None):
     names = []
     missing = 0
     records = []
-    sig_hashes = []
-
+    
     # record.v2 build state
     v2_records = []
     v2_sig_hashes = []  # non-null only
@@ -1029,43 +1026,43 @@ def extract(doc, ctx=None):
         tick_name = canon_str(tick_name)
 
         signature_tuple = [
-            "text_font={}".format(sig_val(text_font)),
-            "text_size_in={}".format(sig_val(text_size_in)),
-            "line_weight={}".format(sig_val(lw)),
-            "color_int={}".format(sig_val(color_int)),
-            "tick_mark={}".format(sig_val(tick_name)),
-            "witness_ctrl={}".format(sig_val(witness)),
+            "text_font={}".format(canon_str(text_font)),
+            "text_size_in={}".format(canon_str(text_size_in)),
+            "line_weight={}".format(canon_str(lw)),
+            "color_int={}".format(canon_str(color_int)),
+            "tick_mark={}".format(canon_str(tick_name)),
+            "witness_ctrl={}".format(canon_str(witness)),
 
             # expanded signature (optional fields)
-            "text_bg={}".format(sig_val(text_bg)),
-            "width_factor={}".format(sig_val(width_factor)),
-            "text_offset_in={}".format(sig_val(_fmt_in_from_ft(text_offset))),
-            "bold={}".format(sig_val(bold)),
-            "italic={}".format(sig_val(italic)),
-            "underline={}".format(sig_val(underline)),
-            "suppress_spaces={}".format(sig_val(suppress_spaces)),
-            "read_convention={}".format(sig_val(read_conv)),
+            "text_bg={}".format(canon_str(text_bg)),
+            "width_factor={}".format(canon_str(width_factor)),
+            "text_offset_in={}".format(canon_str(_fmt_in_from_ft(text_offset))),
+            "bold={}".format(canon_str(bold)),
+            "italic={}".format(canon_str(italic)),
+            "underline={}".format(canon_str(underline)),
+            "suppress_spaces={}".format(canon_str(suppress_spaces)),
+            "read_convention={}".format(canon_str(read_conv)),
 
-            "leader_type={}".format(sig_val(leader_type)),
-            "show_leader_when_text_moves={}".format(sig_val(show_leader_when_text_moves)),
-            "leader_tick_mark={}".format(sig_val(leader_tick_mark)),
+            "leader_type={}".format(canon_str(leader_type)),
+            "show_leader_when_text_moves={}".format(canon_str(show_leader_when_text_moves)),
+            "leader_tick_mark={}".format(canon_str(leader_tick_mark)),
 
-            "tick_mark_line_weight={}".format(sig_val(tick_lw)),
+            "tick_mark_line_weight={}".format(canon_str(tick_lw)),
 
-            "dim_line_ext_in={}".format(sig_val(_fmt_in_from_ft(dim_line_ext))),
-            "flipped_dim_line_ext_in={}".format(sig_val(_fmt_in_from_ft(flipped_dim_line_ext))),
-            "snap_dist_in={}".format(sig_val(_fmt_in_from_ft(snap_dist))),
+            "dim_line_ext_in={}".format(canon_str(_fmt_in_from_ft(dim_line_ext))),
+            "flipped_dim_line_ext_in={}".format(canon_str(_fmt_in_from_ft(flipped_dim_line_ext))),
+            "snap_dist_in={}".format(canon_str(_fmt_in_from_ft(snap_dist))),
 
-            "witness_ext_in={}".format(sig_val(_fmt_in_from_ft(witness_ext))),
-            "witness_gap_in={}".format(sig_val(_fmt_in_from_ft(witness_gap))),
-            "witness_len_in={}".format(sig_val(_fmt_in_from_ft(witness_len))),
+            "witness_ext_in={}".format(canon_str(_fmt_in_from_ft(witness_ext))),
+            "witness_gap_in={}".format(canon_str(_fmt_in_from_ft(witness_gap))),
+            "witness_len_in={}".format(canon_str(_fmt_in_from_ft(witness_len))),
 
-            "center_marks={}".format(sig_val(center_marks)),
-            "center_mark_size_in={}".format(sig_val(_fmt_in_from_ft(center_mark_size))),
+            "center_marks={}".format(canon_str(center_marks)),
+            "center_mark_size_in={}".format(canon_str(_fmt_in_from_ft(center_mark_size))),
 
             # FormatOptions stringify (captures UseDefault + overrides without pretending it's a Parameter)
-            "units_fmt={}".format(sig_val(safe_str(units_fmt) if units_fmt is not None else None)),
-            "alt_units_fmt={}".format(sig_val(safe_str(alt_units_fmt) if alt_units_fmt is not None else None)),
+            "units_fmt={}".format(canon_str(safe_str(units_fmt) if units_fmt is not None else None)),
+            "alt_units_fmt={}".format(canon_str(safe_str(alt_units_fmt) if alt_units_fmt is not None else None)),
         ]
 
         sig_hash = make_hash(signature_tuple)
@@ -1414,8 +1411,7 @@ def extract(doc, ctx=None):
                 "schema": "phase2.dimension_types.v1",
                 "grouping_basis": "phase2.hypothesis",
                 # Deprecated direction: semantic selectors should reference canonical identity_basis.items.
-                "semantic_keys": semantic_keys,
-                "cosmetic_items": phase2_cosmetic_items,
+                                "cosmetic_items": phase2_cosmetic_items,
                 "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_unknown_items,
             }
@@ -1441,8 +1437,7 @@ def extract(doc, ctx=None):
                 "schema": "phase2.dimension_types.v1",
                 "grouping_basis": "phase2.hypothesis",
                 # Deprecated direction: semantic selectors should reference canonical identity_basis.items.
-                "semantic_keys": semantic_keys,
-                "cosmetic_items": phase2_cosmetic_items,
+                                "cosmetic_items": phase2_cosmetic_items,
                 "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_unknown_items,
             }
@@ -1453,7 +1448,6 @@ def extract(doc, ctx=None):
         }
 
         v2_records.append(rec_v2)
-        sig_hashes.append(sig_hash)
 
         # Legacy (v1) record emission was never completed in this file.
         # Preserve existing keys and compute only domain-level aggregates.
@@ -1462,9 +1456,7 @@ def extract(doc, ctx=None):
     # --- finalize legacy (v1) aggregates ---
     info["count"] = len(names)
     info["names"] = sorted(names)
-    info["signature_hashes"] = sorted(sig_hashes)
-    info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else make_hash([])
-
+    
     info["debug_missing_name"] = int(missing)
 
     # --- finalize v2 aggregates ---

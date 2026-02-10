@@ -28,7 +28,7 @@ from core.canon import (
     canon_num,
     canon_bool,
     canon_id,
-    sig_val,
+   
     fnum,
     S_MISSING,
     S_UNREADABLE,
@@ -122,8 +122,7 @@ def _phase2_build_payload(rec, elem=None):
         "grouping_basis": "phase2.hypothesis",
         # Selector-based semantic basis; canonical evidence lives in identity_basis.items.
         # Deprecated direction: semantic_items should not duplicate canonical k/q/v evidence.
-        "semantic_keys": TEXT_TYPE_SEMANTIC_KEYS,
-        "cosmetic_items": cosmetic_items,
+                "cosmetic_items": cosmetic_items,
         "coordination_items": phase2_sorted_items([]),
         "unknown_items": unknown_items,
     }
@@ -161,9 +160,7 @@ def extract(doc, ctx=None):
         "raw_count": 0,
         "names": [],
         "records": [],
-        "signature_hashes": [],
-        "hash": None,
-
+        
         # v2 (contract semantic hash) — additive only; legacy behavior unchanged
         "hash_v2": None,
         "debug_v2_blocked": False,
@@ -189,11 +186,9 @@ def extract(doc, ctx=None):
     names = []
     missing = 0
     records = []
-    sig_hashes = []
-
+    
     # v2 build state (domain-level block; no partial coverage semantics)
     v2_records = []
-    v2_sig_hashes = []
     v2_blocked = False
     v2_reasons = {}
     # Debug-only: keep the legacy pipe-delimited signature row out of records[]
@@ -302,19 +297,19 @@ def extract(doc, ctx=None):
 
         # --- signature tuple (core) ---
         signature_tuple = [
-            "font={}".format(sig_val(font)),
-            "size_in={}".format(sig_val(size_in)),
-            "width_factor={}".format(sig_val(width_factor_n)),
-            "background={}".format(sig_val(background_i)),
-            "line_weight={}".format(sig_val(line_weight)),
-            "color_int={}".format(sig_val(color_int)),
+            "font={}".format(canon_str(font)),
+            "size_in={}".format(canon_str(size_in)),
+            "width_factor={}".format(canon_str(width_factor_n)),
+            "background={}".format(canon_str(background_i)),
+            "line_weight={}".format(canon_str(line_weight)),
+            "color_int={}".format(canon_str(color_int)),
 
-            "show_border={}".format(sig_val(show_border)),
-            "leader_border_offset_in={}".format(sig_val(leader_border_offset_in)),
-            "tab_size_in={}".format(sig_val(tab_size_in)),
-            "bold={}".format(sig_val(bold)),
-            "italic={}".format(sig_val(italic)),
-            "underline={}".format(sig_val(underline)),
+            "show_border={}".format(canon_str(show_border)),
+            "leader_border_offset_in={}".format(canon_str(leader_border_offset_in)),
+            "tab_size_in={}".format(canon_str(tab_size_in)),
+            "bold={}".format(canon_str(bold)),
+            "italic={}".format(canon_str(italic)),
+            "underline={}".format(canon_str(underline)),
         ]
         sig_hash = make_hash(signature_tuple)
 
@@ -503,15 +498,11 @@ def extract(doc, ctx=None):
             v2_sig_hashes.append(sig_hash_v2)
 
         records.append(rec)
-        sig_hashes.append(sig_hash)
 
     info["names"] = sorted(names)
     info["count"] = len(info["names"])
 
-    info["legacy_records"] = sorted(records, key=lambda r: safe_str(r.get("type_name", "")))
     info["records"] = v2_records
-    info["signature_hashes"] = sorted(sig_hashes)
-    info["hash"] = make_hash(sorted(sig_hashes)) if sig_hashes else None
     # Bound debug payload (avoid large repeated strings in exports)
     if v2_sig_rows:
         info["debug_v2_sig_rows_sample"] = v2_sig_rows[:10]

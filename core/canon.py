@@ -141,11 +141,6 @@ def canon_id(v: Any) -> str:
 # Back-compat helpers (deprecated; kept to reduce churn)
 # =========================
 
-def sig_val(v: Any) -> str:
-    """Legacy alias for canon_str."""
-    return canon_str(v)
-
-
 def fnum(v: Any, nd: int) -> str:
     """Legacy alias for canon_num."""
     return canon_num(v, nd=nd)

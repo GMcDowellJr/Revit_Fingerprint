@@ -72,24 +72,17 @@ def extract(doc, ctx=None):
     """
     Extract Line Styles fingerprint from document.
 
-    Legacy surfaces:
-      - info["hash"], info["legacy_records"], info["signature_hashes"]
-
     record.v2 surfaces:
       - info["hash_v2"], info["records"] (record.v2 dicts), info["signature_hashes_v2"]
 
     Pattern references:
-      - Uses line_patterns record.v2 sig_hash via ctx["line_pattern_uid_to_hash_v2"].
+      - Uses line_patterns record.v2 sig_hash via ctx["line_pattern_uid_to_hash"].
       - No sentinel literals are injected into identity items.
     """
     info = {
         "count": 0,
         "raw_count": 0,
         "names": [],
-        "legacy_records": [],
-        "signature_hashes": [],
-        "hash": None,
-
         # record.v2
         "records": [],
         "signature_hashes_v2": [],
@@ -112,7 +105,7 @@ def extract(doc, ctx=None):
     # Dependency map: LinePatternElement.UniqueId -> line_patterns record.v2 sig_hash
     lp_uid_to_sig_hash_v2 = None
     try:
-        lp_uid_to_sig_hash_v2 = (ctx or {}).get("line_pattern_uid_to_hash_v2", None) if ctx is not None else None
+        lp_uid_to_sig_hash_v2 = (ctx or {}).get("line_pattern_uid_to_hash", None) if ctx is not None else None
         if not isinstance(lp_uid_to_sig_hash_v2, dict) or not lp_uid_to_sig_hash_v2:
             lp_uid_to_sig_hash_v2 = None
     except Exception:
@@ -135,7 +128,6 @@ def extract(doc, ctx=None):
     info["raw_count"] = len(subs)
 
     names = []
-    legacy_records = []
     v2_records = []
     v2_sig_hashes = []
     v2_any_blocked = False
@@ -165,34 +157,6 @@ def extract(doc, ctx=None):
                 rgb_sig = "{}-{}-{}".format(int(c.Red), int(c.Green), int(c.Blue))
             except Exception:
                 rgb_sig = S_MISSING
-
-            # -------------------------
-            # Legacy signature (UNCHANGED behavior)
-            # -------------------------
-            lp_val_legacy = S_MISSING
-            try:
-                lp_id = sc.GetLinePatternId(GraphicsStyleType.Projection)
-                if lp_id and lp_id != ElementId.InvalidElementId:
-                    lp_elem = doc.GetElement(lp_id)
-                    lp_uid = getattr(lp_elem, "UniqueId", None) if lp_elem else None
-                    if lp_uid and ctx is not None:
-                        lp_val_legacy = (ctx.get("line_pattern_uid_to_hash") or {}).get(lp_uid, S_MISSING)
-                    else:
-                        lp_val_legacy = S_MISSING
-                else:
-                    # invalid => solid
-                    lp_val_legacy = "SOLID"
-            except Exception:
-                lp_val_legacy = S_MISSING
-
-            legacy_sig = "|".join([
-                safe_str(sc_name),
-                safe_str(w_proj) if w_proj is not None else S_MISSING,
-                safe_str(w_cut) if w_cut is not None else S_MISSING,
-                safe_str(rgb_sig),
-                safe_str(lp_val_legacy),
-            ])
-            legacy_records.append(legacy_sig)
 
             # -------------------------
             # record.v2 identity + sig_hash (NO sentinel literals; q marks missing/unreadable)
@@ -397,7 +361,6 @@ def extract(doc, ctx=None):
                 "grouping_basis": "phase2.hypothesis",
                 # Semantic selector references canonical identity_basis.items.
                 # Deprecated direction: semantic_items should not duplicate canonical evidence.
-                "semantic_keys": LINE_STYLE_SEMANTIC_KEYS,
                 "cosmetic_items": phase2_sorted_items(p2_cosmetic),
                 "coordination_items": phase2_sorted_items([]),
                 "unknown_items": phase2_sorted_items(p2_unknown),
@@ -416,15 +379,10 @@ def extract(doc, ctx=None):
             info["debug_fail_record_build"] += 1
             continue
 
-    legacy_records_sorted = sorted(legacy_records)
-    info["legacy_records"] = legacy_records_sorted
     info["names"] = sorted(set(names))
-    info["count"] = len(legacy_records_sorted)
+    info["count"] = len(v2_records)
 
     # Per-row legacy signature hashes (metadata; NOT used in global hash)
-    info["signature_hashes"] = [make_hash([r]) for r in legacy_records_sorted] if legacy_records_sorted else []
-    info["hash"] = make_hash(legacy_records_sorted) if legacy_records_sorted else None
-
     # record.v2 finalize (domain hash is hash of sig_hashes; block if any record blocked)
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
     info["signature_hashes_v2"] = sorted(v2_sig_hashes)

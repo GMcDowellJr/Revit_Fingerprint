@@ -221,8 +221,7 @@ def extract(doc, ctx=None):
         "count": 0,
         "raw_count": 0,
         "records": [],
-        "hash": None,  # legacy hash intentionally not defined
-        "hash_v2": None,
+                "hash_v2": None,
         "debug_v2_blocked": False,
         "debug_v2_block_reasons": {},
     }
@@ -513,8 +512,7 @@ def extract(doc, ctx=None):
                 "required_qs": required_qs,
                 "label": label,
                 "phase2_payload": {
-                    "semantic_keys": semantic_keys,
-                    "p2_unknown": p2_unknown,
+                                        "p2_unknown": p2_unknown,
                     "join_key_policy": pol,
                 },
             }
@@ -554,8 +552,7 @@ def extract(doc, ctx=None):
             "schema": "phase2.view_filter_definitions.v1",
             "grouping_basis": "phase2.hypothesis",
             # Selector-based semantic basis; canonical evidence lives in identity_basis.items.
-            "semantic_keys": semantic_keys,
-            "cosmetic_items": phase2_sorted_items([]),
+                        "cosmetic_items": phase2_sorted_items([]),
             "unknown_items": p2_unknown,
         }
         rec["sig_basis"] = {

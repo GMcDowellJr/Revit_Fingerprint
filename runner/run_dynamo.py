@@ -117,29 +117,8 @@ from core.join_key_policy import load_join_key_policies
 # Set to None to run all domains, or provide a list of domain names to run specific domains
 ENABLED_DOMAINS = None  # None = all domains
 
-# HASH_MODE controls which hash is authoritative in contract output:
-#
-#   "legacy"   - Uses pipe-delimited signature strings with sentinel literals.
-#                Default mode for backward compatibility with existing tooling.
-#                Hash derived from legacy `hash` field in domain payloads.
-#
-#   "semantic" - Uses record.v2 identity_basis items (no sentinel literals).
-#                Preferred for new integrations and cross-project comparison.
-#                Hash derived from `hash_v2` field in domain payloads.
-#                Domains missing v2 hash will be BLOCKED in semantic mode.
-#
-# Both hashes are always computed by domains. HASH_MODE determines which
-# is surfaced as the authoritative hash in the contract envelope.
-#
-# Migration path:
-#   1. Run with HASH_MODE=legacy (default)
-#   2. Compare `hash` vs `hash_v2` for each domain
-#   3. When all domains produce matching or acceptable v2 hashes, switch to semantic
-#
-# Set via environment variable: REVIT_FINGERPRINT_HASH_MODE=semantic
-HASH_MODE = os.getenv("REVIT_FINGERPRINT_HASH_MODE", "legacy").strip().lower()
-if HASH_MODE not in ("legacy", "semantic"):
-    HASH_MODE = "legacy"
+# Hash computation uses record.v2 identity_basis items (semantic mode).
+# Legacy pipe-delimited hashing removed in PR #XXX.
 
 _DOMAIN_VERSION = "1"
 
@@ -188,17 +167,6 @@ def _extract_v2_hash(payload):
             sv2 = payload.get("semantic_v2", None)
             if isinstance(sv2, dict) and "hash" in sv2:
                 return sv2.get("hash", None)
-    except Exception as e:
-        pass
-    return None
-
-def _extract_legacy_hash(payload):
-    """
-    Best-effort extraction of the legacy semantic hash without changing behavior.
-    """
-    try:
-        if isinstance(payload, dict) and "hash" in payload:
-            return payload.get("hash", None)
     except Exception as e:
         pass
     return None
@@ -314,7 +282,6 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
         block_reasons = []
         domain_diag = {
             "api_reachable": True,
-            "hash_mode": HASH_MODE,
         }
 
         if isinstance(legacy, dict):
@@ -340,13 +307,7 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
             except Exception:
                 pass
 
-        # Select which hash is surfaced in the contract based on runner HASH_MODE.
-        legacy_hash = _extract_legacy_hash(legacy)
-        v2_hash = _extract_v2_hash(legacy)
-
-        hash_value = legacy_hash
-        if HASH_MODE == "semantic":
-            hash_value = v2_hash
+        hash_value = _extract_v2_hash(legacy)
 
         # Lift v2 diagnostics into the contract envelope.
         domain_diag["has_v2"] = bool(_has_v2_surface(legacy))
@@ -391,16 +352,14 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
         if "raw_count" in quality:
             domain_diag["raw_count"] = quality["raw_count"]
 
-        # Semantic mode is an authoritative contract: missing v2 hash must BLOCK for fingerprinted domains.
-        if HASH_MODE == "semantic":
-            if require_v2_hash and domain_status == contracts.DOMAIN_STATUS_OK and hash_value is None:
-                domain_status = contracts.DOMAIN_STATUS_BLOCKED
-                if v2_reasons:
-                    block_reasons = sorted({str(k) for k in v2_reasons.keys()})
-                else:
-                    block_reasons = ["missing_v2_hash"]
-            elif domain_status == contracts.DOMAIN_STATUS_BLOCKED and not block_reasons:
-                block_reasons = sorted({str(k) for k in v2_reasons.keys()}) if v2_reasons else ["blocked"]
+        if require_v2_hash and domain_status == contracts.DOMAIN_STATUS_OK and hash_value is None:
+            domain_status = contracts.DOMAIN_STATUS_BLOCKED
+            if v2_reasons:
+                block_reasons = sorted({str(k) for k in v2_reasons.keys()})
+            else:
+                block_reasons = ["no_semantic_hash"]
+        elif domain_status == contracts.DOMAIN_STATUS_BLOCKED and not block_reasons:
+            block_reasons = sorted({str(k) for k in v2_reasons.keys()}) if v2_reasons else ["blocked"]
 
         env = contracts.new_domain_envelope(
             domain=domain_name,
@@ -737,7 +696,6 @@ def run_fingerprint(doc):
         pass
 
     # Hash mode participates in stable surfaces; timing does not.
-    fingerprint["_hash_mode"] = HASH_MODE
 
     # Authoritative contract (statuses live here; legacy payloads may still exist at top-level)
     run_status, run_diag = contracts.compute_run_status(contract_domains, base_run_diag=run_diag, treat_unsupported_as_degraded=False)

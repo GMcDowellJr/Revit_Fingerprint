@@ -28,7 +28,7 @@ from core.canon import (
     canon_num,
     canon_bool,
     canon_id,
-    sig_val,
+   
     S_MISSING,
     S_UNREADABLE,
     S_NOT_APPLICABLE,
@@ -78,9 +78,7 @@ def extract(doc, ctx=None):
         "raw_count": 0,
         "names": [],
         "records": [],
-        "signature_hashes": [],
-        "hash": None,
-
+        
         # debug counters
         "debug_missing_name": 0,
         "debug_fail_read": 0,
@@ -109,13 +107,10 @@ def extract(doc, ctx=None):
     info["raw_count"] = len(col)
 
     names = []
-    records = []
-    per_hashes = []
     per_hashes_v2 = []
     v2_records = []
     v2_sig_hashes = []
-    uid_to_hash_v2 = {}  # For downstream v2 mapping (only when record v2 is ok)
-    uid_to_hash = {}  # For context population
+    uid_to_hash_v2 = {}
 
     # Phase statuses to check
     statuses = []
@@ -151,23 +146,23 @@ def extract(doc, ctx=None):
 
         # Build phase filter signature (DETERMINISTIC ORDER)
         # Include name for semantic identity across projects.
-        sig = ["name={}".format(sig_val(name))]
+        sig = ["name={}".format(canon_str(name))]
 
         # For each phase status (fixed order), get the graphic settings
         for status_name, status_enum in statuses:
             try:
                 pres = pf.GetPhaseStatusPresentation(status_enum)
-                sig.append("{}|presentation={}".format(status_name, sig_val(str(pres))))
+                sig.append("{}|presentation={}".format(status_name, canon_str(str(pres))))
             except Exception as e:
                 info["debug_fail_read"] += 1
-                sig.append("{}|presentation={}".format(status_name, sig_val(int(pres))))
+                sig.append("{}|presentation={}".format(status_name, canon_str(int(pres))))
 
             # v2: strict numeric enum id only; block on unreadable
             if v2_ok:
                 try:
                     pres_v2 = pf.GetPhaseStatusPresentation(status_enum)
                     pres_int = int(pres_v2)
-                    sig_v2.append("{}|presentation_id={}".format(status_name, sig_val(pres_int)))
+                    sig_v2.append("{}|presentation_id={}".format(status_name, canon_str(pres_int)))
                 except Exception:
                     v2_ok = False
                     v2_reason = "presentation_unreadable"
@@ -276,8 +271,7 @@ def extract(doc, ctx=None):
             "schema": "phase2.phase_filters.v1",
             "grouping_basis": "phase2.hypothesis",
             # Selector-based semantic basis; canonical evidence lives in identity_basis.items.
-            "semantic_keys": semantic_keys,
-            "cosmetic_items": [],
+                        "cosmetic_items": [],
             "coordination_items": phase2_coordination_items,
             "unknown_items": phase2_unknown_items,
         }
@@ -323,25 +317,15 @@ def extract(doc, ctx=None):
             "phase2": rec_phase2,
         }
 
-        records.append(rec)
-        per_hashes.append(def_hash)
         info["debug_kept"] += 1
-
-        # Populate context mapping
-        if uid:
-            uid_to_hash[uid] = def_hash
 
     # Populate context for downstream domains
     if ctx is not None:
-        ctx["phase_filter_uid_to_hash"] = uid_to_hash
-        ctx["phase_filter_uid_to_hash_v2"] = uid_to_hash_v2
+        ctx["phase_filter_uid_to_hash"] = uid_to_hash_v2
 
     info["names"] = sorted(set(names))
-    info["count"] = len(records)
-    info["legacy_records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
+    info["count"] = len(v2_records)
     info["records"] = v2_records
-    info["signature_hashes"] = sorted(per_hashes)
-    info["hash"] = make_hash(info["signature_hashes"])
     info["signature_hashes_v2"] = sorted(v2_sig_hashes)
     if info["debug_v2_blocked"] > 0:
         info["hash_v2"] = None

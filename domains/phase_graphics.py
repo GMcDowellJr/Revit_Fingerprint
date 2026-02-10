@@ -122,7 +122,6 @@ def extract(doc, ctx=None):
 
     sig_sorted = sorted(sig)
     info["signature"] = sig_sorted
-    info["hash"] = make_hash(sig_sorted) if sig_sorted else None
 
     # -------------------------
     # record.v2 + Phase-2 (additive, explicit)
