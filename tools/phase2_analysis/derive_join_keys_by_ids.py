@@ -45,23 +45,13 @@ _DENY_KEY_REGEXES = [
     r"(^|[._])symbol_name$",  # *.symbol_name
 ]
 
+from tools.phase2_analysis.domain_identity_contract import DomainIdentityContract
+
+_CONTRACT = DomainIdentityContract.load()
+
+
 def is_eligible_join_key_item(domain: str, key: str) -> bool:
-    """Return False for keys that are labels/identifiers (e.g., type names)."""
-    k = str(key).strip()
-    if not k:
-        return False
-    lk = k.lower()
-
-    # Fast path: common suffixes
-    if lk.endswith(".name") or lk.endswith("_name") or lk.endswith(".type_name") or lk.endswith("_type_name"):
-        return False
-
-    # Regex denylist
-    for pat in _DENY_KEY_REGEXES:
-        if re.search(pat, lk):
-            return False
-
-    return True
+    return _CONTRACT.is_key_allowed(domain, key)
 
 def extract_identity_map(record: Dict[str, Any]) -> Dict[str, Any]:
     """k -> v from identity_basis.items (stringified v)."""
@@ -394,7 +384,18 @@ def derive_join_keys_by_ids(
         policy = {
             "ids_id": ids_id,
             "hash_alg": "md5_utf8_join_pipe",
+
+            # Identity eligibility contract (governance constraint)
+            "identity_contract": {
+                "path": "contracts/domain_identity_keys_v2.json",
+                "version": "v2",
+                "enforced": True,
+            },
+
+            # Selected composite join key for this IDS
             "required_keys": selected_keys,
+
+            # Data-driven selection details
             "selection": {
                 "method": selection_method,
                 "max_k": max_k,

@@ -50,23 +50,13 @@ _DENY_KEY_REGEXES = [
     r"(^|[._])symbol_name$",
 ]
 
+from tools.phase2_analysis.domain_identity_contract import DomainIdentityContract
+
+_CONTRACT = DomainIdentityContract.load()
+
+
 def is_eligible_join_key_item(domain: str, key: str) -> bool:
-    k = str(key).strip()
-    if not k:
-        return False
-    lk = k.lower()
-
-    # fast suffix blocks
-    if lk.endswith(".name") or lk.endswith("_name"):
-        return False
-    if lk.endswith(".type_name") or lk.endswith("_type_name"):
-        return False
-
-    for pat in _DENY_KEY_REGEXES:
-        if re.search(pat, lk):
-            return False
-
-    return True
+    return _CONTRACT.is_key_allowed(domain, key)
 
 
 # ---------------------------
@@ -401,6 +391,14 @@ def run_pareto_by_ids(
         policies[ids_id] = {
             "ids_id": ids_id,
             "hash_alg": "md5_utf8_join_pipe",
+
+            # Identity eligibility contract (governance constraint)
+            "identity_contract": {
+                "path": "contracts/domain_identity_keys_v2.json",
+                "version": "v2",
+                "enforced": True,
+            },
+
             "required_keys": list(chosen.keys),
             "selection": {
                 "method": "pareto_beam",
