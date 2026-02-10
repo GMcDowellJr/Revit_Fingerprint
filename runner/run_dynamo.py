@@ -174,95 +174,6 @@ def _use_filename_stamp():
     # Default: enabled
     return True
 
-def _selected_output_surfaces():
-    """
-    Which sibling artifacts to write when output_path is provided.
-
-    Env var:
-      REVIT_FINGERPRINT_OUTPUT_SURFACES
-
-    Values:
-      - unset / "" / "all"         => payload,manifest,features
-      - "minimal"                  => manifest,features
-      - comma list e.g. "payload,manifest"
-    """
-    try:
-        raw = os.environ.get("REVIT_FINGERPRINT_OUTPUT_SURFACES", "")
-    except Exception:
-        raw = ""
-    raw = str(raw).strip().lower()
-
-    if not raw or raw == "all":
-        return {"payload", "manifest", "features"}
-
-    if raw == "minimal":
-        return {"manifest", "features"}
-
-    parts = []
-    for p in raw.split(","):
-        s = p.strip().lower()
-        if s:
-            parts.append(s)
-
-    allowed = {"payload", "manifest", "features"}
-    out = {p for p in parts if p in allowed}
-    return out if out else {"payload", "manifest", "features"}
-
-def _should_emit_index():
-    """
-    Whether to emit the index JSON file (canonical contract + hash_mode + identity).
-
-    Env var:
-      REVIT_FINGERPRINT_EMIT_INDEX
-
-    Values:
-      - unset / "" / "1" / "true" => True (default)
-      - "0" / "false"             => False
-    """
-    try:
-        v = os.environ.get("REVIT_FINGERPRINT_EMIT_INDEX", "1")
-    except Exception:
-        v = "1"
-    v = str(v).strip().lower()
-    return v not in ("0", "false", "no", "off", "n", "f")
-
-def _should_emit_details():
-    """
-    Whether to emit the details JSON file (all domain payloads with records).
-
-    Env var:
-      REVIT_FINGERPRINT_EMIT_DETAILS
-
-    Values:
-      - unset / "" / "1" / "true" => True (default)
-      - "0" / "false"             => False
-    """
-    try:
-        v = os.environ.get("REVIT_FINGERPRINT_EMIT_DETAILS", "1")
-    except Exception:
-        v = "1"
-    v = str(v).strip().lower()
-    return v not in ("0", "false", "no", "off", "n", "f")
-
-def _should_emit_legacy_bundle():
-    """
-    Whether to emit the legacy bundle JSON file (current monolithic payload).
-
-    Env var:
-      REVIT_FINGERPRINT_EMIT_LEGACY_BUNDLE
-
-    Values:
-      - unset / "" / "0" / "false" => False (default)
-      - "1" / "true"               => True
-    """
-    try:
-        # Default changed to OFF: legacy bundle must be explicitly requested
-        v = os.environ.get("REVIT_FINGERPRINT_EMIT_LEGACY_BUNDLE", "0")
-    except Exception:
-        v = "0"
-    v = str(v).strip().lower()
-    return v in ("1", "true", "yes", "on")
-
 def _extract_v2_hash(payload):
     """
     Best-effort extraction of the contract semantic hash (v2) without changing legacy behavior.
@@ -473,7 +384,7 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
         if v2_reasons:
             domain_diag["v2_block_reasons"] = v2_reasons
 
-        # Lift count/raw_count into the contract diag for index-only consumption.
+        # Lift count/raw_count into the contract diagnostics.
         quality = _extract_legacy_quality(legacy)
         if "count" in quality:
             domain_diag["count"] = quality["count"]
@@ -984,116 +895,13 @@ try:
             pass
         return bytes_written, round(time.perf_counter() - t0, 3)
 
-    def _build_index_payload(fingerprint_payload, details_filename):
-        """
-        Build the canonical index payload (small, tool-ingest surface).
-
-        Includes:
-          - _contract (with domain summaries including counts in diag)
-          - _hash_mode
-          - identity (if present)
-          - _meta (optional)
-          - _notes (optional)
-          - artifacts (pointer to details file)
-
-        Args:
-          fingerprint_payload: Full fingerprint dict
-          details_filename: Name of the details file (e.g., "basename.details.json")
-
-        Returns:
-          Index payload dict
-        """
-        index = {}
-
-        # Core contract envelope (authoritative)
-        if "_contract" in fingerprint_payload:
-            index["_contract"] = fingerprint_payload["_contract"]
-
-        # Hash mode (required for tools)
-        if "_hash_mode" in fingerprint_payload:
-            index["_hash_mode"] = fingerprint_payload["_hash_mode"]
-
-        # Identity (if present, keep stable)
-        if "identity" in fingerprint_payload:
-            index["identity"] = fingerprint_payload["identity"]
-
-        # Metadata (optional, non-duplicative)
-        if "_meta" in fingerprint_payload:
-            index["_meta"] = fingerprint_payload["_meta"]
-
-        # Runner notes (optional)
-        if "_notes" in fingerprint_payload:
-            index["_notes"] = fingerprint_payload["_notes"]
-
-        # Pointer to details file
-        index["artifacts"] = {
-            "details_href": details_filename
-        }
-
-        return index
-
-    def _build_details_payload(fingerprint_payload):
-        """
-        Build the details payload (all domain payloads with records).
-
-        Includes:
-          - All top-level domain payloads (identity, units, line_patterns, etc.)
-          - Excludes meta fields (_contract, _manifest, _features, _hash_mode, _meta, _notes, _domains)
-
-        Args:
-          fingerprint_payload: Full fingerprint dict
-
-        Returns:
-          Details payload dict
-        """
-        details = {}
-
-        # Meta field keys to exclude (these go in index or are derived)
-        meta_keys = {
-            "_contract", "_manifest", "_features", "_hash_mode",
-            "_meta", "_notes", "_domains", "artifacts"
-        }
-
-        # Extract all domain payloads
-        for key, value in fingerprint_payload.items():
-            if key not in meta_keys:
-                details[key] = value
-
-        return details
-
-    def _write_sibling_artifacts(base_payload_path, fingerprint_payload):
-        """
-        Write payload + sibling stable surfaces.
-
-        Now supports:
-          - Legacy bundle (payload.json) - full monolithic export
-          - Index (payload.index.json) - canonical contract + identity + pointers
-          - Details (payload.details.json) - all domain payloads with records
-          - Manifest (payload.manifest.json) - stable comparison surface
-          - Features (payload.features.json) - cohort analysis surface
-
-        Returns:
-          (paths_dict, bytes_dict, sha256_dict, write_sec_total, write_errors_list)
-        """
+    def _write_fingerprint(base_payload_path, fingerprint_payload):
+        """Write one monolithic fingerprint JSON file."""
         import time as _time
 
-        base_no_ext, _ext = os.path.splitext(base_payload_path)
-
-        # Build filenames for all possible outputs
         paths = {
             "payload": base_payload_path,
-            "index": base_no_ext + ".index.json",
-            "details": base_no_ext + ".details.json",
-            "manifest": base_no_ext + ".manifest.json",
-            "features": base_no_ext + ".features.json",
-            "timings": base_no_ext + ".timings.json",
         }
-
-        # Determine which surfaces to write based on config flags
-        surfaces = _selected_output_surfaces()
-        emit_index = _should_emit_index()
-        emit_details = _should_emit_details()
-        emit_legacy = _should_emit_legacy_bundle()
 
         bytes_written = {}
         sha256 = {}
@@ -1115,66 +923,7 @@ try:
             except Exception as e:
                 errors.append({"surface": kind, "code": "write_failed", "message": str(e)})
 
-        # Write index file (canonical tool-ingest surface)
-        if emit_index:
-            try:
-                details_filename = os.path.basename(paths["details"])
-                index_payload = _build_index_payload(fingerprint_payload, details_filename)
-                _try_write("index", index_payload)
-            except Exception as e:
-                errors.append({"surface": "index", "code": "build_failed", "message": str(e)})
-
-        # Write details file (all domain payloads)
-        if emit_details:
-            try:
-                details_payload = _build_details_payload(fingerprint_payload)
-                _try_write("details", details_payload)
-            except Exception as e:
-                errors.append({"surface": "details", "code": "build_failed", "message": str(e)})
-
-        # Write legacy bundle (full payload, backward compatibility)
-        if emit_legacy and "payload" in surfaces:
-            _try_write("payload", fingerprint_payload)
-
-        # Write manifest (stable comparison surface)
-        if "manifest" in surfaces:
-            m = None
-            try:
-                m = fingerprint_payload.get("_manifest", None) if isinstance(fingerprint_payload, dict) else None
-            except Exception:
-                m = None
-            if m is None:
-                errors.append({"surface": "manifest", "code": "missing_manifest", "message": "payload missing _manifest"})
-            else:
-                _try_write("manifest", m)
-
-        # Write features (cohort analysis surface)
-        if "features" in surfaces:
-            f = None
-            try:
-                f = fingerprint_payload.get("_features", None) if isinstance(fingerprint_payload, dict) else None
-            except Exception:
-                f = None
-            if f is None:
-                errors.append({"surface": "features", "code": "missing_features", "message": "payload missing _features"})
-            else:
-                _try_write("features", f)
-
-        # Write timing report (always emitted when timing data is available)
-        try:
-            _contract = fingerprint_payload.get("_contract", {}) if isinstance(fingerprint_payload, dict) else {}
-            _rd = _contract.get("run_diag", {}) if isinstance(_contract, dict) else {}
-            timing_data = _rd.get("timings", None) if isinstance(_rd, dict) else None
-            if isinstance(timing_data, dict) and timing_data:
-                from datetime import datetime as _dt
-                timing_payload = {
-                    "export_timestamp": _dt.now().strftime("%Y-%m-%dT%H:%M:%S"),
-                    "total_execution_seconds": round(_time.perf_counter() - _SCRIPT_START, 3),
-                }
-                timing_payload.update(timing_data)
-                _try_write("timings", timing_payload)
-        except Exception as e:
-            errors.append({"surface": "timings", "code": "write_failed", "message": str(e)})
+        _try_write("payload", fingerprint_payload)
 
         total_write_sec = round(_time.perf_counter() - t0, 3)
 
@@ -1255,7 +1004,7 @@ try:
         force_full_out = False
 
     if output_path and not force_full_out:
-        paths, bytes_written, sha256, write_sec_total, write_errors = _write_sibling_artifacts(output_path, fingerprint)
+        paths, bytes_written, sha256, write_sec_total, write_errors = _write_fingerprint(output_path, fingerprint)
 
         t_total_done = round(time.perf_counter() - _SCRIPT_START, 3)
 
@@ -1264,7 +1013,7 @@ try:
         summary = {
             "status": status,
             "output_paths": paths,
-            "output_surfaces": sorted(list(_selected_output_surfaces())),
+            "output_surfaces": ["payload"],
             "filename_stamp_enabled": _use_filename_stamp(),
             "filename_stamp_env": os.environ.get("REVIT_FINGERPRINT_FILENAME_STAMP", None),
             "bytes_written": bytes_written,

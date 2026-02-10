@@ -84,12 +84,11 @@ def build_features(payload: Any) -> Dict[str, Any]:
             br = []
         br_sorted = sorted({str(x) for x in br})
 
-        # Pull counts from contract diag first (index-only workflow), then fall back to legacy payload.
-        # This enables build_features() to work with just the index.json file.
+        # Pull counts from contract diag first, then fall back to legacy payload.
         count = None
         raw_count = None
 
-        # Preferred: read from contract.domains[name].diag (populated by runner for index.json)
+        # Preferred: read from contract.domains[name].diag.
         diag = _as_dict(env.get("diag", None))
         if diag:
             count = _as_int(diag.get("count", None))

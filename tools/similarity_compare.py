@@ -1037,136 +1037,28 @@ def write_details_json(details: List[SimilarityDetail], out_path: str) -> None:
 # Batch drivers
 # -----------------------------
 
-def _merge_index_details_raw(index_raw: Dict[str, Any], details_raw: Dict[str, Any]) -> Dict[str, Any]:
-    """Merge index (metadata) and details (domain payloads) into a single fingerprint object."""
-    merged = {**index_raw}
-    for key, value in details_raw.items():
-        # Domain payloads don't start with underscore; index metadata does
-        if not key.startswith("_") and key not in merged:
-            merged[key] = value
-    return merged
-
-
 def find_json_files(dir_path: str) -> List[str]:
-    """Find JSON files in a directory.
-
-    NOTE: For split exports (index + details), consider using load_fingerprints_from_dir()
-    instead which properly merges split files.
-    """
+    """Find monolithic JSON files in a directory (excluding legacy bundles)."""
     p = Path(dir_path)
     if not p.exists() or not p.is_dir():
         raise ValueError(f"not_a_directory: {dir_path}")
 
-    # Prefer split exports (details first; index second). Ignore legacy by default.
-    details = [str(x) for x in p.glob("*.details.json") if x.is_file()]
-    index = [str(x) for x in p.glob("*.index.json") if x.is_file()]
-    legacy = [str(x) for x in p.glob("*.legacy.json") if x.is_file()]
-
-    if details:
-        if legacy:
-            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default (details present).\n")
-        details.sort()
-        return details
-
-    if index:
-        if legacy:
-            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default (index present).\n")
-        sys.stderr.write("[WARN similarity_compare] No *.details.json found; using *.index.json (signature multiset metric may be undefined).\n")
-        index.sort()
-        return index
-
-    # Last resort: any *.json except legacy (avoid implicit re-enable)
     files = [str(x) for x in p.glob("*.json") if x.is_file() and not str(x).lower().endswith(".legacy.json")]
     files.sort()
-    if legacy and files:
-        sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default.\n")
-    if legacy and not files:
-        sys.stderr.write("[WARN similarity_compare] only legacy bundle(s) found; results may be incomplete.\n")
-        legacy.sort()
-        return legacy
     return files
 
 
 def load_fingerprints_from_dir(dir_path: str) -> Dict[str, FingerprintData]:
-    """Load all fingerprints from a directory, handling split exports by merging index + details."""
+    """Load all monolithic fingerprints from a directory."""
     p = Path(dir_path)
     if not p.exists() or not p.is_dir():
         raise ValueError(f"not_a_directory: {dir_path}")
 
-    details = sorted([x for x in p.glob("*.details.json") if x.is_file()])
-    index = sorted([x for x in p.glob("*.index.json") if x.is_file()])
-    legacy = sorted([x for x in p.glob("*.legacy.json") if x.is_file()])
+    files = sorted([x for x in p.glob("*.json") if x.is_file() and not str(x).lower().endswith(".legacy.json")])
 
     fps: Dict[str, FingerprintData] = {}
-
-    if details and index:
-        # SPLIT EXPORT: Merge index + details
-        sys.stderr.write("[INFO similarity_compare] Found split exports. Merging index + details.\n")
-        if legacy:
-            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default (split exports present).\n")
-
-        # Build stem-to-path mappings
-        index_by_stem = {x.stem.lower().replace('.index', ''): x for x in index}
-        details_by_stem = {x.stem.lower().replace('.details', ''): x for x in details}
-
-        for stem in sorted(set(index_by_stem.keys()) | set(details_by_stem.keys())):
-            if stem not in index_by_stem:
-                sys.stderr.write(f"[WARN similarity_compare] Missing index for '{stem}', skipping.\n")
-                continue
-
-            index_path = index_by_stem[stem]
-            try:
-                index_raw = json.loads(index_path.read_text(encoding="utf-8"))
-            except Exception as e:
-                fps[str(index_path)] = FingerprintData(
-                    path=os.path.basename(str(index_path)),
-                    ok=False,
-                    error=f"unreadable_index_json: {type(e).__name__}: {e}",
-                    domains={}
-                )
-                continue
-
-            details_raw: Dict[str, Any] = {}
-            if stem in details_by_stem:
-                details_path = details_by_stem[stem]
-                try:
-                    details_raw = json.loads(details_path.read_text(encoding="utf-8"))
-                except Exception as e:
-                    sys.stderr.write(f"[WARN similarity_compare] Could not load details for '{stem}': {e}\n")
-
-            # Merge index + details
-            merged_raw = _merge_index_details_raw(index_raw, details_raw)
-
-            # Parse the merged fingerprint
-            fp = _parse_fingerprint_data(merged_raw, str(index_path))
-            fps[str(index_path)] = fp
-
-    elif details:
-        # DETAILS ONLY: Domain payloads without metadata (degraded mode)
-        sys.stderr.write("[WARN similarity_compare] Found details but no index. Metadata extraction may fail.\n")
-        if legacy:
-            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default (details present).\n")
-        for fpath in details:
-            fps[str(fpath)] = load_fingerprint(str(fpath))
-
-    elif index:
-        # INDEX ONLY: Metadata but no records (degraded mode)
-        sys.stderr.write("[WARN similarity_compare] No *.details.json found; using *.index.json (signature multiset metric may be undefined).\n")
-        if legacy:
-            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default (index present).\n")
-        for fpath in index:
-            fps[str(fpath)] = load_fingerprint(str(fpath))
-
-    else:
-        # FALLBACK: Generic *.json (legacy/monolithic)
-        files = sorted([x for x in p.glob("*.json") if x.is_file() and not str(x).lower().endswith(".legacy.json")])
-        if legacy and files:
-            sys.stderr.write("[WARN similarity_compare] legacy bundle(s) present but ignored by default.\n")
-        if legacy and not files:
-            sys.stderr.write("[WARN similarity_compare] only legacy bundle(s) found; results may be incomplete.\n")
-            files = legacy
-        for fpath in files:
-            fps[str(fpath)] = load_fingerprint(str(fpath))
+    for fpath in files:
+        fps[str(fpath)] = load_fingerprint(str(fpath))
 
     return fps
 
@@ -1413,14 +1305,11 @@ Compare Revit fingerprint JSONs using domain hashes and record-level signatures.
 
 File format notes:
   - For record-based similarity (signature_multiset_similarity metric), use
-    .details.json files which contain full domain payloads with records.
-  - Legacy .json bundle files also work (contains all data).
-  - .index.json files contain only contract metadata (no records) and should
-    not be used for this tool.
+    monolithic .json files which contain metadata and full domain payloads with records.
 """
     )
-    ap.add_argument("--baseline", required=False, help="Baseline fingerprint JSON path (use .details.json for record-level comparison)")
-    ap.add_argument("--dir", required=True, help="Parent directory containing fingerprint JSON files (non-recursive; use .details.json files for best results)")
+    ap.add_argument("--baseline", required=False, help="Baseline fingerprint JSON path")
+    ap.add_argument("--dir", required=True, help="Parent directory containing fingerprint JSON files (non-recursive)")
     ap.add_argument("--mode", choices=["baseline", "pairwise", "both"], default="both")
 
     # Output base is always --dir/similarity unless user provides absolute paths.
@@ -1438,7 +1327,7 @@ File format notes:
 
     args = ap.parse_args()
 
-    # Discover and load all fingerprints (handles split export merging)
+    # Discover and load all monolithic fingerprints
     fps = load_fingerprints_from_dir(args.dir)
     json_files = sorted(fps.keys())
 
