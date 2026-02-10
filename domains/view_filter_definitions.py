@@ -512,7 +512,8 @@ def extract(doc, ctx=None):
                 "required_qs": required_qs,
                 "label": label,
                 "phase2_payload": {
-                                        "p2_unknown": p2_unknown,
+                    "semantic_keys": semantic_keys,
+                    "p2_unknown": p2_unknown,
                     "join_key_policy": pol,
                 },
             }
