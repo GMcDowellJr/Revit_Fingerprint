@@ -11,6 +11,19 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## Unreleased
 
+### Removed
+- Legacy hash infrastructure (pipe-delimited signatures) removed across all domains
+- `REVIT_FINGERPRINT_HASH_MODE` environment variable (semantic mode now default and only mode)
+- `domains/view_filters_deprecated.py` (unused, 741 lines)
+- `core/canon.py`: deprecated `sig_val()` helper
+- Phase-2 `semantic_keys` duplication in domain payloads
+- Legacy context maps: `*_uid_to_hash_v2` (replaced by canonical `*_uid_to_hash`)
+
+### Changed
+- All domains now emit only `hash_v2` as the canonical domain hash in runner contract output
+- Context maps simplified: removed `_v2` suffix from semantic hash maps
+- Contract building simplified: single semantic hash source instead of mode-dependent logic
+
 ### Added
 - Root governance docs: `INVARIANTS.md`, `ARCHITECTURE.md`, `DECISIONS.md`.
 - **NEW DOMAINS (M4):**
@@ -58,7 +71,7 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 - Phase filters and phase graphic overrides are global.
 - Phase names ARE included in behavioral hashes (D-010 revised for cross-project comparability).
 - Phase sequence number is included in phase signatures to capture ordering.
-- Hash mode migration timeline to be decided (D-014).
+- Hash mode migration timeline completed (D-014).
 
 ---
 

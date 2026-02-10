@@ -12,8 +12,8 @@ Legacy hash:
 semantic_v2 hash (additive):
 - Uses only semantic-safe fields and upstream semantic_v2 hashes.
 - BLOCKS (hash_v2=None) if any required dependency resolution fails:
-  - any referenced phase filter cannot be resolved to phase_filter_uid_to_hash_v2
-  - any referenced view filter cannot be resolved to filter_uid_to_hash_v2
+  - any referenced phase filter cannot be resolved to phase_filter_uid_to_hash
+  - any referenced view filter cannot be resolved to filter_uid_to_hash
 - No sentinel hashing for v2.
 """
 
@@ -31,7 +31,7 @@ from core.deps import require_domain, Blocked
 from core.collect import collect_instances
 from core.canon import (
     canon_str,
-    sig_val,
+   
     fnum,
     canon_num,
     canon_bool,
@@ -297,9 +297,7 @@ def extract(doc, ctx=None):
         "raw_count": 0,
         "names": [],
         "records": [],
-        "signature_hashes": [],
-        "hash": None,
-
+        
         # debug counters
         "debug_not_template": 0,
         "debug_missing_name": 0,
@@ -350,10 +348,10 @@ def extract(doc, ctx=None):
     override_map = ctx_map.get("view_category_overrides_sig_hash", {})
 
     # Get existing maps (already in code)
-    phase_filter_map_v2 = ctx_map.get("phase_filter_uid_to_hash_v2", {})
+    phase_filter_map_v2 = ctx_map.get("phase_filter_uid_to_hash", {})
     view_filter_map = ctx_map.get("view_filter_uid_to_sig_hash_v2", {})
-    line_pattern_map_v2 = ctx_map.get("line_pattern_uid_to_hash_v2", {})
-    fill_pattern_map_v2 = ctx_map.get("fill_pattern_uid_to_hash_v2", {})
+    line_pattern_map_v2 = ctx_map.get("line_pattern_uid_to_hash", {})
+    fill_pattern_map_v2 = ctx_map.get("fill_pattern_uid_to_hash", {})
 
     info["debug_baseline_map_size"] = len(baseline_map)
     if not baseline_map:
@@ -532,7 +530,7 @@ def extract(doc, ctx=None):
                             if pf_elem:
                                 pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
                                 pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                                sig.append("phase_filter={}".format(sig_val(pf_hash)))
+                                sig.append("phase_filter={}".format(canon_str(pf_hash)))
                                 # v2: require upstream v2 hash when phase filter is present
                                 if v2_ok:
                                     pf_hash_v2 = None
@@ -544,7 +542,7 @@ def extract(doc, ctx=None):
                                         _v2_block("phase_filter_unresolved")
                                         v2_ok = False
                                     else:
-                                        sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
+                                        sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
                             else:
                                 sig.append(f"phase_filter={S_NOT_APPLICABLE}")
                 except Exception as e:
@@ -621,8 +619,7 @@ def extract(doc, ctx=None):
                 "schema": "phase2.view_templates.v2",
                 "grouping_basis": "join_key.join_hash",
                 # Selector over canonical identity evidence; avoids duplicating k/q/v payload.
-                "semantic_keys": semantic_keys,
-                "cosmetic_items": [],
+                                "cosmetic_items": [],
                 "coordination_items": [],
                 "unknown_items": _traceability_unknown_items(v),
             }
@@ -717,7 +714,7 @@ def extract(doc, ctx=None):
                         if pf_elem:
                             pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
                             pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                            sig.append("phase_filter={}".format(sig_val(pf_hash)))
+                            sig.append("phase_filter={}".format(canon_str(pf_hash)))
                             # v2: require upstream v2 hash when phase filter is present
                             if v2_ok:
                                 pf_hash_v2 = None
@@ -729,7 +726,7 @@ def extract(doc, ctx=None):
                                     _v2_block("phase_filter_unresolved")
                                     v2_ok = False
                                 else:
-                                    sig_v2.append("phase_filter_hash={}".format(sig_val(pf_hash_v2)))
+                                    sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
                         else:
                             sig.append(f"phase_filter={S_NOT_APPLICABLE}")
             except Exception as e:
@@ -834,8 +831,8 @@ def extract(doc, ctx=None):
 
         if category_override_items:
             override_stack_hash = make_hash(serialize_identity_items(category_override_items))
-            sig.append("category_overrides_def_hash={}".format(sig_val(override_stack_hash)))
-            sig.append("category_overrides_count={}".format(sig_val(override_idx)))
+            sig.append("category_overrides_def_hash={}".format(canon_str(override_stack_hash)))
+            sig.append("category_overrides_count={}".format(canon_str(override_idx)))
         else:
             sig.append("category_overrides_count=0")
 
@@ -859,7 +856,7 @@ def extract(doc, ctx=None):
             filter_ids = list(v.GetFilters() or []) if hasattr(v, "GetFilters") else []
             sig.append("filter_stack_count={}".format(len(filter_ids)))
             if v2_ok:
-                sig_v2.append("vts.filter_stack_count={}".format(sig_val(len(filter_ids))))
+                sig_v2.append("vts.filter_stack_count={}".format(canon_str(len(filter_ids))))
         except Exception:
             filter_ids = None
             sig.append("filter_stack_count=<UNREADABLE>")
@@ -885,9 +882,9 @@ def extract(doc, ctx=None):
                 def_sig = vf_map.get(f_uid) if f_uid else None
 
                 if def_sig:
-                    sig.append("filter[{}].def_sig={}".format(idx3, sig_val(def_sig)))
+                    sig.append("filter[{}].def_sig={}".format(idx3, canon_str(def_sig)))
                     if v2_ok:
-                        sig_v2.append("vts.filter[{}].def_sig_hash={}".format(idx3, sig_val(def_sig)))
+                        sig_v2.append("vts.filter[{}].def_sig_hash={}".format(idx3, canon_str(def_sig)))
                 else:
                     # legacy: keep explicit unreadable marker
                     sig.append("filter[{}].def_sig=<UNREADABLE>".format(idx3))
@@ -1007,8 +1004,7 @@ def extract(doc, ctx=None):
             "schema": "phase2.view_templates.v2",
             "grouping_basis": "join_key.join_hash",
             # Selector-based semantic basis over canonical evidence (pilot pattern).
-            "semantic_keys": semantic_keys,
-            "cosmetic_items": [],
+                        "cosmetic_items": [],
             "coordination_items": [],
             "unknown_items": _traceability_unknown_items(v),
         }
@@ -1047,9 +1043,7 @@ def extract(doc, ctx=None):
             safe_str(r.get("record_id", "")),
         ),
     )
-    info["signature_hashes"] = sorted(per_hashes)
-    info["hash"] = make_hash(info["signature_hashes"])
-
+        
     info["signature_hashes_v2"] = sorted(per_hashes_v2)
     if v2_any_blocked:
         info["hash_v2"] = None

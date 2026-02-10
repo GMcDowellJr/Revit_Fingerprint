@@ -475,8 +475,7 @@ def extract(doc, ctx=None):
         rec_v2["phase2"] = {
             "schema": "phase2.arrowheads.v1",
             "grouping_basis": "phase2.hypothesis",
-            "semantic_keys": semantic_keys,
-            "cosmetic_items": phase2_sorted_items(cosmetic_items),
+                        "cosmetic_items": phase2_sorted_items(cosmetic_items),
             "coordination_items": phase2_sorted_items([]),
             "unknown_items": phase2_sorted_items(unknown_items),
         }

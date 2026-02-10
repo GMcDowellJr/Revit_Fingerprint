@@ -73,4 +73,5 @@ This repository is **not yet a product**.
 It is a governed extractor with an active baseline (M5 complete).
 
 Semantic changes are deliberate and explicit.
+Hashing is semantic-only (`hash_v2`) and legacy hash mode has been removed.
 See `CHANGELOG.md` for semantic change history and `DECISIONS.md` for architectural decisions.

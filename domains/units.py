@@ -93,8 +93,7 @@ def extract(doc, ctx=None):
     result = {
         "repr": None,
         "specs": {},
-        "hash": None,
-
+        
         # record.v2 per-record emission
         "records": [],
         "record_rows": [],
@@ -114,9 +113,6 @@ def extract(doc, ctx=None):
         return result
 
     result["repr"] = safe_str(u)
-
-    # ---- Legacy (domain-level) hash: keep behavior as close as possible ----
-    legacy_records = []
 
     # ---- record.v2 per-spec records ----
     v2_records = []
@@ -289,7 +285,6 @@ def extract(doc, ctx=None):
             "schema": "phase2.units.v1",
             "grouping_basis": "phase2.hypothesis",
             # Deprecated duplication path: semantic evidence is canonical in identity_basis.items.
-            "semantic_keys": list(UNITS_SEMANTIC_KEYS),
             "cosmetic_items": cosmetic_items,
             "coordination_items": phase2_sorted_items([]),
             "unknown_items": unknown_items,
@@ -300,19 +295,6 @@ def extract(doc, ctx=None):
         }
 
         v2_records.append(rec)
-
-        # Legacy payload + hash surface
-        result["specs"][label] = {
-            "spec": label,
-            "unit_id": (unit_v if unit_v is not None else None),
-            "symbol_id": (sym_v if sym_v is not None else None),
-            "accuracy": (float(acc_v) if (acc_v is not None and acc_q == ITEM_Q_OK) else None),
-        }
-        legacy_records.append("{}|{}|{}|{}".format(label, safe_str(unit_v), safe_str(sym_v), safe_str(acc_v)))
-
-    # Legacy domain hash
-    if legacy_records:
-        result["hash"] = make_hash(sorted(legacy_records))
 
     # record.v2 surfaces
     result["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))

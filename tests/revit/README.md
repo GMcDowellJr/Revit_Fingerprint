@@ -18,7 +18,6 @@ From pyRevit, execute:
 Environment variables:
 - `REVIT_FP_TEST_CONFIG` (optional): full path to config.json
 - `REVIT_FP_UPDATE_GOLDEN=1` (optional): creates/overwrites goldens when missing/different
-- `REVIT_FINGERPRINT_HASH_MODE` (optional): `legacy` or `semantic` (runner already supports this)
 
 Outputs:
 - Actual outputs: `tests/revit/out/<case>.actual.json`

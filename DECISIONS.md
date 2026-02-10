@@ -311,6 +311,19 @@ period of at least one extraction cycle before removal.
 
 ---
 
+
+## D-014 — Hash Mode Migration Timeline (COMPLETED)
+
+**Completion Date:** 2026-02-10  
+**PR:** #XXX
+
+Legacy hash infrastructure removed. All domains now use semantic (record.v2) hashing exclusively.
+Comparison run validated equivalence across 50+ sample files on 2026-02-09.
+
+No downstream breaking changes: contract schema already supported semantic mode.
+
+---
+
 ## Notes
 
 - This document is **append-only**.

@@ -3,7 +3,6 @@ import os
 import traceback
 
 # Explicitly request semantic (v2) hashing
-os.environ["REVIT_FINGERPRINT_HASH_MODE"] = "semantic"
 
 import importlib
 

@@ -32,7 +32,7 @@ from core.canon import (
     canon_num,
     canon_bool,
     canon_id,
-    sig_val,
+   
     S_MISSING,
     S_UNREADABLE,
     S_NOT_APPLICABLE,
@@ -125,9 +125,7 @@ def extract(doc, ctx=None):
         "raw_count": 0,
         "names": [],
         "records": [],
-        "signature_hashes": [],
-        "hash": None,
-
+        
         # v2 (contract semantic hash) — additive only; legacy behavior unchanged
         "hash_v2": None,
         "debug_v2_blocked": False,
@@ -160,9 +158,6 @@ def extract(doc, ctx=None):
     info["raw_count"] = len(col)
 
     names = []
-    records = []
-    per_hashes = []
-    uid_to_hash = {}  # For context population
     
     # v2 build state (domain-level block; no partial coverage semantics)
     per_hashes_v2 = []
@@ -202,14 +197,14 @@ def extract(doc, ctx=None):
             seq = i + 1  # stable fallback based on document order
 
         sig = [
-            "seq={}".format(sig_val(seq)),
-            "name={}".format(sig_val(name))
+            "seq={}".format(canon_str(seq)),
+            "name={}".format(canon_str(name))
         ]
 
         # v2 signature: exclude element ids/UniqueIds; keep only semantic fields
         sig_v2 = [
-            "seq={}".format(sig_val(seq)),
-            "name={}".format(sig_val(name)),
+            "seq={}".format(canon_str(seq)),
+            "name={}".format(canon_str(name)),
         ]
         def_hash_v2 = make_hash(sig_v2)
         per_hashes_v2.append(def_hash_v2)
@@ -298,24 +293,16 @@ def extract(doc, ctx=None):
             "phase2": phase2_payload,
         }
 
-        records.append(rec)
-        per_hashes.append(def_hash)
         info["debug_kept"] += 1
-
-        if uid:
-            uid_to_hash[uid] = def_hash
 
     # Populate context for downstream domains
     if ctx is not None:
-        ctx["phase_uid_to_hash"] = uid_to_hash
+        ctx["phase_uid_to_hash"] = uid_to_hash_v2
 
     info["names"] = sorted(set(names))
-    info["count"] = len(records)
-    info["legacy_records"] = records
+    info["count"] = len(v2_records)
     info["records"] = v2_records
-    info["signature_hashes"] = per_hashes
-    info["hash"] = make_hash(info["signature_hashes"]) if info["signature_hashes"] else None
-
+    
     # v2 finalize (domain-level block; no partial coverage)
     if v2_blocked:
         info["hash_v2"] = None

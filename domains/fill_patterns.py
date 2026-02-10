@@ -24,7 +24,7 @@ from core.hashing import make_hash, safe_str
 from core.collect import collect_instances
 from core.canon import (
     canon_str,
-    sig_val,
+   
     fnum,
     canon_num,
     canon_bool,
@@ -81,9 +81,7 @@ def extract(doc, ctx=None):
         "count": 0,
         "raw_count": 0,
         "names": [],
-        "signature_hashes": [],
-        "hash": None,
-        "records": [],
+                "records": [],
 
         # debug counters so you can see why things disappear
         "debug_total_elements": 0,
@@ -119,7 +117,7 @@ def extract(doc, ctx=None):
         try:
             return format(float(v), ".{}f".format(nd))
         except Exception as e:
-            return sig_val(v)
+            return canon_str(v)
 
     def read_is_model(fp, target):
         # Prefer explicit property, else infer from target when possible
@@ -253,7 +251,7 @@ def extract(doc, ctx=None):
                 fv = float(v)
             except Exception as e:
                 return False, "grid_{}_not_float".format(key)
-            parts.append("grid[{}].{}={}".format(idx, key, sig_val(f(v, 9))))
+            parts.append("grid[{}].{}={}".format(idx, key, canon_str(f(v, 9))))
             return True, None
 
         # origin: require 2 floats, pick first supported shape
@@ -266,7 +264,7 @@ def extract(doc, ctx=None):
                 if u is not None and v is not None:
                     fu = float(u)
                     fv = float(v)
-                    parts.append("grid[{}].origin_uv={},{}".format(idx, sig_val(f(fu, 9)), sig_val(f(fv, 9))))
+                    parts.append("grid[{}].origin_uv={},{}".format(idx, canon_str(f(fu, 9)), canon_str(f(fv, 9))))
                     return True, None
             except Exception as e:
                 pass
@@ -279,7 +277,7 @@ def extract(doc, ctx=None):
                 if x is not None and y is not None:
                     fx = float(x)
                     fy = float(y)
-                    parts.append("grid[{}].origin_xy={},{}".format(idx, sig_val(f(fx, 9)), sig_val(f(fy, 9))))
+                    parts.append("grid[{}].origin_xy={},{}".format(idx, canon_str(f(fx, 9)), canon_str(f(fy, 9))))
                     return True, None
             except Exception as e:
                 pass
@@ -293,7 +291,7 @@ def extract(doc, ctx=None):
                         continue
                     fu = float(u)
                     fv = float(v)
-                    parts.append("grid[{}].origin_uv={},{}".format(idx, sig_val(f(fu, 9)), sig_val(f(fv, 9))))
+                    parts.append("grid[{}].origin_uv={},{}".format(idx, canon_str(f(fu, 9)), canon_str(f(fv, 9))))
                     return True, None
                 except Exception as e:
                     continue
@@ -625,10 +623,10 @@ def extract(doc, ctx=None):
             except Exception as e: pass
 
             sig = [
-                "is_solid={}".format(sig_val(is_solid)),
-                "is_model={}".format(sig_val(is_model)),
-                "target={}".format(sig_val(target)),
-                "grid_count={}".format(sig_val(gc)),
+                "is_solid={}".format(canon_str(is_solid)),
+                "is_model={}".format(canon_str(is_model)),
+                "target={}".format(canon_str(target)),
+                "grid_count={}".format(canon_str(gc)),
             ]
 
             if gc:
@@ -692,10 +690,10 @@ def extract(doc, ctx=None):
                     v2_reason = "grid_count_unreadable"
 
             if v2_ok:
-                sig_v2.append("is_solid={}".format(sig_val(bool(is_solid_v2))))
-                sig_v2.append("is_model={}".format(sig_val(bool(is_model_v2))))
-                sig_v2.append("target_id={}".format(sig_val(target_id)))
-                sig_v2.append("grid_count={}".format(sig_val(gc_i)))
+                sig_v2.append("is_solid={}".format(canon_str(bool(is_solid_v2))))
+                sig_v2.append("is_model={}".format(canon_str(bool(is_model_v2))))
+                sig_v2.append("target_id={}".format(canon_str(target_id)))
+                sig_v2.append("grid_count={}".format(canon_str(gc_i)))
 
                 # grids: every grid must be readable
                 if gc_i:
@@ -968,15 +966,10 @@ def extract(doc, ctx=None):
             if uid:
                 uid_to_hash_v2[uid] = sig_hash_v2
 
-        records.append(rec)
-        per_hashes.append(def_hash)
         info["debug_kept"] += 1
 
-    info["signature_hashes"] = sorted(per_hashes)
-    info["names"] = sorted(set(names))
+        info["names"] = sorted(set(names))
     info["count"] = len(info["names"])
-    info["hash"] = make_hash(info["signature_hashes"])
-    info["legacy_records"] = sorted(records, key=lambda r: (r.get("name",""), r.get("id","")))
     info["records"] = v2_records
 
     # v2 finalize: block domain hash if any record is blocked
@@ -988,8 +981,7 @@ def extract(doc, ctx=None):
 
     # Context mapping (UID is allowed only as lookup key; values are semantic hashes)
     if ctx is not None:
-        ctx["fill_pattern_uid_to_hash"] = uid_to_hash
-        ctx["fill_pattern_uid_to_hash_v2"] = uid_to_hash_v2
+        ctx["fill_pattern_uid_to_hash"] = uid_to_hash_v2
 
     info["record_rows"] = [{
         "record_key": safe_str(r.get("record_id", "")),
