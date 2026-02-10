@@ -189,6 +189,7 @@ def extract(doc, ctx=None):
     
     # v2 build state (domain-level block; no partial coverage semantics)
     v2_records = []
+    v2_sig_hashes = []
     v2_blocked = False
     v2_reasons = {}
     # Debug-only: keep the legacy pipe-delimited signature row out of records[]
