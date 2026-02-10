@@ -37,17 +37,14 @@ def _iter_json_paths(root_dir: str) -> List[str]:
 
         name = p.name.lower()
 
-        # Strict: only parse *detail.json artifacts (exclude *index.json)
-        if name.endswith(".index.json"):
-            continue
-        if not name.endswith(".details.json"):
+        if name.endswith(".legacy.json"):
             continue
 
         paths.append(str(p))
 
     if not paths:
         raise FileNotFoundError(
-            f"No *detail.json files found under {root} (excluding *index.json)"
+            f"No export JSON files found under {root} (excluding *legacy.json)"
         )
 
     return sorted(paths, key=lambda s: str(Path(s).parent).lower())
