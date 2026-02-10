@@ -565,14 +565,16 @@ def extract(doc, ctx=None):
     result["records"] = sorted(v2_records, key=lambda r: safe_str(r.get("record_id", "")))
     result["count"] = len(result["records"])
 
-    if v2_sig_hashes and not v2_block_reasons:
+    if v2_block_reasons:
+        # Any blocked record blocks the domain hash (contract invariant).
+        result["hash_v2"] = None
+        result["debug_v2_blocked"] = True
+        result["debug_v2_block_reasons"] = v2_block_reasons
+    else:
+        # Empty domain is valid: emit deterministic empty hash and stay unblocked.
         result["hash_v2"] = make_hash(sorted(v2_sig_hashes))
         result["debug_v2_blocked"] = False
         result["debug_v2_block_reasons"] = {}
-    else:
-        result["hash_v2"] = None
-        result["debug_v2_blocked"] = True
-        result["debug_v2_block_reasons"] = v2_block_reasons or {"no_nonblocked_records": True}
 
     if ctx is not None:
         ctx["view_filter_uid_to_sig_hash_v2"] = uid_to_sig_hash if result.get("hash_v2") is not None else {}
