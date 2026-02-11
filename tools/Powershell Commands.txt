@@ -183,8 +183,8 @@ python tools/run_extract_all.py "<ExportsDir>"
 python tools/run_extract_all.py "<ExportsDir>" --out-root "<OutRoot>" --config "<Phase1RunConfig.json>" --baseline "<BaselineExportFilename.details.json>"
 
 
-python tools/run_extract_all.py "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all" `
-  --out-root "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all\Results" `
+python tools/run_extract_all.py "C:\Users\gmcdowell\Documents\Fingerprint_Out\" `
+  --out-root "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results" `
   --config "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\phase1_probe_config.json"
 
 python tools/diagnose_phase1_empty.py `

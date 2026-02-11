@@ -31,12 +31,13 @@ def _iter_json_paths(root_dir: str) -> List[str]:
         raise FileNotFoundError(f"Not a directory: {root}")
 
     paths: List[str] = []
-    for p in root.rglob("*.json"):
+
+    # Top-level only (non-recursive): avoid ingesting analysis artifacts in subfolders.
+    for p in root.glob("*.json"):
         if not p.is_file():
             continue
 
         name = p.name.lower()
-
         if name.endswith(".legacy.json"):
             continue
 
@@ -44,10 +45,10 @@ def _iter_json_paths(root_dir: str) -> List[str]:
 
     if not paths:
         raise FileNotFoundError(
-            f"No export JSON files found under {root} (excluding *legacy.json)"
+            f"No export JSON files found in top-level of {root} (excluding *legacy.json)"
         )
 
-    return sorted(paths, key=lambda s: str(Path(s).parent).lower())
+    return sorted(paths, key=lambda s: str(Path(s)).lower())
 
 
 def _get_contract(d: Dict[str, Any]) -> Optional[Dict[str, Any]]:
