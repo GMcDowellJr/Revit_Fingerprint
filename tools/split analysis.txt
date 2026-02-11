@@ -33,9 +33,9 @@ python -m tools.phase2_analysis.pareto_join_keys_by_ids `
   --coverage-min 0.75
 -----------------
 
-$EXPORTS = "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all"
+$EXPORTS = "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all_merged"
 $DOMAIN  = "arrowheads"   # e.g. "line_patterns"
-$OUTROOT = "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all\split_analysis_$DOMAIN"
+$OUTROOT = "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all_merged\split_analysis\$DOMAIN"
 
 python tools/run_split_detection_all.py `
   $EXPORTS `
@@ -92,11 +92,11 @@ python -m tools.phase2_analysis.apply_join_keys_by_ids `
 
 --------------
 
-$EXPORTS = "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all"
-$DOMAINS = @("dimension_types")
+$EXPORTS = "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all_merged"
+$DOMAINS = @("fill_patterns","line_patterns","line_styles","object_styles","phase_filters","phases","text_types","units","view_category_overrides","view_filter_applications_view_templates","view_templates","identity")
 
 foreach ($DOMAIN in $DOMAINS) {
-  $OUTROOT = "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all\split_analysis_$DOMAIN"
+  $OUTROOT = "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all_merged\split_analysis\$DOMAIN"
 
   python tools/run_split_detection_all.py $EXPORTS --domain $DOMAIN --out-root $OUTROOT
 
@@ -135,3 +135,10 @@ foreach ($DOMAIN in $DOMAINS) {
     --max-k 5 `
     --coverage-min 0.75
 }
+
+-----
+
+python tools\merge_split_exports.py `
+    "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\UCHLOB" `
+    "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\UCHLOB_merged" `
+    --dry-run
