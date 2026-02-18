@@ -31,7 +31,9 @@ def run_split_detection_workflow(
     domain: str,
     out_root: str,
     threshold: float = 0.70,
-    verify_ids_joinkey: bool = False
+    verify_ids_joinkey: bool = False,
+    run_calibration: bool = False,
+    run_pareto: bool = False,
 ) -> None:
     """Run complete split detection workflow."""
     
@@ -158,35 +160,37 @@ def run_split_detection_workflow(
         description="Phase 2D: Apply IDS join-keys (write join_hash_ids CSV)"
     )
 
-    # Phase 2E: calibrate join-key gates from IDS report
     ids_report_csv = join_keys_out / f"{domain}.ids_key_selection_report.v1.csv"
-    run_command(
-        [
-            sys.executable,
-            '-m', 'tools.phase2_analysis.calibrate_join_key_gates',
-            str(ids_report_csv),
-            '--domain', domain,
-            '--out', str(join_keys_out)
-        ],
-        description="Phase 2E: Calibrate IDS join-key gates"
-    )
+    if run_calibration:
+        # Phase 2E: calibrate join-key gates from IDS report (optional)
+        run_command(
+            [
+                sys.executable,
+                '-m', 'tools.phase2_analysis.calibrate_join_key_gates',
+                str(ids_report_csv),
+                '--domain', domain,
+                '--out', str(join_keys_out)
+            ],
+            description="Phase 2E: Calibrate IDS join-key gates"
+        )
 
-    # Phase 2F: Pareto on escalated IDS policies only
-    run_command(
-        [
-            sys.executable,
-            '-m', 'tools.phase2_analysis.pareto_join_keys_by_ids',
-            exports_dir,
-            '--domain', domain,
-            '--file-to-ids', str(file_to_ids_csv),
-            '--out', str(join_keys_out),
-            '--only-escalated',
-            '--escalation-report', str(ids_report_csv),
-            '--max-k', '5',
-            '--coverage-min', '0.75'
-        ],
-        description="Phase 2F: Pareto IDS join-key refinement"
-    )
+    if run_pareto:
+        # Phase 2F: Pareto on escalated IDS policies only (optional)
+        run_command(
+            [
+                sys.executable,
+                '-m', 'tools.phase2_analysis.pareto_join_keys_by_ids',
+                exports_dir,
+                '--domain', domain,
+                '--file-to-ids', str(file_to_ids_csv),
+                '--out', str(join_keys_out),
+                '--only-escalated',
+                '--escalation-report', str(ids_report_csv),
+                '--max-k', '5',
+                '--coverage-min', '0.75'
+            ],
+            description="Phase 2F: Pareto IDS join-key refinement"
+        )
 
     
     # Phase 3: Element-level classification
@@ -247,6 +251,16 @@ def main() -> None:
         action='store_true',
         help="Verification pipeline for IDS-aware join-keys (restricted to text_types)"
     )
+    parser.add_argument(
+        '--run-calibration',
+        action='store_true',
+        help="Run optional Phase 2E calibration step"
+    )
+    parser.add_argument(
+        '--run-pareto',
+        action='store_true',
+        help="Run optional Phase 2F pareto refinement step"
+    )
     
     args = parser.parse_args()
     
@@ -255,7 +269,9 @@ def main() -> None:
         domain=args.domain,
         out_root=args.out_root,
         threshold=args.threshold,
-        verify_ids_joinkey=args.verify_ids_joinkey
+        verify_ids_joinkey=args.verify_ids_joinkey,
+        run_calibration=args.run_calibration,
+        run_pareto=args.run_pareto,
     )
 
 

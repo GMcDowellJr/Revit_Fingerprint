@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-SCHEMA_VERSION = "v2.1"
+SCHEMA_VERSION = "2.1"
 STANDARD_PRESENCE_MIN = 0.75
 DOMINANT_SHARE_MIN = 0.50
 MIN_RECORDS_FOR_DOMAIN = 50
@@ -148,6 +148,25 @@ def _b32_sha1_16(text: str) -> str:
     digest = hashlib.sha1(text.encode("utf-8")).digest()
     token = base64.b32encode(digest).decode("ascii").lower().rstrip("=")
     return token[:16]
+
+
+def _stable_pattern_id(
+    domain: str,
+    join_key_schema: str,
+    join_hash: str,
+    taken: set[str],
+) -> str:
+    raw = f"{domain}|{join_key_schema}|{join_hash}"
+    digest = hashlib.sha1(raw.encode("utf-8")).digest()
+    token = base64.b32encode(digest).decode("ascii").lower().rstrip("=")
+    for n in range(16, len(token) + 1):
+        candidate = f"pat_{token[:n]}"
+        if candidate not in taken:
+            taken.add(candidate)
+            return candidate
+    candidate = f"pat_{token}"
+    taken.add(candidate)
+    return candidate
 
 
 def _write_csv(path: Path, fieldnames: List[str], rows: List[Dict[str, str]]) -> None:
@@ -341,7 +360,7 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
     } for ex in exports]
     _write_csv(out_dir / "analysis_export_membership.csv", [
         "schema_version", "analysis_run_id", "export_run_id", "membership_role",
-    ], membership_rows)
+    ], _sort_rows(membership_rows, ["analysis_run_id", "export_run_id"]))
 
     files_total = len(exports)
     by_dom_cluster: Dict[Tuple[str, str, str], List[Dict[str, str]]] = defaultdict(list)
@@ -363,16 +382,37 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
     for k, v in by_dom_cluster.items():
         dom_clusters[k[0]].append((k, v))
 
+    pattern_id_by_cluster: Dict[Tuple[str, str, str], str] = {}
     for dom, cluster_items in sorted(dom_clusters.items()):
-        sorted_clusters = sorted(cluster_items, key=lambda kv: (-len(kv[1]), kv[0][1], kv[0][2]))
-        n = len(sorted_clusters)
-        total_dom_records = sum(len(v) for _, v in sorted_clusters)
-        files_per_pattern: Dict[str, set[str]] = {}
-        pids: List[str] = []
-
-        for rank, ((_, schema, join_hash), rows) in enumerate(sorted_clusters, start=1):
-            cluster_id = f"{dom}|{schema}|{join_hash}"
+        pattern_ids_taken: set[str] = set()
+        cluster_rows: List[Dict[str, Any]] = []
+        for (_, schema, join_hash), rows in sorted(cluster_items, key=lambda kv: (kv[0][1], kv[0][2])):
+            # v2.1 default source-of-truth: phase0 join_hash/join_key_schema emitted in export JSON records.
+            pid = _stable_pattern_id(dom, schema, join_hash, pattern_ids_taken)
             files_present = len({r["export_run_id"] for r in rows})
+            cluster_rows.append({
+                "schema": schema,
+                "join_hash": join_hash,
+                "rows": rows,
+                "pid": pid,
+                "files_present": files_present,
+                "records_count": len(rows),
+            })
+            pattern_id_by_cluster[(dom, schema, join_hash)] = pid
+
+        sorted_clusters = sorted(
+            cluster_rows,
+            key=lambda c: (-c["files_present"], -c["records_count"], c["pid"]),
+        )
+        n = len(sorted_clusters)
+        total_dom_records = sum(int(c["records_count"]) for c in sorted_clusters)
+
+        for rank, cluster in enumerate(sorted_clusters, start=1):
+            schema = str(cluster["schema"])
+            join_hash = str(cluster["join_hash"])
+            rows = list(cluster["rows"])
+            files_present = int(cluster["files_present"])
+            cluster_id = f"{dom}|{schema}|{join_hash}"
             presence_pct = (files_present / files_total) if files_total else 0.0
             coverage_pct = (len(rows) / total_dom_records) if total_dom_records else 0.0
             cluster_size = len(rows)
@@ -395,9 +435,7 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
             })
 
             # See docs/PATTERN_ID_AND_LABEL_RULES.md for stable pattern identity/label.
-            pid = f"pat_{_b32_sha1_16(f'{dom}|{schema}|{join_hash}') }"
-            pids.append(pid)
-            files_per_pattern[pid] = {r["export_run_id"] for r in rows}
+            pid = str(cluster["pid"])
             domain_patterns.append({
                 "schema_version": SCHEMA_VERSION,
                 "analysis_run_id": analysis_run_id,
@@ -424,7 +462,7 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
                     "membership_reason_code": "join_hash_exact",
                 })
 
-            shares = [len(v) / total_dom_records for _, v in sorted_clusters] if total_dom_records else []
+            shares = [int(c["records_count"]) / total_dom_records for c in sorted_clusters] if total_dom_records else []
             hhi = sum(s * s for s in shares)
             eff = (1.0 / hhi) if hhi > 0 else 0.0
             authority_rows.append({
@@ -453,7 +491,9 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
                     unknown += 1
                     continue
                 schema = r.get("join_key_schema", "")
-                pid = f"pat_{_b32_sha1_16(f'{dom}|{schema}|{jh}') }"
+                pid = pattern_id_by_cluster.get((dom, schema, jh))
+                if not pid:
+                    continue
                 per_pat[pid] += 1
             dominant_pid = ""
             dominant_share = 0.0
@@ -488,7 +528,7 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
 
         unknown_domain = len([r for r in records if r["domain"] == dom and not r.get("join_hash")])
         total_domain = len([r for r in records if r["domain"] == dom])
-        shares = [len(rows) / total_domain for _, rows in sorted_clusters] if total_domain else []
+        shares = [int(c["records_count"]) / total_domain for c in sorted_clusters] if total_domain else []
         dominant = max(shares) if shares else 0.0
         entropy = -sum((s * (0.0 if s <= 0 else __import__('math').log(s, 2))) for s in shares) if shares else 0.0
         unknown_rate = (unknown_domain / total_domain) if total_domain else 0.0
@@ -536,27 +576,27 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
         "schema_version", "analysis_run_id", "domain", "pattern_id", "pattern_label",
         "source_cluster_id", "pattern_size_records", "pattern_size_files", "pattern_rank",
         "is_candidate_standard", "notes",
-    ], _sort_rows(domain_patterns, ["domain", "pattern_rank", "pattern_id"]))
+    ], _sort_rows(domain_patterns, ["analysis_run_id", "domain", "pattern_id"]))
 
     _write_csv(out_dir / "record_pattern_membership.csv", [
         "schema_version", "analysis_run_id", "export_run_id", "domain", "record_pk",
         "pattern_id", "membership_confidence", "membership_reason_code",
-    ], _sort_rows(rec_membership, ["export_run_id", "domain", "record_pk"]))
+    ], _sort_rows(rec_membership, ["analysis_run_id", "export_run_id", "domain", "record_pk"]))
 
     _write_csv(out_dir / "phase2_authority_pattern.csv", [
         "schema_version", "analysis_run_id", "domain", "pattern_id", "join_key_schema",
         "files_present", "files_total", "presence_pct", "hhi", "effective_cluster_count",
         "authority_score", "confidence_tier",
-    ], _sort_rows(authority_rows, ["domain", "pattern_id"]))
+    ], _sort_rows(authority_rows, ["analysis_run_id", "domain", "pattern_id"]))
 
     _write_csv(out_dir / "pattern_presence_file.csv", [
         "schema_version", "analysis_run_id", "export_run_id", "domain", "pattern_id",
         "pattern_share_pct", "is_dominant_pattern", "deviation_score", "classification",
-    ], _sort_rows(presence_rows, ["export_run_id", "domain", "pattern_id"]))
+    ], _sort_rows(presence_rows, ["analysis_run_id", "export_run_id", "domain", "pattern_id"]))
 
     _write_csv(out_dir / "domain_pattern_diagnostics.csv", [
         "schema_version", "analysis_run_id", "domain", "pattern_count", "dominant_pattern_share_pct",
         "entropy_index", "mixture_flag", "unknown_rate_pct", "recommended_analysis_grain",
-    ], _sort_rows(diag_rows, ["domain"]))
+    ], _sort_rows(diag_rows, ["analysis_run_id", "domain"]))
 
     return analysis_run_id
