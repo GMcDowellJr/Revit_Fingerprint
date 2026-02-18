@@ -31,6 +31,7 @@ def run_split_detection_workflow(
     domain: str,
     out_root: str,
     threshold: float = 0.70,
+    mode: str = 'allpairs',
     verify_ids_joinkey: bool = False,
     run_calibration: bool = False,
     run_pareto: bool = False,
@@ -63,6 +64,7 @@ def run_split_detection_workflow(
             exports_dir,
             '--domain', domain,
             '--threshold', str(threshold),
+            '--mode', mode,
             '--out', str(file_level_out),
             *(['--phase0-dir', str(phase0_dir)] if phase0_dir else []),
         ],
@@ -257,6 +259,12 @@ def main() -> None:
         help="Clustering threshold (default: 0.70)"
     )
     parser.add_argument(
+        '--mode',
+        choices=('allpairs', 'candidates'),
+        default='allpairs',
+        help='File-level split detection mode (default: allpairs)'
+    )
+    parser.add_argument(
         '--verify-ids-joinkey',
         action='store_true',
         help="Verification pipeline for IDS-aware join-keys (restricted to text_types)"
@@ -280,6 +288,7 @@ def main() -> None:
         domain=args.domain,
         out_root=args.out_root,
         threshold=args.threshold,
+        mode=args.mode,
         verify_ids_joinkey=args.verify_ids_joinkey,
         run_calibration=args.run_calibration,
         run_pareto=args.run_pareto,

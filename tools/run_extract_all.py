@@ -222,6 +222,12 @@ def main() -> None:
             "If provided with no value, runs all discovered domains."
         ),
     )
+    ap.add_argument(
+        "--mode",
+        choices=("allpairs", "candidates"),
+        default="allpairs",
+        help="File-level split detection mode passed to split-analysis orchestration (default: allpairs).",
+    )
     args = ap.parse_args()
 
     only_flags = [args.phase0_only, args.phase1_only, args.phase2_only, args.split_only]
@@ -496,6 +502,8 @@ def main() -> None:
                 split_domain,
                 "--out-root",
                 str(split_out),
+                "--mode",
+                str(args.mode),
                 *(['--phase0-dir', str(v21_phase0_dir)] if use_phase0_dir else []),
             ]
             report["commands"].append({"phase": "v21", "step": "split_analysis", "domain": split_domain, "cmd": cmd_split})
