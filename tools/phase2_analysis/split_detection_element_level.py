@@ -9,11 +9,22 @@ import os
 import sys
 from pathlib import Path
 from typing import Dict, List
+import csv
+from typing import Iterator
 
 import pandas as pd
 
 from .io import load_exports, get_domain_records, load_export_file
 from .report import write_json_report
+
+
+def _read_csv_rows(path: str) -> Iterator[Dict[str, str]]:
+    """Stream rows from a CSV file as dicts (UTF-8 with BOM support)."""
+    with open(path, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if isinstance(row, dict):
+                yield {str(k): ("" if v is None else str(v)) for k, v in row.items()}
 
 
 def extract_label_display(record: Dict) -> str:
@@ -65,37 +76,91 @@ def extract_label_display(record: Dict) -> str:
 def classify_file_elements(
     file_export,
     domain: str,
-    reference_standards: Dict
+    reference_standards: Dict,
+    *,
+    phase0_dir: str | None = None,
+    file_id_override: str | None = None,
 ) -> Dict:
-    """Classify each element in file against reference standards."""
-    
-    records = get_domain_records(file_export.data, domain)
-    
+    """Classify each element in file against reference standards.
+
+    Modes:
+    - JSON mode (default): uses file_export.data via get_domain_records
+    - CSV mode: if phase0_dir is provided, reads v2.1 phase0_records.csv for (file_id, domain)
+    """
     element_classifications = []
-    
+
+    if phase0_dir:
+        file_id = str(file_id_override or getattr(file_export, "file_id", "") or "")
+        if not file_id:
+            raise ValueError("CSV mode requires file_id (file_id_override or file_export.file_id).")
+
+        rec_csv = os.path.join(os.path.abspath(phase0_dir), "phase0_records.csv")
+        if not os.path.isfile(rec_csv):
+            raise FileNotFoundError(f"phase0_records.csv not found: {rec_csv}")
+
+        for record in _read_csv_rows(rec_csv):
+            if record.get("domain", "") != domain:
+                continue
+            if record.get("export_run_id", "") != file_id and record.get("file_id", "") != file_id:
+                continue
+
+            sig_hash = (record.get("sig_hash", "") or "").strip()
+            record_id = (record.get("record_id", "") or "").strip()
+            join_hash = (record.get("join_hash", "") or "").strip() or None
+            label_display = (record.get("label_display", "") or "").strip() or (record_id or "Unknown")
+
+            matches = []
+            for std_name, std_data in reference_standards.items():
+                if sig_hash and sig_hash in std_data['sig_hashes']:
+                    matches.append(std_name)
+
+            if len(matches) == 0:
+                classification = 'Custom/Unknown'
+            elif len(matches) == 1:
+                classification = matches[0]
+            else:
+                classification = f"Ambiguous: {', '.join(matches)}"
+
+            element_classifications.append({
+                'record_id': record_id,
+                'label_display': label_display,
+                'sig_hash': sig_hash,
+                'join_hash': join_hash,
+                'classification': classification,
+                'matched_standards': matches
+            })
+
+        stats = compute_element_statistics(element_classifications)
+
+        return {
+            'file_id': file_id,
+            'domain': domain,
+            'elements': element_classifications,
+            'statistics': stats
+        }
+
+    # JSON mode (back-compat)
+    records = get_domain_records(file_export.data, domain)
+
     for record in records:
         sig_hash = record.get('sig_hash')
         record_id = record.get('record_id')
         join_hash = record.get('join_key', {}).get('join_hash') if isinstance(record.get('join_key'), dict) else None
-        
-        # Extract human-readable label
+
         label_display = extract_label_display(record)
-        
-        # Check which standards contain this sig_hash
+
         matches = []
         for std_name, std_data in reference_standards.items():
             if sig_hash in std_data['sig_hashes']:
                 matches.append(std_name)
-        
-        # Classify
+
         if len(matches) == 0:
             classification = 'Custom/Unknown'
         elif len(matches) == 1:
             classification = matches[0]
         else:
-            # Multiple matches - rare if standards are distinct
             classification = f"Ambiguous: {', '.join(matches)}"
-        
+
         element_classifications.append({
             'record_id': record_id,
             'label_display': label_display,
@@ -215,7 +280,9 @@ def run_element_level_classification(
     exports_dir: str,
     domain: str,
     contamination_threshold: float,
-    out_dir: str
+    out_dir: str,
+    *,
+    phase0_dir: str | None = None,
 ) -> None:
     """Run element-level classification for contaminated files."""
     
@@ -251,29 +318,32 @@ def run_element_level_classification(
         print("[INFO] No contaminated files detected. Exiting.")
         return
     
-    # Load exports
     exports_dict = {}
-    exports = load_exports(exports_dir, max_files=None)
-    for export in exports:
-        exports_dict[export.file_id] = export
+    if not phase0_dir:
+        exports = load_exports(exports_dir, max_files=None)
+        for export in exports:
+            exports_dict[export.file_id] = export
     
     # Classify each contaminated file
     contamination_reports = []
     remediation_plans = []
     
     for file_id in contaminated_candidates:
-        if file_id not in exports_dict:
-            sys.stderr.write(f"[WARN] Export not found for {file_id}\n")
-            continue
-        
-        export = exports_dict[file_id]
-        
+        export = None
+        if not phase0_dir:
+            if file_id not in exports_dict:
+                sys.stderr.write(f"[WARN] Export not found for {file_id}\n")
+                continue
+            export = exports_dict[file_id]
+
         print(f"[INFO] Classifying elements in {file_id}...")
-        
+
         result = classify_file_elements(
             file_export=export,
             domain=domain,
-            reference_standards=reference_standards
+            reference_standards=reference_standards,
+            phase0_dir=phase0_dir,
+            file_id_override=file_id,
         )
         
         contamination_reports.append(result)
@@ -370,7 +440,13 @@ def main() -> None:
     )
     parser.add_argument(
         'exports_dir',
-        help="Directory containing fingerprint exports"
+        help="Directory containing fingerprint exports. Ignored if --phase0-dir is provided."
+    )
+    parser.add_argument(
+        '--phase0-dir',
+        dest='phase0_dir',
+        default=None,
+        help="If provided, read v2.1 Phase0 tables from this directory (Results_v21/phase0_v21).",
     )
     parser.add_argument(
         '--domain',
@@ -398,7 +474,8 @@ def main() -> None:
         exports_dir=args.exports_dir,
         domain=args.domain,
         contamination_threshold=args.contamination_threshold,
-        out_dir=args.out_dir
+        out_dir=args.out_dir,
+        phase0_dir=args.phase0_dir,
     )
 
 
