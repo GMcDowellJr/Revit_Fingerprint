@@ -382,8 +382,15 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
     for k, v in by_dom_cluster.items():
         dom_clusters[k[0]].append((k, v))
 
+    records_by_domain: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+    for r in records:
+        records_by_domain[r["domain"]].append(r)
+
     pattern_id_by_cluster: Dict[Tuple[str, str, str], str] = {}
-    for dom, cluster_items in sorted(dom_clusters.items()):
+    for dom in domains:
+        cluster_items = dom_clusters.get(dom, [])
+        domain_records = records_by_domain.get(dom, [])
+        domain_files_present = len({r["export_run_id"] for r in domain_records})
         pattern_ids_taken: set[str] = set()
         cluster_rows: List[Dict[str, Any]] = []
         for (_, schema, join_hash), rows in sorted(cluster_items, key=lambda kv: (kv[0][1], kv[0][2])):
@@ -481,7 +488,7 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
             })
 
         for export_run_id in exports:
-            dom_records = [r for r in records if r["domain"] == dom and r["export_run_id"] == export_run_id]
+            dom_records = [r for r in domain_records if r["export_run_id"] == export_run_id]
             total = len(dom_records)
             per_pat = defaultdict(int)
             unknown = 0
@@ -526,14 +533,14 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
                     "classification": "UNKNOWN",
                 })
 
-        unknown_domain = len([r for r in records if r["domain"] == dom and not r.get("join_hash")])
-        total_domain = len([r for r in records if r["domain"] == dom])
+        unknown_domain = len([r for r in domain_records if not r.get("join_hash")])
+        total_domain = len(domain_records)
         shares = [int(c["records_count"]) / total_domain for c in sorted_clusters] if total_domain else []
         dominant = max(shares) if shares else 0.0
         entropy = -sum((s * (0.0 if s <= 0 else __import__('math').log(s, 2))) for s in shares) if shares else 0.0
         unknown_rate = (unknown_domain / total_domain) if total_domain else 0.0
         rec_grain = "DOMAIN_OK"
-        if total_domain < MIN_RECORDS_FOR_DOMAIN or files_total < MIN_FILES_FOR_DOMAIN:
+        if total_domain < MIN_RECORDS_FOR_DOMAIN or domain_files_present < MIN_FILES_FOR_DOMAIN:
             rec_grain = "INSUFFICIENT_EVIDENCE"
         elif unknown_rate > UNKNOWN_RATE_MAX:
             rec_grain = "KEY_REVISION_REQUIRED"
