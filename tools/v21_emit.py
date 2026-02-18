@@ -232,7 +232,11 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
                 record_ordinal = f"{i:06d}"
                 record_pk = f"{file_id}|{domain}|{record_ordinal}"
                 record_id = _safe_str(rec.get("record_id") or rec.get("id") or rec.get("name"))
-                join_key = rec.get("join_key") if isinstance(rec.get("join_key"), dict) else {}
+                # Day-1 bootstrap join regime:
+                # - keep sig_hash as-is
+                # - set join_hash = sig_hash
+                # - set join_key_schema = bootstrap.sig_hash.v1
+                sig_hash_v = _safe_str(rec.get("sig_hash") or (rec.get("identity_basis", {}) or {}).get("sig_hash"))
                 row = {
                     "schema_version": SCHEMA_VERSION,
                     "export_run_id": export_run_id,
@@ -243,9 +247,9 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
                     "record_ordinal": record_ordinal,
                     "status": _safe_str(rec.get("status")),
                     "identity_quality": _safe_str(rec.get("identity_quality")),
-                    "sig_hash": _safe_str(rec.get("sig_hash") or (rec.get("identity_basis", {}) or {}).get("sig_hash")),
-                    "join_hash": _safe_str(join_key.get("join_hash")),
-                    "join_key_schema": _safe_str(join_key.get("schema")),
+                    "sig_hash": sig_hash_v,
+                    "join_hash": sig_hash_v,
+                    "join_key_schema": "bootstrap.sig_hash.v1",
                     "label_display": _safe_str((rec.get("label") or {}).get("display")),
                     "label_quality": _safe_str((rec.get("label") or {}).get("quality")),
                     "label_provenance": _safe_str((rec.get("label") or {}).get("provenance")),
