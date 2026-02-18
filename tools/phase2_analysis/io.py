@@ -235,3 +235,95 @@ def load_phase0_v21_sig_profiles(phase0_dir: str, domain: str) -> Tuple[Dict[str
         file_paths.setdefault(key, file_profiles[key]["path"])
 
     return file_profiles, file_paths
+
+
+def load_phase0_v21_records_with_identity(
+    phase0_dir: str,
+    domain: str,
+    *,
+    allowed_file_ids: Optional[Set[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Load v2.1 Phase0 records and attach identity_basis.items from phase0_identity_items.csv.
+
+    This supports IDS tools that previously read fingerprint JSON records with:
+      - record_id
+      - sig_hash
+      - identity_basis.items: [{k:<item_key>, v:<item_value>}...]
+
+    Notes:
+    - Uses export_run_id+domain+record_pk as the join spine (identity_items grain).
+    - allowed_file_ids filters by Phase0 records.file_id (or export_run_id) if provided.
+    - item_value is kept as a string (as emitted), which is sufficient for join hash composition.
+    """
+    phase0_dir = os.path.abspath(phase0_dir)
+    rec_csv = os.path.join(phase0_dir, "phase0_records.csv")
+    items_csv = os.path.join(phase0_dir, "phase0_identity_items.csv")
+
+    if not os.path.isfile(rec_csv):
+        raise FileNotFoundError(f"phase0_records.csv not found: {rec_csv}")
+    if not os.path.isfile(items_csv):
+        raise FileNotFoundError(f"phase0_identity_items.csv not found: {items_csv}")
+
+    allowed = set([str(x) for x in (allowed_file_ids or set())]) if allowed_file_ids else None
+
+    # Index records by (export_run_id, domain, record_pk)
+    idx: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+    order: List[Tuple[str, str, str]] = []
+
+    for r in _read_csv_rows(rec_csv):
+        if r.get("domain", "") != domain:
+            continue
+
+        export_run_id = (r.get("export_run_id", "") or "").strip()
+        file_id = (r.get("file_id", "") or "").strip()
+        record_pk = (r.get("record_pk", "") or "").strip()
+        if not export_run_id or not record_pk:
+            continue
+
+        if allowed is not None:
+            # Accept either file_id or export_run_id in the allowlist (interim they are the same).
+            if (file_id not in allowed) and (export_run_id not in allowed):
+                continue
+
+        key = (export_run_id, domain, record_pk)
+
+        rec: Dict[str, Any] = {
+            "_file_id": file_id or export_run_id,
+            "file_id": file_id or export_run_id,
+            "export_run_id": export_run_id,
+            "domain": domain,
+            "record_pk": record_pk,
+            "record_id": (r.get("record_id", "") or "").strip(),
+            "sig_hash": (r.get("sig_hash", "") or "").strip(),
+            "identity_basis": {"items": []},
+        }
+        idx[key] = rec
+        order.append(key)
+
+    # Attach identity items
+    # phase0_identity_items.csv columns:
+    # schema_version, export_run_id, domain, record_pk, item_key, item_value, item_value_type, item_role
+    for r in _read_csv_rows(items_csv):
+        if r.get("domain", "") != domain:
+            continue
+        export_run_id = (r.get("export_run_id", "") or "").strip()
+        record_pk = (r.get("record_pk", "") or "").strip()
+        if not export_run_id or not record_pk:
+            continue
+        key = (export_run_id, domain, record_pk)
+        rec = idx.get(key)
+        if rec is None:
+            continue
+
+        k = (r.get("item_key", "") or "").strip()
+        if not k:
+            continue
+        v = (r.get("item_value", "") or "")
+        rec["identity_basis"]["items"].append({"k": k, "v": v})
+
+    # Deterministic: preserve phase0_records order (already stable-sorted in v2.1), fallback to sorted key.
+    out: List[Dict[str, Any]] = []
+    for k in order:
+        if k in idx:
+            out.append(idx[k])
+    return out
