@@ -160,6 +160,11 @@ def main() -> None:
     ap.add_argument("--skip-phase1", action="store_true")
     ap.add_argument("--skip-phase2", action="store_true")
     ap.add_argument(
+        "--emit-legacy",
+        action="store_true",
+        help="When used with --emit-v21, also emit legacy phase0_flat/phase1_authority/phase2_domain outputs.",
+    )
+    ap.add_argument(
         "--no-dimtypes-by-family",
         action="store_true",
         help="Disable dimension_types by-family packet (default: enabled).",
@@ -205,6 +210,10 @@ def main() -> None:
     v21_analysis_dir = v21_root / "analysis_v21"
     v21_split_root = v21_root / "split_analysis"
 
+    # When --emit-v21 is enabled, legacy Phase0/1/2 outputs are suppressed by default.
+    # Use --emit-legacy to keep emitting legacy artifacts alongside v2.1.
+    run_legacy = (not args.emit_v21) or args.emit_legacy
+
     _ensure_dir(out_root)
     _ensure_dir(phase2_root)
 
@@ -236,7 +245,7 @@ def main() -> None:
     # -------------------------
     # Phase 0
     # -------------------------
-    if not args.skip_phase0:
+    if run_legacy and not args.skip_phase0:
         _ensure_dir(phase0_dir)
         cmd0 = [
             sys.executable,
@@ -254,7 +263,7 @@ def main() -> None:
     # -------------------------
     # Phase 1
     # -------------------------
-    if not args.skip_phase1:
+    if run_legacy and not args.skip_phase1:
         if not args.config:
             sys.stderr.write("[WARN extract_all] --config not provided; skipping Phase-1.\n")
             report["notes"].append("phase1_skipped_no_config")
@@ -316,7 +325,7 @@ def main() -> None:
     # -------------------------
     # Phase 2 (per-domain packet)
     # -------------------------
-    if not args.skip_phase2:
+    if run_legacy and not args.skip_phase2:
         for dom in domains:
             dom_out = phase2_root / dom
             _ensure_dir(dom_out)
