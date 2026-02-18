@@ -12,6 +12,44 @@ from typing import Any, Dict, List, Optional, Tuple
 from v21_emit import emit_analysis_v21, emit_phase0_v21
 
 
+def _discover_domains_from_exports(exports_dir: Path) -> List[str]:
+    """
+    Best-effort discovery of domains from fingerprint JSON exports.
+    Assumes domains are top-level keys excluding meta keys (leading underscore) and known non-domain keys.
+    Deterministic: returns sorted list.
+    """
+    exports_dir = Path(exports_dir)
+    domains: set[str] = set()
+
+    # Scan a limited set first for speed; fall back to full scan if needed.
+    candidates = sorted(exports_dir.glob("*.json"))
+    if not candidates:
+        return []
+
+    for p in candidates[:200]:
+        try:
+            with p.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            continue
+
+        if not isinstance(data, dict):
+            continue
+
+        for k, v in data.items():
+            if not isinstance(k, str):
+                continue
+            if k.startswith("_"):
+                continue
+            if k in ("artifacts",):
+                continue
+            # Domain payloads are typically dict-like.
+            if isinstance(v, dict):
+                domains.add(k)
+
+    return sorted(domains, key=lambda s: s.lower())
+
+
 def _ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
@@ -176,8 +214,13 @@ def main() -> None:
     ap.add_argument("--split-only", action="store_true", help="Run only split-analysis orchestration.")
     ap.add_argument(
         "--split-domains",
-        default="",
-        help="Comma list of domains for split-analysis orchestration under Results_v21/split_analysis/<domain>/.",
+        nargs="?",
+        const="__ALL__",
+        default=None,
+        help=(
+            "Optional comma list of domains for split-analysis orchestration under Results_v21/split_analysis/<domain>/. "
+            "If provided with no value, runs all discovered domains."
+        ),
     )
     args = ap.parse_args()
 
@@ -420,9 +463,29 @@ def main() -> None:
             analysis_run_id = emit_analysis_v21(meta_rows, record_rows, v21_analysis_dir)
             report["notes"].append(f"analysis_run_id={analysis_run_id}")
 
-    split_domains = [d.strip() for d in str(args.split_domains).split(",") if d.strip()]
+    split_domains: List[str] = []
+    if args.split_domains is not None:
+        if str(args.split_domains) == "__ALL__":
+            # Prefer domains discovered from the Phase0_v21 in-memory records if available.
+            try:
+                split_domains = sorted({str(r.get("domain", "")).strip() for r in (record_rows or []) if str(r.get("domain", "")).strip()},
+                                       key=lambda s: s.lower())
+            except Exception:
+                split_domains = []
+
+            # Fallback: discover from JSON exports if Phase0 rows not available.
+            if not split_domains:
+                split_domains = _discover_domains_from_exports(exports_dir)
+        else:
+            split_domains = [d.strip() for d in str(args.split_domains).split(",") if d.strip()]
+
     if split_domains:
         _ensure_dir(v21_split_root)
+
+        # Use Phase0_v21 as the canonical evidence source for split-analysis when available.
+        phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
+        use_phase0_dir = phase0_records_csv.is_file()
+
         for split_domain in split_domains:
             split_out = v21_split_root / split_domain
             cmd_split = [
@@ -433,6 +496,7 @@ def main() -> None:
                 split_domain,
                 "--out-root",
                 str(split_out),
+                *(['--phase0-dir', str(v21_phase0_dir)] if use_phase0_dir else []),
             ]
             report["commands"].append({"phase": "v21", "step": "split_analysis", "domain": split_domain, "cmd": cmd_split})
             _run(cmd_split, env=env)
