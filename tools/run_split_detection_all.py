@@ -98,7 +98,8 @@ def run_split_detection_workflow(
             str(clusters_csv),
             exports_dir,
             '--domain', domain,
-            '--out', str(standards_out)
+            '--out', str(standards_out),
+            *(['--phase0-dir', str(phase0_dir)] if phase0_dir else []),
         ],
         description=f"Phase 2: Build reference standards ({domain})"
     )
@@ -205,7 +206,8 @@ def run_split_detection_workflow(
             exports_dir,
             '--domain', domain,
             '--contamination-threshold', '85.0',
-            '--out', str(element_out)
+            '--out', str(element_out),
+            *(['--phase0-dir', str(phase0_dir)] if phase0_dir else []),
         ],
         description=f"Phase 3: Element-level classification ({domain})"
     )
@@ -231,6 +233,12 @@ def main() -> None:
     parser.add_argument(
         'exports_dir',
         help="Directory containing fingerprint exports"
+    )
+    parser.add_argument(
+        '--phase0-dir',
+        dest='phase0_dir',
+        default=None,
+        help="If provided, use v2.1 Phase0 tables from this directory (Results_v21/phase0_v21) for all split-analysis steps that support CSV mode.",
     )
     parser.add_argument(
         '--domain',
@@ -268,6 +276,7 @@ def main() -> None:
     
     run_split_detection_workflow(
         exports_dir=args.exports_dir,
+        phase0_dir=args.phase0_dir,
         domain=args.domain,
         out_root=args.out_root,
         threshold=args.threshold,
