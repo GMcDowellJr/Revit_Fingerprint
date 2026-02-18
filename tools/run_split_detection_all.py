@@ -34,6 +34,7 @@ def run_split_detection_workflow(
     verify_ids_joinkey: bool = False,
     run_calibration: bool = False,
     run_pareto: bool = False,
+    phase0_dir: str | None = None,
 ) -> None:
     """Run complete split detection workflow."""
     
@@ -62,7 +63,8 @@ def run_split_detection_workflow(
             exports_dir,
             '--domain', domain,
             '--threshold', str(threshold),
-            '--out', str(file_level_out)
+            '--out', str(file_level_out),
+            *(['--phase0-dir', str(phase0_dir)] if phase0_dir else []),
         ],
         description=f"Phase 1: File-level clustering ({domain})"
     )

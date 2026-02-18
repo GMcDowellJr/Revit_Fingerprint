@@ -15,7 +15,11 @@ import pandas as pd
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
 
-from .io import load_exports, get_domain_records
+from .io import (
+    load_exports,
+    get_domain_records,
+    load_phase0_v21_sig_profiles,
+)
 from .report import write_json_report
 from .split_detection import (
     Cluster,
@@ -27,37 +31,38 @@ from .split_detection import (
 )
 
 
-def build_element_profiles(exports_dir: str, domain: str) -> Tuple[Dict, Dict]:
+def build_element_profiles(exports_dir: str, domain: str, *, phase0_dir: str | None = None) -> Tuple[Dict, Dict]:
     """Build element signature profiles for each file.
-    
+
+    Modes:
+    - JSON mode (default): read fingerprint exports in exports_dir
+    - CSV mode: if phase0_dir is provided, read v2.1 Phase0 tables from phase0_dir
+
     Returns:
-        file_profiles: Dict[file_id -> {sig_hashes, path, count}]
-        file_paths: Dict[file_id -> path]
+        file_profiles: Dict[file_id/export_run_id -> {sig_hashes, path, count}]
+        file_paths: Dict[file_id/export_run_id -> path]
     """
-    
+    if phase0_dir:
+        return load_phase0_v21_sig_profiles(phase0_dir, domain)
+
     exports = load_exports(exports_dir)
-    
+
     file_profiles = {}
     file_paths = {}
-    
+
     for export in exports:
         records = get_domain_records(export.data, domain)
-        
-        # Extract sig_hash values
-        sig_hashes = {
-            r.get('sig_hash') 
-            for r in records 
-            if r.get('sig_hash')
-        }
-        
+
+        sig_hashes = {r.get("sig_hash") for r in records if r.get("sig_hash")}
+
         file_profiles[export.file_id] = {
-            'sig_hashes': sig_hashes,
-            'path': export.path,
-            'element_count': len(records)
+            "sig_hashes": sig_hashes,
+            "path": export.path,
+            "element_count": len(records),
         }
-        
+
         file_paths[export.file_id] = export.path
-    
+
     return file_profiles, file_paths
 
 
@@ -241,12 +246,14 @@ def run_file_level_clustering(
     exports_dir: str,
     domain: str,
     threshold: float,
-    out_dir: str
+    out_dir: str,
+    *,
+    phase0_dir: str | None = None,
 ) -> None:
     """Run complete file-level clustering analysis."""
     
     print(f"[INFO] Building element profiles for {domain}...")
-    file_profiles, file_paths = build_element_profiles(exports_dir, domain)
+    file_profiles, file_paths = build_element_profiles(exports_dir, domain, phase0_dir=phase0_dir)
     
     if len(file_profiles) < 2:
         sys.stderr.write(f"[WARN] Only {len(file_profiles)} file(s) found. Cannot cluster.\n")
@@ -375,7 +382,13 @@ def main() -> None:
     )
     parser.add_argument(
         'exports_dir',
-        help="Directory containing fingerprint exports (*.details.json)"
+        help="Directory containing fingerprint exports (*.json). Ignored if --phase0-dir is provided."
+    )
+    parser.add_argument(
+        '--phase0-dir',
+        dest='phase0_dir',
+        default=None,
+        help="If provided, read v2.1 Phase0 tables from this directory (Results_v21/phase0_v21)."
     )
     parser.add_argument(
         '--domain',
@@ -401,7 +414,8 @@ def main() -> None:
         exports_dir=args.exports_dir,
         domain=args.domain,
         threshold=args.threshold,
-        out_dir=args.out_dir
+        out_dir=args.out_dir,
+        phase0_dir=args.phase0_dir,
     )
 
 

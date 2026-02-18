@@ -4,6 +4,9 @@ import json
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional
+import csv
+from pathlib import Path
+from typing import Set, Tuple
 
 
 @dataclass(frozen=True)
@@ -153,3 +156,82 @@ def get_run_provenance(data: Dict[str, Any]) -> Dict[str, Any]:
             break
 
     return out
+
+
+def _read_csv_rows(path: str) -> Iterator[Dict[str, str]]:
+    """Stream rows from a CSV file as dicts (UTF-8)."""
+    with open(path, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if isinstance(row, dict):
+                yield {str(k): ("" if v is None else str(v)) for k, v in row.items()}
+
+
+def load_phase0_v21_file_paths(phase0_dir: str) -> Dict[str, str]:
+    """Return best-effort file_id/export_run_id -> path for metadata heuristics.
+
+    Uses Results_v21/phase0_v21/file_metadata.csv if present.
+    """
+    phase0_dir = os.path.abspath(phase0_dir)
+    meta_csv = os.path.join(phase0_dir, "file_metadata.csv")
+    if not os.path.isfile(meta_csv):
+        return {}
+
+    out: Dict[str, str] = {}
+    for r in _read_csv_rows(meta_csv):
+        # In v2.1, export_run_id is the canonical identifier; interim equals file_id.
+        export_run_id = r.get("export_run_id", "").strip()
+        file_id = r.get("file_id", "").strip()
+        # Prefer normalized central path if present, else raw central path.
+        path = (r.get("central_path_norm", "") or r.get("central_path", "") or "").strip()
+
+        key = export_run_id or file_id
+        if key:
+            out[key] = path or key
+    return out
+
+
+def load_phase0_v21_sig_profiles(phase0_dir: str, domain: str) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, str]]:
+    """Build sig_hash presence profiles per export_run_id from v2.1 Phase0 CSVs.
+
+    Returns:
+        file_profiles: Dict[file_id/export_run_id -> {sig_hashes:Set[str], path:str, element_count:int}]
+        file_paths: Dict[file_id/export_run_id -> path]
+    """
+    phase0_dir = os.path.abspath(phase0_dir)
+    rec_csv = os.path.join(phase0_dir, "phase0_records.csv")
+    if not os.path.isfile(rec_csv):
+        raise FileNotFoundError(f"phase0_records.csv not found: {rec_csv}")
+
+    domain = str(domain)
+    file_paths = load_phase0_v21_file_paths(phase0_dir)
+
+    sig_sets: Dict[str, Set[str]] = {}
+    counts: Dict[str, int] = {}
+
+    for r in _read_csv_rows(rec_csv):
+        if r.get("domain", "") != domain:
+            continue
+
+        export_run_id = r.get("export_run_id", "").strip()
+        file_id = r.get("file_id", "").strip()
+        key = export_run_id or file_id
+        if not key:
+            continue
+
+        sig = r.get("sig_hash", "").strip()
+        if sig:
+            sig_sets.setdefault(key, set()).add(sig)
+
+        counts[key] = counts.get(key, 0) + 1
+
+    file_profiles: Dict[str, Dict[str, Any]] = {}
+    for key in sorted(counts.keys(), key=lambda x: x.lower()):
+        file_profiles[key] = {
+            "sig_hashes": sig_sets.get(key, set()),
+            "path": file_paths.get(key, key),
+            "element_count": counts.get(key, 0),
+        }
+        file_paths.setdefault(key, file_profiles[key]["path"])
+
+    return file_profiles, file_paths
