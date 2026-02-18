@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from v21_emit import emit_analysis_v21, emit_phase0_v21
+
 
 def _ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
@@ -162,7 +164,35 @@ def main() -> None:
         action="store_true",
         help="Disable dimension_types by-family packet (default: enabled).",
     )
+    ap.add_argument("--emit-v21", action="store_true", help="Emit additive v2.1 outputs under Results_v21/.")
+    ap.add_argument("--phase0-only", action="store_true", help="Run only phase0 work (legacy + optional v2.1).")
+    ap.add_argument("--phase1-only", action="store_true", help="Run only phase1 work (legacy + optional v2.1).")
+    ap.add_argument("--phase2-only", action="store_true", help="Run only phase2 work (legacy + optional v2.1).")
+    ap.add_argument("--split-only", action="store_true", help="Run only split-analysis orchestration.")
+    ap.add_argument(
+        "--split-domains",
+        default="",
+        help="Comma list of domains for split-analysis orchestration under Results_v21/split_analysis/<domain>/.",
+    )
     args = ap.parse_args()
+
+    only_flags = [args.phase0_only, args.phase1_only, args.phase2_only, args.split_only]
+    if sum(1 for f in only_flags if f) > 1:
+        raise SystemExit("Only one of --phase0-only/--phase1-only/--phase2-only/--split-only may be used.")
+
+    if args.phase0_only:
+        args.skip_phase1 = True
+        args.skip_phase2 = True
+    elif args.phase1_only:
+        args.skip_phase0 = True
+        args.skip_phase2 = True
+    elif args.phase2_only:
+        args.skip_phase0 = True
+        args.skip_phase1 = True
+    elif args.split_only:
+        args.skip_phase0 = True
+        args.skip_phase1 = True
+        args.skip_phase2 = True
 
     exports_dir = Path(args.exports_dir).resolve()
     out_root = Path(args.out_root).resolve()
@@ -170,6 +200,10 @@ def main() -> None:
     phase0_dir = out_root / "phase0_flat"
     phase1_dir = out_root / "phase1_authority"
     phase2_root = out_root / "phase2_domain"
+    v21_root = out_root / "Results_v21"
+    v21_phase0_dir = v21_root / "phase0_v21"
+    v21_analysis_dir = v21_root / "analysis_v21"
+    v21_split_root = v21_root / "split_analysis"
 
     _ensure_dir(out_root)
     _ensure_dir(phase2_root)
@@ -362,6 +396,37 @@ def main() -> None:
                     {"phase": "phase2", "domain": dom, "step": "dimension_types_by_family", "cmd": cmd2e}
                 )
                 _run(cmd2e, env=env)
+
+    # -------------------------
+    # Optional v2.1 additive outputs
+    # -------------------------
+    if args.emit_v21 and not args.skip_phase0:
+        _ensure_dir(v21_phase0_dir)
+        report["commands"].append({"phase": "v21", "step": "phase0_v21", "out": str(v21_phase0_dir)})
+        meta_rows, record_rows = emit_phase0_v21(exports_dir, v21_phase0_dir, file_id_mode="basename")
+
+        if not args.skip_phase1 or not args.skip_phase2:
+            _ensure_dir(v21_analysis_dir)
+            report["commands"].append({"phase": "v21", "step": "analysis_v21", "out": str(v21_analysis_dir)})
+            analysis_run_id = emit_analysis_v21(meta_rows, record_rows, v21_analysis_dir)
+            report["notes"].append(f"analysis_run_id={analysis_run_id}")
+
+    split_domains = [d.strip() for d in str(args.split_domains).split(",") if d.strip()]
+    if split_domains:
+        _ensure_dir(v21_split_root)
+        for split_domain in split_domains:
+            split_out = v21_split_root / split_domain
+            cmd_split = [
+                sys.executable,
+                "tools/run_split_detection_all.py",
+                str(exports_dir),
+                "--domain",
+                split_domain,
+                "--out-root",
+                str(split_out),
+            ]
+            report["commands"].append({"phase": "v21", "step": "split_analysis", "domain": split_domain, "cmd": cmd_split})
+            _run(cmd_split, env=env)
 
     report_path = out_root / "extract_all.report.json"
     with report_path.open("w", encoding="utf-8") as f:
