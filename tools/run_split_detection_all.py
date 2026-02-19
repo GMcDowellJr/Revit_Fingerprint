@@ -4,11 +4,176 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Dict, List
+
+
+SCHEMA_VERSION = "2.1.0"
+
+
+def _read_csv(path: Path) -> List[Dict[str, str]]:
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        return [{str(k): ("" if v is None else str(v)) for k, v in row.items()} for row in reader]
+
+
+def _write_csv(path: Path, fieldnames: List[str], rows: List[Dict[str, str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: row.get(k, "") for k in fieldnames})
+
+
+def _load_export_mapping(phase0_dir: str | None) -> Dict[str, str]:
+    if not phase0_dir:
+        return {}
+    metadata_csv = Path(phase0_dir) / "file_metadata.csv"
+    if not metadata_csv.exists():
+        return {}
+    out: Dict[str, str] = {}
+    rows = _read_csv(metadata_csv)
+    for row in rows:
+        file_id = row.get("file_id", "").strip()
+        export_run_id = row.get("export_run_id", "").strip()
+        if file_id and export_run_id:
+            out[file_id] = export_run_id
+    return out
+
+
+def _load_analysis_run_id(analysis_dir: str | None) -> str:
+    if not analysis_dir:
+        return ""
+    manifest_csv = Path(analysis_dir) / "analysis_manifest.csv"
+    if not manifest_csv.exists():
+        return ""
+    rows = _read_csv(manifest_csv)
+    return rows[0].get("analysis_run_id", "").strip() if rows else ""
+
+
+def _inject_split_contract_headers(
+    out_root: Path,
+    *,
+    domain: str,
+    analysis_run_id: str,
+    file_to_export: Dict[str, str],
+) -> None:
+    for csv_path in sorted(out_root.rglob("*.csv"), key=lambda p: str(p).lower()):
+        rows = _read_csv(csv_path)
+        if not rows:
+            continue
+
+        old_fields = list(rows[0].keys())
+        new_fields = ["schema_version", "analysis_run_id", "domain", "export_run_id"] + [
+            f for f in old_fields if f not in {"schema_version", "analysis_run_id", "domain", "export_run_id"}
+        ]
+
+        for row in rows:
+            row["schema_version"] = SCHEMA_VERSION
+            row["analysis_run_id"] = analysis_run_id
+            row["domain"] = row.get("domain", "").strip() or domain
+            export_run_id = row.get("export_run_id", "").strip()
+            file_id = row.get("file_id", "").strip()
+            if not export_run_id:
+                export_run_id = file_to_export.get(file_id, "") or file_id
+            row["export_run_id"] = export_run_id
+
+        sort_keys = [k for k in ("analysis_run_id", "domain", "export_run_id", "cluster_id", "record_pk", "record_id", "group_type", "group_id") if k in new_fields]
+        rows.sort(key=lambda r: tuple(r.get(k, "") for k in sort_keys))
+        _write_csv(csv_path, new_fields, rows)
+
+
+def _emit_file_to_export_bridge(out_root: Path, file_to_export: Dict[str, str]) -> None:
+    if not file_to_export:
+        return
+    rows = [{"schema_version": SCHEMA_VERSION, "analysis_run_id": "", "domain": "*", "file_id": k, "export_run_id": v} for k, v in sorted(file_to_export.items(), key=lambda kv: kv[0].lower())]
+    _write_csv(out_root / "file_id_to_export_run_id.csv", ["schema_version", "analysis_run_id", "domain", "file_id", "export_run_id"], rows)
+
+
+def _emit_cluster_to_pattern_map(out_root: Path, analysis_dir: str | None, domain: str, analysis_run_id: str) -> None:
+    if not analysis_dir:
+        return
+    clusters_csv = out_root / "file_level" / f"{domain}.file_clusters.csv"
+    membership_csv = Path(analysis_dir) / "record_pattern_membership.csv"
+    if not clusters_csv.exists() or not membership_csv.exists():
+        return
+
+    cluster_rows = _read_csv(clusters_csv)
+    membership_rows = [r for r in _read_csv(membership_csv) if r.get("domain", "") == domain]
+    if not cluster_rows or not membership_rows:
+        return
+
+    file_to_cluster: Dict[str, str] = {}
+    for r in cluster_rows:
+        export_run_id = r.get("export_run_id", "").strip() or r.get("file_id", "").strip()
+        if export_run_id:
+            file_to_cluster[export_run_id] = r.get("cluster_id", "")
+
+    counts: Dict[str, Dict[str, int]] = {}
+    for r in membership_rows:
+        export_run_id = r.get("export_run_id", "").strip()
+        pattern_id = r.get("pattern_id", "").strip()
+        cluster_id = file_to_cluster.get(export_run_id, "")
+        if not cluster_id or not pattern_id:
+            continue
+        counts.setdefault(cluster_id, {})
+        counts[cluster_id][pattern_id] = counts[cluster_id].get(pattern_id, 0) + 1
+
+    out_rows: List[Dict[str, str]] = []
+    for cluster_id in sorted({r.get("cluster_id", "") for r in cluster_rows if r.get("cluster_id", "")}, key=str):
+        pattern_counts = counts.get(cluster_id, {})
+        if not pattern_counts:
+            out_rows.append({
+                "schema_version": SCHEMA_VERSION,
+                "analysis_run_id": analysis_run_id,
+                "domain": domain,
+                "export_run_id": "",
+                "cluster_id": cluster_id,
+                "pattern_id": "",
+                "mapping_quality": "NONE",
+                "mapping_reason": "no overlapping record membership",
+            })
+            continue
+        ranked = sorted(pattern_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        top_pattern, top_count = ranked[0]
+        total = sum(pattern_counts.values())
+        exact = len(pattern_counts) == 1
+        tied = len(ranked) > 1 and ranked[1][1] == top_count
+        dominant_share = (top_count / total) if total else 0.0
+        if exact:
+            quality = "EXACT"
+            reason = "single pattern observed"
+        elif tied:
+            quality = "AMBIGUOUS"
+            reason = "top pattern tie"
+        elif dominant_share >= 0.5:
+            quality = "DOMINANT"
+            reason = f"top pattern share={dominant_share:.6f}"
+        else:
+            quality = "AMBIGUOUS"
+            reason = f"weak top pattern share={dominant_share:.6f}"
+        out_rows.append({
+            "schema_version": SCHEMA_VERSION,
+            "analysis_run_id": analysis_run_id,
+            "domain": domain,
+            "export_run_id": "",
+            "cluster_id": cluster_id,
+            "pattern_id": top_pattern,
+            "mapping_quality": quality,
+            "mapping_reason": reason,
+        })
+
+    _write_csv(
+        out_root / "split_cluster_to_pattern_map.csv",
+        ["schema_version", "analysis_run_id", "domain", "export_run_id", "cluster_id", "pattern_id", "mapping_quality", "mapping_reason"],
+        out_rows,
+    )
 
 
 def run_command(cmd: list, description: str) -> None:
@@ -36,6 +201,7 @@ def run_split_detection_workflow(
     run_calibration: bool = False,
     run_pareto: bool = False,
     phase0_dir: str | None = None,
+    analysis_dir: str | None = None,
 ) -> None:
     """Run complete split detection workflow."""
     
@@ -70,7 +236,7 @@ def run_split_detection_workflow(
         ],
         description=f"Phase 1: File-level clustering ({domain})"
     )
-    
+
     # Check if split was detected
     report_json = file_level_out / f"{domain}.file_clustering_report.json"
     
@@ -213,6 +379,17 @@ def run_split_detection_workflow(
         ],
         description=f"Phase 3: Element-level classification ({domain})"
     )
+
+    file_to_export = _load_export_mapping(phase0_dir)
+    analysis_run_id = _load_analysis_run_id(analysis_dir)
+    _inject_split_contract_headers(
+        out_root,
+        domain=domain,
+        analysis_run_id=analysis_run_id,
+        file_to_export=file_to_export,
+    )
+    _emit_file_to_export_bridge(out_root, file_to_export)
+    _emit_cluster_to_pattern_map(out_root, analysis_dir, domain, analysis_run_id)
     
     # Summary
     print(f"\n{'='*80}")
@@ -259,6 +436,12 @@ def main() -> None:
         help="Clustering threshold (default: 0.70)"
     )
     parser.add_argument(
+        '--analysis-dir',
+        dest='analysis_dir',
+        default=None,
+        help="Optional path to analysis_v21 output directory (for analysis_run_id and pattern mapping joins).",
+    )
+    parser.add_argument(
         '--mode',
         choices=('allpairs', 'candidates'),
         default='allpairs',
@@ -292,6 +475,7 @@ def main() -> None:
         verify_ids_joinkey=args.verify_ids_joinkey,
         run_calibration=args.run_calibration,
         run_pareto=args.run_pareto,
+        analysis_dir=args.analysis_dir,
     )
 
 
