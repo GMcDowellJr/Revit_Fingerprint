@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import os
 import subprocess
@@ -55,6 +56,35 @@ def _load_analysis_run_id(analysis_dir: str | None) -> str:
         return ""
     rows = _read_csv(manifest_csv)
     return rows[0].get("analysis_run_id", "").strip() if rows else ""
+
+
+def _derive_analysis_run_id(out_root: Path, file_to_export: Dict[str, str]) -> str:
+    candidates: List[str] = []
+    for csv_path in sorted(out_root.rglob("*.csv"), key=lambda p: str(p).lower()):
+        rows = _read_csv(csv_path)
+        for row in rows:
+            export_run_id = row.get("export_run_id", "").strip()
+            file_id = row.get("file_id", "").strip()
+            resolved = export_run_id or file_to_export.get(file_id, "") or file_id
+            if resolved:
+                candidates.append(resolved)
+    if not candidates:
+        return ""
+    src = "|".join(sorted(set(candidates), key=lambda v: v.lower()))
+    return f"ana_{hashlib.sha1(src.encode('utf-8')).hexdigest()[:12]}"
+
+
+def _finalize_split_outputs(out_root: Path, *, domain: str, phase0_dir: str | None, analysis_dir: str | None) -> None:
+    file_to_export = _load_export_mapping(phase0_dir)
+    analysis_run_id = _load_analysis_run_id(analysis_dir) or _derive_analysis_run_id(out_root, file_to_export)
+    _inject_split_contract_headers(
+        out_root,
+        domain=domain,
+        analysis_run_id=analysis_run_id,
+        file_to_export=file_to_export,
+    )
+    _emit_file_to_export_bridge(out_root, file_to_export)
+    _emit_cluster_to_pattern_map(out_root, analysis_dir, domain, analysis_run_id)
 
 
 def _inject_split_contract_headers(
@@ -252,6 +282,7 @@ def run_split_detection_workflow(
     print(f"\n[INFO] Detected {num_clusters} cluster(s)")
     
     if num_clusters < 2:
+        _finalize_split_outputs(out_root, domain=domain, phase0_dir=phase0_dir, analysis_dir=analysis_dir)
         print("[INFO] No split detected - single population")
         print("[INFO] Skipping reference standard building and element-level analysis")
         return
@@ -380,16 +411,7 @@ def run_split_detection_workflow(
         description=f"Phase 3: Element-level classification ({domain})"
     )
 
-    file_to_export = _load_export_mapping(phase0_dir)
-    analysis_run_id = _load_analysis_run_id(analysis_dir)
-    _inject_split_contract_headers(
-        out_root,
-        domain=domain,
-        analysis_run_id=analysis_run_id,
-        file_to_export=file_to_export,
-    )
-    _emit_file_to_export_bridge(out_root, file_to_export)
-    _emit_cluster_to_pattern_map(out_root, analysis_dir, domain, analysis_run_id)
+    _finalize_split_outputs(out_root, domain=domain, phase0_dir=phase0_dir, analysis_dir=analysis_dir)
     
     # Summary
     print(f"\n{'='*80}")
