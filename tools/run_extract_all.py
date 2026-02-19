@@ -58,6 +58,46 @@ def _run(cmd: List[str], *, env: Dict[str, str]) -> None:
     subprocess.run(cmd, check=True, env=env)
 
 
+def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
+    import csv
+
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        return [{str(k): "" if v is None else str(v) for k, v in row.items()} for row in csv.DictReader(f)]
+
+
+def _emit_join_policy_diagnostics(rows: List[Dict[str, str]], diagnostics_dir: Path, domains: Optional[List[str]] = None) -> List[Dict[str, str]]:
+    import csv
+
+    dom_filter = set(domains or [])
+    problems: List[Dict[str, str]] = []
+    for r in rows:
+        dom = str(r.get("domain", "")).strip()
+        if dom_filter and dom not in dom_filter:
+            continue
+        schema = str(r.get("join_key_schema", "")).strip()
+        status = str(r.get("join_key_status", "")).strip()
+        if schema == "bootstrap.sig_hash.v1" or status != "ok":
+            problems.append(
+                {
+                    "domain": dom,
+                    "file_id": str(r.get("file_id", "")),
+                    "record_pk": str(r.get("record_pk", "")),
+                    "join_key_schema": schema,
+                    "join_key_status": status,
+                    "reason": "bootstrap_schema" if schema == "bootstrap.sig_hash.v1" else "non_ok_status",
+                }
+            )
+    diagnostics_dir.mkdir(parents=True, exist_ok=True)
+    out_csv = diagnostics_dir / "join_policy_gate_diagnostics.csv"
+    fields = ["domain", "file_id", "record_pk", "join_key_schema", "join_key_status", "reason"]
+    with out_csv.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        for row in sorted(problems, key=lambda x: (x["domain"], x["file_id"], x["record_pk"])):
+            w.writerow(row)
+    return problems
+
+
 def _detect_surfaces(exports_dir: Path) -> Dict[str, int]:
     names = [p.name for p in exports_dir.iterdir() if p.is_file() and p.name.lower().endswith(".json")]
     details = sum(1 for n in names if n.lower().endswith(".details.json"))
@@ -208,6 +248,12 @@ def main() -> None:
         help="Disable dimension_types by-family packet (default: enabled).",
     )
     ap.add_argument("--emit-v21", action="store_true", help="Emit additive v2.1 outputs under Results_v21/.")
+    ap.add_argument("--emit-phase0-v21", action="store_true", help="Emit v2.1 Phase0 CSVs (bootstrap sentinel allowed).")
+    ap.add_argument("--discover-join-policy", action="store_true", help="Run v2.1 join-key policy discovery stage.")
+    ap.add_argument("--apply-join-policy", action="store_true", help="Apply discovered/provided join-key policy and overwrite phase0_records.csv.")
+    ap.add_argument("--join-policy", default=None, help="Path to join-key policy JSON for apply stage.")
+    ap.add_argument("--strict-join-policy", action="store_true", help="Fail analysis if bootstrap/non-ok join keys are detected.")
+    ap.add_argument("--allow-bootstrap", action="store_true", help="Allow bootstrap join keys for exploratory analysis (warn loudly).")
     ap.add_argument("--phase0-only", action="store_true", help="Run only phase0 work (legacy + optional v2.1).")
     ap.add_argument("--phase1-only", action="store_true", help="Run only phase1 work (legacy + optional v2.1).")
     ap.add_argument("--phase2-only", action="store_true", help="Run only phase2 work (legacy + optional v2.1).")
@@ -229,6 +275,11 @@ def main() -> None:
         help="File-level split detection mode passed to split-analysis orchestration (default: allpairs).",
     )
     args = ap.parse_args()
+
+    if args.emit_v21 and not args.emit_phase0_v21:
+        args.emit_phase0_v21 = True
+    if args.split_domains is not None and not args.strict_join_policy and not args.allow_bootstrap:
+        args.strict_join_policy = True
 
     only_flags = [args.phase0_only, args.phase1_only, args.phase2_only, args.split_only]
     if sum(1 for f in only_flags if f) > 1:
@@ -280,6 +331,8 @@ def main() -> None:
         raise SystemExit("No domains inferred; provide --domains.")
 
     env = os.environ.copy()
+
+    need_v21_analysis = args.emit_v21 and (not args.skip_phase1 or not args.skip_phase2)
 
     report: Dict[str, Any] = {
         "tool": "tools/run_extract_all.py",
@@ -458,15 +511,76 @@ def main() -> None:
     # -------------------------
     # Optional v2.1 additive outputs
     # -------------------------
-    if args.emit_v21 and not args.skip_phase0:
+    if (args.emit_v21 or args.emit_phase0_v21) and not args.skip_phase0:
         _ensure_dir(v21_phase0_dir)
         report["commands"].append({"phase": "v21", "step": "phase0_v21", "out": str(v21_phase0_dir)})
         meta_rows, record_rows = emit_phase0_v21(exports_dir, v21_phase0_dir, file_id_mode="basename")
 
-        if not args.skip_phase1 or not args.skip_phase2:
+        if need_v21_analysis and not (args.discover_join_policy or args.apply_join_policy):
+            problems = _emit_join_policy_diagnostics(record_rows, v21_root / "diagnostics", domains)
+            if problems and args.strict_join_policy and not args.allow_bootstrap:
+                raise SystemExit(
+                    "Strict join policy enforcement failed before v2.1 analysis: bootstrap/non-ok join keys detected. "
+                    "Run run_extract_all.py with --discover-join-policy and --apply-join-policy (or provide --join-policy). "
+                    f"See diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}"
+                )
+            if problems and args.allow_bootstrap:
+                sys.stderr.write("\n" + "!" * 80 + "\n")
+                sys.stderr.write("[WARN extract_all] --allow-bootstrap enabled; proceeding with bootstrap/non-ok join keys for analysis_v21.\n")
+                sys.stderr.write(f"[WARN extract_all] Diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}\n")
+                sys.stderr.write("!" * 80 + "\n\n")
+
             _ensure_dir(v21_analysis_dir)
             report["commands"].append({"phase": "v21", "step": "analysis_v21", "out": str(v21_analysis_dir)})
             analysis_run_id = emit_analysis_v21(meta_rows, record_rows, v21_analysis_dir)
+            report["notes"].append(f"analysis_run_id={analysis_run_id}")
+
+    if args.discover_join_policy:
+        discover_out = v21_root / "policies" / "domain_join_key_policies.v21.json"
+        if args.join_policy:
+            discover_out = Path(args.join_policy).resolve()
+        cmd_discover = [
+            sys.executable,
+            "tools/v21_discover_join_policy.py",
+            "--phase0-dir", str(v21_phase0_dir),
+            "--out-policy", str(discover_out),
+        ]
+        report["commands"].append({"phase": "v21", "step": "discover_join_policy", "cmd": cmd_discover})
+        _run(cmd_discover, env=env)
+        args.join_policy = str(discover_out)
+
+    if args.apply_join_policy:
+        if not args.join_policy:
+            args.join_policy = str((v21_root / "policies" / "domain_join_key_policies.v21.json").resolve())
+        cmd_apply = [
+            sys.executable,
+            "tools/v21_apply_join_policy.py",
+            "--phase0-dir", str(v21_phase0_dir),
+            "--join-policy", str(Path(args.join_policy).resolve()),
+        ]
+        report["commands"].append({"phase": "v21", "step": "apply_join_policy", "cmd": cmd_apply})
+        _run(cmd_apply, env=env)
+
+    if need_v21_analysis and (args.discover_join_policy or args.apply_join_policy):
+        phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
+        if phase0_records_csv.is_file():
+            post_rows = _read_csv_rows(phase0_records_csv)
+            problems = _emit_join_policy_diagnostics(post_rows, v21_root / "diagnostics", domains)
+            if problems and args.strict_join_policy and not args.allow_bootstrap:
+                raise SystemExit(
+                    "Strict join policy enforcement failed before deferred v2.1 analysis: bootstrap/non-ok join keys detected. "
+                    "Run run_extract_all.py with --discover-join-policy and --apply-join-policy (or provide --join-policy). "
+                    f"See diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}"
+                )
+            if problems and args.allow_bootstrap:
+                sys.stderr.write("\n" + "!" * 80 + "\n")
+                sys.stderr.write("[WARN extract_all] --allow-bootstrap enabled; proceeding with bootstrap/non-ok join keys for deferred analysis_v21.\n")
+                sys.stderr.write(f"[WARN extract_all] Diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}\n")
+                sys.stderr.write("!" * 80 + "\n\n")
+
+            _ensure_dir(v21_analysis_dir)
+            report["commands"].append({"phase": "v21", "step": "analysis_v21", "out": str(v21_analysis_dir), "deferred": True})
+            analysis_run_id = emit_analysis_v21(meta_rows, post_rows, v21_analysis_dir)
             report["notes"].append(f"analysis_run_id={analysis_run_id}")
 
     split_domains: List[str] = []
@@ -488,9 +602,22 @@ def main() -> None:
     if split_domains:
         _ensure_dir(v21_split_root)
 
-        # Use Phase0_v21 as the canonical evidence source for split-analysis when available.
         phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
         use_phase0_dir = phase0_records_csv.is_file()
+        if use_phase0_dir:
+            gate_rows = _read_csv_rows(phase0_records_csv)
+            problems = _emit_join_policy_diagnostics(gate_rows, v21_root / "diagnostics", split_domains)
+            if problems and args.strict_join_policy and not args.allow_bootstrap:
+                raise SystemExit(
+                    "Strict join policy enforcement failed: bootstrap/non-ok join keys detected. "
+                    "Run run_extract_all.py with --discover-join-policy and --apply-join-policy (or provide --join-policy). "
+                    f"See diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}"
+                )
+            if problems and args.allow_bootstrap:
+                sys.stderr.write("\n" + "!" * 80 + "\n")
+                sys.stderr.write("[WARN extract_all] --allow-bootstrap enabled; proceeding with bootstrap/non-ok join keys.\n")
+                sys.stderr.write(f"[WARN extract_all] Diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}\n")
+                sys.stderr.write("!" * 80 + "\n\n")
 
         for split_domain in split_domains:
             split_out = v21_split_root / split_domain
@@ -505,6 +632,7 @@ def main() -> None:
                 "--mode",
                 str(args.mode),
                 *(['--phase0-dir', str(v21_phase0_dir)] if use_phase0_dir else []),
+                *( ['--allow-bootstrap'] if args.allow_bootstrap else []),
             ]
             report["commands"].append({"phase": "v21", "step": "split_analysis", "domain": split_domain, "cmd": cmd_split})
             _run(cmd_split, env=env)

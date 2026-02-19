@@ -28,6 +28,41 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 
 import pandas as pd
 
+try:
+    from tools.join_key_discovery.eval import score_candidate
+except ModuleNotFoundError:
+    from join_key_discovery.eval import score_candidate
+
+
+def pareto_search(
+    domain_records: Sequence[Dict[str, str]],
+    domain_identity_items: Dict[str, Dict[str, Tuple[str, str]]],
+    candidate_fields: Sequence[str],
+    cfg: dict | None = None,
+) -> Dict[str, object]:
+    """Callable API for v2.1 discovery orchestration."""
+    cfg = cfg or {}
+    max_k = int(cfg.get("max_k", 4))
+    fields = sorted({str(f).strip() for f in candidate_fields if str(f).strip()}, key=lambda s: s.lower())
+    rows: List[dict] = []
+    for k in range(1, min(max_k, len(fields)) + 1):
+        for subset in itertools.combinations(fields, k):
+            metrics = score_candidate(domain_records, domain_identity_items, list(subset), cfg)
+            rows.append({
+                "keys": "|".join(subset),
+                "k_count": k,
+                "collision_rate": float(metrics.get("collision_rate", 1.0)),
+                "coverage_gap": 1.0 - float(metrics.get("coverage", 0.0)),
+                "fragmentation_rate": float(metrics.get("fragmentation_rate", 1.0)),
+                "metrics": metrics,
+            })
+    if not rows:
+        return {"frontier": [], "chosen": None}
+    front = pareto_front(rows, ["coverage_gap", "collision_rate", "fragmentation_rate", "k_count"])
+    front = sorted(front, key=lambda r: (r["collision_rate"], r["coverage_gap"], r["k_count"], r["keys"]))
+    return {"frontier": front, "chosen": front[0]}
+
+
 def _dedupe_preserve_order(items: Sequence[str]) -> list[str]:
     seen = set()
     out = []

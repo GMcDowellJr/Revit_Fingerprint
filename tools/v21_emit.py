@@ -280,6 +280,9 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
                     "sig_hash": sig_hash_v,
                     "join_hash": sig_hash_v,
                     "join_key_schema": "bootstrap.sig_hash.v1",
+                    "join_key_status": "bootstrap",
+                    "join_key_policy_id": "",
+                    "join_key_policy_version": "",
                     "label_display": _safe_str((rec.get("label") or {}).get("display")),
                     "label_quality": _safe_str((rec.get("label") or {}).get("quality")),
                     "label_provenance": _safe_str((rec.get("label") or {}).get("provenance")),
@@ -339,6 +342,7 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
     _write_csv(out_dir / "phase0_records.csv", [
         "schema_version", "export_run_id", "file_id", "domain", "record_pk", "record_id", "record_ordinal",
         "status", "identity_quality", "sig_hash", "join_hash", "join_key_schema",
+        "join_key_status", "join_key_policy_id", "join_key_policy_version",
         "label_display", "label_quality", "label_provenance",
     ], _sort_rows(record_rows, ["export_run_id", "domain", "record_pk"]))
 
