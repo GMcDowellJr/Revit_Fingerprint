@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-SCHEMA_VERSION = "2.1"
+SCHEMA_VERSION = "2.1.0"
 STANDARD_PRESENCE_MIN = 0.75
 DOMINANT_SHARE_MIN = 0.50
 MIN_RECORDS_FOR_DOMAIN = 50
@@ -114,7 +114,7 @@ def _file_id(path: Path, mode: str) -> str:
 def _get_tool_version() -> str:
     env_v = os.environ.get("FINGERPRINT_TOOL_VERSION", "").strip()
     if env_v:
-        return env_v
+        return env_v if re.match(r"^\d+\.\d+\.\d+([+-].+)?$", env_v) else f"0.0.0+{env_v}"
     base = "0.0.0"
     try:
         gitsha = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
@@ -123,6 +123,37 @@ def _get_tool_version() -> str:
     except Exception:
         pass
     return f"{base}+nogit"
+
+
+def _identity_metadata(data: Dict[str, Any]) -> Dict[str, str]:
+    identity = data.get("identity") if isinstance(data.get("identity"), dict) else {}
+    contract = data.get("_contract") if isinstance(data.get("_contract"), dict) else {}
+    contract_ident = contract.get("identity") if isinstance(contract.get("identity"), dict) else {}
+    phase2 = identity.get("phase2") if isinstance(identity.get("phase2"), dict) else {}
+    lineage_items = phase2.get("lineage_items") if isinstance(phase2.get("lineage_items"), dict) else {}
+
+    central_path = _safe_str(
+        lineage_items.get("central_path")
+        or contract_ident.get("central_path")
+        or identity.get("central_path")
+        or data.get("central_path")
+    )
+    return {
+        "project_label": _safe_str(identity.get("project_title") or contract_ident.get("project_title")),
+        "model_label": _safe_str(
+            lineage_items.get("filename")
+            or identity.get("filename")
+            or identity.get("model_title")
+            or contract_ident.get("model_title")
+        ),
+        "central_path": central_path,
+        "central_path_norm": _safe_str(lineage_items.get("central_path_norm") or _norm_central_path(central_path)),
+        "lineage_hash": _safe_str(phase2.get("lineage_hash") or data.get("lineage_hash") or data.get("_lineage_hash")),
+        "revit_version_number": _safe_str(identity.get("revit_version_number") or contract_ident.get("revit_version_number")),
+        "revit_version_name": _safe_str(identity.get("revit_version_name") or contract_ident.get("revit_version_name")),
+        "revit_build": _safe_str(identity.get("revit_build") or contract_ident.get("revit_build")),
+        "is_workshared": _safe_str(identity.get("is_workshared") if "is_workshared" in identity else contract_ident.get("is_workshared")),
+    }
 
 
 def _norm_central_path(path: str) -> str:
@@ -200,23 +231,22 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
 
         contract = data.get("_contract") if isinstance(data.get("_contract"), dict) else {}
         ident = contract.get("identity") if isinstance(contract.get("identity"), dict) else {}
-        features_identity = data.get("_features", {}).get("identity", {}) if isinstance(data.get("_features"), dict) else {}
-        central_path = _safe_str(features_identity.get("central_path") or ident.get("central_path") or data.get("central_path"))
+        identity_meta = _identity_metadata(data)
         meta_rows.append({
             "schema_version": SCHEMA_VERSION,
             "export_run_id": export_run_id,
             "file_id": file_id,
             "project_id": _safe_str(ident.get("project_id") or ident.get("project_title")),
             "model_id": _safe_str(ident.get("model_id") or ident.get("model_title")),
-            "project_label": _safe_str(ident.get("project_title")),
-            "model_label": _safe_str(ident.get("model_title")),
-            "central_path": central_path,
-            "central_path_norm": _norm_central_path(central_path),
-            "lineage_hash": _safe_str(data.get("lineage_hash") or data.get("_lineage_hash")),
-            "revit_version_number": _safe_str(ident.get("revit_version_number")),
-            "revit_version_name": _safe_str(ident.get("revit_version_name")),
-            "revit_build": _safe_str(ident.get("revit_build")),
-            "is_workshared": _safe_str(ident.get("is_workshared")),
+            "project_label": identity_meta["project_label"],
+            "model_label": identity_meta["model_label"],
+            "central_path": identity_meta["central_path"],
+            "central_path_norm": identity_meta["central_path_norm"],
+            "lineage_hash": identity_meta["lineage_hash"],
+            "revit_version_number": identity_meta["revit_version_number"],
+            "revit_version_name": identity_meta["revit_version_name"],
+            "revit_build": identity_meta["revit_build"],
+            "is_workshared": identity_meta["is_workshared"],
             "tool_version": tool_version,
             "exported_utc": exported_utc,
         })
@@ -337,7 +367,8 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
 
     _write_csv(out_dir / "analysis_manifest.csv", [
         "schema_version", "analysis_run_id", "analysis_scope_hash", "export_run_count", "domain_count",
-        "tool_version", "policy_baseline_version", "policy_pareto_version", "executed_utc",
+        "tool_version", "policy_baseline_version", "policy_pareto_version",
+        "join_key_policy_version", "pattern_promotion_policy_version", "authority_metric_version", "executed_utc",
         "is_incremental_update", "notes",
     ], [{
         "schema_version": SCHEMA_VERSION,
@@ -346,10 +377,13 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
         "export_run_count": str(len(exports)),
         "domain_count": str(len(domains)),
         "tool_version": _get_tool_version(),
-        "policy_baseline_version": "",
-        "policy_pareto_version": "",
+        "policy_baseline_version": "0.0.0",
+        "policy_pareto_version": "0.0.0",
+        "join_key_policy_version": "0.0.0",
+        "pattern_promotion_policy_version": "0.0.0",
+        "authority_metric_version": "0.0.0",
         "executed_utc": executed_utc,
-        "is_incremental_update": "false",
+        "is_incremental_update": "0",
         "notes": (
             "defaults: STANDARD_PRESENCE_MIN=0.75; DOMINANT_SHARE_MIN=0.50; "
             "MIN_RECORDS_FOR_DOMAIN=50; MIN_FILES_FOR_DOMAIN=3; UNKNOWN_RATE_MAX=0.20"

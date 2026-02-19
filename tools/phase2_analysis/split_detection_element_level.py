@@ -106,6 +106,7 @@ def classify_file_elements(
 
             sig_hash = (record.get("sig_hash", "") or "").strip()
             record_id = (record.get("record_id", "") or "").strip()
+            record_pk = (record.get("record_pk", "") or "").strip()
             join_hash = (record.get("join_hash", "") or "").strip() or None
             label_display = (record.get("label_display", "") or "").strip() or (record_id or "Unknown")
 
@@ -123,6 +124,7 @@ def classify_file_elements(
 
             element_classifications.append({
                 'record_id': record_id,
+                'record_pk': record_pk,
                 'label_display': label_display,
                 'sig_hash': sig_hash,
                 'join_hash': join_hash,
@@ -163,6 +165,7 @@ def classify_file_elements(
 
         element_classifications.append({
             'record_id': record_id,
+            'record_pk': "",
             'label_display': label_display,
             'sig_hash': sig_hash,
             'join_hash': join_hash,
@@ -366,6 +369,7 @@ def run_element_level_classification(
             elements_data.append({
                 'file_id': report['file_id'],
                 'record_id': elem['record_id'],
+                'record_pk': elem.get('record_pk', ''),
                 'label_display': elem['label_display'],
                 'sig_hash': elem['sig_hash'],
                 'join_hash': elem['join_hash'],
@@ -375,7 +379,7 @@ def run_element_level_classification(
     elements_df = pd.DataFrame(elements_data)
     
     # Reorder columns to put label_display first
-    column_order = ['file_id', 'label_display', 'classification', 'record_id', 'sig_hash', 'join_hash']
+    column_order = ['file_id', 'label_display', 'classification', 'record_pk', 'record_id', 'sig_hash', 'join_hash']
     elements_df = elements_df[column_order]
     
     elements_csv = os.path.join(out_dir, f"{domain}.element_classifications.csv")
