@@ -45,7 +45,7 @@ def main() -> None:
         if row.get("is_incremental_update", "") not in {"0", "1"}:
             errors.append("analysis_manifest.csv is_incremental_update must be 0/1")
 
-    required = {"schema_version", "analysis_run_id", "domain", "export_run_id"}
+    required = {"schema_version", "analysis_run_id", "domain"}
     for csv_path in sorted(split_dir.rglob("*.csv")):
         rows = read_csv(csv_path)
         if not rows:
@@ -55,11 +55,15 @@ def main() -> None:
         if missing:
             errors.append(f"{csv_path}: missing required columns {missing}")
             continue
+        file_grain = any(k in cols for k in ("export_run_id", "file_id", "record_pk"))
+        if file_grain and "export_run_id" not in cols:
+            errors.append(f"{csv_path}: missing export_run_id for file-grain output")
+            continue
         for r in rows:
             if not r.get("domain", ""):
                 errors.append(f"{csv_path}: empty domain value")
                 break
-            if r.get("export_run_id", "") and r.get("export_run_id", "") not in file_exports:
+            if file_grain and r.get("export_run_id", "") and r.get("export_run_id", "") not in file_exports:
                 # allow bridge files and synthetic rows to pass if they do not represent model rows
                 if csv_path.name not in {"split_cluster_to_pattern_map.csv", "file_id_to_export_run_id.csv"}:
                     errors.append(f"{csv_path}: export_run_id not joinable to file_metadata")

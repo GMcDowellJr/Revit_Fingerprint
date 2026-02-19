@@ -100,7 +100,9 @@ def _inject_split_contract_headers(
             continue
 
         old_fields = list(rows[0].keys())
-        new_fields = ["schema_version", "analysis_run_id", "domain", "export_run_id"] + [
+        file_grain = any(k in old_fields for k in ("export_run_id", "file_id", "record_pk"))
+        required_fields = ["schema_version", "analysis_run_id", "domain"] + (["export_run_id"] if file_grain else [])
+        new_fields = required_fields + [
             f for f in old_fields if f not in {"schema_version", "analysis_run_id", "domain", "export_run_id"}
         ]
 
@@ -108,11 +110,14 @@ def _inject_split_contract_headers(
             row["schema_version"] = SCHEMA_VERSION
             row["analysis_run_id"] = analysis_run_id
             row["domain"] = row.get("domain", "").strip() or domain
-            export_run_id = row.get("export_run_id", "").strip()
-            file_id = row.get("file_id", "").strip()
-            if not export_run_id:
-                export_run_id = file_to_export.get(file_id, "") or file_id
-            row["export_run_id"] = export_run_id
+            if file_grain:
+                export_run_id = row.get("export_run_id", "").strip()
+                file_id = row.get("file_id", "").strip()
+                if not export_run_id:
+                    export_run_id = file_to_export.get(file_id, "") or file_id
+                row["export_run_id"] = export_run_id
+            else:
+                row.pop("export_run_id", None)
 
         sort_keys = [k for k in ("analysis_run_id", "domain", "export_run_id", "cluster_id", "record_pk", "record_id", "group_type", "group_id") if k in new_fields]
         rows.sort(key=lambda r: tuple(r.get(k, "") for k in sort_keys))
@@ -163,7 +168,6 @@ def _emit_cluster_to_pattern_map(out_root: Path, analysis_dir: str | None, domai
                 "schema_version": SCHEMA_VERSION,
                 "analysis_run_id": analysis_run_id,
                 "domain": domain,
-                "export_run_id": "",
                 "cluster_id": cluster_id,
                 "pattern_id": "",
                 "mapping_quality": "NONE",
@@ -192,7 +196,6 @@ def _emit_cluster_to_pattern_map(out_root: Path, analysis_dir: str | None, domai
             "schema_version": SCHEMA_VERSION,
             "analysis_run_id": analysis_run_id,
             "domain": domain,
-            "export_run_id": "",
             "cluster_id": cluster_id,
             "pattern_id": top_pattern,
             "mapping_quality": quality,
@@ -201,7 +204,7 @@ def _emit_cluster_to_pattern_map(out_root: Path, analysis_dir: str | None, domai
 
     _write_csv(
         out_root / "split_cluster_to_pattern_map.csv",
-        ["schema_version", "analysis_run_id", "domain", "export_run_id", "cluster_id", "pattern_id", "mapping_quality", "mapping_reason"],
+        ["schema_version", "analysis_run_id", "domain", "cluster_id", "pattern_id", "mapping_quality", "mapping_reason"],
         out_rows,
     )
 

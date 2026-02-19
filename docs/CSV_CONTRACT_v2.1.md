@@ -18,7 +18,12 @@ Every split-analysis CSV must include:
 1. `schema_version`
 2. `analysis_run_id`
 3. `domain`
+
+File-grain split CSVs must additionally include:
 4. `export_run_id`
+
+`export_run_id` should not be added to non-file-grain outputs where it is not semantically meaningful
+(for example, IDS policy tables or cluster/domain catalogs).
 
 Trace/back-compat:
 - `file_id` may remain as a trace column.
