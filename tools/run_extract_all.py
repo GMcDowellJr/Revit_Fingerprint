@@ -9,6 +9,46 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from v21_emit import emit_analysis_v21, emit_phase0_v21
+
+
+def _discover_domains_from_exports(exports_dir: Path) -> List[str]:
+    """
+    Best-effort discovery of domains from fingerprint JSON exports.
+    Assumes domains are top-level keys excluding meta keys (leading underscore) and known non-domain keys.
+    Deterministic: returns sorted list.
+    """
+    exports_dir = Path(exports_dir)
+    domains: set[str] = set()
+
+    # Scan a limited set first for speed; fall back to full scan if needed.
+    candidates = sorted(exports_dir.glob("*.json"))
+    if not candidates:
+        return []
+
+    for p in candidates[:200]:
+        try:
+            with p.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            continue
+
+        if not isinstance(data, dict):
+            continue
+
+        for k, v in data.items():
+            if not isinstance(k, str):
+                continue
+            if k.startswith("_"):
+                continue
+            if k in ("artifacts",):
+                continue
+            # Domain payloads are typically dict-like.
+            if isinstance(v, dict):
+                domains.add(k)
+
+    return sorted(domains, key=lambda s: s.lower())
+
 
 def _ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
@@ -158,11 +198,55 @@ def main() -> None:
     ap.add_argument("--skip-phase1", action="store_true")
     ap.add_argument("--skip-phase2", action="store_true")
     ap.add_argument(
+        "--emit-legacy",
+        action="store_true",
+        help="When used with --emit-v21, also emit legacy phase0_flat/phase1_authority/phase2_domain outputs.",
+    )
+    ap.add_argument(
         "--no-dimtypes-by-family",
         action="store_true",
         help="Disable dimension_types by-family packet (default: enabled).",
     )
+    ap.add_argument("--emit-v21", action="store_true", help="Emit additive v2.1 outputs under Results_v21/.")
+    ap.add_argument("--phase0-only", action="store_true", help="Run only phase0 work (legacy + optional v2.1).")
+    ap.add_argument("--phase1-only", action="store_true", help="Run only phase1 work (legacy + optional v2.1).")
+    ap.add_argument("--phase2-only", action="store_true", help="Run only phase2 work (legacy + optional v2.1).")
+    ap.add_argument("--split-only", action="store_true", help="Run only split-analysis orchestration.")
+    ap.add_argument(
+        "--split-domains",
+        nargs="?",
+        const="__ALL__",
+        default=None,
+        help=(
+            "Optional comma list of domains for split-analysis orchestration under Results_v21/split_analysis/<domain>/. "
+            "If provided with no value, runs all discovered domains."
+        ),
+    )
+    ap.add_argument(
+        "--mode",
+        choices=("allpairs", "candidates"),
+        default="allpairs",
+        help="File-level split detection mode passed to split-analysis orchestration (default: allpairs).",
+    )
     args = ap.parse_args()
+
+    only_flags = [args.phase0_only, args.phase1_only, args.phase2_only, args.split_only]
+    if sum(1 for f in only_flags if f) > 1:
+        raise SystemExit("Only one of --phase0-only/--phase1-only/--phase2-only/--split-only may be used.")
+
+    if args.phase0_only:
+        args.skip_phase1 = True
+        args.skip_phase2 = True
+    elif args.phase1_only:
+        args.skip_phase0 = True
+        args.skip_phase2 = True
+    elif args.phase2_only:
+        args.skip_phase0 = True
+        args.skip_phase1 = True
+    elif args.split_only:
+        args.skip_phase0 = True
+        args.skip_phase1 = True
+        args.skip_phase2 = True
 
     exports_dir = Path(args.exports_dir).resolve()
     out_root = Path(args.out_root).resolve()
@@ -170,6 +254,14 @@ def main() -> None:
     phase0_dir = out_root / "phase0_flat"
     phase1_dir = out_root / "phase1_authority"
     phase2_root = out_root / "phase2_domain"
+    v21_root = out_root / "Results_v21"
+    v21_phase0_dir = v21_root / "phase0_v21"
+    v21_analysis_dir = v21_root / "analysis_v21"
+    v21_split_root = v21_root / "split_analysis"
+
+    # When --emit-v21 is enabled, legacy Phase0/1/2 outputs are suppressed by default.
+    # Use --emit-legacy to keep emitting legacy artifacts alongside v2.1.
+    run_legacy = (not args.emit_v21) or args.emit_legacy
 
     _ensure_dir(out_root)
     _ensure_dir(phase2_root)
@@ -202,7 +294,7 @@ def main() -> None:
     # -------------------------
     # Phase 0
     # -------------------------
-    if not args.skip_phase0:
+    if run_legacy and not args.skip_phase0:
         _ensure_dir(phase0_dir)
         cmd0 = [
             sys.executable,
@@ -220,7 +312,7 @@ def main() -> None:
     # -------------------------
     # Phase 1
     # -------------------------
-    if not args.skip_phase1:
+    if run_legacy and not args.skip_phase1:
         if not args.config:
             sys.stderr.write("[WARN extract_all] --config not provided; skipping Phase-1.\n")
             report["notes"].append("phase1_skipped_no_config")
@@ -282,7 +374,7 @@ def main() -> None:
     # -------------------------
     # Phase 2 (per-domain packet)
     # -------------------------
-    if not args.skip_phase2:
+    if run_legacy and not args.skip_phase2:
         for dom in domains:
             dom_out = phase2_root / dom
             _ensure_dir(dom_out)
@@ -362,6 +454,60 @@ def main() -> None:
                     {"phase": "phase2", "domain": dom, "step": "dimension_types_by_family", "cmd": cmd2e}
                 )
                 _run(cmd2e, env=env)
+
+    # -------------------------
+    # Optional v2.1 additive outputs
+    # -------------------------
+    if args.emit_v21 and not args.skip_phase0:
+        _ensure_dir(v21_phase0_dir)
+        report["commands"].append({"phase": "v21", "step": "phase0_v21", "out": str(v21_phase0_dir)})
+        meta_rows, record_rows = emit_phase0_v21(exports_dir, v21_phase0_dir, file_id_mode="basename")
+
+        if not args.skip_phase1 or not args.skip_phase2:
+            _ensure_dir(v21_analysis_dir)
+            report["commands"].append({"phase": "v21", "step": "analysis_v21", "out": str(v21_analysis_dir)})
+            analysis_run_id = emit_analysis_v21(meta_rows, record_rows, v21_analysis_dir)
+            report["notes"].append(f"analysis_run_id={analysis_run_id}")
+
+    split_domains: List[str] = []
+    if args.split_domains is not None:
+        if str(args.split_domains) == "__ALL__":
+            # Prefer domains discovered from the Phase0_v21 in-memory records if available.
+            try:
+                split_domains = sorted({str(r.get("domain", "")).strip() for r in (record_rows or []) if str(r.get("domain", "")).strip()},
+                                       key=lambda s: s.lower())
+            except Exception:
+                split_domains = []
+
+            # Fallback: discover from JSON exports if Phase0 rows not available.
+            if not split_domains:
+                split_domains = _discover_domains_from_exports(exports_dir)
+        else:
+            split_domains = [d.strip() for d in str(args.split_domains).split(",") if d.strip()]
+
+    if split_domains:
+        _ensure_dir(v21_split_root)
+
+        # Use Phase0_v21 as the canonical evidence source for split-analysis when available.
+        phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
+        use_phase0_dir = phase0_records_csv.is_file()
+
+        for split_domain in split_domains:
+            split_out = v21_split_root / split_domain
+            cmd_split = [
+                sys.executable,
+                "tools/run_split_detection_all.py",
+                str(exports_dir),
+                "--domain",
+                split_domain,
+                "--out-root",
+                str(split_out),
+                "--mode",
+                str(args.mode),
+                *(['--phase0-dir', str(v21_phase0_dir)] if use_phase0_dir else []),
+            ]
+            report["commands"].append({"phase": "v21", "step": "split_analysis", "domain": split_domain, "cmd": cmd_split})
+            _run(cmd_split, env=env)
 
     report_path = out_root / "extract_all.report.json"
     with report_path.open("w", encoding="utf-8") as f:

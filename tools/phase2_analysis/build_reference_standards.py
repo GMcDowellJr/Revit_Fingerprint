@@ -12,14 +12,16 @@ from typing import Dict, List, Set
 
 import pandas as pd
 
-from .io import load_exports, get_domain_records
+from .io import load_exports, get_domain_records, _read_csv_rows
 
 
 def build_reference_standards_from_clusters(
     clusters_csv: str,
     exports_dir: str,
     domain: str,
-    out_dir: str
+    out_dir: str,
+    *,
+    phase0_dir: str | None = None,
 ) -> None:
     """Build reference standards from cluster representatives."""
     
@@ -47,22 +49,39 @@ def build_reference_standards_from_clusters(
         
         print(f"  {std_name}: representative = {rep_file_id}")
         
-        # Load representative file
-        rep_export = None
-        exports = load_exports(exports_dir, max_files=None)
-        
-        for export in exports:
-            if export.file_id == rep_file_id:
-                rep_export = export
-                break
-        
-        if not rep_export:
-            sys.stderr.write(f"[WARN] Could not find export for {rep_file_id}\n")
-            continue
-        
-        # Extract sig_hash values
-        records = get_domain_records(rep_export.data, domain)
-        sig_hashes = {r.get('sig_hash') for r in records if r.get('sig_hash')}
+        if phase0_dir:
+            # CSV mode: read sig_hashes from Results_v21/phase0_v21/phase0_records.csv
+            rec_csv = os.path.join(os.path.abspath(phase0_dir), "phase0_records.csv")
+            if not os.path.isfile(rec_csv):
+                sys.stderr.write(f"[WARN] phase0_records.csv not found: {rec_csv}\n")
+                continue
+
+            sig_hashes = set()
+            for r in _read_csv_rows(rec_csv):
+                if r.get("domain", "") != domain:
+                    continue
+                # v2.1 uses export_run_id; interim equals file_id. Match either.
+                if r.get("export_run_id", "") != rep_file_id and r.get("file_id", "") != rep_file_id:
+                    continue
+                sh = (r.get("sig_hash", "") or "").strip()
+                if sh:
+                    sig_hashes.add(sh)
+        else:
+            # JSON mode (back-compat)
+            rep_export = None
+            exports = load_exports(exports_dir, max_files=None)
+
+            for export in exports:
+                if export.file_id == rep_file_id:
+                    rep_export = export
+                    break
+
+            if not rep_export:
+                sys.stderr.write(f"[WARN] Could not find export for {rep_file_id}\n")
+                continue
+
+            records = get_domain_records(rep_export.data, domain)
+            sig_hashes = {r.get('sig_hash') for r in records if r.get('sig_hash')}
         
         reference_standards[std_name] = {
             'representative_file': rep_file_id,
@@ -113,7 +132,13 @@ def main() -> None:
     )
     parser.add_argument(
         'exports_dir',
-        help="Directory containing fingerprint exports"
+        help="Directory containing fingerprint exports. Ignored if --phase0-dir is provided."
+    )
+    parser.add_argument(
+        '--phase0-dir',
+        dest='phase0_dir',
+        default=None,
+        help="If provided, read v2.1 Phase0 tables from this directory (Results_v21/phase0_v21).",
     )
     parser.add_argument(
         '--domain',
@@ -133,7 +158,8 @@ def main() -> None:
         clusters_csv=args.clusters_csv,
         exports_dir=args.exports_dir,
         domain=args.domain,
-        out_dir=args.out_dir
+        out_dir=args.out_dir,
+        phase0_dir=args.phase0_dir,
     )
 
 

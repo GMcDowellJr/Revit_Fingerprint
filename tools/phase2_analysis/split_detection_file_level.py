@@ -15,7 +15,11 @@ import pandas as pd
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
 
-from .io import load_exports, get_domain_records
+from .io import (
+    load_exports,
+    get_domain_records,
+    load_phase0_v21_sig_profiles,
+)
 from .report import write_json_report
 from .split_detection import (
     Cluster,
@@ -27,38 +31,115 @@ from .split_detection import (
 )
 
 
-def build_element_profiles(exports_dir: str, domain: str) -> Tuple[Dict, Dict]:
+def build_element_profiles(exports_dir: str, domain: str, *, phase0_dir: str | None = None) -> Tuple[Dict, Dict]:
     """Build element signature profiles for each file.
-    
+
+    Modes:
+    - JSON mode (default): read fingerprint exports in exports_dir
+    - CSV mode: if phase0_dir is provided, read v2.1 Phase0 tables from phase0_dir
+
     Returns:
-        file_profiles: Dict[file_id -> {sig_hashes, path, count}]
-        file_paths: Dict[file_id -> path]
+        file_profiles: Dict[file_id/export_run_id -> {sig_hashes, path, count}]
+        file_paths: Dict[file_id/export_run_id -> path]
     """
-    
+    if phase0_dir:
+        return load_phase0_v21_sig_profiles(phase0_dir, domain)
+
     exports = load_exports(exports_dir)
-    
+
     file_profiles = {}
     file_paths = {}
-    
+
     for export in exports:
         records = get_domain_records(export.data, domain)
-        
-        # Extract sig_hash values
-        sig_hashes = {
-            r.get('sig_hash') 
-            for r in records 
-            if r.get('sig_hash')
-        }
-        
+
+        sig_hashes = {r.get("sig_hash") for r in records if r.get("sig_hash")}
+
         file_profiles[export.file_id] = {
-            'sig_hashes': sig_hashes,
-            'path': export.path,
-            'element_count': len(records)
+            "sig_hashes": sig_hashes,
+            "path": export.path,
+            "element_count": len(records),
         }
-        
+
         file_paths[export.file_id] = export.path
-    
+
     return file_profiles, file_paths
+
+
+def compute_pairwise_similarity_candidates(file_profiles: Dict) -> Tuple[Dict[Tuple[str, str], float], Dict[str, int]]:
+    """
+    Compute exact Jaccard similarity only for file pairs that share >=1 sig_hash.
+
+    Returns:
+        similarity_matrix: Dict[(fid_a,fid_b) -> jaccard] for candidate pairs only (fid_a < fid_b)
+        stats: candidate diagnostics (pairs_possible, pairs_evaluated, isolates, avg_candidates_per_file)
+    """
+    file_ids = sorted(file_profiles.keys())
+    n = len(file_ids)
+
+    # Inverted index: sig_hash -> list(file_id)
+    inv: Dict[str, List[str]] = {}
+    sig_counts_by_file: Dict[str, int] = {}
+
+    for fid in file_ids:
+        s = file_profiles[fid].get("sig_hashes") or set()
+        sig_counts_by_file[fid] = len(s)
+        for sig in s:
+            if not sig:
+                continue
+            inv.setdefault(sig, []).append(fid)
+
+    # Count shared tokens per pair from inverted index
+    shared_counts: Dict[Tuple[str, str], int] = {}
+    for sig, fids in inv.items():
+        if len(fids) < 2:
+            continue
+        fids_sorted = sorted(fids)
+        for i in range(len(fids_sorted) - 1):
+            a = fids_sorted[i]
+            for j in range(i + 1, len(fids_sorted)):
+                b = fids_sorted[j]
+                key = (a, b)  # already sorted
+                shared_counts[key] = shared_counts.get(key, 0) + 1
+
+    # Compute exact Jaccard for candidate pairs (shared >= 1)
+    sim: Dict[Tuple[str, str], float] = {}
+    for (a, b), _shared in shared_counts.items():
+        set_a = file_profiles[a].get("sig_hashes") or set()
+        set_b = file_profiles[b].get("sig_hashes") or set()
+
+        if not set_a or not set_b:
+            jaccard = 0.0
+        else:
+            inter = len(set_a & set_b)
+            uni = len(set_a | set_b)
+            jaccard = inter / uni if uni > 0 else 0.0
+
+        if jaccard > 0.0:
+            sim[(a, b)] = float(jaccard)
+
+    pairs_possible = n * (n - 1) // 2
+    pairs_evaluated = len(shared_counts)
+    files_with_any_candidate = _files_with_any_candidate(shared_counts)
+    isolates = sum(1 for fid in file_ids if sig_counts_by_file.get(fid, 0) > 0 and fid not in files_with_any_candidate)
+    avg_candidates = (2 * pairs_evaluated / n) if n else 0.0
+
+    stats = {
+        "pairs_possible": int(pairs_possible),
+        "pairs_evaluated": int(pairs_evaluated),
+        "pairs_skipped": int(pairs_possible - pairs_evaluated),
+        "isolates": int(isolates),
+        "avg_candidates_per_file": float(avg_candidates),
+    }
+    return sim, stats
+
+
+def _files_with_any_candidate(shared_counts: Dict[Tuple[str, str], int]) -> Set[str]:
+    out: Set[str] = set()
+    for (a, b) in shared_counts.keys():
+        out.add(a)
+        out.add(b)
+    return out
 
 
 def compute_pairwise_similarity(file_profiles: Dict) -> Dict[Tuple[str, str], float]:
@@ -154,6 +235,88 @@ def hierarchical_cluster_files(
     return clusters
 
 
+def threshold_graph_cluster_files(
+    file_profiles: Dict,
+    similarity_matrix: Dict[Tuple[str, str], float],
+    threshold: float = 0.70,
+) -> List[Cluster]:
+    """
+    Cluster files as connected components of a similarity-threshold graph.
+
+    Edge (a,b) exists iff Jaccard(a,b) >= threshold.
+
+    Notes:
+    - Deterministic: stable file_id sorting and component ordering.
+    - Pairs missing in similarity_matrix are treated as similarity 0.0.
+    """
+    file_ids = sorted(file_profiles.keys())
+    n = len(file_ids)
+
+    if n < 2:
+        return [Cluster(
+            cluster_id=0,
+            members=file_ids,
+            size=len(file_ids),
+            avg_internal_similarity=1.0,
+            metadata_patterns={},
+        )]
+
+    # Union-Find
+    parent: Dict[str, str] = {fid: fid for fid in file_ids}
+    rank: Dict[str, int] = {fid: 0 for fid in file_ids}
+
+    def find(x: str) -> str:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: str, b: str) -> None:
+        ra = find(a)
+        rb = find(b)
+        if ra == rb:
+            return
+        if rank[ra] < rank[rb]:
+            parent[ra] = rb
+        elif rank[ra] > rank[rb]:
+            parent[rb] = ra
+        else:
+            parent[rb] = ra
+            rank[ra] += 1
+
+    # Add edges for pairs meeting threshold
+    # similarity_matrix keys are stored as (min,max)
+    for (a, b), sim in similarity_matrix.items():
+        if sim >= threshold:
+            union(a, b)
+
+    # Group by root
+    groups: Dict[str, List[str]] = {}
+    for fid in file_ids:
+        r = find(fid)
+        groups.setdefault(r, []).append(fid)
+
+    # Deterministic cluster ordering:
+    # order by (size desc, first_member asc)
+    comps = []
+    for root, members in groups.items():
+        members_sorted = sorted(members)
+        comps.append((members_sorted, root))
+    comps.sort(key=lambda t: (-len(t[0]), t[0][0].lower()))
+
+    clusters: List[Cluster] = []
+    for members_sorted, _root in comps:
+        avg_sim = compute_avg_internal_similarity(members_sorted, similarity_matrix)
+        clusters.append(Cluster(
+            cluster_id=len(clusters),
+            members=members_sorted,
+            size=len(members_sorted),
+            avg_internal_similarity=avg_sim,
+            metadata_patterns={},
+        ))
+    return clusters
+
+
 def compute_avg_internal_similarity(
     members: List[str],
     similarity_matrix: Dict[Tuple[str, str], float]
@@ -241,22 +404,34 @@ def run_file_level_clustering(
     exports_dir: str,
     domain: str,
     threshold: float,
-    out_dir: str
+    out_dir: str,
+    *,
+    phase0_dir: str | None = None,
+    mode: str = "allpairs",
 ) -> None:
     """Run complete file-level clustering analysis."""
     
     print(f"[INFO] Building element profiles for {domain}...")
-    file_profiles, file_paths = build_element_profiles(exports_dir, domain)
+    file_profiles, file_paths = build_element_profiles(exports_dir, domain, phase0_dir=phase0_dir)
     
     if len(file_profiles) < 2:
         sys.stderr.write(f"[WARN] Only {len(file_profiles)} file(s) found. Cannot cluster.\n")
         return
     
-    print(f"[INFO] Computing pairwise similarity ({len(file_profiles)} files)...")
-    similarity_matrix = compute_pairwise_similarity(file_profiles)
-    
-    print(f"[INFO] Performing hierarchical clustering (threshold: {threshold})...")
-    clusters = hierarchical_cluster_files(file_profiles, similarity_matrix, threshold)
+    candidate_stats = None
+
+    if mode == "candidates":
+        print(f"[INFO] Computing candidate-pair similarity ({len(file_profiles)} files).")
+        similarity_matrix, candidate_stats = compute_pairwise_similarity_candidates(file_profiles)
+
+        print(f"[INFO] Clustering by threshold-graph components (threshold: {threshold}).")
+        clusters = threshold_graph_cluster_files(file_profiles, similarity_matrix, threshold)
+    else:
+        print(f"[INFO] Computing pairwise similarity ({len(file_profiles)} files)...")
+        similarity_matrix = compute_pairwise_similarity(file_profiles)
+
+        print(f"[INFO] Performing hierarchical clustering (threshold: {threshold})...")
+        clusters = hierarchical_cluster_files(file_profiles, similarity_matrix, threshold)
     
     print(f"[INFO] Found {len(clusters)} cluster(s)")
     
@@ -273,11 +448,16 @@ def run_file_level_clustering(
     
     # Assess cluster quality
     file_ids = sorted(file_profiles.keys())
-    distance_matrix = build_distance_matrix_from_similarity(file_ids, similarity_matrix)
     labels = cluster_assignments_to_labels(clusters, file_ids)
-    
-    silhouette = compute_silhouette_score(distance_matrix, labels)
-    interpretation = interpret_silhouette_score(silhouette)
+
+    if mode == "candidates":
+        # Avoid O(F^2) distance matrix construction in candidates mode.
+        silhouette = 0.0
+        interpretation = "not_computed_candidates_mode"
+    else:
+        distance_matrix = build_distance_matrix_from_similarity(file_ids, similarity_matrix)
+        silhouette = compute_silhouette_score(distance_matrix, labels)
+        interpretation = interpret_silhouette_score(silhouette)
     
     # Between-cluster similarity
     between_sim = compute_avg_between_cluster_similarity(clusters, similarity_matrix)
@@ -335,7 +515,9 @@ def run_file_level_clustering(
         },
         'clustering_parameters': {
             'threshold': threshold,
-            'method': 'hierarchical_average_linkage'
+            'mode': mode,
+            'method': ('threshold_graph_components' if mode == 'candidates' else 'hierarchical_average_linkage'),
+            **({'candidate_stats': candidate_stats} if candidate_stats else {}),
         },
         'outputs': {
             'assignments_csv': os.path.abspath(assignments_csv),
@@ -375,7 +557,13 @@ def main() -> None:
     )
     parser.add_argument(
         'exports_dir',
-        help="Directory containing fingerprint exports (*.details.json)"
+        help="Directory containing fingerprint exports (*.json). Ignored if --phase0-dir is provided."
+    )
+    parser.add_argument(
+        '--phase0-dir',
+        dest='phase0_dir',
+        default=None,
+        help="If provided, read v2.1 Phase0 tables from this directory (Results_v21/phase0_v21)."
     )
     parser.add_argument(
         '--domain',
@@ -387,6 +575,17 @@ def main() -> None:
         type=float,
         default=0.70,
         help="Similarity threshold for clustering (default: 0.70)"
+    )
+    parser.add_argument(
+        '--mode',
+        choices=['allpairs', 'candidates'],
+        default='allpairs',
+        help=(
+            "Similarity evaluation mode. "
+            "'allpairs' computes all file pairs (O(F^2)). "
+            "'candidates' computes exact Jaccard only for pairs sharing >=1 sig_hash, "
+            "then clusters by threshold graph components (much faster for large F)."
+        ),
     )
     parser.add_argument(
         '--out',
@@ -401,7 +600,9 @@ def main() -> None:
         exports_dir=args.exports_dir,
         domain=args.domain,
         threshold=args.threshold,
-        out_dir=args.out_dir
+        out_dir=args.out_dir,
+        phase0_dir=args.phase0_dir,
+        mode=args.mode,
     )
 
 

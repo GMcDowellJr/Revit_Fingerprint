@@ -31,7 +31,11 @@ def run_split_detection_workflow(
     domain: str,
     out_root: str,
     threshold: float = 0.70,
-    verify_ids_joinkey: bool = False
+    mode: str = 'allpairs',
+    verify_ids_joinkey: bool = False,
+    run_calibration: bool = False,
+    run_pareto: bool = False,
+    phase0_dir: str | None = None,
 ) -> None:
     """Run complete split detection workflow."""
     
@@ -60,7 +64,9 @@ def run_split_detection_workflow(
             exports_dir,
             '--domain', domain,
             '--threshold', str(threshold),
-            '--out', str(file_level_out)
+            '--mode', mode,
+            '--out', str(file_level_out),
+            *(['--phase0-dir', str(phase0_dir)] if phase0_dir else []),
         ],
         description=f"Phase 1: File-level clustering ({domain})"
     )
@@ -94,7 +100,8 @@ def run_split_detection_workflow(
             str(clusters_csv),
             exports_dir,
             '--domain', domain,
-            '--out', str(standards_out)
+            '--out', str(standards_out),
+            *(['--phase0-dir', str(phase0_dir)] if phase0_dir else []),
         ],
         description=f"Phase 2: Build reference standards ({domain})"
     )
@@ -158,6 +165,38 @@ def run_split_detection_workflow(
         description="Phase 2D: Apply IDS join-keys (write join_hash_ids CSV)"
     )
 
+    ids_report_csv = join_keys_out / f"{domain}.ids_key_selection_report.v1.csv"
+    if run_calibration:
+        # Phase 2E: calibrate join-key gates from IDS report (optional)
+        run_command(
+            [
+                sys.executable,
+                '-m', 'tools.phase2_analysis.calibrate_join_key_gates',
+                str(ids_report_csv),
+                '--domain', domain,
+                '--out', str(join_keys_out)
+            ],
+            description="Phase 2E: Calibrate IDS join-key gates"
+        )
+
+    if run_pareto:
+        # Phase 2F: Pareto on escalated IDS policies only (optional)
+        run_command(
+            [
+                sys.executable,
+                '-m', 'tools.phase2_analysis.pareto_join_keys_by_ids',
+                exports_dir,
+                '--domain', domain,
+                '--file-to-ids', str(file_to_ids_csv),
+                '--out', str(join_keys_out),
+                '--only-escalated',
+                '--escalation-report', str(ids_report_csv),
+                '--max-k', '5',
+                '--coverage-min', '0.75'
+            ],
+            description="Phase 2F: Pareto IDS join-key refinement"
+        )
+
     
     # Phase 3: Element-level classification
     run_command(
@@ -169,7 +208,8 @@ def run_split_detection_workflow(
             exports_dir,
             '--domain', domain,
             '--contamination-threshold', '85.0',
-            '--out', str(element_out)
+            '--out', str(element_out),
+            *(['--phase0-dir', str(phase0_dir)] if phase0_dir else []),
         ],
         description=f"Phase 3: Element-level classification ({domain})"
     )
@@ -197,6 +237,12 @@ def main() -> None:
         help="Directory containing fingerprint exports"
     )
     parser.add_argument(
+        '--phase0-dir',
+        dest='phase0_dir',
+        default=None,
+        help="If provided, use v2.1 Phase0 tables from this directory (Results_v21/phase0_v21) for all split-analysis steps that support CSV mode.",
+    )
+    parser.add_argument(
         '--domain',
         required=True,
         help="Domain to analyze (e.g., dimension_types)"
@@ -213,19 +259,39 @@ def main() -> None:
         help="Clustering threshold (default: 0.70)"
     )
     parser.add_argument(
+        '--mode',
+        choices=('allpairs', 'candidates'),
+        default='allpairs',
+        help='File-level split detection mode (default: allpairs)'
+    )
+    parser.add_argument(
         '--verify-ids-joinkey',
         action='store_true',
         help="Verification pipeline for IDS-aware join-keys (restricted to text_types)"
+    )
+    parser.add_argument(
+        '--run-calibration',
+        action='store_true',
+        help="Run optional Phase 2E calibration step"
+    )
+    parser.add_argument(
+        '--run-pareto',
+        action='store_true',
+        help="Run optional Phase 2F pareto refinement step"
     )
     
     args = parser.parse_args()
     
     run_split_detection_workflow(
         exports_dir=args.exports_dir,
+        phase0_dir=args.phase0_dir,
         domain=args.domain,
         out_root=args.out_root,
         threshold=args.threshold,
-        verify_ids_joinkey=args.verify_ids_joinkey
+        mode=args.mode,
+        verify_ids_joinkey=args.verify_ids_joinkey,
+        run_calibration=args.run_calibration,
+        run_pareto=args.run_pareto,
     )
 
 

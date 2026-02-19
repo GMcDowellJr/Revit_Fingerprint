@@ -29,7 +29,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import pandas as pd
 
-from .io import load_exports, get_domain_records
+from .io import load_exports, get_domain_records, load_phase0_v21_records_with_identity
 
 
 def md5_utf8_join_pipe(parts: List[str]) -> str:
@@ -280,6 +280,8 @@ def derive_join_keys_by_ids(
     max_k: int,
     min_records: int,
     top_candidate_keys: int,
+    *,
+    phase0_dir: Optional[str] = None,
 ) -> None:
     map_df = pd.read_csv(file_to_ids_csv)
     if not {"file_id", "ids_id"}.issubset(set(map_df.columns)):
@@ -287,21 +289,33 @@ def derive_join_keys_by_ids(
 
     file_to_ids = {str(r["file_id"]): str(r["ids_id"]) for _, r in map_df.iterrows()}
 
-    # Load exports once
-    exports = list(load_exports(exports_dir, max_files=None))
-
     ids_to_records: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
 
-    for exp in exports:
-        fid = str(exp.file_id)
-        if fid not in file_to_ids:
-            continue
-        ids_id = file_to_ids[fid]
-        recs = get_domain_records(exp.data, domain)
-        for r in recs:
-            if isinstance(r, dict) and "_file_id" not in r:
-                r["_file_id"] = fid
-        ids_to_records[ids_id].extend(recs)
+    if phase0_dir:
+        # CSV mode: load records+identity from Results_v21/phase0_v21/
+        allowed_files = set(file_to_ids.keys())
+        all_recs = load_phase0_v21_records_with_identity(phase0_dir, domain, allowed_file_ids=allowed_files)
+
+        for r in all_recs:
+            fid = str(r.get("_file_id") or r.get("file_id") or "")
+            if not fid or fid not in file_to_ids:
+                continue
+            ids_id = file_to_ids[fid]
+            ids_to_records[ids_id].append(r)
+    else:
+        # JSON mode (back-compat)
+        exports = list(load_exports(exports_dir, max_files=None))
+
+        for exp in exports:
+            fid = str(exp.file_id)
+            if fid not in file_to_ids:
+                continue
+            ids_id = file_to_ids[fid]
+            recs = get_domain_records(exp.data, domain)
+            for r in recs:
+                if isinstance(r, dict) and "_file_id" not in r:
+                    r["_file_id"] = fid
+            ids_to_records[ids_id].extend(recs)
 
     policies: Dict[str, Any] = {}
     rows: List[Dict[str, Any]] = []
@@ -522,7 +536,16 @@ def derive_join_keys_by_ids(
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Derive join-key policies per IDS using identity_basis evidence")
-    p.add_argument("exports_dir", help="Directory containing fingerprint exports (*.details.json)")
+    p.add_argument(
+        "exports_dir",
+        help="Directory containing fingerprint exports (*.json). Ignored if --phase0-dir is provided.",
+    )
+    p.add_argument(
+        "--phase0-dir",
+        dest="phase0_dir",
+        default=None,
+        help="If provided, read v2.1 Phase0 tables from this directory (Results_v21/phase0_v21).",
+    )
     p.add_argument("--domain", required=True, help="Domain (use text_types for verification)")
     p.add_argument("--file-to-ids", required=True, dest="file_to_ids_csv", help="Path to <domain>.file_to_ids.v1.csv")
     p.add_argument("--out", default="join_keys", dest="out_dir", help="Output directory")
@@ -539,6 +562,7 @@ def main() -> None:
         max_k=args.max_k,
         min_records=args.min_records,
         top_candidate_keys=args.top_candidate_keys,
+        phase0_dir=args.phase0_dir,
     )
 
 
