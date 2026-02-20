@@ -32,6 +32,49 @@ def _write_csv(path: Path, fieldnames: List[str], rows: List[Dict[str, str]]) ->
             writer.writerow({k: row.get(k, "") for k in fieldnames})
 
 
+
+
+def _validate_join_policy_ready(phase0_dir: str | None, domain: str, allow_bootstrap: bool) -> None:
+    if not phase0_dir:
+        return
+    rec_csv = Path(phase0_dir) / "phase0_records.csv"
+    if not rec_csv.exists():
+        return
+    rows = [r for r in _read_csv(rec_csv) if (r.get("domain", "").strip() == domain)]
+    bad = [
+        r
+        for r in rows
+        if (r.get("join_key_schema", "").strip() == "bootstrap.sig_hash.v1")
+        or (r.get("join_key_status", "").strip() != "ok")
+    ]
+    diag_rows = [
+        {
+            "domain": domain,
+            "file_id": r.get("file_id", ""),
+            "record_pk": r.get("record_pk", ""),
+            "join_key_schema": r.get("join_key_schema", ""),
+            "join_key_status": r.get("join_key_status", ""),
+            "reason": "bootstrap_schema" if r.get("join_key_schema", "").strip() == "bootstrap.sig_hash.v1" else "non_ok_status",
+        }
+        for r in bad
+    ]
+    diag_path = Path(phase0_dir).parent / "diagnostics" / "split_join_policy_gate.csv"
+    _write_csv(
+        diag_path,
+        ["domain", "file_id", "record_pk", "join_key_schema", "join_key_status", "reason"],
+        sorted(diag_rows, key=lambda x: (x["domain"], x["file_id"], x["record_pk"])),
+    )
+    if bad and not allow_bootstrap:
+        raise SystemExit(
+            "join_hash bootstrap/non-ok rows detected. Run run_extract_all.py with --discover-join-policy and --apply-join-policy (or provide --join-policy). "
+            f"Diagnostics: {diag_path}"
+        )
+    if bad and allow_bootstrap:
+        sys.stderr.write("\n" + "!" * 80 + "\n")
+        sys.stderr.write("[WARN split_detection] --allow-bootstrap enabled; proceeding with bootstrap/non-ok join keys.\n")
+        sys.stderr.write(f"[WARN split_detection] Diagnostics: {diag_path}\n")
+        sys.stderr.write("!" * 80 + "\n\n")
+
 def _load_export_mapping(phase0_dir: str | None) -> Dict[str, str]:
     if not phase0_dir:
         return {}
@@ -234,10 +277,12 @@ def run_split_detection_workflow(
     run_calibration: bool = False,
     run_pareto: bool = False,
     phase0_dir: str | None = None,
+    allow_bootstrap: bool = False,
     analysis_dir: str | None = None,
 ) -> None:
     """Run complete split detection workflow."""
     
+    _validate_join_policy_ready(phase0_dir, domain, allow_bootstrap)
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
     
@@ -487,6 +532,11 @@ def main() -> None:
         action='store_true',
         help="Run optional Phase 2F pareto refinement step"
     )
+    parser.add_argument(
+        '--allow-bootstrap',
+        action='store_true',
+        help='Allow bootstrap.sig_hash.v1 / non-ok join keys (warn loudly).',
+    )
     
     args = parser.parse_args()
     
@@ -501,6 +551,7 @@ def main() -> None:
         run_calibration=args.run_calibration,
         run_pareto=args.run_pareto,
         analysis_dir=args.analysis_dir,
+        allow_bootstrap=args.allow_bootstrap,
     )
 
 
