@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -55,7 +56,10 @@ def _ensure_dir(p: Path) -> None:
 
 
 def _run(cmd: List[str], *, env: Dict[str, str]) -> None:
+    start = time.time()
+    print(f"[extract_all] RUN: {' '.join(cmd)}", flush=True)
     subprocess.run(cmd, check=True, env=env)
+    print(f"[extract_all] DONE ({time.time() - start:.1f}s): {cmd[1] if len(cmd) > 1 else cmd[0]}", flush=True)
 
 
 def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
@@ -76,7 +80,7 @@ def _emit_join_policy_diagnostics(rows: List[Dict[str, str]], diagnostics_dir: P
             continue
         schema = str(r.get("join_key_schema", "")).strip()
         status = str(r.get("join_key_status", "")).strip()
-        if schema == "bootstrap.sig_hash.v1" or status != "ok":
+        if schema == "sig_hash_as_join_key.v1" or status != "ok":
             problems.append(
                 {
                     "domain": dom,
@@ -84,7 +88,7 @@ def _emit_join_policy_diagnostics(rows: List[Dict[str, str]], diagnostics_dir: P
                     "record_pk": str(r.get("record_pk", "")),
                     "join_key_schema": schema,
                     "join_key_status": status,
-                    "reason": "bootstrap_schema" if schema == "bootstrap.sig_hash.v1" else "non_ok_status",
+                    "reason": "bootstrap_schema" if schema == "sig_hash_as_join_key.v1" else "non_ok_status",
                 }
             )
     diagnostics_dir.mkdir(parents=True, exist_ok=True)
@@ -216,92 +220,126 @@ def _infer_domains(exports_dir: Path) -> List[str]:
     return sorted(out)
 
 
+def _parse_stage_csv(raw: Optional[str]) -> List[str]:
+    if not raw:
+        return []
+    return [s.strip().lower() for s in str(raw).split(',') if s.strip()]
+
+
+def _warn_deprecated_alias(flag: str, replacement: str) -> None:
+    sys.stderr.write(f"[WARN extract_all] Deprecated alias: use {replacement} instead of {flag}.\n")
+
+
+def _enforce_policy_gate(rows: List[Dict[str, str]], diagnostics_dir: Path, domains: Optional[List[str]], allow_sig_hash_join_key: bool) -> None:
+    problems = _emit_join_policy_diagnostics(rows, diagnostics_dir, domains)
+    if problems and not allow_sig_hash_join_key:
+        raise SystemExit(
+            "Join-policy gate failed: identity-mode join keys detected (join_key_schema=sig_hash_as_join_key.v1 or join_key_status!=ok). "
+            "Re-run with --stages flatten,discover,apply,split (or include analyze1/analyze2 with apply), "
+            "or use --allow-sig-hash-join-key for degraded exploratory analysis. "
+            f"Diagnostics: {diagnostics_dir / 'join_policy_gate_diagnostics.csv'}"
+        )
+    if problems and allow_sig_hash_join_key:
+        sys.stderr.write("\n" + "!" * 80 + "\n")
+        sys.stderr.write("[WARN extract_all] --allow-sig-hash-join-key enabled; proceeding with DEGRADED identity-mode clustering (not for governance conclusions).\n")
+        sys.stderr.write(f"[WARN extract_all] Diagnostics: {diagnostics_dir / 'join_policy_gate_diagnostics.csv'}\n")
+        sys.stderr.write("!" * 80 + "\n\n")
+
+
 def main() -> None:
+    stage_names = ["flatten", "discover", "apply", "split", "analyze1", "analyze2"]
     ap = argparse.ArgumentParser(
-        description="One-shot extractor: Phase 0 (flat tables), Phase 1 (authority), Phase 2 (per-domain packet)."
+        description=(
+            "Pipeline orchestrator with explicit stages: flatten (T0), discover (T1), apply (T2), split, analyze1, analyze2. "
+            "Default stages are flatten,discover. Apply is opt-in. Identity-mode join schema sig_hash_as_join_key.v1 is degraded and gated by default."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  default (draft prep): --stages flatten,discover\n"
+            "  operational commit:  --stages flatten,discover,apply\n"
+            "  analysis after apply: --stages flatten,discover,apply,split,analyze1,analyze2\n"
+            "  degraded exploratory analysis (not governance-grade): add --allow-sig-hash-join-key\n"
+            "  matrix reference: docs/extract_stage_matrix.md"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     ap.add_argument("exports_dir", help="Folder containing fingerprint exports (*.details.json / *.index.json).")
     ap.add_argument("--out-root", required=True, help="Output root folder.")
-    ap.add_argument("--config", default=None, help="Phase-1 RunConfig JSON path (required to run Phase-1).")
-    ap.add_argument("--seed-baseline", default=None, help="Optional seed baseline fingerprint JSON path for Phase-1.")
-    ap.add_argument(
-        "--domains",
-        default=None,
-        help="Comma list of domains. If omitted, infer from sample export.",
-    )
-    ap.add_argument(
-        "--baseline",
-        default=None,
-        help="Baseline export filename (must exist in exports_dir). Required for dimension_types by-family packet.",
-    )
-    ap.add_argument("--skip-phase0", action="store_true")
-    ap.add_argument("--skip-phase1", action="store_true")
-    ap.add_argument("--skip-phase2", action="store_true")
-    ap.add_argument(
-        "--emit-legacy",
-        action="store_true",
-        help="When used with --emit-v21, also emit legacy phase0_flat/phase1_authority/phase2_domain outputs.",
-    )
-    ap.add_argument(
-        "--no-dimtypes-by-family",
-        action="store_true",
-        help="Disable dimension_types by-family packet (default: enabled).",
-    )
-    ap.add_argument("--emit-v21", action="store_true", help="Emit additive v2.1 outputs under Results_v21/.")
-    ap.add_argument("--emit-phase0-v21", action="store_true", help="Emit v2.1 Phase0 CSVs (bootstrap sentinel allowed).")
-    ap.add_argument("--discover-join-policy", action="store_true", help="Run v2.1 join-key policy discovery stage.")
-    ap.add_argument("--apply-join-policy", action="store_true", help="Apply discovered/provided join-key policy and overwrite phase0_records.csv.")
-    ap.add_argument("--join-policy", default=None, help="Path to join-key policy JSON for apply stage.")
-    ap.add_argument("--strict-join-policy", action="store_true", help="Fail analysis if bootstrap/non-ok join keys are detected.")
-    ap.add_argument("--allow-bootstrap", action="store_true", help="Allow bootstrap join keys for exploratory analysis (warn loudly).")
-    ap.add_argument("--phase0-only", action="store_true", help="Run only phase0 work (legacy + optional v2.1).")
-    ap.add_argument("--phase1-only", action="store_true", help="Run only phase1 work (legacy + optional v2.1).")
-    ap.add_argument("--phase2-only", action="store_true", help="Run only phase2 work (legacy + optional v2.1).")
-    ap.add_argument("--split-only", action="store_true", help="Run only split-analysis orchestration.")
-    ap.add_argument(
-        "--split-domains",
-        nargs="?",
-        const="__ALL__",
-        default=None,
-        help=(
-            "Optional comma list of domains for split-analysis orchestration under Results_v21/split_analysis/<domain>/. "
-            "If provided with no value, runs all discovered domains."
-        ),
-    )
-    ap.add_argument(
-        "--mode",
-        choices=("allpairs", "candidates"),
-        default="allpairs",
-        help="File-level split detection mode passed to split-analysis orchestration (default: allpairs).",
-    )
+    ap.add_argument("--config", default=None, help="Phase1 config path (required when stage analyze1 is included).")
+    ap.add_argument("--seed-baseline", default=None, help="Optional seed baseline fingerprint JSON path for analyze1.")
+    ap.add_argument("--domains", default=None, help="Comma list of domains; if omitted, infer from exports.")
+    ap.add_argument("--baseline", default=None, help="Baseline export filename for analyze2 dimension_types by-family packet.")
+    ap.add_argument("--emit-legacy", action="store_true", help="Also emit legacy phase0/phase1/phase2 artifacts when analyze1/analyze2 run.")
+    ap.add_argument("--no-dimtypes-by-family", action="store_true", help="Disable dimension_types by-family packet (default: enabled).")
+    ap.add_argument("--stages", default="flatten,discover", help="Comma-separated stages to run. Default: flatten,discover.")
+    ap.add_argument("--skip-stages", default="", help="Comma-separated stages to skip from --stages.")
+    ap.add_argument("--discover-join-policy", action="store_true", help="Alias for including stage discover.")
+    ap.add_argument("--apply-join-policy", action="store_true", help="Alias for including stage apply (operational commit path).")
+    ap.add_argument("--join-policy", default=None, help="Policy JSON path used by apply stage.")
+    ap.add_argument("--require-join-policy", action=argparse.BooleanOptionalAction, default=True, help="Require policy-mode join keys for split/analyze stages (default: true).")
+    ap.add_argument("--strict-join-policy", action="store_true", help="Deprecated alias for --require-join-policy.")
+    ap.add_argument("--allow-sig-hash-join-key", action="store_true", help="Allow degraded identity-mode join keys (sig_hash_as_join_key.v1) for exploratory analysis.")
+    ap.add_argument("--allow-bootstrap", action="store_true", help="Deprecated alias for --allow-sig-hash-join-key.")
+    ap.add_argument("--emit-v21", action="store_true", help="Deprecated alias; v2.1 flatten is default and always emitted.")
+    ap.add_argument("--emit-phase0-v21", action="store_true", help="Deprecated alias; v2.1 flatten is default and always emitted.")
+    ap.add_argument("--phase0-only", action="store_true", help="Deprecated alias for --stages flatten.")
+    ap.add_argument("--phase1-only", action="store_true", help="Deprecated alias for --stages analyze1.")
+    ap.add_argument("--phase2-only", action="store_true", help="Deprecated alias for --stages analyze2.")
+    ap.add_argument("--split-only", action="store_true", help="Deprecated alias for --stages split.")
+    ap.add_argument("--split-domains", nargs="?", const="__ALL__", default=None, help="Domains for split stage; optional CSV. If no value, run all discovered domains.")
+    ap.add_argument("--mode", choices=("allpairs", "candidates"), default="allpairs", help="File-level split detection mode.")
+    ap.add_argument("--discover-sample-size", type=int, default=5000, help="Max records per domain for discover stage (default: 5000; set <=0 to disable sampling).")
+    ap.add_argument("--discover-sample-seed", type=int, default=17, help="Deterministic sampling seed for discover stage (default: 17).")
+    ap.add_argument("--discover-max-candidate-fields", type=int, default=64, help="Max candidate fields per domain for discover stage (default: 64; <=0 disables cap).")
     args = ap.parse_args()
 
-    if args.emit_v21 and not args.emit_phase0_v21:
-        args.emit_phase0_v21 = True
-    if args.split_domains is not None and not args.strict_join_policy and not args.allow_bootstrap:
-        args.strict_join_policy = True
+    for alias, repl, used in [
+        ("--strict-join-policy", "--require-join-policy", args.strict_join_policy),
+        ("--allow-bootstrap", "--allow-sig-hash-join-key", args.allow_bootstrap),
+        ("--emit-v21", "--stages flatten,discover", args.emit_v21),
+        ("--emit-phase0-v21", "--stages flatten,discover", args.emit_phase0_v21),
+        ("--phase0-only", "--stages flatten", args.phase0_only),
+        ("--phase1-only", "--stages analyze1", args.phase1_only),
+        ("--phase2-only", "--stages analyze2", args.phase2_only),
+        ("--split-only", "--stages split", args.split_only),
+    ]:
+        if used:
+            _warn_deprecated_alias(alias, repl)
 
-    only_flags = [args.phase0_only, args.phase1_only, args.phase2_only, args.split_only]
-    if sum(1 for f in only_flags if f) > 1:
+    allow_sig_hash_join_key = args.allow_sig_hash_join_key or args.allow_bootstrap
+    require_join_policy = args.require_join_policy or args.strict_join_policy
+
+    selected_stages = _parse_stage_csv(args.stages) or ["flatten", "discover"]
+    if args.discover_join_policy and "discover" not in selected_stages:
+        selected_stages.append("discover")
+    if args.apply_join_policy and "apply" not in selected_stages:
+        selected_stages.append("apply")
+
+    only_aliases = [args.phase0_only, args.phase1_only, args.phase2_only, args.split_only]
+    if sum(1 for f in only_aliases if f) > 1:
         raise SystemExit("Only one of --phase0-only/--phase1-only/--phase2-only/--split-only may be used.")
-
     if args.phase0_only:
-        args.skip_phase1 = True
-        args.skip_phase2 = True
+        selected_stages = ["flatten"]
     elif args.phase1_only:
-        args.skip_phase0 = True
-        args.skip_phase2 = True
+        selected_stages = ["analyze1"]
     elif args.phase2_only:
-        args.skip_phase0 = True
-        args.skip_phase1 = True
+        selected_stages = ["analyze2"]
     elif args.split_only:
-        args.skip_phase0 = True
-        args.skip_phase1 = True
-        args.skip_phase2 = True
+        selected_stages = ["split"]
+
+    skipped = set(_parse_stage_csv(args.skip_stages))
+    for st in selected_stages + list(skipped):
+        if st not in stage_names:
+            raise SystemExit(f"Unknown stage: {st}. Valid stages: {','.join(stage_names)}")
+    selected_stages = [s for s in stage_names if s in selected_stages and s not in skipped]
+
+    plan_msg = " → ".join([s if s in selected_stages else f"({s} skipped)" for s in stage_names])
+    if require_join_policy and any(s in selected_stages for s in ("split", "analyze1", "analyze2")) and "apply" not in selected_stages:
+        plan_msg += " → (analysis gated: requires policy join keys; include apply stage)"
+    print(f"Plan: {plan_msg}")
 
     exports_dir = Path(args.exports_dir).resolve()
     out_root = Path(args.out_root).resolve()
-
     phase0_dir = out_root / "phase0_flat"
     phase1_dir = out_root / "phase1_authority"
     phase2_root = out_root / "phase2_domain"
@@ -310,337 +348,109 @@ def main() -> None:
     v21_analysis_dir = v21_root / "analysis_v21"
     v21_split_root = v21_root / "split_analysis"
 
-    # When --emit-v21 is enabled, legacy Phase0/1/2 outputs are suppressed by default.
-    # Use --emit-legacy to keep emitting legacy artifacts alongside v2.1.
-    run_legacy = (not args.emit_v21) or args.emit_legacy
-
     _ensure_dir(out_root)
-    _ensure_dir(phase2_root)
-
     surfaces = _detect_surfaces(exports_dir)
-    if surfaces.get("legacy", 0) > 0:
-        sys.stderr.write("[WARN extract_all] legacy bundle(s) present; extractor will not enable legacy implicitly.\n")
 
-    # Domains
     if args.domains and str(args.domains).strip():
         domains = [d.strip() for d in str(args.domains).split(",") if d.strip()]
     else:
         domains = _infer_domains(exports_dir)
-
-    if not domains and not args.skip_phase2:
+    if not domains and any(s in selected_stages for s in ("analyze2",)):
         raise SystemExit("No domains inferred; provide --domains.")
 
     env = os.environ.copy()
+    report: Dict[str, Any] = {"tool": "tools/run_extract_all.py", "exports_dir": str(exports_dir), "out_root": str(out_root), "surfaces": surfaces, "domains": domains, "selected_stages": selected_stages, "commands": [], "notes": []}
+    meta_rows: List[Dict[str, str]] = []
+    record_rows: List[Dict[str, str]] = []
 
-    need_v21_analysis = args.emit_v21 and (not args.skip_phase1 or not args.skip_phase2)
-
-    report: Dict[str, Any] = {
-        "tool": "tools/run_extract_all.py",
-        "exports_dir": str(exports_dir),
-        "out_root": str(out_root),
-        "surfaces": surfaces,
-        "domains": domains,
-        "commands": [],
-        "notes": [],
-    }
-
-    # -------------------------
-    # Phase 0
-    # -------------------------
-    if run_legacy and not args.skip_phase0:
-        _ensure_dir(phase0_dir)
-        cmd0 = [
-            sys.executable,
-            "tools/export_to_flat_tables.py",
-            "--root_dir",
-            str(exports_dir),
-            "--out_dir",
-            str(phase0_dir),
-            "--file_id_mode",
-            "basename",
-        ]
-        report["commands"].append({"phase": "phase0", "cmd": cmd0})
-        _run(cmd0, env=env)
-
-    # -------------------------
-    # Phase 1
-    # -------------------------
-    if run_legacy and not args.skip_phase1:
-        if not args.config:
-            sys.stderr.write("[WARN extract_all] --config not provided; skipping Phase-1.\n")
-            report["notes"].append("phase1_skipped_no_config")
-        else:
-            _ensure_dir(phase1_dir)
-
-            cmd1a = [
-                sys.executable,
-                "tools/phase1_domain_authority.py",
-                "--input-dir",
-                str(exports_dir),
-                "--config",
-                str(Path(args.config).resolve()),
-                "--out-dir",
-                str(phase1_dir),
-            ]
-            
-            if args.seed_baseline:
-                sb = Path(args.seed_baseline)
-                # If user provided a relative path or filename, interpret it relative to exports_dir.
-                seed_path = (exports_dir / sb) if not sb.is_absolute() else sb
-                seed_path = seed_path.resolve()
-                if not seed_path.exists():
-                    raise SystemExit(
-                        f"--seed-baseline not found: {seed_path}\n"
-                        f"Tip: pass a full path or a filename that exists under exports_dir: {exports_dir}"
-                    )
-                cmd1a += ["--seed-baseline", str(seed_path)]
-
-            report["commands"].append({"phase": "phase1", "step": "domain_authority", "cmd": cmd1a})
-            _run(cmd1a, env=env)
-
-            cmd1b = [
-                sys.executable,
-                "tools/phase1_population_framing.py",
-                "--domain-clusters",
-                str(phase1_dir / "domain_cluster_summary.csv"),
-                "--domain-authority",
-                str(phase1_dir / "domain_authority_summary.csv"),
-                "--run-config",
-                str(Path(args.config).resolve()),
-                "--out",
-                str(phase1_dir / "population_baseline_summary.csv"),
-            ]
-            report["commands"].append({"phase": "phase1", "step": "population_framing", "cmd": cmd1b})
-            _run(cmd1b, env=env)
-
-            cmd1c = [
-                sys.executable,
-                "tools/phase1_pairwise_analysis.py",
-                "--baseline-coverage",
-                str(phase1_dir / "baseline_coverage_by_project.csv"),
-                "--out-dir",
-                str(phase1_dir),
-            ]
-            report["commands"].append({"phase": "phase1", "step": "pairwise_analysis", "cmd": cmd1c})
-            _run(cmd1c, env=env)
-
-    # -------------------------
-    # Phase 2 (per-domain packet)
-    # -------------------------
-    if run_legacy and not args.skip_phase2:
-        for dom in domains:
-            dom_out = phase2_root / dom
-            _ensure_dir(dom_out)
-
-            cmd2a = [
-                sys.executable,
-                "-m",
-                "tools.phase2_analysis.run_joinhash_label_population",
-                str(exports_dir),
-                "--domain",
-                dom,
-                "--out",
-                str(dom_out),
-            ]
-            report["commands"].append({"phase": "phase2", "domain": dom, "step": "joinhash_label_population", "cmd": cmd2a})
-            _run(cmd2a, env=env)
-
-            cmd2b = [
-                sys.executable,
-                "-m",
-                "tools.phase2_analysis.run_joinhash_parameter_population",
-                str(exports_dir),
-                "--domain",
-                dom,
-                "--out",
-                str(dom_out),
-            ]
-            report["commands"].append({"phase": "phase2", "domain": dom, "step": "joinhash_parameter_population", "cmd": cmd2b})
-            _run(cmd2b, env=env)
-
-            cmd2c = [
-                sys.executable,
-                "-m",
-                "tools.phase2_analysis.run_candidate_joinkey_simulation",
-                str(exports_dir),
-                "--domain",
-                dom,
-                "--out",
-                str(dom_out),
-            ]
-            report["commands"].append({"phase": "phase2", "domain": dom, "step": "candidate_joinkey_simulation", "cmd": cmd2c})
-            _run(cmd2c, env=env)
-
-            cmd2d = [
-                sys.executable,
-                "-m",
-                "tools.phase2_analysis.run_population_stability",
-                str(exports_dir),
-                "--domain",
-                dom,
-                "--out",
-                str(dom_out),
-            ]
-            report["commands"].append({"phase": "phase2", "domain": dom, "step": "population_stability", "cmd": cmd2d})
-            _run(cmd2d, env=env)
-
-            # Dimension types: by-family packet (default ON)
-            if dom == "dimension_types" and not args.no_dimtypes_by_family:
-                cmd2e = [
-                    sys.executable,
-                    "-m",
-                    "tools.phase2_analysis.run_dimension_types_by_family",
-                    str(exports_dir),
-                    "--domain",
-                    "dimension_types",
-                    "--out",
-                    str(dom_out),
-                ]
-
-                if args.baseline:
-                    cmd2e += ["--baseline", str(args.baseline), "--families_from", "baseline"]
-                else:
-                    # Baseline-free mode: discover families from all exports; skip baseline-anchored steps inside.
-                    cmd2e += ["--families_from", "all"]
-
-                report["commands"].append(
-                    {"phase": "phase2", "domain": dom, "step": "dimension_types_by_family", "cmd": cmd2e}
-                )
-                _run(cmd2e, env=env)
-
-    # -------------------------
-    # Optional v2.1 additive outputs
-    # -------------------------
-    if (args.emit_v21 or args.emit_phase0_v21) and not args.skip_phase0:
+    if "flatten" in selected_stages:
+        print("[extract_all] Stage flatten (T0): emitting flatten outputs...", flush=True)
         _ensure_dir(v21_phase0_dir)
-        report["commands"].append({"phase": "v21", "step": "phase0_v21", "out": str(v21_phase0_dir)})
+        report["commands"].append({"stage": "flatten", "out": str(v21_phase0_dir)})
         meta_rows, record_rows = emit_phase0_v21(exports_dir, v21_phase0_dir, file_id_mode="basename")
+        print(f"[extract_all] Stage flatten complete: rows={len(record_rows)} files={len(meta_rows)} out={v21_phase0_dir}", flush=True)
 
-        if need_v21_analysis and not (args.discover_join_policy or args.apply_join_policy):
-            problems = _emit_join_policy_diagnostics(record_rows, v21_root / "diagnostics", domains)
-            if problems and args.strict_join_policy and not args.allow_bootstrap:
-                raise SystemExit(
-                    "Strict join policy enforcement failed before v2.1 analysis: bootstrap/non-ok join keys detected. "
-                    "Run run_extract_all.py with --discover-join-policy and --apply-join-policy (or provide --join-policy). "
-                    f"See diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}"
-                )
-            if problems and args.allow_bootstrap:
-                sys.stderr.write("\n" + "!" * 80 + "\n")
-                sys.stderr.write("[WARN extract_all] --allow-bootstrap enabled; proceeding with bootstrap/non-ok join keys for analysis_v21.\n")
-                sys.stderr.write(f"[WARN extract_all] Diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}\n")
-                sys.stderr.write("!" * 80 + "\n\n")
-
-            _ensure_dir(v21_analysis_dir)
-            report["commands"].append({"phase": "v21", "step": "analysis_v21", "out": str(v21_analysis_dir)})
-            analysis_run_id = emit_analysis_v21(meta_rows, record_rows, v21_analysis_dir)
-            report["notes"].append(f"analysis_run_id={analysis_run_id}")
-
-    if args.discover_join_policy:
-        discover_out = v21_root / "policies" / "domain_join_key_policies.v21.json"
-        if args.join_policy:
-            discover_out = Path(args.join_policy).resolve()
-        cmd_discover = [
-            sys.executable,
-            "tools/v21_discover_join_policy.py",
-            "--phase0-dir", str(v21_phase0_dir),
-            "--out-policy", str(discover_out),
-        ]
-        report["commands"].append({"phase": "v21", "step": "discover_join_policy", "cmd": cmd_discover})
+    if "discover" in selected_stages:
+        print("[extract_all] Stage discover (T1): deriving join policy candidates...", flush=True)
+        discover_out = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json")
+        cmd_discover = [sys.executable, "tools/v21_discover_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--out-policy", str(discover_out), "--sample-size", str(args.discover_sample_size), "--sample-seed", str(args.discover_sample_seed), "--max-candidate-fields", str(args.discover_max_candidate_fields)]
+        report["commands"].append({"stage": "discover", "cmd": cmd_discover})
         _run(cmd_discover, env=env)
         args.join_policy = str(discover_out)
 
-    if args.apply_join_policy:
-        if not args.join_policy:
-            args.join_policy = str((v21_root / "policies" / "domain_join_key_policies.v21.json").resolve())
-        cmd_apply = [
-            sys.executable,
-            "tools/v21_apply_join_policy.py",
-            "--phase0-dir", str(v21_phase0_dir),
-            "--join-policy", str(Path(args.join_policy).resolve()),
-        ]
-        report["commands"].append({"phase": "v21", "step": "apply_join_policy", "cmd": cmd_apply})
+    if "apply" in selected_stages:
+        print("[extract_all] Stage apply (T2): applying join policy to flatten outputs...", flush=True)
+        policy_path = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json").resolve()
+        cmd_apply = [sys.executable, "tools/v21_apply_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--join-policy", str(policy_path)]
+        report["commands"].append({"stage": "apply", "cmd": cmd_apply})
         _run(cmd_apply, env=env)
 
-    if need_v21_analysis and (args.discover_join_policy or args.apply_join_policy):
+    if any(s in selected_stages for s in ("split", "analyze1", "analyze2")) and require_join_policy:
         phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
         if phase0_records_csv.is_file():
-            post_rows = _read_csv_rows(phase0_records_csv)
-            problems = _emit_join_policy_diagnostics(post_rows, v21_root / "diagnostics", domains)
-            if problems and args.strict_join_policy and not args.allow_bootstrap:
-                raise SystemExit(
-                    "Strict join policy enforcement failed before deferred v2.1 analysis: bootstrap/non-ok join keys detected. "
-                    "Run run_extract_all.py with --discover-join-policy and --apply-join-policy (or provide --join-policy). "
-                    f"See diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}"
-                )
-            if problems and args.allow_bootstrap:
-                sys.stderr.write("\n" + "!" * 80 + "\n")
-                sys.stderr.write("[WARN extract_all] --allow-bootstrap enabled; proceeding with bootstrap/non-ok join keys for deferred analysis_v21.\n")
-                sys.stderr.write(f"[WARN extract_all] Diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}\n")
-                sys.stderr.write("!" * 80 + "\n\n")
+            _enforce_policy_gate(_read_csv_rows(phase0_records_csv), v21_root / "diagnostics", domains, allow_sig_hash_join_key)
 
+    if "analyze1" in selected_stages or "analyze2" in selected_stages:
+        phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
+        if phase0_records_csv.is_file() and not record_rows:
+            record_rows = _read_csv_rows(phase0_records_csv)
+        if (v21_phase0_dir / "file_metadata.csv").is_file() and not meta_rows:
+            meta_rows = _read_csv_rows(v21_phase0_dir / "file_metadata.csv")
+        if meta_rows and record_rows:
             _ensure_dir(v21_analysis_dir)
-            report["commands"].append({"phase": "v21", "step": "analysis_v21", "out": str(v21_analysis_dir), "deferred": True})
-            analysis_run_id = emit_analysis_v21(meta_rows, post_rows, v21_analysis_dir)
+            analysis_run_id = emit_analysis_v21(meta_rows, record_rows, v21_analysis_dir)
             report["notes"].append(f"analysis_run_id={analysis_run_id}")
 
-    split_domains: List[str] = []
-    if args.split_domains is not None:
-        if str(args.split_domains) == "__ALL__":
-            # Prefer domains discovered from the Phase0_v21 in-memory records if available.
-            try:
-                split_domains = sorted({str(r.get("domain", "")).strip() for r in (record_rows or []) if str(r.get("domain", "")).strip()},
-                                       key=lambda s: s.lower())
-            except Exception:
-                split_domains = []
+    if "analyze1" in selected_stages and args.emit_legacy:
+        if not args.config:
+            sys.stderr.write("[WARN extract_all] --config not provided; skipping analyze1 legacy outputs.\n")
+        else:
+            _ensure_dir(phase1_dir)
+            cmd1a = [sys.executable, "tools/phase1_domain_authority.py", "--input-dir", str(exports_dir), "--config", str(Path(args.config).resolve()), "--out-dir", str(phase1_dir)]
+            if args.seed_baseline:
+                sb = Path(args.seed_baseline)
+                seed_path = (exports_dir / sb) if not sb.is_absolute() else sb
+                cmd1a += ["--seed-baseline", str(seed_path.resolve())]
+            _run(cmd1a, env=env)
+            _run([sys.executable, "tools/phase1_population_framing.py", "--domain-clusters", str(phase1_dir / "domain_cluster_summary.csv"), "--domain-authority", str(phase1_dir / "domain_authority_summary.csv"), "--run-config", str(Path(args.config).resolve()), "--out", str(phase1_dir / "population_baseline_summary.csv")], env=env)
+            _run([sys.executable, "tools/phase1_pairwise_analysis.py", "--baseline-coverage", str(phase1_dir / "baseline_coverage_by_project.csv"), "--out-dir", str(phase1_dir)], env=env)
 
-            # Fallback: discover from JSON exports if Phase0 rows not available.
+    if "analyze2" in selected_stages and args.emit_legacy:
+        _ensure_dir(phase2_root)
+        for dom in domains:
+            dom_out = phase2_root / dom
+            _ensure_dir(dom_out)
+            for mod in ["run_joinhash_label_population", "run_joinhash_parameter_population", "run_candidate_joinkey_simulation", "run_population_stability"]:
+                _run([sys.executable, "-m", f"tools.phase2_analysis.{mod}", str(exports_dir), "--domain", dom, "--out", str(dom_out)], env=env)
+            if dom == "dimension_types" and not args.no_dimtypes_by_family:
+                cmd2e = [sys.executable, "-m", "tools.phase2_analysis.run_dimension_types_by_family", str(exports_dir), "--domain", "dimension_types", "--out", str(dom_out)]
+                cmd2e += ["--baseline", str(args.baseline), "--families_from", "baseline"] if args.baseline else ["--families_from", "all"]
+                _run(cmd2e, env=env)
+
+    split_domains: List[str] = []
+    if "split" in selected_stages:
+        if args.split_domains is None or str(args.split_domains) == "__ALL__":
+            split_domains = sorted({str(r.get("domain", "")).strip() for r in (record_rows or []) if str(r.get("domain", "")).strip()}, key=lambda s: s.lower())
             if not split_domains:
                 split_domains = _discover_domains_from_exports(exports_dir)
         else:
             split_domains = [d.strip() for d in str(args.split_domains).split(",") if d.strip()]
 
     if split_domains:
+        print(f"[extract_all] Stage split: running split detection for {len(split_domains)} domain(s)...", flush=True)
         _ensure_dir(v21_split_root)
-
         phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
         use_phase0_dir = phase0_records_csv.is_file()
-        if use_phase0_dir:
-            gate_rows = _read_csv_rows(phase0_records_csv)
-            problems = _emit_join_policy_diagnostics(gate_rows, v21_root / "diagnostics", split_domains)
-            if problems and args.strict_join_policy and not args.allow_bootstrap:
-                raise SystemExit(
-                    "Strict join policy enforcement failed: bootstrap/non-ok join keys detected. "
-                    "Run run_extract_all.py with --discover-join-policy and --apply-join-policy (or provide --join-policy). "
-                    f"See diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}"
-                )
-            if problems and args.allow_bootstrap:
-                sys.stderr.write("\n" + "!" * 80 + "\n")
-                sys.stderr.write("[WARN extract_all] --allow-bootstrap enabled; proceeding with bootstrap/non-ok join keys.\n")
-                sys.stderr.write(f"[WARN extract_all] Diagnostics: {v21_root / 'diagnostics' / 'join_policy_gate_diagnostics.csv'}\n")
-                sys.stderr.write("!" * 80 + "\n\n")
-
+        if use_phase0_dir and require_join_policy:
+            _enforce_policy_gate(_read_csv_rows(phase0_records_csv), v21_root / "diagnostics", split_domains, allow_sig_hash_join_key)
         for split_domain in split_domains:
-            split_out = v21_split_root / split_domain
-            cmd_split = [
-                sys.executable,
-                "tools/run_split_detection_all.py",
-                str(exports_dir),
-                "--domain",
-                split_domain,
-                "--out-root",
-                str(split_out),
-                "--mode",
-                str(args.mode),
-                *(['--phase0-dir', str(v21_phase0_dir)] if use_phase0_dir else []),
-                *( ['--allow-bootstrap'] if args.allow_bootstrap else []),
-            ]
-            report["commands"].append({"phase": "v21", "step": "split_analysis", "domain": split_domain, "cmd": cmd_split})
+            cmd_split = [sys.executable, "tools/run_split_detection_all.py", str(exports_dir), "--domain", split_domain, "--out-root", str(v21_split_root / split_domain), "--mode", str(args.mode), *(["--phase0-dir", str(v21_phase0_dir)] if use_phase0_dir else []), *(["--allow-sig-hash-join-key"] if allow_sig_hash_join_key else [])]
+            report["commands"].append({"stage": "split", "domain": split_domain, "cmd": cmd_split})
             _run(cmd_split, env=env)
 
     report_path = out_root / "extract_all.report.json"
     with report_path.open("w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, sort_keys=True)
-
     print(f"Wrote: {report_path}")
 
 

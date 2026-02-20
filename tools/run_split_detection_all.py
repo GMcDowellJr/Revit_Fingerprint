@@ -34,7 +34,7 @@ def _write_csv(path: Path, fieldnames: List[str], rows: List[Dict[str, str]]) ->
 
 
 
-def _validate_join_policy_ready(phase0_dir: str | None, domain: str, allow_bootstrap: bool) -> None:
+def _validate_join_policy_ready(phase0_dir: str | None, domain: str, allow_sig_hash_join_key: bool) -> None:
     if not phase0_dir:
         return
     rec_csv = Path(phase0_dir) / "phase0_records.csv"
@@ -44,7 +44,7 @@ def _validate_join_policy_ready(phase0_dir: str | None, domain: str, allow_boots
     bad = [
         r
         for r in rows
-        if (r.get("join_key_schema", "").strip() == "bootstrap.sig_hash.v1")
+        if (r.get("join_key_schema", "").strip() == "sig_hash_as_join_key.v1")
         or (r.get("join_key_status", "").strip() != "ok")
     ]
     diag_rows = [
@@ -54,7 +54,7 @@ def _validate_join_policy_ready(phase0_dir: str | None, domain: str, allow_boots
             "record_pk": r.get("record_pk", ""),
             "join_key_schema": r.get("join_key_schema", ""),
             "join_key_status": r.get("join_key_status", ""),
-            "reason": "bootstrap_schema" if r.get("join_key_schema", "").strip() == "bootstrap.sig_hash.v1" else "non_ok_status",
+            "reason": "bootstrap_schema" if r.get("join_key_schema", "").strip() == "sig_hash_as_join_key.v1" else "non_ok_status",
         }
         for r in bad
     ]
@@ -64,14 +64,14 @@ def _validate_join_policy_ready(phase0_dir: str | None, domain: str, allow_boots
         ["domain", "file_id", "record_pk", "join_key_schema", "join_key_status", "reason"],
         sorted(diag_rows, key=lambda x: (x["domain"], x["file_id"], x["record_pk"])),
     )
-    if bad and not allow_bootstrap:
+    if bad and not allow_sig_hash_join_key:
         raise SystemExit(
-            "join_hash bootstrap/non-ok rows detected. Run run_extract_all.py with --discover-join-policy and --apply-join-policy (or provide --join-policy). "
+            "Join-policy gate failed: identity-mode join keys detected (join_key_schema=sig_hash_as_join_key.v1 or join_key_status!=ok). Re-run with run_extract_all.py --stages flatten,discover,apply,split or with --apply-join-policy alias, or use --allow-sig-hash-join-key for degraded exploratory analysis. "
             f"Diagnostics: {diag_path}"
         )
-    if bad and allow_bootstrap:
+    if bad and allow_sig_hash_join_key:
         sys.stderr.write("\n" + "!" * 80 + "\n")
-        sys.stderr.write("[WARN split_detection] --allow-bootstrap enabled; proceeding with bootstrap/non-ok join keys.\n")
+        sys.stderr.write("[WARN split_detection] --allow-sig-hash-join-key enabled; proceeding with DEGRADED identity-mode join keys.\n")
         sys.stderr.write(f"[WARN split_detection] Diagnostics: {diag_path}\n")
         sys.stderr.write("!" * 80 + "\n\n")
 
@@ -277,12 +277,12 @@ def run_split_detection_workflow(
     run_calibration: bool = False,
     run_pareto: bool = False,
     phase0_dir: str | None = None,
-    allow_bootstrap: bool = False,
+    allow_sig_hash_join_key: bool = False,
     analysis_dir: str | None = None,
 ) -> None:
     """Run complete split detection workflow."""
     
-    _validate_join_policy_ready(phase0_dir, domain, allow_bootstrap)
+    _validate_join_policy_ready(phase0_dir, domain, allow_sig_hash_join_key)
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
     
@@ -533,13 +533,20 @@ def main() -> None:
         help="Run optional Phase 2F pareto refinement step"
     )
     parser.add_argument(
+        '--allow-sig-hash-join-key',
+        action='store_true',
+        help='Allow DEGRADED identity-mode join keys (sig_hash_as_join_key.v1 / non-ok status).',
+    )
+    parser.add_argument(
         '--allow-bootstrap',
         action='store_true',
-        help='Allow bootstrap.sig_hash.v1 / non-ok join keys (warn loudly).',
+        help='Deprecated alias for --allow-sig-hash-join-key.',
     )
     
     args = parser.parse_args()
-    
+    if args.allow_bootstrap:
+        sys.stderr.write("[WARN split_detection] Deprecated alias: use --allow-sig-hash-join-key instead of --allow-bootstrap.\n")
+
     run_split_detection_workflow(
         exports_dir=args.exports_dir,
         phase0_dir=args.phase0_dir,
@@ -551,7 +558,7 @@ def main() -> None:
         run_calibration=args.run_calibration,
         run_pareto=args.run_pareto,
         analysis_dir=args.analysis_dir,
-        allow_bootstrap=args.allow_bootstrap,
+        allow_sig_hash_join_key=(args.allow_sig_hash_join_key or args.allow_bootstrap),
     )
 
 

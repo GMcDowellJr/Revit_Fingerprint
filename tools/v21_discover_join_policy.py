@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 from pathlib import Path
 from typing import Dict, List
@@ -42,19 +43,60 @@ def _write_csv(path: Path, fields: List[str], rows: List[Dict[str, str]]) -> Non
             w.writerow({k: r.get(k, "") for k in fields})
 
 
+def _sample_domain_records(records: List[Dict[str, str]], sample_size: int, seed: int) -> List[Dict[str, str]]:
+    if sample_size <= 0 or len(records) <= sample_size:
+        return records
+
+    def _rank(row: Dict[str, str]) -> str:
+        key = row.get("record_pk", "") or row.get("record_id", "") or row.get("file_id", "")
+        return hashlib.sha1(f"{seed}|{key}".encode("utf-8")).hexdigest()
+
+    ranked = sorted(records, key=lambda r: (_rank(r), r.get("record_pk", "")))
+    return ranked[:sample_size]
+
+
+
+
+def _pick_candidate_fields(items: List[Dict[str, str]], max_fields: int) -> List[str]:
+    counts: Dict[str, int] = {}
+    for it in items:
+        k = it.get("item_key", "").strip()
+        if not k:
+            continue
+        counts[k] = counts.get(k, 0) + 1
+    fields = sorted(counts.keys(), key=lambda k: (-counts[k], k.lower()))
+    if max_fields > 0 and len(fields) > max_fields:
+        return fields[:max_fields]
+    return fields
+
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Discover v2.1 join-key policy from Phase0 identity components.")
-    ap.add_argument("--phase0-dir", default="Results_v21/phase0_v21")
-    ap.add_argument("--out-policy", default="Results_v21/policies/domain_join_key_policies.v21.json")
+    ap = argparse.ArgumentParser(
+        description=(
+            "Discover stage (T1): derive per-domain candidate join-key policy from flatten (T0) identity components."
+        )
+    )
+    ap.add_argument("--phase0-dir", default="Results_v21/phase0_v21", help="Flatten output directory (default: Results_v21/phase0_v21).")
+    ap.add_argument("--out-policy", default="Results_v21/policies/domain_join_key_policies.v21.json", help="Output policy JSON path.")
     ap.add_argument("--domains", default=None)
     ap.add_argument("--mode", choices=("auto", "greedy", "pareto"), default="auto")
+    ap.add_argument(
+        "--sample-size",
+        type=int,
+        default=5000,
+        help=(
+            "Max records per domain for discovery evaluation (default: 5000). "
+            "Use a lower value for noisy/high-volume domains like fill_patterns. Set <=0 to disable sampling."
+        ),
+    )
+    ap.add_argument("--sample-seed", type=int, default=17, help="Seed for deterministic per-domain sampling (default: 17).")
+    ap.add_argument("--max-candidate-fields", type=int, default=64, help="Max candidate identity fields per domain after frequency ranking (default: 64; <=0 disables cap).")
     ap.add_argument("--warn-only", action="store_true")
     args = ap.parse_args()
 
     phase0_dir = Path(args.phase0_dir)
     records = _read_csv(phase0_dir / "phase0_records.csv")
     items = _read_csv(phase0_dir / "phase0_identity_items.csv")
-    identity_index = build_identity_index(items)
 
     domains = sorted({r.get("domain", "").strip() for r in records if r.get("domain", "").strip()}, key=str.lower)
     if args.domains:
@@ -65,14 +107,37 @@ def main() -> None:
     report_rows: List[Dict[str, str]] = []
     failures: List[str] = []
 
-    for domain in domains:
-        dom_records = [r for r in records if r.get("domain") == domain]
-        candidate_fields = sorted({it.get("item_key", "").strip() for it in items if it.get("domain") == domain and it.get("item_key", "").strip()}, key=str.lower)
+    print(f"[discover] loaded records={len(records)} identity_items={len(items)} domains={len(domains)} mode={args.mode}", flush=True)
+
+    for i, domain in enumerate(domains, start=1):
+        print(f"[discover] [{i}/{len(domains)}] evaluating domain={domain}", flush=True)
+        dom_records_all = [r for r in records if r.get("domain") == domain]
+        dom_records = _sample_domain_records(dom_records_all, int(args.sample_size), int(args.sample_seed))
+        if len(dom_records) < len(dom_records_all):
+            print(
+                f"[discover] [{i}/{len(domains)}] sampled {len(dom_records)} of {len(dom_records_all)} records "
+                f"(sample_size={args.sample_size}, seed={args.sample_seed})",
+                flush=True,
+            )
+        sampled_pks = {r.get("record_pk", "").strip() for r in dom_records if r.get("record_pk", "").strip()}
+        dom_items = [
+            it for it in items
+            if it.get("domain") == domain and (not sampled_pks or it.get("record_pk", "").strip() in sampled_pks)
+        ]
+        candidate_fields_all = _pick_candidate_fields(dom_items, 0)
+        candidate_fields = _pick_candidate_fields(dom_items, int(args.max_candidate_fields))
+        if int(args.max_candidate_fields) > 0 and len(candidate_fields) < len(candidate_fields_all):
+            print(
+                f"[discover] [{i}/{len(domains)}] candidate fields capped to {len(candidate_fields)} of {len(candidate_fields_all)} "
+                f"(max_candidate_fields={args.max_candidate_fields})",
+                flush=True,
+            )
         if not candidate_fields:
             failures.append(domain)
             report_rows.append({"domain": domain, "method_used": "none", "selected_fields": "", "coverage": "0", "collision_rate": "1", "needs_pareto_reason": "no_candidate_fields", "top_alternates": ""})
             continue
 
+        identity_index = build_identity_index(dom_items)
         greedy = discover_greedy(dom_records, identity_index, candidate_fields, {"max_k": 4})
         chosen = greedy
         method = "greedy"
@@ -116,8 +181,11 @@ def main() -> None:
             "needs_pareto_reason": "|".join(greedy.get("needs_pareto_reasons", [])),
             "top_alternates": " || ".join(a for a in alts if a),
         })
+        print(f"[discover] [{i}/{len(domains)}] selected={'|'.join(sel)} method={method}", flush=True)
 
     out_policy = Path(args.out_policy)
+    print(f"[discover] using flatten dir: {phase0_dir}")
+    print(f"[discover] writing policy: {out_policy}")
     out_policy.parent.mkdir(parents=True, exist_ok=True)
     out_policy.write_text(json.dumps(policies, indent=2, sort_keys=True), encoding="utf-8")
 
@@ -127,6 +195,8 @@ def main() -> None:
         sorted(report_rows, key=lambda r: r["domain"].lower()),
     )
 
+    if failures:
+        print(f"[discover] domains without discovered policy: {','.join(sorted(failures))}", flush=True)
     if failures and not args.warn_only:
         raise SystemExit(f"Failed to discover policies for domains: {','.join(sorted(failures))}")
 
