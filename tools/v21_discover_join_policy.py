@@ -69,7 +69,10 @@ def main() -> None:
     report_rows: List[Dict[str, str]] = []
     failures: List[str] = []
 
-    for domain in domains:
+    print(f"[discover] loaded records={len(records)} identity_items={len(items)} domains={len(domains)} mode={args.mode}", flush=True)
+
+    for i, domain in enumerate(domains, start=1):
+        print(f"[discover] [{i}/{len(domains)}] evaluating domain={domain}", flush=True)
         dom_records = [r for r in records if r.get("domain") == domain]
         candidate_fields = sorted({it.get("item_key", "").strip() for it in items if it.get("domain") == domain and it.get("item_key", "").strip()}, key=str.lower)
         if not candidate_fields:
@@ -120,6 +123,7 @@ def main() -> None:
             "needs_pareto_reason": "|".join(greedy.get("needs_pareto_reasons", [])),
             "top_alternates": " || ".join(a for a in alts if a),
         })
+        print(f"[discover] [{i}/{len(domains)}] selected={'|'.join(sel)} method={method}", flush=True)
 
     out_policy = Path(args.out_policy)
     print(f"[discover] using flatten dir: {phase0_dir}")
@@ -133,6 +137,8 @@ def main() -> None:
         sorted(report_rows, key=lambda r: r["domain"].lower()),
     )
 
+    if failures:
+        print(f"[discover] domains without discovered policy: {','.join(sorted(failures))}", flush=True)
     if failures and not args.warn_only:
         raise SystemExit(f"Failed to discover policies for domains: {','.join(sorted(failures))}")
 

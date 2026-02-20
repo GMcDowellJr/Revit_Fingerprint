@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -55,7 +56,10 @@ def _ensure_dir(p: Path) -> None:
 
 
 def _run(cmd: List[str], *, env: Dict[str, str]) -> None:
+    start = time.time()
+    print(f"[extract_all] RUN: {' '.join(cmd)}", flush=True)
     subprocess.run(cmd, check=True, env=env)
+    print(f"[extract_all] DONE ({time.time() - start:.1f}s): {cmd[1] if len(cmd) > 1 else cmd[0]}", flush=True)
 
 
 def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
@@ -358,11 +362,14 @@ def main() -> None:
     record_rows: List[Dict[str, str]] = []
 
     if "flatten" in selected_stages:
+        print("[extract_all] Stage flatten (T0): emitting flatten outputs...", flush=True)
         _ensure_dir(v21_phase0_dir)
         report["commands"].append({"stage": "flatten", "out": str(v21_phase0_dir)})
         meta_rows, record_rows = emit_phase0_v21(exports_dir, v21_phase0_dir, file_id_mode="basename")
+        print(f"[extract_all] Stage flatten complete: rows={len(record_rows)} files={len(meta_rows)} out={v21_phase0_dir}", flush=True)
 
     if "discover" in selected_stages:
+        print("[extract_all] Stage discover (T1): deriving join policy candidates...", flush=True)
         discover_out = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json")
         cmd_discover = [sys.executable, "tools/v21_discover_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--out-policy", str(discover_out)]
         report["commands"].append({"stage": "discover", "cmd": cmd_discover})
@@ -370,6 +377,7 @@ def main() -> None:
         args.join_policy = str(discover_out)
 
     if "apply" in selected_stages:
+        print("[extract_all] Stage apply (T2): applying join policy to flatten outputs...", flush=True)
         policy_path = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json").resolve()
         cmd_apply = [sys.executable, "tools/v21_apply_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--join-policy", str(policy_path)]
         report["commands"].append({"stage": "apply", "cmd": cmd_apply})
@@ -426,6 +434,7 @@ def main() -> None:
             split_domains = [d.strip() for d in str(args.split_domains).split(",") if d.strip()]
 
     if split_domains:
+        print(f"[extract_all] Stage split: running split detection for {len(split_domains)} domain(s)...", flush=True)
         _ensure_dir(v21_split_root)
         phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
         use_phase0_dir = phase0_records_csv.is_file()
