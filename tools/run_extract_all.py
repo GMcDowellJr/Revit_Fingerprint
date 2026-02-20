@@ -349,7 +349,6 @@ def main() -> None:
     v21_split_root = v21_root / "split_analysis"
 
     _ensure_dir(out_root)
-    _ensure_dir(phase2_root)
     surfaces = _detect_surfaces(exports_dir)
 
     if args.domains and str(args.domains).strip():
@@ -417,6 +416,7 @@ def main() -> None:
             _run([sys.executable, "tools/phase1_pairwise_analysis.py", "--baseline-coverage", str(phase1_dir / "baseline_coverage_by_project.csv"), "--out-dir", str(phase1_dir)], env=env)
 
     if "analyze2" in selected_stages and args.emit_legacy:
+        _ensure_dir(phase2_root)
         for dom in domains:
             dom_out = phase2_root / dom
             _ensure_dir(dom_out)
