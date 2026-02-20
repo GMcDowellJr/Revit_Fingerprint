@@ -290,6 +290,7 @@ def main() -> None:
     ap.add_argument("--mode", choices=("allpairs", "candidates"), default="allpairs", help="File-level split detection mode.")
     ap.add_argument("--discover-sample-size", type=int, default=5000, help="Max records per domain for discover stage (default: 5000; set <=0 to disable sampling).")
     ap.add_argument("--discover-sample-seed", type=int, default=17, help="Deterministic sampling seed for discover stage (default: 17).")
+    ap.add_argument("--discover-max-candidate-fields", type=int, default=64, help="Max candidate fields per domain for discover stage (default: 64; <=0 disables cap).")
     args = ap.parse_args()
 
     for alias, repl, used in [
@@ -373,7 +374,7 @@ def main() -> None:
     if "discover" in selected_stages:
         print("[extract_all] Stage discover (T1): deriving join policy candidates...", flush=True)
         discover_out = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json")
-        cmd_discover = [sys.executable, "tools/v21_discover_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--out-policy", str(discover_out), "--sample-size", str(args.discover_sample_size), "--sample-seed", str(args.discover_sample_seed)]
+        cmd_discover = [sys.executable, "tools/v21_discover_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--out-policy", str(discover_out), "--sample-size", str(args.discover_sample_size), "--sample-seed", str(args.discover_sample_seed), "--max-candidate-fields", str(args.discover_max_candidate_fields)]
         report["commands"].append({"stage": "discover", "cmd": cmd_discover})
         _run(cmd_discover, env=env)
         args.join_policy = str(discover_out)

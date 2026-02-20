@@ -55,6 +55,21 @@ def _sample_domain_records(records: List[Dict[str, str]], sample_size: int, seed
     return ranked[:sample_size]
 
 
+
+
+def _pick_candidate_fields(items: List[Dict[str, str]], max_fields: int) -> List[str]:
+    counts: Dict[str, int] = {}
+    for it in items:
+        k = it.get("item_key", "").strip()
+        if not k:
+            continue
+        counts[k] = counts.get(k, 0) + 1
+    fields = sorted(counts.keys(), key=lambda k: (-counts[k], k.lower()))
+    if max_fields > 0 and len(fields) > max_fields:
+        return fields[:max_fields]
+    return fields
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=(
@@ -75,13 +90,13 @@ def main() -> None:
         ),
     )
     ap.add_argument("--sample-seed", type=int, default=17, help="Seed for deterministic per-domain sampling (default: 17).")
+    ap.add_argument("--max-candidate-fields", type=int, default=64, help="Max candidate identity fields per domain after frequency ranking (default: 64; <=0 disables cap).")
     ap.add_argument("--warn-only", action="store_true")
     args = ap.parse_args()
 
     phase0_dir = Path(args.phase0_dir)
     records = _read_csv(phase0_dir / "phase0_records.csv")
     items = _read_csv(phase0_dir / "phase0_identity_items.csv")
-    identity_index = build_identity_index(items)
 
     domains = sorted({r.get("domain", "").strip() for r in records if r.get("domain", "").strip()}, key=str.lower)
     if args.domains:
@@ -104,12 +119,25 @@ def main() -> None:
                 f"(sample_size={args.sample_size}, seed={args.sample_seed})",
                 flush=True,
             )
-        candidate_fields = sorted({it.get("item_key", "").strip() for it in items if it.get("domain") == domain and it.get("item_key", "").strip()}, key=str.lower)
+        sampled_pks = {r.get("record_pk", "").strip() for r in dom_records if r.get("record_pk", "").strip()}
+        dom_items = [
+            it for it in items
+            if it.get("domain") == domain and (not sampled_pks or it.get("record_pk", "").strip() in sampled_pks)
+        ]
+        candidate_fields_all = _pick_candidate_fields(dom_items, 0)
+        candidate_fields = _pick_candidate_fields(dom_items, int(args.max_candidate_fields))
+        if int(args.max_candidate_fields) > 0 and len(candidate_fields) < len(candidate_fields_all):
+            print(
+                f"[discover] [{i}/{len(domains)}] candidate fields capped to {len(candidate_fields)} of {len(candidate_fields_all)} "
+                f"(max_candidate_fields={args.max_candidate_fields})",
+                flush=True,
+            )
         if not candidate_fields:
             failures.append(domain)
             report_rows.append({"domain": domain, "method_used": "none", "selected_fields": "", "coverage": "0", "collision_rate": "1", "needs_pareto_reason": "no_candidate_fields", "top_alternates": ""})
             continue
 
+        identity_index = build_identity_index(dom_items)
         greedy = discover_greedy(dom_records, identity_index, candidate_fields, {"max_k": 4})
         chosen = greedy
         method = "greedy"
