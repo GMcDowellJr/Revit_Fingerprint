@@ -214,3 +214,77 @@ def test_discover_emits_legacy_compat_shape_and_lists(tmp_path: Path):
     assert dom["explicitly_excluded_items"] == ["dim_type.name"]
     assert dom["shape_gating"]["discriminator_key"] == "dim_type.shape"
     assert dom["gates"]["discriminator_key"] == "dim_type.shape"
+
+
+def test_validate_pareto_auto_bumps_max_k_for_required_items(tmp_path: Path):
+    phase0_dir = tmp_path / "Results_v21" / "phase0_v21"
+    records_path = phase0_dir / "phase0_records.csv"
+    items_path = phase0_dir / "phase0_identity_items.csv"
+    policy_path = tmp_path / "policy.json"
+
+    _write_csv(
+        records_path,
+        ["file_id", "domain", "record_pk", "sig_hash"],
+        [{"file_id": "f1", "domain": "text_types", "record_pk": "1", "sig_hash": "s1"}],
+    )
+    _write_csv(
+        items_path,
+        ["domain", "record_pk", "item_key", "item_value_type", "item_value"],
+        [
+            {"domain": "text_types", "record_pk": "1", "item_key": "text_type.font", "item_value_type": "str", "item_value": "Arial"},
+            {"domain": "text_types", "record_pk": "1", "item_key": "text_type.size_in", "item_value_type": "num", "item_value": "0.1"},
+            {"domain": "text_types", "record_pk": "1", "item_key": "text_type.bold", "item_value_type": "bool", "item_value": "FALSE"},
+            {"domain": "text_types", "record_pk": "1", "item_key": "text_type.italic", "item_value_type": "bool", "item_value": "FALSE"},
+            {"domain": "text_types", "record_pk": "1", "item_key": "text_type.underline", "item_value_type": "bool", "item_value": "FALSE"},
+            {"domain": "text_types", "record_pk": "1", "item_key": "text_type.color_rgb", "item_value_type": "str", "item_value": "0-0-0"},
+            {"domain": "text_types", "record_pk": "1", "item_key": "text_type.width_factor", "item_value_type": "num", "item_value": "1"},
+        ],
+    )
+
+    policy = {
+        "domains": {
+            "text_types": {
+                "required_items": [
+                    "text_type.font",
+                    "text_type.size_in",
+                    "text_type.bold",
+                    "text_type.italic",
+                    "text_type.underline",
+                    "text_type.color_rgb",
+                    "text_type.width_factor",
+                ],
+                "optional_items": [],
+                "explicitly_excluded_items": [],
+            }
+        }
+    }
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+    subprocess.run(
+        [
+            sys.executable,
+            "tools/v21_discover_join_policy.py",
+            "--phase0-dir",
+            str(phase0_dir),
+            "--domains",
+            "text_types",
+            "--policy-json",
+            str(policy_path),
+            "--policy-modes",
+            "validate",
+            "--search-modes",
+            "pareto",
+            "--warn-only",
+        ],
+        check=True,
+        cwd=Path(__file__).resolve().parents[1],
+    )
+
+    validate_csv = phase0_dir.parent / "diagnostics" / "join_key_validate.csv"
+    with validate_csv.open("r", encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows
+    row = rows[0]
+    assert row["domain"] == "text_types"
+    assert row["search_mode"] == "pareto"
+    assert row["status"] == "ok"

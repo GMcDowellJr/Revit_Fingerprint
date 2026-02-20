@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Dict, List, Sequence
 
 try:
-    from tools.join_key_discovery.eval import build_identity_index, normalize_policy_block
+    from tools.join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate
     from tools.join_key_discovery.greedy import discover_greedy
 except ModuleNotFoundError:
-    from join_key_discovery.eval import build_identity_index, normalize_policy_block
+    from join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate
     from join_key_discovery.greedy import discover_greedy
 
 
@@ -99,6 +99,7 @@ def main() -> None:
     ap.add_argument("--sample-size", type=int, default=5000)
     ap.add_argument("--sample-seed", type=int, default=17)
     ap.add_argument("--max-candidate-fields", type=int, default=64)
+    ap.add_argument("--max-k", type=int, default=4, help="Max subset size for Pareto search (validate mode auto-bumps to required count).")
     ap.add_argument("--base-policy", default=None, help="Optional policy to preserve metadata/shape gates when writing out-policy.")
     ap.add_argument("--warn-only", action="store_true")
     args = ap.parse_args()
@@ -162,7 +163,10 @@ def main() -> None:
                 report_rows.append({"domain": domain, "policy_mode": policy_mode, "search_mode": "n/a", "status": "no_candidates", "selected_fields": "", "coverage": "0", "collision_rate": "1", "fragmentation_rate": "1", "required_fields": "|".join(req), "optional_items": "|".join(opt), "excluded_items": "|".join(sorted(excluded))})
                 continue
 
-            cfg = {"max_k": 4, "gates": {"required_fields": req, **gates}}
+            max_k = int(args.max_k)
+            if policy_mode == "validate" and req:
+                max_k = max(max_k, len(req))
+            cfg = {"max_k": max_k, "gates": {"required_fields": req, **gates}}
             for search_mode in search_modes:
                 status = "ok"
                 selected: List[str] = []
@@ -177,6 +181,10 @@ def main() -> None:
                         chosen = sorted(frontier, key=lambda x: (x.get("collision_rate", 1.0), x.get("coverage_gap", 1.0), x.get("k_count", 99), x.get("keys", "")))[0]
                         selected = [x for x in str(chosen.get("keys", "")).split("|") if x]
                         metrics = chosen.get("metrics", {}) if isinstance(chosen.get("metrics"), dict) else {}
+                    elif policy_mode == "validate" and req:
+                        selected = list(req)
+                        metrics = score_candidate(dom_records, identity_index, selected, cfg)
+                        reason = "required_set_fallback"
                     else:
                         status = "blocked"
                         reason = "no_frontier"

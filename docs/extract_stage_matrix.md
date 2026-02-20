@@ -31,7 +31,7 @@ This matrix defines the explicit state-machine semantics used by `tools/run_extr
 | Operational commit (policy applied) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages flatten,discover,apply` |
 | Join-dependent analysis (safe default) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages flatten,discover,apply,split,analyze1,analyze2` |
 | Degraded exploratory analysis (explicitly unsafe for governance) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages flatten,discover,split --allow-sig-hash-join-key` |
-| Noisy discover domains (e.g., fill_patterns) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages discover --discover-sample-size 100 --discover-max-candidate-fields 20` |
+| Noisy discover domains (e.g., fill_patterns) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages discover --discover-sample-size 100 --discover-max-candidate-fields 20 --discover-policy-modes validate --discover-search-modes pareto` |
 
 ## Join-policy compatibility notes
 
