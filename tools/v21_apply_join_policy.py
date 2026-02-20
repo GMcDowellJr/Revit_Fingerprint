@@ -30,18 +30,24 @@ def _write_csv(path: Path, fields: List[str], rows: List[Dict[str, str]]) -> Non
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Apply v2.1 join-key policy and overwrite phase0_records.csv")
-    ap.add_argument("--phase0-dir", default="Results_v21/phase0_v21")
-    ap.add_argument("--join-policy", default="Results_v21/policies/domain_join_key_policies.v21.json")
+    ap = argparse.ArgumentParser(description="Apply stage (T2): apply discovered/provided policy and overwrite flatten output phase0_records.csv")
+    ap.add_argument("--phase0-dir", default="Results_v21/phase0_v21", help="Flatten output directory to update in place.")
+    ap.add_argument("--join-policy", default="Results_v21/policies/domain_join_key_policies.v21.json", help="Join policy JSON produced by discover stage.")
     args = ap.parse_args()
 
     phase0_dir = Path(args.phase0_dir)
+
+    policy_path = Path(args.join_policy).resolve()
+    print(f"[apply] using flatten dir: {phase0_dir}")
+    print(f"[apply] using policy: {policy_path}")
+    if not policy_path.exists():
+        raise SystemExit(f"Join policy not found: {policy_path}")
     records_path = phase0_dir / "phase0_records.csv"
     records = _read_csv(records_path)
     items = _read_csv(phase0_dir / "phase0_identity_items.csv")
     identity_index = build_identity_index(items)
 
-    policy = json.loads(Path(args.join_policy).read_text(encoding="utf-8"))
+    policy = json.loads(policy_path.read_text(encoding="utf-8"))
     dom_policies = policy.get("domains") if isinstance(policy, dict) else {}
     if not isinstance(dom_policies, dict):
         raise SystemExit("Invalid policy format: missing domains")
@@ -54,7 +60,7 @@ def main() -> None:
         p = dom_policies.get(domain)
         if not isinstance(p, dict):
             r["join_hash"] = r.get("join_hash", "")
-            r["join_key_schema"] = "bootstrap.sig_hash.v1"
+            r["join_key_schema"] = "sig_hash_as_join_key.v1"
             r["join_key_status"] = "missing_policy"
             r["join_key_policy_id"] = ""
             r["join_key_policy_version"] = ""

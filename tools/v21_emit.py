@@ -262,10 +262,10 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
                 record_ordinal = f"{i:06d}"
                 record_pk = f"{file_id}|{domain}|{record_ordinal}"
                 record_id = _safe_str(rec.get("record_id") or rec.get("id") or rec.get("name"))
-                # Day-1 bootstrap join regime:
+                # Day-1 identity-mode flatten join regime:
                 # - keep sig_hash as-is
                 # - set join_hash = sig_hash
-                # - set join_key_schema = bootstrap.sig_hash.v1
+                # - set join_key_schema = sig_hash_as_join_key.v1
                 sig_hash_v = _safe_str(rec.get("sig_hash") or (rec.get("identity_basis", {}) or {}).get("sig_hash"))
                 row = {
                     "schema_version": SCHEMA_VERSION,
@@ -279,7 +279,7 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
                     "identity_quality": _safe_str(rec.get("identity_quality")),
                     "sig_hash": sig_hash_v,
                     "join_hash": sig_hash_v,
-                    "join_key_schema": "bootstrap.sig_hash.v1",
+                    "join_key_schema": "sig_hash_as_join_key.v1",
                     "join_key_status": "bootstrap",
                     "join_key_policy_id": "",
                     "join_key_policy_version": "",

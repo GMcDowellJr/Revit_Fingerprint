@@ -43,9 +43,13 @@ def _write_csv(path: Path, fields: List[str], rows: List[Dict[str, str]]) -> Non
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Discover v2.1 join-key policy from Phase0 identity components.")
-    ap.add_argument("--phase0-dir", default="Results_v21/phase0_v21")
-    ap.add_argument("--out-policy", default="Results_v21/policies/domain_join_key_policies.v21.json")
+    ap = argparse.ArgumentParser(
+        description=(
+            "Discover stage (T1): derive per-domain candidate join-key policy from flatten (T0) identity components."
+        )
+    )
+    ap.add_argument("--phase0-dir", default="Results_v21/phase0_v21", help="Flatten output directory (default: Results_v21/phase0_v21).")
+    ap.add_argument("--out-policy", default="Results_v21/policies/domain_join_key_policies.v21.json", help="Output policy JSON path.")
     ap.add_argument("--domains", default=None)
     ap.add_argument("--mode", choices=("auto", "greedy", "pareto"), default="auto")
     ap.add_argument("--warn-only", action="store_true")
@@ -118,6 +122,8 @@ def main() -> None:
         })
 
     out_policy = Path(args.out_policy)
+    print(f"[discover] using flatten dir: {phase0_dir}")
+    print(f"[discover] writing policy: {out_policy}")
     out_policy.parent.mkdir(parents=True, exist_ok=True)
     out_policy.write_text(json.dumps(policies, indent=2, sort_keys=True), encoding="utf-8")
 
