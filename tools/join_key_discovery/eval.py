@@ -41,6 +41,7 @@ def normalize_policy_block(policy_block: Dict[str, Any] | None, fallback_selecte
     selected_fields = _listish(policy_block.get("selected_fields")) or fallback_selected
     required_fields = _listish(policy_block.get("required_fields")) or _listish(policy_block.get("required_items")) or list(selected_fields)
     optional_items = _listish(policy_block.get("optional_items"))
+    explicitly_excluded_items = _listish(policy_block.get("explicitly_excluded_items"))
 
     gates = dict(policy_block.get("gates") or {}) if isinstance(policy_block.get("gates"), dict) else {}
     legacy_shape = policy_block.get("shape_gating") if isinstance(policy_block.get("shape_gating"), dict) else {}
@@ -56,6 +57,7 @@ def normalize_policy_block(policy_block: Dict[str, Any] | None, fallback_selecte
         "selected_fields": selected_fields,
         "required_fields": required_fields,
         "optional_items": optional_items,
+        "explicitly_excluded_items": explicitly_excluded_items,
         "gates": gates,
     }
 

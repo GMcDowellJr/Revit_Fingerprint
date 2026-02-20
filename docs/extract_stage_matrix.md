@@ -36,8 +36,9 @@ This matrix defines the explicit state-machine semantics used by `tools/run_extr
 ## Join-policy compatibility notes
 
 - v2.1 apply accepts both `required_fields` (native) and legacy `required_items` aliases when computing required keys.
-- v2.1 apply also supports shape-gated requirements through `gates` and legacy `shape_gating` blocks (`discriminator_key` + per-shape `additional_required`).
-- Discover remains schema-compatible and can preserve existing gate blocks when `--base-policy` is provided.
+- `optional_items` are preserved for compatibility/forensics and are **not** equivalent to required join keys (`selected_fields`/effective required set).
+- v2.1 apply supports shape-gated requirements through both `gates` and legacy `shape_gating` blocks (`discriminator_key` + per-shape `additional_required`).
+- Discover remains schema-compatible, can preserve existing gate blocks with `--base-policy`, and emits compatibility mirrors (`required_items`, `optional_items`, `explicitly_excluded_items`, and `shape_gating` when gates exist).
 
 ## Backward-compatible alias matrix
 

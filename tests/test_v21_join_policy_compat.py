@@ -134,3 +134,77 @@ def test_apply_diagnostics_include_discriminator_context(tmp_path: Path):
     assert failures[0]["discriminator_key"] == "dim_type.shape"
     assert failures[0]["discriminator_value"] == "Radial"
     assert failures[0]["missing_keys"] == "dim_type.center_mark_size"
+
+
+def test_optional_items_not_required_or_selected_by_default():
+    policy = {
+        "required_items": ["a"],
+        "optional_items": ["b"],
+    }
+    norm = normalize_policy_block(policy)
+    assert norm["required_fields"] == ["a"]
+    assert norm["selected_fields"] == []
+    assert norm["optional_items"] == ["b"]
+
+
+def test_discover_emits_legacy_compat_shape_and_lists(tmp_path: Path):
+    phase0_dir = tmp_path / "Results_v21" / "phase0_v21"
+    records_path = phase0_dir / "phase0_records.csv"
+    items_path = phase0_dir / "phase0_identity_items.csv"
+    base_policy_path = tmp_path / "base_policy.json"
+    out_policy_path = tmp_path / "out_policy.json"
+
+    _write_csv(
+        records_path,
+        ["file_id", "domain", "record_pk", "sig_hash"],
+        [{"file_id": "f", "domain": "dimension_types", "record_pk": "1", "sig_hash": "s1"}],
+    )
+    _write_csv(
+        items_path,
+        ["domain", "record_pk", "item_key", "item_value_type", "item_value"],
+        [
+            {"domain": "dimension_types", "record_pk": "1", "item_key": "dim_type.shape", "item_value_type": "str", "item_value": "Linear"},
+            {"domain": "dimension_types", "record_pk": "1", "item_key": "dim_type.type_name", "item_value_type": "str", "item_value": "L1"},
+        ],
+    )
+
+    base = {
+        "domains": {
+            "dimension_types": {
+                "optional_items": ["dim_type.center_mark_size"],
+                "explicitly_excluded_items": ["dim_type.name"],
+                "shape_gating": {
+                    "discriminator_key": "dim_type.shape",
+                    "shape_requirements": {"Radial": {"additional_required": ["dim_type.center_mark_size"], "additional_optional": []}},
+                    "default_shape_behavior": "common_only",
+                },
+            }
+        }
+    }
+    base_policy_path.write_text(json.dumps(base), encoding="utf-8")
+
+    subprocess.run(
+        [
+            sys.executable,
+            "tools/v21_discover_join_policy.py",
+            "--phase0-dir",
+            str(phase0_dir),
+            "--out-policy",
+            str(out_policy_path),
+            "--domains",
+            "dimension_types",
+            "--base-policy",
+            str(base_policy_path),
+            "--warn-only",
+        ],
+        check=True,
+        cwd=Path(__file__).resolve().parents[1],
+    )
+
+    out = json.loads(out_policy_path.read_text(encoding="utf-8"))
+    dom = out["domains"]["dimension_types"]
+    assert dom["required_items"] == dom["required_fields"]
+    assert dom["optional_items"] == ["dim_type.center_mark_size"]
+    assert dom["explicitly_excluded_items"] == ["dim_type.name"]
+    assert dom["shape_gating"]["discriminator_key"] == "dim_type.shape"
+    assert dom["gates"]["discriminator_key"] == "dim_type.shape"

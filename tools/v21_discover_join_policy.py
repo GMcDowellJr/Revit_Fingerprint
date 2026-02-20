@@ -70,6 +70,18 @@ def _pick_candidate_fields(items: List[Dict[str, str]], max_fields: int) -> List
     return fields
 
 
+
+
+def _to_legacy_shape_gating(gates: Dict[str, object]) -> Dict[str, object]:
+    if not isinstance(gates, dict) or not gates:
+        return {}
+    return {
+        "discriminator_key": gates.get("discriminator_key"),
+        "shape_requirements": gates.get("shape_requirements") if isinstance(gates.get("shape_requirements"), dict) else {},
+        "default_shape_behavior": gates.get("default_shape_behavior") or "common_only",
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=(
@@ -178,14 +190,30 @@ def main() -> None:
                 "shape_requirements": existing["shape_gating"].get("shape_requirements"),
                 "default_shape_behavior": existing["shape_gating"].get("default_shape_behavior"),
             }
-        policies["domains"][domain] = {
+        optional_items = existing.get("optional_items") if isinstance(existing.get("optional_items"), list) else []
+        explicitly_excluded_items = existing.get("explicitly_excluded_items") if isinstance(existing.get("explicitly_excluded_items"), list) else []
+        notes = existing.get("notes") if isinstance(existing.get("notes"), list) else []
+        join_key_schema = str(existing.get("join_key_schema") or f"{domain}.join_key.v21")
+        hash_alg = str(existing.get("hash_alg") or "md5_utf8_join_pipe")
+        policy_row = {
             "policy_id": policy_id,
             "policy_version": "1",
             "selected_fields": sel,
             "required_fields": sel,
+            "required_items": sel,
+            "optional_items": optional_items,
+            "explicitly_excluded_items": explicitly_excluded_items,
             "gates": gates,
             "method_used": method,
+            "join_key_schema": join_key_schema,
+            "hash_alg": hash_alg,
         }
+        legacy_shape_gating = _to_legacy_shape_gating(gates)
+        if legacy_shape_gating:
+            policy_row["shape_gating"] = legacy_shape_gating
+        if notes:
+            policy_row["notes"] = notes
+        policies["domains"][domain] = policy_row
         metrics = chosen.get("metrics", {})
         alts = [x.get("keys") or "|".join(x.get("selected_fields", [])) for x in frontier[:3]]
         if not alts:
