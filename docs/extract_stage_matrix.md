@@ -33,6 +33,12 @@ This matrix defines the explicit state-machine semantics used by `tools/run_extr
 | Degraded exploratory analysis (explicitly unsafe for governance) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages flatten,discover,split --allow-sig-hash-join-key` |
 | Noisy discover domains (e.g., fill_patterns) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages discover --discover-sample-size 100 --discover-max-candidate-fields 20` |
 
+## Join-policy compatibility notes
+
+- v2.1 apply accepts both `required_fields` (native) and legacy `required_items` aliases when computing required keys.
+- v2.1 apply also supports shape-gated requirements through `gates` and legacy `shape_gating` blocks (`discriminator_key` + per-shape `additional_required`).
+- Discover remains schema-compatible and can preserve existing gate blocks when `--base-policy` is provided.
+
 ## Backward-compatible alias matrix
 
 | Preferred flag | Deprecated alias | Current behavior |

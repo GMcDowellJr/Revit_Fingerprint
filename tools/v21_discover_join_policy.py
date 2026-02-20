@@ -91,6 +91,7 @@ def main() -> None:
     )
     ap.add_argument("--sample-seed", type=int, default=17, help="Seed for deterministic per-domain sampling (default: 17).")
     ap.add_argument("--max-candidate-fields", type=int, default=64, help="Max candidate identity fields per domain after frequency ranking (default: 64; <=0 disables cap).")
+    ap.add_argument("--base-policy", default=None, help="Optional existing policy JSON; preserves existing gates/shape_gating when rediscovering.")
     ap.add_argument("--warn-only", action="store_true")
     args = ap.parse_args()
 
@@ -102,6 +103,15 @@ def main() -> None:
     if args.domains:
         allow = {d.strip() for d in str(args.domains).split(",") if d.strip()}
         domains = [d for d in domains if d in allow]
+
+    base_domains: Dict[str, Dict[str, object]] = {}
+    if args.base_policy:
+        base_path = Path(args.base_policy)
+        if base_path.exists():
+            base_loaded = json.loads(base_path.read_text(encoding="utf-8"))
+            cand = base_loaded.get("domains") if isinstance(base_loaded, dict) else {}
+            if isinstance(cand, dict):
+                base_domains = {str(k): v for k, v in cand.items() if isinstance(v, dict)}
 
     policies = {"policy_version": "v21.1", "domains": {}}
     report_rows: List[Dict[str, str]] = []
@@ -160,12 +170,20 @@ def main() -> None:
             failures.append(domain)
             continue
         policy_id = f"{domain}.join_key.v21"
+        existing = base_domains.get(domain, {}) if isinstance(base_domains.get(domain, {}), dict) else {}
+        gates = existing.get("gates") if isinstance(existing.get("gates"), dict) else {}
+        if not gates and isinstance(existing.get("shape_gating"), dict):
+            gates = {
+                "discriminator_key": existing["shape_gating"].get("discriminator_key"),
+                "shape_requirements": existing["shape_gating"].get("shape_requirements"),
+                "default_shape_behavior": existing["shape_gating"].get("default_shape_behavior"),
+            }
         policies["domains"][domain] = {
             "policy_id": policy_id,
             "policy_version": "1",
             "selected_fields": sel,
             "required_fields": sel,
-            "gates": {},
+            "gates": gates,
             "method_used": method,
         }
         metrics = chosen.get("metrics", {})
