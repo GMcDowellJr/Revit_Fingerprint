@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 from pathlib import Path
 from typing import Dict, List
@@ -42,6 +43,18 @@ def _write_csv(path: Path, fields: List[str], rows: List[Dict[str, str]]) -> Non
             w.writerow({k: r.get(k, "") for k in fields})
 
 
+def _sample_domain_records(records: List[Dict[str, str]], sample_size: int, seed: int) -> List[Dict[str, str]]:
+    if sample_size <= 0 or len(records) <= sample_size:
+        return records
+
+    def _rank(row: Dict[str, str]) -> str:
+        key = row.get("record_pk", "") or row.get("record_id", "") or row.get("file_id", "")
+        return hashlib.sha1(f"{seed}|{key}".encode("utf-8")).hexdigest()
+
+    ranked = sorted(records, key=lambda r: (_rank(r), r.get("record_pk", "")))
+    return ranked[:sample_size]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=(
@@ -52,6 +65,16 @@ def main() -> None:
     ap.add_argument("--out-policy", default="Results_v21/policies/domain_join_key_policies.v21.json", help="Output policy JSON path.")
     ap.add_argument("--domains", default=None)
     ap.add_argument("--mode", choices=("auto", "greedy", "pareto"), default="auto")
+    ap.add_argument(
+        "--sample-size",
+        type=int,
+        default=5000,
+        help=(
+            "Max records per domain for discovery evaluation (default: 5000). "
+            "Use a lower value for noisy/high-volume domains like fill_patterns. Set <=0 to disable sampling."
+        ),
+    )
+    ap.add_argument("--sample-seed", type=int, default=17, help="Seed for deterministic per-domain sampling (default: 17).")
     ap.add_argument("--warn-only", action="store_true")
     args = ap.parse_args()
 
@@ -73,7 +96,14 @@ def main() -> None:
 
     for i, domain in enumerate(domains, start=1):
         print(f"[discover] [{i}/{len(domains)}] evaluating domain={domain}", flush=True)
-        dom_records = [r for r in records if r.get("domain") == domain]
+        dom_records_all = [r for r in records if r.get("domain") == domain]
+        dom_records = _sample_domain_records(dom_records_all, int(args.sample_size), int(args.sample_seed))
+        if len(dom_records) < len(dom_records_all):
+            print(
+                f"[discover] [{i}/{len(domains)}] sampled {len(dom_records)} of {len(dom_records_all)} records "
+                f"(sample_size={args.sample_size}, seed={args.sample_seed})",
+                flush=True,
+            )
         candidate_fields = sorted({it.get("item_key", "").strip() for it in items if it.get("domain") == domain and it.get("item_key", "").strip()}, key=str.lower)
         if not candidate_fields:
             failures.append(domain)
