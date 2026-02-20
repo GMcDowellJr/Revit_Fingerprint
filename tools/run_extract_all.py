@@ -276,6 +276,7 @@ def main() -> None:
     ap.add_argument("--discover-join-policy", action="store_true", help="Alias for including stage discover.")
     ap.add_argument("--apply-join-policy", action="store_true", help="Alias for including stage apply (operational commit path).")
     ap.add_argument("--join-policy", default=None, help="Policy JSON path used by apply stage.")
+    ap.add_argument("--domain-policy-json", default=None, help="Official domain policy JSON for discover validate/harsh exploration and apply fallback.")
     ap.add_argument("--require-join-policy", action=argparse.BooleanOptionalAction, default=True, help="Require policy-mode join keys for split/analyze stages (default: true).")
     ap.add_argument("--strict-join-policy", action="store_true", help="Deprecated alias for --require-join-policy.")
     ap.add_argument("--allow-sig-hash-join-key", action="store_true", help="Allow degraded identity-mode join keys (sig_hash_as_join_key.v1) for exploratory analysis.")
@@ -291,6 +292,9 @@ def main() -> None:
     ap.add_argument("--discover-sample-size", type=int, default=5000, help="Max records per domain for discover stage (default: 5000; set <=0 to disable sampling).")
     ap.add_argument("--discover-sample-seed", type=int, default=17, help="Deterministic sampling seed for discover stage (default: 17).")
     ap.add_argument("--discover-max-candidate-fields", type=int, default=64, help="Max candidate fields per domain for discover stage (default: 64; <=0 disables cap).")
+    ap.add_argument("--discover-search-modes", default="greedy,pareto", help="Comma-separated discover engines (default: greedy,pareto).")
+    ap.add_argument("--discover-policy-modes", default="discover,validate,harsh", help="Comma-separated policy strictness modes for exploration CSVs (default: discover,validate,harsh).")
+    ap.add_argument("--discover-emit-policy-json", action="store_true", help="Also emit discovered compatibility policy JSON (off by default; CSV exploration is primary).")
     args = ap.parse_args()
 
     for alias, repl, used in [
@@ -371,16 +375,36 @@ def main() -> None:
         print(f"[extract_all] Stage flatten complete: rows={len(record_rows)} files={len(meta_rows)} out={v21_phase0_dir}", flush=True)
 
     if "discover" in selected_stages:
-        print("[extract_all] Stage discover (T1): deriving join policy candidates...", flush=True)
+        print("[extract_all] Stage discover (T1): exploring join policy candidates (discover/validate/harsh CSVs)...", flush=True)
         discover_out = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json")
-        cmd_discover = [sys.executable, "tools/v21_discover_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--out-policy", str(discover_out), "--sample-size", str(args.discover_sample_size), "--sample-seed", str(args.discover_sample_seed), "--max-candidate-fields", str(args.discover_max_candidate_fields)]
+        cmd_discover = [
+            sys.executable,
+            "tools/v21_discover_join_policy.py",
+            "--phase0-dir",
+            str(v21_phase0_dir),
+            "--sample-size",
+            str(args.discover_sample_size),
+            "--sample-seed",
+            str(args.discover_sample_seed),
+            "--max-candidate-fields",
+            str(args.discover_max_candidate_fields),
+            "--search-modes",
+            str(args.discover_search_modes),
+            "--policy-modes",
+            str(args.discover_policy_modes),
+            "--warn-only",
+        ]
+        if args.domain_policy_json:
+            cmd_discover += ["--policy-json", str(Path(args.domain_policy_json).resolve()), "--base-policy", str(Path(args.domain_policy_json).resolve())]
+        if args.discover_emit_policy_json:
+            cmd_discover += ["--out-policy", str(discover_out)]
+            args.join_policy = str(discover_out)
         report["commands"].append({"stage": "discover", "cmd": cmd_discover})
         _run(cmd_discover, env=env)
-        args.join_policy = str(discover_out)
 
     if "apply" in selected_stages:
         print("[extract_all] Stage apply (T2): applying join policy to flatten outputs...", flush=True)
-        policy_path = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json").resolve()
+        policy_path = Path(args.join_policy).resolve() if args.join_policy else (Path(args.domain_policy_json).resolve() if args.domain_policy_json else (v21_root / "policies" / "domain_join_key_policies.v21.json").resolve())
         cmd_apply = [sys.executable, "tools/v21_apply_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--join-policy", str(policy_path)]
         report["commands"].append({"stage": "apply", "cmd": cmd_apply})
         _run(cmd_apply, env=env)

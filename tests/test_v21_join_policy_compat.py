@@ -201,6 +201,12 @@ def test_discover_emits_legacy_compat_shape_and_lists(tmp_path: Path):
         cwd=Path(__file__).resolve().parents[1],
     )
 
+    diagnostics_dir = phase0_dir.parent / "diagnostics"
+    assert (diagnostics_dir / "join_key_discovery_exploration.csv").exists()
+    assert (diagnostics_dir / "join_key_discover.csv").exists()
+    assert (diagnostics_dir / "join_key_validate.csv").exists()
+    assert (diagnostics_dir / "join_key_harsh.csv").exists()
+
     out = json.loads(out_policy_path.read_text(encoding="utf-8"))
     dom = out["domains"]["dimension_types"]
     assert dom["required_items"] == dom["required_fields"]
