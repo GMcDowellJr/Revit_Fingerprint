@@ -142,6 +142,9 @@ def main() -> None:
     for i, domain in enumerate(domains, start=1):
         dom_records_all = [r for r in records if r.get("domain") == domain]
         dom_records = _sample_domain_records(dom_records_all, int(args.sample_size), int(args.sample_seed))
+        records_total_domain = len(dom_records_all)
+        records_sampled_domain = len(dom_records)
+        sample_rate = (float(records_sampled_domain) / float(records_total_domain)) if records_total_domain else 0.0
         sampled_pks = {r.get("record_pk", "").strip() for r in dom_records if r.get("record_pk", "").strip()}
         dom_items = [it for it in items if it.get("domain") == domain and (not sampled_pks or it.get("record_pk", "").strip() in sampled_pks)]
         candidate_fields = _pick_candidate_fields(dom_items, int(args.max_candidate_fields))
@@ -173,15 +176,38 @@ def main() -> None:
                     "search_mode": "n/a",
                     "status": "no_candidates",
                     "reason": "",
+                    "records_total_domain": str(records_total_domain),
+                    "records_sampled_domain": str(records_sampled_domain),
+                    "sample_rate": f"{sample_rate:.6f}",
+                    "sample_size_arg": str(args.sample_size),
+                    "sample_seed_arg": str(args.sample_seed),
+                    "max_candidate_fields_arg": str(args.max_candidate_fields),
+                    "max_k_effective": "",
                     "candidate_fields_raw": "|".join(candidate_fields),
+                    "candidate_fields_raw_count": str(len(candidate_fields)),
                     "scoped_candidates": "|".join(scoped_candidates),
+                    "scoped_candidates_count": str(len(scoped_candidates)),
                     "work_candidates": "|".join(work_candidates),
+                    "work_candidates_count": str(len(work_candidates)),
                     "selected_fields": "",
                     "coverage": "0",
                     "collision_rate": "1",
                     "fragmentation_rate": "1",
+                    "records_total": "0",
+                    "records_covered": "0",
+                    "collision_records": "0",
+                    "fragmented_sig_count": "0",
+                    "join_group_count": "0",
+                    "hhi": "0.000000",
+                    "effective_cluster_count": "0.000000",
+                    "failures_json": "{}",
+                    "frontier_size": "0",
+                    "fallback_used": "false",
+                    "required_count": str(len(req)),
                     "required_fields": "|".join(req),
+                    "optional_count": str(len(opt)),
                     "optional_items": "|".join(opt),
+                    "excluded_count": str(len(excluded)),
                     "excluded_items": "|".join(sorted(excluded)),
                 })
                 continue
@@ -195,11 +221,14 @@ def main() -> None:
                 selected: List[str] = []
                 metrics: Dict[str, object] = {}
                 reason = ""
+                frontier_size = 0
+                fallback_used = False
                 if search_mode == "pareto":
                     p = _pareto_search_adapter(dom_records, identity_index, work_candidates, cfg)
                     frontier = p.get("frontier") if isinstance(p.get("frontier"), list) else []
                     if policy_mode == "validate" and req:
                         frontier = [row for row in frontier if set(req).issubset(set(str(row.get("keys", "")).split("|")))]
+                    frontier_size = len(frontier)
                     if frontier:
                         chosen = sorted(frontier, key=lambda x: (x.get("collision_rate", 1.0), x.get("coverage_gap", 1.0), x.get("k_count", 99), x.get("keys", "")))[0]
                         selected = [x for x in str(chosen.get("keys", "")).split("|") if x]
@@ -208,6 +237,7 @@ def main() -> None:
                         selected = list(req)
                         metrics = score_candidate(dom_records, identity_index, selected, cfg)
                         reason = "required_set_fallback"
+                        fallback_used = True
                     else:
                         status = "blocked"
                         reason = "no_frontier"
@@ -225,15 +255,38 @@ def main() -> None:
                     "search_mode": search_mode,
                     "status": status,
                     "reason": reason,
+                    "records_total_domain": str(records_total_domain),
+                    "records_sampled_domain": str(records_sampled_domain),
+                    "sample_rate": f"{sample_rate:.6f}",
+                    "sample_size_arg": str(args.sample_size),
+                    "sample_seed_arg": str(args.sample_seed),
+                    "max_candidate_fields_arg": str(args.max_candidate_fields),
+                    "max_k_effective": str(max_k),
                     "candidate_fields_raw": "|".join(candidate_fields),
+                    "candidate_fields_raw_count": str(len(candidate_fields)),
                     "scoped_candidates": "|".join(scoped_candidates),
+                    "scoped_candidates_count": str(len(scoped_candidates)),
                     "work_candidates": "|".join(work_candidates),
+                    "work_candidates_count": str(len(work_candidates)),
                     "selected_fields": "|".join(selected),
                     "coverage": f"{float(metrics.get('coverage', 0.0)):.6f}",
                     "collision_rate": f"{float(metrics.get('collision_rate', 1.0)):.6f}",
                     "fragmentation_rate": f"{float(metrics.get('fragmentation_rate', 1.0)):.6f}",
+                    "records_total": str(int(metrics.get("records_total", 0) or 0)),
+                    "records_covered": str(int(metrics.get("records_covered", 0) or 0)),
+                    "collision_records": str(int(metrics.get("collision_records", 0) or 0)),
+                    "fragmented_sig_count": str(int(metrics.get("fragmented_sig_count", 0) or 0)),
+                    "join_group_count": str(int(metrics.get("join_group_count", 0) or 0)),
+                    "hhi": f"{float(metrics.get('hhi', 0.0)):.6f}",
+                    "effective_cluster_count": f"{float(metrics.get('effective_cluster_count', 0.0)):.6f}",
+                    "failures_json": json.dumps(metrics.get("failures", {}) if isinstance(metrics.get("failures"), dict) else {}, sort_keys=True),
+                    "frontier_size": str(frontier_size),
+                    "fallback_used": "true" if fallback_used else "false",
+                    "required_count": str(len(req)),
                     "required_fields": "|".join(req),
+                    "optional_count": str(len(opt)),
                     "optional_items": "|".join(opt),
+                    "excluded_count": str(len(excluded)),
                     "excluded_items": "|".join(sorted(excluded)),
                 })
 
@@ -254,6 +307,14 @@ def main() -> None:
                 "method_used": "explore",
                 "join_key_schema": str(existing.get("join_key_schema") or f"{domain}.join_key.v21"),
                 "hash_alg": str(existing.get("hash_alg") or "md5_utf8_join_pipe"),
+                "diagnostics": {
+                    "records_total_domain": records_total_domain,
+                    "records_sampled_domain": records_sampled_domain,
+                    "sample_rate": round(sample_rate, 6),
+                    "sample_size_arg": int(args.sample_size),
+                    "sample_seed_arg": int(args.sample_seed),
+                    "max_candidate_fields_arg": int(args.max_candidate_fields),
+                },
             }
             legacy_shape_gating = _to_legacy_shape_gating(gates)
             if legacy_shape_gating:
@@ -265,7 +326,14 @@ def main() -> None:
         print(f"[discover] [{i}/{len(domains)}] domain={domain} explored", flush=True)
 
     diagnostics_dir = phase0_dir.parent / "diagnostics"
-    fields = ["domain", "policy_mode", "search_mode", "status", "reason", "candidate_fields_raw", "scoped_candidates", "work_candidates", "selected_fields", "coverage", "collision_rate", "fragmentation_rate", "required_fields", "optional_items", "excluded_items"]
+    fields = [
+        "domain", "policy_mode", "search_mode", "status", "reason",
+        "records_total_domain", "records_sampled_domain", "sample_rate", "sample_size_arg", "sample_seed_arg", "max_candidate_fields_arg", "max_k_effective",
+        "candidate_fields_raw", "candidate_fields_raw_count", "scoped_candidates", "scoped_candidates_count", "work_candidates", "work_candidates_count",
+        "selected_fields", "coverage", "collision_rate", "fragmentation_rate",
+        "records_total", "records_covered", "collision_records", "fragmented_sig_count", "join_group_count", "hhi", "effective_cluster_count", "failures_json", "frontier_size", "fallback_used",
+        "required_count", "required_fields", "optional_count", "optional_items", "excluded_count", "excluded_items",
+    ]
     _write_csv(diagnostics_dir / "join_key_discovery_exploration.csv", fields, sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("policy_mode", ""), r.get("search_mode", ""))))
     for mode in policy_modes:
         _write_csv(diagnostics_dir / f"join_key_{mode}.csv", fields, [r for r in sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("search_mode", ""))) if r.get("policy_mode") == mode])
