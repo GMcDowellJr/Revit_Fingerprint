@@ -167,7 +167,23 @@ def main() -> None:
                 work_candidates = list(scoped_candidates)
 
             if not work_candidates:
-                report_rows.append({"domain": domain, "policy_mode": policy_mode, "search_mode": "n/a", "status": "no_candidates", "selected_fields": "", "coverage": "0", "collision_rate": "1", "fragmentation_rate": "1", "required_fields": "|".join(req), "optional_items": "|".join(opt), "excluded_items": "|".join(sorted(excluded))})
+                report_rows.append({
+                    "domain": domain,
+                    "policy_mode": policy_mode,
+                    "search_mode": "n/a",
+                    "status": "no_candidates",
+                    "reason": "",
+                    "candidate_fields_raw": "|".join(candidate_fields),
+                    "scoped_candidates": "|".join(scoped_candidates),
+                    "work_candidates": "|".join(work_candidates),
+                    "selected_fields": "",
+                    "coverage": "0",
+                    "collision_rate": "1",
+                    "fragmentation_rate": "1",
+                    "required_fields": "|".join(req),
+                    "optional_items": "|".join(opt),
+                    "excluded_items": "|".join(sorted(excluded)),
+                })
                 continue
 
             max_k = int(args.max_k)
@@ -209,6 +225,9 @@ def main() -> None:
                     "search_mode": search_mode,
                     "status": status,
                     "reason": reason,
+                    "candidate_fields_raw": "|".join(candidate_fields),
+                    "scoped_candidates": "|".join(scoped_candidates),
+                    "work_candidates": "|".join(work_candidates),
                     "selected_fields": "|".join(selected),
                     "coverage": f"{float(metrics.get('coverage', 0.0)):.6f}",
                     "collision_rate": f"{float(metrics.get('collision_rate', 1.0)):.6f}",
@@ -246,7 +265,7 @@ def main() -> None:
         print(f"[discover] [{i}/{len(domains)}] domain={domain} explored", flush=True)
 
     diagnostics_dir = phase0_dir.parent / "diagnostics"
-    fields = ["domain", "policy_mode", "search_mode", "status", "reason", "selected_fields", "coverage", "collision_rate", "fragmentation_rate", "required_fields", "optional_items", "excluded_items"]
+    fields = ["domain", "policy_mode", "search_mode", "status", "reason", "candidate_fields_raw", "scoped_candidates", "work_candidates", "selected_fields", "coverage", "collision_rate", "fragmentation_rate", "required_fields", "optional_items", "excluded_items"]
     _write_csv(diagnostics_dir / "join_key_discovery_exploration.csv", fields, sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("policy_mode", ""), r.get("search_mode", ""))))
     for mode in policy_modes:
         _write_csv(diagnostics_dir / f"join_key_{mode}.csv", fields, [r for r in sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("search_mode", ""))) if r.get("policy_mode") == mode])
