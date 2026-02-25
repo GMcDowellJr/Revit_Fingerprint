@@ -9,10 +9,10 @@ from typing import Dict, List
 
 try:
     from tools.join_key_derivation_phase05 import md5_utf8_join_pipe, serialize_identity_items
-    from tools.join_key_discovery.eval import build_candidate_join_key, build_identity_index
+    from tools.join_key_discovery.eval import build_candidate_join_key_with_details, build_identity_index, normalize_policy_block
 except ModuleNotFoundError:
     from join_key_derivation_phase05 import md5_utf8_join_pipe, serialize_identity_items
-    from join_key_discovery.eval import build_candidate_join_key, build_identity_index
+    from join_key_discovery.eval import build_candidate_join_key_with_details, build_identity_index, normalize_policy_block
 
 
 def _read_csv(path: Path) -> List[Dict[str, str]]:
@@ -64,11 +64,23 @@ def main() -> None:
             r["join_key_status"] = "missing_policy"
             r["join_key_policy_id"] = ""
             r["join_key_policy_version"] = ""
-            failures.append({"domain": domain, "file_id": r.get("file_id", ""), "record_pk": record_pk, "reason": "missing_policy", "missing_keys": "", "policy_id": "", "policy_version": ""})
+            failures.append({"domain": domain, "file_id": r.get("file_id", ""), "record_pk": record_pk, "reason": "missing_policy", "missing_keys": "", "effective_required_keys": "", "discriminator_key": "", "discriminator_value": "", "policy_id": "", "policy_version": ""})
             continue
 
-        selected_fields = [str(x) for x in (p.get("selected_fields") or []) if str(x).strip()]
-        status, selected_items, reason = build_candidate_join_key(identity_index, record_pk, selected_fields, {"required_fields": p.get("required_fields") or selected_fields})
+        normalized = normalize_policy_block(p)
+        selected_fields = normalized["selected_fields"]
+        required_fields = normalized["required_fields"]
+        status, selected_items, reason, details = build_candidate_join_key_with_details(
+            identity_index,
+            record_pk,
+            selected_fields,
+            {
+                "required_fields": required_fields,
+                "discriminator_key": normalized["gates"].get("discriminator_key"),
+                "shape_requirements": normalized["gates"].get("shape_requirements"),
+                "default_shape_behavior": normalized["gates"].get("default_shape_behavior"),
+            },
+        )
         policy_id = str(p.get("policy_id") or f"{domain}.join_key.v21")
         policy_version = str(p.get("policy_version") or "1")
         r["join_key_policy_id"] = policy_id
@@ -78,7 +90,18 @@ def main() -> None:
         if status != "ok":
             r["join_hash"] = ""
             r["join_key_status"] = status
-            failures.append({"domain": domain, "file_id": r.get("file_id", ""), "record_pk": record_pk, "reason": status, "missing_keys": reason, "policy_id": policy_id, "policy_version": policy_version})
+            failures.append({
+                "domain": domain,
+                "file_id": r.get("file_id", ""),
+                "record_pk": record_pk,
+                "reason": status,
+                "missing_keys": reason,
+                "effective_required_keys": "|".join(details.get("effective_required_fields", [])),
+                "discriminator_key": str(details.get("discriminator_key") or ""),
+                "discriminator_value": str(details.get("discriminator_value") or ""),
+                "policy_id": policy_id,
+                "policy_version": policy_version,
+            })
             continue
 
         preimage = serialize_identity_items(selected_items)
@@ -93,7 +116,7 @@ def main() -> None:
 
     _write_csv(
         phase0_dir.parent / "diagnostics" / "join_policy_failures.csv",
-        ["domain", "file_id", "record_pk", "reason", "missing_keys", "policy_id", "policy_version"],
+        ["domain", "file_id", "record_pk", "reason", "missing_keys", "effective_required_keys", "discriminator_key", "discriminator_value", "policy_id", "policy_version"],
         sorted(failures, key=lambda x: (x["domain"], x["file_id"], x["record_pk"])),
     )
 
