@@ -78,6 +78,13 @@ def _dedupe(items: Sequence[str]) -> List[str]:
     return out
 
 
+def _without_excluded(items: Sequence[str], excluded: Sequence[str]) -> List[str]:
+    excluded_lc = {str(x).strip().lower() for x in excluded if str(x).strip()}
+    if not excluded_lc:
+        return _dedupe(items)
+    return _dedupe([x for x in items if str(x).strip().lower() not in excluded_lc])
+
+
 def _to_legacy_shape_gating(gates: Dict[str, object]) -> Dict[str, object]:
     if not isinstance(gates, dict) or not gates:
         return {}
@@ -149,13 +156,13 @@ def main() -> None:
         opt = normalized["optional_items"]
         excluded = set(normalized["explicitly_excluded_items"])
         gates = normalized["gates"]
-        scoped_candidates = [f for f in candidate_fields if f not in excluded]
+        scoped_candidates = _without_excluded(candidate_fields, excluded)
 
         for policy_mode in policy_modes:
             if policy_mode == "validate":
-                work_candidates = _dedupe(req + opt)
+                work_candidates = _without_excluded(req + opt, excluded)
             elif policy_mode == "harsh":
-                work_candidates = _dedupe(req + opt + scoped_candidates)
+                work_candidates = _without_excluded(req + opt + scoped_candidates, excluded)
             else:
                 work_candidates = list(scoped_candidates)
 

@@ -289,9 +289,9 @@ def main() -> None:
     ap.add_argument("--split-only", action="store_true", help="Deprecated alias for --stages split.")
     ap.add_argument("--split-domains", nargs="?", const="__ALL__", default=None, help="Domains for split stage; optional CSV. If no value, run all discovered domains.")
     ap.add_argument("--mode", choices=("allpairs", "candidates"), default="allpairs", help="File-level split detection mode.")
-    ap.add_argument("--discover-sample-size", type=int, default=5000, help="Max records per domain for discover stage (default: 5000; set <=0 to disable sampling).")
-    ap.add_argument("--discover-sample-seed", type=int, default=17, help="Deterministic sampling seed for discover stage (default: 17).")
-    ap.add_argument("--discover-max-candidate-fields", type=int, default=64, help="Max candidate fields per domain for discover stage (default: 64; <=0 disables cap).")
+    ap.add_argument("--discover-sample-size", type=int, default=None, help="Optional max records per domain for discover stage. If omitted, downstream discover tool default is used.")
+    ap.add_argument("--discover-sample-seed", type=int, default=None, help="Optional deterministic sampling seed for discover stage. If omitted, downstream discover tool default is used.")
+    ap.add_argument("--discover-max-candidate-fields", type=int, default=None, help="Optional max candidate fields per domain for discover stage. If omitted, downstream discover tool default is used.")
     ap.add_argument("--discover-search-modes", default="greedy,pareto", help="Comma-separated discover engines (default: greedy,pareto).")
     ap.add_argument("--discover-policy-modes", default="discover,validate,harsh", help="Comma-separated policy strictness modes for exploration CSVs (default: discover,validate,harsh).")
     ap.add_argument("--discover-emit-policy-json", action="store_true", help="Also emit discovered compatibility policy JSON (off by default; CSV exploration is primary).")
@@ -382,18 +382,17 @@ def main() -> None:
             "tools/v21_discover_join_policy.py",
             "--phase0-dir",
             str(v21_phase0_dir),
-            "--sample-size",
-            str(args.discover_sample_size),
-            "--sample-seed",
-            str(args.discover_sample_seed),
-            "--max-candidate-fields",
-            str(args.discover_max_candidate_fields),
             "--search-modes",
             str(args.discover_search_modes),
             "--policy-modes",
             str(args.discover_policy_modes),
-            "--warn-only",
         ]
+        if args.discover_sample_size is not None:
+            cmd_discover += ["--sample-size", str(args.discover_sample_size)]
+        if args.discover_sample_seed is not None:
+            cmd_discover += ["--sample-seed", str(args.discover_sample_seed)]
+        if args.discover_max_candidate_fields is not None:
+            cmd_discover += ["--max-candidate-fields", str(args.discover_max_candidate_fields)]
         if args.domain_policy_json:
             cmd_discover += ["--policy-json", str(Path(args.domain_policy_json).resolve()), "--base-policy", str(Path(args.domain_policy_json).resolve())]
         if args.discover_emit_policy_json:
