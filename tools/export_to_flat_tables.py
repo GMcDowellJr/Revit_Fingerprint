@@ -405,11 +405,15 @@ def main() -> None:
     if synthetic_domains:
         try:
             import pandas as pd
-            from tools.compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
+            try:
+                from tools.compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
+            except Exception:
+                # When run as `python tools/export_to_flat_tables.py`, repo-root package import may not resolve.
+                from compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
         except Exception as ex:
             print(
                 "WARNING: synthetic key augmentation skipped "
-                f"(unable to import pandas/tools.compute_synthetic_keys: {ex})",
+                f"(unable to import pandas/compute_synthetic_keys: {ex})",
                 file=sys.stderr,
             )
             return
