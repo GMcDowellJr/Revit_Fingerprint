@@ -520,10 +520,10 @@
 	  "required_items": [
 		"view_template.sig.include_vg",
 		"view_template.sig.include_filters",
-		"view_template.sig.include_phase_filter",
-		"view_template.sig.appearance_included"
+		"view_template.sig.include_phase_filter"
 	  ],
 	  "optional_items": [
+		"view_template.sig.appearance_included",
 		"view_template.sig.phase_filter",
 		"view_template.category_overrides_def_hash",
 		"view_template.def_hash"
