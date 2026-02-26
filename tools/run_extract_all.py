@@ -393,6 +393,8 @@ def main() -> None:
             cmd_discover += ["--sample-seed", str(args.discover_sample_seed)]
         if args.discover_max_candidate_fields is not None:
             cmd_discover += ["--max-candidate-fields", str(args.discover_max_candidate_fields)]
+        if args.domains and str(args.domains).strip():
+            cmd_discover += ["--domains", str(args.domains)]
         if args.domain_policy_json:
             cmd_discover += ["--policy-json", str(Path(args.domain_policy_json).resolve()), "--base-policy", str(Path(args.domain_policy_json).resolve())]
         if args.discover_emit_policy_json:

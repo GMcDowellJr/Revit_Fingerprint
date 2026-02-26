@@ -337,6 +337,16 @@ def main() -> None:
     _write_csv(diagnostics_dir / "join_key_discovery_exploration.csv", fields, sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("policy_mode", ""), r.get("search_mode", ""))))
     for mode in policy_modes:
         _write_csv(diagnostics_dir / f"join_key_{mode}.csv", fields, [r for r in sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("search_mode", ""))) if r.get("policy_mode") == mode])
+        for search_mode in search_modes:
+            _write_csv(
+                diagnostics_dir / f"join_key_{mode}_{search_mode}.csv",
+                fields,
+                [
+                    r
+                    for r in sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("search_mode", "")))
+                    if r.get("policy_mode") == mode and r.get("search_mode") == search_mode
+                ],
+            )
 
     if args.out_policy:
         out_policy = Path(args.out_policy)
