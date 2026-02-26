@@ -20,10 +20,7 @@ _LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.seg\[(\d{3})\]\.(kind|length)$"
 
 
 def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
-    """Append synthetic line_pattern.segments_norm_hash rows to phase0_identity_items.csv.
-
-    Operates in-place on the flat v2.1 phase0 items surface and preserves existing rows.
-    """
+    """Append synthetic line_pattern.segments_norm_hash rows to phase0_identity_items.csv."""
     if not items_csv.is_file():
         return {"total": 0, "ok": 0, "missing": 0}
 
