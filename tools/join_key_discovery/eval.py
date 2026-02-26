@@ -35,6 +35,32 @@ def _listish(v: Any) -> List[str]:
     return [str(x).strip() for x in v if str(x).strip()]
 
 
+
+
+def _lookup_shape_cfg(shape_requirements: Dict[str, Any], shape_value: str) -> Tuple[str, Any]:
+    """Return (matched_key, cfg) with tolerant bool-string matching."""
+    if not isinstance(shape_requirements, dict):
+        return "", None
+
+    key = str(shape_value).strip()
+    if not key:
+        return "", None
+
+    if key in shape_requirements:
+        return key, shape_requirements.get(key)
+
+    lowered = key.lower()
+    for cand in (lowered, lowered.capitalize(), lowered.upper()):
+        if cand in shape_requirements:
+            return cand, shape_requirements.get(cand)
+
+    if lowered in ("true", "false"):
+        py_bool = "True" if lowered == "true" else "False"
+        if py_bool in shape_requirements:
+            return py_bool, shape_requirements.get(py_bool)
+
+    return "", None
+
 def normalize_policy_block(policy_block: Dict[str, Any] | None, fallback_selected_fields: Sequence[str] | None = None) -> Dict[str, Any]:
     policy_block = policy_block or {}
     fallback_selected = [str(x).strip() for x in (fallback_selected_fields or []) if str(x).strip()]
@@ -80,7 +106,7 @@ def build_candidate_join_key_with_details(
     if disc_key and row_items.get(disc_key):
         shape_value = row_items[disc_key][1]
         shape_requirements = gates.get("shape_requirements") if isinstance(gates.get("shape_requirements"), dict) else {}
-        shape_cfg = shape_requirements.get(shape_value)
+        _shape_key, shape_cfg = _lookup_shape_cfg(shape_requirements, shape_value)
         if isinstance(shape_cfg, dict):
             shape_matched = True
             additional_required = [str(f).strip() for f in (shape_cfg.get("additional_required") or []) if str(f).strip()]
