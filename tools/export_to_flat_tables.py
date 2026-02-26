@@ -2,6 +2,7 @@ import argparse
 import csv
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 import hashlib
@@ -120,6 +121,14 @@ def main() -> None:
         "--split_by_domain",
         action="store_true",
         help="If set, write domain-scoped CSVs (e.g. records__<domain>.csv) instead of combined files.",
+    )
+    ap.add_argument(
+        "--synthetic_domains",
+        default="",
+        help=(
+            "Optional comma-separated domains for synthetic key augmentation after CSV export "
+            "(currently supports: line_patterns)."
+        ),
     )
 
     args = ap.parse_args()
@@ -290,6 +299,7 @@ def main() -> None:
         )
 
     emit_set = {x.strip() for x in str(args.emit).split(",") if x.strip()}
+    synthetic_domains = {x.strip() for x in str(args.synthetic_domains).split(",") if x.strip()}
 
     wrote_paths: List[str] = []
 
@@ -389,6 +399,62 @@ def main() -> None:
     print("Wrote:")
     for p in wrote_paths:
         print(f"  {p}")
+
+    # Optional synthetic-key augmentation step for discovery workflows.
+    # This runs only when identity_items outputs exist and the requested synthetic domain file was written.
+    if synthetic_domains:
+        try:
+            import pandas as pd
+            try:
+                from tools.compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
+            except Exception:
+                # When run as `python tools/export_to_flat_tables.py`, repo-root package import may not resolve.
+                from compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
+        except Exception as ex:
+            print(
+                "WARNING: synthetic key augmentation skipped "
+                f"(unable to import pandas/compute_synthetic_keys: {ex})",
+                file=sys.stderr,
+            )
+            return
+
+        synthetic_wrote: List[str] = []
+
+        if args.split_by_domain:
+            for dom in sorted(synthetic_domains):
+                dom_safe = _safe_name(dom)
+                in_path = out_dir / f"identity_items__{dom_safe}.csv"
+                out_path = out_dir / f"identity_items__{dom_safe}__augmented.csv"
+                if not in_path.exists():
+                    continue
+                if dom != "line_patterns":
+                    print(f"WARNING: synthetic domain not supported yet: {dom}", file=sys.stderr)
+                    continue
+
+                items_df = pd.read_csv(str(in_path), dtype=str, keep_default_na=False)
+                synthetic_df, _ok, _missing = compute_synthetic_keys(items_df, dom)
+                augmented_df = pd.concat([items_df[EXPECTED_COLUMNS], synthetic_df], ignore_index=True)
+                augmented_df.to_csv(str(out_path), index=False)
+                synthetic_wrote.append(str(out_path))
+        else:
+            # Combined identity_items.csv can still be augmented per-domain into a domain-named output.
+            in_path = out_dir / "identity_items.csv"
+            if in_path.exists():
+                items_df = pd.read_csv(str(in_path), dtype=str, keep_default_na=False)
+                for dom in sorted(synthetic_domains):
+                    if dom != "line_patterns":
+                        print(f"WARNING: synthetic domain not supported yet: {dom}", file=sys.stderr)
+                        continue
+                    out_path = out_dir / f"identity_items__{_safe_name(dom)}__augmented.csv"
+                    synthetic_df, _ok, _missing = compute_synthetic_keys(items_df, dom)
+                    augmented_df = pd.concat([items_df[EXPECTED_COLUMNS], synthetic_df], ignore_index=True)
+                    augmented_df.to_csv(str(out_path), index=False)
+                    synthetic_wrote.append(str(out_path))
+
+        if synthetic_wrote:
+            print("Wrote synthetic augmentations:")
+            for p in synthetic_wrote:
+                print(f"  {p}")
 
 
 

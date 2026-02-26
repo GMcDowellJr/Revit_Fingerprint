@@ -135,6 +135,53 @@ def _line_pattern_segments_def_hash(*, segments):
             seq_hash_v, seq_hash_q = (None, ITEM_Q_UNREADABLE)
     return seq_hash_v, seq_hash_q
 
+
+def _line_pattern_segments_norm_hash(*, segments):
+    """Return (v, q) for line_pattern.segments_norm_hash from ordered segments.
+
+    Scale-invariant: lengths are divided by sum of non-dot segment lengths
+    before hashing, so scaled copies of the same pattern produce identical hashes.
+    Dot segments (kind=2) always contribute 0.0 length.
+    """
+    seq_hash_v, seq_hash_q = (None, ITEM_Q_UNREADABLE)
+    if segments is not None:
+        try:
+            seg_parts = []
+            for idx, seg in enumerate(segments):
+                st_id, _st_name = _lp_seg_type_id_and_name(seg)
+                try:
+                    slen = getattr(seg, "Length", None)
+                except Exception:
+                    slen = None
+                if st_id == 2:
+                    slen = 0.0
+                length_v, _length_q = canonicalize_float(slen, nd=9)
+                seg_parts.append((idx, st_id, length_v))
+
+            total = 0.0
+            for _idx, st_id, length_v in seg_parts:
+                try:
+                    if st_id != 2:
+                        total += float(length_v)
+                except Exception:
+                    pass
+
+            tokens = []
+            for idx, st_id, length_v in seg_parts:
+                try:
+                    length_f = float(length_v)
+                except Exception:
+                    length_f = 0.0
+                norm = (length_f / total) if total > 0.0 else 0.0
+                tokens.append("seg[{:03d}].kind={}".format(idx, safe_str(st_id)))
+                tokens.append("seg[{:03d}].norm_length={}".format(idx, format(norm, ".9f")))
+
+            seq_hash = make_hash(tokens)
+            seq_hash_v, seq_hash_q = canonicalize_str(seq_hash)
+        except Exception:
+            seq_hash_v, seq_hash_q = (None, ITEM_Q_UNREADABLE)
+    return seq_hash_v, seq_hash_q
+
 def extract(doc, ctx=None):
     """
     Extract Line Patterns fingerprint from document.
@@ -308,10 +355,20 @@ def extract(doc, ctx=None):
         identity_items.append(
             make_identity_item("line_pattern.segments_def_hash", segments_def_hash_v, segments_def_hash_q)
         )
+        segments_norm_hash_v, segments_norm_hash_q = _line_pattern_segments_norm_hash(
+            segments=segs_v2 if (segs_ok and segs_v2 is not None) else None,
+        )
+        identity_items.append(
+            make_identity_item("line_pattern.segments_norm_hash", segments_norm_hash_v, segments_norm_hash_q)
+        )
 
         # ---- element-level finalize (once per element) ----
         identity_items_sorted = sorted(identity_items, key=lambda it: it.get("k", ""))
-        semantic_keys = sorted(["line_pattern.segment_count", "line_pattern.segments_def_hash"])
+        semantic_keys = sorted([
+            "line_pattern.segment_count",
+            "line_pattern.segments_def_hash",
+            "line_pattern.segments_norm_hash",
+        ])
 
         # Phase-2 compliant: required identity is segment-based, not UID-based
         required_qs = [seg_count_q]
