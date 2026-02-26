@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -11,6 +14,103 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from v21_emit import emit_analysis_v21, emit_phase0_v21
+
+
+_LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.seg\[(\d{3})\]\.(kind|length)$")
+
+
+def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
+    """Append synthetic line_pattern.segments_norm_hash rows to phase0_identity_items.csv."""
+    if not items_csv.is_file():
+        return {"total": 0, "ok": 0, "missing": 0}
+
+    with items_csv.open("r", encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.DictReader(f))
+        fieldnames = list((rows[0].keys() if rows else [
+            "schema_version", "export_run_id", "domain", "record_pk", "item_key", "item_value", "item_value_type", "item_role",
+        ]))
+
+    grouped: Dict[str, List[Dict[str, str]]] = {}
+    for r in rows:
+        if str(r.get("domain", "")) != "line_patterns":
+            continue
+        grouped.setdefault(str(r.get("record_pk", "")), []).append(r)
+
+    out_rows: List[Dict[str, str]] = []
+    ok = 0
+    missing = 0
+    for record_pk, group in grouped.items():
+        seg_rows = [r for r in group if _LP_SEGMENT_KEY_RE.match(str(r.get("item_key", "")))]
+        status = "ok"
+        hash_v = ""
+
+        if not seg_rows or any(str(r.get("item_value_type", "")) != "ok" for r in seg_rows):
+            status = "missing"
+            missing += 1
+        else:
+            segments: Dict[int, Dict[str, float]] = {}
+            parse_error = False
+            for r in seg_rows:
+                m = _LP_SEGMENT_KEY_RE.match(str(r.get("item_key", "")))
+                if not m:
+                    continue
+                idx = int(m.group(1))
+                key = m.group(2)
+                segments.setdefault(idx, {})
+                try:
+                    if key == "kind":
+                        segments[idx]["kind"] = int(str(r.get("item_value", "")))
+                    else:
+                        segments[idx]["length"] = float(str(r.get("item_value", "")))
+                except Exception:
+                    parse_error = True
+                    break
+
+            if parse_error or any("kind" not in d or "length" not in d for d in segments.values()):
+                status = "missing"
+                missing += 1
+            else:
+                ordered = [(idx, int(v["kind"]), float(v["length"])) for idx, v in sorted(segments.items())]
+                total = sum(length for _, kind, length in ordered if kind != 2)
+                tokens: List[str] = []
+                for idx, kind, length in ordered:
+                    norm = (length / total) if total > 0 else 0.0
+                    tokens.append(f"seg[{idx:03d}].kind={kind}")
+                    tokens.append(f"seg[{idx:03d}].norm_length={norm:.9f}")
+                hash_v = hashlib.md5("|".join(tokens).encode("utf-8")).hexdigest()
+                ok += 1
+
+        base = group[0]
+        out_rows.append({
+            "schema_version": str(base.get("schema_version", "")),
+            "export_run_id": str(base.get("export_run_id", "")),
+            "domain": "line_patterns",
+            "record_pk": record_pk,
+            "item_key": "line_pattern.segments_norm_hash",
+            "item_value": hash_v,
+            "item_value_type": status,
+            "item_role": "synthetic",
+        })
+
+    if out_rows:
+        rows.extend(out_rows)
+        rows = sorted(
+            rows,
+            key=lambda r: (
+                str(r.get("export_run_id", "")),
+                str(r.get("domain", "")),
+                str(r.get("record_pk", "")),
+                str(r.get("item_key", "")),
+                str(r.get("item_value", "")),
+            ),
+        )
+        with items_csv.open("w", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fieldnames)
+            w.writeheader()
+            for r in rows:
+                w.writerow({k: r.get(k, "") for k in fieldnames})
+
+    return {"total": len(out_rows), "ok": ok, "missing": missing}
 
 
 def _discover_domains_from_exports(exports_dir: Path) -> List[str]:
@@ -295,6 +395,11 @@ def main() -> None:
     ap.add_argument("--discover-search-modes", default="greedy,pareto", help="Comma-separated discover engines (default: greedy,pareto).")
     ap.add_argument("--discover-policy-modes", default="discover,validate,harsh", help="Comma-separated policy strictness modes for exploration CSVs (default: discover,validate,harsh).")
     ap.add_argument("--discover-emit-policy-json", action="store_true", help="Also emit discovered compatibility policy JSON (off by default; CSV exploration is primary).")
+    ap.add_argument(
+        "--synthetic-domains",
+        default="",
+        help="Optional comma-separated domains for synthetic key augmentation after flatten (currently supports: line_patterns).",
+    )
     args = ap.parse_args()
 
     for alias, repl, used in [
@@ -373,6 +478,21 @@ def main() -> None:
         report["commands"].append({"stage": "flatten", "out": str(v21_phase0_dir)})
         meta_rows, record_rows = emit_phase0_v21(exports_dir, v21_phase0_dir, file_id_mode="basename")
         print(f"[extract_all] Stage flatten complete: rows={len(record_rows)} files={len(meta_rows)} out={v21_phase0_dir}", flush=True)
+
+        synthetic_domains = {d.strip() for d in str(args.synthetic_domains).split(",") if d.strip()}
+        if synthetic_domains:
+            unsupported = sorted([d for d in synthetic_domains if d != "line_patterns"])
+            for d in unsupported:
+                sys.stderr.write(f"[WARN extract_all] synthetic domain not supported yet: {d}\n")
+            if "line_patterns" in synthetic_domains:
+                items_csv = v21_phase0_dir / "phase0_identity_items.csv"
+                stats = _append_line_pattern_synthetic_norm_hash(items_csv)
+                note = (
+                    "synthetic line_patterns segments_norm_hash: "
+                    f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}"
+                )
+                report["notes"].append(note)
+                print(f"[extract_all] {note}", flush=True)
 
     if "discover" in selected_stages:
         print("[extract_all] Stage discover (T1): exploring join policy candidates (discover/validate/harsh CSVs)...", flush=True)
