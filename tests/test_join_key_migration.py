@@ -222,8 +222,12 @@ class TestJoinKeyPolicyStructure:
         assert "view_templates" in policies["domains"]
         vt_policy = policies["domains"]["view_templates"]
 
-        assert vt_policy["join_key_schema"] == "view_templates.join_key.v1"
-        assert "view_template.def_hash" in vt_policy["required_items"]
+        if vt_policy["join_key_schema"] == "view_templates.join_key.v2":
+            assert "view_template.sig.include_phase_filter" in vt_policy["required_items"]
+            assert "view_template.def_hash" not in vt_policy["required_items"]
+        else:
+            assert vt_policy["join_key_schema"] == "view_templates.join_key.v1"
+            assert "view_template.def_hash" in vt_policy["required_items"]
 
 
 # ============================================================

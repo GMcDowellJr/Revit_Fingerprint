@@ -61,6 +61,9 @@ from core.phase2 import (
     phase2_qv_from_legacy_sentinel_str,
     phase2_join_hash,
 )
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy
+
 from core.graphic_overrides import (
     extract_projection_graphics,
     extract_cut_graphics,
@@ -227,40 +230,6 @@ def _semantic_keys_from_identity_items(identity_items):
     )
     return [k for k in keys if k]
 
-
-def _join_key_from_canonical_items(identity_items):
-    """Compute join_key from policy-required selectors over canonical evidence.
-
-    v1 policy for view_templates uses only base required key `view_template.def_hash`.
-    """
-    required_keys = ["view_template.def_hash"]
-    optional_keys = []
-
-    k_to_item = {
-        it.get("k"): it
-        for it in (identity_items or [])
-        if isinstance(it.get("k"), str)
-    }
-
-    hashed_items = []
-    for k in required_keys:
-        item = k_to_item.get(k)
-        if item is None:
-            hashed_items.append({"k": k, "q": ITEM_Q_MISSING, "v": None})
-        else:
-            hashed_items.append({"k": k, "q": item.get("q"), "v": item.get("v")})
-
-    return {
-        "schema": "view_templates.join_key.v1",
-        "hash_alg": "md5_utf8_join_pipe",
-        "keys_used": sorted(required_keys),
-        "items": hashed_items,
-        "selectors": {
-            "required_keys": required_keys,
-            "optional_keys": optional_keys,
-        },
-        "join_hash": phase2_join_hash(hashed_items),
-    }
 
 def _traceability_unknown_items(elem):
     """Build traceability unknown_items for a view element (metadata only)."""
@@ -630,7 +599,17 @@ def extract(doc, ctx=None):
             }
 
             # Back-compat: join_key.items retained, but contains hashed items only.
-            rec["join_key"] = _join_key_from_canonical_items(identity_items)
+            pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "view_templates")
+            vt_join_key, _vt_missing = build_join_key_from_policy(
+                domain_policy=pol,
+                identity_items=identity_items,
+                include_optional_items=False,
+                emit_keys_used=True,
+                hash_optional_items=False,
+                emit_items=False,
+                emit_selectors=True,
+            )
+            rec["join_key"] = vt_join_key
 
             rec["def_hash"] = def_hash
             rec["def_signature"] = sig_final
@@ -1015,7 +994,17 @@ def extract(doc, ctx=None):
         }
 
         # Back-compat: join_key.items retained, but contains hashed items only.
-        rec["join_key"] = _join_key_from_canonical_items(identity_items)
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "view_templates")
+        vt_join_key, _vt_missing = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=identity_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        rec["join_key"] = vt_join_key
         rec["def_hash"] = def_hash
         rec["def_signature"] = sig_final
 
