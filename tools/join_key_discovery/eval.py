@@ -19,8 +19,12 @@ def build_identity_index(identity_items: Sequence[Dict[str, str]]) -> Dict[str, 
             continue
         q = _norm(row.get("item_value_type") or row.get("q"))
         v = _norm(row.get("item_value") or row.get("v"))
-        if not v:
+
+        # Keep q-only rows (blank v) so required-key presence semantics match runtime
+        # join_key building, which treats key presence independent of value completeness.
+        if not v and not q:
             continue
+
         grouped[(record_pk, k)].append((q, v))
 
     for (record_pk, k), vals in sorted(grouped.items(), key=lambda kv: (kv[0][0], kv[0][1])):

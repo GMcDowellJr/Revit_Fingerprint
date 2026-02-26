@@ -66,3 +66,27 @@ def test_shape_gating_does_not_require_phase_filter_for_false():
     assert status == "ok"
     assert details["shape_matched"] is False
     assert "view_template.sig.phase_filter" not in details["effective_required_fields"]
+
+
+def test_identity_index_keeps_q_only_rows_for_required_presence():
+    from tools.join_key_discovery.eval import build_identity_index
+
+    rows = [
+        {
+            "record_pk": "r1",
+            "item_key": "view_template.sig.include_phase_filter",
+            "item_value_type": "ok",
+            "item_value": "true",
+        },
+        {
+            "record_pk": "r1",
+            "item_key": "view_template.sig.phase_filter",
+            "item_value_type": "unsupported_not_applicable",
+            "item_value": "",
+        },
+    ]
+
+    idx = build_identity_index(rows)
+    assert "r1" in idx
+    assert "view_template.sig.phase_filter" in idx["r1"]
+    assert idx["r1"]["view_template.sig.phase_filter"][0] == "unsupported_not_applicable"
