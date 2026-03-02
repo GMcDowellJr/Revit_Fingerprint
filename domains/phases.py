@@ -60,7 +60,8 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
-
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 
 def _phase2_build_phase2_payload(*, phase_name, seq, uid, elem):
     """
@@ -236,6 +237,24 @@ def extract(doc, ctx=None):
 
         identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k", "")))
 
+        # ---------------------------
+        # Discovery feature surface (Phase-2 computes stats / classification)
+        # ---------------------------
+        def _pick_identity_item(items, key):
+            for it in (items or []):
+                if it.get("k") == key:
+                    return it
+            return None
+
+        features_items = []
+        for _k, _t in (
+            ("phase.name", "s"),
+            ("phase.sequence_number", "i"),
+        ):
+            _it = _pick_identity_item(identity_items_v2_sorted, _k)
+            if _it is not None:
+                features_items.append(make_feature_item(_k, _t, _it.get("v"), _it.get("q")))
+                
         pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "phases")
         join_key_v2, _missing = build_join_key_from_policy(
             domain_policy=pol,
@@ -264,9 +283,14 @@ def extract(doc, ctx=None):
                 "provenance": "revit.Phase.Name",
                 "components": {"seq": safe_str(seq)},
             },
+            features_items=features_items,
             debug={
                 "sig_preimage_sample": sig_preimage_v2[:6],
                 "uid_excluded_from_sig": True,
+                "stratum_features": build_stratum_features_v1(
+                    domain="phases",
+                    identity_items=identity_items_sorted,
+                ),
             },
         )
         rec_v2["join_key"] = join_key_v2

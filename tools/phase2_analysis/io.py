@@ -166,6 +166,22 @@ def _read_csv_rows(path: str) -> Iterator[Dict[str, str]]:
             if isinstance(row, dict):
                 yield {str(k): ("" if v is None else str(v)) for k, v in row.items()}
 
+def load_phase0_v21_feature_items(phase0_dir: str) -> List[Dict[str, str]]:
+    """Load phase0_feature_items.csv (if present)."""
+    phase0_dir = os.path.abspath(phase0_dir)
+    p = os.path.join(phase0_dir, "phase0_feature_items.csv")
+    if not os.path.isfile(p):
+        return []
+    return list(_read_csv_rows(p))
+
+
+def load_phase0_v21_stratum_features(phase0_dir: str) -> List[Dict[str, str]]:
+    """Load phase0_stratum_features.csv (if present)."""
+    phase0_dir = os.path.abspath(phase0_dir)
+    p = os.path.join(phase0_dir, "phase0_stratum_features.csv")
+    if not os.path.isfile(p):
+        return []
+    return list(_read_csv_rows(p))
 
 def load_phase0_v21_file_paths(phase0_dir: str) -> Dict[str, str]:
     """Return best-effort file_id/export_run_id -> path for metadata heuristics.

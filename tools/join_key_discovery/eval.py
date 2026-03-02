@@ -7,7 +7,54 @@ from typing import Any, Dict, Iterable, List, Sequence, Tuple
 def _norm(v: Any) -> str:
     return "" if v is None else str(v).strip()
 
+def build_kv_index(
+    rows: Sequence[Dict[str, str]],
+    *,
+    record_pk_col: str = "record_pk",
+    key_col: str = "item_key",
+    q_col: str = "q",
+    v_col: str = "v",
+) -> Dict[str, Dict[str, Tuple[str, str]]]:
+    """record_pk -> key -> (q, v), deterministic tie-break by (q,v).
 
+    This is a generic version of build_identity_index that can index:
+      - phase0_identity_items.csv rows
+      - phase0_feature_items.csv rows (mapped to q/v columns)
+      - exploded discriminator rows (k/q/v)
+    """
+    out: Dict[str, Dict[str, Tuple[str, str]]] = {}
+    grouped: Dict[Tuple[str, str], List[Tuple[str, str]]] = defaultdict(list)
+
+    for row in rows:
+        record_pk = _norm(row.get(record_pk_col))
+        k = _norm(row.get(key_col))
+        if not record_pk or not k:
+            continue
+        q = _norm(row.get(q_col))
+        v = _norm(row.get(v_col))
+
+        # Keep q-only rows (blank v) so required-key presence semantics match runtime.
+        if not v and not q:
+            continue
+
+        grouped[(record_pk, k)].append((q, v))
+
+    for (record_pk, k), vals in sorted(grouped.items(), key=lambda kv: (kv[0][0], kv[0][1])):
+        chosen = sorted(vals, key=lambda t: (t[0], t[1]))[0]
+        out.setdefault(record_pk, {})[k] = chosen
+
+    return out
+
+
+def score_candidate_kv(
+    records: Sequence[Dict[str, str]],
+    kv_by_record: Dict[str, Dict[str, Tuple[str, str]]],
+    selected_fields: Sequence[str],
+    cfg: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Like score_candidate, but uses a pre-built kv index (q,v)."""
+    return score_candidate(records, kv_by_record, selected_fields, cfg)
+    
 def build_identity_index(identity_items: Sequence[Dict[str, str]]) -> Dict[str, Dict[str, Tuple[str, str]]]:
     """record_pk -> item_key -> (q, v), deterministic tie-break by (q,v)."""
     out: Dict[str, Dict[str, Tuple[str, str]]] = {}

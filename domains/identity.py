@@ -47,6 +47,8 @@ from core.record_v2 import (
     make_identity_item,
     serialize_identity_items,
 )
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 
@@ -183,6 +185,17 @@ def extract(doc, ctx=None):
     is_workshared_v, is_workshared_q = canonicalize_bool(info.get("is_workshared", False))
     identity_items.append(make_identity_item("identity.is_workshared", is_workshared_v, is_workshared_q))
 
+    # ---------------------------
+    # Discovery feature surface (Phase-2 computes stats / classification)
+    # ---------------------------
+    features_items = []
+    for it in (identity_items or []):
+        k = it.get("k")
+        if not isinstance(k, str):
+            continue
+        # Identity already canonicalizes; treat as string evidence for discovery.
+        features_items.append(make_feature_item(k, "s", it.get("v"), it.get("q")))
+        
     rvn_v, rvn_q = canonicalize_str(info.get("revit_version_number", None))
     identity_items.append(make_identity_item("identity.revit_version_number", rvn_v, rvn_q))
 
@@ -232,6 +245,13 @@ def extract(doc, ctx=None):
             "display": safe_str(info.get("project_title", "")),
             "quality": "human",
             "provenance": "revit.Document.Title",
+        },
+        features_items=features_items,
+        debug={
+            "stratum_features": build_stratum_features_v1(
+                domain="identity",
+                identity_items=identity_items,
+            ),
         },
     )
     rec_v2["join_key"] = join_key

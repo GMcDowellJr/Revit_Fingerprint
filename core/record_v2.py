@@ -27,6 +27,7 @@ from core.hashing import safe_str
 # =========================
 
 SCHEMA_VERSION_RECORD_V2 = "record.v2"
+SCHEMA_VERSION_FEATURES_V1 = "features.v1"
 IDENTITY_ITEM_SCHEMA_V1 = "identity_items.v1"
 
 ITEM_Q_OK = "ok"
@@ -544,6 +545,7 @@ def build_record_v2(
     schema_version: str = SCHEMA_VERSION_RECORD_V2,
     dominance_order: Sequence[str] = DEFAULT_IDENTITY_QUALITY_DOMINANCE_ORDER,
     debug: Optional[Dict[str, Any]] = None,
+    features_items: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Assemble a record.v2 structure.
 
@@ -594,6 +596,15 @@ def build_record_v2(
         "identity_quality": identity_quality,
         "label": dict(label) if isinstance(label, dict) else {},
     }
+    
+    if features_items is not None:
+        if not isinstance(features_items, (list, tuple)):
+            raise TypeError("features_items must be a sequence if provided")
+        if list(features_items):
+            rec["features"] = {
+                "schema_version": SCHEMA_VERSION_FEATURES_V1,
+                "items": list(features_items),
+            }
 
     if debug is not None:
         if not isinstance(debug, dict):

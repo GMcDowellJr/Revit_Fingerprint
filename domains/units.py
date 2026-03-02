@@ -46,6 +46,8 @@ from core.record_v2 import (
     STATUS_DEGRADED,
     STATUS_BLOCKED,
 )
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 
@@ -187,6 +189,15 @@ def extract(doc, ctx=None):
         # Sort items by k for validator determinism.
         items_sorted = sorted(items, key=lambda it: it.get("k", ""))
 
+        # ---------------------------
+        # Discovery feature surface (Phase-2 computes stats / classification)
+        # ---------------------------
+        features_items = [
+            make_feature_item(it.get("k"), "s", it.get("v"), it.get("q"))
+            for it in (items_sorted or [])
+            if isinstance(it.get("k"), str)
+        ]
+        
         # Minima: block if any required key q != ok
         required_qs = [spec_q, unit_q]
         required_keys = ["units.spec", "units.unit_type_id"]
@@ -230,6 +241,13 @@ def extract(doc, ctx=None):
                 identity_items=items_sorted,
                 required_qs=(),
                 label=rec_label,
+                features_items=features_items,
+                debug={
+                    "stratum_features": build_stratum_features_v1(
+                        domain="units",
+                        identity_items=items_sorted,
+                    ),
+                },
             )
             # Domain-level signal: v2 cannot be complete if any required key unreadable/missing.
             v2_block_reasons["record_blocked:{}".format(label)] = True
@@ -246,6 +264,13 @@ def extract(doc, ctx=None):
                 identity_items=items_sorted,
                 required_qs=required_qs,
                 label=rec_label,
+                features_items=features_items,
+                debug={
+                    "stratum_features": build_stratum_features_v1(
+                        domain="units",
+                        identity_items=items_sorted,
+                    ),
+                },
             )
             v2_sig_hashes.append(sig_hash)
 

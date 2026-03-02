@@ -48,12 +48,12 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
-
+from core.feature_items import make_feature_item
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
 )
-
+from core.stratum_features import build_stratum_features_v1
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 
@@ -370,6 +370,25 @@ def extract(doc, ctx=None):
             "line_pattern.segments_norm_hash",
         ])
 
+        # ---------------------------
+        # Discovery feature surface (Phase-2 computes stats / classification)
+        # ---------------------------
+        def _pick_identity_item(items, key):
+            for it in (items or []):
+                if it.get("k") == key:
+                    return it
+            return None
+
+        features_items = []
+        for _k, _t in (
+            ("line_pattern.is_solid", "b"),
+            ("line_pattern.segment_count", "i"),
+            ("line_pattern.segments_def_hash", "s"),
+        ):
+            _it = _pick_identity_item(identity_items_sorted, _k)
+            if _it is not None:
+                features_items.append(make_feature_item(_k, _t, _it.get("v"), _it.get("q")))
+                
         # Phase-2 compliant: required identity is segment-based, not UID-based
         required_qs = [seg_count_q]
         blocked_required = any(q != ITEM_Q_OK for q in required_qs)
@@ -424,6 +443,13 @@ def extract(doc, ctx=None):
                 "components": {
                     "element_id": safe_str(getattr(getattr(e, "Id", None), "IntegerValue", "")),
                 },
+            },
+            features_items=features_items,
+            debug={
+                "stratum_features": build_stratum_features_v1(
+                    domain="line_patterns",
+                    identity_items=identity_items_sorted,
+                ),
             },
         )
         
