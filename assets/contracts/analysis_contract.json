@@ -1,0 +1,12 @@
+{
+  "tables": [
+    {"path": "flatten/file_metadata.csv", "required_columns": ["schema_version", "export_run_id", "file_id"], "require_non_zero_rows": true},
+    {"path": "analysis/domain_patterns.csv", "required_columns": ["schema_version", "analysis_run_id", "domain", "pattern_id"], "require_non_zero_rows": true},
+    {"path": "analysis/pattern_presence_file.csv", "required_columns": ["schema_version", "analysis_run_id", "export_run_id", "domain"], "require_non_zero_rows": true},
+    {"path": "analysis/export_membership.csv", "required_columns": ["schema_version", "analysis_run_id", "export_run_id"], "require_non_zero_rows": true},
+    {"path": "analysis/record_pattern_membership.csv", "required_columns": ["schema_version", "analysis_run_id", "record_pk"], "require_non_zero_rows": true},
+    {"path": "analysis/authority_pattern.csv", "required_columns": ["schema_version", "analysis_run_id", "domain", "pattern_id"], "require_non_zero_rows": true},
+    {"path": "analysis/domain_pattern_diagnostics.csv", "required_columns": ["schema_version", "analysis_run_id", "domain"], "require_non_zero_rows": true},
+    {"path": "analysis/manifest.csv", "required_columns": ["schema_version", "analysis_run_id", "analysis_scope_hash"], "require_non_zero_rows": true}
+  ]
+}
