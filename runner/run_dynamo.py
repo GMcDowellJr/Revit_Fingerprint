@@ -112,6 +112,7 @@ from domains import view_templates
 from core.manifest import build_manifest
 from core.features import build_features
 from core.join_key_policy import load_join_key_policies
+from core.export_payload import build_export_payload
 
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
@@ -747,6 +748,7 @@ def run_fingerprint(doc):
     # Back-compat: keep a pointer to domains map (same object shape as _contract.domains)
     fingerprint["_domains"] = contract_domains
     fingerprint["_notes"] = runner_notes
+    fingerprint["_join_key_policies"] = ctx.get("join_key_policies")
 
     return fingerprint
 
@@ -756,22 +758,25 @@ try:
     doc = get_doc()
     fingerprint = run_fingerprint(doc)
 
-    domains_emitted = sorted([k for k in fingerprint.keys() if not str(k).startswith("_")])
+    tool_git_sha = None
+    try:
+        if isinstance(_TOOL_VERSION, str) and "+" in _TOOL_VERSION:
+            tool_git_sha = _TOOL_VERSION.split("+", 1)[1]
+    except Exception:
+        tool_git_sha = None
 
-    if ENABLED_DOMAINS is None:
-        domains_requested = "ALL"
-    else:
-        domains_requested = list(ENABLED_DOMAINS)
+    host_app_version = None
+    try:
+        host_app_version = str(getattr(getattr(doc, "Application", None), "VersionNumber", ""))
+    except Exception:
+        host_app_version = None
 
-    fingerprint["_meta"] = {
-        "repo_root": _REPO_ROOT,
-        "tool_version": _TOOL_VERSION,
-        "runner": "M5",
-        "elapsed_seconds": fingerprint.pop("_elapsed_seconds", None),
-        "elapsed_seconds_total": round(time.perf_counter() - _SCRIPT_START, 3),
-        "domains_requested": domains_requested,
-        "domains_emitted": domains_emitted,
-    }
+    export_payload = build_export_payload(
+        legacy_payload=fingerprint,
+        tool_version=_TOOL_VERSION,
+        tool_git_sha=tool_git_sha,
+        host_app_version=host_app_version,
+    )
 
     # ------------------------------------------------------------
     # Output strategy:
@@ -962,7 +967,7 @@ try:
         force_full_out = False
 
     if output_path and not force_full_out:
-        paths, bytes_written, sha256, write_sec_total, write_errors = _write_fingerprint(output_path, fingerprint)
+        paths, bytes_written, sha256, write_sec_total, write_errors = _write_fingerprint(output_path, export_payload)
 
         t_total_done = round(time.perf_counter() - _SCRIPT_START, 3)
 
@@ -982,14 +987,14 @@ try:
                 "json_write_sec_total": write_sec_total,
                 "total_done_sec_from_start": t_total_done,
             },
-            "_meta": fingerprint.get("_meta", {}),
+            "meta": export_payload.get("meta", {}),
         }
 
         OUT = json.dumps(summary, indent=2, sort_keys=True)
 
     else:
         # Legacy behavior: return full JSON through Dynamo (may hang on large payloads)
-        OUT = json.dumps(fingerprint, indent=2, sort_keys=True)
+        OUT = json.dumps(export_payload, indent=2, sort_keys=True)
 
 except Exception as e:
     import traceback as _traceback
