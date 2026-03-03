@@ -33,6 +33,7 @@ from tools.io_export import (
     get_id_sig_hash,
     get_record_label,
     get_top_contract,
+    get_top_manifest,
     iter_domains as io_iter_domains,
 )
 
@@ -141,34 +142,158 @@ def _get_tool_version() -> str:
 
 def _identity_metadata(data: Dict[str, Any]) -> Dict[str, str]:
     identity = data.get("identity") if isinstance(data.get("identity"), dict) else {}
+    meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
     contract = get_top_contract(data) if isinstance(get_top_contract(data), dict) else {}
+    manifest = get_top_manifest(data) if isinstance(get_top_manifest(data), dict) else {}
+
     contract_ident = contract.get("identity") if isinstance(contract.get("identity"), dict) else {}
+    manifest_ident = manifest.get("identity") if isinstance(manifest.get("identity"), dict) else {}
+    meta_ident = meta.get("identity") if isinstance(meta.get("identity"), dict) else {}
+
     phase2 = identity.get("phase2") if isinstance(identity.get("phase2"), dict) else {}
     lineage_items = phase2.get("lineage_items") if isinstance(phase2.get("lineage_items"), dict) else {}
 
     central_path = _safe_str(
         lineage_items.get("central_path")
+        or meta_ident.get("central_path")
         or contract_ident.get("central_path")
+        or manifest_ident.get("central_path")
         or identity.get("central_path")
+        or meta.get("central_path")
         or data.get("central_path")
     )
+
     return {
-        "project_label": _safe_str(identity.get("project_title") or contract_ident.get("project_title")),
+        "project_id": _safe_str(
+            contract_ident.get("project_id")
+            or manifest_ident.get("project_id")
+            or meta_ident.get("project_id")
+            or identity.get("project_id")
+            or meta.get("project_id")
+        ),
+        "model_id": _safe_str(
+            contract_ident.get("model_id")
+            or manifest_ident.get("model_id")
+            or meta_ident.get("model_id")
+            or identity.get("model_id")
+            or meta.get("model_id")
+        ),
+        "project_label": _safe_str(
+            identity.get("project_title")
+            or contract_ident.get("project_title")
+            or manifest_ident.get("project_title")
+            or meta_ident.get("project_title")
+            or meta.get("project_title")
+        ),
         "model_label": _safe_str(
             lineage_items.get("filename")
             or identity.get("filename")
             or identity.get("model_title")
             or contract_ident.get("model_title")
+            or manifest_ident.get("model_title")
+            or meta_ident.get("model_title")
+            or meta.get("model_title")
         ),
         "central_path": central_path,
-        "central_path_norm": _safe_str(lineage_items.get("central_path_norm") or _norm_central_path(central_path)),
-        "lineage_hash": _safe_str(phase2.get("lineage_hash") or data.get("lineage_hash") or data.get("_lineage_hash")),
-        "revit_version_number": _safe_str(identity.get("revit_version_number") or contract_ident.get("revit_version_number")),
-        "revit_version_name": _safe_str(identity.get("revit_version_name") or contract_ident.get("revit_version_name")),
-        "revit_build": _safe_str(identity.get("revit_build") or contract_ident.get("revit_build")),
-        "is_workshared": _safe_str(identity.get("is_workshared") if "is_workshared" in identity else contract_ident.get("is_workshared")),
+        "central_path_norm": _safe_str(
+            lineage_items.get("central_path_norm")
+            or meta_ident.get("central_path_norm")
+            or contract_ident.get("central_path_norm")
+            or manifest_ident.get("central_path_norm")
+            or _norm_central_path(central_path)
+        ),
+        "lineage_hash": _safe_str(
+            phase2.get("lineage_hash")
+            or meta_ident.get("lineage_hash")
+            or contract_ident.get("lineage_hash")
+            or manifest_ident.get("lineage_hash")
+            or meta.get("lineage_hash")
+            or data.get("lineage_hash")
+            or data.get("_lineage_hash")
+        ),
+        "revit_version_number": _safe_str(
+            identity.get("revit_version_number")
+            or contract_ident.get("revit_version_number")
+            or manifest_ident.get("revit_version_number")
+            or meta_ident.get("revit_version_number")
+            or meta.get("revit_version_number")
+        ),
+        "revit_version_name": _safe_str(
+            identity.get("revit_version_name")
+            or contract_ident.get("revit_version_name")
+            or manifest_ident.get("revit_version_name")
+            or meta_ident.get("revit_version_name")
+            or meta.get("revit_version_name")
+        ),
+        "revit_build": _safe_str(
+            identity.get("revit_build")
+            or contract_ident.get("revit_build")
+            or manifest_ident.get("revit_build")
+            or meta_ident.get("revit_build")
+            or meta.get("revit_build")
+        ),
+        "is_workshared": _safe_str(
+            identity.get("is_workshared") if "is_workshared" in identity else (
+                contract_ident.get("is_workshared")
+                if "is_workshared" in contract_ident
+                else (
+                    manifest_ident.get("is_workshared")
+                    if "is_workshared" in manifest_ident
+                    else (meta_ident.get("is_workshared") if "is_workshared" in meta_ident else meta.get("is_workshared"))
+                )
+            )
+        ),
     }
 
+
+
+
+def _iter_status_reasons(rec: Dict[str, Any]) -> List[str]:
+    out: List[str] = []
+    for src in (
+        rec.get("status_reasons"),
+        (rec.get("diagnostics") or {}).get("status_reasons") if isinstance(rec.get("diagnostics"), dict) else None,
+        (rec.get("diagnostics") or {}).get("reasons") if isinstance(rec.get("diagnostics"), dict) else None,
+    ):
+        if isinstance(src, list):
+            for reason in src:
+                if isinstance(reason, str) and reason.strip():
+                    out.append(reason.strip())
+                elif isinstance(reason, dict):
+                    code = reason.get("code") if isinstance(reason.get("code"), str) else ""
+                    detail = reason.get("detail") if isinstance(reason.get("detail"), str) else ""
+                    joined = code or detail
+                    if joined:
+                        out.append(joined)
+    return out
+
+
+def _get_label_components(rec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    label = rec.get("label")
+    if isinstance(label, dict) and isinstance(label.get("components"), dict):
+        return label.get("components")
+    diagnostics = rec.get("diagnostics")
+    if isinstance(diagnostics, dict):
+        for k in ("label_components", "components"):
+            v = diagnostics.get(k)
+            if isinstance(v, dict):
+                return v
+        dlab = diagnostics.get("label")
+        if isinstance(dlab, dict) and isinstance(dlab.get("components"), dict):
+            return dlab.get("components")
+    return None
+
+
+def _get_stratum_features(rec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    dbg = rec.get("debug")
+    if isinstance(dbg, dict) and isinstance(dbg.get("stratum_features"), dict):
+        return dbg.get("stratum_features")
+    diagnostics = rec.get("diagnostics")
+    if isinstance(diagnostics, dict):
+        sf = diagnostics.get("stratum_features")
+        if isinstance(sf, dict):
+            return sf
+    return None
 
 def _norm_central_path(path: str) -> str:
     s = (path or "").strip().replace("\\", "/")
@@ -309,8 +434,8 @@ def emit_flatten(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
             "schema_version": SCHEMA_VERSION,
             "export_run_id": export_run_id,
             "file_id": file_id,
-            "project_id": _safe_str(ident.get("project_id") or ident.get("project_title")),
-            "model_id": _safe_str(ident.get("model_id") or ident.get("model_title")),
+            "project_id": _safe_str(identity_meta["project_id"] or ident.get("project_id") or ident.get("project_title")),
+            "model_id": _safe_str(identity_meta["model_id"] or ident.get("model_id") or ident.get("model_title")),
             "project_label": identity_meta["project_label"],
             "model_label": identity_meta["model_label"],
             "central_path": identity_meta["central_path"],
@@ -362,16 +487,15 @@ def emit_flatten(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                 }
                 record_rows.append(row)
 
-                for reason in rec.get("status_reasons") if isinstance(rec.get("status_reasons"), list) else []:
-                    if isinstance(reason, str) and reason:
-                        reason_rows.append({
-                            "schema_version": SCHEMA_VERSION,
-                            "export_run_id": export_run_id,
-                            "domain": domain,
-                            "record_pk": record_pk,
-                            "reason_code": reason,
-                            "reason_detail": "",
-                        })
+                for reason in _iter_status_reasons(rec):
+                    reason_rows.append({
+                        "schema_version": SCHEMA_VERSION,
+                        "export_run_id": export_run_id,
+                        "domain": domain,
+                        "record_pk": record_pk,
+                        "reason_code": _safe_str(reason),
+                        "reason_detail": "",
+                    })
 
                 items = get_definition_items(rec)
                 if isinstance(items, list):
@@ -392,8 +516,7 @@ def emit_flatten(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                 # ---------------------------
                 # Feature items (discovery surface)
                 # ---------------------------
-                feats = rec.get("features") if isinstance(rec.get("features"), dict) else None
-                feat_items = feats.get("items") if isinstance(feats, dict) else None
+                feat_items = get_definition_items(rec)
                 if isinstance(feat_items, list):
                     for it in feat_items:
                         if not isinstance(it, dict):
@@ -419,10 +542,9 @@ def emit_flatten(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                         })
 
                 # ---------------------------
-                # Stratum features (debug surface)
+                # Stratum features (debug/diagnostics surface)
                 # ---------------------------
-                dbg = rec.get("debug") if isinstance(rec.get("debug"), dict) else None
-                sf = dbg.get("stratum_features") if isinstance(dbg, dict) else None
+                sf = _get_stratum_features(rec)
                 if isinstance(sf, dict):
                     discs = sf.get("discriminators")
                     if not isinstance(discs, list):
@@ -437,8 +559,8 @@ def emit_flatten(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                         "shape": _safe_str(sf.get("shape")),
                         "discriminators_json": json.dumps(discs, ensure_ascii=False, sort_keys=True),
                     })
-                    
-                comps = (rec.get("label") or {}).get("components") if isinstance(rec.get("label"), dict) else None
+
+                comps = _get_label_components(rec)
                 if isinstance(comps, dict):
                     for order, key in enumerate(sorted(comps.keys(), key=str)):
                         val = comps.get(key)
