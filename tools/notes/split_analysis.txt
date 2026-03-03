@@ -1,4 +1,4 @@
-python tools/run_split_detection_all.py `
+python tools/analysis/run_split_detection_all.py `
 	C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all `
 	--domain dimension_types  `
 	--threshold 0.50 `
@@ -37,7 +37,7 @@ $EXPORTS = "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all_merged"
 $DOMAIN  = "arrowheads"   # e.g. "line_patterns"
 $OUTROOT = "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all_merged\split_analysis\$DOMAIN"
 
-python tools/run_split_detection_all.py `
+python tools/analysis/run_split_detection_all.py `
   $EXPORTS `
   --domain $DOMAIN `
   --out-root $OUTROOT
@@ -98,7 +98,7 @@ $DOMAINS = @("fill_patterns","line_patterns","line_styles","object_styles","phas
 foreach ($DOMAIN in $DOMAINS) {
   $OUTROOT = "C:\Users\gmcdowell\Documents\Fingerprint_Out\projects\all_merged\split_analysis\$DOMAIN"
 
-  python tools/run_split_detection_all.py $EXPORTS --domain $DOMAIN --out-root $OUTROOT
+  python tools/analysis/run_split_detection_all.py $EXPORTS --domain $DOMAIN --out-root $OUTROOT
 
   python -m tools.phase2_analysis.emit_intradomain_definition `
     "$OUTROOT\file_level\$DOMAIN.file_clusters.csv" `

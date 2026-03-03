@@ -27,6 +27,19 @@
 - `tools/run_extract_all.py` -> `tools/governance/run_pipeline.py`
 - `tools/validate_v21_contract.py` -> `tools/governance/validate_contract.py`
 - `tools/probes/` -> `research/probes/`
+- `tools/run_split_detection_all.py` -> `tools/analysis/run_split_detection_all.py`
+- `tools/phase1_domain_authority.py` -> `tools/analysis/population/phase1_domain_authority.py`
+- `tools/phase1_population_framing.py` -> `tools/analysis/population/phase1_population_framing.py`
+- `tools/phase1_pairwise_analysis.py` -> `tools/analysis/population/phase1_pairwise_analysis.py`
+- `tools/pareto_joinkey_search.py` -> `tools/pareto/joinkey_search.py`
+- `tools/pareto_make_shape_inputs.py` -> `tools/pareto/make_shape_inputs.py`
+- `tools/export_to_flat_tables.py` -> `tools/export/export_to_flat_tables.py`
+- `tools/details_to_csv.py` -> `tools/export/details_to_csv.py`
+- `tools/merge_split_exports.py` -> `tools/export/merge_split_exports.py`
+- `tools/example_use_split_export.py` -> `tools/export/example_use_split_export.py`
+- `tools/compare_manifest.py` -> `tools/governance/compare_manifest.py`
+- `tools/diagnose_phase1_empty.py` -> `tools/governance/diagnose_phase1_empty.py`
+- `tools/compute_synthetic_keys.py` -> `tools/flatten/utils/compute_synthetic_keys.py`
 
 ## Output path migration
 

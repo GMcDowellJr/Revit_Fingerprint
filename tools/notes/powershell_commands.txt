@@ -16,19 +16,19 @@ python tools\details_to_csv.py --details_json "C:\Users\gmcdowell\Stantec\USW Ka
 
 phase 1
 
-python tools/phase1_domain_authority.py `
+python tools/analysis/population/phase1_domain_authority.py `
 	--input-dir "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects" `
 	--config "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\run_config.json" `
 	--seed-baseline "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.json" `
 	--out-dir "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1"
 
-python tools/phase1_population_framing.py `
+python tools/analysis/population/phase1_population_framing.py `
 	--domain-clusters "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1\domain_cluster_summary.csv" `
 	--domain-authority "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1\domain_authority_summary.csv" `
 	--run-config "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1\run_config.resolved.json" `
 	--out "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1\domain_population_framing.csv"
 
-python tools/phase1_pairwise_analysis.py `
+python tools/analysis/population/phase1_pairwise_analysis.py `
 	--baseline-coverage "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1\baseline_coverage_by_project.csv" `
 	--out-dir "C:\Users\gmcdowell\Stantec\USW Kaizen - General\08_USW_Kaizen_Model_Health\Revit Fingerprint\projects\out_phase1"
 
@@ -93,32 +93,32 @@ $OutRoot    = Join-Path $ExportsDir "_phase2_out"
 python -m tools.phase2_analysis.run_dimension_types_by_family $ExportsDir --domain $Domain --baseline $Baseline --out $OutRoot --families_from baseline
 
 
-python tools/export_to_flat_tables.py `
+python tools/export/export_to_flat_tables.py `
 --root_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2" `
 --out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out" `
 --domains line_patterns
 
-python tools/export_to_flat_tables.py `
+python tools/export/export_to_flat_tables.py `
 	--root_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out" `
 	--out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results" `
 	--emit records,identity_items `
 	--split_by_domain
 
 
-python tools/pareto_joinkey_search.py `
+python tools/pareto/joinkey_search.py `
   --records "C:\Users\gmcdowell\Documents\Fingerprint_Out\records.csv" `
   --items "C:\Users\gmcdowell\Documents\Fingerprint_Out\identity_items.csv" `
   --max_k 4 `
   --exclude_uid_like `
 --out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out"
 
-python tools/pareto_make_shape_inputs.py `
+python tools/pareto/make_shape_inputs.py `
 	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\records__line_patterns.csv" `
 	--items "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\identity_items__line_patterns.csv" `
 	--out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2" `
 	--domain line_patterns
 
-python tools/pareto_joinkey_search.py `
+python tools/pareto/joinkey_search.py `
 	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\records__line_patterns.csv" `
 	--items "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\identity_items__line_patterns.csv" `
 	--max_k 4 `
@@ -127,7 +127,7 @@ python tools/pareto_joinkey_search.py `
 
 
 
-python tools/pareto_joinkey_search.py `
+python tools/pareto/joinkey_search.py `
 	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\records__view_filter_definitions.csv" `
 	--items   "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\identity_items__view_filter_definitions.csv" `
 	--max_k 4 `
@@ -137,7 +137,7 @@ python tools/pareto_joinkey_search.py `
 	--out_dir "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2" `
 	--pareto_name pareto_front__view_filter_definitions__discovery.csv
 
-python tools/pareto_joinkey_search.py `
+python tools/pareto/joinkey_search.py `
 	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\records__line_patterns.csv" `
 	--items   "C:\Users\gmcdowell\Documents\Fingerprint_Out\Phase2\identity_items__line_patterns.csv" `
 	--max_k 4 `
@@ -147,7 +147,7 @@ python tools/pareto_joinkey_search.py `
 	--pareto_name pareto_front__line_patterns__discovery.csv
 	
 	
-python tools/pareto_joinkey_search.py `
+python tools/pareto/joinkey_search.py `
 	--records "...\phase0_flat\records.csv" `
 	--items   "...\phase0_flat\identity_items.csv" `
 	--domain view_filter_definitions `
@@ -158,41 +158,41 @@ python tools/pareto_joinkey_search.py `
 	--out_dir "...\Phase2" `
 	--pareto_name pareto_front__view_filter_definitions__discovery.csv
 
-python tools/pareto_make_shape_inputs.py `
+python tools/pareto/make_shape_inputs.py `
 	--records phase0_flat\records.csv `
 	--items   phase0_flat\identity_items.csv `
 	--domain dimension_types `
 	--out_dir phase2\shape_inputs
 
 
-python tools/run_extract_all.py "C:\Users\gmcdowell\Documents\Fingerprint_Out" `
+python tools/governance/run_pipeline.py "C:\Users\gmcdowell\Documents\Fingerprint_Out" `
 	--out-root "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results" `
 	--config "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\run_config.json" `
 	--seed-baseline fp__rvt-000000000_Stn_ARCH-Interiors_Template_R25__00008178__fingerprint.details.json
 
 
-python tools/run_extract_all.py "<ExportsDir>" 
+python tools/governance/run_pipeline.py "<ExportsDir>" 
 	--out-root "<OutRoot>" 
 	--config "<Phase1RunConfig.json>"
 
-python tools/run_extract_all.py "<ExportsDir>" 
+python tools/governance/run_pipeline.py "<ExportsDir>" 
 --out-root "<OutRoot>" 
 --config "<Phase1RunConfig.json>" 
 --no-dimtypes-by-family
 
-python tools/run_extract_all.py "<ExportsDir>" --out-root "<OutRoot>" --config "<Phase1RunConfig.json>" --baseline "<BaselineExportFilename.details.json>"
+python tools/governance/run_pipeline.py "<ExportsDir>" --out-root "<OutRoot>" --config "<Phase1RunConfig.json>" --baseline "<BaselineExportFilename.details.json>"
 
 
-python tools/run_extract_all.py "C:\Users\gmcdowell\Documents\Fingerprint_Out\" `
+python tools/governance/run_pipeline.py "C:\Users\gmcdowell\Documents\Fingerprint_Out\" `
   --out-root "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results" `
   --config "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\phase1_probe_config.json"
 
-python tools/diagnose_phase1_empty.py `
+python tools/governance/diagnose_phase1_empty.py `
     --exports "C:\Users\gmcdowell\Documents\Fingerprint_Out\templates" `
     --config "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\phase1_probe_config.json" `
     --phase1-out "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase1_authority"
 	
-python tools/pareto_joinkey_search.py `
+python tools/pareto/joinkey_search.py `
 	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase0_flat\records.csv" `
 	--items   "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase0_flat\identity_items.csv" `
 	--domain fill_patterns `
@@ -205,7 +205,7 @@ python tools/pareto_joinkey_search.py `
 	--out_dir C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase2_pareto `
 	--pareto_name pareto_front__fill_patterns__validate.csv
 
-python tools/pareto_joinkey_search.py `
+python tools/pareto/joinkey_search.py `
 	--records "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase0_flat\records.csv" `
 	--items   "C:\Users\gmcdowell\Documents\Fingerprint_Out\Results\phase0_flat\identity_items.csv" `
 	--domain arrowheads `

@@ -591,14 +591,14 @@ def main() -> None:
             sys.stderr.write("[WARN extract_all] --config not provided; skipping analyze1 legacy outputs.\n")
         else:
             _ensure_dir(phase1_dir)
-            cmd1a = [sys.executable, "tools/phase1_domain_authority.py", "--input-dir", str(exports_dir), "--config", str(Path(args.config).resolve()), "--out-dir", str(phase1_dir)]
+            cmd1a = [sys.executable, "tools/analysis/population/phase1_domain_authority.py", "--input-dir", str(exports_dir), "--config", str(Path(args.config).resolve()), "--out-dir", str(phase1_dir)]
             if args.seed_baseline:
                 sb = Path(args.seed_baseline)
                 seed_path = (exports_dir / sb) if not sb.is_absolute() else sb
                 cmd1a += ["--seed-baseline", str(seed_path.resolve())]
             _run(cmd1a, env=env)
-            _run([sys.executable, "tools/phase1_population_framing.py", "--domain-clusters", str(phase1_dir / "domain_cluster_summary.csv"), "--domain-authority", str(phase1_dir / "domain_authority_summary.csv"), "--run-config", str(Path(args.config).resolve()), "--out", str(phase1_dir / "population_baseline_summary.csv")], env=env)
-            _run([sys.executable, "tools/phase1_pairwise_analysis.py", "--baseline-coverage", str(phase1_dir / "baseline_coverage_by_project.csv"), "--out-dir", str(phase1_dir)], env=env)
+            _run([sys.executable, "tools/analysis/population/phase1_population_framing.py", "--domain-clusters", str(phase1_dir / "domain_cluster_summary.csv"), "--domain-authority", str(phase1_dir / "domain_authority_summary.csv"), "--run-config", str(Path(args.config).resolve()), "--out", str(phase1_dir / "population_baseline_summary.csv")], env=env)
+            _run([sys.executable, "tools/analysis/population/phase1_pairwise_analysis.py", "--baseline-coverage", str(phase1_dir / "baseline_coverage_by_project.csv"), "--out-dir", str(phase1_dir)], env=env)
 
     if "analyze2" in selected_stages and args.emit_legacy:
         _ensure_dir(run_root / "analysis_legacy")
@@ -629,7 +629,7 @@ def main() -> None:
         if use_phase0_dir and require_join_policy:
             _enforce_policy_gate(_read_csv_rows(phase0_records_csv), run_root / "diagnostics", split_domains, allow_sig_hash_join_key)
         for split_domain in split_domains:
-            cmd_split = [sys.executable, "tools/run_split_detection_all.py", str(exports_dir), "--domain", split_domain, "--out-root", str(split_root / split_domain), "--mode", str(args.mode), *(["--phase0-dir", str(flatten_dir)] if use_phase0_dir else []), *(["--allow-sig-hash-join-key"] if allow_sig_hash_join_key else [])]
+            cmd_split = [sys.executable, "tools/analysis/run_split_detection_all.py", str(exports_dir), "--domain", split_domain, "--out-root", str(split_root / split_domain), "--mode", str(args.mode), *(["--phase0-dir", str(flatten_dir)] if use_phase0_dir else []), *(["--allow-sig-hash-join-key"] if allow_sig_hash_join_key else [])]
             report["commands"].append({"stage": "split", "domain": split_domain, "cmd": cmd_split})
             _run(cmd_split, env=env)
 

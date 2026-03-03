@@ -1,4 +1,4 @@
-# tools/run_split_detection_all.py
+# tools/analysis/run_split_detection_all.py
 """Complete split detection workflow orchestrator."""
 
 from __future__ import annotations
