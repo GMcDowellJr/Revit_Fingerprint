@@ -816,6 +816,7 @@ try:
         tool_git_sha=tool_git_sha,
         host_app_version=host_app_version,
         thinrunner_meta=thinrunner_meta,
+        policy_registry_path=os.path.join(_REPO_ROOT, "policies", "domain_join_key_policies.json"),
     )
 
     # ------------------------------------------------------------

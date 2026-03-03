@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
+import json
 import os
 import platform
 import re
@@ -111,7 +113,7 @@ def _is_provenance_key(k: str) -> bool:
 
 def _is_label_key(k: str) -> bool:
     k = str(k or "").strip().lower()
-    return k.endswith(".name") or k.endswith(".label") or k in {"name", "label", "display_name"}
+    return k.endswith(".name") or k.endswith(".label") or k in {"name", "label", "display_name", "project_title"}
 
 
 def _provenance_field_for_key(k: str) -> str:
@@ -123,6 +125,56 @@ def _provenance_field_for_key(k: str) -> str:
     if lk.endswith(".elem_id") or lk.endswith(".id.int") or "source_element_id" in lk or re.search(r"(^|[._])element_id$", lk):
         return "element_id"
     return re.sub(r"[^a-z0-9_]+", "_", lk).strip("_") or "source_key"
+
+
+def _normalize_blocked(detail: str) -> str:
+    d = str(detail or "").strip().lower()
+    if "not_applicable" in d or d.startswith("unsupported.not_applicable"):
+        return "not_applicable"
+    if "policy" in d and "omitted" in d:
+        return "policy_omitted"
+    if any(x in d for x in ("missing", "parse", "exception", "failed")):
+        return "error"
+    return "unavailable"
+
+
+def _cleanup_unclassified(
+    unclassified: List[Dict[str, Any]],
+    *,
+    definition_keys: set,
+    provenance_source: Dict[str, Any],
+    label_display: str,
+    label_meta: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    alt_names: List[str] = list(label_meta.get("alt_names") or [])
+
+    for it in unclassified:
+        k = str(it.get("k", "")).strip()
+        if not k or k in definition_keys:
+            continue
+        v = it.get("v")
+
+        if _is_provenance_key(k):
+            field = _provenance_field_for_key(k)
+            if field not in provenance_source:
+                provenance_source[field] = _to_int(v) if field == "element_id" else (str(v) if v is not None else None)
+            continue
+
+        if _is_label_key(k):
+            val = str(v).strip() if v is not None else ""
+            if not val:
+                continue
+            if val == label_display:
+                continue
+            alt_names.append(val)
+            continue
+
+        out.append(it)
+
+    if alt_names:
+        label_meta["alt_names"] = sorted(set(alt_names))
+    return sorted(out, key=lambda x: x["k"])
 
 
 def _classify_unknown_items(
@@ -160,7 +212,14 @@ def _classify_unknown_items(
 
         unclassified.append(_typed_item(k, v, it.get("q"), it.get("t")))
 
-    unclassified = sorted(unclassified, key=lambda x: x["k"])
+    unclassified = _cleanup_unclassified(
+        unclassified,
+        definition_keys=definition_keys,
+        provenance_source=source,
+        label_display=label_display or "",
+        label_meta=label_meta,
+    )
+
     return source, label_display, label_meta, unclassified
 
 
@@ -184,26 +243,29 @@ def _build_record(domain_name: str, rec: Dict[str, Any], export_mode: str) -> Tu
     status = str(rec.get("status") or "")
     status_reasons = [str(x) for x in list(rec.get("status_reasons") or [])]
 
-    blocked_reasons = list(status_reasons)
+    blocked_details: List[str] = []
     if status == "blocked":
-        blocked_reasons = blocked_reasons or ["blocked"]
+        blocked_details.extend(status_reasons or ["blocked"])
     if not sig_hash:
-        blocked_reasons = blocked_reasons or []
-        blocked_reasons.append("missing_sig_hash")
+        blocked_details.append("missing_sig_hash")
     if not join_hash:
-        blocked_reasons = blocked_reasons or []
-        blocked_reasons.append("missing_join_hash")
+        blocked_details.append("missing_join_hash")
 
-    if blocked_reasons:
+    if blocked_details:
+        detail = sorted(set(blocked_details))[0]
         blocked_item = {
             "label": display,
-            "reason": sorted(set(blocked_reasons)),
+            "class": _normalize_blocked(detail),
+            "detail": detail,
+            "reasons": status_reasons,
         }
         audit_blocked = None
         if export_mode == "audit":
             audit_blocked = {
                 "label": display,
-                "reason": sorted(set(blocked_reasons)),
+                "class": _normalize_blocked(detail),
+                "detail": detail,
+                "reasons": status_reasons,
                 "record_id": rec.get("record_id"),
             }
         return None, blocked_item, audit_blocked
@@ -252,12 +314,38 @@ def _build_record(domain_name: str, rec: Dict[str, Any], export_mode: str) -> Tu
     return out, None, None
 
 
-def _extract_signature_keys(policy: Dict[str, Any]) -> List[str]:
-    for key in ("signature_keys", "signature", "sig_keys"):
-        vals = policy.get(key)
-        if isinstance(vals, list):
-            return sorted({str(x) for x in vals if str(x).strip()})
-    return []
+def _default_policy_registry_path() -> str:
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(repo_root, "policies", "domain_join_key_policies.json")
+
+
+def _load_policy_registry(policy_registry_path: Optional[str]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    path = policy_registry_path or _default_policy_registry_path()
+    policy_ref = {
+        "policy_id": "domain_join_key_policies",
+        "policy_version": "0.0.0+unknown",
+        "policy_hash": "unknown",
+        "source": "unknown",
+    }
+
+    if not path:
+        return {}, policy_ref
+
+    try:
+        with open(path, "rb") as f:
+            raw = f.read()
+        policy_ref["policy_hash"] = hashlib.sha256(raw).hexdigest()
+        norm = path.replace("\\", "/").lower()
+        policy_ref["source"] = "in_repo" if norm.endswith("/policies/domain_join_key_policies.json") else "external"
+
+        payload = json.loads(raw.decode("utf-8"))
+        if not isinstance(payload, dict):
+            return {}, policy_ref
+        policy_ref["policy_version"] = str(payload.get("schema_version") or "0.0.0+unknown")
+        domains = payload.get("domains") if isinstance(payload.get("domains"), dict) else {}
+        return domains, policy_ref
+    except Exception:
+        return {}, policy_ref
 
 
 def build_export_payload(
@@ -267,6 +355,7 @@ def build_export_payload(
     tool_git_sha: Optional[str],
     host_app_version: Optional[str],
     thinrunner_meta: Optional[Dict[str, Any]] = None,
+    policy_registry_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     export_mode = get_export_mode()
     contract_domains = legacy_payload.get("_contract", {}).get("domains", {}) if isinstance(legacy_payload.get("_contract"), dict) else {}
@@ -276,26 +365,7 @@ def build_export_payload(
     tr_exporter = tr_meta.get("exporter") if isinstance(tr_meta.get("exporter"), dict) else {}
     tr_host = tr_meta.get("host") if isinstance(tr_meta.get("host"), dict) else {}
 
-    domain_policies_raw = legacy_payload.get("_join_key_policies") if isinstance(legacy_payload.get("_join_key_policies"), dict) else {}
-    if isinstance(domain_policies_raw.get("domains"), dict):
-        domain_policies_raw = domain_policies_raw.get("domains")
-    domain_policies: Dict[str, Any] = {}
-    for domain_name in sorted(str(k) for k in domain_policies_raw.keys()):
-        pol = domain_policies_raw.get(domain_name)
-        if not isinstance(pol, dict):
-            continue
-        required_keys = sorted({str(x) for x in list(pol.get("required") or []) if str(x).strip()})
-        optional_keys = sorted({str(x) for x in list(pol.get("optional") or []) if str(x).strip()})
-        signature_keys = _extract_signature_keys(pol)
-        policy_out: Dict[str, Any] = {
-            "join_policy_id": pol.get("policy_id") or f"{domain_name}.join_key",
-            "join_policy_version": pol.get("version") or "0.1.0",
-            "required_keys": required_keys,
-            "optional_keys": optional_keys,
-        }
-        if signature_keys and signature_keys != required_keys:
-            policy_out["signature_keys"] = signature_keys
-        domain_policies[domain_name] = policy_out
+    policy_domains, policy_ref = _load_policy_registry(policy_registry_path)
 
     domains_out: Dict[str, Any] = {}
     for domain_name in domains_expected:
@@ -323,6 +393,8 @@ def build_export_payload(
             raw_count = len(records)
 
         env = contract_domains.get(domain_name) if isinstance(contract_domains.get(domain_name), dict) else {}
+        warnings = list(env.get("warnings") or [])
+
         summary = {
             "raw_count": int(raw_count),
             "exported_count": len(records),
@@ -331,7 +403,7 @@ def build_export_payload(
         assert summary["exported_count"] == len(records)
 
         diag: Dict[str, Any] = {
-            "warnings": [],
+            "warnings": warnings,
             "block_reasons": list(env.get("block_reasons") or []),
         }
         if blocked_records:
@@ -344,6 +416,22 @@ def build_export_payload(
             "summary": summary,
             "diag": diag,
             "records": records,
+        }
+
+    domain_policies: Dict[str, Any] = {}
+    for domain_name in sorted(domains_out.keys()):
+        pol = policy_domains.get(domain_name)
+        if not isinstance(pol, dict):
+            domain_policies[domain_name] = {"missing_policy": True}
+            domains_out[domain_name]["diag"]["warnings"].append("missing_policy")
+            continue
+        domain_policies[domain_name] = {
+            "join_key_schema": pol.get("join_key_schema"),
+            "hash_alg": pol.get("hash_alg"),
+            "required_keys": list(pol.get("required_items") or []),
+            "optional_keys": list(pol.get("optional_items") or []),
+            "explicitly_excluded_keys": list(pol.get("explicitly_excluded_items") or []),
+            "shape_gating": pol.get("shape_gating") if isinstance(pol.get("shape_gating"), dict) else None,
         }
 
     exporter_name = _coalesce(
@@ -383,8 +471,8 @@ def build_export_payload(
         "manifest": {
             "schema": {"id": "fingerprint.manifest", "version": "0.2.0"},
             "domains_expected": domains_expected,
+            "policy_ref": policy_ref,
             "domain_policies": domain_policies,
-            "policy_notes": "signature_keys omitted when identical to required_keys",
             "record_requirements": {
                 "required_paths": ["domain", "id.sig_hash", "id.join_hash", "label.display", "definition.items"],
             },
