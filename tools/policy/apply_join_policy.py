@@ -5,13 +5,19 @@ import argparse
 import csv
 import json
 from pathlib import Path
+import sys
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from typing import Dict, List
 
 try:
-    from tools.join_key_derivation_phase05 import md5_utf8_join_pipe, serialize_identity_items
+    from tools.policy.join_key_derivation import md5_utf8_join_pipe, serialize_identity_items
     from tools.join_key_discovery.eval import build_candidate_join_key_with_details, build_identity_index, normalize_policy_block
 except ModuleNotFoundError:
-    from join_key_derivation_phase05 import md5_utf8_join_pipe, serialize_identity_items
+    from tools.policy.join_key_derivation import md5_utf8_join_pipe, serialize_identity_items
     from join_key_discovery.eval import build_candidate_join_key_with_details, build_identity_index, normalize_policy_block
 
 

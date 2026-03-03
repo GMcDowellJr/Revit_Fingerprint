@@ -6,6 +6,12 @@ import csv
 import hashlib
 import json
 from pathlib import Path
+import sys
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from typing import Dict, List, Sequence
 
 try:
@@ -24,9 +30,9 @@ def _read_csv(path: Path) -> List[Dict[str, str]]:
 def _pareto_search_adapter(domain_records, identity_index, candidate_fields, cfg):
     try:
         try:
-            from tools.pareto_joinkey_search import pareto_search
+            from tools.pareto.joinkey_search import pareto_search
         except ModuleNotFoundError:
-            from pareto_joinkey_search import pareto_search
+            from tools.pareto.joinkey_search import pareto_search
         return pareto_search(domain_records, identity_index, candidate_fields, cfg)
     except ModuleNotFoundError:
         return {"frontier": [], "chosen": None, "error": "pareto_dependency_missing"}
