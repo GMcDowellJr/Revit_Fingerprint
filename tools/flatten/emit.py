@@ -27,6 +27,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from tools.io_export import (
+    get_definition_items,
+    get_domain_records,
+    get_id_sig_hash,
+    get_record_label,
+    get_top_contract,
+    iter_domains as io_iter_domains,
+)
+
 SCHEMA_VERSION = "2.1.0"
 STANDARD_PRESENCE_MIN = 0.75
 DOMINANT_SHARE_MIN = 0.50
@@ -105,16 +114,7 @@ def _merge_index_details(index_fp: Dict[str, Any], details_fp: Dict[str, Any]) -
 
 
 def _iter_domains(d: Dict[str, Any]) -> List[str]:
-    c = d.get("_contract")
-    if isinstance(c, dict):
-        doms = c.get("domains")
-        if isinstance(doms, dict):
-            return sorted([str(k) for k in doms.keys()])
-    out: List[str] = []
-    for k, v in d.items():
-        if isinstance(k, str) and not k.startswith("_") and isinstance(v, dict) and isinstance(v.get("records"), list):
-            out.append(k)
-    return sorted(out)
+    return sorted([str(k) for k in io_iter_domains(d)])
 
 
 def _file_id(path: Path, mode: str) -> str:
@@ -141,7 +141,7 @@ def _get_tool_version() -> str:
 
 def _identity_metadata(data: Dict[str, Any]) -> Dict[str, str]:
     identity = data.get("identity") if isinstance(data.get("identity"), dict) else {}
-    contract = data.get("_contract") if isinstance(data.get("_contract"), dict) else {}
+    contract = get_top_contract(data) if isinstance(get_top_contract(data), dict) else {}
     contract_ident = contract.get("identity") if isinstance(contract.get("identity"), dict) else {}
     phase2 = identity.get("phase2") if isinstance(identity.get("phase2"), dict) else {}
     lineage_items = phase2.get("lineage_items") if isinstance(phase2.get("lineage_items"), dict) else {}
@@ -302,7 +302,7 @@ def emit_flatten(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
         export_run_id = _file_id(primary, file_id_mode)
         file_id = export_run_id
 
-        contract = data.get("_contract") if isinstance(data.get("_contract"), dict) else {}
+        contract = get_top_contract(data) if isinstance(get_top_contract(data), dict) else {}
         ident = contract.get("identity") if isinstance(contract.get("identity"), dict) else {}
         identity_meta = _identity_metadata(data)
         meta_rows.append({
@@ -325,8 +325,7 @@ def emit_flatten(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
         })
 
         for domain in _iter_domains(data):
-            payload = data.get(domain)
-            recs = payload.get("records") if isinstance(payload, dict) else None
+            recs = get_domain_records(data, domain)
             if not isinstance(recs, list):
                 continue
             for i, rec in enumerate(recs):
@@ -339,7 +338,8 @@ def emit_flatten(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                 # - keep sig_hash as-is
                 # - set join_hash = sig_hash
                 # - set join_key_schema = sig_hash_as_join_key.v1
-                sig_hash_v = _safe_str(rec.get("sig_hash") or (rec.get("identity_basis", {}) or {}).get("sig_hash"))
+                sig_hash_v = _safe_str(get_id_sig_hash(rec))
+                label_obj = rec.get("label") if isinstance(rec.get("label"), dict) else {}
                 row = {
                     "schema_version": SCHEMA_VERSION,
                     "export_run_id": export_run_id,
@@ -356,9 +356,9 @@ def emit_flatten(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                     "join_key_status": "bootstrap",
                     "join_key_policy_id": "",
                     "join_key_policy_version": "",
-                    "label_display": _safe_str((rec.get("label") or {}).get("display")),
-                    "label_quality": _safe_str((rec.get("label") or {}).get("quality")),
-                    "label_provenance": _safe_str((rec.get("label") or {}).get("provenance")),
+                    "label_display": _safe_str(label_obj.get("display") or get_record_label(rec)),
+                    "label_quality": _safe_str(label_obj.get("quality")),
+                    "label_provenance": _safe_str(label_obj.get("provenance")),
                 }
                 record_rows.append(row)
 
@@ -373,7 +373,7 @@ def emit_flatten(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                             "reason_detail": "",
                         })
 
-                items = (rec.get("identity_basis") or {}).get("items") if isinstance(rec.get("identity_basis"), dict) else None
+                items = get_definition_items(rec)
                 if isinstance(items, list):
                     for it in items:
                         if not isinstance(it, dict):

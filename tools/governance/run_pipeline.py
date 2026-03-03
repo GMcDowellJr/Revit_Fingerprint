@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from tools.flatten.emit import emit_analysis, emit_flatten
 from tools.io.pathing import resolve_out_dir
+from tools.io_export import iter_domains as io_iter_domains, get_top_contract
 
 
 def _run_id() -> str:
@@ -136,15 +137,10 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
 
 
 def _discover_domains_from_exports(exports_dir: Path) -> List[str]:
-    """
-    Best-effort discovery of domains from fingerprint JSON exports.
-    Assumes domains are top-level keys excluding meta keys (leading underscore) and known non-domain keys.
-    Deterministic: returns sorted list.
-    """
+    """Best-effort discovery of domains from fingerprint JSON exports."""
     exports_dir = Path(exports_dir)
     domains: set[str] = set()
 
-    # Scan a limited set first for speed; fall back to full scan if needed.
     candidates = sorted(exports_dir.glob("*.json"))
     if not candidates:
         return []
@@ -159,16 +155,9 @@ def _discover_domains_from_exports(exports_dir: Path) -> List[str]:
         if not isinstance(data, dict):
             continue
 
-        for k, v in data.items():
-            if not isinstance(k, str):
-                continue
-            if k.startswith("_"):
-                continue
-            if k in ("artifacts",):
-                continue
-            # Domain payloads are typically dict-like.
-            if isinstance(v, dict):
-                domains.add(k)
+        for d in io_iter_domains(data):
+            if isinstance(d, str) and d:
+                domains.add(d)
 
     return sorted(domains, key=lambda s: s.lower())
 
@@ -320,25 +309,13 @@ def _infer_domains(exports_dir: Path) -> List[str]:
     elif details_path:
         fp = _read_json(details_path)
 
-    # Try contract first (most reliable)
-    c = fp.get("_contract")
+    c = get_top_contract(fp)
     if isinstance(c, dict):
         doms = c.get("domains")
         if isinstance(doms, dict):
             return sorted([str(k) for k in doms.keys()])
 
-    # Try _domains (back-compat surface)
-    d = fp.get("_domains")
-    if isinstance(d, dict):
-        return sorted([str(k) for k in d.keys()])
-
-    # Fallback: scan top-level keys for domain-like payloads
-    out: List[str] = []
-    for k, v in fp.items():
-        if not isinstance(k, str) or k.startswith("_"):
-            continue
-        if isinstance(v, dict) and (("records" in v) or ("status" in v) or ("domain_version" in v)):
-            out.append(k)
+    out = [str(d) for d in io_iter_domains(fp) if isinstance(d, str)]
     return sorted(out)
 
 
