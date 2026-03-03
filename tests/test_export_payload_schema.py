@@ -8,6 +8,7 @@ def _legacy_sample(*, nested_policy_shape=False):
             "version": "0.1.0",
             "required": ["a"],
             "optional": ["b"],
+            "signature_keys": ["a", "sig_only"],
         }
     }
     if nested_policy_shape:
@@ -24,7 +25,7 @@ def _legacy_sample(*, nested_policy_shape=False):
         "_join_key_policies": domain_policies,
         "_notes": ["note"],
         "line_patterns": {
-            "count": 1,
+            "count": 2,
             "records": [
                 {
                     "domain": "line_patterns",
@@ -45,18 +46,29 @@ def _legacy_sample(*, nested_policy_shape=False):
                         "unknown_items": [
                             {"k": "line_pattern.source_unique_id", "v": "uid-1", "q": "ok"},
                             {"k": "line_pattern.source_element_id", "v": "42", "q": "ok"},
+                            {"k": "line_pattern.display.label", "v": "LP label", "q": "ok"},
                             {"k": "line_pattern.some_unknown", "v": "z", "q": "unsupported"},
                         ]
                     },
                     "features": {"items": [{"k": "dup", "v": "dup"}]},
-                    "identity_basis_extra": {"items": []},
-                }
+                },
+                {
+                    "domain": "line_patterns",
+                    "record_id": "r2",
+                    "status": "blocked",
+                    "status_reasons": ["blocked_upstream"],
+                    "sig_hash": None,
+                    "label": {"display": "BLOCKED"},
+                    "identity_basis": {"items": [{"k": "gamma", "v": "y", "q": "ok"}]},
+                    "join_key": {"join_hash": None, "keys_used": ["gamma"]},
+                    "phase2": {"unknown_items": [{"k": "line_pattern.uid", "v": "uid-2", "q": "ok"}]},
+                },
             ],
         },
     }
 
 
-def test_export_payload_shape_and_required_paths():
+def test_export_payload_shape_and_required_paths_and_block_filtering():
     out = build_export_payload(
         legacy_payload=_legacy_sample(),
         tool_version="0.0.0+abc",
@@ -64,7 +76,13 @@ def test_export_payload_shape_and_required_paths():
         host_app_version="2025",
     )
     assert set(out.keys()) == {"contract", "manifest", "meta", "notes", "domains"}
-    rec = out["domains"]["line_patterns"]["records"][0]
+
+    dom = out["domains"]["line_patterns"]
+    assert dom["summary"]["exported_count"] == len(dom["records"]) == 1
+    assert dom["summary"]["blocked_count"] == 1
+    assert "blocked_records" in dom["diag"]
+
+    rec = dom["records"][0]
     assert rec["domain"] == "line_patterns"
     assert rec["id"]["sig_hash"] == "md5:abc"
     assert rec["id"]["join_hash"] == "md5:def"
@@ -72,7 +90,7 @@ def test_export_payload_shape_and_required_paths():
     assert "definition" in rec and isinstance(rec["definition"]["items"], list)
 
 
-def test_legacy_keys_removed_and_t_enum_q_enforced():
+def test_no_unknown_items_and_intended_use_and_dedupe():
     out = build_export_payload(
         legacy_payload=_legacy_sample(),
         tool_version="0.0.0+abc",
@@ -80,15 +98,24 @@ def test_legacy_keys_removed_and_t_enum_q_enforced():
         host_app_version="2025",
     )
     rec = out["domains"]["line_patterns"]["records"][0]
+    assert "unknown_items" not in str(rec)
     assert "phase2" not in rec
     assert "features" not in rec
     assert "identity_basis" not in rec
+
     items = rec["definition"]["items"]
+    assert items and all(it.get("u") == "def" for it in items)
     assert {it["t"] for it in items}.issubset({"s", "i", "f", "b", "json"})
     assert {it["q"] for it in items}.issubset({"ok", "warn", "unknown"})
+
+    def_keys = {it["k"] for it in items}
+    for pit in rec["provenance"]["source"].keys():
+        assert pit not in def_keys
+
     assert rec["provenance"]["source"]["element_unique_id"] == "uid-1"
     assert rec["provenance"]["source"]["element_id"] == 42
-    assert rec["diagnostics"]["unknown_items"][0]["k"] == "line_pattern.some_unknown"
+    assert rec["label"]["meta"]["line_pattern.display.label"] == "LP label"
+    assert rec["diagnostics"]["unclassified_items"][0]["k"] == "line_pattern.some_unknown"
 
 
 def test_domain_policies_is_domain_mapping_and_supports_legacy_nested_shape():
@@ -102,29 +129,21 @@ def test_domain_policies_is_domain_mapping_and_supports_legacy_nested_shape():
     assert "domains" not in policies
     assert list(policies.keys()) == ["line_patterns"]
     assert policies["line_patterns"]["required_keys"] == ["a"]
+    assert policies["line_patterns"]["signature_keys"] == ["a", "sig_only"]
 
 
-def test_summary_counts_and_non_null_meta_fields_with_thinrunner_precedence():
+def test_audit_mode_includes_basis_and_blocked_audit_records(monkeypatch):
+    monkeypatch.setenv("REVIT_FINGERPRINT_EXPORT_MODE", "audit")
     out = build_export_payload(
         legacy_payload=_legacy_sample(),
-        tool_version=None,
-        tool_git_sha=None,
-        host_app_version=None,
-        thinrunner_meta={
-            "exporter": {"name": "thinrunner_fp", "version": "0.9.0", "git_sha": "deadbee"},
-            "host": {"python": "CPython 3.9.12", "app": "Revit", "app_version": "2024"},
-        },
+        tool_version="0.0.0+abc",
+        tool_git_sha="abc",
+        host_app_version="2025",
     )
-    dom = out["domains"]["line_patterns"]
-    assert dom["summary"]["exported_count"] == len(dom["records"])
-    assert dom["summary"]["blocked_count"] == 0
-    assert dom["summary"]["raw_count"] == 1
-
-    exporter = out["meta"]["tools"]["exporter"]
-    assert exporter["name"] == "thinrunner_fp"
-    assert exporter["version"] == "0.9.0"
-    assert exporter["git_sha"] == "deadbee"
-    assert out["meta"]["host"]["python"] == "CPython 3.9.12"
+    rec = out["domains"]["line_patterns"]["records"][0]
+    assert "audit" in rec
+    assert sorted(rec["audit"].keys()) == ["join_basis", "sig_basis"]
+    assert "audit_blocked_records" in out["domains"]["line_patterns"]["diag"]
 
 
 def test_meta_fallback_placeholders_when_metadata_missing():
