@@ -140,6 +140,25 @@ def _get_tool_version() -> str:
     return f"{base}+nogit"
 
 
+def _pick_first_non_empty(*vals: Any) -> Any:
+    for v in vals:
+        if v is None:
+            continue
+        if isinstance(v, str) and not v.strip():
+            continue
+        return v
+    return None
+
+
+def _dict_get_path(d: Dict[str, Any], *keys: str) -> Any:
+    cur: Any = d
+    for k in keys:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(k)
+    return cur
+
+
 def _identity_metadata(data: Dict[str, Any]) -> Dict[str, str]:
     identity = data.get("identity") if isinstance(data.get("identity"), dict) else {}
     meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
@@ -153,98 +172,106 @@ def _identity_metadata(data: Dict[str, Any]) -> Dict[str, str]:
     phase2 = identity.get("phase2") if isinstance(identity.get("phase2"), dict) else {}
     lineage_items = phase2.get("lineage_items") if isinstance(phase2.get("lineage_items"), dict) else {}
 
-    central_path = _safe_str(
-        lineage_items.get("central_path")
-        or meta_ident.get("central_path")
-        or contract_ident.get("central_path")
-        or manifest_ident.get("central_path")
-        or identity.get("central_path")
-        or meta.get("central_path")
-        or data.get("central_path")
-    )
+    central_path = _safe_str(_pick_first_non_empty(
+        lineage_items.get("central_path"),
+        _dict_get_path(meta, "source", "central_path"),
+        meta_ident.get("central_path"),
+        contract_ident.get("central_path"),
+        manifest_ident.get("central_path"),
+        identity.get("central_path"),
+        meta.get("central_path"),
+        data.get("central_path"),
+    ))
 
     return {
-        "project_id": _safe_str(
-            contract_ident.get("project_id")
-            or manifest_ident.get("project_id")
-            or meta_ident.get("project_id")
-            or identity.get("project_id")
-            or meta.get("project_id")
-        ),
-        "model_id": _safe_str(
-            contract_ident.get("model_id")
-            or manifest_ident.get("model_id")
-            or meta_ident.get("model_id")
-            or identity.get("model_id")
-            or meta.get("model_id")
-        ),
-        "project_label": _safe_str(
-            identity.get("project_title")
-            or contract_ident.get("project_title")
-            or manifest_ident.get("project_title")
-            or meta_ident.get("project_title")
-            or meta.get("project_title")
-        ),
-        "model_label": _safe_str(
-            lineage_items.get("filename")
-            or identity.get("filename")
-            or identity.get("model_title")
-            or contract_ident.get("model_title")
-            or manifest_ident.get("model_title")
-            or meta_ident.get("model_title")
-            or meta.get("model_title")
-        ),
+        "project_id": _safe_str(_pick_first_non_empty(
+            contract_ident.get("project_id"),
+            manifest_ident.get("project_id"),
+            meta_ident.get("project_id"),
+            _dict_get_path(meta, "source", "project_id"),
+            meta.get("project_id"),
+            identity.get("project_id"),
+        )),
+        "model_id": _safe_str(_pick_first_non_empty(
+            contract_ident.get("model_id"),
+            manifest_ident.get("model_id"),
+            meta_ident.get("model_id"),
+            _dict_get_path(meta, "source", "model_id"),
+            meta.get("model_id"),
+            identity.get("model_id"),
+        )),
+        "project_label": _safe_str(_pick_first_non_empty(
+            identity.get("project_title"),
+            contract_ident.get("project_title"),
+            manifest_ident.get("project_title"),
+            meta_ident.get("project_title"),
+            _dict_get_path(meta, "source", "project_title"),
+            meta.get("project_title"),
+        )),
+        "model_label": _safe_str(_pick_first_non_empty(
+            lineage_items.get("filename"),
+            identity.get("filename"),
+            identity.get("model_title"),
+            contract_ident.get("model_title"),
+            manifest_ident.get("model_title"),
+            meta_ident.get("model_title"),
+            _dict_get_path(meta, "source", "model_title"),
+            meta.get("model_title"),
+            meta.get("filename"),
+        )),
         "central_path": central_path,
-        "central_path_norm": _safe_str(
-            lineage_items.get("central_path_norm")
-            or meta_ident.get("central_path_norm")
-            or contract_ident.get("central_path_norm")
-            or manifest_ident.get("central_path_norm")
-            or _norm_central_path(central_path)
-        ),
-        "lineage_hash": _safe_str(
-            phase2.get("lineage_hash")
-            or meta_ident.get("lineage_hash")
-            or contract_ident.get("lineage_hash")
-            or manifest_ident.get("lineage_hash")
-            or meta.get("lineage_hash")
-            or data.get("lineage_hash")
-            or data.get("_lineage_hash")
-        ),
-        "revit_version_number": _safe_str(
-            identity.get("revit_version_number")
-            or contract_ident.get("revit_version_number")
-            or manifest_ident.get("revit_version_number")
-            or meta_ident.get("revit_version_number")
-            or meta.get("revit_version_number")
-        ),
-        "revit_version_name": _safe_str(
-            identity.get("revit_version_name")
-            or contract_ident.get("revit_version_name")
-            or manifest_ident.get("revit_version_name")
-            or meta_ident.get("revit_version_name")
-            or meta.get("revit_version_name")
-        ),
-        "revit_build": _safe_str(
-            identity.get("revit_build")
-            or contract_ident.get("revit_build")
-            or manifest_ident.get("revit_build")
-            or meta_ident.get("revit_build")
-            or meta.get("revit_build")
-        ),
-        "is_workshared": _safe_str(
-            identity.get("is_workshared") if "is_workshared" in identity else (
-                contract_ident.get("is_workshared")
-                if "is_workshared" in contract_ident
-                else (
-                    manifest_ident.get("is_workshared")
-                    if "is_workshared" in manifest_ident
-                    else (meta_ident.get("is_workshared") if "is_workshared" in meta_ident else meta.get("is_workshared"))
-                )
-            )
-        ),
+        "central_path_norm": _safe_str(_pick_first_non_empty(
+            lineage_items.get("central_path_norm"),
+            _dict_get_path(meta, "source", "central_path_norm"),
+            meta_ident.get("central_path_norm"),
+            contract_ident.get("central_path_norm"),
+            manifest_ident.get("central_path_norm"),
+            meta.get("central_path_norm"),
+            _norm_central_path(central_path),
+        )),
+        "lineage_hash": _safe_str(_pick_first_non_empty(
+            phase2.get("lineage_hash"),
+            _dict_get_path(meta, "source", "lineage_hash"),
+            meta_ident.get("lineage_hash"),
+            contract_ident.get("lineage_hash"),
+            manifest_ident.get("lineage_hash"),
+            meta.get("lineage_hash"),
+            data.get("lineage_hash"),
+            data.get("_lineage_hash"),
+        )),
+        "revit_version_number": _safe_str(_pick_first_non_empty(
+            identity.get("revit_version_number"),
+            contract_ident.get("revit_version_number"),
+            manifest_ident.get("revit_version_number"),
+            meta_ident.get("revit_version_number"),
+            _dict_get_path(meta, "source", "revit_version_number"),
+            meta.get("revit_version_number"),
+        )),
+        "revit_version_name": _safe_str(_pick_first_non_empty(
+            identity.get("revit_version_name"),
+            contract_ident.get("revit_version_name"),
+            manifest_ident.get("revit_version_name"),
+            meta_ident.get("revit_version_name"),
+            _dict_get_path(meta, "source", "revit_version_name"),
+            meta.get("revit_version_name"),
+        )),
+        "revit_build": _safe_str(_pick_first_non_empty(
+            identity.get("revit_build"),
+            contract_ident.get("revit_build"),
+            manifest_ident.get("revit_build"),
+            meta_ident.get("revit_build"),
+            _dict_get_path(meta, "source", "revit_build"),
+            meta.get("revit_build"),
+        )),
+        "is_workshared": _safe_str(_pick_first_non_empty(
+            identity.get("is_workshared") if "is_workshared" in identity else None,
+            contract_ident.get("is_workshared") if "is_workshared" in contract_ident else None,
+            manifest_ident.get("is_workshared") if "is_workshared" in manifest_ident else None,
+            meta_ident.get("is_workshared") if "is_workshared" in meta_ident else None,
+            _dict_get_path(meta, "source", "is_workshared"),
+            meta.get("is_workshared"),
+        )),
     }
-
 
 
 
@@ -278,6 +305,14 @@ def _get_label_components(rec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             v = diagnostics.get(k)
             if isinstance(v, dict):
                 return v
+            if isinstance(v, list):
+                out: Dict[str, Any] = {}
+                for i, it in enumerate(v):
+                    if isinstance(it, dict):
+                        kk = it.get("k") or it.get("key") or f"comp_{i:03d}"
+                        out[str(kk)] = it.get("v")
+                if out:
+                    return out
         dlab = diagnostics.get("label")
         if isinstance(dlab, dict) and isinstance(dlab.get("components"), dict):
             return dlab.get("components")
@@ -288,11 +323,16 @@ def _get_stratum_features(rec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     dbg = rec.get("debug")
     if isinstance(dbg, dict) and isinstance(dbg.get("stratum_features"), dict):
         return dbg.get("stratum_features")
+    if isinstance(rec.get("stratum_features"), dict):
+        return rec.get("stratum_features")
     diagnostics = rec.get("diagnostics")
     if isinstance(diagnostics, dict):
         sf = diagnostics.get("stratum_features")
         if isinstance(sf, dict):
             return sf
+        sf2 = diagnostics.get("stratum")
+        if isinstance(sf2, dict) and isinstance(sf2.get("features"), dict):
+            return sf2.get("features")
     return None
 
 def _norm_central_path(path: str) -> str:
@@ -516,7 +556,8 @@ def emit_flatten(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                 # ---------------------------
                 # Feature items (discovery surface)
                 # ---------------------------
-                feat_items = get_definition_items(rec)
+                feats = rec.get("features") if isinstance(rec.get("features"), dict) else None
+                feat_items = feats.get("items") if isinstance(feats, dict) else None
                 if isinstance(feat_items, list):
                     for it in feat_items:
                         if not isinstance(it, dict):
