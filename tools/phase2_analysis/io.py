@@ -5,6 +5,17 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional
 import csv
+
+import sys
+
+# Allow large JSON fields (e.g., discriminators_json) in CSV exports.
+# Default is 131072 bytes which is too small for some domains.
+try:
+    csv.field_size_limit(sys.maxsize)
+except (OverflowError, AttributeError):
+    # Some builds/platforms clamp; fall back to a high safe value.
+    csv.field_size_limit(10 * 1024 * 1024)
+    
 from pathlib import Path
 from typing import Set, Tuple
 
