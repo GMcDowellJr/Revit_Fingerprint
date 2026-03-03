@@ -19,15 +19,15 @@ sys.path.insert(0, str(_TOOLS_DIR))
 try:
     # repo-local when invoked from root
     from join_key_discovery.eval import build_identity_index, build_kv_index, score_candidate_kv
-    from phase2_analysis.io import _read_csv_rows, load_phase0_v21_feature_items, load_phase0_v21_stratum_features
+    from tools.analysis.authority.io import _read_csv_rows, load_phase0_v21_feature_items, load_phase0_v21_stratum_features
 except ModuleNotFoundError:
     # package-local when invoked from tools/
     from join_key_discovery.eval import build_identity_index, build_kv_index, score_candidate_kv
 
 try:
-    from tools.phase2_analysis.io import _read_csv_rows, load_phase0_v21_feature_items, load_phase0_v21_stratum_features
+    from tools.analysis.authority.io import _read_csv_rows, load_phase0_v21_feature_items, load_phase0_v21_stratum_features
 except ModuleNotFoundError:
-    from phase2_analysis.io import _read_csv_rows, load_phase0_v21_feature_items, load_phase0_v21_stratum_features
+    from tools.analysis.authority.io import _read_csv_rows, load_phase0_v21_feature_items, load_phase0_v21_stratum_features
 
 
 def pareto_front(rows: List[dict], objectives: Sequence[str]) -> List[dict]:

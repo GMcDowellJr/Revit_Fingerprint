@@ -450,7 +450,7 @@ def main() -> None:
         '--phase0-dir',
         dest='phase0_dir',
         default=None,
-        help="If provided, read v2.1 Phase0 tables from this directory (Results_v21/phase0_v21).",
+        help="If provided, read v2.1 Phase0 tables from this directory (out/current/flatten).",
     )
     parser.add_argument(
         '--domain',

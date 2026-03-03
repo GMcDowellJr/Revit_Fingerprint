@@ -197,7 +197,7 @@ def load_phase0_v21_stratum_features(phase0_dir: str) -> List[Dict[str, str]]:
 def load_phase0_v21_file_paths(phase0_dir: str) -> Dict[str, str]:
     """Return best-effort file_id/export_run_id -> path for metadata heuristics.
 
-    Uses Results_v21/phase0_v21/file_metadata.csv if present.
+    Uses out/current/flatten/file_metadata.csv if present.
     """
     phase0_dir = os.path.abspath(phase0_dir)
     meta_csv = os.path.join(phase0_dir, "file_metadata.csv")

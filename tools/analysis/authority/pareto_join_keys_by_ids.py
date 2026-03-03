@@ -50,7 +50,7 @@ _DENY_KEY_REGEXES = [
     r"(^|[._])symbol_name$",
 ]
 
-from tools.phase2_analysis.domain_identity_contract import DomainIdentityContract
+from tools.analysis.authority.domain_identity_contract import DomainIdentityContract
 
 _CONTRACT = DomainIdentityContract.load()
 

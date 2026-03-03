@@ -50,7 +50,7 @@ def build_reference_standards_from_clusters(
         print(f"  {std_name}: representative = {rep_file_id}")
         
         if phase0_dir:
-            # CSV mode: read sig_hashes from Results_v21/phase0_v21/phase0_records.csv
+            # CSV mode: read sig_hashes from out/current/flatten/phase0_records.csv
             rec_csv = os.path.join(os.path.abspath(phase0_dir), "phase0_records.csv")
             if not os.path.isfile(rec_csv):
                 sys.stderr.write(f"[WARN] phase0_records.csv not found: {rec_csv}\n")
@@ -138,7 +138,7 @@ def main() -> None:
         '--phase0-dir',
         dest='phase0_dir',
         default=None,
-        help="If provided, read v2.1 Phase0 tables from this directory (Results_v21/phase0_v21).",
+        help="If provided, read v2.1 Phase0 tables from this directory (out/current/flatten).",
     )
     parser.add_argument(
         '--domain',

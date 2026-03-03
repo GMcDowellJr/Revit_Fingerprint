@@ -172,7 +172,7 @@ def main() -> None:
         "--phase0-dir",
         dest="phase0_dir",
         default=None,
-        help="If provided, read v2.1 Phase0 tables from this directory (Results_v21/phase0_v21).",
+        help="If provided, read v2.1 Phase0 tables from this directory (out/current/flatten).",
     )
     p.add_argument("--domain", required=True, help="Domain (use text_types for verification)")
     p.add_argument("--file-to-ids", required=True, dest="file_to_ids_csv", help="Path to <domain>.file_to_ids.v1.csv")

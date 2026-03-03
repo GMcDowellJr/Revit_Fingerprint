@@ -45,7 +45,7 @@ _DENY_KEY_REGEXES = [
     r"(^|[._])symbol_name$",  # *.symbol_name
 ]
 
-from tools.phase2_analysis.domain_identity_contract import DomainIdentityContract
+from tools.analysis.authority.domain_identity_contract import DomainIdentityContract
 
 _CONTRACT = DomainIdentityContract.load()
 
@@ -292,7 +292,7 @@ def derive_join_keys_by_ids(
     ids_to_records: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
 
     if phase0_dir:
-        # CSV mode: load records+identity from Results_v21/phase0_v21/
+        # CSV mode: load records+identity from out/current/flatten/
         allowed_files = set(file_to_ids.keys())
         all_recs = load_phase0_v21_records_with_identity(phase0_dir, domain, allowed_file_ids=allowed_files)
 
@@ -544,7 +544,7 @@ def main() -> None:
         "--phase0-dir",
         dest="phase0_dir",
         default=None,
-        help="If provided, read v2.1 Phase0 tables from this directory (Results_v21/phase0_v21).",
+        help="If provided, read v2.1 Phase0 tables from this directory (out/current/flatten).",
     )
     p.add_argument("--domain", required=True, help="Domain (use text_types for verification)")
     p.add_argument("--file-to-ids", required=True, dest="file_to_ids_csv", help="Path to <domain>.file_to_ids.v1.csv")
