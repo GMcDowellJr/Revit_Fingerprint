@@ -959,6 +959,15 @@ def extract(doc, ctx=None):
         semantic_items = [it for it in identity_items if it.get("k") in set(semantic_keys)]
         sig_hash = make_hash(serialize_identity_items(semantic_items))
 
+        # ---------------------------
+        # Discovery feature surface (Phase-2 computes stats / classification)
+        # ---------------------------
+        features_items = [
+            make_feature_item(it.get("k"), "s", it.get("v"), it.get("q"))
+            for it in (identity_items or [])
+            if isinstance(it.get("k"), str)
+        ]
+        
         rid_info = make_record_id_from_element(v)
         if rid_info:
             record_id, record_id_alg = rid_info

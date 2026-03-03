@@ -312,7 +312,7 @@ def extract(doc, ctx=None):
                 "uid_excluded_from_sig": True,
                 "stratum_features": build_stratum_features_v1(
                     domain="phase_filters",
-                    identity_items=identity_items,
+                    identity_items=identity_items_v2_sorted,
                 ),
             },
         )
