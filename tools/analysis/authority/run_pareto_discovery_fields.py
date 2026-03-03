@@ -9,25 +9,13 @@ from typing import Dict, List, Sequence, Tuple
 
 import sys
 
-# Ensure repo_root and repo_root/tools are on sys.path so imports work no matter where invoked from.
-_THIS = Path(__file__).resolve()
-_REPO_ROOT = _THIS.parents[2]  # .../tools/phase2_analysis/<file> -> repo root
-_TOOLS_DIR = _REPO_ROOT / "tools"
-sys.path.insert(0, str(_REPO_ROOT))
-sys.path.insert(0, str(_TOOLS_DIR))
+# Ensure repo root is importable when running script by file path.
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-try:
-    # repo-local when invoked from root
-    from join_key_discovery.eval import build_identity_index, build_kv_index, score_candidate_kv
-    from tools.analysis.authority.io import _read_csv_rows, load_phase0_v21_feature_items, load_phase0_v21_stratum_features
-except ModuleNotFoundError:
-    # package-local when invoked from tools/
-    from join_key_discovery.eval import build_identity_index, build_kv_index, score_candidate_kv
-
-try:
-    from tools.analysis.authority.io import _read_csv_rows, load_phase0_v21_feature_items, load_phase0_v21_stratum_features
-except ModuleNotFoundError:
-    from tools.analysis.authority.io import _read_csv_rows, load_phase0_v21_feature_items, load_phase0_v21_stratum_features
+from tools.join_key_discovery.eval import build_identity_index, build_kv_index, score_candidate_kv
+from tools.analysis.authority.io import _read_csv_rows, load_phase0_v21_feature_items, load_phase0_v21_stratum_features
 
 
 def pareto_front(rows: List[dict], objectives: Sequence[str]) -> List[dict]:

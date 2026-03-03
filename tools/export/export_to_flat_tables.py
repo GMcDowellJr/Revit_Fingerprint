@@ -406,10 +406,10 @@ def main() -> None:
         try:
             import pandas as pd
             try:
-                from tools.compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
+                from tools.flatten.utils.compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
             except Exception:
                 # When run as `python tools/export/export_to_flat_tables.py`, repo-root package import may not resolve.
-                from compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
+                from tools.flatten.utils.compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
         except Exception as ex:
             print(
                 "WARNING: synthetic key augmentation skipped "
