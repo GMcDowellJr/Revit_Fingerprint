@@ -810,13 +810,17 @@ try:
 
     thinrunner_meta = _thinrunner_meta_from_env(doc)
 
+    _policy_registry_path = os.path.join(_REPO_ROOT, "policies", "domain_join_key_policies.json")
+    if not os.path.exists(_policy_registry_path):
+        _policy_registry_path = os.path.join(_REPO_ROOT, "domain_join_key_policies.json")
+
     export_payload = build_export_payload(
         legacy_payload=fingerprint,
         tool_version=_TOOL_VERSION,
         tool_git_sha=tool_git_sha,
         host_app_version=host_app_version,
         thinrunner_meta=thinrunner_meta,
-        policy_registry_path=os.path.join(_REPO_ROOT, "policies", "domain_join_key_policies.json"),
+        policy_registry_path=_policy_registry_path,
     )
 
     # ------------------------------------------------------------

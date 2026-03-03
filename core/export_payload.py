@@ -316,7 +316,14 @@ def _build_record(domain_name: str, rec: Dict[str, Any], export_mode: str) -> Tu
 
 def _default_policy_registry_path() -> str:
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(repo_root, "policies", "domain_join_key_policies.json")
+    candidates = [
+        os.path.join(repo_root, "domain_join_key_policies.json"),
+        os.path.join(repo_root, "policies", "domain_join_key_policies.json"),
+    ]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return candidates[-1]
 
 
 def _load_policy_registry(policy_registry_path: Optional[str]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
