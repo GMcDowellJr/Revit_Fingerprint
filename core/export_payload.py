@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import os
+import platform
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -18,6 +19,16 @@ def get_export_mode() -> str:
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _coalesce(*values: Any) -> Optional[str]:
+    for value in values:
+        if value is None:
+            continue
+        s = str(value).strip()
+        if s:
+            return s
+    return None
 
 
 def _to_int(v: Any) -> Optional[int]:
@@ -159,14 +170,27 @@ def _build_record(domain_name: str, rec: Dict[str, Any], export_mode: str) -> Di
     return out
 
 
-def build_export_payload(*, legacy_payload: Dict[str, Any], tool_version: Optional[str], tool_git_sha: Optional[str], host_app_version: Optional[str]) -> Dict[str, Any]:
+def build_export_payload(
+    *,
+    legacy_payload: Dict[str, Any],
+    tool_version: Optional[str],
+    tool_git_sha: Optional[str],
+    host_app_version: Optional[str],
+    thinrunner_meta: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     export_mode = get_export_mode()
     contract_domains = legacy_payload.get("_contract", {}).get("domains", {}) if isinstance(legacy_payload.get("_contract"), dict) else {}
     domains_expected = sorted([str(k) for k in contract_domains.keys()])
 
+    tr_meta = thinrunner_meta if isinstance(thinrunner_meta, dict) else {}
+    tr_exporter = tr_meta.get("exporter") if isinstance(tr_meta.get("exporter"), dict) else {}
+    tr_host = tr_meta.get("host") if isinstance(tr_meta.get("host"), dict) else {}
+
     domain_policies_raw = legacy_payload.get("_join_key_policies") if isinstance(legacy_payload.get("_join_key_policies"), dict) else {}
+    if isinstance(domain_policies_raw.get("domains"), dict):
+        domain_policies_raw = domain_policies_raw.get("domains")
     domain_policies: Dict[str, Any] = {}
-    for domain_name in sorted(domain_policies_raw.keys()):
+    for domain_name in sorted(str(k) for k in domain_policies_raw.keys()):
         pol = domain_policies_raw.get(domain_name)
         if not isinstance(pol, dict):
             continue
@@ -190,19 +214,43 @@ def build_export_payload(*, legacy_payload: Dict[str, Any], tool_version: Option
         blocked_count = sum(1 for r in records if r.get("diagnostics", {}).get("status") == "blocked")
 
         env = contract_domains.get(domain_name) if isinstance(contract_domains.get(domain_name), dict) else {}
+        summary = {
+            "raw_count": int(raw_count),
+            "exported_count": len(records),
+            "blocked_count": blocked_count,
+        }
+        assert summary["exported_count"] == len(records)
+
         domains_out[domain_name] = {
             "schema": {"id": "fingerprint.domain", "version": "0.2.0"},
-            "summary": {
-                "raw_count": int(raw_count),
-                "exported_count": len(records),
-                "blocked_count": blocked_count,
-            },
+            "summary": summary,
             "diag": {
                 "warnings": [],
                 "block_reasons": list(env.get("block_reasons") or []),
             },
             "records": records,
         }
+
+    exporter_name = _coalesce(
+        tr_exporter.get("name"),
+        "revit_fingerprint",
+    )
+    exporter_version = _coalesce(
+        tr_exporter.get("version"),
+        tool_version,
+        "0.0.0+unknown",
+    )
+    exporter_git_sha = _coalesce(
+        tr_exporter.get("git_sha"),
+        tool_git_sha,
+        "unknown",
+    )
+    host_python = _coalesce(
+        tr_host.get("python"),
+        "{} {}".format(platform.python_implementation(), platform.python_version()),
+    )
+    host_app = _coalesce(tr_host.get("app"), "Revit")
+    host_app_ver = _coalesce(tr_host.get("app_version"), host_app_version, "unknown")
 
     return {
         "contract": {
@@ -232,15 +280,15 @@ def build_export_payload(*, legacy_payload: Dict[str, Any], tool_version: Option
             "export": {"export_mode": export_mode},
             "tools": {
                 "exporter": {
-                    "name": "revit_fingerprint",
-                    "version": tool_version,
-                    "git_sha": tool_git_sha,
+                    "name": exporter_name,
+                    "version": exporter_version,
+                    "git_sha": exporter_git_sha,
                 }
             },
             "host": {
-                "app": "Revit",
-                "app_version": host_app_version,
-                "python": "CPython",
+                "app": host_app,
+                "app_version": host_app_ver,
+                "python": host_python,
             },
         },
         "notes": {

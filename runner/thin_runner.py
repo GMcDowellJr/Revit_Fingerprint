@@ -8,6 +8,18 @@ import importlib
 
 sys.dont_write_bytecode = True
 
+
+# Thinrunner metadata bridge (preferred metadata source for export payload)
+try:
+    import platform as _platform
+    os.environ["REVIT_FINGERPRINT_EXPORTER_NAME"] = "revit_fingerprint"
+    os.environ["REVIT_FINGERPRINT_EXPORTER_VERSION"] = str(os.environ.get("FINGERPRINT_TOOL_VERSION", "")).strip()
+    os.environ["REVIT_FINGERPRINT_EXPORTER_GIT_SHA"] = str(os.environ.get("REVIT_FINGERPRINT_GIT_SHA", "")).strip()
+    os.environ["REVIT_FINGERPRINT_HOST_PYTHON"] = "{} {}".format(_platform.python_implementation(), _platform.python_version())
+    os.environ["REVIT_FINGERPRINT_HOST_APP"] = "Revit"
+except Exception:
+    pass
+
 # Provide output path to imported runner via env var (import boundary safe)
 try:
     if IN is not None and len(IN) > 0 and IN[0] is not None and str(IN[0]).strip():

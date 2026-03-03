@@ -123,6 +123,43 @@ ENABLED_DOMAINS = None  # None = all domains
 
 _DOMAIN_VERSION = "1"
 
+
+
+def _thinrunner_meta_from_env(doc):
+    """Build thinrunner metadata map with safe fallback values."""
+    import platform as _platform
+
+    def _getenv(name):
+        try:
+            v = os.getenv(name, "")
+        except Exception:
+            v = ""
+        return str(v).strip()
+
+    exporter = {
+        "name": _getenv("REVIT_FINGERPRINT_EXPORTER_NAME"),
+        "version": _getenv("REVIT_FINGERPRINT_EXPORTER_VERSION"),
+        "git_sha": _getenv("REVIT_FINGERPRINT_EXPORTER_GIT_SHA"),
+    }
+
+    app_version = _getenv("REVIT_FINGERPRINT_HOST_APP_VERSION")
+    if not app_version:
+        try:
+            app_version = str(getattr(getattr(doc, "Application", None), "VersionNumber", "")).strip()
+        except Exception:
+            app_version = ""
+
+    host = {
+        "python": _getenv("REVIT_FINGERPRINT_HOST_PYTHON") or "{} {}".format(_platform.python_implementation(), _platform.python_version()),
+        "app": _getenv("REVIT_FINGERPRINT_HOST_APP") or "Revit",
+        "app_version": app_version,
+    }
+
+    return {
+        "exporter": exporter,
+        "host": host,
+    }
+
 def _use_filename_stamp():
     """
     Returns True unless explicitly disabled.
@@ -771,11 +808,14 @@ try:
     except Exception:
         host_app_version = None
 
+    thinrunner_meta = _thinrunner_meta_from_env(doc)
+
     export_payload = build_export_payload(
         legacy_payload=fingerprint,
         tool_version=_TOOL_VERSION,
         tool_git_sha=tool_git_sha,
         host_app_version=host_app_version,
+        thinrunner_meta=thinrunner_meta,
     )
 
     # ------------------------------------------------------------

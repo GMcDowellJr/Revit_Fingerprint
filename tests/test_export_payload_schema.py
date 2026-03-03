@@ -1,7 +1,18 @@
 from core.export_payload import build_export_payload
 
 
-def _legacy_sample():
+def _legacy_sample(*, nested_policy_shape=False):
+    domain_policies = {
+        "line_patterns": {
+            "policy_id": "line_patterns.join_key",
+            "version": "0.1.0",
+            "required": ["a"],
+            "optional": ["b"],
+        }
+    }
+    if nested_policy_shape:
+        domain_policies = {"domains": domain_policies}
+
     return {
         "_contract": {
             "domains": {
@@ -10,14 +21,7 @@ def _legacy_sample():
                 }
             }
         },
-        "_join_key_policies": {
-            "line_patterns": {
-                "policy_id": "line_patterns.join_key",
-                "version": "0.1.0",
-                "required": ["a"],
-                "optional": ["b"],
-            }
-        },
+        "_join_key_policies": domain_policies,
         "_notes": ["note"],
         "line_patterns": {
             "count": 1,
@@ -85,3 +89,53 @@ def test_legacy_keys_removed_and_t_enum_q_enforced():
     assert rec["provenance"]["source"]["element_unique_id"] == "uid-1"
     assert rec["provenance"]["source"]["element_id"] == 42
     assert rec["diagnostics"]["unknown_items"][0]["k"] == "line_pattern.some_unknown"
+
+
+def test_domain_policies_is_domain_mapping_and_supports_legacy_nested_shape():
+    out = build_export_payload(
+        legacy_payload=_legacy_sample(nested_policy_shape=True),
+        tool_version="0.0.0+abc",
+        tool_git_sha="abc",
+        host_app_version="2025",
+    )
+    policies = out["manifest"]["domain_policies"]
+    assert "domains" not in policies
+    assert list(policies.keys()) == ["line_patterns"]
+    assert policies["line_patterns"]["required_keys"] == ["a"]
+
+
+def test_summary_counts_and_non_null_meta_fields_with_thinrunner_precedence():
+    out = build_export_payload(
+        legacy_payload=_legacy_sample(),
+        tool_version=None,
+        tool_git_sha=None,
+        host_app_version=None,
+        thinrunner_meta={
+            "exporter": {"name": "thinrunner_fp", "version": "0.9.0", "git_sha": "deadbee"},
+            "host": {"python": "CPython 3.9.12", "app": "Revit", "app_version": "2024"},
+        },
+    )
+    dom = out["domains"]["line_patterns"]
+    assert dom["summary"]["exported_count"] == len(dom["records"])
+    assert dom["summary"]["blocked_count"] == 0
+    assert dom["summary"]["raw_count"] == 1
+
+    exporter = out["meta"]["tools"]["exporter"]
+    assert exporter["name"] == "thinrunner_fp"
+    assert exporter["version"] == "0.9.0"
+    assert exporter["git_sha"] == "deadbee"
+    assert out["meta"]["host"]["python"] == "CPython 3.9.12"
+
+
+def test_meta_fallback_placeholders_when_metadata_missing():
+    out = build_export_payload(
+        legacy_payload=_legacy_sample(),
+        tool_version=None,
+        tool_git_sha=None,
+        host_app_version=None,
+    )
+    exporter = out["meta"]["tools"]["exporter"]
+    assert exporter["name"] == "revit_fingerprint"
+    assert exporter["version"] == "0.0.0+unknown"
+    assert exporter["git_sha"] == "unknown"
+    assert out["meta"]["host"]["python"].startswith("CPython ")
