@@ -3,6 +3,13 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import argparse
 import json
 import os
@@ -12,7 +19,7 @@ from typing import Dict, List, Set
 
 import pandas as pd
 
-from .io import load_exports, get_domain_records, _read_csv_rows
+from tools.analysis.authority.io import load_exports, get_domain_records, _read_csv_rows
 
 
 def build_reference_standards_from_clusters(

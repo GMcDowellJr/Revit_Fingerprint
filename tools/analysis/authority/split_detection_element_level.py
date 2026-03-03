@@ -3,6 +3,13 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import argparse
 import json
 import os
@@ -14,8 +21,8 @@ from typing import Iterator
 
 import pandas as pd
 
-from .io import load_exports, get_domain_records, load_export_file
-from .report import write_json_report
+from tools.analysis.authority.io import load_exports, get_domain_records, load_export_file
+from tools.analysis.authority.report import write_json_report
 
 
 def _read_csv_rows(path: str) -> Iterator[Dict[str, str]]:

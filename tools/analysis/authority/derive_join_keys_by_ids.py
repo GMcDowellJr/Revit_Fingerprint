@@ -36,7 +36,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import pandas as pd
 
-from .io import load_exports, get_domain_records, load_phase0_v21_records_with_identity
+from tools.analysis.authority.io import load_exports, get_domain_records, load_phase0_v21_records_with_identity
 
 
 def md5_utf8_join_pipe(parts: List[str]) -> str:

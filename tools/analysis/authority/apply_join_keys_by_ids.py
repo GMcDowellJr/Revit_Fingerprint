@@ -6,6 +6,13 @@ Non-destructive: writes a CSV; does not modify export JSONs.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import argparse
 import csv
 import hashlib
@@ -15,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from .io import load_exports, get_domain_records, load_phase0_v21_records_with_identity
+from tools.analysis.authority.io import load_exports, get_domain_records, load_phase0_v21_records_with_identity
 
 
 def md5_utf8_join_pipe(parts: List[str]) -> str:

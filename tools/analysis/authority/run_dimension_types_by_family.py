@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import argparse
 import json
 import os
@@ -8,14 +15,14 @@ import shutil
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-from .io import load_exports, get_domain_records, get_domain_payload
-from .run_change_type import run_change_type
-from .run_population_stability import run_population_stability
-from .run_candidate_joinkey_simulation import run_candidate_joinkey_simulation
-from .run_joinhash_label_population import run_joinhash_label_population
-from .run_joinhash_parameter_population import run_joinhash_parameter_population
-from .run_collision_differencing import run_collision_differencing
-from .run_identity_collision_diagnostics import run_identity_collision_diagnostics
+from tools.analysis.authority.io import load_exports, get_domain_records, get_domain_payload
+from tools.analysis.authority.run_change_type import run_change_type
+from tools.analysis.authority.run_population_stability import run_population_stability
+from tools.analysis.authority.run_candidate_joinkey_simulation import run_candidate_joinkey_simulation
+from tools.analysis.authority.run_joinhash_label_population import run_joinhash_label_population
+from tools.analysis.authority.run_joinhash_parameter_population import run_joinhash_parameter_population
+from tools.analysis.authority.run_collision_differencing import run_collision_differencing
+from tools.analysis.authority.run_identity_collision_diagnostics import run_identity_collision_diagnostics
 
 
 DOMAIN_DEFAULT = "dimension_types"

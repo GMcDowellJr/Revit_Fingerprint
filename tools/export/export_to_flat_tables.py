@@ -4,6 +4,10 @@ import json
 import os
 import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 import hashlib
 import re
@@ -405,11 +409,7 @@ def main() -> None:
     if synthetic_domains:
         try:
             import pandas as pd
-            try:
-                from tools.flatten.utils.compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
-            except Exception:
-                # When run as `python tools/export/export_to_flat_tables.py`, repo-root package import may not resolve.
-                from tools.flatten.utils.compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
+            from tools.flatten.utils.compute_synthetic_keys import compute_synthetic_keys, EXPECTED_COLUMNS
         except Exception as ex:
             print(
                 "WARNING: synthetic key augmentation skipped "

@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import argparse
 import csv
 import os
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
-from .io import load_exports, get_domain_records
-from .index import build_domain_index
-from .stability import presence_counts
-from .report import write_json_report
+from tools.analysis.authority.io import load_exports, get_domain_records
+from tools.analysis.authority.index import build_domain_index
+from tools.analysis.authority.stability import presence_counts
+from tools.analysis.authority.report import write_json_report
 
 
 def _phase2_items_map_no_dups(record) -> Tuple[Dict[str, Tuple[str, str]], bool]:

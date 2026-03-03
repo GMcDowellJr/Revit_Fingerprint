@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import argparse
 import csv
 import os
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
-from .io import load_exports, get_domain_records
-from .index import build_domain_index
-from .stability import stable_join_hashes
-from .report import write_json_report
+from tools.analysis.authority.io import load_exports, get_domain_records
+from tools.analysis.authority.index import build_domain_index
+from tools.analysis.authority.stability import stable_join_hashes
+from tools.analysis.authority.report import write_json_report
 
 
 def extract_phase2_items(record) -> Dict[str, Tuple[str, str]]:

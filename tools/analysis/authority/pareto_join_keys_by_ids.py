@@ -43,7 +43,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 
-from .io import load_exports, get_domain_records
+from tools.analysis.authority.io import load_exports, get_domain_records
 
 
 # ---------------------------

@@ -3,6 +3,13 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import argparse
 import json
 import os
@@ -15,13 +22,13 @@ import pandas as pd
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
 
-from .io import (
+from tools.analysis.authority.io import (
     load_exports,
     get_domain_records,
     load_phase0_v21_sig_profiles,
 )
-from .report import write_json_report
-from .split_detection import (
+from tools.analysis.authority.report import write_json_report
+from tools.analysis.authority.split_detection import (
     Cluster,
     extract_metadata_patterns,
     compute_silhouette_score,

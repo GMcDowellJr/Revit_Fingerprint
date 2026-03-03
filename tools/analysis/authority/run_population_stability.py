@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import argparse
 import os
 import csv
 from typing import List
 
-from .io import load_exports, get_domain_records
-from .index import build_domain_index
-from .stability import presence_counts, stability_distribution
-from .report import write_json_report
+from tools.analysis.authority.io import load_exports, get_domain_records
+from tools.analysis.authority.index import build_domain_index
+from tools.analysis.authority.stability import presence_counts, stability_distribution
+from tools.analysis.authority.report import write_json_report
 
 
 def run_population_stability(

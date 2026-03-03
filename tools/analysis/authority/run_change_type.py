@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import argparse
 import os
 from typing import Any, Dict, List
 
-from .io import ExportFile, load_exports, get_domain_records, get_run_provenance
-from .index import build_domain_index
-from .compare import classify_pair, ChangeCounts
-from .report import write_change_type_csv, write_json_report, format_console_summary
+from tools.analysis.authority.io import ExportFile, load_exports, get_domain_records, get_run_provenance
+from tools.analysis.authority.index import build_domain_index
+from tools.analysis.authority.compare import classify_pair, ChangeCounts
+from tools.analysis.authority.report import write_change_type_csv, write_json_report, format_console_summary
 
 
 def run_change_type(
