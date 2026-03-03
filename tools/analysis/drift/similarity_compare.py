@@ -21,10 +21,22 @@ import itertools
 import json
 import os
 import sys
+
+# Ensure repo root is importable when running as a script.
+try:
+    _HERE = os.path.abspath(os.path.dirname(__file__))
+    _REPO_ROOT = os.path.abspath(os.path.join(_HERE, os.pardir, os.pardir, os.pardir))
+    if _REPO_ROOT not in sys.path:
+        sys.path.insert(0, _REPO_ROOT)
+except Exception:
+    pass
+
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+from tools.io_export import detect_export_schema, get_domain_records, get_id_sig_hash, iter_domains
 
 
 # -----------------------------
@@ -138,17 +150,14 @@ def _norm_status(s: Any) -> str:
 
 
 def _extract_domains_obj(fp: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """
-    Return the domain-metadata object.
-
-    Supported layouts:
-      1) New contract: top-level "_domains" (dict)
-      2) Legacy: top-level "domains" (dict)
-      3) Wrapped legacy: {"fingerprint"|"result"|"results"|"data": {"domains": {...}}}
-    """
-    v = fp.get("_domains")
-    if isinstance(v, dict):
-        return v
+    schema = detect_export_schema(fp)
+    if schema == "new":
+        v = fp.get("domains")
+        return v if isinstance(v, dict) else None
+    if schema == "old":
+        v = fp.get("_domains")
+        if isinstance(v, dict):
+            return v
 
     v = fp.get("domains")
     if isinstance(v, dict):
@@ -195,7 +204,7 @@ def _extract_sig_hashes(domain_payload: Dict[str, Any], domain_name: str) -> Opt
         saw_v2 = True
 
         st = _norm_status(r.get("status"))
-        sig = r.get("sig_hash")
+        sig = get_id_sig_hash(r)
 
         if st == STATUS_BLOCKED:
             # Contract: sig_hash must be null when blocked; do not include.
@@ -262,13 +271,14 @@ def load_fingerprint(path: str) -> FingerprintData:
         return FingerprintData(path=os.path.basename(str(p)), ok=False, error="missing_domains_object", domains={})
 
     # Detect whether this is the new contract (domains_obj == raw["_domains"])
-    is_new_contract = isinstance(raw.get("_domains"), dict) and domains_obj is raw.get("_domains")
+    is_new_contract = detect_export_schema(raw) == "new"
 
     domains: Dict[str, DomainData] = {}
 
     if is_new_contract:
         # domains_obj provides meta (status/hash/reasons); per-domain payload is at top-level key with same name.
-        for dname, meta in domains_obj.items():
+        for dname in iter_domains(raw):
+            meta = domains_obj.get(dname) if isinstance(domains_obj, dict) else {}
             if not isinstance(dname, str):
                 dname = str(dname)
 
@@ -287,30 +297,7 @@ def load_fingerprint(path: str) -> FingerprintData:
             status = _extract_domain_status(meta)
             dhash = _extract_domain_hash(meta)
 
-            payload = raw.get(dname, None)
-            if payload is None:
-                # Domain exists in _domains but has no payload key (distinct from blocked/unreadable)
-                reason = None
-                for rk in ("reason", "block_reason", "degrade_reason", "error"):
-                    rv = meta.get(rk)
-                    if isinstance(rv, str) and rv.strip():
-                        reason = rv.strip()
-                        break
-                if reason is None:
-                    br = meta.get("block_reasons")
-                    if isinstance(br, list) and br:
-                        reason = f"block_reasons:{br[0]}"
-                domains[dname] = DomainData(
-                    name=dname,
-                    status=status,
-                    domain_hash=dhash,
-                    sig_hashes=None,
-                    unreadable=False,
-                    missing=True,
-                    reason=reason or "missing_domain_payload_key",
-                )
-                continue
-
+            payload = {"records": get_domain_records(raw, dname)}
             if not isinstance(payload, dict):
                 domains[dname] = DomainData(
                     name=dname,
@@ -720,7 +707,7 @@ def _extract_sig_label_meta(domain_payload: Dict[str, Any]) -> Optional[Dict[str
 
         saw_v2 = True
 
-        sig = r.get("sig_hash")
+        sig = get_id_sig_hash(r)
         if not isinstance(sig, str) or not sig:
             # Contract: ok/degraded must have a 32-hex sig_hash; blocked must be null.
             # If missing/invalid, do not guess; just omit.
@@ -1071,13 +1058,14 @@ def _parse_fingerprint_data(raw: Dict[str, Any], path: str) -> FingerprintData:
         return FingerprintData(path=os.path.basename(str(p)), ok=False, error="missing_domains_object", domains={})
 
     # Detect whether this is the new contract (domains_obj == raw["_domains"])
-    is_new_contract = isinstance(raw.get("_domains"), dict) and domains_obj is raw.get("_domains")
+    is_new_contract = detect_export_schema(raw) == "new"
 
     domains: Dict[str, DomainData] = {}
 
     if is_new_contract:
         # domains_obj provides meta (status/hash/reasons); per-domain payload is at top-level key with same name.
-        for dname, meta in domains_obj.items():
+        for dname in iter_domains(raw):
+            meta = domains_obj.get(dname) if isinstance(domains_obj, dict) else {}
             if not isinstance(dname, str):
                 dname = str(dname)
 
@@ -1096,30 +1084,7 @@ def _parse_fingerprint_data(raw: Dict[str, Any], path: str) -> FingerprintData:
             status = _extract_domain_status(meta)
             dhash = _extract_domain_hash(meta)
 
-            payload = raw.get(dname, None)
-            if payload is None:
-                # Domain exists in _domains but has no payload key (distinct from blocked/unreadable)
-                reason = None
-                for rk in ("reason", "block_reason", "degrade_reason", "error"):
-                    rv = meta.get(rk)
-                    if isinstance(rv, str) and rv.strip():
-                        reason = rv.strip()
-                        break
-                if reason is None:
-                    br = meta.get("block_reasons")
-                    if isinstance(br, list) and br:
-                        reason = f"block_reasons:{br[0]}"
-                domains[dname] = DomainData(
-                    name=dname,
-                    status=status,
-                    domain_hash=dhash,
-                    sig_hashes=None,
-                    unreadable=False,
-                    missing=True,
-                    reason=reason or "missing_domain_payload_key",
-                )
-                continue
-
+            payload = {"records": get_domain_records(raw, dname)}
             if not isinstance(payload, dict):
                 domains[dname] = DomainData(
                     name=dname,

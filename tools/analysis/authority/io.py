@@ -8,6 +8,16 @@ import csv
 
 import sys
 
+# Ensure repo root is importable when running as a script.
+try:
+    _HERE = os.path.abspath(os.path.dirname(__file__))
+    _REPO_ROOT = os.path.abspath(os.path.join(_HERE, os.pardir, os.pardir, os.pardir))
+    if _REPO_ROOT not in sys.path:
+        sys.path.insert(0, _REPO_ROOT)
+except Exception:
+    pass
+
+
 # Allow large JSON fields (e.g., discriminators_json) in CSV exports.
 # Default is 131072 bytes which is too small for some domains.
 try:
@@ -18,6 +28,12 @@ except (OverflowError, AttributeError):
     
 from pathlib import Path
 from typing import Set, Tuple
+
+from tools.io_export import (
+    get_top_contract,
+    get_domain_records as io_get_domain_records,
+    iter_domains as io_iter_domains,
+)
 
 
 @dataclass(frozen=True)
@@ -88,8 +104,7 @@ def load_exports(root_dir: str, *, max_files: Optional[int] = None) -> List[Expo
 
 def get_contract(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Return the authoritative run contract envelope if present."""
-    c = data.get("_contract")
-    return c if isinstance(c, dict) else None
+    return get_top_contract(data)
 
 
 def get_domains_map(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -126,23 +141,8 @@ def get_domain_payload(data: Dict[str, Any], domain: str) -> Optional[Dict[str, 
 
 
 def get_domain_records(data: Dict[str, Any], domain: str) -> List[Dict[str, Any]]:
-    """Extract record.v2 records list from the domain payload.
-
-    Notes:
-    - Contract per-domain envelope does not include records in current runner.
-    - Domains implementing record.v2 typically expose records under <domain>.records.
-    """
-    payload = get_domain_payload(data, domain)
-    if not isinstance(payload, dict):
-        return []
-    recs = payload.get("records")
-    if not isinstance(recs, list):
-        return []
-    out: List[Dict[str, Any]] = []
-    for r in recs:
-        if isinstance(r, dict):
-            out.append(r)
-    return out
+    """Extract record.v2 records list from the domain payload."""
+    return io_get_domain_records(data, domain)
 
 
 def get_run_provenance(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -354,3 +354,8 @@ def load_phase0_v21_records_with_identity(
         if k in idx:
             out.append(idx[k])
     return out
+
+
+def get_all_domains(data: Dict[str, Any]) -> List[str]:
+    """Return known domain names from export payload."""
+    return io_iter_domains(data)

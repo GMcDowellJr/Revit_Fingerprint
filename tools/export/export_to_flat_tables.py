@@ -12,6 +12,16 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import hashlib
 import re
 
+from tools.io_export import (
+    get_definition_items,
+    get_domain_records as io_get_domain_records,
+    get_id_join_hash,
+    get_id_sig_hash,
+    get_top_contract,
+    get_record_label,
+    iter_domains as io_iter_domains,
+)
+
 
 # UID-ish key detection (best-effort). Used only to normalize UID-like values in identity items.
 # Note: exporter contract says sig_hash is already UID-free; this is for legacy/forensic normalization only.
@@ -57,8 +67,7 @@ def _iter_json_paths(root_dir: str) -> List[str]:
 
 
 def _get_contract(d: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    c = d.get("_contract")
-    return c if isinstance(c, dict) else None
+    return get_top_contract(d)
 
 
 def _get_domain_payload(d: Dict[str, Any], domain: str) -> Optional[Dict[str, Any]]:
@@ -67,38 +76,16 @@ def _get_domain_payload(d: Dict[str, Any], domain: str) -> Optional[Dict[str, An
 
 
 def _get_domain_records(d: Dict[str, Any], domain: str) -> List[Dict[str, Any]]:
-    payload = _get_domain_payload(d, domain)
-    if not isinstance(payload, dict):
-        return []
-    recs = payload.get("records")
-    if not isinstance(recs, list):
-        return []
-    out: List[Dict[str, Any]] = []
-    for r in recs:
-        if isinstance(r, dict):
-            out.append(r)
-    return out
+    return io_get_domain_records(d, domain)
 
 
 def _iter_domains(d: Dict[str, Any], explicit: Optional[List[str]]) -> List[str]:
     if explicit:
         return [str(x) for x in explicit]
-
-    # Prefer contract domains listing if present.
-    c = _get_contract(d)
-    if isinstance(c, dict):
-        doms = c.get("domains")
-        if isinstance(doms, dict):
-            return sorted([k for k, v in doms.items() if isinstance(k, str)], key=str.lower)
-
-    # Fallback: any top-level key whose value is an object with a "records" list.
-    domains = []
-    for k, v in d.items():
-        if not isinstance(k, str) or k.startswith("_"):
-            continue
-        if isinstance(v, dict) and isinstance(v.get("records"), list):
-            domains.append(k)
-    return sorted(domains, key=str.lower)
+    doms = [x for x in io_iter_domains(d) if isinstance(x, str)]
+    if doms:
+        return sorted(doms, key=str.lower)
+    return []
 
 
 def _read_json(path: str) -> Dict[str, Any]:
@@ -189,25 +176,16 @@ def main() -> None:
                 record_id = _safe_str(r.get("record_id") or r.get("id") or r.get("name"))
                 status = _safe_str(r.get("status"))
                 identity_quality = _safe_str(r.get("identity_quality"))
-                sig_hash = _safe_str(
-                    r.get("sig_hash")
-                    or (
-                        r.get("identity_basis", {}).get("sig_hash")
-                        if isinstance(r.get("identity_basis"), dict)
-                        else None
-                    )
-                )
+                sig_hash = _safe_str(get_id_sig_hash(r))
 
                 join_key = r.get("join_key")
 
-                join_hash = None
-                join_key_schema = None
-                if isinstance(join_key, dict):
-                    join_hash = _safe_str(join_key.get("join_hash"))
-                    join_key_schema = _safe_str(join_key.get("schema"))
+                join_hash = _safe_str(get_id_join_hash(r))
+                join_key_schema = _safe_str(join_key.get("schema")) if isinstance(join_key, dict) else ""
 
                 # Trust upstream exporter: sig_hash is already UID-free by contract.
 
+                label_obj = r.get("label") if isinstance(r.get("label"), dict) else {}
                 records_rows.append({
                     "file_id": file_id,
                     "domain": domain,
@@ -219,9 +197,9 @@ def main() -> None:
                     "sig_hash": sig_hash,
                     "join_hash": join_hash,
                     "join_key_schema": join_key_schema,
-                    "label_display": _safe_str(r.get("label", {}).get("display")),
-                    "label_quality": _safe_str(r.get("label", {}).get("quality")),
-                    "label_provenance": _safe_str(r.get("label", {}).get("provenance")),
+                    "label_display": _safe_str(label_obj.get("display") or get_record_label(r)),
+                    "label_quality": _safe_str(label_obj.get("quality")),
+                    "label_provenance": _safe_str(label_obj.get("provenance")),
                 })
 
 
@@ -241,8 +219,7 @@ def main() -> None:
                             })
 
                 # identity_items
-                ib = r.get("identity_basis") if isinstance(r.get("identity_basis"), dict) else None
-                items = ib.get("items") if isinstance(ib, dict) else None
+                items = get_definition_items(r)
                 if isinstance(items, list):
                     for idx, it in enumerate(items):
                         if not isinstance(it, dict):

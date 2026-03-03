@@ -7,11 +7,29 @@ import json
 import math
 import os
 import sys
+
+# Ensure repo root is importable when running as a script.
+try:
+    _HERE = os.path.abspath(os.path.dirname(__file__))
+    _REPO_ROOT = os.path.abspath(os.path.join(_HERE, os.pardir, os.pardir, os.pardir))
+    if _REPO_ROOT not in sys.path:
+        sys.path.insert(0, _REPO_ROOT)
+except Exception:
+    pass
+
 from dataclasses import dataclass
 from collections import Counter
 import statistics
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+from tools.io_export import (
+    get_definition_items,
+    get_domain_records,
+    get_id_sig_hash,
+    get_top_contract,
+    iter_domains,
+)
 
 
 # -------------------------
@@ -79,7 +97,7 @@ def load_json(path: Path) -> Dict[str, Any]:
 
 def project_id_from_fp(fp: Dict[str, Any], fallback: str) -> str:
     # Prefer _features.identity.project_title when present (seen in both sample files)
-    ident = fp.get("_features", {}).get("identity", {}) or fp.get("_contract", {}).get("identity", {})
+    ident = fp.get("_features", {}).get("identity", {}) or (get_top_contract(fp) or {}).get("identity", {})
     title = ident.get("project_title")
     if isinstance(title, str) and title.strip():
         return title.strip()
@@ -104,11 +122,7 @@ def _extract_record_sig_hashes_v2(fp: Optional[Dict[str, Any]], domain_name: str
     if not isinstance(fp, dict):
         return None
 
-    payload = fp.get(domain_name)
-    if not isinstance(payload, dict):
-        return None
-
-    recs = payload.get("records")
+    recs = get_domain_records(fp, domain_name)
     if not isinstance(recs, list):
         return None
 
@@ -126,7 +140,7 @@ def _extract_record_sig_hashes_v2(fp: Optional[Dict[str, Any]], domain_name: str
         if st == "blocked":
             continue
 
-        sig = r.get("sig_hash")
+        sig = get_id_sig_hash(r)
         if isinstance(sig, str) and sig:
             if domain_name in SEMANTIC_UID_DOMAINS:
                 out.append(_strip_revit_uid_tail(sig))
@@ -218,12 +232,8 @@ def _semantic_record_sig_hash(domain: str, rec: Dict[str, Any]) -> Optional[str]
       - Normalize any domain-specific UID keys by stripping ElementId tails
       - Hash canonicalized items (order preserved as exported)
     """
-    ib = rec.get("identity_basis")
-    if not isinstance(ib, dict):
-        return None
-
-    items = ib.get("items")
-    if not isinstance(items, list) or not items:
+    items = get_definition_items(rec)
+    if not items:
         return None
 
     uid_keys = SEMANTIC_UID_KEYS_BY_DOMAIN.get(domain, set())
@@ -254,20 +264,9 @@ def _domain_payload_from_fp(fp: Dict[str, Any], dom: str) -> Optional[Dict[str, 
       - fp["records"][dom] = [...]
       - fp["domains"][dom]["records"] = [...]
     """
-    v = fp.get(dom)
-    if isinstance(v, dict):
-        return v
-
-    recs = fp.get("records")
-    if isinstance(recs, dict) and isinstance(recs.get(dom), list):
-        return {"records": recs.get(dom)}
-
-    doms = fp.get("domains")
-    if isinstance(doms, dict):
-        dv = doms.get(dom)
-        if isinstance(dv, dict) and isinstance(dv.get("records"), list):
-            return dv
-
+    recs = get_domain_records(fp, dom)
+    if recs:
+        return {"records": recs}
     return None
 
 
@@ -345,6 +344,10 @@ def extract_domains_summary(fp: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     extra_domains = fp.get("_domains", {})
     if isinstance(extra_domains, dict):
         ingest(extra_domains, has_domain_version=True)
+
+    if not out:
+        inferred = {d: {} for d in iter_domains(fp)}
+        ingest(inferred, has_domain_version=False)
 
     return out
 
