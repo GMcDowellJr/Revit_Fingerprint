@@ -54,7 +54,8 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
-
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
@@ -341,6 +342,32 @@ def extract(doc, ctx=None):
                 preimage_v2 = serialize_identity_items(semantic_items)
                 sig_hash_v2 = make_hash(preimage_v2)
 
+                # ---------------------------
+                # Discovery feature surface (Phase-2 computes stats / classification)
+                # ---------------------------
+                def _pick_identity_item(items, key):
+                    for it in (items or []):
+                        if it.get("k") == key:
+                            return it
+                    return None
+
+                features_items = []
+                for _k, _t in (
+                    ("object_style.tab", "s"),
+                    ("object_style.category_type", "s"),
+                    ("object_style.is_subcategory", "b"),
+                    ("object_style.can_add_subcategory", "b"),
+                    ("object_style.is_cuttable", "b"),
+                    ("object_style.allows_visibility_control", "b"),
+                    ("object_style.has_material_quantities", "b"),
+                    ("object_style.color_rgb", "s"),
+                    ("object_style.weight_projection", "i"),
+                    ("object_style.pattern_name", "s"),
+                ):
+                    _it = _pick_identity_item(identity_items_sorted, _k)
+                    if _it is not None:
+                        features_items.append(make_feature_item(_k, _t, _it.get("v"), _it.get("q")))
+                        
                 rec_v2 = build_record_v2(
                     domain="object_styles",
                     record_id=safe_str(row_key),
@@ -354,6 +381,13 @@ def extract(doc, ctx=None):
                         "quality": "human",
                         "provenance": "computed.path",
                         "components": {"row_key": safe_str(row_key)},
+                    },
+                    features_items=features_items,
+                    debug={
+                        "stratum_features": build_stratum_features_v1(
+                            domain="object_styles",
+                            identity_items=identity_items_sorted,
+                        ),
                     },
                 )
 

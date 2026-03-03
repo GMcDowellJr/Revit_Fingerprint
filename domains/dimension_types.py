@@ -64,7 +64,8 @@ from core.record_v2 import (
     STATUS_DEGRADED,
     STATUS_BLOCKED,
 )
-
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
@@ -501,6 +502,9 @@ def _build_identity_items(
         tick_sig_hash=tick_sig_hash,
     )
 
+    # Candidate group discriminator (intrinsic, stable): shape family
+    items.insert(1, make_identity_item("dim_type.family", safe_str(shape_family), ITEM_Q_OK))
+
     # Track required qualities for blocking determination
     # Common required qualities (shape, unit formatting, prefix/suffix)
     required_qs = [
@@ -545,6 +549,7 @@ def _build_identity_items(
     items = sorted(items, key=lambda it: it.get("k", ""))
 
     return items, required_qs
+
 
 
 # --- v2 helpers: Units / Alternate Units FormatOptions ---
@@ -1337,6 +1342,29 @@ def extract(doc, ctx=None):
             center_mark_size_q=center_mark_size_q,
         )
 
+        # ---------------------------
+        # Discovery feature surface (Phase-2 computes stats / classification)
+        # ---------------------------
+        # NOTE: This is NOT a join key and does not affect sig_hash.
+        # Keep intrinsic-only; avoid volatile identifiers (ElementId/UniqueId).
+        features_items = [
+            make_feature_item("dim_type.shape", "s", shape_v, shape_q),
+            make_feature_item("dim_type.family", "s", safe_str(shape_family), ITEM_Q_OK),
+            make_feature_item("dim_type.unit_format_id", "s", unit_format_id_v, unit_format_id_q),
+            make_feature_item("dim_type.rounding_method", "s", rounding_v, rounding_q),
+            make_feature_item("dim_type.accuracy", "s", accuracy_v, accuracy_q),
+            make_feature_item("dim_type.prefix", "s", prefix_v, prefix_q),
+            make_feature_item("dim_type.suffix", "s", suffix_v, suffix_q),
+        ]
+
+        # Shape-gated features are allowed here (they are evidence, not strata definitions).
+        if _is_linear_family(shape_family):
+            features_items.append(make_feature_item("dim_type.witness_line_control", "s", witness_v, witness_q))
+
+        if _is_radial_family(shape_family):
+            features_items.append(make_feature_item("dim_type.center_marks", "s", center_marks_v, center_marks_q))
+            features_items.append(make_feature_item("dim_type.center_mark_size", "s", center_mark_size_v, center_mark_size_q))
+            
         # Canonical evidence source for this domain is identity_basis.items.
         # Selectors (join_key.keys_used, phase2.semantic_keys) define subsets without duplicating k/q/v evidence.
         semantic_keys = sorted([it.get("k", "") for it in identity_items if isinstance(it.get("k"), str) and it.get("k")])
@@ -1403,6 +1431,13 @@ def extract(doc, ctx=None):
                 identity_items=identity_items,
                 required_qs=(),
                 label=label,
+                features_items=features_items,
+                debug={
+                    "stratum_features": build_stratum_features_v1(
+                        domain="dimension_types",
+                        identity_items=identity_items,
+                    ),
+                },
             )
             # Phase-2 additive fields (do not affect record.v2 invariants)
             rec_v2["join_key"] = join_key_policy
@@ -1429,7 +1464,15 @@ def extract(doc, ctx=None):
                 identity_items=identity_items,
                 required_qs=required_qs,
                 label=label,
+                features_items=features_items,
+                debug={
+                    "stratum_features": build_stratum_features_v1(
+                        domain="dimension_types",
+                        identity_items=identity_items,
+                    ),
+                },
             )
+        
             # Phase-2 additive fields (do not affect record.v2 invariants)
             rec_v2["join_key"] = join_key_policy
 

@@ -9,6 +9,20 @@ import os
 import re
 import subprocess
 from collections import defaultdict
+# Label synthesis (optional — degrades gracefully if label_synthesis dir absent)
+try:
+    import sys as _sys, os as _os
+    _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+    from label_synthesis.label_resolver import (
+        resolve_pattern_label,
+        find_near_duplicate_merges,
+        load_llm_cache,
+        load_annotations,
+        load_label_population,
+    )
+    _LABEL_SYNTHESIS_AVAILABLE = True
+except ImportError:
+    _LABEL_SYNTHESIS_AVAILABLE = False
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -199,7 +213,63 @@ def _stable_pattern_id(
     taken.add(candidate)
     return candidate
 
+def _load_items_by_pk_for_domain(
+    phase0_dir: Path, domain: str
+) -> Dict[str, List[Dict[str, str]]]:
+    """Load identity items for a single domain — streams full file but runs once per domain.
+    For large corpora call _load_all_items_partitioned instead."""
+    items_csv = phase0_dir / "phase0_identity_items.csv"
+    if not items_csv.is_file():
+        return {}
+    result: Dict[str, List[Dict[str, str]]] = {}
+    try:
+        with items_csv.open("r", encoding="utf-8-sig", newline="") as f:
+            for row in csv.DictReader(f):
+                if row.get("domain", "") != domain:
+                    continue
+                pk = row.get("record_pk", "").strip()
+                if not pk:
+                    continue
+                result.setdefault(pk, []).append({
+                    "k": row.get("item_key", ""),
+                    "v": row.get("item_value", ""),
+                    "q": row.get("item_value_type", "ok"),
+                })
+    except Exception:
+        pass
+    return result
 
+
+def _load_all_items_partitioned(
+    phase0_dir: Path,
+) -> Dict[str, Dict[str, List[Dict[str, str]]]]:
+    """Read phase0_identity_items.csv ONCE and partition by domain.
+    Returns {domain: {record_pk: [{k,v,q}, ...]}}
+    Use this when label_synth_active to avoid N-domain × 668MB scans."""
+    items_csv = phase0_dir / "phase0_identity_items.csv"
+    if not items_csv.is_file():
+        return {}
+    result: Dict[str, Dict[str, List[Dict[str, str]]]] = {}
+    try:
+        with items_csv.open("r", encoding="utf-8-sig", newline="") as f:
+            for row in csv.DictReader(f):
+                domain = row.get("domain", "").strip()
+                pk = row.get("record_pk", "").strip()
+                if not domain or not pk:
+                    continue
+                result.setdefault(domain, {}).setdefault(pk, []).append({
+                    "k": row.get("item_key", ""),
+                    "v": row.get("item_value", ""),
+                    "q": row.get("item_value_type", "ok"),
+                })
+    except Exception:
+        pass
+    return result
+
+def _load_items_by_pk(phase0_dir: Path) -> Dict[str, List[Dict[str, str]]]:
+    """Full-corpus load — kept for reference but not called in hot path."""
+    return _load_items_by_pk_for_domain(phase0_dir, domain="")  # returns empty — use per-domain version
+    
 def _write_csv(path: Path, fieldnames: List[str], rows: List[Dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
@@ -222,6 +292,9 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
     label_rows: List[Dict[str, str]] = []
     reason_rows: List[Dict[str, str]] = []
 
+    feature_rows: List[Dict[str, str]] = []
+    stratum_rows: List[Dict[str, str]] = []
+    
     for _, primary, secondary in _iter_export_files(exports_dir):
         data = _read_json(primary)
         if secondary is not None:
@@ -315,7 +388,56 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
                             "item_value_type": _safe_str(it.get("q")),
                             "item_role": "identity_basis",
                         })
+                        
+                # ---------------------------
+                # Feature items (discovery surface)
+                # ---------------------------
+                feats = rec.get("features") if isinstance(rec.get("features"), dict) else None
+                feat_items = feats.get("items") if isinstance(feats, dict) else None
+                if isinstance(feat_items, list):
+                    for it in feat_items:
+                        if not isinstance(it, dict):
+                            continue
+                        k = _safe_str(it.get("k"))
+                        if not k:
+                            continue
+                        t = _safe_str(it.get("t"))
+                        q = _safe_str(it.get("q"))
+                        v = it.get("v")
+                        if not isinstance(v, (str, int, float, bool)) and v is not None:
+                            v = json.dumps(v, ensure_ascii=False, sort_keys=True)
+                        feature_rows.append({
+                            "schema_version": SCHEMA_VERSION,
+                            "export_run_id": export_run_id,
+                            "domain": domain,
+                            "record_pk": record_pk,
+                            "feature_key": k,
+                            "feature_type": t,
+                            "feature_value": _safe_str(v),
+                            "feature_quality": q,
+                            "ref_label": _safe_str(it.get("ref_label")),
+                        })
 
+                # ---------------------------
+                # Stratum features (debug surface)
+                # ---------------------------
+                dbg = rec.get("debug") if isinstance(rec.get("debug"), dict) else None
+                sf = dbg.get("stratum_features") if isinstance(dbg, dict) else None
+                if isinstance(sf, dict):
+                    discs = sf.get("discriminators")
+                    if not isinstance(discs, list):
+                        discs = []
+                    stratum_rows.append({
+                        "schema_version": SCHEMA_VERSION,
+                        "export_run_id": export_run_id,
+                        "domain": domain,
+                        "record_pk": record_pk,
+                        "stratum_schema_version": _safe_str(sf.get("schema_version")),
+                        "group": _safe_str(sf.get("group")),
+                        "shape": _safe_str(sf.get("shape")),
+                        "discriminators_json": json.dumps(discs, ensure_ascii=False, sort_keys=True),
+                    })
+                    
                 comps = (rec.get("label") or {}).get("components") if isinstance(rec.get("label"), dict) else None
                 if isinstance(comps, dict):
                     for order, key in enumerate(sorted(comps.keys(), key=str)):
@@ -351,6 +473,20 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
         "item_value_type", "item_role",
     ], _sort_rows(item_rows, ["export_run_id", "domain", "record_pk", "item_key", "item_value"]))
 
+    _write_csv(out_dir / "phase0_feature_items.csv", [
+        "schema_version", "export_run_id", "domain", "record_pk",
+        "feature_key", "feature_type", "feature_value", "feature_quality", "ref_label",
+    ], _sort_rows(feature_rows, [
+        "export_run_id", "domain", "record_pk", "feature_key", "feature_type", "feature_quality", "feature_value"
+    ]))
+
+    _write_csv(out_dir / "phase0_stratum_features.csv", [
+        "schema_version", "export_run_id", "domain", "record_pk",
+        "stratum_schema_version", "group", "shape", "discriminators_json",
+    ], _sort_rows(stratum_rows, [
+        "export_run_id", "domain", "record_pk", "group", "shape"
+    ]))
+    
     _write_csv(out_dir / "phase0_label_components.csv", [
         "schema_version", "export_run_id", "domain", "record_pk", "component_key", "component_value", "component_order",
     ], _sort_rows(label_rows, ["export_run_id", "domain", "record_pk", "component_order", "component_key"]))
@@ -369,6 +505,26 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
     analysis_scope_hash = hashlib.sha1(scope_src.encode("utf-8")).hexdigest()
     analysis_run_id = f"ana_{analysis_scope_hash[:12]}"
 
+    # --- Label synthesis setup (all optional; skipped entirely if dir absent) ---
+    _label_synth_dir = out_dir.parent / "label_synthesis"
+    _label_synth_active = (
+        _LABEL_SYNTHESIS_AVAILABLE
+        and _label_synth_dir.is_dir()
+        and any(_label_synth_dir.iterdir())
+    )
+
+    if _label_synth_active:
+        _phase0_dir = out_dir.parent / "phase0_v21"
+        _all_items = _load_all_items_partitioned(_phase0_dir)  # one read, ~668MB once
+        _llm_cache = load_llm_cache(str(_label_synth_dir / "llm_name_cache.json"))
+        _annotations = load_annotations(str(_label_synth_dir / "pattern_annotations.csv"))
+    else:
+        _phase0_dir = out_dir.parent / "phase0_v21"
+        _all_items = {}
+        _llm_cache = {}
+        _annotations = {}
+    _label_pop_by_domain: Dict[str, Dict] = {}
+    
     _write_csv(out_dir / "analysis_manifest.csv", [
         "schema_version", "analysis_run_id", "analysis_scope_hash", "export_run_count", "domain_count",
         "tool_version", "policy_baseline_version", "policy_pareto_version",
@@ -430,6 +586,12 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
 
     pattern_id_by_cluster: Dict[Tuple[str, str, str], str] = {}
     for dom in domains:
+        
+        if _label_synth_active and dom not in _label_pop_by_domain:
+            pop_csv = _label_synth_dir / f"{dom}.joinhash_label_population.csv"
+            _label_pop_by_domain[dom] = load_label_population(str(pop_csv), dom)
+        _items_by_pk = _all_items.get(dom, {}) if _label_synth_active else {}
+            
         cluster_items = dom_clusters.get(dom, [])
         domain_records = records_by_domain.get(dom, [])
         domain_files_present = len({r["export_run_id"] for r in domain_records})
@@ -453,6 +615,19 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
             cluster_rows,
             key=lambda c: (-c["files_present"], -c["records_count"], c["pid"]),
         )
+        
+        # Layer 2.5: build near-dup merge map for this domain
+        if _label_synth_active:
+            _clusters_with_items = []
+            for c in sorted_clusters:
+                rep_pk = c["rows"][0].get("record_pk", "") if c["rows"] else ""
+                c["identity_items"] = _items_by_pk.get(rep_pk, [])
+                _clusters_with_items.append(c)
+            _near_dup_map = find_near_duplicate_merges(_clusters_with_items)
+        else:
+            _near_dup_map = {}
+        _canonical_labels: Dict[str, str] = {}
+        
         n = len(sorted_clusters)
         total_dom_records = sum(int(c["records_count"]) for c in sorted_clusters)
 
@@ -484,19 +659,46 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
             })
 
             # See docs/PATTERN_ID_AND_LABEL_RULES.md for stable pattern identity/label.
+            
             pid = str(cluster["pid"])
+
+            # Resolve label through the 5-layer chain
+            if _label_synth_active:
+                _near_dup_canonical_jh = _near_dup_map.get(join_hash)
+                _near_dup_target_label = _canonical_labels.get(_near_dup_canonical_jh) if _near_dup_canonical_jh else None
+                _rep_pk = rows[0].get("record_pk", "") if rows else ""
+                _identity_items = _items_by_pk.get(_rep_pk, [])
+                pattern_label, label_source = resolve_pattern_label(
+                    domain=dom,
+                    join_hash=join_hash,
+                    join_key_schema=schema,
+                    pattern_rank=rank,
+                    pattern_count=n,
+                    identity_items=_identity_items,
+                    label_population=_label_pop_by_domain.get(dom, {}).get(join_hash, []),
+                    annotations=_annotations,
+                    llm_cache=_llm_cache,
+                    pattern_id=pid,
+                    near_dup_target_label=_near_dup_target_label,
+                )
+                if join_hash not in _near_dup_map:
+                    _canonical_labels[join_hash] = pattern_label
+            else:
+                pattern_label = f"{schema} — Variant {rank} of {n}"
+                label_source = "fallback"
+
             domain_patterns.append({
                 "schema_version": SCHEMA_VERSION,
                 "analysis_run_id": analysis_run_id,
                 "domain": dom,
                 "pattern_id": pid,
-                "pattern_label": f"{schema} — Variant {rank} of {n}",
+                "pattern_label": pattern_label,
                 "source_cluster_id": cluster_id,
                 "pattern_size_records": str(cluster_size),
                 "pattern_size_files": str(files_present),
                 "pattern_rank": str(rank),
                 "is_candidate_standard": "true" if presence_pct >= STANDARD_PRESENCE_MIN else "",
-                "notes": "",
+                "notes": label_source if label_source != "fallback" else "",
             })
 
             for r in rows:

@@ -51,6 +51,8 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.join_key_policy import get_domain_join_key_policy
 from core.collect import collect_types
 from core.join_key_builder import build_join_key_from_policy
@@ -385,6 +387,29 @@ def extract(doc, ctx=None):
 
         semantic_keys = sorted({it.get("k") for it in identity_items if isinstance(it.get("k"), str)})
 
+        # ---------------------------
+        # Discovery feature surface (Phase-2 computes stats / classification)
+        # ---------------------------
+        def _pick_identity_item(items, key):
+            for it in (items or []):
+                if it.get("k") == key:
+                    return it
+            return None
+
+        features_items = []
+        for _k, _t in (
+            ("arrowhead.style_label", "s"),
+            ("arrowhead.tick_size_in", "f"),
+            ("arrowhead.arrow_closed", "b"),
+            ("arrowhead.fill_tick", "b"),
+            ("arrowhead.tick_mark_centered", "b"),
+            ("arrowhead.heavy_end_pen_weight", "i"),
+            ("arrowhead.width_angle_deg", "f"),
+        ):
+            _it = _pick_identity_item(identity_items, _k)
+            if _it is not None:
+                features_items.append(make_feature_item(_k, _t, _it.get("v"), _it.get("q")))
+                
         # Required qs: style + tick_size must be OK (classifier depends on their presence)
         required_qs = [style_label_q, tick_in_q]
         if any(q != ITEM_Q_OK for q in required_qs):
@@ -441,6 +466,7 @@ def extract(doc, ctx=None):
             identity_items=identity_items,
             required_qs=tuple(required_qs),
             label=label,
+            features_items=features_items,
             debug={
                 "name_may_be_null_for_system_types": True,
                 "uid_excluded_from_sig": True,
@@ -451,6 +477,10 @@ def extract(doc, ctx=None):
                 "width_angle_raw_rad": safe_str(ang_rad) if ang_rad is not None else "",
                 "width_angle_display": safe_str(width_angle_disp) if width_angle_disp else "",
                 "width_angle_param_names": safe_str(debug_param_names) if debug_param_names else "",
+                "stratum_features": build_stratum_features_v1(
+                    domain="arrowheads",
+                    identity_items=identity_items,
+                ),
             },
         )
 

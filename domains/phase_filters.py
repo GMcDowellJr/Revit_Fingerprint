@@ -51,6 +51,8 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 
@@ -197,6 +199,27 @@ def extract(doc, ctx=None):
             "phase_filter.new.presentation_id",
             "phase_filter.temporary.presentation_id",
         ])
+        
+        # ---------------------------
+        # Discovery feature surface (Phase-2 computes stats / classification)
+        # ---------------------------
+        def _pick_identity_item(items, key):
+            for it in (items or []):
+                if it.get("k") == key:
+                    return it
+            return None
+
+        features_items = []
+        for _k, _t in (
+            ("phase_filter.existing.presentation_id", "i"),
+            ("phase_filter.new.presentation_id", "i"),
+            ("phase_filter.demolished.presentation_id", "i"),
+            ("phase_filter.temporary.presentation_id", "i"),
+        ):
+            _it = _pick_identity_item(identity_items_v2_sorted, _k)
+            if _it is not None:
+                features_items.append(make_feature_item(_k, _t, _it.get("v"), _it.get("q")))
+                
         semantic_key_set = set(semantic_keys)
         sig_basis_items_v2 = [
             it for it in identity_items_v2_sorted
@@ -283,9 +306,14 @@ def extract(doc, ctx=None):
                 "quality": "human",
                 "provenance": "revit.PhaseFilter.Name",
             },
+            features_items=features_items,
             debug={
                 "sig_preimage_sample": sig_preimage_v2[:6],
                 "uid_excluded_from_sig": True,
+                "stratum_features": build_stratum_features_v1(
+                    domain="phase_filters",
+                    identity_items=identity_items,
+                ),
             },
         )
         rec_v2["join_key"] = rec_join_key

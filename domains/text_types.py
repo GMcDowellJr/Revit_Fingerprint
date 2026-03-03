@@ -59,7 +59,8 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
-
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 
@@ -459,6 +460,31 @@ def extract(doc, ctx=None):
         sig_preimage_v2 = serialize_identity_items(semantic_items_v2)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
 
+        # ---------------------------
+        # Discovery feature surface (Phase-2 computes stats / classification)
+        # ---------------------------
+        def _pick_identity_item(items, key):
+            for it in (items or []):
+                if it.get("k") == key:
+                    return it
+            return None
+
+        features_items = []
+        for _k, _t in (
+            ("text_type.font", "s"),
+            ("text_type.bold", "b"),
+            ("text_type.italic", "b"),
+            ("text_type.underline", "b"),
+            ("text_type.background", "s"),
+            ("text_type.show_border", "b"),
+            ("text_type.text_size", "f"),
+            ("text_type.width_factor", "f"),
+            ("text_type.color_rgb", "s"),
+        ):
+            _it = _pick_identity_item(identity_items_v2_sorted, _k)
+            if _it is not None:
+                features_items.append(make_feature_item(_k, _t, _it.get("v"), _it.get("q")))
+                
         rec_v2 = build_record_v2(
             domain="text_types",
             record_id=safe_str(type_name) if safe_str(type_name) else safe_str(t.Id.IntegerValue),
@@ -472,10 +498,15 @@ def extract(doc, ctx=None):
                 "quality": "human",
                 "provenance": "revit.TextNoteType.Name",
             },
+            features_items=features_items,
             debug={
                 "sig_preimage_sample": sig_preimage_v2[:6],
                 "uid_excluded_from_sig": True,
                 "leader_arrowhead_uid_excluded_from_sig": True,
+                "stratum_features": build_stratum_features_v1(
+                    domain="dimension_types",
+                    identity_items=identity_items_sorted,
+                ),
             },
         )
         rec_v2["join_key"], _missing = build_join_key_from_policy(

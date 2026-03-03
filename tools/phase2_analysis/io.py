@@ -5,6 +5,17 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional
 import csv
+
+import sys
+
+# Allow large JSON fields (e.g., discriminators_json) in CSV exports.
+# Default is 131072 bytes which is too small for some domains.
+try:
+    csv.field_size_limit(sys.maxsize)
+except (OverflowError, AttributeError):
+    # Some builds/platforms clamp; fall back to a high safe value.
+    csv.field_size_limit(10 * 1024 * 1024)
+    
 from pathlib import Path
 from typing import Set, Tuple
 
@@ -166,6 +177,22 @@ def _read_csv_rows(path: str) -> Iterator[Dict[str, str]]:
             if isinstance(row, dict):
                 yield {str(k): ("" if v is None else str(v)) for k, v in row.items()}
 
+def load_phase0_v21_feature_items(phase0_dir: str) -> List[Dict[str, str]]:
+    """Load phase0_feature_items.csv (if present)."""
+    phase0_dir = os.path.abspath(phase0_dir)
+    p = os.path.join(phase0_dir, "phase0_feature_items.csv")
+    if not os.path.isfile(p):
+        return []
+    return list(_read_csv_rows(p))
+
+
+def load_phase0_v21_stratum_features(phase0_dir: str) -> List[Dict[str, str]]:
+    """Load phase0_stratum_features.csv (if present)."""
+    phase0_dir = os.path.abspath(phase0_dir)
+    p = os.path.join(phase0_dir, "phase0_stratum_features.csv")
+    if not os.path.isfile(p):
+        return []
+    return list(_read_csv_rows(p))
 
 def load_phase0_v21_file_paths(phase0_dir: str) -> Dict[str, str]:
     """Return best-effort file_id/export_run_id -> path for metadata heuristics.

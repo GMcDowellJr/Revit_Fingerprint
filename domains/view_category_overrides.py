@@ -31,6 +31,8 @@ from core.record_v2 import (
     canonicalize_str,
     canonicalize_int,
 )
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.phase2 import phase2_sorted_items
 from core.deps import require_domain, Blocked
 from core.join_key_policy import get_domain_join_key_policy
@@ -321,6 +323,26 @@ def extract(doc, ctx=None):
             preimage = serialize_identity_items(semantic_items)
             sig_hash = make_hash(preimage) if preimage is not None else None
 
+            # ---------------------------
+            # Discovery feature surface (Phase-2 computes stats / classification)
+            # ---------------------------
+            def _pick_identity_item(items, key):
+                for it in (items or []):
+                    if it.get("k") == key:
+                        return it
+                return None
+
+            features_items = []
+            for _k, _t in (
+                ("view_cat_override.view_type", "s"),
+                ("view_cat_override.is_template", "b"),
+                ("view_cat_override.category_name", "s"),
+                ("view_cat_override.has_any_override", "b"),
+            ):
+                _it = _pick_identity_item(identity_items_sorted, _k)
+                if _it is not None:
+                    features_items.append(make_feature_item(_k, _t, _it.get("v"), _it.get("q")))
+                    
             required_keys = ["vco.baseline_category_path", "vco.baseline_sig_hash", "vco.override_properties_hash"]
             item_by_k = {it.get("k"): it for it in identity_items_sorted}
             required_qs = [safe_str(item_by_k.get(rk, {}).get("q", ITEM_Q_MISSING)) for rk in required_keys]
@@ -357,6 +379,13 @@ def extract(doc, ctx=None):
                     identity_items=identity_items_sorted,
                     required_qs=(),
                     label=label,
+                    features_items=features_items,
+                    debug={
+                        "stratum_features": build_stratum_features_v1(
+                            domain="view_category_overrides",
+                            identity_items=identity_items_sorted,
+                        ),
+                    },
                 )
                 blocked_records.append(rec)
             else:
@@ -370,6 +399,13 @@ def extract(doc, ctx=None):
                     identity_items=identity_items_sorted,
                     required_qs=required_qs,
                     label=label,
+                    features_items=features_items,
+                    debug={
+                        "stratum_features": build_stratum_features_v1(
+                            domain="view_category_overrides",
+                            identity_items=identity_items_sorted,
+                        ),
+                    },
                 )
 
                 if sig_hash in override_patterns:

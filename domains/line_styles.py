@@ -45,7 +45,8 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
-
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
@@ -297,6 +298,26 @@ def extract(doc, ctx=None):
             preimage_v2 = serialize_identity_items(semantic_items)
             sig_hash_v2 = make_hash(preimage_v2)
 
+            # ---------------------------
+            # Discovery feature surface (Phase-2 computes stats / classification)
+            # ---------------------------
+            def _pick_identity_item(items, key):
+                for it in (items or []):
+                    if it.get("k") == key:
+                        return it
+                return None
+
+            features_items = []
+            for _k, _t in (
+                ("line_style.parent_category_name", "s"),
+                ("line_style.color_rgb", "s"),
+                ("line_style.weight_projection", "i"),
+                ("line_style.pattern_name", "s"),
+            ):
+                _it = _pick_identity_item(identity_items_sorted, _k)
+                if _it is not None:
+                    features_items.append(make_feature_item(_k, _t, _it.get("v"), _it.get("q")))
+                    
             rec_v2 = build_record_v2(
                 domain="line_styles",
                 record_id=safe_str(sc_name),
@@ -310,6 +331,13 @@ def extract(doc, ctx=None):
                     "quality": "human",
                     "provenance": "computed.path",
                     "components": {"path": safe_str(path_v_raw)},
+                },
+                features_items=features_items,
+                debug={
+                    "stratum_features": build_stratum_features_v1(
+                        domain="line_styles",
+                        identity_items=identity_items_sorted,
+                    ),
                 },
             )
 

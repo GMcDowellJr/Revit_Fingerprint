@@ -52,7 +52,8 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
-
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 
@@ -913,6 +914,27 @@ def extract(doc, ctx=None):
         sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
 
+        # ---------------------------
+        # Discovery feature surface (Phase-2 computes stats / classification)
+        # ---------------------------
+        def _pick_identity_item(items, key):
+            for it in (items or []):
+                if it.get("k") == key:
+                    return it
+            return None
+
+        features_items = []
+        for _k, _t in (
+            ("fill_pattern.is_solid", "b"),
+            ("fill_pattern.is_model", "b"),
+            ("fill_pattern.target_id", "i"),
+            ("fill_pattern.grid_count", "i"),
+            ("fill_pattern.grids_def_hash", "s"),
+        ):
+            _it = _pick_identity_item(identity_items_v2_sorted, _k)
+            if _it is not None:
+                features_items.append(make_feature_item(_k, _t, _it.get("v"), _it.get("q")))
+                
         # Selector-only phase2 semantic surface: no duplicated k/q/v evidence.
         semantic_keys = sorted({it.get("k") for it in identity_items_v2_sorted if isinstance(it.get("k"), str)})
         phase2_payload.pop("semantic_items", None)
@@ -944,9 +966,14 @@ def extract(doc, ctx=None):
                 "quality": "human",
                 "provenance": "revit.FillPatternElement.Name",
             },
+            features_items=features_items,
             debug={
                 "sig_preimage_sample": sig_preimage_v2[:6],
                 "uid_excluded_from_sig": True,
+                "stratum_features": build_stratum_features_v1(
+                    domain="fill_patterns",
+                    identity_items=identity_items_v2_sorted,
+                ),
             },
         )
         rec_v2["join_key"] = join_key

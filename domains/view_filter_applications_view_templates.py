@@ -39,7 +39,8 @@ from core.record_v2 import (
     make_record_id_structural,
     serialize_identity_items,
 )
-
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.phase2 import (
     phase2_join_hash,
     phase2_sorted_items,
@@ -376,6 +377,17 @@ def extract(doc, ctx=None):
                 "identity_items": items_sorted,
                 "required_qs": required_qs,
                 "label": label,
+                "features_items": [
+                    make_feature_item(it.get("k"), "s", it.get("v"), it.get("q"))
+                    for it in (items_sorted or [])
+                    if isinstance(it.get("k"), str)
+                ],
+                "debug": {
+                    "stratum_features": build_stratum_features_v1(
+                        domain="view_filter_applications_view_templates",
+                        identity_items=items_sorted,
+                    ),
+                },
                 "phase2_payload": {
                     "p2_unknown": p2_unknown,
                                         "join_key_policy": pol,
@@ -397,6 +409,8 @@ def extract(doc, ctx=None):
             identity_items=spec["identity_items"],
             required_qs=spec["required_qs"],
             label=spec["label"],
+            features_items=spec.get("features_items"),
+            debug=spec.get("debug"),
         )
 
         pol = spec["phase2_payload"]["join_key_policy"]

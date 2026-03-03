@@ -50,7 +50,8 @@ from core.record_v2 import (
     make_record_id_structural,
     serialize_identity_items,
 )
-
+from core.feature_items import make_feature_item
+from core.stratum_features import build_stratum_features_v1
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
@@ -511,6 +512,17 @@ def extract(doc, ctx=None):
                 "identity_items": items_sorted,
                 "required_qs": required_qs,
                 "label": label,
+                "features_items": [
+                    make_feature_item(it.get("k"), "s", it.get("v"), it.get("q"))
+                    for it in (items_sorted or [])
+                    if isinstance(it.get("k"), str)
+                ],
+                "debug": {
+                    "stratum_features": build_stratum_features_v1(
+                        domain="view_filter_definitions",
+                        identity_items=items_sorted,
+                    ),
+                },
                 "phase2_payload": {
                     "semantic_keys": semantic_keys,
                     "p2_unknown": p2_unknown,
@@ -533,6 +545,8 @@ def extract(doc, ctx=None):
             identity_items=spec["identity_items"],
             required_qs=spec["required_qs"],
             label=spec["label"],
+            features_items=spec.get("features_items"),
+            debug=spec.get("debug"),
         )
         if rec["status"] == STATUS_BLOCKED:
             v2_block_reasons[f"record_blocked:{rec['record_id']}"] = True
