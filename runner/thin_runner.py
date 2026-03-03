@@ -8,6 +8,18 @@ import importlib
 
 sys.dont_write_bytecode = True
 
+
+# Thinrunner metadata bridge (preferred metadata source for export payload)
+try:
+    import platform as _platform
+    os.environ["REVIT_FINGERPRINT_EXPORTER_NAME"] = "revit_fingerprint"
+    os.environ["REVIT_FINGERPRINT_EXPORTER_VERSION"] = str(os.environ.get("FINGERPRINT_TOOL_VERSION", "")).strip()
+    os.environ["REVIT_FINGERPRINT_EXPORTER_GIT_SHA"] = str(os.environ.get("REVIT_FINGERPRINT_GIT_SHA", "")).strip()
+    os.environ["REVIT_FINGERPRINT_HOST_PYTHON"] = "{} {}".format(_platform.python_implementation(), _platform.python_version())
+    os.environ["REVIT_FINGERPRINT_HOST_APP"] = "Revit"
+except Exception:
+    pass
+
 # Provide output path to imported runner via env var (import boundary safe)
 try:
     if IN is not None and len(IN) > 0 and IN[0] is not None and str(IN[0]).strip():
@@ -24,16 +36,12 @@ try:
 except Exception:
     pass
 
-# Optional: IN[1] == True forces full OUT (debug/back-compat)
-try:
-    if IN is not None and len(IN) > 1 and bool(IN[1]) is True:
-        os.environ["REVIT_FINGERPRINT_FORCE_FULL_OUT"] = "1"
-    else:
-        os.environ.pop("REVIT_FINGERPRINT_FORCE_FULL_OUT", None)
-except Exception as e:
-    os.environ.pop("REVIT_FINGERPRINT_FORCE_FULL_OUT", None)
-
-# Optional: IN[2] controls whether a timestamp is appended to output filenames
+# Optional: input contract
+#  - IN[1]: timestamp option for filename stamp
+#  - IN[2]: tool version override for exporter metadata bridge
+#  - IN[3]: exporter git sha override for exporter metadata bridge
+#
+# IN[1] controls whether a timestamp is appended to output filenames
 #  - True / 1 / "true"  => stamp ON  (REVIT_FINGERPRINT_FILENAME_STAMP=1)
 #  - False / 0 / "false" => stamp OFF (REVIT_FINGERPRINT_FILENAME_STAMP=0)
 #  - Missing/None => stamp OFF (safer for batch determinism)
@@ -75,12 +83,12 @@ def _parse_boolish(v):
     return None
 
 try:
-    raw_in2 = None
-    have_in2 = (IN is not None and len(IN) > 2)
-    if have_in2:
-        raw_in2 = IN[2]
+    raw_in1 = None
+    have_in1 = (IN is not None and len(IN) > 1)
+    if have_in1:
+        raw_in1 = IN[1]
 
-    stamp_choice = _parse_boolish(raw_in2) if have_in2 else None
+    stamp_choice = _parse_boolish(raw_in1) if have_in1 else None
 
     if stamp_choice is True:
         os.environ["REVIT_FINGERPRINT_FILENAME_STAMP"] = "1"
@@ -89,13 +97,29 @@ try:
     else:
         # Missing/None/unparseable => default OFF
         os.environ["REVIT_FINGERPRINT_FILENAME_STAMP"] = "0"
-        if have_in2 and raw_in2 is not None:
+        if have_in1 and raw_in1 is not None:
             _thinrunner_warnings.append(
-                "IN[2] unparseable for timestamp flag; defaulting REVIT_FINGERPRINT_FILENAME_STAMP=0"
+                "IN[1] unparseable for timestamp flag; defaulting REVIT_FINGERPRINT_FILENAME_STAMP=0"
             )
 except Exception:
     # Default OFF on any thinrunner failure here
     os.environ["REVIT_FINGERPRINT_FILENAME_STAMP"] = "0"
+
+
+# Optional metadata overrides from Dynamo inputs
+#  - IN[2]: tool version
+#  - IN[3]: exporter git sha
+try:
+    if IN is not None and len(IN) > 2 and IN[2] is not None:
+        os.environ["REVIT_FINGERPRINT_EXPORTER_VERSION"] = str(IN[2]).strip()
+except Exception:
+    pass
+
+try:
+    if IN is not None and len(IN) > 3 and IN[3] is not None:
+        os.environ["REVIT_FINGERPRINT_EXPORTER_GIT_SHA"] = str(IN[3]).strip()
+except Exception:
+    pass
 
 # MUST be the repo root that contains: core/, domains/, runner/
 # Dynamo-node safe behavior:
