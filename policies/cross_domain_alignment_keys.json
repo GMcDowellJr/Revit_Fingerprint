@@ -1,0 +1,107 @@
+{
+  "schema": "cross_domain_alignment_keys.v1",
+  "description": "Registry of domain families, member domains, and alignment keys. Alignment keys are identity_item fields shared across domains within a family that governance expects to be consistent. Used for cross-domain alignment scoring in analysis and BI.",
+  "domain_families": {
+    "dimension_types": {
+      "description": "All Revit dimension style types grouped by system family",
+      "member_domains": [
+        "dimension_types_linear",
+        "dimension_types_angular",
+        "dimension_types_radial",
+        "dimension_types_diameter",
+        "dimension_types_spot_elevation",
+        "dimension_types_spot_coordinate",
+        "dimension_types_spot_slope"
+      ],
+      "alignment_keys": [
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.unit_format_id"
+      ],
+      "notes": "Linear family (linear, angular) share witness_line_control. Radial/Diameter share center mark fields. Spot families each have unique primary unit fields. Alignment keys are the subset applicable to ALL member domains."
+    },
+    "view_templates": {
+      "description": "View templates grouped by Revit ViewType family as shown in UI",
+      "member_domains": [
+        "view_templates_ceiling_plans",
+        "view_templates_elevations_sections_detail",
+        "view_templates_floor_structural_area_plans",
+        "view_templates_renderings_drafting",
+        "view_templates_schedules"
+      ],
+      "alignment_keys": [
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.vg.model_categories_sig_hash",
+        "vt.vg.annotation_categories_sig_hash"
+      ],
+      "notes": "Alignment keys are VG overrides applicable to all view types. View Range, Rendering Settings etc. are domain-specific and not alignment keys."
+    },
+    "object_styles": {
+      "description": "Object styles grouped by Revit category type tab",
+      "member_domains": [
+        "object_styles_model",
+        "object_styles_annotation",
+        "object_styles_analytical",
+        "object_styles_imported"
+      ],
+      "alignment_keys": [
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "notes": "Cut weight and material are only applicable to Model tab — not alignment keys. Imported tab uses render material from CAD source, not governed Revit material."
+    },
+    "fill_patterns": {
+      "description": "Fill patterns grouped by Revit target (Drafting vs Model)",
+      "member_domains": [
+        "fill_patterns_drafting",
+        "fill_patterns_model"
+      ],
+      "alignment_keys": [
+        "fill_pattern.grids_def_hash"
+      ],
+      "notes": "Alignment key enables asking whether a geometric pattern exists in both Drafting and Model libraries."
+    },
+    "arrowheads": {
+      "description": "Arrowhead types — single domain, single member",
+      "member_domains": [
+        "arrowheads"
+      ],
+      "alignment_keys": [],
+      "notes": "Single-member family. No cross-domain alignment applicable."
+    },
+    "line_patterns": {
+      "description": "Line patterns — single domain, single member",
+      "member_domains": [
+        "line_patterns"
+      ],
+      "alignment_keys": [],
+      "notes": "Single-member family."
+    },
+    "line_styles": {
+      "description": "Line styles — single domain, single member",
+      "member_domains": [
+        "line_styles"
+      ],
+      "alignment_keys": [],
+      "notes": "Single-member family."
+    },
+    "text_types": {
+      "description": "Text note types — single domain, single member",
+      "member_domains": [
+        "text_types"
+      ],
+      "alignment_keys": [],
+      "notes": "Single-member family. Font, size, width_factor are already in identity_items and available for cross-family alignment scoring without extractor changes."
+    }
+  }
+}
