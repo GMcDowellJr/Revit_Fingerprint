@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Fill Patterns domain extractor.
+Fill Patterns (Model) domain extractor.
 
 Fingerprints fill pattern definitions including:
 - Solid vs. patterned
-- Model vs. drafting
+- Model patterns only
 - Grid definitions (angle, origin, offset, shift)
 
 Per-record identity: UniqueId
@@ -63,6 +63,10 @@ except ImportError:
 
 # Global debug flag
 DEBUG_INCLUDE_FILLPATTERN_SIGNATURES = False
+
+DOMAIN_NAME = "fill_patterns_model"
+_TARGET_NAME = "Model"
+_TARGET_INT = 1  # Drafting=0, Model=1
 
 
 def extract(doc, ctx=None):
@@ -559,7 +563,7 @@ def extract(doc, ctx=None):
             semantic_reduced.append(it)
 
         return {
-            "schema": "phase2.fill_patterns.v1",
+            "schema": "phase2.{}.v1".format(DOMAIN_NAME),
             "grouping_basis": "phase2.hypothesis",
             "semantic_items": phase2_sorted_items(semantic_reduced),
             "cosmetic_items": phase2_sorted_items(cosmetic),
@@ -593,6 +597,16 @@ def extract(doc, ctx=None):
             fp = e.GetFillPattern()
         except Exception as e:
             fp = None
+
+        # Filter: only process patterns matching this domain's target
+        if fp is not None:
+            try:
+                _fp_target_int = int(fp.Target)
+            except Exception:
+                _fp_target_int = -1
+            if _fp_target_int != _TARGET_INT:
+                info["debug_skipped_no_name"] += 1  # reuse counter for skipped wrong-target
+                continue
 
         # -------------------------
         # Legacy signature (UNCHANGED meaning)
@@ -763,7 +777,7 @@ def extract(doc, ctx=None):
                 gc_v, gc_q = (None, ITEM_Q_UNREADABLE)
 
         identity_items_v2.append(make_identity_item("fill_pattern.is_solid", is_solid_v, is_solid_q))
-        identity_items_v2.append(make_identity_item("fill_pattern.target_id", target_v, target_q))
+        identity_items_v2.append(make_identity_item("fill_pattern.target", _TARGET_NAME, ITEM_Q_OK))
         identity_items_v2.append(make_identity_item("fill_pattern.grid_count", gc_v, gc_q))
         required_qs = [is_solid_q, target_q, gc_q]
 
@@ -920,7 +934,7 @@ def extract(doc, ctx=None):
 
         # Policy-driven join_key from canonical evidence (identity_basis.items) only.
         # Optional keys stay in identity evidence for future exploration but are not hashed by default.
-        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "fill_patterns")
+        pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
         join_key, _missing = build_join_key_from_policy(
             domain_policy=pol,
             identity_items=identity_items_v2_sorted,
@@ -932,7 +946,7 @@ def extract(doc, ctx=None):
         )
 
         rec_v2 = build_record_v2(
-            domain="fill_patterns",
+            domain=DOMAIN_NAME,
             record_id=safe_str(name) if safe_str(name) else safe_str(e.Id.IntegerValue),
             status=status_v2,
             status_reasons=sorted(set(status_reasons_v2)),
@@ -952,7 +966,7 @@ def extract(doc, ctx=None):
         rec_v2["join_key"] = join_key
         rec_v2["phase2"] = phase2_payload
         rec_v2["sig_basis"] = {
-            "schema": "fill_patterns.sig_basis.v1",
+            "schema": "{}.sig_basis.v1".format(DOMAIN_NAME),
             "keys_used": semantic_keys,
         }
 
