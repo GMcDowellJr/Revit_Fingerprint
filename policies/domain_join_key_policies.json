@@ -99,7 +99,8 @@
       "notes": [
         "Identity is definition-based via ordered segment (kind,length) sequence; segments are collapsed into line_pattern.segments_def_hash.",
         "line_pattern.segments_def_hash must be derived only from segment kinds and lengths in order and must not incorporate UID, name, or element_id.",
-        "Names are labels only and must not participate in joins."
+        "Names are labels only and must not participate in joins.",
+        "lp.is_import added to coordination_items in extractor v2."
       ]
     },
     "line_styles": {
@@ -120,45 +121,22 @@
         "pattern_ref.kind is too coarse and produces high collisions; it must not be used for joins."
       ]
     },
-    "fill_patterns": {
-      "join_key_schema": "fill_patterns.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "fill_pattern.grids_def_hash"
-      ],
-      "optional_items": [
-        "fill_pattern.target_id",
-        "fill_pattern.is_solid",
-        "fill_pattern.grid_count"
-      ],
-      "explicitly_excluded_items": [
-        "fill_pattern.uid",
-        "fill_pattern.elem_id",
-        "fill_pattern.name"
-      ],
-      "notes": [
-        "Definition-based identity is structural: ordered grid parameter sequence; reduce to a single derived grids_def_hash for governance joins.",
-        "Sparse per-grid scalar keys (e.g., grid[i].shift/angle) are not acceptable for identity due to high collision evidence in Phase-2 Pareto exploration.",
-        "target_id/is_solid/grid_count are context/disambiguation only and must not replace grids_def_hash."
-      ]
-    },
     "arrowheads": {
-      "join_key_schema": "arrowheads.join_key.v1",
+      "join_key_schema": "arrowheads.join_key.v2",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
         "arrowhead.style",
         "arrowhead.tick_size_in"
       ],
-      "optional_items": [
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "arrowhead.name",
+        "arrowhead.type_id",
         "arrowhead.width_angle_deg",
         "arrowhead.fill_tick",
         "arrowhead.arrow_closed",
         "arrowhead.tick_mark_centered",
         "arrowhead.heavy_end_pen_weight"
-      ],
-      "explicitly_excluded_items": [
-        "arrowhead.name",
-        "arrowhead.type_id"
       ],
       "shape_gating": {
         "discriminator_key": "arrowhead.style",
@@ -170,133 +148,26 @@
               "arrowhead.arrow_closed"
             ],
             "additional_optional": [],
-            "notes": "Arrow styles require arrow-specific geometry + fill/closed flags"
+            "notes": "Arrow record class: arrow-specific geometry + fill/closed flags are applicable and required."
           },
-          "Tick": {
+          "Heavy end tick mark": {
             "additional_required": [
               "arrowhead.tick_mark_centered",
               "arrowhead.heavy_end_pen_weight"
             ],
             "additional_optional": [],
-            "notes": "Tick styles require centered/pen weight parameters"
-          },
-          "Dot": {
-            "additional_required": [
-              "arrowhead.tick_mark_centered",
-              "arrowhead.heavy_end_pen_weight"
-            ],
-            "additional_optional": [],
-            "notes": "Dot styles share tick parameters for definition"
-          },
-          "Other": {
-            "additional_required": [
-              "arrowhead.tick_mark_centered",
-              "arrowhead.heavy_end_pen_weight"
-            ],
-            "additional_optional": [],
-            "notes": "Fallback: include a minimal tick flag to preserve definition"
+            "notes": "Heavy end tick mark record class: centered and pen weight are applicable and required."
           }
         },
         "default_shape_behavior": "common_only"
       },
       "notes": [
-        "Definition-based identity only; no referential identifiers in joins.",
-        "arrowhead.name is label-only and may be null for built-in/system arrowheads.",
-        "Downstream domains reference arrowhead identity via this domain signature, not by id or name.",
-        "Shape-gated join keys ensure only applicable style parameters are required."
-      ]
-    },
-    "dimension_types": {
-      "join_key_schema": "dimension_types.join_key.v3",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "dim_type.shape",
-        "dim_type.accuracy"
-      ],
-      "optional_items": [
-		"dim_type.tick_mark_sig_hash",
-        "dim_type.prefix",
-        "dim_type.suffix",
-        "dim_type.unit_format_id",
-        "dim_type.rounding",
-        "dim_type.witness_line_control",
-        "dim_type.center_marks",
-        "dim_type.center_mark_size"
-      ],
-      "explicitly_excluded_items": [
-        "dim_type.tick_mark_uid",
-        "dim_attr.tick_mark_uid",
-        "dim_type.name"
-      ],
-      "shape_gating": {
-        "discriminator_key": "dim_type.shape",
-        "shape_requirements": {
-          "Linear": {
-            "additional_required": ["dim_type.witness_line_control","dim_type.tick_mark_sig_hash"],
-            "additional_optional": [],
-            "notes": "Linear dimensions must match on witness line control behavior"
-          },
-          "LinearFixed": {
-            "additional_required": ["dim_type.witness_line_control","dim_type.tick_mark_sig_hash"],
-            "additional_optional": [],
-            "notes": "LinearFixed dimensions share witness line requirements with Linear"
-          },
-          "Radial": {
-            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size","dim_type.tick_mark_sig_hash"],
-            "additional_optional": [],
-            "notes": "Radial dimensions must match on center mark configuration"
-          },
-          "Diameter": {
-            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size","dim_type.tick_mark_sig_hash"],
-            "additional_optional": [],
-            "notes": "Diameter dimensions share center mark requirements with Radial"
-          },
-          "DiameterLinked": {
-            "additional_required": ["dim_type.center_marks", "dim_type.center_mark_size","dim_type.tick_mark_sig_hash"],
-            "additional_optional": [],
-            "notes": "DiameterLinked dimensions share center mark requirements with Radial"
-          },
-          "Angular": {
-            "additional_required": ["dim_type.unit_format_id","dim_type.tick_mark_sig_hash"],
-            "additional_optional": [],
-            "notes": "Angular dimensions use common properties only"
-          },
-          "ArcLength": {
-            "additional_required": ["dim_type.unit_format_id","dim_type.tick_mark_sig_hash"],
-            "additional_optional": [],
-            "notes": "ArcLength dimensions use common properties only"
-          },
-          "SpotElevation": {
-            "additional_required": ["dim_type.unit_format_id"],
-            "additional_optional": [],
-            "notes": "Spot dimensions use common properties only"
-          },
-          "SpotCoordinate": {
-            "additional_required": ["dim_type.unit_format_id","dim_type.tick_mark_sig_hash"],
-            "additional_optional": [],
-            "notes": "Spot dimensions use common properties only"
-          },
-          "SpotSlope": {
-            "additional_required": ["dim_type.unit_format_id","dim_type.tick_mark_sig_hash"],
-            "additional_optional": [],
-            "notes": "Spot dimensions use common properties only"
-          },
-          "SpotElevationFixed": {
-            "additional_required": ["dim_type.unit_format_id"],
-            "additional_optional": [],
-            "notes": "Spot dimensions use common properties only"
-          }
-        },
-        "default_shape_behavior": "common_only"
-      },
-      "notes": [
-        "Schema v3: Shape-gated join key requirements.",
-        "dim_type.shape is now REQUIRED and used as discriminator for shape-specific requirements.",
-        "Linear family (Linear, LinearFixed) requires witness_line_control.",
-        "Radial family (Radial, Diameter, DiameterLinked) requires center_marks and center_mark_size.",
-        "Angular and Spot families use common properties only.",
-        "Definition-based tick mark identity via dim_type.tick_mark_sig_hash.",
-        "UID-based tick mark fields must never participate in joins."
+        "Schema v2: record class routing corrected. Dot/Diagonal/Box/Loop/Elevation Target/Datum triangle are size-only (common items only).",
+        "Arrow record class: arrowhead.width_angle_deg, arrowhead.fill_tick, arrowhead.arrow_closed.",
+        "Heavy end tick mark record class: arrowhead.tick_mark_centered, arrowhead.heavy_end_pen_weight.",
+        "Size-only record classes (Dot/Diagonal/Box/Loop/Elevation Target/Datum triangle): common items only (arrowhead.style + arrowhead.tick_size_in).",
+        "Style-specific fields moved from optional_items to explicitly_excluded_items at common level — they are never unconditionally applicable.",
+        "Definition-based identity only; no referential identifiers in joins."
       ]
     },
     "text_types": {
@@ -333,93 +204,50 @@
         "If text_type.leader_arrowhead_sig_hash is unavailable for some records, treat as lower confidence rather than substituting uid/name."
       ]
     },
-	"view_filter_definitions": {
-	  "join_key_schema": "view_filter_definitions.join_key.v2",
-	  "hash_alg": "md5_utf8_join_pipe",
-	  "required_items": [
-		"vf.def_hash"
-	  ],
-	  "optional_items": [],
-	  "explicitly_excluded_items": [
-		"vf.uid_or_namekey",
-		"vf.elem_id",
-		"vf.categories",
-		"vf.logic_root",
-		"vf.rule_count",
-		"vf.rules[].sig",
-		"label.components.name",
-		"label.display"
-	  ],
-	  "notes": [
-		"Structured domain: join is performed on vf.def_hash only (definition bundle hash).",
-		"vf.def_hash is computed from canonical vf.categories + vf.logic_root + vf.rule_count + ordered vf.rule[###].sig, but those leaf inputs remain identity-only for forensics.",
-		"Names/labels and any UID-like identifiers are prohibited from joins for standards governance."
-	  ]
-	},
-	"view_filter_applications_view_templates": {
-	  "join_key_schema": "view_filter_applications_view_templates.join_key.v2",
-	  "hash_alg": "md5_utf8_join_pipe",
-	  "required_items": [
-		"vfa.stack_def_hash"
-	  ],
-	  "optional_items": [],
-	  "explicitly_excluded_items": [
-		"vfa.template_uid_or_namekey",
-		"vfa.template_elem_id",
-		"vfa.filter_stack_count",
-		"vfa.stack[].filter_sig_hash",
-		"vfa.stack[].visible",
-		"vfa.stack[].enabled"
-	  ],
-	  "notes": [
-		"Structured-sequence domain: join identity is the ordered filter-stack definition collapsed into vfa.stack_def_hash.",
-		"Leaf stack members and counts are authoritative identity (identity_basis) but must not participate in joins.",
-		"Template identifiers are labels/linkage only and are prohibited from joins."
-	  ]
-	},
-	"object_styles": {
-	  "join_key_schema": "object_styles.join_key.v3",
-	  "hash_alg": "md5_utf8_join_pipe",
-	  "required_items": [
-		"obj_style.pattern_ref.kind"
-	  ],
-	  "optional_items": [
-		"obj_style.row_key",
-		"obj_style.weight.projection",
-		"obj_style.pattern_ref.sig_hash"
-	  ],
-	  "explicitly_excluded_items": [
-		"obj_style.color.rgb",
-		"obj_style.weight.cut"
-	  ],
-	  "shape_gating": {
-		"discriminator_key": "obj_style.pattern_ref.kind",
-		"shape_requirements": {
-		  "ref": {
-			"additional_required": [
-			  "obj_style.row_key",
-			  "obj_style.weight.projection",
-			  "obj_style.pattern_ref.sig_hash"
-			],
-			"additional_optional": [],
-			"notes": "Referenced patterns must join via line pattern sig_hash."
-		  },
-		  "solid": {
-			"additional_required": [
-			  "obj_style.row_key",
-			  "obj_style.weight.projection"
-			],
-			"additional_optional": [],
-			"notes": "Solid has no referenced line pattern; do not require sig_hash."
-		  }
-		},
-		"default_shape_behavior": "common_only"
-	  },
-	  "notes": [
-		"Schema v3: discriminator is the only common required item; per-shape additional_required supplies the real join keys.",
-		"Passes A1/A2/A3/A4 while keeping solids joinable without pattern sig_hash."
-	  ]
-	},
+    "view_filter_definitions": {
+      "join_key_schema": "view_filter_definitions.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vf.def_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vf.uid_or_namekey",
+        "vf.elem_id",
+        "vf.categories",
+        "vf.logic_root",
+        "vf.rule_count",
+        "vf.rules[].sig",
+        "label.components.name",
+        "label.display"
+      ],
+      "notes": [
+        "Structured domain: join is performed on vf.def_hash only (definition bundle hash).",
+        "vf.def_hash is computed from canonical vf.categories + vf.logic_root + vf.rule_count + ordered vf.rule[###].sig, but those leaf inputs remain identity-only for forensics.",
+        "Names/labels and any UID-like identifiers are prohibited from joins for standards governance."
+      ]
+    },
+    "view_filter_applications_view_templates": {
+      "join_key_schema": "view_filter_applications_view_templates.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vfa.stack_def_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vfa.template_uid_or_namekey",
+        "vfa.template_elem_id",
+        "vfa.filter_stack_count",
+        "vfa.stack[].filter_sig_hash",
+        "vfa.stack[].visible",
+        "vfa.stack[].enabled"
+      ],
+      "notes": [
+        "Structured-sequence domain: join identity is the ordered filter-stack definition collapsed into vfa.stack_def_hash.",
+        "Leaf stack members and counts are authoritative identity (identity_basis) but must not participate in joins.",
+        "Template identifiers are labels/linkage only and are prohibited from joins."
+      ]
+    },
     "view_category_overrides": {
       "join_key_schema": "view_category_overrides.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
@@ -448,26 +276,453 @@
         "Individual delta properties (line_weight, color, etc.) are forensic detail, excluded from joins."
       ]
     },
-    "view_templates": {
-      "join_key_schema": "view_templates.join_key.v1",
+    "dimension_types_linear": {
+      "join_key_schema": "dimension_types_linear.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "view_template.def_hash"
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
+        "dim_type.unit_format_id",
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
-        "view_template.name",
-        "view_template.uid",
-        "view_template.element_id",
-        "view_template.view_type",
-        "view_template.is_schedule",
-        "view_template.category_overrides_def_hash"
+        "dim_type.name",
+        "dim_type.tick_mark_uid",
+        "dim_attr.tick_mark_uid"
       ],
       "notes": [
-        "Structured domain: join identity is the definition bundle hash (def_hash).",
-        "def_hash captures complete template behavioral definition including referenced filters and phases.",
-        "Names, UIDs, and element IDs are labels/linkage only and must not participate in joins.",
-        "category_overrides_def_hash is semantic context but excluded from v1 join for simplicity."
+        "Domain family: dimension_types.",
+        "Contains: Linear, LinearFixed, Angular, ArcLength shapes (all share witness_line_control).",
+        "No record class gating needed — homogeneous property structure across all four shapes.",
+        "witness_line_control is confirmed active for all four shapes in UI."
+      ]
+    },
+    "dimension_types_angular": {
+      "join_key_schema": "dimension_types_angular.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
+        "dim_type.unit_format_id",
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "dim_type.name",
+        "dim_type.tick_mark_uid",
+        "dim_attr.tick_mark_uid"
+      ],
+      "notes": [
+        "Domain family: dimension_types.",
+        "Contains: Angular only.",
+        "UI exposes Angular Dimension Style as a distinct system family.",
+        "Witness Line Control is active for Angular — required, not optional.",
+        "No record class gating needed."
+      ]
+    },
+    "dimension_types_radial": {
+      "join_key_schema": "dimension_types_radial.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.radius_symbol_location",
+        "dim_type.radius_symbol_text",
+        "dim_type.unit_format_id"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "dim_type.name",
+        "dim_type.tick_mark_uid",
+        "dim_attr.tick_mark_uid"
+      ],
+      "notes": [
+        "Domain family: dimension_types.",
+        "Contains: Radial only.",
+        "Radius Symbol Location and Radius Symbol Text are active fields in UI.",
+        "No record class gating needed."
+      ]
+    },
+    "dimension_types_diameter": {
+      "join_key_schema": "dimension_types_diameter.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.diameter_symbol_location",
+        "dim_type.diameter_symbol_text",
+        "dim_type.unit_format_id"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "dim_type.name",
+        "dim_type.tick_mark_uid",
+        "dim_attr.tick_mark_uid"
+      ],
+      "notes": [
+        "Domain family: dimension_types.",
+        "Contains: Diameter, DiameterLinked.",
+        "Diameter Symbol Location and Diameter Symbol Text are active fields in UI.",
+        "No record class gating needed."
+      ]
+    },
+    "dimension_types_spot_elevation": {
+      "join_key_schema": "dimension_types_spot_elevation.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.elevation_indicator",
+        "dim_type.elevation_indicator_as_prefix_suffix",
+        "dim_type.top_indicator",
+        "dim_type.bottom_indicator",
+        "dim_type.top_indicator_as_prefix_suffix",
+        "dim_type.bottom_indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "dim_type.name",
+        "dim_type.tick_mark_uid",
+        "dim_attr.tick_mark_uid"
+      ],
+      "notes": [
+        "Domain family: dimension_types.",
+        "Contains: SpotElevation, SpotElevationFixed.",
+        "Primary units shows indicator fields, no prefix/suffix, no witness line.",
+        "Leader Arrowhead replaces Tick Mark for spot types.",
+        "No record class gating needed."
+      ]
+    },
+    "dimension_types_spot_coordinate": {
+      "join_key_schema": "dimension_types_spot_coordinate.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.top_coordinate",
+        "dim_type.bottom_coordinate",
+        "dim_type.north_south_indicator",
+        "dim_type.east_west_indicator",
+        "dim_type.include_elevation",
+        "dim_type.elevation_indicator",
+        "dim_type.indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "dim_type.name",
+        "dim_type.tick_mark_uid",
+        "dim_attr.tick_mark_uid"
+      ],
+      "notes": [
+        "Domain family: dimension_types.",
+        "Contains: SpotCoordinate only.",
+        "Entirely different primary units — coordinate indicator fields.",
+        "No record class gating needed."
+      ]
+    },
+    "dimension_types_spot_slope": {
+      "join_key_schema": "dimension_types_spot_slope.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.slope_direction",
+        "dim_type.leader_line_length"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "dim_type.name",
+        "dim_type.tick_mark_uid",
+        "dim_attr.tick_mark_uid"
+      ],
+      "notes": [
+        "Domain family: dimension_types.",
+        "Contains: SpotSlope only.",
+        "Minimal — Slope Direction and Leader Line Length active, no symbol field.",
+        "Rotate with Component is greyed (not applicable) — not extracted.",
+        "No record class gating needed."
+      ]
+    },
+    "object_styles_model": {
+      "join_key_schema": "object_styles_model.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.weight.cut",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "optional_items": [
+        "obj_style.material_sig_hash"
+      ],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "Domain family: object_styles.",
+        "Contains: CategoryType.Model categories and subcategories.",
+        "Cut weight and material are applicable to Model categories.",
+        "pattern_ref gate removed — pattern_ref.sig_hash is optional (present for ref patterns, q=missing for solid/none).",
+        "pattern_ref.kind NOT in identity_items — only needed for the old gate which is removed.",
+        "row_key encodes category path and provides primary identity."
+      ]
+    },
+    "object_styles_annotation": {
+      "join_key_schema": "object_styles_annotation.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "obj_style.weight.cut",
+        "obj_style.material_sig_hash"
+      ],
+      "notes": [
+        "Domain family: object_styles.",
+        "Contains: CategoryType.Annotation categories.",
+        "Cut weight and material do not exist for Annotation categories in Revit API.",
+        "These fields must not be emitted in identity_items for this domain."
+      ]
+    },
+    "object_styles_analytical": {
+      "join_key_schema": "object_styles_analytical.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "obj_style.weight.cut",
+        "obj_style.material_sig_hash"
+      ],
+      "notes": [
+        "Domain family: object_styles.",
+        "Contains: CategoryType.AnalyticalModel categories.",
+        "Same structure as annotation: cut weight and material not applicable."
+      ]
+    },
+    "object_styles_imported": {
+      "join_key_schema": "object_styles_imported.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "obj_style.weight.cut",
+        "obj_style.material_sig_hash"
+      ],
+      "notes": [
+        "Domain family: object_styles.",
+        "Contains: CategoryType.Imported categories (CAD import artifacts).",
+        "Material present but is CAD render material, not governed Revit material — excluded from identity."
+      ]
+    },
+    "fill_patterns_drafting": {
+      "join_key_schema": "fill_patterns_drafting.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "fill_pattern.target",
+        "fill_pattern.grid_count",
+        "fill_pattern.grids_def_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "fill_pattern.name",
+        "fill_pattern.is_solid"
+      ],
+      "notes": [
+        "Domain family: fill_patterns.",
+        "Contains: FillPatternTarget.Drafting (target_id = 0), excluding solid fills.",
+        "Solid fills are system defaults, ungoverned — excluded from this domain.",
+        "grids_def_hash is the hash of the ordered grid definitions."
+      ]
+    },
+    "fill_patterns_model": {
+      "join_key_schema": "fill_patterns_model.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "fill_pattern.target",
+        "fill_pattern.grid_count",
+        "fill_pattern.grids_def_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "fill_pattern.name",
+        "fill_pattern.is_solid"
+      ],
+      "notes": [
+        "Domain family: fill_patterns.",
+        "Contains: FillPatternTarget.Model (target_id = 1), excluding solid fills.",
+        "Solid fills excluded — system defaults, ungoverned."
+      ]
+    },
+    "view_templates_floor_structural_area_plans": {
+      "join_key_schema": "view_templates_floor_structural_area_plans.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.view_range_sig_hash",
+        "vt.underlay_orientation",
+        "vt.orientation",
+        "vt.depth_clipping",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash",
+        "vt.color_scheme_sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vt.name",
+        "vt.uid",
+        "vt.element_id",
+        "vt.view_type",
+        "vt.is_schedule"
+      ],
+      "notes": [
+        "Domain family: view_templates.",
+        "Contains: ViewType.FloorPlan, ViewType.EngineeringPlan (Structural), ViewType.AreaPlan.",
+        "View Range, Orientation, Depth Clipping applicable.",
+        "Rendering Settings NOT applicable."
+      ]
+    },
+    "view_templates_ceiling_plans": {
+      "join_key_schema": "view_templates_ceiling_plans.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.view_range_sig_hash",
+        "vt.underlay_orientation",
+        "vt.orientation",
+        "vt.depth_clipping",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vt.name",
+        "vt.uid",
+        "vt.element_id",
+        "vt.view_type",
+        "vt.is_schedule"
+      ],
+      "notes": [
+        "Domain family: view_templates.",
+        "Contains: ViewType.CeilingPlan.",
+        "Same structure as floor plans except no Color Scheme field."
+      ]
+    },
+    "view_templates_elevations_sections_detail": {
+      "join_key_schema": "view_templates_elevations_sections_detail.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.far_clipping",
+        "vt.depth_cueing_sig_hash",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash",
+        "vt.color_scheme_location"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vt.name",
+        "vt.uid",
+        "vt.element_id",
+        "vt.view_type",
+        "vt.is_schedule"
+      ],
+      "notes": [
+        "Domain family: view_templates.",
+        "Contains: ViewType.Elevation, ViewType.Section, ViewType.Detail.",
+        "No View Range, no Orientation.",
+        "Far Clipping and Depth Cueing present instead."
+      ]
+    },
+    "view_templates_renderings_drafting": {
+      "join_key_schema": "view_templates_renderings_drafting.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.rendering_settings_sig_hash",
+        "vt.background_sig_hash",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vt.name",
+        "vt.uid",
+        "vt.element_id",
+        "vt.view_type",
+        "vt.is_schedule"
+      ],
+      "notes": [
+        "Domain family: view_templates.",
+        "Contains: ViewType.ThreeD, ViewType.Rendering, ViewType.DraftingView.",
+        "Rendering Settings and Background applicable.",
+        "No View Range, no Orientation, no Depth Clipping."
+      ]
+    },
+    "view_templates_schedules": {
+      "join_key_schema": "view_templates_schedules.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.include_vg",
+        "vt.include_filters",
+        "vt.include_appearance"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vt.name",
+        "vt.uid",
+        "vt.element_id",
+        "vt.view_type",
+        "vt.is_schedule"
+      ],
+      "notes": [
+        "Domain family: view_templates.",
+        "Contains: ViewType.Schedule, ViewType.PanelSchedule.",
+        "Schedule templates expose only include flags and phase filter — minimal surface."
       ]
     }
   }
