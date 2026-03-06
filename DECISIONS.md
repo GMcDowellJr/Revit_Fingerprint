@@ -324,6 +324,48 @@ No downstream breaking changes: contract schema already supported semantic mode.
 
 ---
 
+## D-015 — Domain Family Split Architecture
+
+**Status:** Accepted
+**Date:** 2026-03-06
+
+**Decision**
+The four monolithic extractors (`object_styles`, `fill_patterns`, `dimension_types`,
+`view_templates`) are split into per-partition domain files, each covering one record
+class or ViewType family. The split follows a three-level hierarchy:
+
+- **Domain family**: Named grouping (e.g., `object_styles`, `dimension_types`)
+- **Domain**: Individual split file (e.g., `object_styles_model`, `dimension_types_linear`)
+- **Record class**: The entity type within a domain (e.g., Model categories, Linear shapes)
+
+**Rationale**
+- Monolithic extractors mixed heterogeneous record structures, making per-class policy
+  governance impractical.
+- Each split domain can have its own join-key policy tailored to the record class.
+- Shape discrimination moves to domain-level filtering rather than within-domain branching.
+- Downstream tools and analysis pipelines can target specific record classes directly.
+
+**Split mapping**
+
+| Old domain | New domains |
+|------------|-------------|
+| `object_styles` | `object_styles_model`, `object_styles_annotation`, `object_styles_analytical`, `object_styles_imported` |
+| `fill_patterns` | `fill_patterns_drafting`, `fill_patterns_model` |
+| `dimension_types` | `dimension_types_linear`, `dimension_types_angular`, `dimension_types_radial`, `dimension_types_diameter`, `dimension_types_spot_elevation`, `dimension_types_spot_coordinate`, `dimension_types_spot_slope` |
+| `view_templates` | `view_templates_floor_structural_area_plans`, `view_templates_ceiling_plans`, `view_templates_elevations_sections_detail`, `view_templates_renderings_drafting`, `view_templates_schedules` |
+
+**Shared helpers**
+- `core/dimension_type_helpers.py`: Shape constants, detection, and reading helpers
+- `core/vg_sig.py`: VG signature helpers for view_templates split domains
+
+**Consequences**
+- Each split domain has its own flat join-key policy (no shape_gating in new dimension_types policies — shape discrimination is done at domain-level)
+- The `require_domain` dependency chain is updated to reference split domain names
+- Tools and analysis configs use split domain names throughout
+- No semantic change to hash values within each record class
+
+---
+
 ## Notes
 
 - This document is **append-only**.

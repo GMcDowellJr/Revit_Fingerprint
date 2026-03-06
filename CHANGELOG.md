@@ -11,6 +11,39 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## Unreleased
 
+### Changed (D-015 — Domain Family Split Architecture)
+
+Domain scope redefined: four monolithic extractors split into 18 per-partition domains.
+No hash values changed within any record class — this is a structural change only.
+
+- **`object_styles`** split into `object_styles_model`, `object_styles_annotation`,
+  `object_styles_analytical`, `object_styles_imported` — each covers one CategoryType.
+  `require_domain` references updated to split names throughout.
+
+- **`fill_patterns`** split into `fill_patterns_drafting`, `fill_patterns_model` —
+  each covers one FillPatternTarget. Join-key policy updated to use `fill_pattern.target`
+  (was `fill_pattern.target_id`) and `fill_pattern.grid_count` as co-required keys.
+
+- **`dimension_types`** split into 7 per-shape domains (`dimension_types_linear`,
+  `dimension_types_angular`, `dimension_types_radial`, `dimension_types_diameter`,
+  `dimension_types_spot_elevation`, `dimension_types_spot_coordinate`,
+  `dimension_types_spot_slope`). Shape discrimination now happens at domain-level
+  (handled shapes frozenset). Shared helpers moved to `core/dimension_type_helpers.py`.
+
+- **`view_templates`** split into 5 per-ViewType-family domains
+  (`view_templates_floor_structural_area_plans`, `view_templates_ceiling_plans`,
+  `view_templates_elevations_sections_detail`, `view_templates_renderings_drafting`,
+  `view_templates_schedules`). Shared VG helpers in `core/vg_sig.py`.
+
+- Dependency chain (`require_domain` calls) updated in `view_category_overrides`
+  and runner to reference split domain names.
+
+- Join-key policies updated: all split domains have flat per-domain policies.
+  Arrowheads policy corrected: shape-gated keys moved from `explicitly_excluded_items`
+  to `optional_items` to satisfy A3 validation rule.
+
+---
+
 ### Removed
 - Legacy hash infrastructure (pipe-delimited signatures) removed across all domains
 - `REVIT_FINGERPRINT_HASH_MODE` environment variable (semantic mode now default and only mode)
