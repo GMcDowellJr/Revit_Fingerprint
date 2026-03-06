@@ -3,8 +3,17 @@
   "domains_in_scope": [
     "line_patterns",
     "line_styles",
-    "object_styles",
-    "dimension_types"
+    "object_styles_model",
+    "object_styles_annotation",
+    "object_styles_analytical",
+    "object_styles_imported",
+    "dimension_types_linear",
+    "dimension_types_angular",
+    "dimension_types_radial",
+    "dimension_types_diameter",
+    "dimension_types_spot_elevation",
+    "dimension_types_spot_coordinate",
+    "dimension_types_spot_slope"
   ],
 
   "cluster_method": "semantic_multiset_exact",
