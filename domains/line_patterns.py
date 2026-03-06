@@ -426,12 +426,36 @@ def extract(doc, ctx=None):
         unknown_items.append(make_identity_item("line_pattern.source_element_id", _eid_v, _eid_q))
         unknown_items.append(make_identity_item("line_pattern.source_unique_id", _uid_v, _uid_q))
 
+        # lp.is_import coordination item for BI slicer.
+        # Detection: Revit import-derived line patterns typically have names prefixed
+        # with "IMPORT-" or similar. Best-effort; q=degraded if uncertain.
+        is_import_v = None
+        is_import_q = ITEM_Q_MISSING
+        try:
+            _nm_raw = getattr(e, "Name", None) or ""
+            _nm_str = str(_nm_raw).strip().upper()
+            # Common Revit import line pattern name prefixes observed in practice
+            _import_prefixes = ("IMPORT-", "IMPORT ", "<IMPORT>")
+            if any(_nm_str.startswith(p) for p in _import_prefixes):
+                is_import_v, is_import_q = ("true", ITEM_Q_OK)
+            elif _nm_str:
+                # Name is readable but doesn't match import prefix — best-effort: not import
+                is_import_v, is_import_q = ("false", ITEM_Q_OK)
+            else:
+                is_import_v, is_import_q = (None, ITEM_Q_MISSING)
+        except Exception:
+            is_import_v, is_import_q = (None, ITEM_Q_UNREADABLE)
+
+        lp_coordination_items = [
+            make_identity_item("lp.is_import", is_import_v, is_import_q),
+        ]
+
         rec_v2["phase2"] = {
             "schema": "phase2.line_patterns.v1",
             "grouping_basis": "phase2.hypothesis",
             # Selector-based semantic basis; canonical evidence lives in identity_basis.items.
             "cosmetic_items": phase2_sorted_items(cosmetic_items),
-            "coordination_items": phase2_sorted_items([]),
+            "coordination_items": phase2_sorted_items(lp_coordination_items),
             "unknown_items": phase2_sorted_items(unknown_items),
         }
         rec_v2["sig_basis"] = {
