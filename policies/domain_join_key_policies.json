@@ -128,15 +128,16 @@
         "arrowhead.style",
         "arrowhead.tick_size_in"
       ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "arrowhead.name",
-        "arrowhead.type_id",
+      "optional_items": [
         "arrowhead.width_angle_deg",
         "arrowhead.fill_tick",
         "arrowhead.arrow_closed",
         "arrowhead.tick_mark_centered",
         "arrowhead.heavy_end_pen_weight"
+      ],
+      "explicitly_excluded_items": [
+        "arrowhead.name",
+        "arrowhead.type_id"
       ],
       "shape_gating": {
         "discriminator_key": "arrowhead.style",

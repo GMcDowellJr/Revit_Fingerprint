@@ -435,7 +435,7 @@ def extract(doc, ctx=None):
             _nm_raw = getattr(e, "Name", None) or ""
             _nm_str = str(_nm_raw).strip().upper()
             # Common Revit import line pattern name prefixes observed in practice
-            _import_prefixes = ("IMPORT-", "IMPORT ", "<IMPORT>")
+            _import_prefixes = ("IMPORT-", "IMPORT ", "<" + "IMPORT>")
             if any(_nm_str.startswith(p) for p in _import_prefixes):
                 is_import_v, is_import_q = ("true", ITEM_Q_OK)
             elif _nm_str:
