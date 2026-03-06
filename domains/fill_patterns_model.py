@@ -91,6 +91,7 @@ def extract(doc, ctx=None):
         "debug_total_elements": 0,
         "debug_kept": 0,
         "debug_skipped_no_name": 0,
+        "debug_skipped_wrong_target": 0,
         "debug_fail_getfillpattern": 0,
         "debug_fail_grid_read": 0,
 
@@ -108,7 +109,7 @@ def extract(doc, ctx=None):
                 of_class=FillPatternElement,
                 require_unique_id=True,
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="fill_patterns:FillPatternElement:instances",
+                cache_key="fill_patterns_model:FillPatternElement:instances",
             )
         )
     except Exception as e:
@@ -122,24 +123,6 @@ def extract(doc, ctx=None):
             return format(float(v), ".{}f".format(nd))
         except Exception as e:
             return canon_str(v)
-
-    def read_is_model(fp, target):
-        # Prefer explicit property, else infer from target when possible
-        is_model = None
-        for attr in ["IsModelFillPattern", "IsModel", "IsModelFill"]:
-            try:
-                if hasattr(fp, attr):
-                    is_model = getattr(fp, attr)
-                    break
-            except Exception as e:
-                pass
-        if is_model is None:
-            try:
-                if target is not None:
-                    is_model = (int(target) == 1)  # Drafting=0, Model=1 in many builds
-            except Exception as e:
-                pass
-        return is_model
 
     def grid_sig(fp, i):
         # Return a stable list; never raise
@@ -393,10 +376,12 @@ def extract(doc, ctx=None):
         unknown.append({"k": "fill_pattern.source_element_id", "v": _eid_v, "q": _eid_q})
         unknown.append({"k": "fill_pattern.source_unique_id", "v": _uid_v, "q": _uid_q})
 
+        # target is always _TARGET_NAME for this domain
+        semantic.append({"k": "fill_pattern.target", "v": _TARGET_NAME, "q": ITEM_Q_OK})
+
         if fp is None:
             # Explicit unreadable (GetFillPattern failed)
             _phase2_add_bool(semantic, "fill_pattern.is_solid", None, unreadable=True)
-            _phase2_add_int(semantic, "fill_pattern.target_id", None, unreadable=True)
             _phase2_add_int(semantic, "fill_pattern.grid_count", None, unreadable=True)
         else:
             # is_solid
@@ -406,21 +391,6 @@ def extract(doc, ctx=None):
                 _phase2_add_bool(semantic, "fill_pattern.is_solid", None, unreadable=True)
             else:
                 _phase2_add_bool(semantic, "fill_pattern.is_solid", bool(is_solid))
-
-            # target_id
-            try:
-                t = fp.Target
-            except Exception:
-                _phase2_add_int(semantic, "fill_pattern.target_id", None, unreadable=True)
-                target_id = None
-            else:
-                try:
-                    target_id = int(t)
-                except Exception:
-                    _phase2_add_int(semantic, "fill_pattern.target_id", None, unreadable=True)
-                    target_id = None
-                else:
-                    _phase2_add_int(semantic, "fill_pattern.target_id", target_id)
 
             # grid_count
             try:
@@ -587,7 +557,6 @@ def extract(doc, ctx=None):
         if not name:
             info["debug_skipped_no_name"] += 1
             continue
-        names.append(name)
 
         uid = getattr(e, "UniqueId", "") or ""
 
@@ -605,8 +574,10 @@ def extract(doc, ctx=None):
             except Exception:
                 _fp_target_int = -1
             if _fp_target_int != _TARGET_INT:
-                info["debug_skipped_no_name"] += 1  # reuse counter for skipped wrong-target
+                info["debug_skipped_wrong_target"] += 1
                 continue
+
+        names.append(name)
 
         # -------------------------
         # Legacy signature (UNCHANGED meaning)
@@ -615,8 +586,7 @@ def extract(doc, ctx=None):
             info["debug_fail_getfillpattern"] += 1
             sig = [
                 f"is_solid={S_MISSING}",
-                f"is_model={S_MISSING}",
-                f"target={S_MISSING}",
+                f"target={_TARGET_NAME}",
                 f"grid_count={S_MISSING}",
                 f"grid[000].unreadable={S_MISSING}",
                 "error=GetFillPatternFailed",
@@ -626,20 +596,13 @@ def extract(doc, ctx=None):
             try: is_solid = fp.IsSolidFill
             except Exception as e: pass
 
-            target = None
-            try: target = fp.Target
-            except Exception as e: pass
-
-            is_model = read_is_model(fp, target)
-
             gc = None
             try: gc = fp.GridCount
             except Exception as e: pass
 
             sig = [
                 "is_solid={}".format(canon_str(is_solid)),
-                "is_model={}".format(canon_str(is_model)),
-                "target={}".format(canon_str(target)),
+                "target={}".format(_TARGET_NAME),
                 "grid_count={}".format(canon_str(gc)),
             ]
 
@@ -675,26 +638,6 @@ def extract(doc, ctx=None):
                 v2_reason = "is_solid_unreadable"
 
             if v2_ok:
-                # target: require int
-                try:
-                    target_v2 = fp.Target
-                    target_id = int(target_v2)
-                except Exception as e:
-                    v2_ok = False
-                    v2_reason = "target_unreadable"
-
-            if v2_ok:
-                # is_model: require bool (direct or inferred); but must resolve, else block
-                try:
-                    is_model_v2 = read_is_model(fp, target_v2)
-                    if is_model_v2 is None:
-                        v2_ok = False
-                        v2_reason = "is_model_unresolved"
-                except Exception as e:
-                    v2_ok = False
-                    v2_reason = "is_model_unreadable"
-
-            if v2_ok:
                 # grid_count: require int (0 allowed)
                 try:
                     gc_v2 = fp.GridCount
@@ -704,9 +647,8 @@ def extract(doc, ctx=None):
                     v2_reason = "grid_count_unreadable"
 
             if v2_ok:
+                sig_v2.append("target={}".format(_TARGET_NAME))
                 sig_v2.append("is_solid={}".format(canon_str(bool(is_solid_v2))))
-                sig_v2.append("is_model={}".format(canon_str(bool(is_model_v2))))
-                sig_v2.append("target_id={}".format(canon_str(target_id)))
                 sig_v2.append("grid_count={}".format(canon_str(gc_i)))
 
                 # grids: every grid must be readable
@@ -757,7 +699,6 @@ def extract(doc, ctx=None):
 
         if fp is None:
             is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
-            target_v, target_q = (None, ITEM_Q_UNREADABLE)
             gc_v, gc_q = (None, ITEM_Q_UNREADABLE)
             gc_i = None
         else:
@@ -766,20 +707,17 @@ def extract(doc, ctx=None):
             except Exception:
                 is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
             try:
-                target_v, target_q = canonicalize_int(int(fp.Target))
-            except Exception:
-                target_v, target_q = (None, ITEM_Q_UNREADABLE)
-            try:
                 gc_i = int(fp.GridCount)
                 gc_v, gc_q = canonicalize_int(gc_i)
             except Exception:
                 gc_i = None
                 gc_v, gc_q = (None, ITEM_Q_UNREADABLE)
 
-        identity_items_v2.append(make_identity_item("fill_pattern.is_solid", is_solid_v, is_solid_q))
+        # target is always _TARGET_NAME / ITEM_Q_OK - not part of required_qs check
         identity_items_v2.append(make_identity_item("fill_pattern.target", _TARGET_NAME, ITEM_Q_OK))
+        identity_items_v2.append(make_identity_item("fill_pattern.is_solid", is_solid_v, is_solid_q))
         identity_items_v2.append(make_identity_item("fill_pattern.grid_count", gc_v, gc_q))
-        required_qs = [is_solid_q, target_q, gc_q]
+        required_qs = [is_solid_q, gc_q]
 
         if gc_i and gc_i > 0:
             for i in range(gc_i):
@@ -994,8 +932,11 @@ def extract(doc, ctx=None):
         info["hash_v2"] = make_hash(info["signature_hashes_v2"])
 
     # Context mapping (UID is allowed only as lookup key; values are semantic hashes)
+    # Both drafting and model domains contribute to the same fill_pattern_uid_to_hash map
     if ctx is not None:
-        ctx["fill_pattern_uid_to_hash"] = uid_to_hash_v2
+        existing = ctx.get("fill_pattern_uid_to_hash") or {}
+        existing.update(uid_to_hash_v2)
+        ctx["fill_pattern_uid_to_hash"] = existing
 
     info["record_rows"] = [{
         "record_key": safe_str(r.get("record_id", "")),

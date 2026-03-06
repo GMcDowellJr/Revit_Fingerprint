@@ -1,23 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-View Templates domain extractor - Schedules.
+View Templates - Schedules domain extractor.
 
-Filters to only process view templates that are ViewSchedule instances or
-whose ViewType matches "Schedule".
+Fingerprints view templates for ViewSchedule (schedule) views.
 
-All extraction logic uses the schedule-specific path (minimal stable surface),
-identical to the schedule branch in view_templates.py.
-
-Legacy hash:
-- Continues to use existing behavior including sentinel strings where present.
-- Uses ctx maps: phase_filter_uid_to_hash.
-
-semantic_v2 hash (additive):
-- Uses only semantic-safe fields and upstream semantic_v2 hashes.
-- BLOCKS (hash_v2=None) if any required dependency resolution fails.
-
-NOTE: Schedule filter stack + VG signatures are not consistently supported
-across Revit API versions. Schedule signature is kept minimal and stable.
+Domain family: view_templates
+Contains view types: ViewSchedule
 """
 
 import os
@@ -67,9 +55,11 @@ from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 
 from core.vg_sig import (
+    _phase2_items_from_def_signature,
     _canonical_identity_items_from_signature,
     _semantic_keys_from_identity_items,
     _traceability_unknown_items,
+    _compute_delta_items,
 )
 
 try:
@@ -139,7 +129,7 @@ def extract(doc, ctx=None):
         # v2 (contract semantic) surfaces - additive only
         "hash_v2": None,
         "signature_hashes_v2": [],
-        "debug_v2_blocked": 0,
+        "debug_v2_blocked": False,
         "debug_v2_block_reasons": {},
         # PR6: deterministic degraded signaling
         "debug_view_context_problem": 0,
@@ -412,7 +402,7 @@ def extract(doc, ctx=None):
         )
 
         rec["phase2"] = {
-            "schema": "phase2.{}.v1".format(DOMAIN_NAME),
+            "schema": "phase2.{}.v2".format(DOMAIN_NAME),
             "grouping_basis": "join_key.join_hash",
             "cosmetic_items": [],
             "coordination_items": [],
@@ -420,7 +410,6 @@ def extract(doc, ctx=None):
         }
 
         rec["sig_basis"] = {
-            "schema": "{}.sig_basis.v1".format(DOMAIN_NAME),
             "hash_alg": "md5_utf8_join_pipe",
             "keys_used": semantic_keys,
         }

@@ -2,16 +2,13 @@
 """
 Dimension Types - Spot Slope domain extractor.
 
-Fingerprints SpotSlope dimension types only.
+Fingerprints SpotSlope dimension types.
 
 Domain family: dimension_types
 Contains shapes: SpotSlope
 
 Per-record identity: sig_hash (UID-free) derived from identity_items.
 Ordering: order-insensitive (identity_items sorted before hashing)
-
-Note: SpotSlope types typically do not support GetUnitsFormatOptions().
-unit_format_id is included in identity_items but is not a blocking required field.
 """
 
 import os
@@ -24,10 +21,11 @@ if repo_root not in sys.path:
 
 from core.hashing import make_hash, safe_str
 from core.collect import collect_types
-from core.rows import first_param, _as_string
+from core.rows import first_param, _as_string, _as_double
 from core.canon import canon_str, S_MISSING, S_UNREADABLE
 from core.record_v2 import (
     canonicalize_str,
+    canonicalize_str_allow_empty,
     canonicalize_int,
     canonicalize_float,
     ITEM_Q_OK,
@@ -47,9 +45,8 @@ from core.join_key_builder import build_join_key_from_policy
 from core.dimension_type_helpers import (
     _get_dimension_shape,
     _build_text_appearance_items,
-    _read_tick_mark_sig_hash,
     _read_unit_format_info,
-    _read_prefix_suffix,
+    _fmt_in_from_ft,
     get_type_display_name,
     SHAPE_SPOT_SLOPE,
     SHAPE_SPOT_ELEVATION,
@@ -64,14 +61,20 @@ except ImportError:
 
 DOMAIN_NAME = "dimension_types_spot_slope"
 
+# Shapes handled by this domain
 _HANDLED_SHAPES = frozenset({SHAPE_SPOT_SLOPE})
 
 
 def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
+    """
+    Heuristic override: use FamilyName prefix to more precisely classify Spot types.
+    Returns updated (shape_v, shape_family, shape_q).
+    """
     try:
         family_name = getattr(d, "FamilyName", None)
         basis = family_name if family_name else type_name
         bn_l = safe_str(basis).strip().lower()
+
         if bn_l.startswith("spot slopes"):
             return (SHAPE_SPOT_SLOPE, FAMILY_SPOT, ITEM_Q_OK)
         elif bn_l.startswith("spot elevations"):
@@ -133,41 +136,64 @@ def extract(doc, ctx=None):
             type_name = get_type_display_name(d)
 
             shape_v, shape_family, shape_q = _get_dimension_shape(d)
+
+            # Apply family-name heuristic override
             shape_v, shape_family, shape_q = _apply_family_name_override(
                 d, shape_v, shape_family, shape_q, type_name
             )
 
+            # Filter: skip shapes not handled by this domain
             if shape_v not in _HANDLED_SHAPES:
                 continue
 
-            # Unit format info (SpotSlope often returns UNSUPPORTED_NOT_APPLICABLE)
+            # --- Read core identity fields ---
+
+            # Unit format info
             (unit_format_id_v, unit_format_id_q,
-             rounding_v, rounding_q,
-             accuracy_v, accuracy_q) = _read_unit_format_info(d)
+             _rounding_v, _rounding_q,
+             _accuracy_v, _accuracy_q) = _read_unit_format_info(d)
 
-            # Prefix/Suffix
-            prefix_v, prefix_q, suffix_v, suffix_q = _read_prefix_suffix(d)
+            # Slope Direction / Read Convention
+            slope_direction_v, slope_direction_q = (None, ITEM_Q_MISSING)
+            try:
+                p_sd = first_param(d, ui_names=["Slope Direction", "Read Convention"])
+                sd_raw = _as_string(p_sd) if p_sd is not None else None
+                slope_direction_v, slope_direction_q = canonicalize_str_allow_empty(sd_raw)
+            except Exception:
+                slope_direction_v, slope_direction_q = (None, ITEM_Q_UNREADABLE)
 
-            # Tick mark sig hash
-            tick_sig_hash_v, tick_sig_hash_q = _read_tick_mark_sig_hash(d, ctx, doc)
+            # Leader Line Length (stored in feet, convert to inches)
+            leader_line_length_v, leader_line_length_q = (None, ITEM_Q_MISSING)
+            try:
+                p_lll = first_param(d, ui_names=["Leader Line Length"])
+                lll_ft = _as_double(p_lll) if p_lll is not None else None
+                if lll_ft is not None:
+                    leader_line_length_v, leader_line_length_q = canonicalize_float(_fmt_in_from_ft(lll_ft))
+                else:
+                    leader_line_length_v, leader_line_length_q = (None, ITEM_Q_MISSING)
+            except Exception:
+                leader_line_length_v, leader_line_length_q = (None, ITEM_Q_UNREADABLE)
 
-            # Build identity items
+            # --- Build identity items ---
             core_items = [
                 make_identity_item("dim_type.shape", shape_v, shape_q),
-                make_identity_item("dim_type.accuracy", accuracy_v, accuracy_q),
-                make_identity_item("dim_type.tick_mark_sig_hash", tick_sig_hash_v, tick_sig_hash_q),
                 make_identity_item("dim_type.unit_format_id", unit_format_id_v, unit_format_id_q),
-                make_identity_item("dim_type.rounding", rounding_v, rounding_q),
-                make_identity_item("dim_type.prefix", prefix_v, prefix_q),
-                make_identity_item("dim_type.suffix", suffix_v, suffix_q),
+                make_identity_item("dim_type.slope_direction", slope_direction_v, slope_direction_q),
+                make_identity_item("dim_type.leader_line_length", leader_line_length_v, leader_line_length_q),
             ]
 
             text_items = _build_text_appearance_items(d)
             all_items = core_items + text_items
+
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
-            # SpotSlope: unit_format_id is NOT in required_qs (known to be not applicable)
-            required_qs = [shape_q, prefix_q, suffix_q]
+            # Required qualities for blocking
+            required_qs = [
+                shape_q,
+                unit_format_id_q,
+                slope_direction_q,
+                leader_line_length_q,
+            ]
             for it in text_items:
                 required_qs.append(it.get("q", ITEM_Q_MISSING))
 
@@ -178,12 +204,6 @@ def extract(doc, ctx=None):
                 q = it.get("q")
                 k = it.get("k", "")
                 if q == ITEM_Q_OK:
-                    continue
-                if q == ITEM_Q_MISSING and k == "dim_type.tick_mark_sig_hash":
-                    continue
-                if q == ITEM_Q_UNSUPPORTED_NOT_APPLICABLE and k in (
-                    "dim_type.unit_format_id", "dim_type.rounding", "dim_type.accuracy"
-                ):
                     continue
                 status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
@@ -263,7 +283,7 @@ def extract(doc, ctx=None):
             v2_records.append(rec_v2)
 
         except Exception:
-            continue
+            continue  # fail-soft per record
 
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
     info["count"] = len(v2_records)

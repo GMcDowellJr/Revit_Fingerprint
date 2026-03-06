@@ -93,7 +93,7 @@ except Exception as e:
 DOMAIN_NAME = "view_templates_renderings_drafting"
 
 # ViewType strings handled by this domain extractor
-_HANDLED_VIEW_TYPES = {"Rendering", "DraftingView", "Drawing"}
+_HANDLED_VIEW_TYPES = frozenset({"Rendering", "DraftingView", "Drawing"})
 
 
 def extract(doc, ctx=None):

@@ -206,9 +206,10 @@ def extract(doc, ctx=None):
         return info
 
     try:
-        require_domain((ctx or {}).get("_domains", {}), "object_styles")
+        require_domain((ctx or {}).get("_domains", {}), "object_styles_model")
         require_domain((ctx or {}).get("_domains", {}), "line_patterns")
-        require_domain((ctx or {}).get("_domains", {}), "fill_patterns")
+        require_domain((ctx or {}).get("_domains", {}), "fill_patterns_drafting")
+        require_domain((ctx or {}).get("_domains", {}), "fill_patterns_model")
     except Blocked:
         info["debug_v2_blocked"] = True
         return info
