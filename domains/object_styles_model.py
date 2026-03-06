@@ -1,22 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-Object Styles domain extractor.
+Object Styles (Model) domain extractor.
 
-Fingerprints Category graphics (non-import categories) including:
-- Parent category + subcategories
-- Projection/cut lineweights
-- Line colors
-- Line patterns
-- Materials
+Domain family: object_styles
+Contains: CategoryType.Model categories and subcategories
 
-Per-row identity: parent_name|row_name (name-based, not UniqueId)
+Per-record identity: sig_hash (UID-free) derived from identity_items.
 Ordering: order-insensitive (sorted before hashing)
+
+Cut weight and material are applicable to Model categories.
+pattern_ref.kind gate removed — pattern_ref.sig_hash is optional
+(present for ref patterns, q=missing for solid/none).
 """
 
 import os
 import sys
 
-# Ensure repo root is importable (so `import core...` works everywhere)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 repo_root = os.path.dirname(current_dir)
 if repo_root not in sys.path:
@@ -25,10 +24,6 @@ if repo_root not in sys.path:
 from core.hashing import make_hash, safe_str
 from core.canon import (
     canon_str,
-    canon_num,
-    canon_bool,
-    canon_id,
-    rgb_sig_from_color,
     S_MISSING,
     S_UNREADABLE,
     S_NOT_APPLICABLE,
@@ -36,9 +31,7 @@ from core.canon import (
 from core.graphic_overrides import (
     extract_projection_graphics,
     extract_cut_graphics,
-    extract_halftone,
 )
-
 from core.record_v2 import (
     STATUS_OK,
     STATUS_DEGRADED,
@@ -54,12 +47,10 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
-
 from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
 )
-
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 from core.deps import require_domain, Blocked
@@ -70,43 +61,33 @@ except ImportError:
     GraphicsStyleType = None
     CategoryType = None
 
+DOMAIN_NAME = "object_styles_model"
 
-# Canonical semantic selector for object_styles sig_hash.
-# Canonical evidence source remains identity_basis.items; selector lists avoid
-# duplicating k/q/v payloads into additional evidence arrays.
-OBJECT_STYLE_SEMANTIC_KEYS = sorted([
+# Semantic keys for sig_hash preimage
+SEMANTIC_KEYS = sorted([
     "obj_style.color.rgb",
-    "obj_style.pattern_ref.kind",
     "obj_style.pattern_ref.sig_hash",
     "obj_style.weight.cut",
     "obj_style.weight.projection",
 ])
 
+
 def extract(doc, ctx=None):
     """
-    Extract Object Styles fingerprint from document.
+    Extract Object Styles (Model) fingerprint from document.
 
-    record.v2 surfaces:
-      - info["hash_v2"], info["records"] (record.v2 dicts), info["signature_hashes_v2"]
-
-    Pattern references:
-      - Uses line_patterns record.v2 sig_hash via ctx["line_pattern_uid_to_hash"].
-      - No sentinel literals are injected into identity items.
+    Includes CategoryType.Model categories and subcategories only.
     """
     info = {
         "count": 0,
         "raw_count": 0,
-        "names": [],
-        # record.v2
         "records": [],
         "signature_hashes_v2": [],
         "hash_v2": None,
         "debug_v2_blocked": False,
         "debug_v2_block_reasons": {},
-
-        # debug counters
         "debug_total_categories": 0,
-        "debug_skipped_import": 0,
+        "debug_skipped_wrong_type": 0,
         "debug_skipped_no_name": 0,
         "debug_fail_record_build": 0,
     }
@@ -121,12 +102,8 @@ def extract(doc, ctx=None):
     except Blocked as b:
         info["debug_v2_blocked"] = True
         info["debug_v2_block_reasons"] = {"dependency_blocked": "line_patterns: {}".format(b.reasons)}
-        info["count"] = 0
-        info["records"] = []
-        info["hash_v2"] = None
         return info
 
-    # Dependency map: LinePatternElement.UniqueId -> line_patterns record.v2 sig_hash
     lp_uid_to_sig_hash_v2 = None
     try:
         lp_uid_to_sig_hash_v2 = (ctx or {}).get("line_pattern_uid_to_hash", None) if ctx is not None else None
@@ -135,35 +112,32 @@ def extract(doc, ctx=None):
     except Exception:
         lp_uid_to_sig_hash_v2 = None
 
-    def rgb_sig_from_color(c):
+    def _rgb_sig(c):
         try:
             return "{}-{}-{}".format(int(c.Red), int(c.Green), int(c.Blue))
         except Exception:
-            return S_MISSING
+            return None
 
     try:
         cats = doc.Settings.Categories
     except Exception:
         return info
 
-    names = []
     v2_records = []
     v2_sig_hashes = []
     v2_any_blocked = False
-    v2_block_reasons = {}
 
-    # Parent + children iteration
     for cat in list(cats or []):
         info["debug_total_categories"] += 1
 
         try:
-            # Skip import categories
-            if cat.CategoryType == CategoryType.Import:
-                info["debug_skipped_import"] += 1
+            ct = cat.CategoryType
+            if ct != CategoryType.Model:
+                info["debug_skipped_wrong_type"] += 1
                 continue
         except Exception:
-            # If CategoryType can't be read, treat as non-import (fail open for legacy parity)
-            pass
+            info["debug_skipped_wrong_type"] += 1
+            continue
 
         try:
             parent_name = canon_str(getattr(cat, "Name", None))
@@ -174,17 +148,9 @@ def extract(doc, ctx=None):
             info["debug_skipped_no_name"] += 1
             continue
 
-        # Determine a stable cat_type string for legacy signature
-        try:
-            cat_type = safe_str(getattr(cat, "CategoryType", None))
-        except Exception:
-            cat_type = S_MISSING
-
-        # Rows: parent "self" then each subcategory
         rows = [("self", cat)]
         try:
-            subs = list(getattr(cat, "SubCategories", []) or [])
-            for sc in subs:
+            for sc in list(getattr(cat, "SubCategories", []) or []):
                 try:
                     rn = canon_str(getattr(sc, "Name", None))
                 except Exception:
@@ -197,66 +163,35 @@ def extract(doc, ctx=None):
         for row_name, cat_obj in rows:
             try:
                 row_key = "{}|{}".format(parent_name, row_name)
-                names.append(row_key)
 
-                try:
-                    w_proj_legacy = cat_obj.GetLineWeight(GraphicsStyleType.Projection)
-                except Exception:
-                    w_proj_legacy = None
-                try:
-                    w_cut_legacy = cat_obj.GetLineWeight(GraphicsStyleType.Cut)
-                except Exception:
-                    w_cut_legacy = None
-
-                try:
-                    rgb_sig_legacy = rgb_sig_from_color(cat_obj.LineColor)
-                except Exception:
-                    rgb_sig_legacy = S_MISSING
-
-                # -------------------------
-                # record.v2 identity + sig_hash (NO sentinel literals; q marks missing/unreadable)
-                # -------------------------
                 status_reasons = []
                 status_v2 = STATUS_OK
-
                 identity_items = []
 
-                # Required: row key
                 rk_v, rk_q = canonicalize_str(row_key)
                 identity_items.append(make_identity_item("obj_style.row_key", rk_v, rk_q))
                 required_qs = [rk_q]
 
-                # Extract graphics using shared helpers (category surface)
-                proj_items = extract_projection_graphics(
-                    doc,
-                    cat_obj,
-                    ctx,
-                    key_prefix="obj_style.projection",
-                )
-                cut_items = extract_cut_graphics(
-                    doc,
-                    cat_obj,
-                    ctx,
-                    key_prefix="obj_style.cut",
-                )
-                # Keep halftone extraction centralized (not part of legacy identity set).
-                _halftone_items = extract_halftone(cat_obj, key_prefix="obj_style.halftone")
+                proj_items = extract_projection_graphics(doc, cat_obj, ctx, key_prefix="obj_style.projection")
+                cut_items = extract_cut_graphics(doc, cat_obj, ctx, key_prefix="obj_style.cut")
 
                 proj_items_by_key = {it.get("k"): it for it in (proj_items or [])}
                 cut_items_by_key = {it.get("k"): it for it in (cut_items or [])}
 
-                # Optional: projection weight
+                # projection weight
                 proj_weight_item = proj_items_by_key.get("obj_style.projection.line_weight", {}) or {}
                 wproj_v = proj_weight_item.get("v", None)
                 wproj_q = proj_weight_item.get("q", ITEM_Q_MISSING)
-                if w_proj_legacy is None and wproj_q != ITEM_Q_OK:
-                    wproj_v, wproj_q = None, ITEM_Q_MISSING
                 if wproj_q != ITEM_Q_OK:
                     status_v2 = STATUS_DEGRADED
                     status_reasons.append("weight_projection_missing_or_unreadable")
                 identity_items.append(make_identity_item("obj_style.weight.projection", wproj_v, wproj_q))
 
-                # Optional: cut weight (many categories legitimately lack cut -> treat as unsupported)
+                # cut weight — applicable to Model categories
+                try:
+                    w_cut_legacy = cat_obj.GetLineWeight(GraphicsStyleType.Cut)
+                except Exception:
+                    w_cut_legacy = None
                 if w_cut_legacy is None:
                     wcut_v, wcut_q = None, ITEM_Q_UNSUPPORTED
                 else:
@@ -265,19 +200,25 @@ def extract(doc, ctx=None):
                     wcut_q = cut_weight_item.get("q", ITEM_Q_MISSING)
                 identity_items.append(make_identity_item("obj_style.weight.cut", wcut_v, wcut_q))
 
-                # Optional: color
+                # color
                 proj_color_item = proj_items_by_key.get("obj_style.projection.color.rgb", {}) or {}
                 rgb_v = proj_color_item.get("v", None)
                 rgb_q = proj_color_item.get("q", ITEM_Q_MISSING)
-                if rgb_sig_legacy in {S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE}:
-                    rgb_v, rgb_q = None, ITEM_Q_MISSING
+                if rgb_q != ITEM_Q_OK:
+                    try:
+                        rgb_sig = _rgb_sig(cat_obj.LineColor)
+                        if rgb_sig:
+                            rgb_v, rgb_q = canonicalize_str(rgb_sig)
+                        else:
+                            rgb_v, rgb_q = None, ITEM_Q_MISSING
+                    except Exception:
+                        rgb_v, rgb_q = None, ITEM_Q_MISSING
                 if rgb_q != ITEM_Q_OK:
                     status_v2 = STATUS_DEGRADED
                     status_reasons.append("color_rgb_missing_or_unreadable")
                 identity_items.append(make_identity_item("obj_style.color.rgb", rgb_v, rgb_q))
 
-                # Optional: pattern reference (sig_hash from line_patterns record.v2)
-                lp_kind_v = None
+                # pattern reference (optional — sig_hash present for ref patterns, missing for solid/none)
                 lp_sig_hash_v = None
                 lp_sig_hash_q = ITEM_Q_MISSING
 
@@ -290,7 +231,6 @@ def extract(doc, ctx=None):
                     status_reasons.append("get_line_pattern_id_failed")
 
                 if lp_id_v2 and getattr(lp_id_v2, "IntegerValue", 0) > 0:
-                    lp_kind_v = "ref"
                     if lp_uid_to_sig_hash_v2 is None:
                         status_v2 = STATUS_DEGRADED
                         status_reasons.append("dependency_missing_line_patterns_v2_sig_hash")
@@ -310,39 +250,23 @@ def extract(doc, ctx=None):
                             else:
                                 status_v2 = STATUS_DEGRADED
                                 status_reasons.append("dependency_unmapped_line_pattern_v2_sig_hash")
-                        else:
-                            status_v2 = STATUS_DEGRADED
-                            status_reasons.append("line_pattern_uid_missing")
-                else:
-                    lp_kind_v = "solid"
 
-                kind_v, kind_q = canonicalize_str(lp_kind_v)
-                if kind_q != ITEM_Q_OK:
-                    status_v2 = STATUS_DEGRADED
-                    status_reasons.append("pattern_kind_missing_or_unreadable")
-                identity_items.append(make_identity_item("obj_style.pattern_ref.kind", kind_v, kind_q))
+                identity_items.append(make_identity_item("obj_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
 
-                if lp_sig_hash_q == ITEM_Q_OK:
-                    identity_items.append(make_identity_item("obj_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
-
-                # Enforce minima: required not-ok => blocked
                 if any(q != ITEM_Q_OK for q in required_qs):
                     status_v2 = STATUS_BLOCKED
                     status_reasons.append("required_identity_not_ok")
 
-                # Canonical evidence source for this domain is identity_basis.items.
-                # Selectors (join_key.keys_used, phase2.semantic_keys, sig_basis.keys_used)
-                # define hash subsets without duplicating k/q/v payloads.
                 identity_items_sorted = sorted(identity_items, key=lambda d: str(d.get("k", "")))
                 semantic_items = [
                     it for it in identity_items_sorted
-                    if safe_str(it.get("k", "")) in set(OBJECT_STYLE_SEMANTIC_KEYS)
+                    if safe_str(it.get("k", "")) in set(SEMANTIC_KEYS)
                 ]
                 preimage_v2 = serialize_identity_items(semantic_items)
-                sig_hash_v2 = make_hash(preimage_v2)
+                sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(preimage_v2)
 
                 rec_v2 = build_record_v2(
-                    domain="object_styles",
+                    domain=DOMAIN_NAME,
                     record_id=safe_str(row_key),
                     status=status_v2,
                     status_reasons=sorted(set(status_reasons)),
@@ -357,10 +281,7 @@ def extract(doc, ctx=None):
                     },
                 )
 
-                # -------------------------
-                # Phase-2 additions (additive, explanatory, reversible)
-                # -------------------------
-                pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "object_styles")
+                pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
                 rec_v2["join_key"], _missing = build_join_key_from_policy(
                     domain_policy=pol,
                     identity_items=identity_items_sorted,
@@ -371,22 +292,25 @@ def extract(doc, ctx=None):
                     emit_selectors=True,
                 )
 
-                cosmetic_items = []
+                # coordination_items
+                try:
+                    cat_type_str = safe_str(getattr(cat_obj, "CategoryType", None))
+                except Exception:
+                    cat_type_str = None
+                ct_v, ct_q = phase2_qv_from_legacy_sentinel_str(cat_type_str, allow_empty=False)
+                try:
+                    _is_sub = row_name != "self"
+                    is_sub_v, is_sub_q = ("true" if _is_sub else "false"), ITEM_Q_OK
+                except Exception:
+                    is_sub_v, is_sub_q = None, ITEM_Q_UNREADABLE
+
+                coordination_items = [
+                    make_identity_item("obj_style.domain_family", "object_styles", ITEM_Q_OK),
+                    make_identity_item("obj_style.category_type", ct_v, ct_q),
+                    make_identity_item("obj_style.is_subcategory", is_sub_v, is_sub_q),
+                ]
+
                 unknown_items = []
-
-                # Graphics are behavioral (semantic), category name is cosmetic.
-                for it in (identity_items_sorted or []):
-                    k = safe_str(it.get("k", ""))
-                    if k == "obj_style.row_key":
-                        cosmetic_items.append(it)
-                    else:
-                        unknown_items.append(it)
-
-                # Add CategoryType as unknown context (not part of identity_basis)
-                ct_v, ct_q = phase2_qv_from_legacy_sentinel_str(cat_type, allow_empty=False)
-                unknown_items.append(make_identity_item("obj_style.category_type", ct_v, ct_q))
-
-                # Traceability fields (metadata only — never in hash/sig/join)
                 try:
                     _eid_raw = getattr(getattr(cat_obj, "Id", None), "IntegerValue", None)
                     _eid_v, _eid_q = canonicalize_int(_eid_raw)
@@ -403,22 +327,22 @@ def extract(doc, ctx=None):
                 unknown_items.append(make_identity_item("obj_style.source_unique_id", _uid_v, _uid_q))
 
                 rec_v2["phase2"] = {
-                    "schema": "phase2.object_styles.v1",
+                    "schema": "phase2.{}.v1".format(DOMAIN_NAME),
                     "grouping_basis": "phase2.hypothesis",
-                    # Semantic selector references identity_basis.items.
-                    # Deprecated direction: do not duplicate semantic k/q/v evidence here.
-                    "cosmetic_items": phase2_sorted_items(cosmetic_items),
-                    "coordination_items": phase2_sorted_items([]),
+                    "cosmetic_items": phase2_sorted_items([
+                        make_identity_item("obj_style.row_key", rk_v, rk_q),
+                    ]),
+                    "coordination_items": phase2_sorted_items(coordination_items),
                     "unknown_items": phase2_sorted_items(unknown_items),
                 }
                 rec_v2["sig_basis"] = {
-                    "schema": "object_styles.sig_basis.v1",
-                    "keys_used": OBJECT_STYLE_SEMANTIC_KEYS,
+                    "schema": "{}.sig_basis.v1".format(DOMAIN_NAME),
+                    "keys_used": SEMANTIC_KEYS,
                 }
 
                 v2_records.append(rec_v2)
-
-                v2_sig_hashes.append(sig_hash_v2)
+                if sig_hash_v2:
+                    v2_sig_hashes.append(sig_hash_v2)
                 if status_v2 == STATUS_BLOCKED:
                     v2_any_blocked = True
 
@@ -426,57 +350,41 @@ def extract(doc, ctx=None):
                 info["debug_fail_record_build"] += 1
                 continue
 
-    info["names"] = sorted(set(names))
     info["count"] = len(v2_records)
-    info["raw_count"] = info["debug_total_categories"]
-
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
     info["signature_hashes_v2"] = sorted(v2_sig_hashes)
 
     if v2_any_blocked:
         info["debug_v2_blocked"] = True
-        v2_block_reasons["one_or_more_records_blocked"] = True
+        info["debug_v2_block_reasons"] = {"one_or_more_records_blocked": True}
 
     if (not v2_any_blocked) and info["signature_hashes_v2"]:
         info["hash_v2"] = make_hash(info["signature_hashes_v2"])
     else:
         if (not v2_any_blocked) and (not info["signature_hashes_v2"]):
             info["debug_v2_blocked"] = True
-            v2_block_reasons["no_v2_records"] = True
+            info["debug_v2_block_reasons"] = {"no_v2_records": True}
         info["hash_v2"] = None
 
-    if v2_block_reasons:
-        info["debug_v2_block_reasons"] = v2_block_reasons
+    # Export baseline map for downstream domains
+    if ctx is not None:
+        category_to_sig_hash = {}
+        for rec in (info.get("records") or []):
+            for item in (rec.get("identity_basis", {}).get("items", []) or []):
+                if item.get("k") == "obj_style.row_key":
+                    key = item.get("v")
+                    sig_hash = rec.get("sig_hash")
+                    if key and sig_hash:
+                        category_to_sig_hash[key] = sig_hash
+                    break
+        # Merge into ctx (Model is authoritative for baseline)
+        existing = ctx.get("object_styles_category_to_sig_hash", {})
+        existing.update(category_to_sig_hash)
+        ctx["object_styles_category_to_sig_hash"] = existing
 
     info["record_rows"] = [
         {"record_key": safe_str(r.get("record_id", "")), "sig_hash": r.get("sig_hash", None)}
         for r in info["records"]
     ]
-
-    # Export baseline map for downstream domains (view_category_overrides, view_templates)
-    if ctx is not None:
-        category_to_sig_hash = {}
-        category_records = {}  # Full records for detailed comparison
-
-        records = info.get("records") or []
-        for rec in records:
-            row_key = rec.get("identity_basis", {}).get("items", [])
-            # Find row_key value (obj_style.row_key)
-            for item in row_key:
-                if item.get("k") == "obj_style.row_key":
-                    key = item.get("v")
-                    sig_hash = rec.get("sig_hash")
-
-                    if key and sig_hash:
-                        category_to_sig_hash[key] = sig_hash
-                        category_records[sig_hash] = rec
-                    break
-
-        # Export to context
-        ctx["object_styles_category_to_sig_hash"] = category_to_sig_hash
-        ctx["object_styles_records"] = category_records
-
-        # Debug info
-        info["debug_exported_baseline_count"] = len(category_to_sig_hash)
 
     return info
