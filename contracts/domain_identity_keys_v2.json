@@ -19,32 +19,12 @@
   ],
 
   "domains": {
-    "dimension_types": {
-      "allowed_keys": [
-        "dim_type.uid",
-        "dim_type.shape",
-        "dim_type.text_type_uid",
-        "dim_type.tick_mark_uid",
-        "dim_type.witness_line_control",
-        "dim_type.unit_format_id",
-        "dim_type.rounding",
-        "dim_type.accuracy",
-        "dim_type.prefix",
-        "dim_type.suffix"
-      ],
-      "required_keys": [
-        "dim_type.uid",
-        "dim_type.shape"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
     "line_patterns": {
+      "domain_family": "line_patterns",
       "allowed_keys": [
         "line_pattern.uid_or_namekey",
-        "line_pattern.segment_count"
+        "line_pattern.segment_count",
+        "line_pattern.segments_def_hash"
       ],
       "allowed_key_prefixes": [
         "line_pattern.seg["
@@ -63,33 +43,19 @@
     },
 
     "line_styles": {
+      "domain_family": "line_styles",
       "allowed_keys": [
         "line_style.line_weight_projection",
         "line_style.color_rgb",
         "line_style.weight.cut",
-        "line_style.pattern_ref.sig_hash"
+        "line_style.pattern_ref.sig_hash",
+        "line_style.weight.projection",
+        "line_style.color.rgb"
       ],
       "required_keys": [
         "line_style.line_weight_projection",
         "line_style.color_rgb",
         "line_style.pattern_ref.sig_hash"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
-    "object_styles": {
-      "allowed_keys": [
-        "obj_style.row_key",
-        "obj_style.color.rgb",
-        "obj_style.weight.projection",
-        "obj_style.weight.cut",
-        "obj_style.pattern_ref.kind",
-        "obj_style.pattern_ref.sig_hash"
-      ],
-      "required_keys": [
-        "obj_style.row_key"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -97,6 +63,7 @@
     },
 
     "units": {
+      "domain_family": "units",
       "allowed_keys": [
         "units.spec",
         "units.unit_type_id",
@@ -114,11 +81,13 @@
     },
 
     "view_filter_definitions": {
+      "domain_family": "view_filter_definitions",
       "allowed_keys": [
         "vf.uid_or_namekey",
         "vf.logic_root",
         "vf.rule_count",
-        "vf.categories"
+        "vf.categories",
+        "vf.def_hash"
       ],
       "allowed_key_prefixes": [
         "vf.rule["
@@ -141,9 +110,11 @@
     },
 
     "view_filter_applications_view_templates": {
+      "domain_family": "view_filter_applications_view_templates",
       "allowed_keys": [
         "vfa.template_uid_or_namekey",
-        "vfa.filter_stack_count"
+        "vfa.filter_stack_count",
+        "vfa.stack_def_hash"
       ],
       "allowed_key_prefixes": [
         "vfa.stack["
@@ -162,34 +133,26 @@
       }
     },
 
-    "fill_patterns": {
-      "allowed_keys": ["fill_pattern.name", "fill_pattern.is_solid", "fill_pattern.target_id", "fill_pattern.grid_count"],
-      "allowed_key_prefixes": ["fill_pattern.grid["],
-      "required_keys": ["fill_pattern.name", "fill_pattern.is_solid", "fill_pattern.target_id", "fill_pattern.grid_count"],
-      "minima": {"block_if_any_required_not_ok": true},
-      "indexed_key_rules": {
-        "fill_pattern.grid[i].angle": true,
-        "fill_pattern.grid[i].origin_u": true,
-        "fill_pattern.grid[i].origin_v": true,
-        "fill_pattern.grid[i].shift": true,
-        "fill_pattern.grid[i].offset": true
-      }
-    },
     "phases": {
+      "domain_family": "phases",
       "allowed_keys": ["phase.seq", "phase.name"],
       "allowed_key_prefixes": [],
       "required_keys": ["phase.seq", "phase.name"],
       "minima": {"block_if_any_required_not_ok": true},
       "indexed_key_rules": {}
     },
+
     "phase_filters": {
+      "domain_family": "phase_filters",
       "allowed_keys": ["phase_filter.name", "phase_filter.new.presentation_id", "phase_filter.existing.presentation_id", "phase_filter.demolished.presentation_id", "phase_filter.temporary.presentation_id"],
       "allowed_key_prefixes": [],
       "required_keys": ["phase_filter.name", "phase_filter.new.presentation_id", "phase_filter.existing.presentation_id", "phase_filter.demolished.presentation_id", "phase_filter.temporary.presentation_id"],
       "minima": {"block_if_any_required_not_ok": true},
       "indexed_key_rules": {}
     },
+
     "text_types": {
+      "domain_family": "text_types",
       "allowed_keys": ["text_type.name", "text_type.font", "text_type.size_in", "text_type.width_factor", "text_type.background", "text_type.line_weight", "text_type.color_rgb", "text_type.show_border", "text_type.leader_border_offset_in", "text_type.tab_size_in", "text_type.bold", "text_type.italic", "text_type.underline"],
       "allowed_key_prefixes": [],
       "required_keys": ["text_type.name", "text_type.font", "text_type.size_in", "text_type.width_factor", "text_type.background", "text_type.line_weight", "text_type.color_rgb", "text_type.show_border", "text_type.leader_border_offset_in", "text_type.tab_size_in", "text_type.bold", "text_type.italic", "text_type.underline"],
@@ -198,6 +161,7 @@
     },
 
     "arrowheads": {
+      "domain_family": "arrowheads",
       "allowed_keys": [
         "arrowhead.style",
         "arrowhead.arrow_style_raw_int",
@@ -219,6 +183,7 @@
     },
 
     "identity": {
+      "domain_family": "identity",
       "allowed_keys": [
         "identity.is_workshared",
         "identity.revit_version_number",
@@ -234,6 +199,7 @@
     },
 
     "view_category_overrides": {
+      "domain_family": "view_category_overrides",
       "allowed_keys": [
         "vco.baseline_category_path",
         "vco.baseline_sig_hash",
@@ -249,13 +215,516 @@
       }
     },
 
-    "view_templates": {
+    "dimension_types_linear": {
+      "domain_family": "dimension_types",
       "allowed_keys": [
-        "view_template.def_hash",
-        "view_template.category_overrides_def_hash"
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
+        "dim_type.unit_format_id",
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
       ],
       "required_keys": [
-        "view_template.def_hash"
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
+        "dim_type.unit_format_id",
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "dimension_types_angular": {
+      "domain_family": "dimension_types",
+      "allowed_keys": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
+        "dim_type.unit_format_id",
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "required_keys": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
+        "dim_type.unit_format_id",
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "dimension_types_radial": {
+      "domain_family": "dimension_types",
+      "allowed_keys": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.radius_symbol_location",
+        "dim_type.radius_symbol_text",
+        "dim_type.unit_format_id",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "required_keys": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.radius_symbol_location",
+        "dim_type.radius_symbol_text",
+        "dim_type.unit_format_id"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "dimension_types_diameter": {
+      "domain_family": "dimension_types",
+      "allowed_keys": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.diameter_symbol_location",
+        "dim_type.diameter_symbol_text",
+        "dim_type.unit_format_id",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "required_keys": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.diameter_symbol_location",
+        "dim_type.diameter_symbol_text",
+        "dim_type.unit_format_id"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "dimension_types_spot_elevation": {
+      "domain_family": "dimension_types",
+      "allowed_keys": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.elevation_indicator",
+        "dim_type.elevation_indicator_as_prefix_suffix",
+        "dim_type.top_indicator",
+        "dim_type.bottom_indicator",
+        "dim_type.top_indicator_as_prefix_suffix",
+        "dim_type.bottom_indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_sig_hash",
+        "dim_type.leader_arrowhead_sig_hash",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "required_keys": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.elevation_indicator",
+        "dim_type.elevation_indicator_as_prefix_suffix",
+        "dim_type.top_indicator",
+        "dim_type.bottom_indicator",
+        "dim_type.top_indicator_as_prefix_suffix",
+        "dim_type.bottom_indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_sig_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "dimension_types_spot_coordinate": {
+      "domain_family": "dimension_types",
+      "allowed_keys": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.top_coordinate",
+        "dim_type.bottom_coordinate",
+        "dim_type.north_south_indicator",
+        "dim_type.east_west_indicator",
+        "dim_type.include_elevation",
+        "dim_type.elevation_indicator",
+        "dim_type.indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_sig_hash",
+        "dim_type.leader_arrowhead_sig_hash",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "required_keys": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.top_coordinate",
+        "dim_type.bottom_coordinate",
+        "dim_type.north_south_indicator",
+        "dim_type.east_west_indicator",
+        "dim_type.include_elevation",
+        "dim_type.elevation_indicator",
+        "dim_type.indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_sig_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "dimension_types_spot_slope": {
+      "domain_family": "dimension_types",
+      "allowed_keys": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.slope_direction",
+        "dim_type.leader_line_length",
+        "dim_type.leader_arrowhead_sig_hash",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "required_keys": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.slope_direction",
+        "dim_type.leader_line_length"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "object_styles_model": {
+      "domain_family": "object_styles",
+      "allowed_keys": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.weight.cut",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash",
+        "obj_style.material_sig_hash"
+      ],
+      "required_keys": [
+        "obj_style.row_key"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "object_styles_annotation": {
+      "domain_family": "object_styles",
+      "allowed_keys": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "required_keys": [
+        "obj_style.row_key"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "object_styles_analytical": {
+      "domain_family": "object_styles",
+      "allowed_keys": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "required_keys": [
+        "obj_style.row_key"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "object_styles_imported": {
+      "domain_family": "object_styles",
+      "allowed_keys": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "required_keys": [
+        "obj_style.row_key"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "fill_patterns_drafting": {
+      "domain_family": "fill_patterns",
+      "allowed_keys": [
+        "fill_pattern.target",
+        "fill_pattern.grid_count",
+        "fill_pattern.grids_def_hash"
+      ],
+      "allowed_key_prefixes": [
+        "fill_pattern.grid["
+      ],
+      "required_keys": [
+        "fill_pattern.target",
+        "fill_pattern.grid_count",
+        "fill_pattern.grids_def_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {
+        "fill_pattern.grid[i].angle": true,
+        "fill_pattern.grid[i].origin_u": true,
+        "fill_pattern.grid[i].origin_v": true,
+        "fill_pattern.grid[i].shift": true,
+        "fill_pattern.grid[i].offset": true
+      }
+    },
+
+    "fill_patterns_model": {
+      "domain_family": "fill_patterns",
+      "allowed_keys": [
+        "fill_pattern.target",
+        "fill_pattern.grid_count",
+        "fill_pattern.grids_def_hash"
+      ],
+      "allowed_key_prefixes": [
+        "fill_pattern.grid["
+      ],
+      "required_keys": [
+        "fill_pattern.target",
+        "fill_pattern.grid_count",
+        "fill_pattern.grids_def_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {
+        "fill_pattern.grid[i].angle": true,
+        "fill_pattern.grid[i].origin_u": true,
+        "fill_pattern.grid[i].origin_v": true,
+        "fill_pattern.grid[i].shift": true,
+        "fill_pattern.grid[i].offset": true
+      }
+    },
+
+    "view_templates_floor_structural_area_plans": {
+      "domain_family": "view_templates",
+      "allowed_keys": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.view_range_sig_hash",
+        "vt.underlay_orientation",
+        "vt.orientation",
+        "vt.depth_clipping",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash",
+        "vt.color_scheme_sig_hash"
+      ],
+      "required_keys": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.view_range_sig_hash",
+        "vt.underlay_orientation",
+        "vt.orientation",
+        "vt.depth_clipping",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash",
+        "vt.color_scheme_sig_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "view_templates_ceiling_plans": {
+      "domain_family": "view_templates",
+      "allowed_keys": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.view_range_sig_hash",
+        "vt.underlay_orientation",
+        "vt.orientation",
+        "vt.depth_clipping",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash"
+      ],
+      "required_keys": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.view_range_sig_hash",
+        "vt.underlay_orientation",
+        "vt.orientation",
+        "vt.depth_clipping",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "view_templates_elevations_sections_detail": {
+      "domain_family": "view_templates",
+      "allowed_keys": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.far_clipping",
+        "vt.depth_cueing_sig_hash",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash",
+        "vt.color_scheme_location"
+      ],
+      "required_keys": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.far_clipping",
+        "vt.depth_cueing_sig_hash",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash",
+        "vt.color_scheme_location"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "view_templates_renderings_drafting": {
+      "domain_family": "view_templates",
+      "allowed_keys": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.rendering_settings_sig_hash",
+        "vt.background_sig_hash",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash"
+      ],
+      "required_keys": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.rendering_settings_sig_hash",
+        "vt.background_sig_hash",
+        "vt.vg_model_categories_sig_hash",
+        "vt.vg_annotation_categories_sig_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "view_templates_schedules": {
+      "domain_family": "view_templates",
+      "allowed_keys": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.include_vg",
+        "vt.include_filters",
+        "vt.include_appearance"
+      ],
+      "required_keys": [
+        "vt.view_type_family",
+        "vt.phase_filter_sig_hash",
+        "vt.filter_stack_sig_hash",
+        "vt.include_vg",
+        "vt.include_filters",
+        "vt.include_appearance"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
