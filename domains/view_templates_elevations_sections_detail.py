@@ -68,10 +68,35 @@ except Exception:
 
 DOMAIN_NAME = "view_templates_elevations_sections_detail"
 
+
+def _build_elevation_section_detail_viewtype_set():
+    """
+    Build the ViewType integer set for this domain.
+    Elevation=3, ThreeD=4 confirmed from probe data.
+    Section integer resolved at runtime to handle version variation.
+    """
+    vt_set = {3, 4}  # Elevation=3, ThreeD=4 (probe-confirmed)
+    try:
+        from Autodesk.Revit.DB import ViewType
+        # Section (ViewType.Section may not exist in all versions)
+        sec = getattr(ViewType, "Section", None)
+        if sec is not None:
+            vt_set.add(int(sec))
+        # Detail views
+        det = getattr(ViewType, "Detail", None)
+        if det is not None:
+            vt_set.add(int(det))
+    except Exception:
+        pass
+    return frozenset(vt_set)
+
+
 # ViewType integers handled by this domain extractor.
 # CPython3/pythonnet returns int string from enum, so we use int() comparison.
-# Elevation=3
-DOMAIN_VIEWTYPE_SET = frozenset({3})
+# Elevation=3, ThreeD=4 confirmed from probe data.
+# Section and Detail resolved at runtime (integers vary by Revit version).
+# Source: probe_view_templates_2026-02-05.json observed_on_buckets
+DOMAIN_VIEWTYPE_SET = _build_elevation_section_detail_viewtype_set()
 
 
 def extract(doc, ctx=None):
