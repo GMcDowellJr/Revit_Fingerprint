@@ -59,7 +59,6 @@ from core.dimension_type_helpers import (
     FAMILY_LINEAR,
     FAMILY_ANGULAR,
     FAMILY_RADIAL,
-    FAMILY_DIAMETER,
     FAMILY_SPOT,
 )
 
