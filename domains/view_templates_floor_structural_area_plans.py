@@ -68,10 +68,29 @@ except Exception:
 
 DOMAIN_NAME = "view_templates_floor_structural_area_plans"
 
+
+def _build_floor_structural_area_viewtype_set():
+    """
+    Build the ViewType integer set for this domain.
+    FloorPlan=1, AreaPlan=117 are confirmed from probe data.
+    EngineeringPlan integer is resolved at runtime to handle version variation.
+    """
+    vt_set = {1, 117}
+    try:
+        from Autodesk.Revit.DB import ViewType
+        ep = int(ViewType.EngineeringPlan)
+        vt_set.add(ep)
+    except Exception:
+        # If EngineeringPlan is not accessible, 115 is the commonly observed value
+        vt_set.add(115)
+    return frozenset(vt_set)
+
+
 # ViewType integers handled by this domain extractor.
 # CPython3/pythonnet returns int string from enum, so we use int() comparison.
-# FloorPlan=1, AreaPlan=117
-DOMAIN_VIEWTYPE_SET = frozenset({1, 117})
+# FloorPlan=1, AreaPlan=117, EngineeringPlan/StructuralPlan=resolved at runtime
+# Source: probe_view_templates_2026-02-05.json observed_on_buckets
+DOMAIN_VIEWTYPE_SET = _build_floor_structural_area_viewtype_set()
 
 
 def extract(doc, ctx=None):
