@@ -3,7 +3,7 @@
 View Templates - Elevations, Sections, and Detail views domain extractor.
 
 Domain family: view_templates
-Contains view types: Elevation (ViewType integer: 3)
+Contains view types: Elevation (3), Section (runtime), Detail (runtime)
 
 Uses integer ViewType comparison (CPython3/pythonnet returns int string from enums).
 Per-template signature pattern: include flags + phase filter + filter stack.
@@ -72,10 +72,10 @@ DOMAIN_NAME = "view_templates_elevations_sections_detail"
 def _build_elevation_section_detail_viewtype_set():
     """
     Build the ViewType integer set for this domain.
-    Elevation=3, ThreeD=4 confirmed from probe data.
-    Section integer resolved at runtime to handle version variation.
+    Elevation=3 only from probe data. Section and Detail resolved at runtime.
+    ThreeD(4) belongs in renderings_drafting domain.
     """
-    vt_set = {3, 4}  # Elevation=3, ThreeD=4 (probe-confirmed)
+    vt_set = {3}  # Elevation=3 only
     try:
         from Autodesk.Revit.DB import ViewType
         # Section (ViewType.Section may not exist in all versions)
@@ -93,8 +93,8 @@ def _build_elevation_section_detail_viewtype_set():
 
 # ViewType integers handled by this domain extractor.
 # CPython3/pythonnet returns int string from enum, so we use int() comparison.
-# Elevation=3, ThreeD=4 confirmed from probe data.
-# Section and Detail resolved at runtime (integers vary by Revit version).
+# Elevation=3, Section and Detail resolved at runtime (integers vary by Revit version).
+# ThreeD(4) is handled by view_templates_renderings_drafting, not this domain.
 # Source: probe_view_templates_2026-02-05.json observed_on_buckets
 DOMAIN_VIEWTYPE_SET = _build_elevation_section_detail_viewtype_set()
 
