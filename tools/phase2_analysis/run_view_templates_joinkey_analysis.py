@@ -158,11 +158,12 @@ def analyze_view_templates(export_path: str) -> None:
     with open(export_path, "r", encoding="utf-8") as handle:
         data = json.load(handle)
 
-    records = (
-        data.get("domains", {})
-        .get("view_templates", {})
-        .get("records", [])
+    _vt_data = (
+        data.get("_compat_view_templates")
+        or data.get("domains", {}).get("view_templates", {})
+        or {}
     )
+    records = _vt_data.get("records", [])
 
     print("View Templates Join Key Discovery")
     print("=" * 48)
