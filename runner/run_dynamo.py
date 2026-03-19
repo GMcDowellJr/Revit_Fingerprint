@@ -109,17 +109,10 @@ from domains import view_filter_definitions, view_filter_applications_view_templ
 from domains import phases, phase_filters, phase_graphics
 from domains import view_category_overrides
 # Split domains: object_styles
-from domains import object_styles_model, object_styles_annotation, object_styles_analytical, object_styles_imported
-# Split domains: fill_patterns
-from domains import fill_patterns_drafting, fill_patterns_model
-# Split domains: dimension_types
-from domains import dimension_types_linear, dimension_types_angular, dimension_types_radial
-from domains import dimension_types_diameter, dimension_types_spot_elevation
-from domains import dimension_types_spot_coordinate, dimension_types_spot_slope
-# Split domains: view_templates
-from domains import view_templates_floor_structural_area_plans, view_templates_ceiling_plans
-from domains import view_templates_elevations_sections_detail, view_templates_renderings_drafting
-from domains import view_templates_schedules
+from domains import object_styles
+from domains import fill_patterns
+from domains import dimension_types
+from domains import view_templates
 from core.manifest import build_manifest
 from core.features import build_features
 from core.join_key_policy import load_join_key_policies
@@ -525,22 +518,22 @@ def run_fingerprint(doc):
 
     # object_styles split domains (model must run first to export baseline map to ctx)
     if _enabled("object_styles_model"):
-        legacy = _domain_run("object_styles_model", object_styles_model.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("object_styles_model", object_styles.extract_model, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["object_styles_model"] = legacy
 
     if _enabled("object_styles_annotation"):
-        legacy = _domain_run("object_styles_annotation", object_styles_annotation.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("object_styles_annotation", object_styles.extract_annotation, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["object_styles_annotation"] = legacy
 
     if _enabled("object_styles_analytical"):
-        legacy = _domain_run("object_styles_analytical", object_styles_analytical.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("object_styles_analytical", object_styles.extract_analytical, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["object_styles_analytical"] = legacy
 
     if _enabled("object_styles_imported"):
-        legacy = _domain_run("object_styles_imported", object_styles_imported.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("object_styles_imported", object_styles.extract_imported, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["object_styles_imported"] = legacy
 
@@ -551,12 +544,12 @@ def run_fingerprint(doc):
 
     # fill_patterns split domains
     if _enabled("fill_patterns_drafting"):
-        legacy = _domain_run("fill_patterns_drafting", fill_patterns_drafting.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("fill_patterns_drafting", fill_patterns.extract_drafting, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["fill_patterns_drafting"] = legacy
 
     if _enabled("fill_patterns_model"):
-        legacy = _domain_run("fill_patterns_model", fill_patterns_model.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("fill_patterns_model", fill_patterns.extract_model, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["fill_patterns_model"] = legacy
 
@@ -572,37 +565,37 @@ def run_fingerprint(doc):
 
     # dimension_types split domains
     if _enabled("dimension_types_linear"):
-        legacy = _domain_run("dimension_types_linear", dimension_types_linear.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("dimension_types_linear", dimension_types.extract_linear, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["dimension_types_linear"] = legacy
 
     if _enabled("dimension_types_angular"):
-        legacy = _domain_run("dimension_types_angular", dimension_types_angular.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("dimension_types_angular", dimension_types.extract_angular, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["dimension_types_angular"] = legacy
 
     if _enabled("dimension_types_radial"):
-        legacy = _domain_run("dimension_types_radial", dimension_types_radial.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("dimension_types_radial", dimension_types.extract_radial, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["dimension_types_radial"] = legacy
 
     if _enabled("dimension_types_diameter"):
-        legacy = _domain_run("dimension_types_diameter", dimension_types_diameter.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("dimension_types_diameter", dimension_types.extract_diameter, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["dimension_types_diameter"] = legacy
 
     if _enabled("dimension_types_spot_elevation"):
-        legacy = _domain_run("dimension_types_spot_elevation", dimension_types_spot_elevation.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("dimension_types_spot_elevation", dimension_types.extract_spot_elevation, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["dimension_types_spot_elevation"] = legacy
 
     if _enabled("dimension_types_spot_coordinate"):
-        legacy = _domain_run("dimension_types_spot_coordinate", dimension_types_spot_coordinate.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("dimension_types_spot_coordinate", dimension_types.extract_spot_coordinate, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["dimension_types_spot_coordinate"] = legacy
 
     if _enabled("dimension_types_spot_slope"):
-        legacy = _domain_run("dimension_types_spot_slope", dimension_types_spot_slope.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        legacy = _domain_run("dimension_types_spot_slope", dimension_types.extract_spot_slope, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["dimension_types_spot_slope"] = legacy
 
@@ -734,21 +727,17 @@ def run_fingerprint(doc):
     # (filter stack resolution). Schedules only require phase_filters — ViewSchedule
     # templates do not have view filter stacks.
     for _vt_domain, _vt_extractor in [
-        ("view_templates_floor_structural_area_plans",
-         view_templates_floor_structural_area_plans),
-        ("view_templates_ceiling_plans",
-         view_templates_ceiling_plans),
-        ("view_templates_elevations_sections_detail",
-         view_templates_elevations_sections_detail),
-        ("view_templates_renderings_drafting",
-         view_templates_renderings_drafting),
+        ("view_templates_floor_structural_area_plans", view_templates.extract_floor_structural_area_plans),
+        ("view_templates_ceiling_plans", view_templates.extract_ceiling_plans),
+        ("view_templates_elevations_sections_detail", view_templates.extract_elevations_sections_detail),
+        ("view_templates_renderings_drafting", view_templates.extract_renderings_drafting),
     ]:
         if not _enabled(_vt_domain):
             continue
         try:
             require_domain(contract_domains, "phase_filters")
             require_domain(contract_domains, "view_filter_definitions")
-            legacy = _domain_run(_vt_domain, _vt_extractor.extract, doc, ctx,
+            legacy = _domain_run(_vt_domain, _vt_extractor, doc, ctx,
                                  contract_domains, run_diag, runner_notes)
             if legacy is not None:
                 fingerprint[_vt_domain] = legacy
@@ -771,7 +760,7 @@ def run_fingerprint(doc):
         try:
             require_domain(contract_domains, "phase_filters")
             legacy = _domain_run("view_templates_schedules",
-                                 view_templates_schedules.extract, doc, ctx,
+                                 view_templates.extract_schedules, doc, ctx,
                                  contract_domains, run_diag, runner_notes)
             if legacy is not None:
                 fingerprint["view_templates_schedules"] = legacy
@@ -793,10 +782,10 @@ def run_fingerprint(doc):
     # across all 5 domains. Emits a runner note if any templates fell through.
     try:
         _vt_domains = [
-            "view_templates_floor_structural_area_plans",
-            "view_templates_ceiling_plans",
-            "view_templates_elevations_sections_detail",
-            "view_templates_renderings_drafting",
+            "view_templates.extract_floor_structural_area_plans",
+            "view_templates.extract_ceiling_plans",
+            "view_templates.extract_elevations_sections_detail",
+            "view_templates.extract_renderings_drafting",
             "view_templates_schedules",
         ]
         _vt_total_kept = sum(
@@ -804,10 +793,10 @@ def run_fingerprint(doc):
             for d in _vt_domains
         )
         _vt_raw = fingerprint.get(
-            "view_templates_floor_structural_area_plans", {}
+            "view_templates.extract_floor_structural_area_plans", {}
         ).get("raw_count", 0)
         _vt_not_template = fingerprint.get(
-            "view_templates_floor_structural_area_plans", {}
+            "view_templates.extract_floor_structural_area_plans", {}
         ).get("debug_not_template", 0)
         _vt_templates_total = (_vt_raw or 0) - (_vt_not_template or 0)
         _vt_unrouted = _vt_templates_total - _vt_total_kept
@@ -840,10 +829,10 @@ def run_fingerprint(doc):
 
     try:
         _vt_records = []
-        for _dom in ["view_templates_floor_structural_area_plans",
-                     "view_templates_ceiling_plans",
-                     "view_templates_elevations_sections_detail",
-                     "view_templates_renderings_drafting",
+        for _dom in ["view_templates.extract_floor_structural_area_plans",
+                     "view_templates.extract_ceiling_plans",
+                     "view_templates.extract_elevations_sections_detail",
+                     "view_templates.extract_renderings_drafting",
                      "view_templates_schedules"]:
             _vt_records.extend(fingerprint.get(_dom, {}).get("records", []))
         if _vt_records:
@@ -851,10 +840,10 @@ def run_fingerprint(doc):
                 "records": _vt_records,
                 "count": len(_vt_records),
                 "_is_compat_alias": True,
-                "_source_domains": ["view_templates_floor_structural_area_plans",
-                                    "view_templates_ceiling_plans",
-                                    "view_templates_elevations_sections_detail",
-                                    "view_templates_renderings_drafting",
+                "_source_domains": ["view_templates.extract_floor_structural_area_plans",
+                                    "view_templates.extract_ceiling_plans",
+                                    "view_templates.extract_elevations_sections_detail",
+                                    "view_templates.extract_renderings_drafting",
                                     "view_templates_schedules"],
             }
     except Exception:
