@@ -162,8 +162,10 @@ def extract(doc, ctx=None):
 
     Args:
         doc: Revit Document
-        ctx: context dict; must contain object_styles_category_to_sig_hash
-             (populated by object_styles_model)
+        ctx: context dict; must contain object_style_row_key_to_sig_hash
+             (from object_styles_model) and optionally
+             object_style_annotation_row_key_to_sig_hash
+             (from object_styles_annotation) for annotation category baselines
 
     Returns:
         dict with records, hash_v2, count, raw_count, and debug counters.
@@ -192,11 +194,17 @@ def extract(doc, ctx=None):
         info["debug_v2_blocked"] = True
         return info
 
-    # row_key → sig_hash map from object_styles_model
-    baseline_sig_map = (
-        (ctx or {}).get("object_style_row_key_to_sig_hash")
-        or (ctx or {}).get("object_styles_category_to_sig_hash")
-        or {}
+    # Merge model and annotation baseline maps.
+    # Annotation categories (Grids, Revision Clouds, etc.) live in the annotation map.
+    baseline_sig_map = {}
+    baseline_sig_map.update(
+        (ctx or {}).get("object_style_row_key_to_sig_hash", {}) or {}
+    )
+    baseline_sig_map.update(
+        (ctx or {}).get("object_styles_category_to_sig_hash", {}) or {}
+    )
+    baseline_sig_map.update(
+        (ctx or {}).get("object_style_annotation_row_key_to_sig_hash", {}) or {}
     )
 
     # Build V/G include-controlled BIP set once
