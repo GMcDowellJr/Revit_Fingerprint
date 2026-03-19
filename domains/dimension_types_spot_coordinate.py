@@ -64,6 +64,9 @@ DOMAIN_NAME = "dimension_types_spot_coordinate"
 # Shapes handled by this domain
 _HANDLED_SHAPES = frozenset({SHAPE_SPOT_COORDINATE})
 
+# Family name expected for user-governed types in this domain
+EXPECTED_FAMILY = "Spot Coordinates"
+
 
 def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
     """
@@ -181,6 +184,11 @@ def extract(doc, ctx=None):
         try:
             type_name = get_type_display_name(d)
 
+            # Exclude system built-in types with id-based labels (not user-accessible)
+            if type_name is None or (isinstance(type_name, str) and ":id:" in type_name):
+                info["debug_system_types_excluded"] = info.get("debug_system_types_excluded", 0) + 1
+                continue
+
             shape_v, shape_family, shape_q = _get_dimension_shape(d)
 
             # Apply family-name heuristic override
@@ -190,6 +198,20 @@ def extract(doc, ctx=None):
 
             # Filter: skip shapes not handled by this domain
             if shape_v not in _HANDLED_SHAPES:
+                continue
+
+            # Exclude confirmed wrong-family types (system/infrastructure types)
+            family_name = None
+            try:
+                p_fam = first_param(d, bip_names=["SYMBOL_FAMILY_NAME_PARAM"], ui_names=["Family Name"])
+                if p_fam:
+                    family_name = _as_string(p_fam)
+                    if family_name:
+                        family_name = canon_str(family_name)
+            except Exception:
+                pass
+            if family_name and family_name != EXPECTED_FAMILY:
+                info["debug_wrong_family_excluded"] = info.get("debug_wrong_family_excluded", 0) + 1
                 continue
 
             # --- Read core identity fields ---

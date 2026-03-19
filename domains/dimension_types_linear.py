@@ -72,6 +72,9 @@ DOMAIN_NAME = "dimension_types_linear"
 # but same identity model with witness_line_control)
 _HANDLED_SHAPES = frozenset({SHAPE_LINEAR, SHAPE_LINEAR_FIXED, SHAPE_ARC_LENGTH})
 
+# Family name expected for user-governed types in this domain
+EXPECTED_FAMILY = "Linear Dimension Style"
+
 
 def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
     """
@@ -145,6 +148,11 @@ def extract(doc, ctx=None):
             # Get display name for heuristic override
             type_name = get_type_display_name(d)
 
+            # Exclude system built-in types with id-based labels (not user-accessible)
+            if type_name is None or (isinstance(type_name, str) and ":id:" in type_name):
+                info["debug_system_types_excluded"] = info.get("debug_system_types_excluded", 0) + 1
+                continue
+
             shape_v, shape_family, shape_q = _get_dimension_shape(d)
 
             # Apply family-name heuristic override to detect Spot types
@@ -154,6 +162,21 @@ def extract(doc, ctx=None):
 
             # Filter: skip shapes not handled by this domain
             if shape_v not in _HANDLED_SHAPES:
+                continue
+
+            # Exclude confirmed wrong-family types (system/infrastructure types)
+            # family_name=None means unreadable — do not exclude on absence
+            family_name = None
+            try:
+                p_fam = first_param(d, bip_names=["SYMBOL_FAMILY_NAME_PARAM"], ui_names=["Family Name"])
+                if p_fam:
+                    family_name = _as_string(p_fam)
+                    if family_name:
+                        family_name = canon_str(family_name)
+            except Exception:
+                pass
+            if family_name and family_name != EXPECTED_FAMILY:
+                info["debug_wrong_family_excluded"] = info.get("debug_wrong_family_excluded", 0) + 1
                 continue
 
             # --- Read core identity fields ---
