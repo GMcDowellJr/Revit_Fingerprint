@@ -1083,11 +1083,30 @@ def _build_elevation_section_detail_viewtype_set():
     """
     Build the ViewType integer set for elevations/sections/detail.
 
-    Probe-confirmed integers only:
-      3 = Elevation
-      4 = Section
+    Probe-confirmed integers:
+      3 = Elevation (stable across Revit versions)
+      117 = Section in this Revit version (confirmed from corpus templates:
+            Building Sections, Wall Sections, Exterior Details, Interior Details)
+
+    Note: int(ViewType.Section) resolves to 117 at runtime in this environment.
+    117 was intentionally removed from floor_structural_area_plans (where it was
+    incorrectly routing Section templates). It belongs here in elevations.
+
+    The runtime resolution path is kept for forward compatibility with Revit
+    versions where Section may have a different integer.
     """
-    return frozenset({3, 4})
+    vt_set = {3, 117}  # Elevation=3, Section=117 (probe-confirmed)
+    try:
+        from Autodesk.Revit.DB import ViewType
+        sec = getattr(ViewType, "Section", None)
+        if sec is not None:
+            vt_set.add(int(sec))
+        det = getattr(ViewType, "Detail", None)
+        if det is not None:
+            vt_set.add(int(det))
+    except Exception:
+        pass
+    return frozenset(vt_set)
 
 
 _ELEVATION_SECTION_DETAIL_VIEWTYPE_SET = _build_elevation_section_detail_viewtype_set()
