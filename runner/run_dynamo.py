@@ -673,6 +673,19 @@ def run_fingerprint(doc):
             require_domain(contract_domains, "line_patterns")
             require_domain(contract_domains, "fill_patterns_drafting")
             require_domain(contract_domains, "fill_patterns_model")
+            # Soft requirements — emit note if absent but do not block VCO
+            # (these partitions are legitimately empty in most files)
+            for _soft_dep in ["object_styles_annotation",
+                              "object_styles_analytical",
+                              "object_styles_imported"]:
+                if _soft_dep not in contract_domains:
+                    runner_notes.append(
+                        "view_category_overrides: {} not run; "
+                        "{} category overrides will have no baseline".format(
+                            _soft_dep,
+                            _soft_dep.replace("object_styles_", "")
+                        )
+                    )
 
             legacy = _domain_run(
                 "view_category_overrides",
@@ -795,6 +808,47 @@ def run_fingerprint(doc):
                 )
         except Exception:
             pass
+
+    # Compatibility aliases: merge split domain records into legacy keys
+    # so that analysis tools built against the monolithic schema still work.
+    # These are read-only views — they do not affect any hashes.
+    try:
+        _os_records = []
+        for _dom in ["object_styles_model", "object_styles_annotation",
+                     "object_styles_analytical", "object_styles_imported"]:
+            _os_records.extend(fingerprint.get(_dom, {}).get("records", []))
+        if _os_records:
+            fingerprint["_compat_object_styles"] = {
+                "records": _os_records,
+                "count": len(_os_records),
+                "_is_compat_alias": True,
+                "_source_domains": ["object_styles_model", "object_styles_annotation",
+                                    "object_styles_analytical", "object_styles_imported"],
+            }
+    except Exception:
+        pass
+
+    try:
+        _vt_records = []
+        for _dom in ["view_templates_floor_structural_area_plans",
+                     "view_templates_ceiling_plans",
+                     "view_templates_elevations_sections_detail",
+                     "view_templates_renderings_drafting",
+                     "view_templates_schedules"]:
+            _vt_records.extend(fingerprint.get(_dom, {}).get("records", []))
+        if _vt_records:
+            fingerprint["_compat_view_templates"] = {
+                "records": _vt_records,
+                "count": len(_vt_records),
+                "_is_compat_alias": True,
+                "_source_domains": ["view_templates_floor_structural_area_plans",
+                                    "view_templates_ceiling_plans",
+                                    "view_templates_elevations_sections_detail",
+                                    "view_templates_renderings_drafting",
+                                    "view_templates_schedules"],
+            }
+    except Exception:
+        pass
 
     # End total extraction timer
     try:
