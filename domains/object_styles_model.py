@@ -383,6 +383,8 @@ def extract(doc, ctx=None):
         existing = ctx.get("object_styles_category_to_sig_hash", {})
         existing.update(category_to_sig_hash)
         ctx["object_styles_category_to_sig_hash"] = existing
+        # Alias used by view_category_overrides (row_key → sig_hash, same data)
+        ctx["object_style_row_key_to_sig_hash"] = dict(existing)
 
     info["record_rows"] = [
         {"record_key": safe_str(r.get("record_id", "")), "sig_hash": r.get("sig_hash", None)}
