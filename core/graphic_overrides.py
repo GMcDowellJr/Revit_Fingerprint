@@ -275,8 +275,8 @@ def extract_projection_graphics(
         List of IdentityItem dicts for projection line/color/pattern/fill.
     """
     items: List[Dict[str, Any]] = []
-    line_pattern_map = (ctx or {}).get("line_pattern_uid_to_sig_hash_v2")
-    fill_pattern_map = (ctx or {}).get("fill_pattern_uid_to_sig_hash_v2")
+    line_pattern_map = (ctx or {}).get("line_pattern_uid_to_hash")
+    fill_pattern_map = (ctx or {}).get("fill_pattern_uid_to_hash")
 
     if _is_category(source):
         # Category API (object styles domain)
@@ -408,8 +408,8 @@ def extract_cut_graphics(
         List of IdentityItem dicts for cut line/color/pattern/fill.
     """
     items: List[Dict[str, Any]] = []
-    line_pattern_map = (ctx or {}).get("line_pattern_uid_to_sig_hash_v2")
-    fill_pattern_map = (ctx or {}).get("fill_pattern_uid_to_sig_hash_v2")
+    line_pattern_map = (ctx or {}).get("line_pattern_uid_to_hash")
+    fill_pattern_map = (ctx or {}).get("fill_pattern_uid_to_hash")
 
     if _is_category(source):
         # Category cut properties are not supported for all categories (e.g., annotations).
