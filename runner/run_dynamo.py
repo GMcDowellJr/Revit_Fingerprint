@@ -766,6 +766,36 @@ def run_fingerprint(doc):
             if legacy is not None:
                 fingerprint["view_templates_schedules"] = legacy
 
+        # Routing completeness check: verify all view templates accounted for
+        # across all 5 domains. Emits a runner note if any templates fell through.
+        try:
+            _vt_domains = [
+                "view_templates_floor_structural_area_plans",
+                "view_templates_ceiling_plans",
+                "view_templates_elevations_sections_detail",
+                "view_templates_renderings_drafting",
+                "view_templates_schedules",
+            ]
+            _vt_total_kept = sum(
+                fingerprint.get(d, {}).get("debug_kept", 0)
+                for d in _vt_domains
+            )
+            _vt_raw = fingerprint.get(
+                "view_templates_floor_structural_area_plans", {}
+            ).get("raw_count", 0)
+            _vt_not_template = fingerprint.get(
+                "view_templates_floor_structural_area_plans", {}
+            ).get("debug_not_template", 0)
+            _vt_templates_total = (_vt_raw or 0) - (_vt_not_template or 0)
+            _vt_unrouted = _vt_templates_total - _vt_total_kept
+            if _vt_unrouted > 0:
+                runner_notes.append(
+                    "view_templates: {} template(s) not routed to any domain "
+                    "(unrecognized viewtype)".format(_vt_unrouted)
+                )
+        except Exception:
+            pass
+
     # End total extraction timer
     try:
         _timing.end_timer("total_extraction")
