@@ -667,12 +667,22 @@ def run_fingerprint(doc):
             fingerprint["view_filter_applications_view_templates"] = legacy
 
     if _enabled("view_category_overrides"):
-        # Hard dependencies: must run after object_styles_model + pattern domains
+        # Hard dependencies: must run after object_styles_model + line_patterns.
+        # VCO cannot produce meaningful output without the model baseline or
+        # line pattern refs, so these remain hard requirements.
+        # fill_patterns are soft — graphic_overrides.py degrades gracefully
+        # when a fill pattern ref can't be resolved (q=missing on the field).
         try:
             require_domain(contract_domains, "object_styles_model")
             require_domain(contract_domains, "line_patterns")
-            require_domain(contract_domains, "fill_patterns_drafting")
-            require_domain(contract_domains, "fill_patterns_model")
+            # Soft requirements for fill pattern partitions
+            for _fp_dep in ["fill_patterns_drafting", "fill_patterns_model"]:
+                if _fp_dep not in contract_domains:
+                    runner_notes.append(
+                        "view_category_overrides: {} not run; "
+                        "fill pattern refs in overrides will degrade to q=missing".format(
+                            _fp_dep)
+                    )
             # Soft requirements — emit note if absent but do not block VCO
             # (these partitions are legitimately empty in most files)
             for _soft_dep in ["object_styles_annotation",
@@ -719,95 +729,95 @@ def run_fingerprint(doc):
                 message=";".join(list(b.reasons)),
             )
 
-    # view_templates split domains - all share the same hard dependencies
-    _vt_deps_ok = True
+    # view_templates split domains.
+    # Non-schedule domains require both phase_filters and view_filter_definitions
+    # (filter stack resolution). Schedules only require phase_filters — ViewSchedule
+    # templates do not have view filter stacks.
+    for _vt_domain, _vt_extractor in [
+        ("view_templates_floor_structural_area_plans",
+         view_templates_floor_structural_area_plans),
+        ("view_templates_ceiling_plans",
+         view_templates_ceiling_plans),
+        ("view_templates_elevations_sections_detail",
+         view_templates_elevations_sections_detail),
+        ("view_templates_renderings_drafting",
+         view_templates_renderings_drafting),
+    ]:
+        if not _enabled(_vt_domain):
+            continue
+        try:
+            require_domain(contract_domains, "phase_filters")
+            require_domain(contract_domains, "view_filter_definitions")
+            legacy = _domain_run(_vt_domain, _vt_extractor.extract, doc, ctx,
+                                 contract_domains, run_diag, runner_notes)
+            if legacy is not None:
+                fingerprint[_vt_domain] = legacy
+        except Blocked as b:
+            contract_domains[_vt_domain] = contracts.new_domain_envelope(
+                domain=_vt_domain,
+                domain_version=_DOMAIN_VERSION,
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                block_reasons=list(b.reasons),
+                diag={"blocked_code": b.code, "upstream": b.upstream},
+                records=None,
+                hash_value=None,
+            )
+            contracts.add_bounded_error(run_diag, domain=_vt_domain,
+                status=contracts.DOMAIN_STATUS_BLOCKED, code=b.code,
+                message=";".join(list(b.reasons)))
+
+    # Schedules gate: only requires phase_filters
+    if _enabled("view_templates_schedules"):
+        try:
+            require_domain(contract_domains, "phase_filters")
+            legacy = _domain_run("view_templates_schedules",
+                                 view_templates_schedules.extract, doc, ctx,
+                                 contract_domains, run_diag, runner_notes)
+            if legacy is not None:
+                fingerprint["view_templates_schedules"] = legacy
+        except Blocked as b:
+            contract_domains["view_templates_schedules"] = contracts.new_domain_envelope(
+                domain="view_templates_schedules",
+                domain_version=_DOMAIN_VERSION,
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                block_reasons=list(b.reasons),
+                diag={"blocked_code": b.code, "upstream": b.upstream},
+                records=None,
+                hash_value=None,
+            )
+            contracts.add_bounded_error(run_diag, domain="view_templates_schedules",
+                status=contracts.DOMAIN_STATUS_BLOCKED, code=b.code,
+                message=";".join(list(b.reasons)))
+
+    # Routing completeness check: verify all view templates accounted for
+    # across all 5 domains. Emits a runner note if any templates fell through.
     try:
-        require_domain(contract_domains, "phase_filters")
-        require_domain(contract_domains, "view_filter_definitions")
-    except Blocked as b:
-        _vt_deps_ok = False
-        for _vt_dn in [
+        _vt_domains = [
             "view_templates_floor_structural_area_plans",
             "view_templates_ceiling_plans",
             "view_templates_elevations_sections_detail",
             "view_templates_renderings_drafting",
             "view_templates_schedules",
-        ]:
-            contract_domains[_vt_dn] = contracts.new_domain_envelope(
-                domain=_vt_dn,
-                domain_version=_DOMAIN_VERSION,
-                status=contracts.DOMAIN_STATUS_BLOCKED,
-                block_reasons=list(b.reasons),
-                diag={
-                    "blocked_code": b.code,
-                    "upstream": b.upstream,
-                },
-                records=None,
-                hash_value=None,
+        ]
+        _vt_total_kept = sum(
+            fingerprint.get(d, {}).get("debug_kept", 0)
+            for d in _vt_domains
+        )
+        _vt_raw = fingerprint.get(
+            "view_templates_floor_structural_area_plans", {}
+        ).get("raw_count", 0)
+        _vt_not_template = fingerprint.get(
+            "view_templates_floor_structural_area_plans", {}
+        ).get("debug_not_template", 0)
+        _vt_templates_total = (_vt_raw or 0) - (_vt_not_template or 0)
+        _vt_unrouted = _vt_templates_total - _vt_total_kept
+        if _vt_unrouted > 0:
+            runner_notes.append(
+                "view_templates: {} template(s) not routed to any domain "
+                "(unrecognized viewtype)".format(_vt_unrouted)
             )
-            contracts.add_bounded_error(
-                run_diag,
-                domain=_vt_dn,
-                status=contracts.DOMAIN_STATUS_BLOCKED,
-                code=b.code,
-                message=";".join(list(b.reasons)),
-            )
-
-    if _vt_deps_ok:
-        if _enabled("view_templates_floor_structural_area_plans"):
-            legacy = _domain_run("view_templates_floor_structural_area_plans", view_templates_floor_structural_area_plans.extract, doc, ctx, contract_domains, run_diag, runner_notes)
-            if legacy is not None:
-                fingerprint["view_templates_floor_structural_area_plans"] = legacy
-
-        if _enabled("view_templates_ceiling_plans"):
-            legacy = _domain_run("view_templates_ceiling_plans", view_templates_ceiling_plans.extract, doc, ctx, contract_domains, run_diag, runner_notes)
-            if legacy is not None:
-                fingerprint["view_templates_ceiling_plans"] = legacy
-
-        if _enabled("view_templates_elevations_sections_detail"):
-            legacy = _domain_run("view_templates_elevations_sections_detail", view_templates_elevations_sections_detail.extract, doc, ctx, contract_domains, run_diag, runner_notes)
-            if legacy is not None:
-                fingerprint["view_templates_elevations_sections_detail"] = legacy
-
-        if _enabled("view_templates_renderings_drafting"):
-            legacy = _domain_run("view_templates_renderings_drafting", view_templates_renderings_drafting.extract, doc, ctx, contract_domains, run_diag, runner_notes)
-            if legacy is not None:
-                fingerprint["view_templates_renderings_drafting"] = legacy
-
-        if _enabled("view_templates_schedules"):
-            legacy = _domain_run("view_templates_schedules", view_templates_schedules.extract, doc, ctx, contract_domains, run_diag, runner_notes)
-            if legacy is not None:
-                fingerprint["view_templates_schedules"] = legacy
-
-        # Routing completeness check: verify all view templates accounted for
-        # across all 5 domains. Emits a runner note if any templates fell through.
-        try:
-            _vt_domains = [
-                "view_templates_floor_structural_area_plans",
-                "view_templates_ceiling_plans",
-                "view_templates_elevations_sections_detail",
-                "view_templates_renderings_drafting",
-                "view_templates_schedules",
-            ]
-            _vt_total_kept = sum(
-                fingerprint.get(d, {}).get("debug_kept", 0)
-                for d in _vt_domains
-            )
-            _vt_raw = fingerprint.get(
-                "view_templates_floor_structural_area_plans", {}
-            ).get("raw_count", 0)
-            _vt_not_template = fingerprint.get(
-                "view_templates_floor_structural_area_plans", {}
-            ).get("debug_not_template", 0)
-            _vt_templates_total = (_vt_raw or 0) - (_vt_not_template or 0)
-            _vt_unrouted = _vt_templates_total - _vt_total_kept
-            if _vt_unrouted > 0:
-                runner_notes.append(
-                    "view_templates: {} template(s) not routed to any domain "
-                    "(unrecognized viewtype)".format(_vt_unrouted)
-                )
-        except Exception:
-            pass
+    except Exception:
+        pass
 
     # Compatibility aliases: merge split domain records into legacy keys
     # so that analysis tools built against the monolithic schema still work.
