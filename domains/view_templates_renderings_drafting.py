@@ -3,7 +3,7 @@
 View Templates - Renderings, 3D Views, and Drafting Views domain extractor.
 
 Domain family: view_templates
-Contains view types: ThreeD, DraftingView (ViewType integers: 4, 10)
+Contains view types: ThreeD (4), DraftingView (10), Rendering (runtime)
 
 Uses integer ViewType comparison (CPython3/pythonnet returns int string from enums).
 Per-template signature pattern: include flags + phase filter + filter stack.
@@ -68,10 +68,28 @@ except Exception:
 
 DOMAIN_NAME = "view_templates_renderings_drafting"
 
+
+def _build_renderings_drafting_viewtype_set():
+    """
+    Build the ViewType integer set for this domain.
+    ThreeD=4, DraftingView=10 from probe data. Rendering resolved at runtime.
+    """
+    vt_set = {4, 10}  # ThreeD=4, DraftingView=10
+    try:
+        from Autodesk.Revit.DB import ViewType
+        ren = getattr(ViewType, "Rendering", None)
+        if ren is not None:
+            vt_set.add(int(ren))
+    except Exception:
+        pass
+    return frozenset(vt_set)
+
+
 # ViewType integers handled by this domain extractor.
 # CPython3/pythonnet returns int string from enum, so we use int() comparison.
-# ThreeD=4, DraftingView=10
-DOMAIN_VIEWTYPE_SET = frozenset({4, 10})
+# ThreeD=4, DraftingView=10, Rendering resolved at runtime.
+# Source: probe_view_templates_2026-02-05.json observed_on_buckets
+DOMAIN_VIEWTYPE_SET = _build_renderings_drafting_viewtype_set()
 
 
 def extract(doc, ctx=None):
