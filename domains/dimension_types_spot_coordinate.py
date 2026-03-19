@@ -2,10 +2,16 @@
 """
 Dimension Types - Spot Coordinate domain extractor.
 
-Fingerprints SpotCoordinate dimension types.
+Fingerprints SpotCoordinate and AlignmentStationLabel dimension types.
 
 Domain family: dimension_types
-Contains shapes: SpotCoordinate
+Contains shapes: SpotCoordinate, AlignmentStationLabel
+
+Shape/family routing: SpotCoordinate and AlignmentStationLabel.
+AlignmentStationLabel is Civil-infrastructure only; parameter surface confirmed
+overlapping with SpotCoordinate in probe data (text placement, symbol, indicator
+fields). Routed here as the closest spot-family sibling.
+Source: probe_dimension_types_2026-02-04.json observed_on_shapes.
 
 Per-record identity: sig_hash (UID-free) derived from identity_items.
 Ordering: order-insensitive (identity_items sorted before hashing)
@@ -51,6 +57,7 @@ from core.dimension_type_helpers import (
     SHAPE_SPOT_COORDINATE,
     SHAPE_SPOT_ELEVATION,
     SHAPE_SPOT_SLOPE,
+    SHAPE_ALIGNMENT_STATION_LABEL,
     FAMILY_SPOT,
 )
 
@@ -61,11 +68,21 @@ except ImportError:
 
 DOMAIN_NAME = "dimension_types_spot_coordinate"
 
-# Shapes handled by this domain
-_HANDLED_SHAPES = frozenset({SHAPE_SPOT_COORDINATE})
+# Shapes handled by this domain.
+# AlignmentStationLabel is Civil infrastructure only — present in Civil projects,
+# absent in architectural. It shares parameter surface with SpotCoordinate
+# (text placement, symbol, indicator fields) per probe data.
+_HANDLED_SHAPES = frozenset({
+    SHAPE_SPOT_COORDINATE,
+    SHAPE_ALIGNMENT_STATION_LABEL,
+})
 
-# Family name expected for user-governed types in this domain
-EXPECTED_FAMILY = "Spot Coordinates"
+# Family names accepted for user-governed types in this domain.
+# "Alignment Station Labels" is the Civil family name for AlignmentStationLabel types.
+ACCEPTED_FAMILIES = frozenset({
+    "Spot Coordinates",
+    "Alignment Station Labels",
+})
 
 
 def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
@@ -210,7 +227,7 @@ def extract(doc, ctx=None):
                         family_name = canon_str(family_name)
             except Exception:
                 pass
-            if family_name and family_name != EXPECTED_FAMILY:
+            if family_name and family_name not in ACCEPTED_FAMILIES:
                 info["debug_wrong_family_excluded"] = info.get("debug_wrong_family_excluded", 0) + 1
                 continue
 
