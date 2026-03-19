@@ -1624,6 +1624,10 @@ def extract_spot_coordinate(doc, ctx=None):
     _HANDLED_SHAPES = _SPOT_COORD_HANDLED
     EXPECTED_FAMILY = _SPOT_COORD_EXPECTED_FAMILY
     DOMAIN_NAME = "dimension_types_spot_coordinate"
+    ACCEPTED_FAMILIES = frozenset({
+        "Spot Coordinates",
+        "Alignment Station Labels",
+    })
     """
     Extract SpotCoordinate dimension types fingerprint.
 

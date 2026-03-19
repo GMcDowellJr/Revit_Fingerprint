@@ -112,33 +112,34 @@ def _semantic_keys_from_identity_items(identity_items):
 
 def _build_floor_structural_area_viewtype_set():
     """
-    Build the ViewType integer set for this domain.
-    FloorPlan=1 is confirmed from probe data.
-    AreaPlan is resolved separately from EngineeringPlan because
-    EngineeringPlan can collide with Section in some Revit versions.
+    Build the ViewType integer set for floor/structural/area plans.
+
+    Probe-confirmed integers only:
+      1 = FloorPlan
+
+    AreaPlan and StructuralPlan are intentionally excluded here because
+    117 collides with Section in this Revit version.
     """
-    vt_set = {1}
-    try:
-        from Autodesk.Revit.DB import ViewType
-        ap = getattr(ViewType, "AreaPlan", None)
-        if ap is not None:
-            vt_set.add(int(ap))
-        else:
-            vt_set.add(117)
-    except Exception:
-        vt_set.add(117)
-    return frozenset(vt_set)
+    return frozenset({1})
 
 
-# ViewType integers handled by this domain extractor.
-# CPython3/pythonnet returns int string from enum, so we use int() comparison.
-# FloorPlan=1, AreaPlan=117, EngineeringPlan/StructuralPlan=resolved at runtime
-# Source: probe_view_templates_2026-02-05.json observed_on_buckets
-DOMAIN_VIEWTYPE_SET = _build_floor_structural_area_viewtype_set()
+def _build_ceiling_plan_viewtype_set():
+    """
+    Build the ViewType integer set for ceiling plans.
+
+    Probe-confirmed integers only:
+      2 = CeilingPlan
+    """
+    return frozenset({2})
+
+
+_FLOOR_STRUCTURAL_AREA_VIEWTYPE_SET = _build_floor_structural_area_viewtype_set()
+_CEILING_PLAN_VIEWTYPE_SET = _build_ceiling_plan_viewtype_set()
 
 
 def extract_floor_structural_area_plans(doc, ctx=None):
     DOMAIN_NAME = "view_templates_floor_structural_area_plans"
+    DOMAIN_VIEWTYPE_SET = _FLOOR_STRUCTURAL_AREA_VIEWTYPE_SET
     """
     Extract view templates fingerprint - Floor Plans and Area Plans only.
 
@@ -609,6 +610,7 @@ def extract_floor_structural_area_plans(doc, ctx=None):
 
 def extract_ceiling_plans(doc, ctx=None):
     DOMAIN_NAME = "view_templates_ceiling_plans"
+    DOMAIN_VIEWTYPE_SET = _CEILING_PLAN_VIEWTYPE_SET
     """
     Extract view templates fingerprint - Ceiling Plans only.
 
@@ -1079,36 +1081,21 @@ def extract_ceiling_plans(doc, ctx=None):
 
 def _build_elevation_section_detail_viewtype_set():
     """
-    Build the ViewType integer set for this domain.
-    Elevation=3 only from probe data. Section and Detail resolved at runtime.
-    ThreeD(4) belongs in renderings_drafting domain.
+    Build the ViewType integer set for elevations/sections/detail.
+
+    Probe-confirmed integers only:
+      3 = Elevation
+      4 = Section
     """
-    vt_set = {3}  # Elevation=3 only
-    try:
-        from Autodesk.Revit.DB import ViewType
-        # Section (ViewType.Section may not exist in all versions)
-        sec = getattr(ViewType, "Section", None)
-        if sec is not None:
-            vt_set.add(int(sec))
-        # Detail views
-        det = getattr(ViewType, "Detail", None)
-        if det is not None:
-            vt_set.add(int(det))
-    except Exception:
-        pass
-    return frozenset(vt_set)
+    return frozenset({3, 4})
 
 
-# ViewType integers handled by this domain extractor.
-# CPython3/pythonnet returns int string from enum, so we use int() comparison.
-# Elevation=3, Section and Detail resolved at runtime (integers vary by Revit version).
-# ThreeD(4) is handled by view_templates_renderings_drafting, not this domain.
-# Source: probe_view_templates_2026-02-05.json observed_on_buckets
-DOMAIN_VIEWTYPE_SET = _build_elevation_section_detail_viewtype_set()
+_ELEVATION_SECTION_DETAIL_VIEWTYPE_SET = _build_elevation_section_detail_viewtype_set()
 
 
 def extract_elevations_sections_detail(doc, ctx=None):
     DOMAIN_NAME = "view_templates_elevations_sections_detail"
+    DOMAIN_VIEWTYPE_SET = _ELEVATION_SECTION_DETAIL_VIEWTYPE_SET
     """
     Extract view templates fingerprint - Elevations only.
 
@@ -1579,29 +1566,23 @@ def extract_elevations_sections_detail(doc, ctx=None):
 
 def _build_renderings_drafting_viewtype_set():
     """
-    Build the ViewType integer set for this domain.
-    ThreeD=4, DraftingView=10 from probe data. Rendering resolved at runtime.
+    Build the ViewType integer set for renderings/drafting.
+
+    Probe-confirmed integers only:
+      10 = DraftingView
+
+    ThreeD is intentionally excluded because it collides with Section in
+    this Revit version, and Rendering is excluded until probe evidence exists.
     """
-    vt_set = {4, 10}  # ThreeD=4, DraftingView=10
-    try:
-        from Autodesk.Revit.DB import ViewType
-        ren = getattr(ViewType, "Rendering", None)
-        if ren is not None:
-            vt_set.add(int(ren))
-    except Exception:
-        pass
-    return frozenset(vt_set)
+    return frozenset({10})
 
 
-# ViewType integers handled by this domain extractor.
-# CPython3/pythonnet returns int string from enum, so we use int() comparison.
-# ThreeD=4, DraftingView=10, Rendering resolved at runtime.
-# Source: probe_view_templates_2026-02-05.json observed_on_buckets
-DOMAIN_VIEWTYPE_SET = _build_renderings_drafting_viewtype_set()
+_RENDERINGS_DRAFTING_VIEWTYPE_SET = _build_renderings_drafting_viewtype_set()
 
 
 def extract_renderings_drafting(doc, ctx=None):
     DOMAIN_NAME = "view_templates_renderings_drafting"
+    DOMAIN_VIEWTYPE_SET = _RENDERINGS_DRAFTING_VIEWTYPE_SET
     """
     Extract view templates fingerprint - 3D Views and Drafting Views only.
 
