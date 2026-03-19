@@ -11,6 +11,79 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## Unreleased
 
+### Changed (hash-breaking — full re-extraction required)
+**Domain family splits (D-015):**
+- `dimension_types` split into 7 domains: `dimension_types_linear`
+  (Linear/LinearFixed/Angular/ArcLength), `dimension_types_angular`,
+  `dimension_types_radial`, `dimension_types_diameter`,
+  `dimension_types_spot_elevation`, `dimension_types_spot_coordinate`,
+  `dimension_types_spot_slope`
+- `object_styles` split into 4 domains by CategoryType tab:
+  `object_styles_model`, `object_styles_annotation`,
+  `object_styles_analytical`, `object_styles_imported`
+- `fill_patterns` split into 2 domains by target:
+  `fill_patterns_drafting`, `fill_patterns_model`. Solid fills
+  (system defaults) excluded from both domains.
+- `view_templates` split into 5 domains by ViewType group:
+  `view_templates_floor_structural_area_plans`,
+  `view_templates_ceiling_plans`,
+  `view_templates_elevations_sections_detail`,
+  `view_templates_renderings_drafting`,
+  `view_templates_schedules`
+
+**Arrowhead record class corrections:**
+- Dot, Diagonal, Box, Loop, Elevation Target, Datum triangle record
+  classes corrected to size-only (tick_size_in only). Previous hashes
+  for these styles incorrectly included tick_mark_centered and
+  heavy_end_pen_weight.
+
+**object_styles join-key correction:**
+- pattern_ref.kind record class gate removed. Was incorrect —
+  pattern_ref.sig_hash moves to optional_items.
+
+**Dimension type policy corrections:**
+- Angular: witness_line_control added to required identity
+  (confirmed active in UI for Angular, not previously included)
+- Radial: radius_symbol_location and radius_symbol_text added
+- Diameter: diameter_symbol_location and diameter_symbol_text added
+- Spot families: shape-specific indicator and placement fields added
+
+**System type exclusion:**
+- Dimension type extractors now exclude system built-in types not
+  accessible in the Revit UI (detected via id-based label fallback
+  and family name gate). These types cannot be governed.
+- Arrowhead extractor now excludes placeholder_missing records
+  (unidentifiable system types).
+- Domain routing bugs fixed: DiameterLinked/Alignment Station Labels
+  excluded from dimension_types_diameter; Diameter types with
+  SpotElevationFixed shape enum correctly routed to diameter domain
+  via family name gate.
+
+### Added
+- `policies/cross_domain_alignment_keys.json` — domain family registry
+  and alignment key definitions
+- `arrowhead.record_class` in coordination_items for all arrowhead records
+- `lp.is_import` in coordination_items for line_patterns records
+- `dim_type.domain_family` in coordination_items for all dimension type records
+- `obj_style.category_type`, `obj_style.domain_family`, `obj_style.is_subcategory`
+  in coordination_items for all object style records
+- `vt.view_type_family`, `vt.view_type_raw` in coordination_items for all
+  view template records
+- `object_styles_annotation` now populates
+  `ctx["object_style_annotation_row_key_to_sig_hash"]` for VCO baseline lookup
+- View category overrides: `vco.include_controlled`, `vco.vg_category_type`,
+  `vco.context_type` added to coordination_items (D-016)
+- View category overrides: category 2 (latent overrides, V/G checkbox unchecked)
+  now captured alongside category 1
+
+### Decisions captured
+- D-015: Domain family architecture — split criteria, vocabulary, alignment key
+  registry
+- D-016: VCO scope — category 1 (template-controlled) and category 2 (latent)
+  implemented; category 3 (view-local) deferred with hooks
+
+---
+
 ### Changed (D-015 — Domain Family Split Architecture)
 
 Domain scope redefined: four monolithic extractors split into 18 per-partition domains.

@@ -617,28 +617,13 @@
     "view_templates_floor_structural_area_plans": {
       "domain_family": "view_templates",
       "allowed_keys": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.view_range_sig_hash",
-        "vt.underlay_orientation",
-        "vt.orientation",
-        "vt.depth_clipping",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash",
-        "vt.color_scheme_sig_hash"
+        "view_template.def_hash"
+      ],
+      "allowed_key_prefixes": [
+        "view_template.sig."
       ],
       "required_keys": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.view_range_sig_hash",
-        "vt.underlay_orientation",
-        "vt.orientation",
-        "vt.depth_clipping",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash",
-        "vt.color_scheme_sig_hash"
+        "view_template.def_hash"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -648,26 +633,13 @@
     "view_templates_ceiling_plans": {
       "domain_family": "view_templates",
       "allowed_keys": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.view_range_sig_hash",
-        "vt.underlay_orientation",
-        "vt.orientation",
-        "vt.depth_clipping",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash"
+        "view_template.def_hash"
+      ],
+      "allowed_key_prefixes": [
+        "view_template.sig."
       ],
       "required_keys": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.view_range_sig_hash",
-        "vt.underlay_orientation",
-        "vt.orientation",
-        "vt.depth_clipping",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash"
+        "view_template.def_hash"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -677,24 +649,13 @@
     "view_templates_elevations_sections_detail": {
       "domain_family": "view_templates",
       "allowed_keys": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.far_clipping",
-        "vt.depth_cueing_sig_hash",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash",
-        "vt.color_scheme_location"
+        "view_template.def_hash"
+      ],
+      "allowed_key_prefixes": [
+        "view_template.sig."
       ],
       "required_keys": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.far_clipping",
-        "vt.depth_cueing_sig_hash",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash",
-        "vt.color_scheme_location"
+        "view_template.def_hash"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -704,22 +665,13 @@
     "view_templates_renderings_drafting": {
       "domain_family": "view_templates",
       "allowed_keys": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.rendering_settings_sig_hash",
-        "vt.background_sig_hash",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash"
+        "view_template.def_hash"
+      ],
+      "allowed_key_prefixes": [
+        "view_template.sig."
       ],
       "required_keys": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.rendering_settings_sig_hash",
-        "vt.background_sig_hash",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash"
+        "view_template.def_hash"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -729,20 +681,13 @@
     "view_templates_schedules": {
       "domain_family": "view_templates",
       "allowed_keys": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.include_vg",
-        "vt.include_filters",
-        "vt.include_appearance"
+        "view_template.def_hash"
+      ],
+      "allowed_key_prefixes": [
+        "view_template.sig."
       ],
       "required_keys": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.include_vg",
-        "vt.include_filters",
-        "vt.include_appearance"
+        "view_template.def_hash"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
