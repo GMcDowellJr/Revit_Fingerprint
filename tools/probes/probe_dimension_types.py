@@ -97,6 +97,47 @@ def _safe_type_name(elem):
     except:
         return None
 
+def _get_family_name_param(dim_type):
+    """
+    Read the family-name parameter using the same lookup path as the extractor.
+    Returns the raw string value or None when the parameter is absent, unreadable,
+    unset, or only whitespace.
+    """
+    def _normalize_param_string(p):
+        if p is None:
+            return None
+        try:
+            if not p.HasValue:
+                return None
+        except Exception:
+            return None
+        try:
+            v = p.AsString()
+        except Exception:
+            return None
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s if s else None
+
+    if dim_type is None:
+        return None
+    # Try BIP first
+    try:
+        v = _normalize_param_string(dim_type.get_Parameter(BuiltInParameter.SYMBOL_FAMILY_NAME_PARAM))
+        if v is not None:
+            return v
+    except Exception:
+        pass
+    # Try LookupParameter as last resort
+    try:
+        v = _normalize_param_string(dim_type.LookupParameter("Family Name"))
+        if v is not None:
+            return v
+    except Exception:
+        pass
+    return None
+
 def _safe_param_def_name(p):
     try:
         d = p.Definition
@@ -797,7 +838,9 @@ for dt in selected:
         synth_crosswalk_rows.append({
             "dim_type.id": _safe(lambda: dt.Id.IntegerValue, None),
             "dim_type.name": _safe(lambda: _safe_type_name(dt), None),
+            "dim_type.family_name_param": _get_family_name_param(dt),
             "dim_type.shape": shape_key,
+            "dim_type.shape_family": shape_family,
             "format_sig.primary": sigs.get("primary"),
             "format_sig.alternate": sigs.get("alternate")
         })
@@ -854,7 +897,44 @@ for t in selected:
             entry["ok_but_unset_count"] += 1
 
         entry["observed_on_shapes"].add(shape_key)
+        entry["observed_on_families"].add(shape_family)
         _maybe_set_example(entry, pv)
+
+    # Explicit family name capture — not always in GetOrderedParameters()
+    fn_val = _get_family_name_param(t)
+    fn_contract = {
+        "q": "ok" if fn_val is not None else "unreadable",
+        "storage": "String",
+        "raw": fn_val,
+        "display": fn_val,
+        "norm": fn_val
+    }
+    pk_fn = "x.dim_type.family_name_param"
+    if pk_fn not in param_index:
+        param_index[pk_fn] = {
+            "storage_types": set(),
+            "q_counts": {"ok": 0, "missing": 0, "unreadable": 0, "unsupported": 0},
+            "ok_but_unset_count": 0,
+            "example": None,
+            "observed_on_shapes": set(),
+            "observed_on_families": set(),
+            "_seen_obs": set(),
+            "unique_value_count": 0
+        }
+    entry = param_index[pk_fn]
+    q = fn_contract.get("q") or "unreadable"
+    st = fn_contract.get("storage")
+    norm = fn_contract.get("norm")
+    obs_sig = (pk_fn, str(st), str(norm))
+    if obs_sig not in entry["_seen_obs"]:
+        entry["_seen_obs"].add(obs_sig)
+        entry["unique_value_count"] += 1
+        if st:
+            entry["storage_types"].add(st)
+        entry["q_counts"][q] = entry["q_counts"].get(q, 0) + 1
+        _maybe_set_example(entry, fn_contract)
+    entry["observed_on_shapes"].add(shape_key)
+    entry["observed_on_families"].add(shape_family)
 
 
 # Emit inventory records (stable order)
