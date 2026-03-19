@@ -467,6 +467,12 @@ def extract(doc, ctx=None):
         label_display = nm if nm else "Arrowhead"
         label_quality = "human" if nm else "placeholder_missing"
 
+        # Exclude unidentifiable system arrowheads — placeholder_missing means
+        # no name could be resolved, making these types ungovernable
+        if label_quality == "placeholder_missing":
+            info["debug_system_types_excluded"] = info.get("debug_system_types_excluded", 0) + 1
+            continue
+
         label = {
             "display": safe_str(label_display),
             "quality": label_quality,
