@@ -808,28 +808,6 @@ def run_fingerprint(doc):
     except Exception:
         pass
 
-    try:
-        _vt_records = []
-        for _dom in ["view_templates.extract_floor_structural_area_plans",
-                     "view_templates.extract_ceiling_plans",
-                     "view_templates.extract_elevations_sections_detail",
-                     "view_templates.extract_renderings_drafting",
-                     "view_templates_schedules"]:
-            _vt_records.extend(fingerprint.get(_dom, {}).get("records", []))
-        if _vt_records:
-            fingerprint["_compat_view_templates"] = {
-                "records": _vt_records,
-                "count": len(_vt_records),
-                "_is_compat_alias": True,
-                "_source_domains": ["view_templates.extract_floor_structural_area_plans",
-                                    "view_templates.extract_ceiling_plans",
-                                    "view_templates.extract_elevations_sections_detail",
-                                    "view_templates.extract_renderings_drafting",
-                                    "view_templates_schedules"],
-            }
-    except Exception:
-        pass
-
     # End total extraction timer
     try:
         _timing.end_timer("total_extraction")
