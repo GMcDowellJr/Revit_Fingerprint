@@ -194,18 +194,19 @@ def extract(doc, ctx=None):
         info["debug_v2_blocked"] = True
         return info
 
-    # Merge model and annotation baseline maps.
-    # Annotation categories (Grids, Revision Clouds, etc.) live in the annotation map.
+    # Build unified baseline map from all object_styles partition ctx maps.
+    # Each partition populates its own ctx key after the domain family split.
     baseline_sig_map = {}
-    baseline_sig_map.update(
-        (ctx or {}).get("object_style_row_key_to_sig_hash", {}) or {}
-    )
-    baseline_sig_map.update(
-        (ctx or {}).get("object_styles_category_to_sig_hash", {}) or {}
-    )
-    baseline_sig_map.update(
-        (ctx or {}).get("object_style_annotation_row_key_to_sig_hash", {}) or {}
-    )
+    for _ctx_key in [
+        "object_style_row_key_to_sig_hash",             # model
+        "object_style_annotation_row_key_to_sig_hash",  # annotation
+        "object_style_analytical_row_key_to_sig_hash",  # analytical
+        "object_style_imported_row_key_to_sig_hash",    # imported
+    ]:
+        baseline_sig_map.update((ctx or {}).get(_ctx_key) or {})
+    if not baseline_sig_map:
+        info["debug_no_baseline_map"] = True
+        # Don't block — degrade individual records where baseline is missing
 
     # Build V/G include-controlled BIP set once
     vg_include_bips = _build_vg_include_bips()
