@@ -610,7 +610,11 @@ def _read_unit_format_info(d):
             accuracy_v, accuracy_q = ("use_default", ITEM_Q_OK)
         else:
             try:
-                unit_format_id_v, unit_format_id_q = canonicalize_str(safe_str(fo.GetUnitTypeId()))
+                forge_type_id_obj = fo.GetUnitTypeId()
+                uid_str = getattr(forge_type_id_obj, "TypeId", None)
+                if uid_str is None:
+                    uid_str = forge_type_id_obj.ToString()
+                unit_format_id_v, unit_format_id_q = canonicalize_str(str(uid_str))
             except Exception:
                 unit_format_id_v, unit_format_id_q = (None, ITEM_Q_UNREADABLE)
 
