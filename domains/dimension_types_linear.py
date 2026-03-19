@@ -229,16 +229,18 @@ def extract(doc, ctx=None):
             required_qs = [
                 shape_q,
                 accuracy_q,
-                witness_q,
+                tick_sig_hash_q,
                 unit_format_id_q,
                 rounding_q,
                 prefix_q,
                 suffix_q,
             ]
+            # witness_line_control: soft-required — only contributes to blocking if
+            # successfully read (q=OK appended to list has no blocking effect; this
+            # pattern ensures the field never blocks on lookup failure)
+            if witness_q == ITEM_Q_OK:
+                required_qs.append(witness_q)
             # text/appearance fields are cross-family alignment, not primary identity — not blocking
-
-            # tick_mark_sig_hash is optional (not all types have tick marks)
-            # So we do NOT add tick_sig_hash_q to required_qs
 
             blocked = any(q != ITEM_Q_OK for q in required_qs)
 

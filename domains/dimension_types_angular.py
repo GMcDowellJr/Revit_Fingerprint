@@ -222,12 +222,13 @@ def extract(doc, ctx=None):
             required_qs = [
                 shape_q,
                 accuracy_q,
-                witness_q,
+                tick_sig_hash_q,
                 unit_format_id_q,
             ]
+            # witness_line_control: soft-required — only contributes when successfully read
+            if witness_q == ITEM_Q_OK:
+                required_qs.append(witness_q)
             # text/appearance fields are cross-family alignment, not primary identity — not blocking
-
-            # tick_mark_sig_hash is optional
             blocked = any(q != ITEM_Q_OK for q in required_qs)
 
             status_reasons = []
