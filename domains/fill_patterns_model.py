@@ -381,16 +381,17 @@ def extract(doc, ctx=None):
 
         if fp is None:
             # Explicit unreadable (GetFillPattern failed)
-            _phase2_add_bool(semantic, "fill_pattern.is_solid", None, unreadable=True)
             _phase2_add_int(semantic, "fill_pattern.grid_count", None, unreadable=True)
+            # is_solid in coordination only (filter criterion, not identity)
+            _phase2_add_bool(coordination, "fill_pattern.is_solid", None, unreadable=True)
         else:
-            # is_solid
+            # is_solid goes to coordination_items only — it is a filter criterion, not identity
             try:
                 is_solid = fp.IsSolidFill
             except Exception:
-                _phase2_add_bool(semantic, "fill_pattern.is_solid", None, unreadable=True)
+                _phase2_add_bool(coordination, "fill_pattern.is_solid", None, unreadable=True)
             else:
-                _phase2_add_bool(semantic, "fill_pattern.is_solid", bool(is_solid))
+                _phase2_add_bool(coordination, "fill_pattern.is_solid", bool(is_solid))
 
             # grid_count
             try:
@@ -577,6 +578,14 @@ def extract(doc, ctx=None):
                 info["debug_skipped_wrong_target"] += 1
                 continue
 
+        # Filter: skip solid fills — system defaults, ungoverned
+        if fp is not None:
+            try:
+                if fp.IsSolidFill:
+                    continue
+            except Exception:
+                pass  # if unreadable, proceed and let field-level q handle it
+
         names.append(name)
 
         # -------------------------
@@ -698,14 +707,9 @@ def extract(doc, ctx=None):
         # Name is carried in label{} and in the phase2 cosmetic surface.
 
         if fp is None:
-            is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
             gc_v, gc_q = (None, ITEM_Q_UNREADABLE)
             gc_i = None
         else:
-            try:
-                is_solid_v, is_solid_q = canonicalize_bool(bool(fp.IsSolidFill))
-            except Exception:
-                is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
             try:
                 gc_i = int(fp.GridCount)
                 gc_v, gc_q = canonicalize_int(gc_i)
@@ -715,9 +719,9 @@ def extract(doc, ctx=None):
 
         # target is always _TARGET_NAME / ITEM_Q_OK - not part of required_qs check
         identity_items_v2.append(make_identity_item("fill_pattern.target", _TARGET_NAME, ITEM_Q_OK))
-        identity_items_v2.append(make_identity_item("fill_pattern.is_solid", is_solid_v, is_solid_q))
+        # is_solid is a filter criterion, not an identity field — omitted from identity_items
         identity_items_v2.append(make_identity_item("fill_pattern.grid_count", gc_v, gc_q))
-        required_qs = [is_solid_q, gc_q]
+        required_qs = [gc_q]
 
         if gc_i and gc_i > 0:
             for i in range(gc_i):
