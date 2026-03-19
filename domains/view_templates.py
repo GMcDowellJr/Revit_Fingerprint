@@ -112,17 +112,20 @@ def _semantic_keys_from_identity_items(identity_items):
 def _build_floor_structural_area_viewtype_set():
     """
     Build the ViewType integer set for this domain.
-    FloorPlan=1, AreaPlan=117 are confirmed from probe data.
-    EngineeringPlan integer is resolved at runtime to handle version variation.
+    FloorPlan=1 is confirmed from probe data.
+    AreaPlan is resolved separately from EngineeringPlan because
+    EngineeringPlan can collide with Section in some Revit versions.
     """
-    vt_set = {1, 117}
+    vt_set = {1}
     try:
         from Autodesk.Revit.DB import ViewType
-        ep = int(ViewType.EngineeringPlan)
-        vt_set.add(ep)
+        ap = getattr(ViewType, "AreaPlan", None)
+        if ap is not None:
+            vt_set.add(int(ap))
+        else:
+            vt_set.add(117)
     except Exception:
-        # If EngineeringPlan is not accessible, 115 is the commonly observed value
-        vt_set.add(115)
+        vt_set.add(117)
     return frozenset(vt_set)
 
 
@@ -134,6 +137,7 @@ DOMAIN_VIEWTYPE_SET = _build_floor_structural_area_viewtype_set()
 
 
 def extract_floor_structural_area_plans(doc, ctx=None):
+    DOMAIN_NAME = "view_templates_floor_structural_area_plans"
     """
     Extract view templates fingerprint - Floor Plans and Area Plans only.
 
@@ -603,6 +607,7 @@ def extract_floor_structural_area_plans(doc, ctx=None):
     return info
 
 def extract_ceiling_plans(doc, ctx=None):
+    DOMAIN_NAME = "view_templates_ceiling_plans"
     """
     Extract view templates fingerprint - Ceiling Plans only.
 
@@ -1102,6 +1107,7 @@ DOMAIN_VIEWTYPE_SET = _build_elevation_section_detail_viewtype_set()
 
 
 def extract_elevations_sections_detail(doc, ctx=None):
+    DOMAIN_NAME = "view_templates_elevations_sections_detail"
     """
     Extract view templates fingerprint - Elevations only.
 
@@ -1594,6 +1600,7 @@ DOMAIN_VIEWTYPE_SET = _build_renderings_drafting_viewtype_set()
 
 
 def extract_renderings_drafting(doc, ctx=None):
+    DOMAIN_NAME = "view_templates_renderings_drafting"
     """
     Extract view templates fingerprint - 3D Views and Drafting Views only.
 
@@ -2075,6 +2082,7 @@ def _is_schedule_view(v):
 
 
 def extract_schedules(doc, ctx=None):
+    DOMAIN_NAME = "view_templates_schedules"
     """
     Extract view templates fingerprint - Schedules only.
 

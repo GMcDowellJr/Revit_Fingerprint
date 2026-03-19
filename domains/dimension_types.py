@@ -124,6 +124,7 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 def extract_linear(doc, ctx=None):
     _HANDLED_SHAPES = _LINEAR_HANDLED
     EXPECTED_FAMILY = _LINEAR_EXPECTED_FAMILY
+    DOMAIN_NAME = "dimension_types_linear"
     """
     Extract Linear/LinearFixed/ArcLength dimension types fingerprint.
 
@@ -394,6 +395,7 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 def extract_angular(doc, ctx=None):
     _HANDLED_SHAPES = _ANGULAR_HANDLED
     EXPECTED_FAMILY = _ANGULAR_EXPECTED_FAMILY
+    DOMAIN_NAME = "dimension_types_angular"
     """
     Extract Angular dimension types fingerprint.
 
@@ -653,6 +655,7 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 def extract_radial(doc, ctx=None):
     _HANDLED_SHAPES = _RADIAL_HANDLED
     EXPECTED_FAMILY = _RADIAL_EXPECTED_FAMILY
+    DOMAIN_NAME = "dimension_types_radial"
     """
     Extract Radial dimension types fingerprint.
 
@@ -932,6 +935,7 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 
 
 def extract_diameter(doc, ctx=None):
+    DOMAIN_NAME = "dimension_types_diameter"
     EXPECTED_FAMILY = _DIAMETER_EXPECTED_FAMILY
     """
     Extract Diameter dimension types fingerprint.
@@ -1259,6 +1263,7 @@ def _read_symbol_name(d, doc):
 def extract_spot_elevation(doc, ctx=None):
     _HANDLED_SHAPES = _SPOT_ELEV_HANDLED
     EXPECTED_FAMILY = _SPOT_ELEV_EXPECTED_FAMILY
+    DOMAIN_NAME = "dimension_types_spot_elevation"
     """
     Extract SpotElevation and SpotElevationFixed dimension types fingerprint.
 
@@ -1615,6 +1620,7 @@ def _read_symbol_name(d, doc):
 def extract_spot_coordinate(doc, ctx=None):
     _HANDLED_SHAPES = _SPOT_COORD_HANDLED
     EXPECTED_FAMILY = _SPOT_COORD_EXPECTED_FAMILY
+    DOMAIN_NAME = "dimension_types_spot_coordinate"
     """
     Extract SpotCoordinate dimension types fingerprint.
 
@@ -1939,6 +1945,7 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 def extract_spot_slope(doc, ctx=None):
     _HANDLED_SHAPES = _SPOT_SLOPE_HANDLED
     EXPECTED_FAMILY = _SPOT_SLOPE_EXPECTED_FAMILY
+    DOMAIN_NAME = "dimension_types_spot_slope"
     """
     Extract SpotSlope dimension types fingerprint.
 

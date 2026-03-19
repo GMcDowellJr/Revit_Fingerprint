@@ -59,6 +59,7 @@ def _collect_fill_patterns(doc, ctx):
 
 def extract_drafting(doc, ctx=None):
     _TARGET_INT = _TARGET_DRAFTING_INT
+    _TARGET_NAME = "Drafting"
     """
     Extract Fill Patterns fingerprint from document.
 
@@ -934,6 +935,7 @@ def extract_drafting(doc, ctx=None):
 
 def extract_model(doc, ctx=None):
     _TARGET_INT = _TARGET_MODEL_INT
+    _TARGET_NAME = "Model"
     """
     Extract Fill Patterns fingerprint from document.
 
