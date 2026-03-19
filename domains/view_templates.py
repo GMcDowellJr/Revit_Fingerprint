@@ -59,6 +59,56 @@ def _collect_templates(doc, ctx):
         ctx[_CTX_TEMPLATES_CACHE_KEY] = col
     return col
 
+
+def _phase2_items_from_def_signature(def_signature):
+    """Convert legacy def_signature entries ('k=v') into IdentityItems safely."""
+    out = []
+    for s in (def_signature or []):
+        try:
+            ss = safe_str(s)
+        except Exception:
+            continue
+        if "=" not in ss:
+            k = "view_template.sig.{}".format(ss)
+            out.append(make_identity_item(k, None, "missing"))
+            continue
+        left, right = ss.split("=", 1)
+        k = "view_template.sig.{}".format(safe_str(left).strip())
+        rr = safe_str(right).strip()
+        if len(rr) >= 2 and ((rr[0] == rr[-1] == "'") or (rr[0] == rr[-1] == '"')):
+            rr = rr[1:-1].strip()
+        if ("|" in rr) and ("=" in rr):
+            parts = [p.strip() for p in rr.split("|") if p.strip()]
+            for part in parts:
+                if "=" not in part:
+                    out.append(make_identity_item("{}.part".format(k), None, "missing"))
+                    continue
+                subk_raw, subv_raw = part.split("=", 1)
+                subk = safe_str(subk_raw).strip()
+                subv = safe_str(subv_raw).strip()
+                if len(subv) >= 2 and ((subv[0] == subv[-1] == "'") or (subv[0] == subv[-1] == '"')):
+                    subv = subv[1:-1].strip()
+                sv, sq = phase2_qv_from_legacy_sentinel_str(subv, allow_empty=True)
+                out.append(make_identity_item("{}.{}".format(k, subk), sv, sq))
+        else:
+            v, q = phase2_qv_from_legacy_sentinel_str(rr, allow_empty=True)
+            out.append(make_identity_item(k, v, q))
+    return phase2_sorted_items(out)
+
+
+def _canonical_identity_items_from_signature(def_hash, def_signature, override_stack_hash=None):
+    items = [make_identity_item("view_template.def_hash", def_hash, ITEM_Q_OK)]
+    if override_stack_hash:
+        items.append(make_identity_item("view_template.category_overrides_def_hash", override_stack_hash, ITEM_Q_OK))
+    items.extend(_phase2_items_from_def_signature(def_signature))
+    return phase2_sorted_items(items)
+
+
+def _semantic_keys_from_identity_items(identity_items):
+    keys = sorted({safe_str(it.get("k", "")) for it in (identity_items or []) if isinstance(it.get("k"), str) and safe_str(it.get("k", "")) and safe_str(it.get("k", "")) != "view_template.def_hash"})
+    return [k for k in keys if k]
+
+
 def _build_floor_structural_area_viewtype_set():
     """
     Build the ViewType integer set for this domain.

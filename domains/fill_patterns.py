@@ -37,6 +37,8 @@ except ImportError:
 
 DEBUG_INCLUDE_FILLPATTERN_SIGNATURES = False
 _CTX_FILL_PATTERNS_CACHE_KEY = "_fill_patterns_cache"
+_TARGET_DRAFTING_INT = 0
+_TARGET_MODEL_INT = 1
 
 
 def _collect_fill_patterns(doc, ctx):
@@ -56,6 +58,7 @@ def _collect_fill_patterns(doc, ctx):
     return col
 
 def extract_drafting(doc, ctx=None):
+    _TARGET_INT = _TARGET_DRAFTING_INT
     """
     Extract Fill Patterns fingerprint from document.
 
@@ -930,6 +933,7 @@ def extract_drafting(doc, ctx=None):
     return info
 
 def extract_model(doc, ctx=None):
+    _TARGET_INT = _TARGET_MODEL_INT
     """
     Extract Fill Patterns fingerprint from document.
 

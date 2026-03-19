@@ -68,6 +68,19 @@ except ImportError:
     DimensionType = None
 
 _CTX_DIM_TYPES_CACHE_KEY = "_dim_types_cache"
+_LINEAR_HANDLED = frozenset({SHAPE_LINEAR, SHAPE_LINEAR_FIXED, SHAPE_ARC_LENGTH})
+_ANGULAR_HANDLED = frozenset({SHAPE_ANGULAR})
+_RADIAL_HANDLED = frozenset({SHAPE_RADIAL})
+_SPOT_ELEV_HANDLED = frozenset({SHAPE_SPOT_ELEVATION})
+_SPOT_COORD_HANDLED = frozenset({SHAPE_SPOT_COORDINATE, SHAPE_ALIGNMENT_STATION_LABEL})
+_SPOT_SLOPE_HANDLED = frozenset({SHAPE_SPOT_SLOPE})
+_LINEAR_EXPECTED_FAMILY = "Linear Dimension Style"
+_ANGULAR_EXPECTED_FAMILY = "Angular Dimension Style"
+_RADIAL_EXPECTED_FAMILY = "Radial Dimension Style"
+_DIAMETER_EXPECTED_FAMILY = "Diameter Dimension Style"
+_SPOT_ELEV_EXPECTED_FAMILY = "Spot Elevations"
+_SPOT_COORD_EXPECTED_FAMILY = "Spot Coordinates"
+_SPOT_SLOPE_EXPECTED_FAMILY = "Spot Slopes"
 
 
 def _collect_dim_types(doc, ctx):
@@ -109,6 +122,8 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 
 
 def extract_linear(doc, ctx=None):
+    _HANDLED_SHAPES = _LINEAR_HANDLED
+    EXPECTED_FAMILY = _LINEAR_EXPECTED_FAMILY
     """
     Extract Linear/LinearFixed/ArcLength dimension types fingerprint.
 
@@ -377,6 +392,8 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 
 
 def extract_angular(doc, ctx=None):
+    _HANDLED_SHAPES = _ANGULAR_HANDLED
+    EXPECTED_FAMILY = _ANGULAR_EXPECTED_FAMILY
     """
     Extract Angular dimension types fingerprint.
 
@@ -634,6 +651,8 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 
 
 def extract_radial(doc, ctx=None):
+    _HANDLED_SHAPES = _RADIAL_HANDLED
+    EXPECTED_FAMILY = _RADIAL_EXPECTED_FAMILY
     """
     Extract Radial dimension types fingerprint.
 
@@ -913,6 +932,7 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 
 
 def extract_diameter(doc, ctx=None):
+    EXPECTED_FAMILY = _DIAMETER_EXPECTED_FAMILY
     """
     Extract Diameter dimension types fingerprint.
 
@@ -1237,6 +1257,8 @@ def _read_symbol_name(d, doc):
 
 
 def extract_spot_elevation(doc, ctx=None):
+    _HANDLED_SHAPES = _SPOT_ELEV_HANDLED
+    EXPECTED_FAMILY = _SPOT_ELEV_EXPECTED_FAMILY
     """
     Extract SpotElevation and SpotElevationFixed dimension types fingerprint.
 
@@ -1591,6 +1613,8 @@ def _read_symbol_name(d, doc):
 
 
 def extract_spot_coordinate(doc, ctx=None):
+    _HANDLED_SHAPES = _SPOT_COORD_HANDLED
+    EXPECTED_FAMILY = _SPOT_COORD_EXPECTED_FAMILY
     """
     Extract SpotCoordinate dimension types fingerprint.
 
@@ -1913,6 +1937,8 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 
 
 def extract_spot_slope(doc, ctx=None):
+    _HANDLED_SHAPES = _SPOT_SLOPE_HANDLED
+    EXPECTED_FAMILY = _SPOT_SLOPE_EXPECTED_FAMILY
     """
     Extract SpotSlope dimension types fingerprint.
 

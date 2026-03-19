@@ -90,7 +90,7 @@ def _matches_category_type(cat, kind):
     if kind == "analytical":
         return _is_analytical_category_type(ct)
     if kind == "imported":
-        return ct == CategoryType.Import
+        return ct == getattr(CategoryType, "ImportInstance", getattr(CategoryType, "Imported", None))
     return False
 
 
