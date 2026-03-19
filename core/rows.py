@@ -55,6 +55,30 @@ def _as_string(p):
     return None
 
 
+def _as_value_string(p):
+    """
+    Extract display value from a parameter using AsValueString().
+
+    Unlike _as_string() which only works for String StorageType, this works
+    for Integer/enum params (e.g. Text Orientation, Text Location, Witness Line
+    Control, Slope Direction) by returning the enum's display label.
+
+    Args:
+        p: Parameter object
+
+    Returns:
+        Display string value or None if not available
+    """
+    try:
+        if p and p.HasValue:
+            s = p.AsValueString()
+            if s is not None:
+                return safe_str(s)
+    except Exception:
+        pass
+    return None
+
+
 def _as_double(p):
     """
     Extract double value from a parameter.

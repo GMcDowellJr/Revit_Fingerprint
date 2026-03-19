@@ -22,7 +22,7 @@ if repo_root not in sys.path:
 
 from core.hashing import make_hash, safe_str
 from core.collect import collect_types
-from core.rows import first_param, _as_string, _as_double, _as_int, format_len_inches
+from core.rows import first_param, _as_string, _as_value_string, _as_double, _as_int, format_len_inches
 from core.canon import canon_str, S_MISSING, S_UNREADABLE
 from core.record_v2 import (
     canonicalize_str,
@@ -172,11 +172,12 @@ def extract(doc, ctx=None):
             # Witness line control (required for all shapes in this domain)
             witness_v, witness_q = (None, ITEM_Q_MISSING)
             try:
-                p_wit = first_param(d, ui_names=["Witness Line Control"])
+                p_wit = first_param(d, ui_names=["Witness Line Control", "Witness line control"])
                 if p_wit is None:
                     witness_v, witness_q = (None, ITEM_Q_MISSING)
                 else:
-                    witness_raw = _as_string(p_wit)
+                    # Witness Line Control is Integer/enum — must use AsValueString(), not AsString()
+                    witness_raw = _as_value_string(p_wit)
                     if witness_raw is not None and witness_raw.strip() == "":
                         witness_v, witness_q = (None, ITEM_Q_MISSING)
                     else:

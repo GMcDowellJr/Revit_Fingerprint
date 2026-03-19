@@ -30,6 +30,7 @@ from core.canon import canon_str, S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE
 from core.rows import (
     first_param,
     _as_string,
+    _as_value_string,
     _as_double,
     _as_int,
     format_len_inches,
@@ -473,11 +474,11 @@ def _build_text_appearance_items(d):
         wf_v, wf_q = (None, ITEM_Q_UNREADABLE)
     items.append(make_identity_item("dim_type.text_width_factor", wf_v, wf_q))
 
-    # text_background
+    # text_background (storage=Integer/enum — use AsValueString; probe shows display='Opaque')
     try:
         p_bg = first_param(d, ui_names=["Text Background"])
-        bg_raw = _as_string(p_bg) if p_bg is not None else None
-        bg_v, bg_q = canonicalize_str_allow_empty(bg_raw)
+        bg_raw = _as_value_string(p_bg) if p_bg is not None else None
+        bg_v, bg_q = canonicalize_str(bg_raw)
     except Exception:
         bg_v, bg_q = (None, ITEM_Q_UNREADABLE)
     items.append(make_identity_item("dim_type.text_background", bg_v, bg_q))

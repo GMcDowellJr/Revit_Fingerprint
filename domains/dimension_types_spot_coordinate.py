@@ -21,7 +21,7 @@ if repo_root not in sys.path:
 
 from core.hashing import make_hash, safe_str
 from core.collect import collect_types
-from core.rows import first_param, _as_string, _as_int, get_element_display_name
+from core.rows import first_param, _as_string, _as_value_string, _as_int, get_element_display_name
 from core.canon import canon_str, S_MISSING, S_UNREADABLE
 from core.record_v2 import (
     canonicalize_str,
@@ -199,21 +199,21 @@ def extract(doc, ctx=None):
              _rounding_v, _rounding_q,
              _accuracy_v, _accuracy_q) = _read_unit_format_info(d)
 
-            # Top Coordinate
+            # Top Coordinate (storage=Integer/enum, display='North / South' — use AsValueString)
             top_coordinate_v, top_coordinate_q = (None, ITEM_Q_MISSING)
             try:
-                p_tc = first_param(d, ui_names=["Top Value", "Top Coordinate"])
-                tc_raw = _as_string(p_tc) if p_tc is not None else None
-                top_coordinate_v, top_coordinate_q = canonicalize_str_allow_empty(tc_raw)
+                p_tc = first_param(d, ui_names=["Top Coordinate", "Top Value"])
+                tc_raw = _as_value_string(p_tc) if p_tc is not None else None
+                top_coordinate_v, top_coordinate_q = canonicalize_str(tc_raw)
             except Exception:
                 top_coordinate_v, top_coordinate_q = (None, ITEM_Q_UNREADABLE)
 
-            # Bottom Coordinate
+            # Bottom Coordinate (storage=Integer/enum, display='East / West' — use AsValueString)
             bottom_coordinate_v, bottom_coordinate_q = (None, ITEM_Q_MISSING)
             try:
-                p_bc = first_param(d, ui_names=["Bottom Value", "Bottom Coordinate"])
-                bc_raw = _as_string(p_bc) if p_bc is not None else None
-                bottom_coordinate_v, bottom_coordinate_q = canonicalize_str_allow_empty(bc_raw)
+                p_bc = first_param(d, ui_names=["Bottom Coordinate", "Bottom Value"])
+                bc_raw = _as_value_string(p_bc) if p_bc is not None else None
+                bottom_coordinate_v, bottom_coordinate_q = canonicalize_str(bc_raw)
             except Exception:
                 bottom_coordinate_v, bottom_coordinate_q = (None, ITEM_Q_UNREADABLE)
 
@@ -262,21 +262,21 @@ def extract(doc, ctx=None):
             except Exception:
                 indicator_prefix_v, indicator_prefix_q = (None, ITEM_Q_UNREADABLE)
 
-            # Text Orientation
+            # Text Orientation (storage=Integer/enum — use AsValueString)
             text_orientation_v, text_orientation_q = (None, ITEM_Q_MISSING)
             try:
                 p_to = first_param(d, ui_names=["Text Orientation"])
-                to_raw = _as_string(p_to) if p_to is not None else None
-                text_orientation_v, text_orientation_q = canonicalize_str_allow_empty(to_raw)
+                to_raw = _as_value_string(p_to) if p_to is not None else None
+                text_orientation_v, text_orientation_q = canonicalize_str(to_raw)
             except Exception:
                 text_orientation_v, text_orientation_q = (None, ITEM_Q_UNREADABLE)
 
-            # Text Location / Note Location
+            # Text Location (storage=Integer/enum — use AsValueString; probe name is "Text Location")
             text_location_v, text_location_q = (None, ITEM_Q_MISSING)
             try:
-                p_tl = first_param(d, ui_names=["Note Location", "Text Location"])
-                tl_raw = _as_string(p_tl) if p_tl is not None else None
-                text_location_v, text_location_q = canonicalize_str_allow_empty(tl_raw)
+                p_tl = first_param(d, ui_names=["Text Location", "Note Location"])
+                tl_raw = _as_value_string(p_tl) if p_tl is not None else None
+                text_location_v, text_location_q = canonicalize_str(tl_raw)
             except Exception:
                 text_location_v, text_location_q = (None, ITEM_Q_UNREADABLE)
 

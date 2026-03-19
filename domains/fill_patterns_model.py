@@ -350,6 +350,7 @@ def extract(doc, ctx=None):
     def _phase2_build_phase2(name, uid, elem_id_str, fp, elem):
         semantic = []
         cosmetic = []
+        coordination = []
         unknown = []
 
         # cosmetic
@@ -538,7 +539,7 @@ def extract(doc, ctx=None):
             "grouping_basis": "phase2.hypothesis",
             "semantic_items": phase2_sorted_items(semantic_reduced),
             "cosmetic_items": phase2_sorted_items(cosmetic),
-            "coordination_items": phase2_sorted_items([]),
+            "coordination_items": phase2_sorted_items(coordination),
             "unknown_items": phase2_sorted_items(unknown),
         }
 

@@ -21,7 +21,7 @@ if repo_root not in sys.path:
 
 from core.hashing import make_hash, safe_str
 from core.collect import collect_types
-from core.rows import first_param, _as_string, _as_double
+from core.rows import first_param, _as_string, _as_value_string, _as_double
 from core.canon import canon_str, S_MISSING, S_UNREADABLE
 from core.record_v2 import (
     canonicalize_str,
@@ -153,12 +153,13 @@ def extract(doc, ctx=None):
              _rounding_v, _rounding_q,
              _accuracy_v, _accuracy_q) = _read_unit_format_info(d)
 
-            # Slope Direction / Read Convention
+            # Slope Direction / Read Convention (storage=Integer/enum — use AsValueString)
             slope_direction_v, slope_direction_q = (None, ITEM_Q_MISSING)
             try:
                 p_sd = first_param(d, ui_names=["Slope Direction", "Read Convention"])
-                sd_raw = _as_string(p_sd) if p_sd is not None else None
-                slope_direction_v, slope_direction_q = canonicalize_str_allow_empty(sd_raw)
+                # Probe confirms storage=Integer (display='Down') — must use AsValueString
+                sd_raw = _as_value_string(p_sd) if p_sd is not None else None
+                slope_direction_v, slope_direction_q = canonicalize_str(sd_raw)
             except Exception:
                 slope_direction_v, slope_direction_q = (None, ITEM_Q_UNREADABLE)
 
