@@ -49,8 +49,6 @@ from core.dimension_type_helpers import (
     _read_unit_format_info,
     _fmt_in_from_ft,
     get_type_display_name,
-    SHAPE_DIAMETER,
-    SHAPE_DIAMETER_LINKED,
     SHAPE_SPOT_ELEVATION,
     SHAPE_SPOT_COORDINATE,
     SHAPE_SPOT_SLOPE,
@@ -64,11 +62,10 @@ except ImportError:
 
 DOMAIN_NAME = "dimension_types_diameter"
 
-# Shapes handled by this domain
-# DiameterLinked is a system type for civil/linked assembly dimensions — excluded
-_HANDLED_SHAPES = frozenset({SHAPE_DIAMETER})
-
-# Family name expected for user-governed types in this domain
+# Family name expected for user-governed types in this domain.
+# NOTE: Shape-based filtering is intentionally absent. Revit's DimensionStyleType enum
+# maps some Diameter types to SpotElevationFixed (enum integer collision). The family name
+# is the only authoritative signal for this domain.
 EXPECTED_FAMILY = "Diameter Dimension Style"
 
 
@@ -96,7 +93,7 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 
 def extract(doc, ctx=None):
     """
-    Extract Diameter and DiameterLinked dimension types fingerprint.
+    Extract Diameter dimension types fingerprint.
 
     Args:
         doc: Revit Document
@@ -155,9 +152,9 @@ def extract(doc, ctx=None):
                 d, shape_v, shape_family, shape_q, type_name
             )
 
-            # Filter: skip shapes not handled by this domain
-            if shape_v not in _HANDLED_SHAPES:
-                continue
+            # Note: no shape-based filter here. Revit's DimensionStyleType enum maps
+            # some Diameter types to SpotElevationFixed (integer collision in the enum).
+            # Family name is the sole authoritative gate for this domain.
 
             # Exclude confirmed wrong-family types (e.g. Alignment Station Labels)
             family_name = None
