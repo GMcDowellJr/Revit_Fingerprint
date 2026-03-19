@@ -711,7 +711,6 @@ def run_fingerprint(doc):
     try:
         require_domain(contract_domains, "phase_filters")
         require_domain(contract_domains, "view_filter_definitions")
-        require_domain(contract_domains, "view_category_overrides")
     except Blocked as b:
         _vt_deps_ok = False
         for _vt_dn in [
