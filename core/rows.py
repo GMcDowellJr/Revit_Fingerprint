@@ -169,6 +169,40 @@ def format_len_inches(feet_val):
             return None
 
 
+def _canon_rgb(v):
+    """
+    Canonicalize a color value to a stable "r-g-b" string.
+
+    Accepts:
+      - dict with "r", "g", "b" keys (from try_get_color_rgb_from_elem)
+      - list/tuple of 3 integers
+      - string already in "r-g-b" format
+
+    Returns:
+      str "r-g-b" or safe_str fallback
+    """
+    if v is None:
+        return None
+    if isinstance(v, dict):
+        try:
+            r = int(v.get("r", 0))
+            g = int(v.get("g", 0))
+            b = int(v.get("b", 0))
+            return "{}-{}-{}".format(r, g, b)
+        except Exception:
+            return safe_str(v)
+    if isinstance(v, (list, tuple)) and len(v) == 3:
+        try:
+            r, g, b = [int(x) for x in v]
+            return "{}-{}-{}".format(r, g, b)
+        except Exception:
+            return safe_str(v)
+    s = safe_str(v)
+    if isinstance(s, str) and s.count("-") == 2:
+        return s
+    return s
+
+
 def try_get_color_rgb_from_elem(elem):
     """
     Extract color from an element as both integer and RGB dict.

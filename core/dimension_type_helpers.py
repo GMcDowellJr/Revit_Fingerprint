@@ -35,6 +35,7 @@ from core.rows import (
     format_len_inches,
     try_get_color_rgb_from_elem,
     get_element_display_name,
+    _canon_rgb,
 )
 from core.record_v2 import (
     canonicalize_str,
@@ -481,11 +482,12 @@ def _build_text_appearance_items(d):
         bg_v, bg_q = (None, ITEM_Q_UNREADABLE)
     items.append(make_identity_item("dim_type.text_background", bg_v, bg_q))
 
-    # color_rgb
+    # color_rgb — canonicalize dict to "r-g-b" string before storing
     try:
-        _color_int, color_rgb_str = try_get_color_rgb_from_elem(d)
+        _color_int, color_rgb_raw = try_get_color_rgb_from_elem(d)
+        color_rgb_str = _canon_rgb(color_rgb_raw)
         if color_rgb_str is not None:
-            color_v, color_q = canonicalize_str(safe_str(color_rgb_str))
+            color_v, color_q = canonicalize_str(color_rgb_str)
         else:
             color_v, color_q = (None, ITEM_Q_MISSING)
     except Exception:
