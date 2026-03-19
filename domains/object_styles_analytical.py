@@ -360,20 +360,20 @@ def extract(doc, ctx=None):
     # else: 0 records is valid — no analytical categories in this model
     # hash_v2 stays None, debug_v2_blocked stays False (not an error)
 
-    # Export baseline map for downstream domains
+    # Export partition ctx maps for VCO baseline lookup
     if ctx is not None:
-        category_to_sig_hash = {}
-        for rec in (info.get("records") or []):
-            for item in (rec.get("identity_basis", {}).get("items", []) or []):
-                if item.get("k") == "obj_style.row_key":
-                    key = item.get("v")
-                    sig_hash = rec.get("sig_hash")
-                    if key and sig_hash:
-                        category_to_sig_hash[key] = sig_hash
-                    break
-        existing = ctx.get("object_styles_category_to_sig_hash", {})
-        existing.update(category_to_sig_hash)
-        ctx["object_styles_category_to_sig_hash"] = existing
+        _row_key_to_sig = {}
+        _records_by_sig = {}
+        for _rec in info.get("records", []):
+            _items = {_it["k"]: _it for _it in _rec.get("identity_basis", {}).get("items", [])}
+            _rk = _items.get("obj_style.row_key", {})
+            if _rk.get("q") == ITEM_Q_OK and _rk.get("v"):
+                _sig = _rec.get("sig_hash")
+                if _sig:
+                    _row_key_to_sig[_rk["v"]] = _sig
+                    _records_by_sig[_sig] = _rec
+        ctx["object_style_analytical_row_key_to_sig_hash"] = _row_key_to_sig
+        ctx["object_styles_analytical_records"] = _records_by_sig
 
     info["record_rows"] = [
         {"record_key": safe_str(r.get("record_id", "")), "sig_hash": r.get("sig_hash", None)}

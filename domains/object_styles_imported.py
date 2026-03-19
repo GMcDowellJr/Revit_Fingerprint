@@ -347,6 +347,21 @@ def extract(doc, ctx=None):
     # else: 0 records is valid — no imported categories (CAD imports) in this model
     # hash_v2 stays None, debug_v2_blocked stays False (not an error)
 
+    # Export partition ctx maps for VCO baseline lookup
+    if ctx is not None:
+        _row_key_to_sig = {}
+        _records_by_sig = {}
+        for _rec in info.get("records", []):
+            _items = {_it["k"]: _it for _it in _rec.get("identity_basis", {}).get("items", [])}
+            _rk = _items.get("obj_style.row_key", {})
+            if _rk.get("q") == ITEM_Q_OK and _rk.get("v"):
+                _sig = _rec.get("sig_hash")
+                if _sig:
+                    _row_key_to_sig[_rk["v"]] = _sig
+                    _records_by_sig[_sig] = _rec
+        ctx["object_style_imported_row_key_to_sig_hash"] = _row_key_to_sig
+        ctx["object_styles_imported_records"] = _records_by_sig
+
     info["record_rows"] = [
         {"record_key": safe_str(r.get("record_id", "")), "sig_hash": r.get("sig_hash", None)}
         for r in info["records"]
