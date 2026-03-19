@@ -372,7 +372,7 @@
         "dim_type.bottom_indicator_as_prefix_suffix",
         "dim_type.text_orientation",
         "dim_type.text_location",
-        "dim_type.symbol_sig_hash",
+        "dim_type.symbol_name",
         "dim_type.leader_arrowhead_sig_hash",
         "dim_type.text_font",
         "dim_type.text_size_in",
@@ -395,7 +395,7 @@
         "dim_type.bottom_indicator_as_prefix_suffix",
         "dim_type.text_orientation",
         "dim_type.text_location",
-        "dim_type.symbol_sig_hash"
+        "dim_type.symbol_name"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -416,7 +416,7 @@
         "dim_type.indicator_as_prefix_suffix",
         "dim_type.text_orientation",
         "dim_type.text_location",
-        "dim_type.symbol_sig_hash",
+        "dim_type.symbol_name",
         "dim_type.leader_arrowhead_sig_hash",
         "dim_type.text_font",
         "dim_type.text_size_in",
@@ -440,7 +440,7 @@
         "dim_type.indicator_as_prefix_suffix",
         "dim_type.text_orientation",
         "dim_type.text_location",
-        "dim_type.symbol_sig_hash"
+        "dim_type.symbol_name"
       ],
       "minima": {
         "block_if_any_required_not_ok": true

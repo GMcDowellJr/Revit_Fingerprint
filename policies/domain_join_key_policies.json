@@ -396,7 +396,7 @@
         "dim_type.bottom_indicator_as_prefix_suffix",
         "dim_type.text_orientation",
         "dim_type.text_location",
-        "dim_type.symbol_sig_hash"
+        "dim_type.symbol_name"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
@@ -427,7 +427,7 @@
         "dim_type.indicator_as_prefix_suffix",
         "dim_type.text_orientation",
         "dim_type.text_location",
-        "dim_type.symbol_sig_hash"
+        "dim_type.symbol_name"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [

@@ -229,8 +229,7 @@ def extract(doc, ctx=None):
                 radius_symbol_text_q,
                 unit_format_id_q,
             ]
-            for it in text_items:
-                required_qs.append(it.get("q", ITEM_Q_MISSING))
+            # text/appearance fields are cross-family alignment, not primary identity — not blocking
 
             blocked = any(q != ITEM_Q_OK for q in required_qs)
 

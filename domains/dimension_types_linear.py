@@ -172,15 +172,15 @@ def extract(doc, ctx=None):
             # Witness line control (required for all shapes in this domain)
             witness_v, witness_q = (None, ITEM_Q_MISSING)
             try:
-                p_wit = first_param(d, ui_names=["Witness Line Control"])
+                p_wit = first_param(d, bip_names=["DIM_WITNESS_LINE_CONTROL"], ui_names=["Witness Line Control"])
                 if p_wit is None:
                     witness_v, witness_q = (None, ITEM_Q_MISSING)
                 else:
                     witness_raw = _as_string(p_wit)
-                    if witness_raw is not None:
-                        witness_v, witness_q = canonicalize_str_allow_empty(witness_raw)
+                    if witness_raw is not None and witness_raw.strip() == "":
+                        witness_v, witness_q = (None, ITEM_Q_MISSING)
                     else:
-                        witness_v, witness_q = ("", ITEM_Q_OK)
+                        witness_v, witness_q = canonicalize_str(witness_raw)
             except Exception:
                 witness_v, witness_q = (None, ITEM_Q_UNREADABLE)
 
@@ -211,9 +211,7 @@ def extract(doc, ctx=None):
                 prefix_q,
                 suffix_q,
             ]
-            # text/appearance fields - add them all as required
-            for it in text_items:
-                required_qs.append(it.get("q", ITEM_Q_MISSING))
+            # text/appearance fields are cross-family alignment, not primary identity — not blocking
 
             # tick_mark_sig_hash is optional (not all types have tick marks)
             # So we do NOT add tick_sig_hash_q to required_qs

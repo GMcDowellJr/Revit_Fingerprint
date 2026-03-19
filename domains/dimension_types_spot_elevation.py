@@ -87,14 +87,14 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
     return (shape_v, shape_family, shape_q)
 
 
-def _read_symbol_sig_hash(d, doc):
+def _read_symbol_name(d, doc):
     """
-    Try to read a "Spot Symbol" or "Symbol" parameter that references a loaded family.
-    If ElementId > 0, resolve element and use its name as the hash input.
-    Returns (symbol_sig_hash_v, symbol_sig_hash_q).
+    Try to read the "Symbol" parameter that references a loaded family.
+    If ElementId > 0, resolve element and return its name directly.
+    Returns (symbol_name_v, symbol_name_q).
     """
     try:
-        p_sym = first_param(d, ui_names=["Spot Symbol", "Symbol"])
+        p_sym = first_param(d, ui_names=["Symbol"])
         if p_sym is None:
             return (None, ITEM_Q_MISSING)
 
@@ -107,35 +107,27 @@ def _read_symbol_sig_hash(d, doc):
         except Exception:
             return (None, ITEM_Q_UNREADABLE)
 
-        if eid is None or getattr(eid, "IntegerValue", 0) <= 0:
+        if eid is None or getattr(eid, "IntegerValue", -1) <= 0:
             return (None, ITEM_Q_MISSING)
 
-        elem = None
+        sym_elem = None
         try:
-            elem = doc.GetElement(eid)
+            sym_elem = doc.GetElement(eid)
         except Exception:
             return (None, ITEM_Q_UNREADABLE)
 
-        if elem is None:
+        if sym_elem is None:
             return (None, ITEM_Q_MISSING)
 
-        name = None
+        sym_name = None
         try:
-            name = get_element_display_name(elem)
+            sym_name = getattr(sym_elem, "Name", None)
         except Exception:
             pass
 
-        if not name:
-            try:
-                name = safe_str(getattr(elem, "Name", None))
-            except Exception:
-                pass
-
-        if name:
-            sym_hash = make_hash([safe_str(name)])
-            return (sym_hash, ITEM_Q_OK)
-        else:
-            return (None, ITEM_Q_MISSING)
+        if sym_name:
+            return canonicalize_str(str(sym_name))
+        return (None, ITEM_Q_MISSING)
 
     except Exception:
         return (None, ITEM_Q_UNREADABLE)
@@ -220,43 +212,43 @@ def extract(doc, ctx=None):
             # Elevation Indicator as Prefix/Suffix
             elev_ind_prefix_v, elev_ind_prefix_q = (None, ITEM_Q_MISSING)
             try:
-                p_eip = first_param(d, ui_names=["Indicator as Prefix/Suffix", "Elevation Indicator as Prefix/Suffix"])
+                p_eip = first_param(d, ui_names=["Elevation Indicator as Prefix/Suffix", "Elevation Indicator as Prefix/S"])
                 eip_int = _as_int(p_eip) if p_eip is not None else None
                 elev_ind_prefix_v, elev_ind_prefix_q = canonicalize_bool(eip_int)
             except Exception:
                 elev_ind_prefix_v, elev_ind_prefix_q = (None, ITEM_Q_UNREADABLE)
 
-            # Top Value indicator
+            # Top Indicator
             top_indicator_v, top_indicator_q = (None, ITEM_Q_MISSING)
             try:
-                p_top = first_param(d, ui_names=["Top Value", "Top Indicator"])
+                p_top = first_param(d, ui_names=["Top Indicator"])
                 top_raw = _as_string(p_top) if p_top is not None else None
                 top_indicator_v, top_indicator_q = canonicalize_str_allow_empty(top_raw)
             except Exception:
                 top_indicator_v, top_indicator_q = (None, ITEM_Q_UNREADABLE)
 
-            # Bottom Value indicator
+            # Bottom Indicator
             bottom_indicator_v, bottom_indicator_q = (None, ITEM_Q_MISSING)
             try:
-                p_bot = first_param(d, ui_names=["Bottom Value", "Bottom Indicator"])
+                p_bot = first_param(d, ui_names=["Bottom Indicator"])
                 bot_raw = _as_string(p_bot) if p_bot is not None else None
                 bottom_indicator_v, bottom_indicator_q = canonicalize_str_allow_empty(bot_raw)
             except Exception:
                 bottom_indicator_v, bottom_indicator_q = (None, ITEM_Q_UNREADABLE)
 
-            # Top Value as Prefix/Suffix
+            # Top Indicator as Prefix/Suffix
             top_ind_prefix_v, top_ind_prefix_q = (None, ITEM_Q_MISSING)
             try:
-                p_tip = first_param(d, ui_names=["Top Value as Prefix/Suffix"])
+                p_tip = first_param(d, ui_names=["Top Indicator as Prefix/Suffix"])
                 tip_int = _as_int(p_tip) if p_tip is not None else None
                 top_ind_prefix_v, top_ind_prefix_q = canonicalize_bool(tip_int)
             except Exception:
                 top_ind_prefix_v, top_ind_prefix_q = (None, ITEM_Q_UNREADABLE)
 
-            # Bottom Value as Prefix/Suffix
+            # Bottom Indicator as Prefix/Suffix
             bot_ind_prefix_v, bot_ind_prefix_q = (None, ITEM_Q_MISSING)
             try:
-                p_bip = first_param(d, ui_names=["Bottom Value as Prefix/Suffix"])
+                p_bip = first_param(d, ui_names=["Bottom Indicator as Prefix/Suffix", "Bottom Indicator as Prefix/Suf"])
                 bip_int = _as_int(p_bip) if p_bip is not None else None
                 bot_ind_prefix_v, bot_ind_prefix_q = canonicalize_bool(bip_int)
             except Exception:
@@ -280,8 +272,8 @@ def extract(doc, ctx=None):
             except Exception:
                 text_location_v, text_location_q = (None, ITEM_Q_UNREADABLE)
 
-            # Symbol sig hash
-            symbol_sig_hash_v, symbol_sig_hash_q = _read_symbol_sig_hash(d, doc)
+            # Symbol name (ElementId resolved to name; no ctx map available for sig_hash)
+            symbol_name_v, symbol_name_q = _read_symbol_name(d, doc)
 
             # --- Build identity items ---
             core_items = [
@@ -295,7 +287,7 @@ def extract(doc, ctx=None):
                 make_identity_item("dim_type.bottom_indicator_as_prefix_suffix", bot_ind_prefix_v, bot_ind_prefix_q),
                 make_identity_item("dim_type.text_orientation", text_orientation_v, text_orientation_q),
                 make_identity_item("dim_type.text_location", text_location_v, text_location_q),
-                make_identity_item("dim_type.symbol_sig_hash", symbol_sig_hash_v, symbol_sig_hash_q),
+                make_identity_item("dim_type.symbol_name", symbol_name_v, symbol_name_q),
             ]
 
             text_items = _build_text_appearance_items(d)
@@ -315,10 +307,9 @@ def extract(doc, ctx=None):
                 bot_ind_prefix_q,
                 text_orientation_q,
                 text_location_q,
-                symbol_sig_hash_q,
+                symbol_name_q,
             ]
-            for it in text_items:
-                required_qs.append(it.get("q", ITEM_Q_MISSING))
+            # text/appearance fields are cross-family alignment, not primary identity — not blocking
 
             blocked = any(q != ITEM_Q_OK for q in required_qs)
 
