@@ -275,11 +275,13 @@ def extract(doc, ctx=None):
                 )
 
                 # coordination_items
+                _CATEGORY_TYPE_LABELS = {1: "Model", 2: "Annotation", 3: "AnalyticalModel", 4: "Imported"}
                 try:
-                    cat_type_str = safe_str(getattr(cat_obj, "CategoryType", None))
+                    cat_type_int = int(cat_obj.CategoryType)
+                    cat_type_label = _CATEGORY_TYPE_LABELS.get(cat_type_int, safe_str(cat_type_int))
+                    ct_v, ct_q = canonicalize_str(cat_type_label)
                 except Exception:
-                    cat_type_str = None
-                ct_v, ct_q = phase2_qv_from_legacy_sentinel_str(cat_type_str, allow_empty=False)
+                    ct_v, ct_q = (None, ITEM_Q_UNREADABLE)
                 try:
                     _is_sub = row_name != "self"
                     is_sub_v, is_sub_q = ("true" if _is_sub else "false"), ITEM_Q_OK
