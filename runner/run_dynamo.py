@@ -363,7 +363,15 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
         if "raw_count" in quality:
             domain_diag["raw_count"] = quality["raw_count"]
 
-        if require_v2_hash and domain_status == contracts.DOMAIN_STATUS_OK and hash_value is None:
+        # Empty-population exemption: if the domain explicitly emits raw_count=0 and
+        # hash_v2=None with debug_v2_blocked=False, that is a valid "no content" state —
+        # not a hash failure.  Only block on no_semantic_hash when raw_count > 0 (i.e. the
+        # domain had candidates but produced no hash, which is a genuine problem).
+        _raw_count = quality.get("raw_count", None)
+        _empty_population = (_raw_count is not None and _raw_count == 0
+                             and not bool((legacy or {}).get("debug_v2_blocked", True)))
+
+        if require_v2_hash and domain_status == contracts.DOMAIN_STATUS_OK and hash_value is None and not _empty_population:
             domain_status = contracts.DOMAIN_STATUS_BLOCKED
             if v2_reasons:
                 block_reasons = sorted({str(k) for k in v2_reasons.keys()})
