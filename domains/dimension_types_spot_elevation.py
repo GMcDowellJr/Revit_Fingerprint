@@ -296,18 +296,15 @@ def extract(doc, ctx=None):
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
             # Required qualities for blocking
+            # prefix/suffix indicators, symbol_name are optional enrichment — not blocking
             required_qs = [
                 shape_q,
                 unit_format_id_q,
                 elevation_indicator_q,
-                elev_ind_prefix_q,
                 top_indicator_q,
                 bottom_indicator_q,
-                top_ind_prefix_q,
-                bot_ind_prefix_q,
                 text_orientation_q,
                 text_location_q,
-                symbol_name_q,
             ]
             # text/appearance fields are cross-family alignment, not primary identity — not blocking
 

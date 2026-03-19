@@ -187,7 +187,7 @@ def extract(doc, ctx=None):
             # Radius symbol location
             radius_symbol_location_v, radius_symbol_location_q = (None, ITEM_Q_MISSING)
             try:
-                p_rsl = first_param(d, ui_names=["Radius Symbol Location"])
+                p_rsl = first_param(d, ui_names=["Radius Symbol Location", "Symbol Location"])
                 rsl_raw = _as_string(p_rsl) if p_rsl is not None else None
                 radius_symbol_location_v, radius_symbol_location_q = canonicalize_str_allow_empty(rsl_raw)
             except Exception:
@@ -220,13 +220,12 @@ def extract(doc, ctx=None):
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
             # Required qualities for blocking
+            # radius_symbol_location, radius_symbol_text are optional enrichment — not blocking
             required_qs = [
                 shape_q,
                 accuracy_q,
                 center_marks_q,
                 center_mark_size_q,
-                radius_symbol_location_q,
-                radius_symbol_text_q,
                 unit_format_id_q,
             ]
             # text/appearance fields are cross-family alignment, not primary identity — not blocking

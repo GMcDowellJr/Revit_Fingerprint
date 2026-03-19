@@ -188,11 +188,11 @@ def extract(doc, ctx=None):
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
             # Required qualities for blocking
+            # leader_line_length is optional enrichment — not blocking
             required_qs = [
                 shape_q,
                 unit_format_id_q,
                 slope_direction_q,
-                leader_line_length_q,
             ]
             # text/appearance fields are cross-family alignment, not primary identity — not blocking
 

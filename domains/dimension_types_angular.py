@@ -165,7 +165,7 @@ def extract(doc, ctx=None):
             # Witness line control (Angular dimensions expose witness_line_control per spec)
             witness_v, witness_q = (None, ITEM_Q_MISSING)
             try:
-                p_wit = first_param(d, bip_names=["DIM_WITNESS_LINE_CONTROL"], ui_names=["Witness Line Control"])
+                p_wit = first_param(d, ui_names=["Witness Line Control"])
                 if p_wit is None:
                     witness_v, witness_q = (None, ITEM_Q_MISSING)
                 else:
@@ -195,14 +195,12 @@ def extract(doc, ctx=None):
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
             # Required qualities for blocking
+            # rounding, prefix, suffix are optional enrichment — not blocking for Angular
             required_qs = [
                 shape_q,
                 accuracy_q,
                 witness_q,
                 unit_format_id_q,
-                rounding_q,
-                prefix_q,
-                suffix_q,
             ]
             # text/appearance fields are cross-family alignment, not primary identity — not blocking
 

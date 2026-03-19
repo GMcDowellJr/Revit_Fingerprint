@@ -172,7 +172,7 @@ def extract(doc, ctx=None):
             # Witness line control (required for all shapes in this domain)
             witness_v, witness_q = (None, ITEM_Q_MISSING)
             try:
-                p_wit = first_param(d, bip_names=["DIM_WITNESS_LINE_CONTROL"], ui_names=["Witness Line Control"])
+                p_wit = first_param(d, ui_names=["Witness Line Control"])
                 if p_wit is None:
                     witness_v, witness_q = (None, ITEM_Q_MISSING)
                 else:

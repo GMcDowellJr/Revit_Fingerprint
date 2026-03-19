@@ -187,7 +187,7 @@ def extract(doc, ctx=None):
             # Diameter symbol location
             diameter_symbol_location_v, diameter_symbol_location_q = (None, ITEM_Q_MISSING)
             try:
-                p_dsl = first_param(d, ui_names=["Diameter Symbol Location"])
+                p_dsl = first_param(d, ui_names=["Diameter Symbol Location", "Symbol Location"])
                 dsl_raw = _as_string(p_dsl) if p_dsl is not None else None
                 diameter_symbol_location_v, diameter_symbol_location_q = canonicalize_str_allow_empty(dsl_raw)
             except Exception:
@@ -220,13 +220,12 @@ def extract(doc, ctx=None):
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
             # Required qualities for blocking
+            # diameter_symbol_location, diameter_symbol_text are optional enrichment — not blocking
             required_qs = [
                 shape_q,
                 accuracy_q,
                 center_marks_q,
                 center_mark_size_q,
-                diameter_symbol_location_q,
-                diameter_symbol_text_q,
                 unit_format_id_q,
             ]
             # text/appearance fields are cross-family alignment, not primary identity — not blocking

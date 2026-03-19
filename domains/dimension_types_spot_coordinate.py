@@ -305,6 +305,7 @@ def extract(doc, ctx=None):
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
             # Required qualities for blocking
+            # include_elevation, elevation_indicator, indicator_prefix, symbol_name are optional — not blocking
             required_qs = [
                 shape_q,
                 unit_format_id_q,
@@ -312,12 +313,8 @@ def extract(doc, ctx=None):
                 bottom_coordinate_q,
                 north_south_indicator_q,
                 east_west_indicator_q,
-                include_elevation_q,
-                elevation_indicator_q,
-                indicator_prefix_q,
                 text_orientation_q,
                 text_location_q,
-                symbol_name_q,
             ]
             # text/appearance fields are cross-family alignment, not primary identity — not blocking
 
