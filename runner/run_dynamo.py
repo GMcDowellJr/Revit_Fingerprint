@@ -808,25 +808,6 @@ def run_fingerprint(doc):
     except Exception:
         pass
 
-    # Compatibility aliases: merge split domain records into legacy keys
-    # so that analysis tools built against the monolithic schema still work.
-    # These are read-only views — they do not affect any hashes.
-    try:
-        _os_records = []
-        for _dom in ["object_styles_model", "object_styles_annotation",
-                     "object_styles_analytical", "object_styles_imported"]:
-            _os_records.extend(fingerprint.get(_dom, {}).get("records", []))
-        if _os_records:
-            fingerprint["_compat_object_styles"] = {
-                "records": _os_records,
-                "count": len(_os_records),
-                "_is_compat_alias": True,
-                "_source_domains": ["object_styles_model", "object_styles_annotation",
-                                    "object_styles_analytical", "object_styles_imported"],
-            }
-    except Exception:
-        pass
-
     try:
         _vt_records = []
         for _dom in ["view_templates.extract_floor_structural_area_plans",
