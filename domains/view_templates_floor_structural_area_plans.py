@@ -144,7 +144,6 @@ def extract(doc, ctx=None):
     # CRITICAL DEPENDENCIES - view templates cannot work without these
     try:
         require_domain(ctx_map.get("_domains", {}), "object_styles_model")
-        require_domain(ctx_map.get("_domains", {}), "view_category_overrides")
         require_domain(ctx_map.get("_domains", {}), "phase_filters")
         require_domain(ctx_map.get("_domains", {}), "view_filter_definitions")
         require_domain(ctx_map.get("_domains", {}), "line_patterns")
