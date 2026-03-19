@@ -230,11 +230,16 @@ class TestJoinKeyPolicyStructure:
         for dom in split_domains:
             assert dom in policies["domains"], "{} missing from policies".format(dom)
 
-        # Each split domain must have a join_key_schema starting with the domain name.
+        # Each split domain must have a join_key_schema.
+        # Split view_template domains share the "view_templates.join_key.v1" schema
+        # because they share the same join key semantics (view_template.def_hash).
         for dom in split_domains:
             pol = policies["domains"][dom]
             assert "join_key_schema" in pol
-            assert pol["join_key_schema"].startswith(dom)
+            schema = pol["join_key_schema"]
+            assert schema.startswith(dom) or schema == "view_templates.join_key.v1", (
+                "{}: unexpected schema {}".format(dom, schema)
+            )
 
 
 # ============================================================

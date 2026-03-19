@@ -589,141 +589,103 @@
       ]
     },
     "view_templates_floor_structural_area_plans": {
-      "join_key_schema": "view_templates_floor_structural_area_plans.join_key.v1",
+      "join_key_schema": "view_templates.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.view_range_sig_hash",
-        "vt.underlay_orientation",
-        "vt.orientation",
-        "vt.depth_clipping",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash",
-        "vt.color_scheme_sig_hash"
+        "view_template.def_hash"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
-        "vt.name",
-        "vt.uid",
-        "vt.element_id",
-        "vt.view_type",
-        "vt.is_schedule"
+        "view_template.name",
+        "view_template.uid",
+        "view_template.element_id",
+        "view_template.category_overrides_def_hash"
       ],
       "notes": [
-        "Domain family: view_templates.",
-        "Contains: ViewType.FloorPlan, ViewType.EngineeringPlan (Structural), ViewType.AreaPlan.",
-        "View Range, Orientation, Depth Clipping applicable.",
-        "Rendering Settings NOT applicable."
+        "Split domain: same join key policy as monolithic view_templates.",
+        "view_template.def_hash captures complete behavioral definition.",
+        "Domain family routing is handled by coordination_items.vt.view_type_family, not by the join key.",
+        "Contains: ViewType.FloorPlan, ViewType.EngineeringPlan (Structural), ViewType.AreaPlan."
       ]
     },
     "view_templates_ceiling_plans": {
-      "join_key_schema": "view_templates_ceiling_plans.join_key.v1",
+      "join_key_schema": "view_templates.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.view_range_sig_hash",
-        "vt.underlay_orientation",
-        "vt.orientation",
-        "vt.depth_clipping",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash"
+        "view_template.def_hash"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
-        "vt.name",
-        "vt.uid",
-        "vt.element_id",
-        "vt.view_type",
-        "vt.is_schedule"
+        "view_template.name",
+        "view_template.uid",
+        "view_template.element_id",
+        "view_template.category_overrides_def_hash"
       ],
       "notes": [
-        "Domain family: view_templates.",
-        "Contains: ViewType.CeilingPlan.",
-        "Same structure as floor plans except no Color Scheme field."
+        "Split domain: same join key policy as monolithic view_templates.",
+        "view_template.def_hash captures complete behavioral definition.",
+        "Domain family routing is handled by coordination_items.vt.view_type_family, not by the join key.",
+        "Contains: ViewType.CeilingPlan."
       ]
     },
     "view_templates_elevations_sections_detail": {
-      "join_key_schema": "view_templates_elevations_sections_detail.join_key.v1",
+      "join_key_schema": "view_templates.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.far_clipping",
-        "vt.depth_cueing_sig_hash",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash",
-        "vt.color_scheme_location"
+        "view_template.def_hash"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
-        "vt.name",
-        "vt.uid",
-        "vt.element_id",
-        "vt.view_type",
-        "vt.is_schedule"
+        "view_template.name",
+        "view_template.uid",
+        "view_template.element_id",
+        "view_template.category_overrides_def_hash"
       ],
       "notes": [
-        "Domain family: view_templates.",
-        "Contains: ViewType.Elevation, ViewType.Section, ViewType.Detail.",
-        "No View Range, no Orientation.",
-        "Far Clipping and Depth Cueing present instead."
+        "Split domain: same join key policy as monolithic view_templates.",
+        "view_template.def_hash captures complete behavioral definition.",
+        "Domain family routing is handled by coordination_items.vt.view_type_family, not by the join key.",
+        "Contains: ViewType.Elevation, ViewType.Section, ViewType.Detail."
       ]
     },
     "view_templates_renderings_drafting": {
-      "join_key_schema": "view_templates_renderings_drafting.join_key.v1",
+      "join_key_schema": "view_templates.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.rendering_settings_sig_hash",
-        "vt.background_sig_hash",
-        "vt.vg_model_categories_sig_hash",
-        "vt.vg_annotation_categories_sig_hash"
+        "view_template.def_hash"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
-        "vt.name",
-        "vt.uid",
-        "vt.element_id",
-        "vt.view_type",
-        "vt.is_schedule"
+        "view_template.name",
+        "view_template.uid",
+        "view_template.element_id",
+        "view_template.category_overrides_def_hash"
       ],
       "notes": [
-        "Domain family: view_templates.",
-        "Contains: ViewType.ThreeD, ViewType.Rendering, ViewType.DraftingView.",
-        "Rendering Settings and Background applicable.",
-        "No View Range, no Orientation, no Depth Clipping."
+        "Split domain: same join key policy as monolithic view_templates.",
+        "view_template.def_hash captures complete behavioral definition.",
+        "Domain family routing is handled by coordination_items.vt.view_type_family, not by the join key.",
+        "Contains: ViewType.ThreeD, ViewType.Rendering, ViewType.DraftingView."
       ]
     },
     "view_templates_schedules": {
-      "join_key_schema": "view_templates_schedules.join_key.v1",
+      "join_key_schema": "view_templates.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "vt.view_type_family",
-        "vt.phase_filter_sig_hash",
-        "vt.filter_stack_sig_hash",
-        "vt.include_vg",
-        "vt.include_filters",
-        "vt.include_appearance"
+        "view_template.def_hash"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
-        "vt.name",
-        "vt.uid",
-        "vt.element_id",
-        "vt.view_type",
-        "vt.is_schedule"
+        "view_template.name",
+        "view_template.uid",
+        "view_template.element_id",
+        "view_template.category_overrides_def_hash"
       ],
       "notes": [
-        "Domain family: view_templates.",
-        "Contains: ViewType.Schedule, ViewType.PanelSchedule.",
-        "Schedule templates expose only include flags and phase filter — minimal surface."
+        "Split domain: same join key policy as monolithic view_templates.",
+        "view_template.def_hash captures complete behavioral definition.",
+        "Domain family routing is handled by coordination_items.vt.view_type_family, not by the join key.",
+        "Contains: ViewType.Schedule, ViewType.PanelSchedule."
       ]
     }
   }
