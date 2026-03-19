@@ -354,14 +354,11 @@ def extract(doc, ctx=None):
     if v2_any_blocked:
         info["debug_v2_blocked"] = True
         info["debug_v2_block_reasons"] = {"one_or_more_records_blocked": True}
-
-    if (not v2_any_blocked) and info["signature_hashes_v2"]:
-        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
-    else:
-        if (not v2_any_blocked) and (not info["signature_hashes_v2"]):
-            info["debug_v2_blocked"] = True
-            info["debug_v2_block_reasons"] = {"no_v2_records": True}
         info["hash_v2"] = None
+    elif info["signature_hashes_v2"]:
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
+    # else: 0 records is valid — no analytical categories in this model
+    # hash_v2 stays None, debug_v2_blocked stays False (not an error)
 
     # Export baseline map for downstream domains
     if ctx is not None:
