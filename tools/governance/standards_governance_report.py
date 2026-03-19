@@ -58,11 +58,12 @@ class StandardsGovernanceAnalyzer:
         category_baselines: Dict[str, List[Dict[str, str]]] = defaultdict(list)
 
         for project in self.projects:
-            records = (
-                project.data.get("domains", {})
-                .get("object_styles", {})
-                .get("records", [])
+            _os_data = (
+                project.data.get("_compat_object_styles")
+                or project.data.get("domains", {}).get("object_styles", {})
+                or {}
             )
+            records = _os_data.get("records", [])
             for rec in records:
                 row_key = _get_identity_value(rec, "obj_style.row_key")
                 sig_hash = rec.get("sig_hash")
@@ -101,11 +102,12 @@ class StandardsGovernanceAnalyzer:
         canonical_baselines = self._get_canonical_baselines()
 
         for project in self.projects:
-            templates = (
-                project.data.get("domains", {})
-                .get("view_templates", {})
-                .get("records", [])
+            _vt_data = (
+                project.data.get("_compat_view_templates")
+                or project.data.get("domains", {}).get("view_templates", {})
+                or {}
             )
+            templates = _vt_data.get("records", [])
             for template in templates:
                 template_name = template.get("label", "Unknown")
                 items = template.get("identity_basis", {}).get("items", [])
@@ -150,11 +152,12 @@ class StandardsGovernanceAnalyzer:
         template_patterns: Dict[str, List[Dict[str, str]]] = defaultdict(list)
 
         for project in self.projects:
-            templates = (
-                project.data.get("domains", {})
-                .get("view_templates", {})
-                .get("records", [])
+            _vt_data = (
+                project.data.get("_compat_view_templates")
+                or project.data.get("domains", {}).get("view_templates", {})
+                or {}
             )
+            templates = _vt_data.get("records", [])
             for template in templates:
                 template_name = template.get("label", "Unknown")
                 sig_hash = template.get("sig_hash")
@@ -199,11 +202,12 @@ class StandardsGovernanceAnalyzer:
         category_baselines: Dict[str, List[str]] = defaultdict(list)
 
         for project in self.projects:
-            records = (
-                project.data.get("domains", {})
-                .get("object_styles", {})
-                .get("records", [])
+            _os_data = (
+                project.data.get("_compat_object_styles")
+                or project.data.get("domains", {}).get("object_styles", {})
+                or {}
             )
+            records = _os_data.get("records", [])
             for rec in records:
                 row_key = _get_identity_value(rec, "obj_style.row_key")
                 sig_hash = rec.get("sig_hash")

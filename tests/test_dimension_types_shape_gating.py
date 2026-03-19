@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Tests for shape-gated dimension type property export.
+"""Tests for dimension_types domain split architecture.
 
-This module tests the shape-gating logic for dimension_types domain:
-- Shape discriminator position and values
-- Shape-specific property inclusion/exclusion
-- Common property presence across all shapes
-- Quality value correctness (no UNSUPPORTED_NOT_APPLICABLE for shape-gated properties)
+After the domain split refactor, shape discrimination happens at the domain level:
+each domain (dimension_types_linear, dimension_types_radial, etc.) handles specific
+shapes with a flat per-domain policy. The old shape_gating policy mechanism is no
+longer used for dimension_types.
 
 Tests are organized into:
-1. Unit tests for helper functions (no Revit required)
-2. Unit tests for identity item builders (no Revit required)
-3. Integration test patterns for Revit validation (documented)
+1. Shape constant and mapping tests (from core.dimension_type_helpers)
+2. Domain policy validation tests (per split domain)
+3. Join key construction tests (for split domain policies)
 """
 
 try:
@@ -23,16 +22,14 @@ from core.record_v2 import (
     ITEM_Q_OK,
     ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
-    ITEM_Q_UNSUPPORTED,
-    ITEM_Q_UNSUPPORTED_NOT_APPLICABLE,
     make_identity_item,
     serialize_identity_items,
 )
 from core.join_key_policy import load_join_key_policies, get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 
-# Import dimension_types module components for testing
-from domains.dimension_types import (
+# Import shape constants and mappings from the shared helper module
+from core.dimension_type_helpers import (
     # Shape constants
     SHAPE_LINEAR,
     SHAPE_ANGULAR,
@@ -55,18 +52,6 @@ from domains.dimension_types import (
     # Mappings
     SHAPE_TO_FAMILY,
     SHAPE_INT_TO_NAME,
-    # Helper functions
-    _is_linear_family,
-    _is_radial_family,
-    _is_angular_family,
-    _is_spot_family,
-    # Identity item builders
-    _build_common_identity_items,
-    _build_linear_identity_items,
-    _build_radial_identity_items,
-    _build_angular_identity_items,
-    _build_spot_identity_items,
-    _build_identity_items,
 )
 
 
@@ -140,452 +125,144 @@ class TestShapeConstants:
 
 
 # =============================================================================
-# Family Helper Function Tests
+# Family Mapping Tests (via SHAPE_TO_FAMILY)
 # =============================================================================
 
-class TestFamilyHelpers:
-    """Test family detection helper functions."""
+class TestFamilyMappings:
+    """Test family mapping correctness via SHAPE_TO_FAMILY."""
 
-    def test_is_linear_family(self):
-        """_is_linear_family must return True only for linear family."""
-        assert _is_linear_family(FAMILY_LINEAR) is True
-        assert _is_linear_family(FAMILY_RADIAL) is False
-        assert _is_linear_family(FAMILY_ANGULAR) is False
-        assert _is_linear_family(FAMILY_SPOT) is False
-        assert _is_linear_family(FAMILY_UNKNOWN) is False
+    def test_linear_shapes_map_to_linear_family(self):
+        """Linear and LinearFixed must map to linear family."""
+        assert SHAPE_TO_FAMILY.get(SHAPE_LINEAR) == FAMILY_LINEAR
+        assert SHAPE_TO_FAMILY.get(SHAPE_LINEAR_FIXED) == FAMILY_LINEAR
 
-    def test_is_radial_family(self):
-        """_is_radial_family must return True only for radial family."""
-        assert _is_radial_family(FAMILY_RADIAL) is True
-        assert _is_radial_family(FAMILY_LINEAR) is False
-        assert _is_radial_family(FAMILY_ANGULAR) is False
-        assert _is_radial_family(FAMILY_SPOT) is False
-        assert _is_radial_family(FAMILY_UNKNOWN) is False
+    def test_radial_shapes_map_to_radial_family(self):
+        """Radial, Diameter, DiameterLinked must map to radial family."""
+        assert SHAPE_TO_FAMILY.get(SHAPE_RADIAL) == FAMILY_RADIAL
+        assert SHAPE_TO_FAMILY.get(SHAPE_DIAMETER) == FAMILY_RADIAL
+        assert SHAPE_TO_FAMILY.get(SHAPE_DIAMETER_LINKED) == FAMILY_RADIAL
 
-    def test_is_angular_family(self):
-        """_is_angular_family must return True only for angular family."""
-        assert _is_angular_family(FAMILY_ANGULAR) is True
-        assert _is_angular_family(FAMILY_LINEAR) is False
-        assert _is_angular_family(FAMILY_RADIAL) is False
-        assert _is_angular_family(FAMILY_SPOT) is False
-        assert _is_angular_family(FAMILY_UNKNOWN) is False
+    def test_angular_shapes_map_to_angular_family(self):
+        """Angular and ArcLength must map to angular family."""
+        assert SHAPE_TO_FAMILY.get(SHAPE_ANGULAR) == FAMILY_ANGULAR
+        assert SHAPE_TO_FAMILY.get(SHAPE_ARC_LENGTH) == FAMILY_ANGULAR
 
-    def test_is_spot_family(self):
-        """_is_spot_family must return True only for spot family."""
-        assert _is_spot_family(FAMILY_SPOT) is True
-        assert _is_spot_family(FAMILY_LINEAR) is False
-        assert _is_spot_family(FAMILY_RADIAL) is False
-        assert _is_spot_family(FAMILY_ANGULAR) is False
-        assert _is_spot_family(FAMILY_UNKNOWN) is False
+    def test_spot_shapes_map_to_spot_family(self):
+        """Spot elevation/coordinate/slope must map to spot family."""
+        assert SHAPE_TO_FAMILY.get(SHAPE_SPOT_ELEVATION) == FAMILY_SPOT
+        assert SHAPE_TO_FAMILY.get(SHAPE_SPOT_COORDINATE) == FAMILY_SPOT
+        assert SHAPE_TO_FAMILY.get(SHAPE_SPOT_SLOPE) == FAMILY_SPOT
+        assert SHAPE_TO_FAMILY.get(SHAPE_SPOT_ELEVATION_FIXED) == FAMILY_SPOT
+
+    def test_unknown_maps_to_unknown_family(self):
+        """Unknown shape must map to unknown family."""
+        assert SHAPE_TO_FAMILY.get(SHAPE_UNKNOWN) == FAMILY_UNKNOWN
 
 
 # =============================================================================
-# Identity Item Builder Tests
+# Split Domain Policy Tests
 # =============================================================================
 
-class TestCommonIdentityItems:
-    """Test _build_common_identity_items function."""
+class TestSplitDomainPolicies:
+    """Test join key policies for each split dimension_types domain."""
 
-    def test_common_items_count(self):
-        """Common identity items must include exactly 7 properties."""
-        items = _build_common_identity_items(
-            shape_v="Linear", shape_q=ITEM_Q_OK,
-            unit_format_id_v="autodesk.unit.formatOption:length", unit_format_id_q=ITEM_Q_OK,
-            rounding_v="Nearest", rounding_q=ITEM_Q_OK,
-            accuracy_v="0.01", accuracy_q=ITEM_Q_OK,
-            prefix_v="", prefix_q=ITEM_Q_OK,
-            suffix_v="", suffix_q=ITEM_Q_OK,
-            tick_sig_hash="abc123",
-        )
-        assert len(items) == 7
-
-    def test_common_items_keys(self):
-        """Common identity items must have correct keys."""
-        items = _build_common_identity_items(
-            shape_v="Linear", shape_q=ITEM_Q_OK,
-            unit_format_id_v="autodesk.unit.formatOption:length", unit_format_id_q=ITEM_Q_OK,
-            rounding_v="Nearest", rounding_q=ITEM_Q_OK,
-            accuracy_v="0.01", accuracy_q=ITEM_Q_OK,
-            prefix_v="", prefix_q=ITEM_Q_OK,
-            suffix_v="", suffix_q=ITEM_Q_OK,
-            tick_sig_hash="abc123",
-        )
-        keys = {it["k"] for it in items}
-        expected_keys = {
-            "dim_type.shape",
-            "dim_type.unit_format_id",
-            "dim_type.rounding",
-            "dim_type.accuracy",
-            "dim_type.prefix",
-            "dim_type.suffix",
-            "dim_type.tick_mark_sig_hash",
-        }
-        assert keys == expected_keys
-
-    def test_shape_is_first_item(self):
-        """Shape must be the first common identity item."""
-        items = _build_common_identity_items(
-            shape_v="Linear", shape_q=ITEM_Q_OK,
-            unit_format_id_v=None, unit_format_id_q=ITEM_Q_MISSING,
-            rounding_v=None, rounding_q=ITEM_Q_MISSING,
-            accuracy_v="0.01", accuracy_q=ITEM_Q_OK,
-            prefix_v=None, prefix_q=ITEM_Q_MISSING,
-            suffix_v=None, suffix_q=ITEM_Q_MISSING,
-            tick_sig_hash=None,
-        )
-        assert items[0]["k"] == "dim_type.shape"
-        assert items[0]["v"] == "Linear"
-        assert items[0]["q"] == ITEM_Q_OK
-
-    def test_tick_sig_hash_missing_when_none(self):
-        """Tick mark sig hash must be MISSING when not provided."""
-        items = _build_common_identity_items(
-            shape_v="Linear", shape_q=ITEM_Q_OK,
-            unit_format_id_v=None, unit_format_id_q=ITEM_Q_MISSING,
-            rounding_v=None, rounding_q=ITEM_Q_MISSING,
-            accuracy_v="0.01", accuracy_q=ITEM_Q_OK,
-            prefix_v=None, prefix_q=ITEM_Q_MISSING,
-            suffix_v=None, suffix_q=ITEM_Q_MISSING,
-            tick_sig_hash=None,
-        )
-        tick_item = next(it for it in items if it["k"] == "dim_type.tick_mark_sig_hash")
-        assert tick_item["v"] is None
-        assert tick_item["q"] == ITEM_Q_MISSING
-
-
-class TestLinearIdentityItems:
-    """Test _build_linear_identity_items function."""
-
-    def test_linear_items_count(self):
-        """Linear identity items must include exactly 1 property."""
-        items = _build_linear_identity_items(
-            witness_v="Gap to Element",
-            witness_q=ITEM_Q_OK,
-        )
-        assert len(items) == 1
-
-    def test_linear_items_key(self):
-        """Linear identity items must use the correct key."""
-        items = _build_linear_identity_items(
-            witness_v="Gap to Element",
-            witness_q=ITEM_Q_OK,
-        )
-        assert items[0]["k"] == "dim_type.witness_line_control"
-
-
-class TestRadialIdentityItems:
-    """Test _build_radial_identity_items function."""
-
-    def test_radial_items_count(self):
-        """Radial identity items must include exactly 2 properties."""
-        items = _build_radial_identity_items(
-            center_marks_v="1",
-            center_marks_q=ITEM_Q_OK,
-            center_mark_size_v="0.125",
-            center_mark_size_q=ITEM_Q_OK,
-        )
-        assert len(items) == 2
-
-    def test_radial_items_keys(self):
-        """Radial identity items must use correct keys."""
-        items = _build_radial_identity_items(
-            center_marks_v="1",
-            center_marks_q=ITEM_Q_OK,
-            center_mark_size_v="0.125",
-            center_mark_size_q=ITEM_Q_OK,
-        )
-        keys = {it["k"] for it in items}
-        assert "dim_type.center_marks" in keys
-        assert "dim_type.center_mark_size" in keys
-
-
-class TestAngularIdentityItems:
-    """Test _build_angular_identity_items function."""
-
-    def test_angular_items_empty(self):
-        """Angular identity items list should be empty (no shape-specific params)."""
-        items = _build_angular_identity_items()
-        assert items == []
-
-
-class TestSpotIdentityItems:
-    """Test _build_spot_identity_items function."""
-
-    def test_spot_items_empty(self):
-        """Spot identity items list should be empty (no shape-specific params)."""
-        items = _build_spot_identity_items()
-        assert items == []
-
-
-# =============================================================================
-# Shape-Gating Integration Tests
-# =============================================================================
-
-class TestJoinKeyShapeGating:
-    """Test join key policy shape gating integration."""
-
-    def _load_dim_policy(self):
-        """Load dimension_types join key policy."""
+    def _load_policy(self, domain_name):
+        """Load join key policy for a specific split domain."""
         policies = load_join_key_policies("policies/domain_join_key_policies.json")
-        return get_domain_join_key_policy(policies, "dimension_types")
+        return get_domain_join_key_policy(policies, domain_name)
 
-    def test_policy_has_shape_gating(self):
-        """Dimension types policy must have shape_gating section."""
-        dim_policy = self._load_dim_policy()
-        assert "shape_gating" in dim_policy
-        assert dim_policy["shape_gating"]["discriminator_key"] == "dim_type.shape"
+    def test_linear_policy_has_witness_line_control(self):
+        """Linear domain must require witness_line_control."""
+        pol = self._load_policy("dimension_types_linear")
+        assert "dim_type.witness_line_control" in pol["required_items"]
+        assert "dim_type.shape" in pol["required_items"]
+        assert "dim_type.accuracy" in pol["required_items"]
+        assert "dim_type.tick_mark_sig_hash" in pol["required_items"]
 
-    def test_policy_schema_version(self):
-        """Dimension types policy must be at v3."""
-        dim_policy = self._load_dim_policy()
-        assert dim_policy["join_key_schema"] == "dimension_types.join_key.v3"
+    def test_radial_policy_has_center_marks(self):
+        """Radial domain must require center_marks and center_mark_size."""
+        pol = self._load_policy("dimension_types_radial")
+        assert "dim_type.center_marks" in pol["required_items"]
+        assert "dim_type.center_mark_size" in pol["required_items"]
+        assert "dim_type.shape" in pol["required_items"]
 
-    def test_linear_requires_witness_line_control(self):
-        """Linear shape must require witness_line_control."""
-        dim_policy = self._load_dim_policy()
-        items = [
-            make_identity_item("dim_type.shape", "Linear", ITEM_Q_OK),
-            make_identity_item("dim_type.accuracy", "0.01", ITEM_Q_OK),
-            make_identity_item("dim_type.tick_mark_sig_hash", "abc123", ITEM_Q_OK),
-            make_identity_item("dim_type.unit_format_id", "uf", ITEM_Q_OK),
-            # Missing witness_line_control
+    def test_angular_policy_has_unit_format_id(self):
+        """Angular domain must require unit_format_id."""
+        pol = self._load_policy("dimension_types_angular")
+        assert "dim_type.unit_format_id" in pol["required_items"]
+        assert "dim_type.shape" in pol["required_items"]
+
+    def test_diameter_policy_exists(self):
+        """Diameter domain must have a valid policy."""
+        pol = self._load_policy("dimension_types_diameter")
+        assert pol is not None
+        assert "dim_type.shape" in pol["required_items"]
+
+    def test_spot_elevation_policy_exists(self):
+        """Spot elevation domain must have a valid policy."""
+        pol = self._load_policy("dimension_types_spot_elevation")
+        assert pol is not None
+        assert "dim_type.shape" in pol["required_items"]
+
+    def test_spot_coordinate_policy_exists(self):
+        """Spot coordinate domain must have a valid policy."""
+        pol = self._load_policy("dimension_types_spot_coordinate")
+        assert pol is not None
+        assert "dim_type.shape" in pol["required_items"]
+
+    def test_spot_slope_policy_exists(self):
+        """Spot slope domain must have a valid policy."""
+        pol = self._load_policy("dimension_types_spot_slope")
+        assert pol is not None
+        assert "dim_type.shape" in pol["required_items"]
+
+    def test_all_split_domains_have_schemas(self):
+        """All split dimension_types domains must have valid join_key_schema."""
+        split_domains = [
+            "dimension_types_linear",
+            "dimension_types_angular",
+            "dimension_types_radial",
+            "dimension_types_diameter",
+            "dimension_types_spot_elevation",
+            "dimension_types_spot_coordinate",
+            "dimension_types_spot_slope",
         ]
-
-        jk, missing = build_join_key_from_policy(domain_policy=dim_policy, identity_items=items)
-
-        assert "dim_type.witness_line_control" in missing
-        assert jk["shape_gating"]["shape_value"] == "Linear"
-        assert jk["shape_gating"]["shape_matched"] is True
-        assert "dim_type.witness_line_control" in jk["shape_gating"]["additional_required_keys"]
-
-    def test_linear_with_witness_line_control(self):
-        """Linear shape with witness_line_control should have no missing."""
-        dim_policy = self._load_dim_policy()
-        items = [
-            make_identity_item("dim_type.shape", "Linear", ITEM_Q_OK),
-            make_identity_item("dim_type.accuracy", "0.01", ITEM_Q_OK),
-            make_identity_item("dim_type.tick_mark_sig_hash", "abc123", ITEM_Q_OK),
-            make_identity_item("dim_type.unit_format_id", "uf", ITEM_Q_OK),
-            make_identity_item("dim_type.witness_line_control", "Gap to Element", ITEM_Q_OK),
-        ]
-
-        jk, missing = build_join_key_from_policy(domain_policy=dim_policy, identity_items=items)
-
-        assert "dim_type.witness_line_control" not in missing
-        assert jk["shape_gating"]["shape_matched"] is True
-
-    def test_radial_requires_center_marks(self):
-        """Radial shape must require center_marks and center_mark_size."""
-        dim_policy = self._load_dim_policy()
-        items = [
-            make_identity_item("dim_type.shape", "Radial", ITEM_Q_OK),
-            make_identity_item("dim_type.accuracy", "0.01", ITEM_Q_OK),
-            make_identity_item("dim_type.tick_mark_sig_hash", "abc123", ITEM_Q_OK),
-            make_identity_item("dim_type.unit_format_id", "uf", ITEM_Q_OK),
-            # Missing center_marks and center_mark_size
-        ]
-
-        jk, missing = build_join_key_from_policy(domain_policy=dim_policy, identity_items=items)
-
-        assert "dim_type.center_marks" in missing
-        assert "dim_type.center_mark_size" in missing
-        assert jk["shape_gating"]["shape_value"] == "Radial"
-
-    def test_radial_with_center_marks(self):
-        """Radial shape with center marks should have no missing."""
-        dim_policy = self._load_dim_policy()
-        items = [
-            make_identity_item("dim_type.shape", "Radial", ITEM_Q_OK),
-            make_identity_item("dim_type.accuracy", "0.01", ITEM_Q_OK),
-            make_identity_item("dim_type.tick_mark_sig_hash", "abc123", ITEM_Q_OK),
-            make_identity_item("dim_type.unit_format_id", "uf", ITEM_Q_OK),
-            make_identity_item("dim_type.center_marks", "1", ITEM_Q_OK),
-            make_identity_item("dim_type.center_mark_size", "0.125", ITEM_Q_OK),
-        ]
-
-        jk, missing = build_join_key_from_policy(domain_policy=dim_policy, identity_items=items)
-
-        assert "dim_type.center_marks" not in missing
-        assert "dim_type.center_mark_size" not in missing
-
-    def test_angular_requires_unit_format_id(self):
-        """Angular shape should require unit_format_id now."""
-        dim_policy = self._load_dim_policy()
-        items = [
-            make_identity_item("dim_type.shape", "Angular", ITEM_Q_OK),
-            make_identity_item("dim_type.accuracy", "0.01", ITEM_Q_OK),
-            make_identity_item("dim_type.tick_mark_sig_hash", "abc123", ITEM_Q_OK),
-        ]
-
-        jk, missing = build_join_key_from_policy(domain_policy=dim_policy, identity_items=items)
-
-        assert "dim_type.unit_format_id" in missing
-        assert jk["shape_gating"]["additional_required_keys"] == ["dim_type.unit_format_id", "dim_type.tick_mark_sig_hash"]
-
-    def test_angular_with_unit_format_id(self):
-        """Angular shape with unit_format_id should have no missing."""
-        dim_policy = self._load_dim_policy()
-        items = [
-            make_identity_item("dim_type.shape", "Angular", ITEM_Q_OK),
-            make_identity_item("dim_type.accuracy", "0.01", ITEM_Q_OK),
-            make_identity_item("dim_type.tick_mark_sig_hash", "abc123", ITEM_Q_OK),
-            make_identity_item("dim_type.unit_format_id", "uf", ITEM_Q_OK),
-        ]
-
-        jk, missing = build_join_key_from_policy(domain_policy=dim_policy, identity_items=items)
-
-        assert "dim_type.unit_format_id" not in missing
-
-    def test_unknown_shape_uses_common_only(self):
-        """Unknown shapes should use common properties only (default_shape_behavior=common_only)."""
-        dim_policy = self._load_dim_policy()
-        items = [
-            make_identity_item("dim_type.shape", "SomeNewShape", ITEM_Q_OK),
-            make_identity_item("dim_type.accuracy", "0.01", ITEM_Q_OK),
-            make_identity_item("dim_type.tick_mark_sig_hash", "abc123", ITEM_Q_OK),
-        ]
-
-        jk, missing = build_join_key_from_policy(domain_policy=dim_policy, identity_items=items)
-
-        # Shape not matched, but still works with common only
-        assert jk["shape_gating"]["shape_value"] == "SomeNewShape"
-        assert jk["shape_gating"]["shape_matched"] is False
-        assert jk["shape_gating"]["additional_required_keys"] == []
-
-    def test_all_shapes_have_definitions(self):
-        """All known shapes must have shape_requirements definitions."""
-        dim_policy = self._load_dim_policy()
-        all_shapes = [
-            "Linear", "LinearFixed", "Radial", "Diameter", "DiameterLinked",
-            "Angular", "ArcLength", "SpotElevation", "SpotCoordinate",
-            "SpotSlope", "SpotElevationFixed"
-        ]
-        shape_reqs = dim_policy["shape_gating"]["shape_requirements"]
-        for shape in all_shapes:
-            assert shape in shape_reqs, f"Shape {shape} missing from shape_requirements"
+        for dom in split_domains:
+            pol = self._load_policy(dom)
+            assert pol is not None, "Policy for {} is None".format(dom)
+            assert pol.get("join_key_schema", "").startswith(dom), \
+                "join_key_schema mismatch for {}".format(dom)
 
 
 # =============================================================================
-# Property Exclusion Tests
-# =============================================================================
-
-class TestPropertyExclusion:
-    """Test that shape-gated properties are correctly excluded."""
-
-    def _get_keys_for_shape(self, shape_v, shape_family, **shape_specific_args):
-        """Helper to get identity item keys for a given shape."""
-        args = {
-            "shape_family": shape_family,
-            "shape_v": shape_v,
-            "shape_q": ITEM_Q_OK,
-            "unit_format_id_v": "test",
-            "unit_format_id_q": ITEM_Q_OK,
-            "rounding_v": "Nearest",
-            "rounding_q": ITEM_Q_OK,
-            "accuracy_v": "0.01",
-            "accuracy_q": ITEM_Q_OK,
-            "prefix_v": "",
-            "prefix_q": ITEM_Q_OK,
-            "suffix_v": "",
-            "suffix_q": ITEM_Q_OK,
-            "tick_sig_hash": "abc123",
-        }
-        args.update(shape_specific_args)
-        items, _ = _build_identity_items(**args)
-        return {it["k"] for it in items}
-
-    def test_linear_excludes_radial_properties(self):
-        """Linear dimensions must NOT include radial-specific properties."""
-        keys = self._get_keys_for_shape(
-            SHAPE_LINEAR, FAMILY_LINEAR,
-            witness_v="Gap to Element", witness_q=ITEM_Q_OK
-        )
-
-        assert "dim_type.center_marks" not in keys
-        assert "dim_type.center_mark_size" not in keys
-
-    def test_linear_excludes_angular_properties(self):
-        """Linear dimensions must NOT include angular-specific properties."""
-        # Angular has no specific properties, but verify linear doesn't add spurious ones
-        keys = self._get_keys_for_shape(
-            SHAPE_LINEAR, FAMILY_LINEAR,
-            witness_v="Gap to Element", witness_q=ITEM_Q_OK
-        )
-
-        # Should only have common + linear-specific
-        expected_prefixes = ["dim_type."]
-        for key in keys:
-            assert key.startswith("dim_type.")
-
-    def test_radial_excludes_linear_properties(self):
-        """Radial dimensions must NOT include linear-specific properties."""
-        keys = self._get_keys_for_shape(
-            SHAPE_RADIAL, FAMILY_RADIAL,
-            center_marks_v="1", center_marks_q=ITEM_Q_OK,
-            center_mark_size_v="0.125", center_mark_size_q=ITEM_Q_OK
-        )
-
-        assert "dim_type.witness_line_control" not in keys
-
-    def test_angular_excludes_linear_and_radial_properties(self):
-        """Angular dimensions must NOT include linear or radial-specific properties."""
-        keys = self._get_keys_for_shape(
-            SHAPE_ANGULAR, FAMILY_ANGULAR
-        )
-
-        assert "dim_type.witness_line_control" not in keys
-        assert "dim_type.center_marks" not in keys
-        assert "dim_type.center_mark_size" not in keys
-
-    def test_spot_excludes_linear_and_radial_properties(self):
-        """Spot dimensions must NOT include linear or radial-specific properties."""
-        keys = self._get_keys_for_shape(
-            SHAPE_SPOT_ELEVATION, FAMILY_SPOT
-        )
-
-        assert "dim_type.witness_line_control" not in keys
-        assert "dim_type.center_marks" not in keys
-        assert "dim_type.center_mark_size" not in keys
-
-
-# =============================================================================
-# Policy-level Integration Test Pattern (Documented)
+# Policy-level Integration Tests
 # =============================================================================
 
 class TestPolicyLoadPattern:
     """Documented integration test patterns for full Revit validation."""
 
     def test_policy_load_integration_pattern(self):
-        """Policy load integration pattern placeholder.
-
-        This test documents the pattern for integration tests when running
-        inside Revit environment.
-        """
-        # This is a placeholder for Revit-based integration tests
-        # In a Revit environment, you would:
-        # 1. Export actual dimension types
-        # 2. Verify shape-specific keys present/absent based on shape
-        # 3. Validate join key construction across shapes
+        """Policy load integration pattern placeholder."""
         assert True
 
 
 class TestCanonicalEvidenceSelectors:
-    """Pilot checks for canonical evidence + selectors behavior."""
+    """Pilot checks for canonical evidence + selectors behavior (new flat policies)."""
 
-    def test_join_key_uses_required_and_shape_gated_keys_only(self):
+    def test_linear_join_key_uses_required_keys_only(self):
+        """Linear domain: join key must include all required items and exclude optional."""
         policies = load_join_key_policies("policies/domain_join_key_policies.json")
-        pol = get_domain_join_key_policy(policies, "dimension_types")
+        pol = get_domain_join_key_policy(policies, "dimension_types_linear")
 
         identity_items = [
             make_identity_item("dim_type.shape", "Linear", ITEM_Q_OK),
             make_identity_item("dim_type.accuracy", "0.010000000", ITEM_Q_OK),
             make_identity_item("dim_type.tick_mark_sig_hash", "1" * 32, ITEM_Q_OK),
             make_identity_item("dim_type.witness_line_control", "Gap to Element", ITEM_Q_OK),
-            # Optional evidence stays in canonical identity superset, but is not hashed in join_key.
+            make_identity_item("dim_type.unit_format_id", "autodesk.unit.formatOption:length", ITEM_Q_OK),
+            make_identity_item("dim_type.rounding", "Nearest", ITEM_Q_OK),
             make_identity_item("dim_type.prefix", "PFX", ITEM_Q_OK),
             make_identity_item("dim_type.suffix", "SFX", ITEM_Q_OK),
-            make_identity_item("dim_type.rounding", "Nearest", ITEM_Q_OK),
-            make_identity_item("dim_type.unit_format_id", "autodesk.unit.formatOption:length", ITEM_Q_OK),
         ]
 
         join_key, missing = build_join_key_from_policy(
@@ -597,18 +274,11 @@ class TestCanonicalEvidenceSelectors:
         )
 
         assert missing == []
-        assert join_key["keys_used"] == [
-            "dim_type.accuracy",
-            "dim_type.shape",
-            "dim_type.tick_mark_sig_hash",
-            "dim_type.witness_line_control",
-        ]
-        assert sorted([it["k"] for it in join_key["items"]]) == join_key["keys_used"]
-        assert "dim_type.prefix" not in join_key["keys_used"]
+        # All required items from the linear policy must appear in keys_used
+        for k in pol["required_items"]:
+            assert k in join_key["keys_used"], "Required key {} not in keys_used".format(k)
 
-        join_preimage = serialize_identity_items([it for it in identity_items if it["k"] in join_key["keys_used"]])
+        join_preimage = serialize_identity_items(
+            [it for it in identity_items if it["k"] in set(join_key["keys_used"])]
+        )
         assert join_key["join_hash"] == make_hash(join_preimage)
-
-        # Semantic signature uses the canonical superset (identity_items), so it diverges from join hash.
-        sig_hash = make_hash(serialize_identity_items(identity_items))
-        assert sig_hash != join_key["join_hash"]

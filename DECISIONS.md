@@ -324,6 +324,140 @@ No downstream breaking changes: contract schema already supported semantic mode.
 
 ---
 
+## D-015 — Domain Family Split Architecture
+
+**Status:** Accepted
+**Date:** 2026-03-06
+
+**Decision**
+The four monolithic extractors (`object_styles`, `fill_patterns`, `dimension_types`,
+`view_templates`) are split into per-partition domain files, each covering one record
+class or ViewType family. The split follows a three-level hierarchy:
+
+- **Domain family**: Named grouping (e.g., `object_styles`, `dimension_types`)
+- **Domain**: Individual split file (e.g., `object_styles_model`, `dimension_types_linear`)
+- **Record class**: The entity type within a domain (e.g., Model categories, Linear shapes)
+
+**Rationale**
+- Monolithic extractors mixed heterogeneous record structures, making per-class policy
+  governance impractical.
+- Each split domain can have its own join-key policy tailored to the record class.
+- Shape discrimination moves to domain-level filtering rather than within-domain branching.
+- Downstream tools and analysis pipelines can target specific record classes directly.
+
+**Split mapping**
+
+| Old domain | New domains |
+|------------|-------------|
+| `object_styles` | `object_styles_model`, `object_styles_annotation`, `object_styles_analytical`, `object_styles_imported` |
+| `fill_patterns` | `fill_patterns_drafting`, `fill_patterns_model` |
+| `dimension_types` | `dimension_types_linear`, `dimension_types_angular`, `dimension_types_radial`, `dimension_types_diameter`, `dimension_types_spot_elevation`, `dimension_types_spot_coordinate`, `dimension_types_spot_slope` |
+| `view_templates` | `view_templates_floor_structural_area_plans`, `view_templates_ceiling_plans`, `view_templates_elevations_sections_detail`, `view_templates_renderings_drafting`, `view_templates_schedules` |
+
+**Shared helpers**
+- `core/dimension_type_helpers.py`: Shape constants, detection, and reading helpers
+- `core/vg_sig.py`: VG signature helpers for view_templates split domains
+
+**Consequences**
+- Each split domain has its own flat join-key policy (no shape_gating in new dimension_types policies — shape discrimination is done at domain-level)
+- The `require_domain` dependency chain is updated to reference split domain names
+- Tools and analysis configs use split domain names throughout
+- No semantic change to hash values within each record class
+
+---
+
+## D-015 — Domain Family Architecture
+**Status:** Accepted
+**Date:** 2026-03-19
+### Context
+Several Revit API classes expose structurally heterogeneous records that were
+initially extracted as single monolithic domains. As the corpus grew and governance
+questions became more specific, the single-domain approach produced analytically
+meaningless blended HHI scores (e.g. a single score for dimension_types mixing
+Linear and SpotCoordinate types that share almost no applicable properties).
+### Vocabulary
+- **Domain family**: Named grouping of related domains. Policy and BI concept only —
+  no code hierarchy. Defined in `policies/cross_domain_alignment_keys.json`.
+- **Domain**: The extractable, analyzable unit. One extractor file, one policy entry,
+  one sig_hash, one HHI score. All domains are flat peers in the runner.
+- **Record class**: Within a single domain, records may fall into classes where
+  different properties are applicable to identity. Routed by class discriminator.
+  Implemented via `shape_gating` block in join-key policy.
+- **Class discriminator**: The identity_item field whose value determines a record's
+  record class.
+- **Alignment keys**: Fields shared across domains within a family that governance
+  expects to be consistent. Defined in `policies/cross_domain_alignment_keys.json`.
+### Decision
+Adopt the three-level architecture above. Revit's system family boundary is the
+authoritative partition criterion for deciding when to split into separate domains
+versus use a record class gate within one domain.
+The shape_gating JSON key in join-key policy is retained for backward compatibility
+with core/join_key_builder.py. The new vocabulary applies to prose, comments, and
+documentation only — not to JSON key names.
+### Affected domains in this branch
+- `dimension_types` → 7 domains (linear, angular, radial, diameter, spot_elevation,
+  spot_coordinate, spot_slope)
+- `view_templates` → 5 domains (floor_structural_area_plans, ceiling_plans,
+  elevations_sections_detail, renderings_drafting, schedules)
+- `object_styles` → 4 domains (model, annotation, analytical, imported)
+- `fill_patterns` → 2 domains (drafting, model)
+- `arrowheads` — record class corrections only, no split
+- `line_patterns` — lp.is_import added to coordination_items, no split
+### Cross-domain alignment
+Alignment keys — fields shared across domains within a family that governance
+expects to be consistent — are defined in `policies/cross_domain_alignment_keys.json`.
+Cross-domain alignment scoring is a BI/analysis concern, not an extraction concern.
+Extractor changes are not required to enable cross-domain alignment analysis.
+### Consequences
+- All hashes from previous exports are obsolete. Full re-extraction required.
+- 28 domains replace 4 monolithic extractors plus corrections to 2 others.
+- `run_extract_all`, `phase1_probe_config`, `contracts/domain_identity_keys_v2.json`
+  updated with new domain names.
+- Power BI domain family grouping and alignment measures to be implemented separately.
+- Future consolidation: separate extractor files per domain will be refactored into
+  one file per domain family with internal routing. Deferred until all domains are
+  validated.
+
+---
+
+## D-016 — View Category Overrides Scope and Category Classification
+**Status:** Accepted
+**Date:** 2026-03-19
+### Context
+View category overrides (VCO) can exist in three populations with different
+governance implications:
+1. Template-controlled overrides: V/G checkbox checked, override differs from
+   object styles baseline. These are enforced on all views using the template.
+2. Latent overrides: V/G checkbox unchecked, override set on the template.
+   Not enforced but would activate if the checkbox were checked.
+3. View-local overrides: overrides set directly on individual views, either
+   on non-templated views or on views where the template does not control
+   that category.
+### Decision
+Implement categories 1 and 2 in the same domain with the same record schema.
+Category 3 is deferred.
+The `vco.include_controlled` coordination_item (true/false) distinguishes
+category 1 from category 2. BI governance measures filter on
+`vco.include_controlled = true` to scope to the governed population.
+Category 2 records (latent overrides) are included because a latent override
+that diverges from the standard is a governance risk: if the V/G checkbox is
+later checked, the non-standard override activates silently.
+### Category 3 hooks
+When category 3 (view-local overrides) is implemented:
+- Add `vco.context_type = "view_local"` in coordination_items
+  (current records use `"template"`)
+- Add `vco.view_element_id` in unknown_items for traceability
+- No changes to category 1/2 records, join-key policy, or sig_hash
+### Consequences
+- VCO depends on `object_styles_model` and `object_styles_annotation` ctx maps
+  for baseline sig_hash resolution
+- VCO reads view templates directly from the Revit API — it does NOT depend on
+  view_template_* domain extractors
+- View-local overrides (category 3) may be a large population; implement with
+  record-count ceiling and non-default-only filter when deferred work begins
+
+---
+
 ## Notes
 
 - This document is **append-only**.

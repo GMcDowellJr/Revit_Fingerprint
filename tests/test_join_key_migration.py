@@ -212,22 +212,34 @@ class TestJoinKeyPolicyStructure:
         assert "vco.override_properties_hash" in vco_policy["required_items"]
 
     def test_vt_policy_exists(self):
-        """view_templates policy must exist in policies file."""
+        """view_templates split domain policies must exist in policies file."""
         import json
         policies_path = os.path.join(repo_root, "policies", "domain_join_key_policies.json")
 
         with open(policies_path) as f:
             policies = json.load(f)
 
-        assert "view_templates" in policies["domains"]
-        vt_policy = policies["domains"]["view_templates"]
+        # After domain split, view_templates is partitioned into 5 sub-domains.
+        split_domains = [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+            "view_templates_elevations_sections_detail",
+            "view_templates_renderings_drafting",
+            "view_templates_schedules",
+        ]
+        for dom in split_domains:
+            assert dom in policies["domains"], "{} missing from policies".format(dom)
 
-        if vt_policy["join_key_schema"] == "view_templates.join_key.v2":
-            assert "view_template.sig.include_phase_filter" in vt_policy["required_items"]
-            assert "view_template.def_hash" not in vt_policy["required_items"]
-        else:
-            assert vt_policy["join_key_schema"] == "view_templates.join_key.v1"
-            assert "view_template.def_hash" in vt_policy["required_items"]
+        # Each split domain must have a join_key_schema.
+        # Split view_template domains share the "view_templates.join_key.v1" schema
+        # because they share the same join key semantics (view_template.def_hash).
+        for dom in split_domains:
+            pol = policies["domains"][dom]
+            assert "join_key_schema" in pol
+            schema = pol["join_key_schema"]
+            assert schema.startswith(dom) or schema == "view_templates.join_key.v1", (
+                "{}: unexpected schema {}".format(dom, schema)
+            )
 
 
 # ============================================================

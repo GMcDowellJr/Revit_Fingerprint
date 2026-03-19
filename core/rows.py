@@ -55,6 +55,30 @@ def _as_string(p):
     return None
 
 
+def _as_value_string(p):
+    """
+    Extract display value from a parameter using AsValueString().
+
+    Unlike _as_string() which only works for String StorageType, this works
+    for Integer/enum params (e.g. Text Orientation, Text Location, Witness Line
+    Control, Slope Direction) by returning the enum's display label.
+
+    Args:
+        p: Parameter object
+
+    Returns:
+        Display string value or None if not available
+    """
+    try:
+        if p and p.HasValue:
+            s = p.AsValueString()
+            if s is not None:
+                return safe_str(s)
+    except Exception:
+        pass
+    return None
+
+
 def _as_double(p):
     """
     Extract double value from a parameter.
@@ -167,6 +191,40 @@ def format_len_inches(feet_val):
             return float(feet_val) * 12.0
         except Exception as e:
             return None
+
+
+def _canon_rgb(v):
+    """
+    Canonicalize a color value to a stable "r-g-b" string.
+
+    Accepts:
+      - dict with "r", "g", "b" keys (from try_get_color_rgb_from_elem)
+      - list/tuple of 3 integers
+      - string already in "r-g-b" format
+
+    Returns:
+      str "r-g-b" or safe_str fallback
+    """
+    if v is None:
+        return None
+    if isinstance(v, dict):
+        try:
+            r = int(v.get("r", 0))
+            g = int(v.get("g", 0))
+            b = int(v.get("b", 0))
+            return "{}-{}-{}".format(r, g, b)
+        except Exception:
+            return safe_str(v)
+    if isinstance(v, (list, tuple)) and len(v) == 3:
+        try:
+            r, g, b = [int(x) for x in v]
+            return "{}-{}-{}".format(r, g, b)
+        except Exception:
+            return safe_str(v)
+    s = safe_str(v)
+    if isinstance(s, str) and s.count("-") == 2:
+        return s
+    return s
 
 
 def try_get_color_rgb_from_elem(elem):

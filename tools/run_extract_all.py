@@ -567,8 +567,8 @@ def main() -> None:
             _ensure_dir(dom_out)
             for mod in ["run_joinhash_label_population", "run_joinhash_parameter_population", "run_candidate_joinkey_simulation", "run_population_stability"]:
                 _run([sys.executable, "-m", f"tools.phase2_analysis.{mod}", str(exports_dir), "--domain", dom, "--out", str(dom_out)], env=env)
-            if dom == "dimension_types" and not args.no_dimtypes_by_family:
-                cmd2e = [sys.executable, "-m", "tools.phase2_analysis.run_dimension_types_by_family", str(exports_dir), "--domain", "dimension_types", "--out", str(dom_out)]
+            if dom.startswith("dimension_types_") and not args.no_dimtypes_by_family:
+                cmd2e = [sys.executable, "-m", "tools.phase2_analysis.run_dimension_types_by_family", str(exports_dir), "--domain", dom, "--out", str(dom_out)]
                 cmd2e += ["--baseline", str(args.baseline), "--families_from", "baseline"] if args.baseline else ["--families_from", "all"]
                 _run(cmd2e, env=env)
 

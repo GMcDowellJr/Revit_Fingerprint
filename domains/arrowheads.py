@@ -193,6 +193,22 @@ def _build_tick_identity_items(
     ]
 
 
+# ---------------------------------------------------------------------------
+# Record class buckets (per arrowhead style)
+# ---------------------------------------------------------------------------
+# Arrow record class: style-specific arrow geometry fields are applicable.
+# Tick record class (Heavy end tick mark): tick-specific fields are applicable.
+# SizeOnly record class: all remaining styles (Dot, Diagonal, Box, Loop,
+#   Elevation Target, Datum triangle) — UI greys all style-specific fields.
+#   Only common items (style + tick_size_in) participate in identity.
+
+STYLE_BUCKET_ARROW = frozenset({"Arrow"})
+STYLE_BUCKET_TICK = frozenset({"Heavy end tick mark"})
+STYLE_BUCKET_SIZE_ONLY = frozenset({
+    "Dot", "Diagonal", "Box", "Loop", "Elevation Target", "Datum triangle"
+})
+
+
 def _is_arrowhead_type(doc, t):
     """
     Best-effort classifier:
@@ -371,17 +387,48 @@ def extract(doc, ctx=None):
         pen_raw = _as_int(p_pen)
         pen_v, pen_q = canonicalize_int(pen_raw)
 
+        # Route to record class based on style.
+        # Arrow record class: arrow-specific geometry fields applicable.
+        # Tick record class (Heavy end tick mark): tick-specific fields applicable.
+        # SizeOnly record class: common items only (UI greys all style-specific fields).
+        # Unknown styles: common items only (default_shape_behavior: common_only).
+        common_items = _build_common_identity_items(
+            style_v=style_label_v,
+            style_q=style_label_q,
+            tick_in_v=tick_in_v,
+            tick_in_q=tick_in_q,
+        )
+
+        if style_label_v in STYLE_BUCKET_ARROW:
+            record_class = "Arrow"
+            class_items = _build_arrow_identity_items(
+                width_angle_v=ang_deg_v,
+                width_angle_q=ang_deg_q,
+                fill_v=fill_v,
+                fill_q=fill_q,
+                closed_v=closed_v,
+                closed_q=closed_q,
+            )
+        elif style_label_v in STYLE_BUCKET_TICK:
+            record_class = "Tick"
+            class_items = _build_tick_identity_items(
+                centered_v=center_v,
+                centered_q=center_q,
+                pen_v=pen_v,
+                pen_q=pen_q,
+            )
+        elif style_label_v in STYLE_BUCKET_SIZE_ONLY:
+            record_class = "SizeOnly"
+            class_items = []
+        else:
+            # Unknown style — common items only per default_shape_behavior: common_only
+            record_class = "Unknown"
+            class_items = []
+
         identity_items = [
-            make_identity_item("arrowhead.style", style_label_v, style_label_q),
             make_identity_item("arrowhead.arrow_style_raw_int", style_raw_v, style_raw_q),
             make_identity_item("arrowhead.arrow_style_display", style_disp_v, style_disp_q),
-            make_identity_item("arrowhead.tick_size_in", tick_in_v, tick_in_q),
-            make_identity_item("arrowhead.width_angle_deg", ang_deg_v, ang_deg_q),
-            make_identity_item("arrowhead.fill_tick", fill_v, fill_q),
-            make_identity_item("arrowhead.arrow_closed", closed_v, closed_q),
-            make_identity_item("arrowhead.tick_mark_centered", center_v, center_q),
-            make_identity_item("arrowhead.heavy_end_pen_weight", pen_v, pen_q),
-        ]
+        ] + common_items + class_items
 
         semantic_keys = sorted({it.get("k") for it in identity_items if isinstance(it.get("k"), str)})
 
@@ -419,6 +466,12 @@ def extract(doc, ctx=None):
         # Label is not identity; keep human if possible.
         label_display = nm if nm else "Arrowhead"
         label_quality = "human" if nm else "placeholder_missing"
+
+        # Exclude unidentifiable system arrowheads — placeholder_missing means
+        # no name could be resolved, making these types ungovernable
+        if label_quality == "placeholder_missing":
+            info["debug_system_types_excluded"] = info.get("debug_system_types_excluded", 0) + 1
+            continue
 
         label = {
             "display": safe_str(label_display),
@@ -472,11 +525,16 @@ def extract(doc, ctx=None):
         unknown_items.append(make_identity_item("arrowhead.source_element_id", _eid_v, _eid_q))
         unknown_items.append(make_identity_item("arrowhead.source_unique_id", _uid_v, _uid_q))
 
+        # record_class coordination item for BI slicer
+        coordination_items = [
+            make_identity_item("arrowhead.record_class", record_class, ITEM_Q_OK),
+        ]
+
         rec_v2["phase2"] = {
             "schema": "phase2.arrowheads.v1",
             "grouping_basis": "phase2.hypothesis",
-                        "cosmetic_items": phase2_sorted_items(cosmetic_items),
-            "coordination_items": phase2_sorted_items([]),
+            "cosmetic_items": phase2_sorted_items(cosmetic_items),
+            "coordination_items": phase2_sorted_items(coordination_items),
             "unknown_items": phase2_sorted_items(unknown_items),
         }
 

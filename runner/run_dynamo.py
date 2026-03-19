@@ -103,12 +103,23 @@ clr.AddReference("RevitServices")
 from RevitServices.Persistence import DocumentManager
 
 # Import domain extractors
-from domains import identity, units, object_styles, line_patterns, line_styles
-from domains import fill_patterns, arrowheads, text_types, dimension_types
+from domains import identity, units, line_patterns, line_styles
+from domains import arrowheads, text_types
 from domains import view_filter_definitions, view_filter_applications_view_templates
 from domains import phases, phase_filters, phase_graphics
 from domains import view_category_overrides
-from domains import view_templates
+# Split domains: object_styles
+from domains import object_styles_model, object_styles_annotation, object_styles_analytical, object_styles_imported
+# Split domains: fill_patterns
+from domains import fill_patterns_drafting, fill_patterns_model
+# Split domains: dimension_types
+from domains import dimension_types_linear, dimension_types_angular, dimension_types_radial
+from domains import dimension_types_diameter, dimension_types_spot_elevation
+from domains import dimension_types_spot_coordinate, dimension_types_spot_slope
+# Split domains: view_templates
+from domains import view_templates_floor_structural_area_plans, view_templates_ceiling_plans
+from domains import view_templates_elevations_sections_detail, view_templates_renderings_drafting
+from domains import view_templates_schedules
 from core.manifest import build_manifest
 from core.features import build_features
 from core.join_key_policy import load_join_key_policies
@@ -352,7 +363,15 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
         if "raw_count" in quality:
             domain_diag["raw_count"] = quality["raw_count"]
 
-        if require_v2_hash and domain_status == contracts.DOMAIN_STATUS_OK and hash_value is None:
+        # Empty-population exemption: if the domain explicitly emits raw_count=0 and
+        # hash_v2=None with debug_v2_blocked=False, that is a valid "no content" state —
+        # not a hash failure.  Only block on no_semantic_hash when raw_count > 0 (i.e. the
+        # domain had candidates but produced no hash, which is a genuine problem).
+        _raw_count = quality.get("raw_count", None)
+        _empty_population = (_raw_count is not None and _raw_count == 0
+                             and not bool((legacy or {}).get("debug_v2_blocked", True)))
+
+        if require_v2_hash and domain_status == contracts.DOMAIN_STATUS_OK and hash_value is None and not _empty_population:
             domain_status = contracts.DOMAIN_STATUS_BLOCKED
             if v2_reasons:
                 block_reasons = sorted({str(k) for k in v2_reasons.keys()})
@@ -504,20 +523,42 @@ def run_fingerprint(doc):
         if legacy is not None:
             fingerprint["line_patterns"] = legacy
 
-    if _enabled("object_styles"):
-        legacy = _domain_run("object_styles", object_styles.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+    # object_styles split domains (model must run first to export baseline map to ctx)
+    if _enabled("object_styles_model"):
+        legacy = _domain_run("object_styles_model", object_styles_model.extract, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
-            fingerprint["object_styles"] = legacy
+            fingerprint["object_styles_model"] = legacy
+
+    if _enabled("object_styles_annotation"):
+        legacy = _domain_run("object_styles_annotation", object_styles_annotation.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["object_styles_annotation"] = legacy
+
+    if _enabled("object_styles_analytical"):
+        legacy = _domain_run("object_styles_analytical", object_styles_analytical.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["object_styles_analytical"] = legacy
+
+    if _enabled("object_styles_imported"):
+        legacy = _domain_run("object_styles_imported", object_styles_imported.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["object_styles_imported"] = legacy
 
     if _enabled("line_styles"):
         legacy = _domain_run("line_styles", line_styles.extract, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["line_styles"] = legacy
 
-    if _enabled("fill_patterns"):
-        legacy = _domain_run("fill_patterns", fill_patterns.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+    # fill_patterns split domains
+    if _enabled("fill_patterns_drafting"):
+        legacy = _domain_run("fill_patterns_drafting", fill_patterns_drafting.extract, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
-            fingerprint["fill_patterns"] = legacy
+            fingerprint["fill_patterns_drafting"] = legacy
+
+    if _enabled("fill_patterns_model"):
+        legacy = _domain_run("fill_patterns_model", fill_patterns_model.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["fill_patterns_model"] = legacy
 
     if _enabled("arrowheads"):
         legacy = _domain_run("arrowheads", arrowheads.extract, doc, ctx, contract_domains, run_diag, runner_notes)
@@ -529,10 +570,41 @@ def run_fingerprint(doc):
         if legacy is not None:
             fingerprint["text_types"] = legacy
 
-    if _enabled("dimension_types"):
-        legacy = _domain_run("dimension_types", dimension_types.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+    # dimension_types split domains
+    if _enabled("dimension_types_linear"):
+        legacy = _domain_run("dimension_types_linear", dimension_types_linear.extract, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
-            fingerprint["dimension_types"] = legacy
+            fingerprint["dimension_types_linear"] = legacy
+
+    if _enabled("dimension_types_angular"):
+        legacy = _domain_run("dimension_types_angular", dimension_types_angular.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["dimension_types_angular"] = legacy
+
+    if _enabled("dimension_types_radial"):
+        legacy = _domain_run("dimension_types_radial", dimension_types_radial.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["dimension_types_radial"] = legacy
+
+    if _enabled("dimension_types_diameter"):
+        legacy = _domain_run("dimension_types_diameter", dimension_types_diameter.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["dimension_types_diameter"] = legacy
+
+    if _enabled("dimension_types_spot_elevation"):
+        legacy = _domain_run("dimension_types_spot_elevation", dimension_types_spot_elevation.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["dimension_types_spot_elevation"] = legacy
+
+    if _enabled("dimension_types_spot_coordinate"):
+        legacy = _domain_run("dimension_types_spot_coordinate", dimension_types_spot_coordinate.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["dimension_types_spot_coordinate"] = legacy
+
+    if _enabled("dimension_types_spot_slope"):
+        legacy = _domain_run("dimension_types_spot_slope", dimension_types_spot_slope.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["dimension_types_spot_slope"] = legacy
 
     # New global domains (M4) - run before contextual domains
     # These populate ctx with mappings for views/templates to reference
@@ -595,11 +667,35 @@ def run_fingerprint(doc):
             fingerprint["view_filter_applications_view_templates"] = legacy
 
     if _enabled("view_category_overrides"):
-        # Hard dependencies: must run after object_styles + pattern domains
+        # Hard dependencies: must run after object_styles_model + line_patterns.
+        # VCO cannot produce meaningful output without the model baseline or
+        # line pattern refs, so these remain hard requirements.
+        # fill_patterns are soft — graphic_overrides.py degrades gracefully
+        # when a fill pattern ref can't be resolved (q=missing on the field).
         try:
-            require_domain(contract_domains, "object_styles")
+            require_domain(contract_domains, "object_styles_model")
             require_domain(contract_domains, "line_patterns")
-            require_domain(contract_domains, "fill_patterns")
+            # Soft requirements for fill pattern partitions
+            for _fp_dep in ["fill_patterns_drafting", "fill_patterns_model"]:
+                if _fp_dep not in contract_domains:
+                    runner_notes.append(
+                        "view_category_overrides: {} not run; "
+                        "fill pattern refs in overrides will degrade to q=missing".format(
+                            _fp_dep)
+                    )
+            # Soft requirements — emit note if absent but do not block VCO
+            # (these partitions are legitimately empty in most files)
+            for _soft_dep in ["object_styles_annotation",
+                              "object_styles_analytical",
+                              "object_styles_imported"]:
+                if _soft_dep not in contract_domains:
+                    runner_notes.append(
+                        "view_category_overrides: {} not run; "
+                        "{} category overrides will have no baseline".format(
+                            _soft_dep,
+                            _soft_dep.replace("object_styles_", "")
+                        )
+                    )
 
             legacy = _domain_run(
                 "view_category_overrides",
@@ -633,36 +729,136 @@ def run_fingerprint(doc):
                 message=";".join(list(b.reasons)),
             )
 
-    if _enabled("view_templates"):
-        # Hard dependencies: downstream must not run if upstream is missing or non-acceptable.
+    # view_templates split domains.
+    # Non-schedule domains require both phase_filters and view_filter_definitions
+    # (filter stack resolution). Schedules only require phase_filters — ViewSchedule
+    # templates do not have view filter stacks.
+    for _vt_domain, _vt_extractor in [
+        ("view_templates_floor_structural_area_plans",
+         view_templates_floor_structural_area_plans),
+        ("view_templates_ceiling_plans",
+         view_templates_ceiling_plans),
+        ("view_templates_elevations_sections_detail",
+         view_templates_elevations_sections_detail),
+        ("view_templates_renderings_drafting",
+         view_templates_renderings_drafting),
+    ]:
+        if not _enabled(_vt_domain):
+            continue
         try:
             require_domain(contract_domains, "phase_filters")
             require_domain(contract_domains, "view_filter_definitions")
-            require_domain(contract_domains, "view_category_overrides")
-
-            legacy = _domain_run("view_templates", view_templates.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+            legacy = _domain_run(_vt_domain, _vt_extractor.extract, doc, ctx,
+                                 contract_domains, run_diag, runner_notes)
             if legacy is not None:
-                fingerprint["view_templates"] = legacy
+                fingerprint[_vt_domain] = legacy
         except Blocked as b:
-            contract_domains["view_templates"] = contracts.new_domain_envelope(
-                domain="view_templates",
+            contract_domains[_vt_domain] = contracts.new_domain_envelope(
+                domain=_vt_domain,
                 domain_version=_DOMAIN_VERSION,
                 status=contracts.DOMAIN_STATUS_BLOCKED,
                 block_reasons=list(b.reasons),
-                diag={
-                    "blocked_code": b.code,
-                    "upstream": b.upstream,
-                },
+                diag={"blocked_code": b.code, "upstream": b.upstream},
                 records=None,
                 hash_value=None,
             )
-            contracts.add_bounded_error(
-                run_diag,
-                domain="view_templates",
+            contracts.add_bounded_error(run_diag, domain=_vt_domain,
+                status=contracts.DOMAIN_STATUS_BLOCKED, code=b.code,
+                message=";".join(list(b.reasons)))
+
+    # Schedules gate: only requires phase_filters
+    if _enabled("view_templates_schedules"):
+        try:
+            require_domain(contract_domains, "phase_filters")
+            legacy = _domain_run("view_templates_schedules",
+                                 view_templates_schedules.extract, doc, ctx,
+                                 contract_domains, run_diag, runner_notes)
+            if legacy is not None:
+                fingerprint["view_templates_schedules"] = legacy
+        except Blocked as b:
+            contract_domains["view_templates_schedules"] = contracts.new_domain_envelope(
+                domain="view_templates_schedules",
+                domain_version=_DOMAIN_VERSION,
                 status=contracts.DOMAIN_STATUS_BLOCKED,
-                code=b.code,
-                message=";".join(list(b.reasons)),
+                block_reasons=list(b.reasons),
+                diag={"blocked_code": b.code, "upstream": b.upstream},
+                records=None,
+                hash_value=None,
             )
+            contracts.add_bounded_error(run_diag, domain="view_templates_schedules",
+                status=contracts.DOMAIN_STATUS_BLOCKED, code=b.code,
+                message=";".join(list(b.reasons)))
+
+    # Routing completeness check: verify all view templates accounted for
+    # across all 5 domains. Emits a runner note if any templates fell through.
+    try:
+        _vt_domains = [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+            "view_templates_elevations_sections_detail",
+            "view_templates_renderings_drafting",
+            "view_templates_schedules",
+        ]
+        _vt_total_kept = sum(
+            fingerprint.get(d, {}).get("debug_kept", 0)
+            for d in _vt_domains
+        )
+        _vt_raw = fingerprint.get(
+            "view_templates_floor_structural_area_plans", {}
+        ).get("raw_count", 0)
+        _vt_not_template = fingerprint.get(
+            "view_templates_floor_structural_area_plans", {}
+        ).get("debug_not_template", 0)
+        _vt_templates_total = (_vt_raw or 0) - (_vt_not_template or 0)
+        _vt_unrouted = _vt_templates_total - _vt_total_kept
+        if _vt_unrouted > 0:
+            runner_notes.append(
+                "view_templates: {} template(s) not routed to any domain "
+                "(unrecognized viewtype)".format(_vt_unrouted)
+            )
+    except Exception:
+        pass
+
+    # Compatibility aliases: merge split domain records into legacy keys
+    # so that analysis tools built against the monolithic schema still work.
+    # These are read-only views — they do not affect any hashes.
+    try:
+        _os_records = []
+        for _dom in ["object_styles_model", "object_styles_annotation",
+                     "object_styles_analytical", "object_styles_imported"]:
+            _os_records.extend(fingerprint.get(_dom, {}).get("records", []))
+        if _os_records:
+            fingerprint["_compat_object_styles"] = {
+                "records": _os_records,
+                "count": len(_os_records),
+                "_is_compat_alias": True,
+                "_source_domains": ["object_styles_model", "object_styles_annotation",
+                                    "object_styles_analytical", "object_styles_imported"],
+            }
+    except Exception:
+        pass
+
+    try:
+        _vt_records = []
+        for _dom in ["view_templates_floor_structural_area_plans",
+                     "view_templates_ceiling_plans",
+                     "view_templates_elevations_sections_detail",
+                     "view_templates_renderings_drafting",
+                     "view_templates_schedules"]:
+            _vt_records.extend(fingerprint.get(_dom, {}).get("records", []))
+        if _vt_records:
+            fingerprint["_compat_view_templates"] = {
+                "records": _vt_records,
+                "count": len(_vt_records),
+                "_is_compat_alias": True,
+                "_source_domains": ["view_templates_floor_structural_area_plans",
+                                    "view_templates_ceiling_plans",
+                                    "view_templates_elevations_sections_detail",
+                                    "view_templates_renderings_drafting",
+                                    "view_templates_schedules"],
+            }
+    except Exception:
+        pass
 
     # End total extraction timer
     try:

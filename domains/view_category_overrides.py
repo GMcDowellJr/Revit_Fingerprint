@@ -2,14 +2,25 @@
 """
 View Category Overrides domain extractor.
 
-Captures category override deltas relative to object_styles baseline.
-This domain is designed for reuse across view templates and future view-level overrides.
+Captures per-category graphics override records for view templates:
+  - Category 1: Template-controlled overrides (V/G checkbox checked)
+  - Category 2: Latent overrides (V/G checkbox unchecked, override set)
+
+Both categories share the same record schema. BI filters by
+coordination_items.vco.include_controlled to isolate the governance
+population (Category 1).
+
+Category 3 (view-local overrides on non-template views) is deferred.
+Hooks: vco.context_type will be "view_local" for that population.
+
+Dependencies:
+  Upstream:  object_styles_model  (for row_key → sig_hash baseline map)
+  Downstream: none (view_template_* domains do NOT depend on VCO)
 """
 
 import os
 import sys
 
-# Ensure repo root is importable (so `import core...` works everywhere)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 repo_root = os.path.dirname(current_dir)
 if repo_root not in sys.path:
@@ -43,90 +54,100 @@ from core.graphic_overrides import (
 )
 
 try:
-    from Autodesk.Revit.DB import View, OverrideGraphicSettings
+    from Autodesk.Revit.DB import (
+        View,
+        OverrideGraphicSettings,
+        BuiltInParameter,
+    )
 except ImportError:
     View = None
     OverrideGraphicSettings = None
+    BuiltInParameter = None
 
 from core.collect import collect_instances
 
 
+# ---------------------------------------------------------------------------
+# V/G include-controlled BIP map.
+# When a BIP integer is present in GetTemplateParameterIds(), the corresponding
+# V/G tab's "Include" checkbox is checked for that template.
+# ---------------------------------------------------------------------------
+def _build_vg_include_bips():
+    if BuiltInParameter is None:
+        return {}
+    bips = {}
+    try:
+        bips["Model"] = int(BuiltInParameter.VIS_GRAPHICS_OVERRIDES)
+    except Exception:
+        pass
+    try:
+        bips["Annotation"] = int(BuiltInParameter.VIS_GRAPHICS_ANNOTATION_OVERRIDES)
+    except Exception:
+        pass
+    try:
+        bips["AnalyticalModel"] = int(BuiltInParameter.VIS_GRAPHICS_ANALYTICAL_MODEL_OVERRIDES)
+    except Exception:
+        pass
+    try:
+        bips["Imported"] = int(BuiltInParameter.VIS_GRAPHICS_IMPORT_OVERRIDES)
+    except Exception:
+        pass
+    return bips
+
+
+_CAT_TYPE_LABELS = {1: "Model", 2: "Annotation", 3: "AnalyticalModel", 4: "Imported"}
+
+
 def _compute_override_properties_hash(identity_items):
     """
-    Compute canonical hash of ALL override properties as a behavioral unit.
+    Compute canonical hash of ALL override properties as a behavioural unit.
 
-    Two records with the same set of overrides but different templates/categories
-    will have the same override_properties_hash, enabling pattern detection.
+    Excludes baseline reference items (keys starting with 'vco.baseline').
+    Deterministic: sorts by key before hashing.
 
-    Args:
-        identity_items: List of IdentityItem dicts (full identity_basis items)
-
-    Returns:
-        str: MD5 hash of canonical override signature
+    Kept for backwards compatibility with test_join_key_migration.py and any
+    external callers.  Internal extraction uses the non-default field approach;
+    this helper is the canonical public surface for the hash algorithm.
     """
     import hashlib
 
-    # Extract only delta properties (exclude baseline references)
     override_items = [
-        item for item in identity_items
-        if not item.get('k', '').startswith('vco.baseline')
-           and item.get('k', '').startswith('vco.')
+        item for item in (identity_items or [])
+        if not item.get("k", "").startswith("vco.baseline")
+           and item.get("k", "").startswith("vco.")
     ]
+    sorted_items = sorted(override_items, key=lambda x: x.get("k", ""))
 
-    # Sort by key for canonical ordering
-    sorted_items = sorted(override_items, key=lambda x: x.get('k', ''))
-
-    # Build canonical signature (same format as other domains)
-    signature_parts = []
+    parts = []
     for item in sorted_items:
-        k = item.get('k', '')
-        q = item.get('q', '')
-        v = item.get('v')
-        # Handle None values explicitly
-        v_str = '' if v is None else str(v)
-        signature_parts.append("{}={}:{}".format(k, q, v_str))
+        k = item.get("k", "")
+        q = item.get("q", "")
+        v = item.get("v")
+        v_str = "" if v is None else str(v)
+        parts.append("{}={}:{}".format(k, q, v_str))
 
-    signature = "|".join(signature_parts)
-
-    # Compute MD5 hash matching hash_alg policy
-    return hashlib.md5(signature.encode('utf-8')).hexdigest()
+    signature = "|".join(parts)
+    return hashlib.md5(signature.encode("utf-8")).hexdigest()
 
 
 def _phase2_partition_items(items):
-    """Partition IdentityItems into semantic/cosmetic/unknown buckets.
-
-    Semantic: Baseline references + override hash (defines the pattern)
-    Cosmetic: Individual delta properties (forensic detail)
-    Unknown: Template/category context
-    """
+    """Partition identity_basis items into semantic/cosmetic/unknown buckets."""
     semantic = []
     cosmetic = []
     unknown = []
 
     for it in (items or []):
         k = safe_str(it.get("k", ""))
-
-        # SEMANTIC: Baseline refs and derived override hash
-        # These define WHAT the override pattern is
-        if k in ["vco.baseline_category_path",
+        if k in ("vco.baseline_category_path",
                  "vco.baseline_sig_hash",
-                 "vco.override_properties_hash"]:
+                 "vco.override_properties_hash"):
             semantic.append(it)
-            continue
-
-        # COSMETIC: Individual delta properties
-        # These are forensic detail ABOUT the pattern
-        if (
-            k.startswith("vco.projection.")
-            or k.startswith("vco.cut.")
-            or k.startswith("vco.halftone")
-            or k.startswith("vco.transparency")
-        ):
+        elif (k.startswith("vco.projection.")
+              or k.startswith("vco.cut.")
+              or k in ("vco.halftone", "vco.transparency")):
             cosmetic.append(it)
-            continue
-
-        # UNKNOWN: Everything else (should be minimal)
-        unknown.append(it)
+        else:
+            unknown.append(it)
 
     return (
         phase2_sorted_items(semantic),
@@ -135,64 +156,26 @@ def _phase2_partition_items(items):
     )
 
 
-def _compute_delta_items(override_items, baseline_record, key_prefix):
-    """
-    Compare override to baseline, return only changed properties.
-
-    Args:
-        override_items: List[IdentityItem] from extract_*_graphics()
-        baseline_record: Full record dict from object_styles
-        key_prefix: "vco" or "vco.projection" etc.
-
-    Returns:
-        List[IdentityItem]: Only items that differ from baseline
-    """
-    delta_items = []
-
-    baseline_items = (baseline_record or {}).get("identity_basis", {}).get("items", []) or []
-    baseline_map = {item.get("k"): item.get("v") for item in baseline_items}
-
-    prefix = "{}.".format(safe_str(key_prefix).strip(".")) if key_prefix else ""
-
-    for override_item in (override_items or []):
-        override_key = safe_str(override_item.get("k", ""))
-        if not override_key:
-            continue
-
-        if prefix and override_key.startswith(prefix):
-            baseline_key = "obj_style.{}".format(override_key[len(prefix):])
-        elif override_key.startswith("vco."):
-            baseline_key = "obj_style.{}".format(override_key[len("vco."):])
-        else:
-            baseline_key = override_key
-
-        baseline_value = baseline_map.get(baseline_key)
-        override_value = override_item.get("v")
-
-        if override_value != baseline_value:
-            delta_items.append(override_item)
-
-    return delta_items
-
-
 def extract(doc, ctx=None):
     """
-    Extract view category override deltas relative to object_styles baseline.
+    Extract view category override records from all view templates.
 
     Args:
-        doc: Revit document
-        ctx: context dict with mappings from other domains
+        doc: Revit Document
+        ctx: context dict; must contain object_style_row_key_to_sig_hash
+             (from object_styles_model) and optionally
+             object_style_annotation_row_key_to_sig_hash
+             (from object_styles_annotation) for annotation category baselines
 
     Returns:
-        Dictionary with records, hashes, and debug counters
+        dict with records, hash_v2, count, raw_count, and debug counters.
     """
     info = {
         "count": 0,
+        "raw_count": 0,      # (template × category) pairs with any override
         "records": [],
         "hash_v2": None,
         "signature_hashes_v2": [],
-
-        # Debug counters
         "debug_templates_processed": 0,
         "debug_categories_checked": 0,
         "debug_overrides_found": 0,
@@ -206,147 +189,208 @@ def extract(doc, ctx=None):
         return info
 
     try:
-        require_domain((ctx or {}).get("_domains", {}), "object_styles")
-        require_domain((ctx or {}).get("_domains", {}), "line_patterns")
-        require_domain((ctx or {}).get("_domains", {}), "fill_patterns")
+        require_domain((ctx or {}).get("_domains", {}), "object_styles_model")
     except Blocked:
         info["debug_v2_blocked"] = True
         return info
 
-    baseline_sig_map = ctx.get("object_styles_category_to_sig_hash", {}) if ctx else {}
-    baseline_records = ctx.get("object_styles_records", {}) if ctx else {}
-
+    # Build unified baseline map from all object_styles partition ctx maps.
+    # Each partition populates its own ctx key after the domain family split.
+    baseline_sig_map = {}
+    for _ctx_key in [
+        "object_style_row_key_to_sig_hash",             # model
+        "object_style_annotation_row_key_to_sig_hash",  # annotation
+        "object_style_analytical_row_key_to_sig_hash",  # analytical
+        "object_style_imported_row_key_to_sig_hash",    # imported
+    ]:
+        baseline_sig_map.update((ctx or {}).get(_ctx_key) or {})
     if not baseline_sig_map:
-        info["debug_v2_blocked"] = True
-        return info
+        info["debug_no_baseline_map"] = True
+        # Don't block — degrade individual records where baseline is missing
 
-    templates = []
+    # Build V/G include-controlled BIP set once
+    vg_include_bips = _build_vg_include_bips()
+
+    # -----------------------------------------------------------------------
+    # Collect view templates via collect_instances (wraps FEC internally).
+    # collect_types is for ElementType subclasses; View instances are not
+    # types, so collect_instances is the appropriate API.
+    # -----------------------------------------------------------------------
+    all_views = []
     try:
-        templates = list(
-            collect_instances(
-                doc,
-                of_class=View,
-                where_key="view_category_overrides.views",
-            )
+        all_views = list(
+            collect_instances(doc, of_class=View, where_key="view_category_overrides.views")
         )
     except Exception:
-        templates = list(getattr(doc, "AllViews", []) or [])
+        pass
 
-    templates = [v for v in templates if getattr(v, "IsTemplate", False)]
+    templates = [v for v in all_views if _safe_bool(lambda: v.IsTemplate)]
     info["debug_templates_processed"] = len(templates)
 
-    override_patterns = {}
-    blocked_records = []
+    # -----------------------------------------------------------------------
+    # Collect categories (top-level + subcategories).
+    # -----------------------------------------------------------------------
+    all_cats = []  # [(cat_obj, is_sub, parent_or_None)]
+    try:
+        cat_root = doc.Settings.Categories
+        for cat in cat_root:
+            try:
+                all_cats.append((cat, False, None))
+                try:
+                    for sub in cat.SubCategories:
+                        all_cats.append((sub, True, cat))
+                except Exception:
+                    pass
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # Default OGS used to detect non-default fields
+    dflt = OverrideGraphicSettings()
+
+    v2_records = []
     signature_hashes_v2 = []
     v2_any_blocked = False
 
-    categories = []
-    try:
-        categories = list(getattr(doc.Settings, "Categories", []) or [])
-    except Exception:
-        categories = []
-
     for template in templates:
-        template_name = canon_str(getattr(template, "Name", None))
+        # --- V/G include-controlled state ---
+        tpl_param_ids = set()
+        try:
+            for p in (template.GetTemplateParameterIds() or []):
+                try:
+                    tpl_param_ids.add(int(p.IntegerValue))
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
-        for category in categories:
-            category_name = canon_str(getattr(category, "Name", None))
-            category_path = "{}|self".format(category_name)
+        # Template traceability
+        tpl_uid = None
+        try:
+            tpl_uid = safe_str(template.UniqueId)
+        except Exception:
+            pass
+        tpl_eid = None
+        try:
+            tpl_eid = int(template.Id.IntegerValue)
+        except Exception:
+            pass
+
+        for (cat, is_sub, parent) in all_cats:
+            # Only govern known category types
+            try:
+                cat_type_int = int(cat.CategoryType)
+            except Exception:
+                continue
+            if cat_type_int not in _CAT_TYPE_LABELS:
+                continue
 
             info["debug_categories_checked"] += 1
 
-            baseline_sig_hash = baseline_sig_map.get(category_path)
-            if not baseline_sig_hash:
-                info["debug_no_baseline"] += 1
-                continue
-
-            baseline_record = baseline_records.get(baseline_sig_hash)
-            if not baseline_record:
-                info["debug_no_baseline"] += 1
-                continue
-
+            # Read override from this template for this category
             try:
-                ogs = template.GetCategoryOverrides(category.Id)
+                ogs = template.GetCategoryOverrides(cat.Id)
             except Exception:
                 continue
-
-            if not ogs:
+            if ogs is None:
                 continue
 
-            override_items = []
-
+            # Extract override items
             proj_items = extract_projection_graphics(doc, ogs, ctx, "vco.projection")
             cut_items = extract_cut_graphics(doc, ogs, ctx, "vco.cut")
             halftone_items = extract_halftone(ogs, "vco.halftone")
             trans_items = extract_transparency(ogs, "vco.transparency")
+            all_ogs_items = proj_items + cut_items + halftone_items + trans_items
 
-            override_items.extend(proj_items)
-            override_items.extend(cut_items)
-            override_items.extend(halftone_items)
-            override_items.extend(trans_items)
+            # Compare to default OGS to detect any override
+            dflt_proj = extract_projection_graphics(doc, dflt, ctx, "vco.projection")
+            dflt_cut = extract_cut_graphics(doc, dflt, ctx, "vco.cut")
+            dflt_halftone = extract_halftone(dflt, "vco.halftone")
+            dflt_trans = extract_transparency(dflt, "vco.transparency")
+            dflt_map = {it.get("k"): it.get("v")
+                        for it in dflt_proj + dflt_cut + dflt_halftone + dflt_trans}
 
-            delta_items = _compute_delta_items(override_items, baseline_record, "vco")
+            actual_map = {it.get("k"): it.get("v") for it in all_ogs_items}
+            has_override = any(actual_map.get(k) != dflt_map.get(k) for k in actual_map)
 
-            if not delta_items:
+            if not has_override:
                 info["debug_no_change"] += 1
                 continue
 
             info["debug_overrides_found"] += 1
+            info["raw_count"] += 1
 
-            base_path_v, base_path_q = canonicalize_str(category_path)
-            base_sig_v, base_sig_q = canonicalize_str(baseline_sig_hash)
+            # --- Build row_key to look up baseline sig_hash ---
+            cat_name = safe_str(getattr(cat, "Name", None) or "")
+            if is_sub and parent is not None:
+                parent_name = safe_str(getattr(parent, "Name", None) or "")
+                row_key = "{}|{}".format(parent_name, cat_name)
+            else:
+                row_key = "{}|self".format(cat_name)
 
-            identity_items = [
-                make_identity_item("vco.baseline_category_path", base_path_v, base_path_q),
-                make_identity_item("vco.baseline_sig_hash", base_sig_v, base_sig_q),
+            baseline_sig = baseline_sig_map.get(row_key) if baseline_sig_map else None
+            if not baseline_sig:
+                info["debug_no_baseline"] += 1
+
+            # --- V/G include_controlled state ---
+            cat_type_label = _CAT_TYPE_LABELS.get(cat_type_int, safe_str(cat_type_int))
+            vg_bip = vg_include_bips.get(cat_type_label)
+            include_controlled = vg_bip is not None and vg_bip in tpl_param_ids
+
+            # --- Identity items ---
+            rk_v, rk_q = canonicalize_str(row_key)
+            bs_v, bs_q = canonicalize_str(baseline_sig) if baseline_sig else (None, ITEM_Q_MISSING)
+
+            # override_properties_hash = hash of non-default field items only
+            non_dflt_items = [
+                it for it in all_ogs_items
+                if actual_map.get(it.get("k")) != dflt_map.get(it.get("k"))
             ]
-            identity_items.extend(delta_items)
+            non_dflt_sorted = sorted(non_dflt_items, key=lambda x: x.get("k", ""))
+            oph_preimage = serialize_identity_items(non_dflt_sorted) if non_dflt_sorted else "|empty|"
+            override_props_hash = make_hash(oph_preimage)
+            oph_v, oph_q = canonicalize_str(override_props_hash)
 
-            # Compute override_properties_hash before sorting
-            override_props_hash = _compute_override_properties_hash(identity_items)
-            identity_items.append(
-                make_identity_item(
-                    "vco.override_properties_hash",
-                    override_props_hash,
-                    ITEM_Q_OK
-                )
+            identity_items = (
+                [
+                    make_identity_item("vco.baseline_category_path", rk_v, rk_q),
+                    make_identity_item("vco.baseline_sig_hash", bs_v, bs_q),
+                    make_identity_item("vco.override_properties_hash", oph_v, oph_q),
+                ]
+                + sorted(all_ogs_items, key=lambda x: x.get("k", ""))
             )
+            identity_items_sorted = sorted(identity_items, key=lambda it: it.get("k", ""))
 
-            # Canonical evidence source for this domain is identity_basis.items.
-            # Selectors (join_key.keys_used, phase2.semantic_keys, sig_basis.keys_used)
-            # reference subsets without duplicating k/q/v payloads.
-            identity_items_sorted = sorted(identity_items, key=lambda it: str(it.get("k", "")))
-            semantic_keys = sorted({safe_str(it.get("k", "")) for it in identity_items_sorted if safe_str(it.get("k", ""))})
-            semantic_items = [it for it in identity_items_sorted if safe_str(it.get("k", "")) in set(semantic_keys)]
-            preimage = serialize_identity_items(semantic_items)
-            sig_hash = make_hash(preimage) if preimage is not None else None
+            # sig_hash
+            preimage = serialize_identity_items(identity_items_sorted)
+            sig_hash = make_hash(preimage) if preimage else None
 
-            required_keys = ["vco.baseline_category_path", "vco.baseline_sig_hash", "vco.override_properties_hash"]
-            item_by_k = {it.get("k"): it for it in identity_items_sorted}
-            required_qs = [safe_str(item_by_k.get(rk, {}).get("q", ITEM_Q_MISSING)) for rk in required_keys]
-
+            # Status computation
+            required_qs = [rk_q, bs_q, oph_q]
+            blocked = any(q != ITEM_Q_OK for q in required_qs) or sig_hash is None
+            any_incomplete = any(it.get("q") != ITEM_Q_OK for it in identity_items_sorted)
             status_reasons = []
-            any_incomplete = False
             for it in identity_items_sorted:
-                q = it.get("q")
-                if q != ITEM_Q_OK:
-                    any_incomplete = True
-                    status_reasons.append("identity.incomplete:{}:{}".format(q, it.get("k")))
+                if it.get("q") != ITEM_Q_OK:
+                    status_reasons.append("identity.incomplete:{}:{}".format(
+                        it.get("q"), it.get("k")))
 
-            blocked = any(q != ITEM_Q_OK for q in required_qs)
-
-            record_id = "vco_{}_{}".format(safe_str(category_name), safe_str(sig_hash or "blocked")[:8])
+            record_id = "vco_{}_{}".format(
+                safe_str(row_key),
+                safe_str(sig_hash or "blocked")[:8],
+            )
             label = {
-                "display": "{}: {} changes".format(category_path, len(delta_items)),
+                "display": row_key,
                 "quality": "human",
-                "provenance": "computed.delta",
+                "provenance": "computed.override",
                 "components": {
-                    "template": safe_str(template_name),
-                    "category_path": safe_str(category_path),
+                    "category_path": safe_str(row_key),
+                    "template_uid": safe_str(tpl_uid or ""),
                 },
             }
 
-            if blocked or sig_hash is None:
+            if blocked:
                 v2_any_blocked = True
                 rec = build_record_v2(
                     domain="view_category_overrides",
@@ -358,7 +402,6 @@ def extract(doc, ctx=None):
                     required_qs=(),
                     label=label,
                 )
-                blocked_records.append(rec)
             else:
                 status = STATUS_DEGRADED if any_incomplete else STATUS_OK
                 rec = build_record_v2(
@@ -371,46 +414,54 @@ def extract(doc, ctx=None):
                     required_qs=required_qs,
                     label=label,
                 )
-
-                if sig_hash in override_patterns:
-                    continue
-
-                override_patterns[sig_hash] = rec
                 signature_hashes_v2.append(sig_hash)
 
+            # --- Phase 2 partitioning ---
             p2_semantic, p2_cosmetic, p2_unknown = _phase2_partition_items(identity_items_sorted)
 
-            # Traceability fields (metadata only — never in hash/sig/join)
+            coordination = [
+                make_identity_item(
+                    "vco.include_controlled",
+                    "true" if include_controlled else "false",
+                    ITEM_Q_OK,
+                ),
+                make_identity_item("vco.vg_category_type", cat_type_label, ITEM_Q_OK),
+                make_identity_item("vco.context_type", "template", ITEM_Q_OK),
+            ]
+
+            cosmetic = []
             try:
-                _tpl_eid_raw = getattr(getattr(template, "Id", None), "IntegerValue", None)
-                _tpl_eid_v, _tpl_eid_q = canonicalize_int(_tpl_eid_raw)
+                tpl_name_raw = getattr(template, "Name", None)
+                if tpl_name_raw:
+                    tpl_nm_v, tpl_nm_q = canonicalize_str(safe_str(tpl_name_raw))
+                    cosmetic.append(make_identity_item("vco.template_name", tpl_nm_v, tpl_nm_q))
             except Exception:
-                _tpl_eid_v, _tpl_eid_q = (None, ITEM_Q_UNREADABLE)
+                pass
+
+            unknown_extra = []
             try:
-                _tpl_uid_raw = getattr(template, "UniqueId", None)
-                _tpl_uid_v, _tpl_uid_q = canonicalize_str(_tpl_uid_raw)
+                eid_v, eid_q = canonicalize_int(tpl_eid)
+                unknown_extra.append(make_identity_item("vco.template_element_id", eid_v, eid_q))
             except Exception:
-                _tpl_uid_v, _tpl_uid_q = (None, ITEM_Q_UNREADABLE)
+                unknown_extra.append(
+                    make_identity_item("vco.template_element_id", None, ITEM_Q_UNREADABLE))
             try:
-                _cat_eid_raw = getattr(getattr(category, "Id", None), "IntegerValue", None)
-                _cat_eid_v, _cat_eid_q = canonicalize_int(_cat_eid_raw)
+                uid_v, uid_q = canonicalize_str(tpl_uid)
+                unknown_extra.append(make_identity_item("vco.template_unique_id", uid_v, uid_q))
             except Exception:
-                _cat_eid_v, _cat_eid_q = (None, ITEM_Q_UNREADABLE)
-            p2_unknown.append({"k": "vco.category_source_element_id", "q": _cat_eid_q, "v": _cat_eid_v})
-            p2_unknown.append({"k": "vco.template_source_element_id", "q": _tpl_eid_q, "v": _tpl_eid_v})
-            p2_unknown.append({"k": "vco.template_source_unique_id", "q": _tpl_uid_q, "v": _tpl_uid_v})
+                unknown_extra.append(
+                    make_identity_item("vco.template_unique_id", None, ITEM_Q_UNREADABLE))
 
             rec["phase2"] = {
                 "schema": "phase2.view_category_overrides.v1",
                 "grouping_basis": "join_key.join_hash",
-                # Semantic selector references identity_basis.items.
-                # Deprecated direction: semantic_items should not duplicate canonical evidence.
-                                "cosmetic_items": phase2_sorted_items(p2_cosmetic),
-                "coordination_items": phase2_sorted_items([]),
-                "unknown_items": phase2_sorted_items(p2_unknown),
+                "cosmetic_items": phase2_sorted_items(p2_cosmetic + cosmetic),
+                "coordination_items": phase2_sorted_items(coordination),
+                "unknown_items": phase2_sorted_items(p2_unknown + unknown_extra),
             }
 
-            pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "view_category_overrides")
+            pol = get_domain_join_key_policy(
+                (ctx or {}).get("join_key_policies"), "view_category_overrides")
             rec["join_key"], _missing = build_join_key_from_policy(
                 domain_policy=pol,
                 identity_items=identity_items_sorted,
@@ -423,25 +474,34 @@ def extract(doc, ctx=None):
 
             rec["sig_basis"] = {
                 "schema": "view_category_overrides.sig_basis.v1",
-                "keys_used": semantic_keys,
+                "keys_used": sorted({safe_str(it.get("k", "")) for it in identity_items_sorted}),
             }
 
-    records = list(override_patterns.values()) + blocked_records
-    records = sorted(records, key=lambda r: safe_str(r.get("record_id", "")))
+            v2_records.append(rec)
 
-    info["records"] = records
-    info["count"] = len(records)
+    info["records"] = sorted(v2_records, key=lambda r: safe_str(r.get("record_id", "")))
+    info["count"] = len(v2_records)
     info["signature_hashes_v2"] = sorted(signature_hashes_v2)
 
     if v2_any_blocked:
         info["debug_v2_blocked"] = True
-
-    if signature_hashes_v2 and not v2_any_blocked:
-        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
-    else:
+        info["debug_v2_block_reasons"] = {"one_or_more_records_blocked": True}
         info["hash_v2"] = None
+    elif signature_hashes_v2:
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
+    # else: 0 override records is valid — no overrides in this model
+    # hash_v2 stays None, debug_v2_blocked stays False
 
+    # Keep legacy ctx key for backwards compatibility
     if ctx is not None:
-        ctx["view_category_overrides_sig_hash"] = dict(override_patterns)
+        ctx["view_category_overrides_sig_hash"] = {}
 
     return info
+
+
+def _safe_bool(fn, default=False):
+    """Evaluate a zero-arg callable, returning default on any exception."""
+    try:
+        return bool(fn())
+    except Exception:
+        return default
