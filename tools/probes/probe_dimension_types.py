@@ -100,26 +100,40 @@ def _safe_type_name(elem):
 def _get_family_name_param(dim_type):
     """
     Read the family-name parameter using the same lookup path as the extractor.
-    Returns the raw string value or None if unreadable.
+    Returns the raw string value or None when the parameter is absent, unreadable,
+    unset, or only whitespace.
     """
+    def _normalize_param_string(p):
+        if p is None:
+            return None
+        try:
+            if not p.HasValue:
+                return None
+        except Exception:
+            return None
+        try:
+            v = p.AsString()
+        except Exception:
+            return None
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s if s else None
+
     if dim_type is None:
         return None
     # Try BIP first
     try:
-        p = dim_type.get_Parameter(BuiltInParameter.SYMBOL_FAMILY_NAME_PARAM)
-        if p is not None:
-            v = p.AsString()
-            if v is not None:
-                return str(v)
+        v = _normalize_param_string(dim_type.get_Parameter(BuiltInParameter.SYMBOL_FAMILY_NAME_PARAM))
+        if v is not None:
+            return v
     except Exception:
         pass
     # Try LookupParameter as last resort
     try:
-        p = dim_type.LookupParameter("Family Name")
-        if p is not None:
-            v = p.AsString()
-            if v is not None:
-                return str(v)
+        v = _normalize_param_string(dim_type.LookupParameter("Family Name"))
+        if v is not None:
+            return v
     except Exception:
         pass
     return None
