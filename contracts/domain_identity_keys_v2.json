@@ -203,7 +203,25 @@
       "allowed_keys": [
         "vco.baseline_category_path",
         "vco.baseline_sig_hash",
-        "vco.override_properties_hash"
+        "vco.override_properties_hash",
+        "vco.projection.line_weight",
+        "vco.projection.color.rgb",
+        "vco.projection.pattern_ref.sig_hash",
+        "vco.projection.fill_pattern_ref.sig_hash",
+        "vco.projection.fill_color.rgb",
+        "vco.cut.line_weight",
+        "vco.cut.color.rgb",
+        "vco.cut.pattern_ref.sig_hash",
+        "vco.cut.fill_pattern_ref.sig_hash",
+        "vco.cut.fill_color.rgb",
+        "vco.halftone",
+        "vco.transparency",
+        "vco.include_controlled",
+        "vco.vg_category_type",
+        "vco.context_type",
+        "vco.template_name",
+        "vco.template_element_id",
+        "vco.template_unique_id"
       ],
       "required_keys": [
         "vco.baseline_category_path",
