@@ -39,6 +39,7 @@ from core.phase2 import phase2_sorted_items
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 from core.dimension_type_helpers import (
+    _fmt_in_from_ft,
     _get_dimension_shape,
     _build_text_appearance_items,
     _read_tick_mark_sig_hash,
@@ -71,6 +72,7 @@ _CTX_DIM_TYPES_CACHE_KEY = "_dim_types_cache"
 _LINEAR_HANDLED = frozenset({SHAPE_LINEAR, SHAPE_LINEAR_FIXED, SHAPE_ARC_LENGTH})
 _ANGULAR_HANDLED = frozenset({SHAPE_ANGULAR})
 _RADIAL_HANDLED = frozenset({SHAPE_RADIAL})
+_DIAMETER_HANDLED = frozenset({SHAPE_DIAMETER, SHAPE_SPOT_ELEVATION_FIXED})
 _SPOT_ELEV_HANDLED = frozenset({SHAPE_SPOT_ELEVATION})
 _SPOT_COORD_HANDLED = frozenset({SHAPE_SPOT_COORDINATE, SHAPE_ALIGNMENT_STATION_LABEL})
 _SPOT_SLOPE_HANDLED = frozenset({SHAPE_SPOT_SLOPE})
@@ -935,6 +937,7 @@ def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
 
 
 def extract_diameter(doc, ctx=None):
+    _HANDLED_SHAPES = _DIAMETER_HANDLED
     DOMAIN_NAME = "dimension_types_diameter"
     EXPECTED_FAMILY = _DIAMETER_EXPECTED_FAMILY
     """
