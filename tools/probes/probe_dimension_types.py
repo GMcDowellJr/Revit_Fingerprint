@@ -99,9 +99,7 @@ def _safe_type_name(elem):
 
 def _get_family_name_param(dim_type):
     """
-    Read SYMBOL_FAMILY_NAME_PARAM directly from a DimensionType.
-    This is the exact same lookup the extractor's family gate uses,
-    so the crosswalk output directly tells us what the gate will see.
+    Read the family-name parameter using the same lookup path as the extractor.
     Returns the raw string value or None if unreadable.
     """
     if dim_type is None:
@@ -113,13 +111,6 @@ def _get_family_name_param(dim_type):
             v = p.AsString()
             if v is not None:
                 return str(v)
-    except Exception:
-        pass
-    # Try FamilyName property as fallback
-    try:
-        fn = getattr(dim_type, "FamilyName", None)
-        if fn is not None:
-            return str(fn)
     except Exception:
         pass
     # Try LookupParameter as last resort
