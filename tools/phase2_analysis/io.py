@@ -18,18 +18,27 @@ class ExportFile:
     data: Dict[str, Any]
 
 
-def iter_json_paths(root_dir: str) -> Iterator[str]:
-    """Yield monolithic export JSON paths in root_dir (non-recursive)."""
-    root_dir = os.path.abspath(root_dir)
-    if not os.path.isdir(root_dir):
-        raise FileNotFoundError(f"Not a directory: {root_dir}")
-
+def _ordered_export_names(root_dir: str) -> List[str]:
+    """Return export JSON names in priority order: fingerprint, then plain fallback."""
     names = [
         n
         for n in os.listdir(root_dir)
         if n.lower().endswith(".json") and not n.lower().endswith(".legacy.json")
     ]
     names.sort(key=lambda x: x.lower())
+
+    fingerprints = [n for n in names if n.lower().endswith("__fingerprint.json")]
+    plain = [n for n in names if not n.lower().endswith("__fingerprint.json")]
+    return fingerprints + plain
+
+
+def iter_json_paths(root_dir: str) -> Iterator[str]:
+    """Yield monolithic export JSON paths in root_dir (non-recursive)."""
+    root_dir = os.path.abspath(root_dir)
+    if not os.path.isdir(root_dir):
+        raise FileNotFoundError(f"Not a directory: {root_dir}")
+
+    names = _ordered_export_names(root_dir)
 
     for name in names:
         p = os.path.join(root_dir, name)
@@ -57,12 +66,7 @@ def load_exports(root_dir: str, *, max_files: Optional[int] = None) -> List[Expo
     if not os.path.isdir(root_dir):
         raise FileNotFoundError(f"Not a directory: {root_dir}")
 
-    names = [
-        n
-        for n in os.listdir(root_dir)
-        if n.lower().endswith(".json") and not n.lower().endswith(".legacy.json")
-    ]
-    names.sort(key=lambda x: x.lower())
+    names = _ordered_export_names(root_dir)
 
     exports: List[ExportFile] = []
     for name in names:

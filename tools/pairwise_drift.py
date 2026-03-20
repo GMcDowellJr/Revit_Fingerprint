@@ -111,9 +111,9 @@ def main(argv: list[str]) -> int:
     )
     ap.add_argument(
         "--pattern",
-        default="*.index.json",
-        help="Glob pattern for inputs (default: *.index.json). "
-             "Use *.details.json if you intentionally want record-level payloads.",
+        default="*__fingerprint.json",
+        help="Glob pattern for inputs (default: *__fingerprint.json). "
+             "Use *.index.json or *.details.json if you intentionally want legacy split inputs.",
     )
     ap.add_argument(
         "--baseline",
