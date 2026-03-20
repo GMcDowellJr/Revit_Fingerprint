@@ -60,22 +60,48 @@ class TimingCollector:
                 t_start = self._pending.pop(label, None)
                 if t_start is None:
                     return
-                elapsed = t_end - t_start
-                if label not in self._durations:
-                    self._durations[label] = []
-                self._durations[label].append(elapsed)
-
-                # If there is an active domain, also record under domain scope
-                if self._active_domain and not label.startswith("domain:"):
-                    domain = self._active_domain
-                    if domain not in self._domain_scoped:
-                        self._domain_scoped[domain] = {}
-                    scoped = self._domain_scoped[domain]
-                    if label not in scoped:
-                        scoped[label] = []
-                    scoped[label].append(elapsed)
+                self._record_elapsed_locked(label, t_end - t_start, calls=1)
         except Exception:
             pass
+
+    def record_elapsed(self, label: str, elapsed_seconds: float, calls: int = 1) -> None:
+        """
+        Record a pre-computed elapsed duration directly.
+
+        Used for hot-loop accumulation patterns where per-call start/end overhead
+        is unacceptable. Durations are expanded into logical call entries so the
+        existing raw/domain reports preserve call counts and totals.
+        """
+        try:
+            with self._lock:
+                self._record_elapsed_locked(label, elapsed_seconds, calls=calls)
+        except Exception:
+            pass
+
+    def _record_elapsed_locked(self, label: str, elapsed_seconds: float, calls: int = 1) -> None:
+        """Record elapsed time while holding ``self._lock``."""
+        label = str(label)
+        try:
+            elapsed = float(elapsed_seconds)
+        except Exception:
+            elapsed = 0.0
+        if elapsed < 0.0:
+            elapsed = 0.0
+        try:
+            logical_calls = int(calls)
+        except Exception:
+            logical_calls = 1
+        if logical_calls <= 0:
+            logical_calls = 1
+
+        per_call = elapsed / float(logical_calls) if logical_calls else elapsed
+        durations = self._durations.setdefault(label, [])
+        durations.extend([per_call] * logical_calls)
+
+        if self._active_domain and not label.startswith("domain:"):
+            domain = self._active_domain
+            scoped = self._domain_scoped.setdefault(domain, {})
+            scoped.setdefault(label, []).extend([per_call] * logical_calls)
 
     def set_active_domain(self, domain_name: Optional[str]) -> None:
         """Set the currently executing domain for sub-timing scoping."""
@@ -174,6 +200,12 @@ class TimingCollector:
             "total_api_seconds": round(total_api, 6),
             "total_processing_seconds": round(total_processing, 6),
             "overhead_seconds": round(overhead, 6),
+            "total_serialization_seconds": round(
+                sum(self._durations.get("total_serialization", [0.0])), 6
+            ),
+            "total_run_seconds": round(
+                sum(self._durations.get("total_run", [0.0])), 6
+            ),
         }
 
         report: Dict[str, Any] = {

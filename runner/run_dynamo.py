@@ -481,6 +481,7 @@ def run_fingerprint(doc):
     except Exception:
         pass
 
+    _timing.start_timer("total_run")
     _timing.start_timer("total_extraction")
 
     # PR6: shared document + view context (domains can use for consistent view reads)
@@ -646,6 +647,18 @@ def run_fingerprint(doc):
         )
 
     # Contextual domains (can reference global domains via ctx)
+    # Cache pre-warm: populate shared View instances cache before any view-related domain runs.
+    # view_filter_applications_view_templates, view_category_overrides, and all
+    # view_templates_* domains use _VIEW_INSTANCES_CACHE_KEY so FEC executes exactly once.
+    # This block must remain the first view-domain operation in the runner.
+    try:
+        from domains.view_templates import _VIEW_INSTANCES_CACHE_KEY as _VT_CACHE_KEY
+        from core.collect import collect_instances as _ci
+        from Autodesk.Revit.DB import View as _View
+        _ci(doc, of_class=_View, cctx=ctx["_collect"], cache_key=_VT_CACHE_KEY)
+    except Exception:
+        pass
+
     if _enabled("view_filter_applications_view_templates"):
         legacy = _domain_run(
             "view_filter_applications_view_templates",
@@ -1048,6 +1061,7 @@ try:
     # Timings around the post-extraction phase
     t_extract_done = round(time.perf_counter() - _SCRIPT_START, 3)
 
+    _timing.start_timer("total_serialization")
     output_path = _get_output_path_from_dynamo()
 
     # If caller provided a directory, write a deterministically-named file into it.
@@ -1134,6 +1148,15 @@ try:
     else:
         # Legacy behavior: return full JSON through Dynamo (may hang on large payloads)
         OUT = json.dumps(fingerprint, indent=2, sort_keys=True)
+
+    try:
+        _timing.end_timer("total_serialization")
+    except Exception:
+        pass
+    try:
+        _timing.end_timer("total_run")
+    except Exception:
+        pass
 
 except Exception as e:
     import traceback as _traceback

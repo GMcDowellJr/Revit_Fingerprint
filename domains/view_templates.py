@@ -43,6 +43,10 @@ except Exception as e:
 
 _CTX_TEMPLATES_CACHE_KEY = "_view_templates_cache"
 
+# Canonical cache key for all-View-instances collection.
+# All view_templates_* domains use this key so FEC runs once per extraction run.
+_VIEW_INSTANCES_CACHE_KEY = "view_instances:View:all"
+
 
 def _collect_templates(doc, ctx):
     if ctx is not None and _CTX_TEMPLATES_CACHE_KEY in ctx:
@@ -53,7 +57,7 @@ def _collect_templates(doc, ctx):
             of_class=View,
             require_unique_id=True,
             cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-            cache_key="view_templates:View:instances",
+            cache_key=_VIEW_INSTANCES_CACHE_KEY,
         )
     )
     if ctx is not None:
@@ -202,7 +206,7 @@ def extract_floor_structural_area_plans(doc, ctx=None):
                 of_class=View,
                 require_unique_id=True,
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="view_templates_floor_structural_area_plans:View:instances",
+                cache_key=_VIEW_INSTANCES_CACHE_KEY,
             )
         )
     except Exception as e:
@@ -673,7 +677,7 @@ def extract_ceiling_plans(doc, ctx=None):
                 of_class=View,
                 require_unique_id=True,
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="view_templates_ceiling_plans:View:instances",
+                cache_key=_VIEW_INSTANCES_CACHE_KEY,
             )
         )
     except Exception as e:
@@ -1177,7 +1181,7 @@ def extract_elevations_sections_detail(doc, ctx=None):
                 of_class=View,
                 require_unique_id=True,
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="view_templates_elevations_sections_detail:View:instances",
+                cache_key=_VIEW_INSTANCES_CACHE_KEY,
             )
         )
     except Exception as e:
@@ -1664,7 +1668,7 @@ def extract_renderings_drafting(doc, ctx=None):
                 of_class=View,
                 require_unique_id=True,
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="view_templates_renderings_drafting:View:instances",
+                cache_key=_VIEW_INSTANCES_CACHE_KEY,
             )
         )
     except Exception as e:
@@ -2146,7 +2150,7 @@ def extract_schedules(doc, ctx=None):
                 of_class=View,
                 require_unique_id=True,
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="view_templates_schedules:View:instances",
+                cache_key=_VIEW_INSTANCES_CACHE_KEY,
             )
         )
     except Exception as e:

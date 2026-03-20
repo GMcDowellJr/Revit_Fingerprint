@@ -44,6 +44,7 @@ from core.phase2 import (
     phase2_join_hash,
     phase2_sorted_items,
 )
+from domains.view_templates import _VIEW_INSTANCES_CACHE_KEY
 
 
 from core.join_key_policy import get_domain_join_key_policy
@@ -111,10 +112,8 @@ def extract(doc, ctx=None):
                 doc,
                 of_class=View,
                 require_unique_id=False,
-                where=lambda v: bool(getattr(v, "IsTemplate", False)),
-                where_key="IsTemplate==True",
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="view_filter_applications_view_templates:View:templates",
+                cache_key=_VIEW_INSTANCES_CACHE_KEY,
             )
         )
     except Exception as e:
@@ -129,6 +128,9 @@ def extract(doc, ctx=None):
     v2_block_reasons: Dict[str, Any] = {}
 
     for v in col:
+        if not bool(getattr(v, "IsTemplate", False)):
+            continue
+
         try:
             name_raw = getattr(v, "Name", None)
         except Exception:
