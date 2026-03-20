@@ -647,6 +647,18 @@ def run_fingerprint(doc):
         )
 
     # Contextual domains (can reference global domains via ctx)
+    # Cache pre-warm: populate shared View instances cache before any view-related domain runs.
+    # view_filter_applications_view_templates, view_category_overrides, and all
+    # view_templates_* domains use _VIEW_INSTANCES_CACHE_KEY so FEC executes exactly once.
+    # This block must remain the first view-domain operation in the runner.
+    try:
+        from domains.view_templates import _VIEW_INSTANCES_CACHE_KEY as _VT_CACHE_KEY
+        from core.collect import collect_instances as _ci
+        from Autodesk.Revit.DB import View as _View
+        _ci(doc, of_class=_View, cctx=ctx["_collect"], cache_key=_VT_CACHE_KEY)
+    except Exception:
+        pass
+
     if _enabled("view_filter_applications_view_templates"):
         legacy = _domain_run(
             "view_filter_applications_view_templates",
@@ -722,15 +734,6 @@ def run_fingerprint(doc):
                 code=b.code,
                 message=";".join(list(b.reasons)),
             )
-
-    # Cache pre-warm: FEC for View instances runs once here; all view_* domains reuse.
-    try:
-        from domains.view_templates import _VIEW_INSTANCES_CACHE_KEY as _VT_CACHE_KEY
-        from core.collect import collect_instances as _ci
-        from Autodesk.Revit.DB import View as _View
-        _ci(doc, of_class=_View, cctx=ctx["_collect"], cache_key=_VT_CACHE_KEY)
-    except Exception:
-        pass
 
     # view_templates split domains.
     # Non-schedule domains require both phase_filters and view_filter_definitions
