@@ -9,7 +9,29 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ---
 
-## Unreleased
+## [Unreleased]
+
+### Fixed
+- VCO `dflt_map` computation hoisted out of O(templates × categories) inner loop;
+  `other_seconds` reduced from ~920s to ~9s on large files, total VCO time reduced ~73%
+- FEC cache deduplication: all `(doc, View, instances)` collection sites normalized to
+  `_VIEW_INSTANCES_CACHE_KEY`; redundant FEC calls reduced from 12 to 7 per run
+- View instances cache pre-warm repositioned before `view_filter_applications_view_templates`,
+  ensuring the cache is populated before any view-related domain runs
+- `_timing` scope resolved via injection pattern (`run_fingerprint(doc, timing=None)`);
+  timing report merge restored to correct location inside `run_fingerprint()`
+
+### Added
+- `TimingCollector.record_elapsed()` for hot-loop accumulation without per-iteration
+  lock overhead
+- VCO inner loop sub-timers: `vco.enumerate_categories`, `vco.get_param_ids`,
+  `vco.get_category_overrides`, `vco.extract_graphics` — `other_seconds` is now
+  attributable residual Python overhead rather than a black hole
+- `total_serialization` and `total_run` timer scaffolding in runner; both correctly
+  report 0.0 in written fingerprint (ordering constraint — captured in Dynamo summary
+  surface instead)
+
+---
 
 ### Changed (hash-breaking — full re-extraction required)
 **Domain family splits (D-015):**
