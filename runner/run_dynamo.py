@@ -445,7 +445,7 @@ def get_doc():
     """Get current Revit document from Dynamo context."""
     return DocumentManager.Instance.CurrentDBDocument
 
-def run_fingerprint(doc):
+def run_fingerprint(doc, timing=None):
     """
     Execute fingerprint extraction on the given document.
 
@@ -470,7 +470,7 @@ def run_fingerprint(doc):
     ctx["_collect"] = CollectCtx()
 
     # Timing instrumentation: create collector and wire into subsystems
-    _timing = TimingCollector()
+    _timing = timing if timing is not None else TimingCollector()
     ctx["_timing"] = _timing
     ctx["_collect"].timing = _timing
 
@@ -481,7 +481,6 @@ def run_fingerprint(doc):
     except Exception:
         pass
 
-    _timing.start_timer("total_run")
     _timing.start_timer("total_extraction")
 
     # PR6: shared document + view context (domains can use for consistent view reads)
@@ -844,7 +843,9 @@ def run_fingerprint(doc):
         # Do not change run outcome if diagnostics merge fails.
         pass
 
-    # Merge timing report into run_diag (timing does not affect hashes or stable surfaces)
+    # Merge timing report into run_diag before contract envelope is built.
+    # total_run and total_serialization are not yet ended here — they will show 0.0,
+    # which is acceptable. Domain timings are complete at this point.
     try:
         timing_report = _timing.get_report()
         if isinstance(timing_report, dict):
@@ -914,9 +915,11 @@ def run_fingerprint(doc):
 
 # Execute extraction (OUT protection)
 try:
+    _timing = TimingCollector()
+    _timing.start_timer("total_run")
     doc = get_doc()
-    fingerprint = run_fingerprint(doc)
-    _timing = fingerprint.pop("_timing_collector", None)
+    fingerprint = run_fingerprint(doc, timing=_timing)
+    _timing = fingerprint.pop("_timing_collector", _timing)
 
     domains_emitted = sorted([k for k in fingerprint.keys() if not str(k).startswith("_")])
 
