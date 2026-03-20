@@ -20,6 +20,7 @@ Dependencies:
 
 import os
 import sys
+import time
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 repo_root = os.path.dirname(current_dir)
@@ -65,6 +66,7 @@ except ImportError:
     BuiltInParameter = None
 
 from core.collect import collect_instances
+from domains.view_templates import _VIEW_INSTANCES_CACHE_KEY
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +212,7 @@ def extract(doc, ctx=None):
 
     # Build V/G include-controlled BIP set once
     vg_include_bips = _build_vg_include_bips()
+    _tc = (ctx or {}).get("_timing") if ctx is not None else None
 
     # -----------------------------------------------------------------------
     # Collect view templates via collect_instances (wraps FEC internally).
@@ -219,7 +222,12 @@ def extract(doc, ctx=None):
     all_views = []
     try:
         all_views = list(
-            collect_instances(doc, of_class=View, where_key="view_category_overrides.views")
+            collect_instances(
+                doc,
+                of_class=View,
+                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+                cache_key=_VIEW_INSTANCES_CACHE_KEY,
+            )
         )
     except Exception:
         pass
@@ -232,6 +240,11 @@ def extract(doc, ctx=None):
     # -----------------------------------------------------------------------
     all_cats = []  # [(cat_obj, is_sub, parent_or_None)]
     try:
+        if _tc is not None:
+            try:
+                _tc.start_timer("api:vco.enumerate_categories")
+            except Exception:
+                pass
         cat_root = doc.Settings.Categories
         for cat in cat_root:
             try:
@@ -245,6 +258,12 @@ def extract(doc, ctx=None):
                 pass
     except Exception:
         pass
+    finally:
+        if _tc is not None:
+            try:
+                _tc.end_timer("api:vco.enumerate_categories")
+            except Exception:
+                pass
 
     # Default OGS used to detect non-default fields
     dflt = OverrideGraphicSettings()
@@ -252,11 +271,20 @@ def extract(doc, ctx=None):
     v2_records = []
     signature_hashes_v2 = []
     v2_any_blocked = False
+    _vco_get_overrides_total = 0.0
+    _vco_get_overrides_calls = 0
+    _vco_extract_graphics_total = 0.0
+    _vco_extract_graphics_calls = 0
 
     for template in templates:
         # --- V/G include-controlled state ---
         tpl_param_ids = set()
         try:
+            if _tc is not None:
+                try:
+                    _tc.start_timer("api:vco.get_param_ids")
+                except Exception:
+                    pass
             for p in (template.GetTemplateParameterIds() or []):
                 try:
                     tpl_param_ids.add(int(p.IntegerValue))
@@ -264,6 +292,12 @@ def extract(doc, ctx=None):
                     pass
         except Exception:
             pass
+        finally:
+            if _tc is not None:
+                try:
+                    _tc.end_timer("api:vco.get_param_ids")
+                except Exception:
+                    pass
 
         # Template traceability
         tpl_uid = None
@@ -290,18 +324,24 @@ def extract(doc, ctx=None):
 
             # Read override from this template for this category
             try:
+                _t0 = time.perf_counter()
                 ogs = template.GetCategoryOverrides(cat.Id)
+                _vco_get_overrides_total += time.perf_counter() - _t0
+                _vco_get_overrides_calls += 1
             except Exception:
                 continue
             if ogs is None:
                 continue
 
             # Extract override items
+            _graphics_t0 = time.perf_counter()
             proj_items = extract_projection_graphics(doc, ogs, ctx, "vco.projection")
             cut_items = extract_cut_graphics(doc, ogs, ctx, "vco.cut")
             halftone_items = extract_halftone(ogs, "vco.halftone")
             trans_items = extract_transparency(ogs, "vco.transparency")
             all_ogs_items = proj_items + cut_items + halftone_items + trans_items
+            _vco_extract_graphics_total += time.perf_counter() - _graphics_t0
+            _vco_extract_graphics_calls += 1
 
             # Compare to default OGS to detect any override
             dflt_proj = extract_projection_graphics(doc, dflt, ctx, "vco.projection")
@@ -478,6 +518,13 @@ def extract(doc, ctx=None):
             }
 
             v2_records.append(rec)
+
+    if _tc is not None:
+        try:
+            _tc.record_elapsed("api:vco.get_category_overrides", _vco_get_overrides_total, _vco_get_overrides_calls)
+            _tc.record_elapsed("api:vco.extract_graphics", _vco_extract_graphics_total, _vco_extract_graphics_calls)
+        except Exception:
+            pass
 
     info["records"] = sorted(v2_records, key=lambda r: safe_str(r.get("record_id", "")))
     info["count"] = len(v2_records)

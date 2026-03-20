@@ -44,6 +44,24 @@ class TestTimingCollectorBasic:
         entry = report["raw"]["processing:make_hash"]
         assert entry["calls"] == 3
 
+    def test_record_elapsed_single_call(self):
+        tc = TimingCollector()
+        tc.record_elapsed("api:vco.get_category_overrides", 0.25, calls=1)
+
+        report = tc.get_report()
+        entry = report["raw"]["api:vco.get_category_overrides"]
+        assert entry["calls"] == 1
+        assert entry["total_seconds"] == pytest.approx(0.25, abs=1e-6)
+
+    def test_record_elapsed_multiple_calls(self):
+        tc = TimingCollector()
+        tc.record_elapsed("api:vco.extract_graphics", 0.9, calls=3)
+
+        report = tc.get_report()
+        entry = report["raw"]["api:vco.extract_graphics"]
+        assert entry["calls"] == 3
+        assert entry["total_seconds"] == pytest.approx(0.9, abs=1e-6)
+
     def test_unmatched_end_timer_silently_ignored(self):
         tc = TimingCollector()
         # Should not raise
@@ -84,6 +102,27 @@ class TestTimingCollectorDomainScoping:
         assert "make_hash" in domain_entry["processing"]
         assert domain_entry["api_seconds"] >= 0.0
         assert domain_entry["processing_seconds"] >= 0.0
+
+    def test_record_elapsed_domain_scoped(self):
+        tc = TimingCollector()
+        tc.set_active_domain("view_category_overrides")
+        tc.start_timer("domain:view_category_overrides")
+        tc.record_elapsed("api:vco.get_category_overrides", 1.2, calls=4)
+        tc.end_timer("domain:view_category_overrides")
+        tc.set_active_domain(None)
+
+        report = tc.get_report()
+        entry = report["domains"]["view_category_overrides"]["api_calls"]["vco.get_category_overrides"]
+        assert entry["calls"] == 4
+        assert entry["total_seconds"] == pytest.approx(1.2, abs=1e-6)
+
+    def test_record_elapsed_no_active_domain(self):
+        tc = TimingCollector()
+        tc.record_elapsed("api:vco.extract_graphics", 0.5, calls=2)
+
+        report = tc.get_report()
+        assert report["raw"]["api:vco.extract_graphics"]["calls"] == 2
+        assert report["domains"] == {}
 
     def test_sub_timings_without_active_domain_not_scoped(self):
         tc = TimingCollector()
@@ -222,6 +261,16 @@ class TestTimingCollectorDefensive:
         tc = TimingCollector()
         # Should not raise
         tc.end_timer(None)
+
+    def test_record_elapsed_defensive(self):
+        tc = TimingCollector()
+        tc.record_elapsed("api:zero", 0.0, calls=0)
+        tc.record_elapsed("api:negative", -1.0, calls=-3)
+        report = tc.get_report()
+        assert report["raw"]["api:zero"]["calls"] == 1
+        assert report["raw"]["api:zero"]["total_seconds"] == pytest.approx(0.0, abs=1e-6)
+        assert report["raw"]["api:negative"]["calls"] == 1
+        assert report["raw"]["api:negative"]["total_seconds"] == pytest.approx(0.0, abs=1e-6)
 
     def test_set_active_domain_none(self):
         tc = TimingCollector()
