@@ -42,24 +42,32 @@ core/                   Pure Python utilities (no Revit API calls)
   features.py           Cohort-analysis feature surface
   naming.py             Document-derived naming helpers
   manifest.py           Stable manifest surface for comparison
+  dimension_type_helpers.py  Shape constants, detection, and reading helpers (shared by dimension_types)
+  timing_collector.py   Extraction profiling instrumentation
+  vg_sig.py             VG signature helpers for view_templates
 
-domains/                One extract(doc, ctx) function per domain (17 total)
+domains/                One extract(doc, ctx) function per domain (16 active)
   identity.py           Project metadata (NO HASH - metadata only)
   units.py              Length/area/volume format options
-  object_styles.py      Object style definitions (exports baseline for overrides)
+  object_styles.py      Object style definitions — internal routing by CategoryType:
+                          model, annotation, analytical, imported partitions
   line_patterns.py      Line pattern definitions
   line_styles.py        Line style definitions
-  fill_patterns.py      Fill pattern definitions
+  fill_patterns.py      Fill pattern definitions — internal routing by FillPatternTarget:
+                          drafting and model partitions
   text_types.py         Text type definitions
   arrowheads.py         Arrowhead (tick mark) definitions with shape-gating
-  dimension_types.py    Dimension type definitions with shape-gating
+  dimension_types.py    Dimension type definitions — internal routing by DimensionShape:
+                          linear, angular, radial, diameter, spot_elevation,
+                          spot_coordinate, spot_slope partitions
   phases.py             Phase inventory & sequence (names IN hash per D-010)
   phase_filters.py      Phase filter definitions
   phase_graphics.py     Phase graphic overrides (DISABLED - API limitation per D-013)
-  view_filters.py       Global view filter definitions
   view_filter_definitions.py        Detailed filter rule extraction
   view_filter_applications_view_templates.py  Filter application stacks
-  view_templates.py     Template definitions (behavioral fingerprinting)
+  view_templates.py     Template definitions — internal routing by ViewType family:
+                          floor_structural_area_plans, ceiling_plans,
+                          elevations_sections_detail, renderings_drafting, schedules
   view_category_overrides.py  Category override deltas vs object_styles
 
 runner/                 Host-specific entry points
@@ -69,23 +77,25 @@ runner/                 Host-specific entry points
 validators/             Output validation
   record_v2.py          record.v2 schema validation
 
-policies/               Join-key policies (shape-gating rules)
+policies/               Join-key policies and alignment keys
   domain_join_key_policies.json  Per-domain join-key policies with shape-gating
+  cross_domain_alignment_keys.json  Domain family registry and alignment key definitions
 
 tools/                  Analysis & comparison utilities
   compare_manifest.py   Diff analysis
   pairwise_drift.py     Cross-project drift scoring
-  similarity_compare.py Similarity metrics
-  score_drift.py        Drift scoring utilities
-  export_to_flat_tables.py   CSV export
-  details_to_csv.py     Details extraction to CSV
-  run_extract_all.py    Batch extraction runner
   pareto_joinkey_search.py   Join-key optimization analysis
   pareto_make_shape_inputs.py  Shape-based input prep
+  merge_split_exports.py     Merge split export artifacts
+  export_to_flat_tables.py   CSV export
+  details_to_csv.py     Details extraction to CSV
 
   phase1_domain_authority.py         Phase-1: Authority analysis
   phase1_pairwise_analysis.py        Phase-1: Pairwise comparison
   phase1_population_framing.py       Phase-1: Population analysis
+
+  join_key_discovery/                Phase-1.5: Join-key discovery package
+    eval.py, greedy.py
 
   phase2_analysis/                   Phase-2 analysis package
     attributes.py, compare.py, index.py, io.py, report.py, stability.py
@@ -94,10 +104,12 @@ tools/                  Analysis & comparison utilities
   governance/                        Governance reporting
     standards_governance_report.py   Standards governance report generator
 
-  probes/                            API probes
+  probes/                            API probes (15 domain-specific probes)
     probe_arrowheads.py              Arrowhead API verification
+    probe_dimension_types.py         Dimension type exploration
+    probe_phase_graphics.py          Phase graphics API confirmation
 
-tests/                  pytest test suite (14 test files + fixtures)
+tests/                  pytest test suite (38+ test files + fixtures)
   test_sentinel_policy.py            Enforce only 3 allowed sentinels
   test_hashing_incremental.py        Hash determinism
   test_contracts_run_status.py       Status rollup (failed > degraded > ok)
@@ -112,6 +124,14 @@ tests/                  pytest test suite (14 test files + fixtures)
   test_join_key_builder_shape_gating_dedupe.py  Join-key deduplication
   test_pareto_shape_gating.py        Pareto shape-gating analysis
   test_split_export.py               Split export functionality
+  test_record_id_determinism.py      record_id generation stability
+  test_timing_collector.py           Extraction profiling
+  test_graphic_overrides.py          VG signature extraction
+  test_collect.py                    Element collection cache behavior
+  test_join_key_discovery_shape_matching.py  Shape matching in join-key discovery
+  test_join_key_migration.py         Join-key policy migration validation
+  test_v21_join_policy_compat.py     Version 2.1 join policy compatibility
+  test_*_canonical_selectors.py      Domain-specific canonical selector tests (14 domains)
   revit/                             Revit integration harness (requires Revit)
   golden/                            Golden file comparisons
 
@@ -174,6 +194,29 @@ Use `UniqueId` ONLY for element-backed entities where identity persistence matte
 - Order-insensitive structures: sort before hashing
 - Each domain MUST explicitly state its ordering behavior
 
+## Domain Family Architecture (D-015)
+
+Consolidated extractors route records internally by record class (Revit system family boundary).
+Each partition emits its own `sig_hash` and `domain` label within a shared extractor file.
+
+**Domain family mappings**:
+
+| Domain file | Record-class partitions (emitted domain names) |
+|-------------|------------------------------------------------|
+| `object_styles.py` | `object_styles_model`, `object_styles_annotation`, `object_styles_analytical`, `object_styles_imported` |
+| `fill_patterns.py` | `fill_patterns_drafting`, `fill_patterns_model` |
+| `dimension_types.py` | `dimension_types_linear`, `dimension_types_angular`, `dimension_types_radial`, `dimension_types_diameter`, `dimension_types_spot_elevation`, `dimension_types_spot_coordinate`, `dimension_types_spot_slope` |
+| `view_templates.py` | `view_templates_floor_structural_area_plans`, `view_templates_ceiling_plans`, `view_templates_elevations_sections_detail`, `view_templates_renderings_drafting`, `view_templates_schedules` |
+
+**Shared helpers**:
+- `core/dimension_type_helpers.py` - Shape constants, detection, reading for dimension types
+- `core/vg_sig.py` - VG signature helpers for view template partitions
+
+**Key vocabulary**:
+- **Domain family**: Named grouping (e.g., `object_styles`). Policy and BI concept; no code hierarchy.
+- **Domain**: Extractable unit with one policy entry and one `sig_hash`. Partitions within a file are flat peers in the runner.
+- **Record class**: Entities within a domain that use different identity properties, routed by class discriminator.
+
 ## Phase-2 Buckets
 
 Records partition their items into four buckets:
@@ -191,29 +234,33 @@ Records partition their items into four buckets:
 
 ## Shape-Gating System
 
-Shape-gating enables conditional join-key composition based on discriminator values. Used for domains where different entity shapes require different properties:
+Shape-gating enables conditional join-key composition based on discriminator values. Used for domains where different entity shapes require different identity properties.
 
-**Supported domains**:
+**Supported domains** (via `policies/domain_join_key_policies.json`):
 - `arrowheads`: Shape discriminator by ArrowheadStyle (Arrow/Tick/Dot/Slash)
-- `dimension_types`: Shape discriminator by DimensionShape (Linear/Angular/Radial/Diameter/ArcLength/SpotElevation/SpotCoordinate/SpotSlope)
+- `dimension_types_*`: Shape discrimination now done at domain-level (per-partition files handle one shape each)
 
-**Policy structure** (in `policies/domain_join_key_policies.json`):
-```json
-{
-  "domain_name": {
-    "common_keys": ["key1", "key2"],
-    "shape_gating": {
-      "discriminator_key": "shape_key",
-      "shapes": {
-        "ShapeValue": {
-          "required": ["shape_specific_key"],
-          "optional": ["optional_key"]
+**Actual policy structure**:
+
+    {
+      "domain_name": {
+        "join_key_schema": "domain.join_key.v1",
+        "hash_alg": "md5_utf8_join_pipe",
+        "required_items": ["key1", "key2"],
+        "optional_items": ["opt_key"],
+        "explicitly_excluded_items": ["uid", "name"],
+        "shape_gating": {
+          "discriminator_key": "shape_key",
+          "shape_requirements": {
+            "ShapeValue": {
+              "additional_required": ["shape_specific_key"],
+              "additional_optional": []
+            }
+          },
+          "default_shape_behavior": "common_only"
         }
       }
     }
-  }
-}
-```
 
 ## Development Workflow
 
@@ -230,15 +277,15 @@ Every commit message MUST state "no semantic change" OR describe the semantic ch
 ### CHANGELOG Discipline
 Log ONLY semantic changes (signature composition, ordering rules, identity rules, fail-soft behavior). Do NOT log pure refactors.
 
-### Hash Modes
+### Hash Mode
+The system uses semantic hashing (record.v2 identity-basis) exclusively (D-014 completed 2026-02-10).
+Legacy pipe-delimited signature mode has been removed. All domains emit only `hash_v2` as the
+canonical domain hash.
 
-The system uses semantic hashing (record.v2 identity-basis) exclusively as of PR #XXX.
-Legacy pipe-delimited signature mode was removed after validation confirmed equivalence.
-
-**Migration note:** If comparing old exports to new ones, legacy exports contained a `hash` 
-field; new exports contain only `hash_v2` (which is now the canonical hash).
+**Migration note:** Legacy exports contained a `hash` field; current exports contain only `hash_v2`.
 
 ### Domain Development Pattern
+
 ```python
 # domains/example.py
 from core.hashing import make_hash, safe_str
@@ -263,6 +310,9 @@ def extract(doc, ctx=None):
     }
 ```
 
+For consolidated extractors that emit multiple partitions, `extract()` returns a list of
+per-partition result dicts, each with its own `domain` key identifying the partition.
+
 ## Testing
 
 ### Run Tests
@@ -284,6 +334,8 @@ pytest tests/test_hashing_incremental.py   # Specific test
 | `test_dimension_types_shape_gating.py` | Dimension shape-specific properties |
 | `test_join_key_policy_validation.py` | Join-key policy rule enforcement |
 | `test_join_key_builder_shape_gating_dedupe.py` | Deduplication across shape requirements |
+| `test_record_id_determinism.py` | record_id generation stability |
+| `test_*_canonical_selectors.py` | Domain-specific canonical selector validation (14 domains) |
 
 ### Validate Exported JSON
 ```bash
@@ -295,17 +347,18 @@ FINGERPRINT_JSON_PATH=/path/to/export.json pytest tests/test_record_contract_v2.
 The runner populates context (`ctx`) for domain cross-references:
 
 **Runner-provided**:
-- `_collect` - FilteredElementCollector wrapper
-- `_doc_view` - Document/view context
+- `_collect` - FilteredElementCollector wrapper (from `core/collect.py`)
+- `_doc_view` - Document/view context (from `core/context.py`)
 - `debug_vg_details` - Verbose VG debugging
 
 **Domain-populated** (for downstream domain use):
 - `phase_uid_to_hash` - phases → view_templates
 - `phase_filter_uid_to_hash` - phase_filters → view_templates
-- `view_filter_uid_to_hash` - view_filters → view_templates
-- `view_filter_uid_to_sig_hash_v2` - view_filter_definitions → templates
+- `view_filter_uid_to_hash` - view_filter_definitions → view_templates
+- `view_filter_uid_to_sig_hash_v2` - view_filter_definitions → view_templates
 - `line_pattern_uid_to_hash` - line_patterns → object_styles, line_styles
-- `line_pattern_uid_to_hash` - line_patterns → object_styles, line_styles (v2)
+- `object_style_model_row_key_to_sig_hash` - object_styles_model → view_category_overrides
+- `object_style_annotation_row_key_to_sig_hash` - object_styles_annotation → view_category_overrides
 
 ## Key Decisions Reference
 
@@ -324,6 +377,9 @@ The runner populates context (`ctx`) for domain cross-references:
 | D-011 | Domain-driven architecture |
 | D-012 | Markdown portability rule (no nested fenced blocks) |
 | D-013 | `phase_graphics` disabled (API limitation) |
+| D-014 | **COMPLETED (2026-02-10)**: Semantic (record.v2) hashing is now the only mode; legacy removed |
+| D-015 | Domain family architecture — Revit system family boundary is partition criterion; consolidated extractors with internal routing |
+| D-016 | VCO scope — categories 1 (template-controlled) and 2 (latent) implemented; category 3 (view-local) deferred |
 
 See `DECISIONS.md` for full rationale.
 
@@ -338,8 +394,16 @@ See `DECISIONS.md` for full rationale.
 6. Document ordering behavior and identity rules
 7. Update `DECISIONS.md` if introducing new semantic rules
 
+### Adding a New Partition to a Consolidated Domain
+1. Add record-class routing in the domain extractor's internal dispatch
+2. Add a flat join-key policy entry for the new partition name
+3. Register allowed keys in `contracts/domain_identity_keys_v2.json`
+4. Add canonical-selector tests in `tests/test_<domain>_canonical_selectors.py`
+5. Update runner if the partition needs a new `ctx` key or dependency
+6. Document in `CHANGELOG.md` if the change affects hashes
+
 ### Adding Shape-Gated Properties
-1. Define discriminator key and shape values in join-key policy
+1. Define discriminator key and shape values in join-key policy (`shape_requirements` block)
 2. Implement shape detection in domain extractor
 3. Mark non-applicable properties with `q: "not_applicable"`
 4. Add shape-gating tests in `tests/test_<domain>_shape_gating.py`
@@ -376,3 +440,5 @@ When working on this codebase, start with:
 - The `phase_graphics` domain is intentionally disabled - do not attempt to enable without API justification
 - Shape-gating policies MUST be validated via `test_join_key_policy_validation.py`
 - Phase names ARE included in hashes (D-010 revised) - this is intentional for cross-project comparison
+- The D-015 domain family splits are hash-breaking — previous exports are obsolete and require full re-extraction
+- Consolidated extractors emit multiple partition domains; do not add a new flat domain for what should be a partition
