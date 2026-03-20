@@ -901,6 +901,10 @@ def run_fingerprint(doc):
             domains=contract_domains,
         )
 
+    # Preserve the collector for post-extraction serialization timing at module scope.
+    # This hidden key is removed before the final payload is emitted.
+    fingerprint["_timing_collector"] = _timing
+
     # Back-compat: keep a pointer to domains map (same object shape as _contract.domains)
     fingerprint["_domains"] = contract_domains
     fingerprint["_notes"] = runner_notes
@@ -912,6 +916,7 @@ def run_fingerprint(doc):
 try:
     doc = get_doc()
     fingerprint = run_fingerprint(doc)
+    _timing = fingerprint.pop("_timing_collector", None)
 
     domains_emitted = sorted([k for k in fingerprint.keys() if not str(k).startswith("_")])
 
@@ -1061,7 +1066,8 @@ try:
     # Timings around the post-extraction phase
     t_extract_done = round(time.perf_counter() - _SCRIPT_START, 3)
 
-    _timing.start_timer("total_serialization")
+    if _timing is not None:
+        _timing.start_timer("total_serialization")
     output_path = _get_output_path_from_dynamo()
 
     # If caller provided a directory, write a deterministically-named file into it.
@@ -1150,11 +1156,13 @@ try:
         OUT = json.dumps(fingerprint, indent=2, sort_keys=True)
 
     try:
-        _timing.end_timer("total_serialization")
+        if _timing is not None:
+            _timing.end_timer("total_serialization")
     except Exception:
         pass
     try:
-        _timing.end_timer("total_run")
+        if _timing is not None:
+            _timing.end_timer("total_run")
     except Exception:
         pass
 
