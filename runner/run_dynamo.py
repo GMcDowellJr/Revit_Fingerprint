@@ -843,6 +843,16 @@ def run_fingerprint(doc, timing=None):
         # Do not change run outcome if diagnostics merge fails.
         pass
 
+    # Merge timing report into run_diag before contract envelope is built.
+    # total_run and total_serialization are not yet ended here — they will show 0.0,
+    # which is acceptable. Domain timings are complete at this point.
+    try:
+        timing_report = _timing.get_report()
+        if isinstance(timing_report, dict):
+            run_diag["timings"] = timing_report
+    except Exception:
+        pass
+
     # Hash mode participates in stable surfaces; timing does not.
 
     # Authoritative contract (statuses live here; legacy payloads may still exist at top-level)
@@ -1156,12 +1166,6 @@ try:
     try:
         if _timing is not None:
             _timing.end_timer("total_run")
-    except Exception:
-        pass
-    try:
-        timing_report = _timing.get_report()
-        if isinstance(timing_report, dict):
-            fingerprint["_contract"]["run_diag"]["timings"] = timing_report
     except Exception:
         pass
 
