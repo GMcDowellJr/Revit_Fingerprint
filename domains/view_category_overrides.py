@@ -265,8 +265,14 @@ def extract(doc, ctx=None):
             except Exception:
                 pass
 
-    # Default OGS used to detect non-default fields
+    # Default OGS used to detect non-default fields — computed once, never changes.
     dflt = OverrideGraphicSettings()
+    dflt_proj = extract_projection_graphics(doc, dflt, ctx, "vco.projection")
+    dflt_cut = extract_cut_graphics(doc, dflt, ctx, "vco.cut")
+    dflt_halftone = extract_halftone(dflt, "vco.halftone")
+    dflt_trans = extract_transparency(dflt, "vco.transparency")
+    dflt_map = {it.get("k"): it.get("v")
+                for it in dflt_proj + dflt_cut + dflt_halftone + dflt_trans}
 
     v2_records = []
     signature_hashes_v2 = []
@@ -342,14 +348,6 @@ def extract(doc, ctx=None):
             all_ogs_items = proj_items + cut_items + halftone_items + trans_items
             _vco_extract_graphics_total += time.perf_counter() - _graphics_t0
             _vco_extract_graphics_calls += 1
-
-            # Compare to default OGS to detect any override
-            dflt_proj = extract_projection_graphics(doc, dflt, ctx, "vco.projection")
-            dflt_cut = extract_cut_graphics(doc, dflt, ctx, "vco.cut")
-            dflt_halftone = extract_halftone(dflt, "vco.halftone")
-            dflt_trans = extract_transparency(dflt, "vco.transparency")
-            dflt_map = {it.get("k"): it.get("v")
-                        for it in dflt_proj + dflt_cut + dflt_halftone + dflt_trans}
 
             actual_map = {it.get("k"): it.get("v") for it in all_ogs_items}
             has_override = any(actual_map.get(k) != dflt_map.get(k) for k in actual_map)
