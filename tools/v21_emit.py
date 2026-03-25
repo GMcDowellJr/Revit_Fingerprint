@@ -14,12 +14,25 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+_TOOLS_DIR = str(Path(__file__).resolve().parent)
+if _TOOLS_DIR not in sys.path:
+    sys.path.insert(0, _TOOLS_DIR)
+
+from label_synthesis.label_resolver import (
+    find_near_duplicate_merges,
+    load_annotations,
+    load_label_population,
+    load_llm_cache,
+    resolve_pattern_label,
+)
+
 SCHEMA_VERSION = "2.1.0"
 STANDARD_PRESENCE_MIN = 0.75
 DOMINANT_SHARE_MIN = 0.50
 MIN_RECORDS_FOR_DOMAIN = 50
 MIN_FILES_FOR_DOMAIN = 3
 UNKNOWN_RATE_MAX = 0.20
+SUPPRESSED_ANALYSIS_DOMAINS = {"object_styles_imported"}
 
 # See docs/CENTRAL_PATH_NORM_RULE.md for normalization contract.
 _VOLATILE_SEGMENTS = {
@@ -226,6 +239,111 @@ def _sort_rows(rows: List[Dict[str, str]], keys: List[str]) -> List[Dict[str, st
     return sorted(rows, key=lambda r: tuple(r.get(k, "") for k in keys))
 
 
+def _iter_object_style_name_candidates(rec: Dict[str, Any]) -> Iterable[str]:
+    for k in ("record_id", "id", "name"):
+        v = rec.get(k)
+        if isinstance(v, str) and v.strip():
+            yield v
+    label = rec.get("label")
+    if isinstance(label, dict):
+        disp = label.get("display")
+        if isinstance(disp, str) and disp.strip():
+            yield disp
+    identity_basis = rec.get("identity_basis")
+    if isinstance(identity_basis, dict):
+        items = identity_basis.get("items")
+        if isinstance(items, list):
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                v = it.get("v")
+                if isinstance(v, str) and v.strip():
+                    yield v
+
+
+def _remap_object_style_domain(source_domain: str, rec: Dict[str, Any]) -> Optional[str]:
+    if not source_domain.startswith("object_styles_"):
+        return source_domain
+    haystack = " | ".join([s.lower() for s in _iter_object_style_name_candidates(rec)])
+
+    # Temporary flatten-side hygiene:
+    # - Skip known imported DWG / Imports-in-Families rows from mainline model domain.
+    # - Route explicit analytical names into object_styles_analytical.
+    # TODO(move-to-exporter): move this classification upstream into exporter probe/domain emission.
+    if "imports in families" in haystack or "-.dwg-" in haystack or ".dwg" in haystack:
+        return None
+    if "-analytical-" in haystack:
+        return "object_styles_analytical"
+    return source_domain
+
+
+def _load_identity_items_by_record(phase0_dir: Optional[Path], domain: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
+    if phase0_dir is None:
+        return {}
+
+    csv_path: Optional[Path] = None
+    if domain:
+        scoped = phase0_dir / "phase0_identity_items_by_domain" / f"{domain}.csv"
+        if scoped.is_file():
+            csv_path = scoped
+
+    if csv_path is None:
+        fallback = phase0_dir / "phase0_identity_items.csv"
+        if not fallback.is_file():
+            return {}
+        csv_path = fallback
+
+    out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            if domain and _safe_str(row.get("domain")) and _safe_str(row.get("domain")) != domain:
+                continue
+            record_pk = _safe_str(row.get("record_pk"))
+            if not record_pk:
+                continue
+            out[record_pk].append({
+                "k": _safe_str(row.get("item_key")),
+                "v": _safe_str(row.get("item_value")),
+                "q": _safe_str(row.get("item_value_type")),
+                "role": _safe_str(row.get("item_role")),
+            })
+    return out
+
+
+def _load_label_resolution_inputs(results_v21_dir: Optional[Path], domain: str) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, str], Dict[str, Any]]:
+    if results_v21_dir is None:
+        return {}, {}, {}
+
+    label_synth_dir = results_v21_dir / "label_synthesis"
+    analysis_v21_dir = results_v21_dir / "analysis_v21"
+
+    population_candidates = [
+        label_synth_dir / f"{domain}.joinhash_label_population.csv",
+        analysis_v21_dir / f"{domain}.joinhash_label_population.csv",
+        analysis_v21_dir / "label_population" / f"{domain}.joinhash_label_population.csv",
+    ]
+    pop_path = next((p for p in population_candidates if p.is_file()), None)
+    label_pop = load_label_population(str(pop_path), domain) if pop_path else {}
+
+    annotation_candidates = [
+        label_synth_dir / f"{domain}.pattern_annotations.csv",
+        label_synth_dir / "pattern_annotations.csv",
+        analysis_v21_dir / "pattern_annotations.csv",
+    ]
+    anno_path = next((p for p in annotation_candidates if p.is_file()), None)
+    annotations = load_annotations(str(anno_path)) if anno_path else {}
+
+    llm_cache_candidates = [
+        label_synth_dir / f"{domain}.llm_name_cache.json",
+        label_synth_dir / "llm_name_cache.json",
+        analysis_v21_dir / f"{domain}.llm_name_cache.json",
+        analysis_v21_dir / "llm_name_cache.json",
+    ]
+    llm_path = next((p for p in llm_cache_candidates if p.is_file()), None)
+    llm_cache = load_llm_cache(str(llm_path)) if llm_path else {}
+    return label_pop, annotations, llm_cache
+
+
 def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename") -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     exported_utc = _utc_now_iso()
     tool_version = _get_tool_version()
@@ -264,13 +382,16 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
             "exported_utc": exported_utc,
         })
 
-        for domain in _iter_domains(data):
-            payload = data.get(domain)
+        for source_domain in _iter_domains(data):
+            payload = data.get(source_domain)
             recs = payload.get("records") if isinstance(payload, dict) else None
             if not isinstance(recs, list):
                 continue
             for i, rec in enumerate(recs):
                 if not isinstance(rec, dict):
+                    continue
+                domain = _remap_object_style_domain(source_domain, rec)
+                if not domain:
                     continue
                 record_ordinal = f"{i:06d}"
                 record_pk = f"{file_id}|{domain}|{record_ordinal}"
@@ -374,9 +495,16 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
     return meta_rows, record_rows
 
 
-def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, str]], out_dir: Path) -> str:
+def emit_analysis_v21(
+    meta_rows: List[Dict[str, str]],
+    records: List[Dict[str, str]],
+    out_dir: Path,
+    *,
+    phase0_dir: Optional[Path] = None,
+    results_v21_dir: Optional[Path] = None,
+) -> str:
     exports = sorted({r["export_run_id"] for r in meta_rows})
-    domains = sorted({r["domain"] for r in records})
+    domains = sorted({r["domain"] for r in records if r.get("domain", "") not in SUPPRESSED_ANALYSIS_DOMAINS})
     executed_utc = _utc_now_iso()
     scope_src = "|".join(exports)
     analysis_scope_hash = hashlib.sha1(scope_src.encode("utf-8")).hexdigest()
@@ -420,6 +548,8 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
     files_total = len(exports)
     by_dom_cluster: Dict[Tuple[str, str, str], List[Dict[str, str]]] = defaultdict(list)
     for r in records:
+        if r.get("domain", "") in SUPPRESSED_ANALYSIS_DOMAINS:
+            continue
         jh = r.get("join_hash", "")
         if not jh:
             continue
@@ -439,13 +569,17 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
 
     records_by_domain: Dict[str, List[Dict[str, str]]] = defaultdict(list)
     for r in records:
+        if r.get("domain", "") in SUPPRESSED_ANALYSIS_DOMAINS:
+            continue
         records_by_domain[r["domain"]].append(r)
-
     pattern_id_by_cluster: Dict[Tuple[str, str, str], str] = {}
     for dom in domains:
+        print(f"[v21_emit] domain={dom} (start)", flush=True)
+        identity_items_by_record = _load_identity_items_by_record(phase0_dir, dom)
         cluster_items = dom_clusters.get(dom, [])
         domain_records = records_by_domain.get(dom, [])
         domain_files_present = len({r["export_run_id"] for r in domain_records})
+        label_population_by_hash, annotations, llm_cache = _load_label_resolution_inputs(results_v21_dir, dom)
         pattern_ids_taken: set[str] = set()
         cluster_rows: List[Dict[str, Any]] = []
         for (_, schema, join_hash), rows in sorted(cluster_items, key=lambda kv: (kv[0][1], kv[0][2])):
@@ -459,6 +593,7 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
                 "pid": pid,
                 "files_present": files_present,
                 "records_count": len(rows),
+                "identity_items": identity_items_by_record.get(rows[0].get("record_pk", ""), []),
             })
             pattern_id_by_cluster[(dom, schema, join_hash)] = pid
 
@@ -468,6 +603,8 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
         )
         n = len(sorted_clusters)
         total_dom_records = sum(int(c["records_count"]) for c in sorted_clusters)
+        near_dup_merge_map = find_near_duplicate_merges(sorted_clusters)
+        resolved_labels: Dict[str, Tuple[str, str]] = {}
 
         for rank, cluster in enumerate(sorted_clusters, start=1):
             schema = str(cluster["schema"])
@@ -498,12 +635,36 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
 
             # See docs/PATTERN_ID_AND_LABEL_RULES.md for stable pattern identity/label.
             pid = str(cluster["pid"])
+            generic_label = f"{schema} — Variant {rank} of {n}"
+            near_dup_target_label: Optional[str] = None
+            near_dup_target_hash = near_dup_merge_map.get(join_hash)
+            if near_dup_target_hash:
+                near_dup_target_label = resolved_labels.get(near_dup_target_hash, ("", ""))[0] or None
+            resolved_label, resolved_source = resolve_pattern_label(
+                domain=dom,
+                join_hash=join_hash,
+                join_key_schema=schema,
+                pattern_rank=rank,
+                pattern_count=n,
+                identity_items=cluster.get("identity_items") or [],
+                label_population=label_population_by_hash.get(join_hash) or [],
+                annotations=annotations,
+                llm_cache=llm_cache,
+                pattern_id=pid,
+                near_dup_target_label=near_dup_target_label,
+            )
+            resolved_labels[join_hash] = (resolved_label, resolved_source)
             domain_patterns.append({
                 "schema_version": SCHEMA_VERSION,
                 "analysis_run_id": analysis_run_id,
                 "domain": dom,
                 "pattern_id": pid,
-                "pattern_label": f"{schema} — Variant {rank} of {n}",
+                # Back-compat: keep legacy generic label in pattern_label so existing
+                # Power BI transforms that parse "Variant X of N" continue to work.
+                "pattern_label": generic_label,
+                "pattern_label_human": resolved_label,
+                "pattern_label_source": resolved_source,
+                "pattern_label_fallback": generic_label,
                 "source_cluster_id": cluster_id,
                 "pattern_size_records": str(cluster_size),
                 "pattern_size_files": str(files_present),
@@ -612,6 +773,10 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
             "unknown_rate_pct": f"{unknown_rate:.6f}",
             "recommended_analysis_grain": rec_grain,
         })
+        print(
+            f"[v21_emit] domain={dom} (done) clusters={len(sorted_clusters)} records={len(domain_records)}",
+            flush=True,
+        )
 
     # Unknown join_hash rows still get membership rows with blank pattern_id.
     for r in records:
@@ -635,9 +800,13 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
     ], _sort_rows(domain_metrics, ["domain", "join_key_schema", "join_hash"]))
 
     _write_csv(out_dir / "domain_patterns.csv", [
+        # Keep legacy first 11 columns in the original order for Power BI queries
+        # that pin Csv.Document([Columns=11]) and/or type-steps against that shape.
         "schema_version", "analysis_run_id", "domain", "pattern_id", "pattern_label",
         "source_cluster_id", "pattern_size_records", "pattern_size_files", "pattern_rank",
         "is_candidate_standard", "notes",
+        # v2.1 human-readable/audit extensions are appended for compatibility.
+        "pattern_label_human", "pattern_label_source", "pattern_label_fallback",
     ], _sort_rows(domain_patterns, ["analysis_run_id", "domain", "pattern_id"]))
 
     _write_csv(out_dir / "record_pattern_membership.csv", [

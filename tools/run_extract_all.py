@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from v21_emit import emit_analysis_v21, emit_phase0_v21
 
+SUPPRESSED_DOWNSTREAM_DOMAINS = {"object_styles_imported"}
+
 
 _LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.seg\[(\d{3})\]\.(kind|length)$")
 
@@ -169,6 +171,51 @@ def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
 
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         return [{str(k): "" if v is None else str(v) for k, v in row.items()} for row in csv.DictReader(f)]
+
+
+def _ensure_domain_scoped_identity_items(phase0_dir: Path) -> Optional[Path]:
+    src = phase0_dir / "phase0_identity_items.csv"
+    if not src.is_file():
+        return None
+
+    shard_dir = phase0_dir / "phase0_identity_items_by_domain"
+    shard_dir.mkdir(parents=True, exist_ok=True)
+    sentinel = shard_dir / ".complete"
+
+    try:
+        if sentinel.is_file() and sentinel.stat().st_mtime >= src.stat().st_mtime:
+            return shard_dir
+    except OSError:
+        pass
+
+    for old in shard_dir.glob("*.csv"):
+        old.unlink(missing_ok=True)
+
+    handles: Dict[str, Any] = {}
+    writers: Dict[str, csv.DictWriter] = {}
+    try:
+        with src.open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            fieldnames = list(reader.fieldnames or [])
+            if not fieldnames:
+                return shard_dir
+            for row in reader:
+                domain = str(row.get("domain", "")).strip()
+                if not domain:
+                    continue
+                if domain not in writers:
+                    fp = (shard_dir / f"{domain}.csv").open("w", encoding="utf-8", newline="")
+                    handles[domain] = fp
+                    w = csv.DictWriter(fp, fieldnames=fieldnames)
+                    w.writeheader()
+                    writers[domain] = w
+                writers[domain].writerow({k: row.get(k, "") for k in fieldnames})
+    finally:
+        for fp in handles.values():
+            fp.close()
+
+    sentinel.write_text(str(src.stat().st_mtime), encoding="utf-8")
+    return shard_dir
 
 
 def _emit_join_policy_diagnostics(rows: List[Dict[str, str]], diagnostics_dir: Path, domains: Optional[List[str]] = None) -> List[Dict[str, str]]:
@@ -475,11 +522,17 @@ def main() -> None:
         domains = [d.strip() for d in str(args.domains).split(",") if d.strip()]
     else:
         domains = _infer_domains(exports_dir)
+    active_domains = [d for d in domains if d not in SUPPRESSED_DOWNSTREAM_DOMAINS]
+    suppressed_domains = sorted(set(domains) - set(active_domains))
+    if suppressed_domains:
+        sys.stderr.write(
+            f"[INFO extract_all] suppressed_downstream_domains={','.join(suppressed_domains)}\n"
+        )
     if not domains and any(s in selected_stages for s in ("analyze2",)):
         raise SystemExit("No domains inferred; provide --domains.")
 
     env = os.environ.copy()
-    report: Dict[str, Any] = {"tool": "tools/run_extract_all.py", "exports_dir": str(exports_dir), "out_root": str(out_root), "surfaces": surfaces, "domains": domains, "selected_stages": selected_stages, "commands": [], "notes": []}
+    report: Dict[str, Any] = {"tool": "tools/run_extract_all.py", "exports_dir": str(exports_dir), "out_root": str(out_root), "surfaces": surfaces, "domains": domains, "active_domains": active_domains, "selected_stages": selected_stages, "commands": [], "notes": []}
     meta_rows: List[Dict[str, str]] = []
     record_rows: List[Dict[str, str]] = []
 
@@ -544,17 +597,39 @@ def main() -> None:
     if any(s in selected_stages for s in ("split", "analyze1", "analyze2")) and require_join_policy:
         phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
         if phase0_records_csv.is_file():
-            _enforce_policy_gate(_read_csv_rows(phase0_records_csv), v21_root / "diagnostics", domains, allow_sig_hash_join_key)
+            _enforce_policy_gate(_read_csv_rows(phase0_records_csv), v21_root / "diagnostics", active_domains, allow_sig_hash_join_key)
 
     if "analyze1" in selected_stages or "analyze2" in selected_stages:
         phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
-        if phase0_records_csv.is_file() and not record_rows:
+        if phase0_records_csv.is_file():
+            # Always reload from disk here so analyze uses post-apply join_hash values,
+            # not in-memory rows captured before join policy application.
             record_rows = _read_csv_rows(phase0_records_csv)
-        if (v21_phase0_dir / "file_metadata.csv").is_file() and not meta_rows:
+        if (v21_phase0_dir / "file_metadata.csv").is_file():
             meta_rows = _read_csv_rows(v21_phase0_dir / "file_metadata.csv")
         if meta_rows and record_rows:
+            shard_dir = _ensure_domain_scoped_identity_items(v21_phase0_dir)
+            if shard_dir is not None:
+                report["notes"].append(f"identity_items_shards={shard_dir}")
+
+            # Ensure modal label population artifacts exist for the active v2.1 emit path.
+            cmd_label_pop = [
+                sys.executable,
+                "tools/label_synthesis/build_label_population.py",
+                "--out-root",
+                str(out_root),
+            ]
+            report["commands"].append({"stage": "analyze", "cmd": cmd_label_pop})
+            _run(cmd_label_pop, env=env)
+
             _ensure_dir(v21_analysis_dir)
-            analysis_run_id = emit_analysis_v21(meta_rows, record_rows, v21_analysis_dir)
+            analysis_run_id = emit_analysis_v21(
+                meta_rows,
+                record_rows,
+                v21_analysis_dir,
+                phase0_dir=v21_phase0_dir,
+                results_v21_dir=v21_root,
+            )
             report["notes"].append(f"analysis_run_id={analysis_run_id}")
 
     if "analyze1" in selected_stages and args.emit_legacy:
@@ -574,7 +649,7 @@ def main() -> None:
     if "analyze2" in selected_stages and args.emit_legacy:
         _ensure_dir(phase2_root)
         dimtype_domains_seen: List[str] = []
-        for dom in domains:
+        for dom in active_domains:
             dom_out = phase2_root / dom
             _ensure_dir(dom_out)
             for mod in ["run_joinhash_label_population", "run_joinhash_parameter_population", "run_candidate_joinkey_simulation", "run_population_stability"]:
@@ -596,11 +671,11 @@ def main() -> None:
     split_domains: List[str] = []
     if "split" in selected_stages:
         if args.split_domains is None or str(args.split_domains) == "__ALL__":
-            split_domains = sorted({str(r.get("domain", "")).strip() for r in (record_rows or []) if str(r.get("domain", "")).strip()}, key=lambda s: s.lower())
+            split_domains = sorted({str(r.get("domain", "")).strip() for r in (record_rows or []) if str(r.get("domain", "")).strip() and str(r.get("domain", "")).strip() not in SUPPRESSED_DOWNSTREAM_DOMAINS}, key=lambda s: s.lower())
             if not split_domains:
-                split_domains = _discover_domains_from_exports(exports_dir)
+                split_domains = [d for d in _discover_domains_from_exports(exports_dir) if d not in SUPPRESSED_DOWNSTREAM_DOMAINS]
         else:
-            split_domains = [d.strip() for d in str(args.split_domains).split(",") if d.strip()]
+            split_domains = [d.strip() for d in str(args.split_domains).split(",") if d.strip() and d.strip() not in SUPPRESSED_DOWNSTREAM_DOMAINS]
 
     if split_domains:
         print(f"[extract_all] Stage split: running split detection for {len(split_domains)} domain(s)...", flush=True)

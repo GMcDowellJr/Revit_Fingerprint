@@ -128,7 +128,7 @@ def build_label_population(out_root: Path) -> None:
         flush=True,
     )
     print(
-        f"[build_label_population] Re-run analyze1,analyze2 to apply labels to domain_patterns.csv",
+        "[build_label_population] Label population artifacts are ready for emit_analysis_v21.",
         flush=True,
     )
 

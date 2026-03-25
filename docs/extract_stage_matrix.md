@@ -13,6 +13,8 @@ This matrix defines the explicit state-machine semantics used by `tools/run_extr
 | `analyze1` | Legacy Phase1 | Analysis stage (authority-related legacy path and/or v2.1 analysis output). | ❌ No | ✅ Yes | Gate can be overridden only by explicit degraded-mode flag. |
 | `analyze2` | Legacy Phase2 | Per-domain analysis packet stage and/or v2.1 analysis output. | ❌ No | ✅ Yes | Gate can be overridden only by explicit degraded-mode flag. |
 
+> Temporary object-styles stopgap (March 2026): flatten currently drops object-style rows that match imported CAD noise markers (`"Imports in Families"` or `".dwg"` in object-style key/name text), and downstream stages suppress `object_styles_imported`. This is intentionally reversible in pipeline code and should be moved into exporter-side domain assignment logic in a future exporter update.
+
 ## Join-policy gate matrix
 
 | Condition | Default behavior | Explicit override |
