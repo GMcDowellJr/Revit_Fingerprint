@@ -554,7 +554,13 @@ def main() -> None:
             meta_rows = _read_csv_rows(v21_phase0_dir / "file_metadata.csv")
         if meta_rows and record_rows:
             _ensure_dir(v21_analysis_dir)
-            analysis_run_id = emit_analysis_v21(meta_rows, record_rows, v21_analysis_dir)
+            analysis_run_id = emit_analysis_v21(
+                meta_rows,
+                record_rows,
+                v21_analysis_dir,
+                phase0_dir=v21_phase0_dir,
+                results_v21_dir=v21_root,
+            )
             report["notes"].append(f"analysis_run_id={analysis_run_id}")
 
     if "analyze1" in selected_stages and args.emit_legacy:

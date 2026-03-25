@@ -14,6 +14,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+_TOOLS_DIR = str(Path(__file__).resolve().parent)
+if _TOOLS_DIR not in sys.path:
+    sys.path.insert(0, _TOOLS_DIR)
+
+from label_synthesis.label_resolver import (
+    find_near_duplicate_merges,
+    load_annotations,
+    load_label_population,
+    load_llm_cache,
+    resolve_pattern_label,
+)
+
 SCHEMA_VERSION = "2.1.0"
 STANDARD_PRESENCE_MIN = 0.75
 DOMINANT_SHARE_MIN = 0.50
@@ -226,6 +238,62 @@ def _sort_rows(rows: List[Dict[str, str]], keys: List[str]) -> List[Dict[str, st
     return sorted(rows, key=lambda r: tuple(r.get(k, "") for k in keys))
 
 
+def _load_identity_items_by_record(phase0_dir: Optional[Path]) -> Dict[str, List[Dict[str, Any]]]:
+    if phase0_dir is None:
+        return {}
+    csv_path = phase0_dir / "phase0_identity_items.csv"
+    if not csv_path.is_file():
+        return {}
+
+    out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            record_pk = _safe_str(row.get("record_pk"))
+            if not record_pk:
+                continue
+            out[record_pk].append({
+                "k": _safe_str(row.get("item_key")),
+                "v": _safe_str(row.get("item_value")),
+                "q": _safe_str(row.get("item_value_type")),
+                "role": _safe_str(row.get("item_role")),
+            })
+    return out
+
+
+def _load_label_resolution_inputs(results_v21_dir: Optional[Path], domain: str) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, str], Dict[str, Any]]:
+    if results_v21_dir is None:
+        return {}, {}, {}
+
+    label_synth_dir = results_v21_dir / "label_synthesis"
+    analysis_v21_dir = results_v21_dir / "analysis_v21"
+
+    population_candidates = [
+        label_synth_dir / f"{domain}.joinhash_label_population.csv",
+        analysis_v21_dir / f"{domain}.joinhash_label_population.csv",
+        analysis_v21_dir / "label_population" / f"{domain}.joinhash_label_population.csv",
+    ]
+    pop_path = next((p for p in population_candidates if p.is_file()), None)
+    label_pop = load_label_population(str(pop_path), domain) if pop_path else {}
+
+    annotation_candidates = [
+        label_synth_dir / f"{domain}.pattern_annotations.csv",
+        label_synth_dir / "pattern_annotations.csv",
+        analysis_v21_dir / "pattern_annotations.csv",
+    ]
+    anno_path = next((p for p in annotation_candidates if p.is_file()), None)
+    annotations = load_annotations(str(anno_path)) if anno_path else {}
+
+    llm_cache_candidates = [
+        label_synth_dir / f"{domain}.llm_name_cache.json",
+        label_synth_dir / "llm_name_cache.json",
+        analysis_v21_dir / f"{domain}.llm_name_cache.json",
+        analysis_v21_dir / "llm_name_cache.json",
+    ]
+    llm_path = next((p for p in llm_cache_candidates if p.is_file()), None)
+    llm_cache = load_llm_cache(str(llm_path)) if llm_path else {}
+    return label_pop, annotations, llm_cache
+
+
 def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename") -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     exported_utc = _utc_now_iso()
     tool_version = _get_tool_version()
@@ -374,7 +442,14 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
     return meta_rows, record_rows
 
 
-def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, str]], out_dir: Path) -> str:
+def emit_analysis_v21(
+    meta_rows: List[Dict[str, str]],
+    records: List[Dict[str, str]],
+    out_dir: Path,
+    *,
+    phase0_dir: Optional[Path] = None,
+    results_v21_dir: Optional[Path] = None,
+) -> str:
     exports = sorted({r["export_run_id"] for r in meta_rows})
     domains = sorted({r["domain"] for r in records})
     executed_utc = _utc_now_iso()
@@ -440,12 +515,14 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
     records_by_domain: Dict[str, List[Dict[str, str]]] = defaultdict(list)
     for r in records:
         records_by_domain[r["domain"]].append(r)
+    identity_items_by_record = _load_identity_items_by_record(phase0_dir)
 
     pattern_id_by_cluster: Dict[Tuple[str, str, str], str] = {}
     for dom in domains:
         cluster_items = dom_clusters.get(dom, [])
         domain_records = records_by_domain.get(dom, [])
         domain_files_present = len({r["export_run_id"] for r in domain_records})
+        label_population_by_hash, annotations, llm_cache = _load_label_resolution_inputs(results_v21_dir, dom)
         pattern_ids_taken: set[str] = set()
         cluster_rows: List[Dict[str, Any]] = []
         for (_, schema, join_hash), rows in sorted(cluster_items, key=lambda kv: (kv[0][1], kv[0][2])):
@@ -459,6 +536,7 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
                 "pid": pid,
                 "files_present": files_present,
                 "records_count": len(rows),
+                "identity_items": identity_items_by_record.get(rows[0].get("record_pk", ""), []),
             })
             pattern_id_by_cluster[(dom, schema, join_hash)] = pid
 
@@ -468,6 +546,8 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
         )
         n = len(sorted_clusters)
         total_dom_records = sum(int(c["records_count"]) for c in sorted_clusters)
+        near_dup_merge_map = find_near_duplicate_merges(sorted_clusters)
+        resolved_labels: Dict[str, Tuple[str, str]] = {}
 
         for rank, cluster in enumerate(sorted_clusters, start=1):
             schema = str(cluster["schema"])
@@ -498,12 +578,34 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
 
             # See docs/PATTERN_ID_AND_LABEL_RULES.md for stable pattern identity/label.
             pid = str(cluster["pid"])
+            generic_label = f"{schema} — Variant {rank} of {n}"
+            near_dup_target_label: Optional[str] = None
+            near_dup_target_hash = near_dup_merge_map.get(join_hash)
+            if near_dup_target_hash:
+                near_dup_target_label = resolved_labels.get(near_dup_target_hash, ("", ""))[0] or None
+            resolved_label, resolved_source = resolve_pattern_label(
+                domain=dom,
+                join_hash=join_hash,
+                join_key_schema=schema,
+                pattern_rank=rank,
+                pattern_count=n,
+                identity_items=cluster.get("identity_items") or [],
+                label_population=label_population_by_hash.get(join_hash) or [],
+                annotations=annotations,
+                llm_cache=llm_cache,
+                pattern_id=pid,
+                near_dup_target_label=near_dup_target_label,
+            )
+            resolved_labels[join_hash] = (resolved_label, resolved_source)
             domain_patterns.append({
                 "schema_version": SCHEMA_VERSION,
                 "analysis_run_id": analysis_run_id,
                 "domain": dom,
                 "pattern_id": pid,
-                "pattern_label": f"{schema} — Variant {rank} of {n}",
+                "pattern_label": resolved_label,
+                "pattern_label_human": resolved_label,
+                "pattern_label_source": resolved_source,
+                "pattern_label_fallback": generic_label,
                 "source_cluster_id": cluster_id,
                 "pattern_size_records": str(cluster_size),
                 "pattern_size_files": str(files_present),
@@ -636,6 +738,7 @@ def emit_analysis_v21(meta_rows: List[Dict[str, str]], records: List[Dict[str, s
 
     _write_csv(out_dir / "domain_patterns.csv", [
         "schema_version", "analysis_run_id", "domain", "pattern_id", "pattern_label",
+        "pattern_label_human", "pattern_label_source", "pattern_label_fallback",
         "source_cluster_id", "pattern_size_records", "pattern_size_files", "pattern_rank",
         "is_candidate_standard", "notes",
     ], _sort_rows(domain_patterns, ["analysis_run_id", "domain", "pattern_id"]))
