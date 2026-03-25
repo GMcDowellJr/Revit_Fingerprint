@@ -239,18 +239,36 @@ def _sort_rows(rows: List[Dict[str, str]], keys: List[str]) -> List[Dict[str, st
     return sorted(rows, key=lambda r: tuple(r.get(k, "") for k in keys))
 
 
-def compute_hhi_from_shares(shares: Iterable[float]) -> Optional[float]:
+def compute_hhi_from_shares(
+    shares: Iterable[float],
+    *,
+    require_closed_universe: bool = True,
+    closure_tolerance: float = 1e-9,
+) -> Optional[float]:
     """Compute HHI from a generic share vector.
 
-    Shares may be raw weights or pre-normalized shares; this helper normalizes
-    non-negative values and returns None when no valid universe exists.
+    Shares must be non-negative proportions. By default this helper enforces a
+    closed universe (sum(shares) ~= 1.0) and returns None if invalid.
     """
-    vals = [float(s) for s in shares if s is not None and float(s) > 0.0]
-    denom = sum(vals)
-    if denom <= 0.0:
+    vals: List[float] = []
+    for s in shares:
+        if s is None:
+            continue
+        try:
+            v = float(s)
+        except (TypeError, ValueError):
+            return None
+        if v < 0.0:
+            return None
+        vals.append(v)
+    if not vals:
         return None
-    norm = [v / denom for v in vals]
-    return sum(v * v for v in norm)
+    total = sum(vals)
+    if total <= 0.0:
+        return None
+    if require_closed_universe and abs(total - 1.0) > closure_tolerance:
+        return None
+    return sum(v * v for v in vals)
 
 
 def compute_effective_clusters(hhi_value: Optional[float]) -> Optional[float]:
@@ -756,16 +774,27 @@ def emit_analysis_v21(
                 schema = r.get("join_key_schema", "")
                 pid = pattern_id_by_cluster.get((dom, schema, jh))
                 if not pid:
+                    unknown += 1
                     continue
                 per_pat[pid] += 1
             dominant_pid = ""
             dominant_share = 0.0
             if per_pat and total > 0:
-                dominant_pid, dominant_count = sorted(per_pat.items(), key=lambda kv: (-kv[1], kv[0]))[0]
+                ranked = sorted(per_pat.items(), key=lambda kv: (-kv[1], kv[0]))
+                dominant_count = ranked[0][1]
+                dominant_ties = [pid for pid, cnt in ranked if cnt == dominant_count]
                 dominant_share = dominant_count / total
-                dominant_files_by_pattern[dominant_pid] += 1
-                dominant_files_with_valid_pattern += 1
-            hhi_file_records = compute_hhi_from_shares([cnt / total for cnt in per_pat.values()]) if total > 0 else None
+                # Dominance universe rule: only files with a unique dominant pattern
+                # participate in domain_dominance concentration.
+                if len(dominant_ties) == 1:
+                    dominant_pid = dominant_ties[0]
+                    dominant_files_by_pattern[dominant_pid] += 1
+                    dominant_files_with_valid_pattern += 1
+            shares_file_records = [cnt / total for cnt in per_pat.values()] if total > 0 else []
+            if total > 0 and unknown > 0:
+                # Records universe rule: include unknown/unassigned bucket so shares close.
+                shares_file_records.append(unknown / total)
+            hhi_file_records = compute_hhi_from_shares(shares_file_records) if total > 0 else None
             eff_clusters_file_records = compute_effective_clusters(hhi_file_records)
             file_domain_rows.append({
                 "schema_version": SCHEMA_VERSION,
@@ -801,11 +830,14 @@ def emit_analysis_v21(
                     "classification": "UNKNOWN",
                 })
 
-        unknown_domain = len([r for r in domain_records if not r.get("join_hash")])
+        known_domain_records = sum(int(c["records_count"]) for c in sorted_clusters)
+        unknown_domain = max(0, len(domain_records) - known_domain_records)
         total_domain = len(domain_records)
         shares = [int(c["records_count"]) / total_domain for c in sorted_clusters] if total_domain else []
         dominant = max(shares) if shares else 0.0
         entropy = -sum((s * (0.0 if s <= 0 else __import__('math').log(s, 2))) for s in shares) if shares else 0.0
+        # Presence-event concentration (not file-distribution concentration):
+        # denominator is sum(files_present across patterns in the domain).
         hhi_domain_presence = compute_hhi_from_shares(
             [int(c["files_present"]) / files_present_sum for c in sorted_clusters]
         ) if files_present_sum > 0 else None
@@ -814,9 +846,11 @@ def emit_analysis_v21(
             [cnt / dominant_files_with_valid_pattern for cnt in dominant_files_by_pattern.values()]
         ) if dominant_files_with_valid_pattern > 0 else None
         eff_clusters_domain_dominance = compute_effective_clusters(hhi_domain_dominance)
-        hhi_domain_records = compute_hhi_from_shares(
-            [int(c["records_count"]) / total_domain for c in sorted_clusters]
-        ) if total_domain > 0 else None
+        shares_domain_records = [int(c["records_count"]) / total_domain for c in sorted_clusters] if total_domain > 0 else []
+        if total_domain > 0 and unknown_domain > 0:
+            # Keep records concentration universe closed by including unknown/unassigned.
+            shares_domain_records.append(unknown_domain / total_domain)
+        hhi_domain_records = compute_hhi_from_shares(shares_domain_records) if total_domain > 0 else None
         eff_clusters_domain_records = compute_effective_clusters(hhi_domain_records)
         unknown_rate = (unknown_domain / total_domain) if total_domain else 0.0
         rec_grain = "DOMAIN_OK"
