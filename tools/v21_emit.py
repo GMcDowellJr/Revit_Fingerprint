@@ -602,7 +602,9 @@ def emit_analysis_v21(
                 "analysis_run_id": analysis_run_id,
                 "domain": dom,
                 "pattern_id": pid,
-                "pattern_label": resolved_label,
+                # Back-compat: keep legacy generic label in pattern_label so existing
+                # Power BI transforms that parse "Variant X of N" continue to work.
+                "pattern_label": generic_label,
                 "pattern_label_human": resolved_label,
                 "pattern_label_source": resolved_source,
                 "pattern_label_fallback": generic_label,
