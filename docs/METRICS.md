@@ -10,6 +10,7 @@ HHI values are only computed from closed share vectors (shares sum to 1.0).
 - **Numerator:** `files_present` for a pattern
 - **Denominator:** `sum(files_present across patterns in the domain)`
 - **Universe type:** presence-event distribution (not a file distribution)
+- **Comparability note:** this metric is not directly comparable to file-based distributions (for example dominance/file-record concentration).
 - **Unknown handling:** no explicit unknown bucket (unknown records are not presence events)
 - **Interpretation caveat:** multi-pattern files contribute to multiple presence events and can overweight mixed files by design.
 
@@ -25,7 +26,7 @@ HHI values are only computed from closed share vectors (shares sum to 1.0).
 - **Grain:** `domain`
 - **Numerator:** record count per pattern, plus an explicit unknown/unassigned record bucket
 - **Denominator:** total records in the domain
-- **Unknown bucket definition:** records not assigned to any resolved pattern (e.g., missing join hash or unresolved assignment)
+- **Unknown bucket definition:** canonical definition is `total records - records assigned to any pattern` (includes missing join hash and unresolved assignment cases)
 - **Closed-universe statement:** shares are constructed to sum to 1.0
 
 ### 4) `hhi_file_records`
@@ -40,6 +41,13 @@ HHI values are only computed from closed share vectors (shares sum to 1.0).
 - **Definition:** `1 / HHI`
 - **Null behavior:** null when HHI is null/undefined/invalid
 - **Interpretation:** effective number of patterns implied by concentration
+
+### Dominance diagnostics fields
+- **`files_total`:** total files in analysis scope.
+- **`files_with_unique_dominant`:** files with exactly one dominant pattern winner.
+- **`files_with_tied_dominant`:** files where multiple patterns tie for top count.
+- **`files_excluded_from_dominance`:** `files_total - files_with_unique_dominant`.
+  - Components: tied-dominant files + files with no valid dominant pattern.
 
 ## Metric Design Principles
 

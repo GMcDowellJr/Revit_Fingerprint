@@ -891,6 +891,7 @@ def emit_analysis_v21(
             "files_with_unique_dominant": str(dominant_files_with_valid_pattern),
             "files_with_tied_dominant": str(files_with_tied_dominant),
             "files_excluded_from_dominance": str(files_excluded_from_dominance),
+            "pct_files_unique_dominant": f"{(dominant_files_with_valid_pattern / files_total) if files_total else 0.0:.6f}",
         })
         print(
             f"[v21_emit] domain={dom} (done) clusters={len(sorted_clusters)} records={len(domain_records)}",
@@ -956,6 +957,7 @@ def emit_analysis_v21(
         "hhi_domain_dominance", "eff_clusters_domain_dominance",
         "hhi_domain_records", "eff_clusters_domain_records",
         "files_total", "files_with_unique_dominant", "files_with_tied_dominant", "files_excluded_from_dominance",
+        "pct_files_unique_dominant",
     ], _sort_rows(diag_rows, ["analysis_run_id", "domain"]))
 
     return analysis_run_id
