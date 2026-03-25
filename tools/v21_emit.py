@@ -528,6 +528,7 @@ def emit_analysis_v21(
         records_by_domain[r["domain"]].append(r)
     pattern_id_by_cluster: Dict[Tuple[str, str, str], str] = {}
     for dom in domains:
+        print(f"[v21_emit] domain={dom} (start)", flush=True)
         identity_items_by_record = _load_identity_items_by_record(phase0_dir, dom)
         cluster_items = dom_clusters.get(dom, [])
         domain_records = records_by_domain.get(dom, [])
@@ -726,6 +727,10 @@ def emit_analysis_v21(
             "unknown_rate_pct": f"{unknown_rate:.6f}",
             "recommended_analysis_grain": rec_grain,
         })
+        print(
+            f"[v21_emit] domain={dom} (done) clusters={len(sorted_clusters)} records={len(domain_records)}",
+            flush=True,
+        )
 
     # Unknown join_hash rows still get membership rows with blank pattern_id.
     for r in records:
