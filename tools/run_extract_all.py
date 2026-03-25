@@ -548,9 +548,11 @@ def main() -> None:
 
     if "analyze1" in selected_stages or "analyze2" in selected_stages:
         phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
-        if phase0_records_csv.is_file() and not record_rows:
+        if phase0_records_csv.is_file():
+            # Always reload from disk here so analyze uses post-apply join_hash values,
+            # not in-memory rows captured before join policy application.
             record_rows = _read_csv_rows(phase0_records_csv)
-        if (v21_phase0_dir / "file_metadata.csv").is_file() and not meta_rows:
+        if (v21_phase0_dir / "file_metadata.csv").is_file():
             meta_rows = _read_csv_rows(v21_phase0_dir / "file_metadata.csv")
         if meta_rows and record_rows:
             # Ensure modal label population artifacts exist for the active v2.1 emit path.
