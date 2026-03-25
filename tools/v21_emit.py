@@ -32,6 +32,7 @@ DOMINANT_SHARE_MIN = 0.50
 MIN_RECORDS_FOR_DOMAIN = 50
 MIN_FILES_FOR_DOMAIN = 3
 UNKNOWN_RATE_MAX = 0.20
+SUPPRESSED_ANALYSIS_DOMAINS = {"object_styles_imported"}
 
 # See docs/CENTRAL_PATH_NORM_RULE.md for normalization contract.
 _VOLATILE_SEGMENTS = {
@@ -238,6 +239,44 @@ def _sort_rows(rows: List[Dict[str, str]], keys: List[str]) -> List[Dict[str, st
     return sorted(rows, key=lambda r: tuple(r.get(k, "") for k in keys))
 
 
+def _iter_object_style_name_candidates(rec: Dict[str, Any]) -> Iterable[str]:
+    for k in ("record_id", "id", "name"):
+        v = rec.get(k)
+        if isinstance(v, str) and v.strip():
+            yield v
+    label = rec.get("label")
+    if isinstance(label, dict):
+        disp = label.get("display")
+        if isinstance(disp, str) and disp.strip():
+            yield disp
+    identity_basis = rec.get("identity_basis")
+    if isinstance(identity_basis, dict):
+        items = identity_basis.get("items")
+        if isinstance(items, list):
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                v = it.get("v")
+                if isinstance(v, str) and v.strip():
+                    yield v
+
+
+def _remap_object_style_domain(source_domain: str, rec: Dict[str, Any]) -> Optional[str]:
+    if not source_domain.startswith("object_styles_"):
+        return source_domain
+    haystack = " | ".join([s.lower() for s in _iter_object_style_name_candidates(rec)])
+
+    # Temporary flatten-side hygiene:
+    # - Skip known imported DWG / Imports-in-Families rows from mainline model domain.
+    # - Route explicit analytical names into object_styles_analytical.
+    # TODO(move-to-exporter): move this classification upstream into exporter probe/domain emission.
+    if "imports in families" in haystack or "-.dwg-" in haystack or ".dwg" in haystack:
+        return None
+    if "-analytical-" in haystack:
+        return "object_styles_analytical"
+    return source_domain
+
+
 def _load_identity_items_by_record(phase0_dir: Optional[Path], domain: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
     if phase0_dir is None:
         return {}
@@ -343,13 +382,16 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
             "exported_utc": exported_utc,
         })
 
-        for domain in _iter_domains(data):
-            payload = data.get(domain)
+        for source_domain in _iter_domains(data):
+            payload = data.get(source_domain)
             recs = payload.get("records") if isinstance(payload, dict) else None
             if not isinstance(recs, list):
                 continue
             for i, rec in enumerate(recs):
                 if not isinstance(rec, dict):
+                    continue
+                domain = _remap_object_style_domain(source_domain, rec)
+                if not domain:
                     continue
                 record_ordinal = f"{i:06d}"
                 record_pk = f"{file_id}|{domain}|{record_ordinal}"
@@ -462,7 +504,7 @@ def emit_analysis_v21(
     results_v21_dir: Optional[Path] = None,
 ) -> str:
     exports = sorted({r["export_run_id"] for r in meta_rows})
-    domains = sorted({r["domain"] for r in records})
+    domains = sorted({r["domain"] for r in records if r.get("domain", "") not in SUPPRESSED_ANALYSIS_DOMAINS})
     executed_utc = _utc_now_iso()
     scope_src = "|".join(exports)
     analysis_scope_hash = hashlib.sha1(scope_src.encode("utf-8")).hexdigest()
@@ -506,6 +548,8 @@ def emit_analysis_v21(
     files_total = len(exports)
     by_dom_cluster: Dict[Tuple[str, str, str], List[Dict[str, str]]] = defaultdict(list)
     for r in records:
+        if r.get("domain", "") in SUPPRESSED_ANALYSIS_DOMAINS:
+            continue
         jh = r.get("join_hash", "")
         if not jh:
             continue
@@ -525,6 +569,8 @@ def emit_analysis_v21(
 
     records_by_domain: Dict[str, List[Dict[str, str]]] = defaultdict(list)
     for r in records:
+        if r.get("domain", "") in SUPPRESSED_ANALYSIS_DOMAINS:
+            continue
         records_by_domain[r["domain"]].append(r)
     pattern_id_by_cluster: Dict[Tuple[str, str, str], str] = {}
     for dom in domains:

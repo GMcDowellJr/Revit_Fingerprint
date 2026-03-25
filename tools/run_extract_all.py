@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from v21_emit import emit_analysis_v21, emit_phase0_v21
 
+SUPPRESSED_DOWNSTREAM_DOMAINS = {"object_styles_imported"}
+
 
 _LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.seg\[(\d{3})\]\.(kind|length)$")
 
@@ -520,11 +522,17 @@ def main() -> None:
         domains = [d.strip() for d in str(args.domains).split(",") if d.strip()]
     else:
         domains = _infer_domains(exports_dir)
+    active_domains = [d for d in domains if d not in SUPPRESSED_DOWNSTREAM_DOMAINS]
+    suppressed_domains = sorted(set(domains) - set(active_domains))
+    if suppressed_domains:
+        sys.stderr.write(
+            f"[INFO extract_all] suppressed_downstream_domains={','.join(suppressed_domains)}\n"
+        )
     if not domains and any(s in selected_stages for s in ("analyze2",)):
         raise SystemExit("No domains inferred; provide --domains.")
 
     env = os.environ.copy()
-    report: Dict[str, Any] = {"tool": "tools/run_extract_all.py", "exports_dir": str(exports_dir), "out_root": str(out_root), "surfaces": surfaces, "domains": domains, "selected_stages": selected_stages, "commands": [], "notes": []}
+    report: Dict[str, Any] = {"tool": "tools/run_extract_all.py", "exports_dir": str(exports_dir), "out_root": str(out_root), "surfaces": surfaces, "domains": domains, "active_domains": active_domains, "selected_stages": selected_stages, "commands": [], "notes": []}
     meta_rows: List[Dict[str, str]] = []
     record_rows: List[Dict[str, str]] = []
 
@@ -589,7 +597,7 @@ def main() -> None:
     if any(s in selected_stages for s in ("split", "analyze1", "analyze2")) and require_join_policy:
         phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
         if phase0_records_csv.is_file():
-            _enforce_policy_gate(_read_csv_rows(phase0_records_csv), v21_root / "diagnostics", domains, allow_sig_hash_join_key)
+            _enforce_policy_gate(_read_csv_rows(phase0_records_csv), v21_root / "diagnostics", active_domains, allow_sig_hash_join_key)
 
     if "analyze1" in selected_stages or "analyze2" in selected_stages:
         phase0_records_csv = v21_phase0_dir / "phase0_records.csv"
@@ -641,7 +649,7 @@ def main() -> None:
     if "analyze2" in selected_stages and args.emit_legacy:
         _ensure_dir(phase2_root)
         dimtype_domains_seen: List[str] = []
-        for dom in domains:
+        for dom in active_domains:
             dom_out = phase2_root / dom
             _ensure_dir(dom_out)
             for mod in ["run_joinhash_label_population", "run_joinhash_parameter_population", "run_candidate_joinkey_simulation", "run_population_stability"]:
@@ -663,11 +671,11 @@ def main() -> None:
     split_domains: List[str] = []
     if "split" in selected_stages:
         if args.split_domains is None or str(args.split_domains) == "__ALL__":
-            split_domains = sorted({str(r.get("domain", "")).strip() for r in (record_rows or []) if str(r.get("domain", "")).strip()}, key=lambda s: s.lower())
+            split_domains = sorted({str(r.get("domain", "")).strip() for r in (record_rows or []) if str(r.get("domain", "")).strip() and str(r.get("domain", "")).strip() not in SUPPRESSED_DOWNSTREAM_DOMAINS}, key=lambda s: s.lower())
             if not split_domains:
-                split_domains = _discover_domains_from_exports(exports_dir)
+                split_domains = [d for d in _discover_domains_from_exports(exports_dir) if d not in SUPPRESSED_DOWNSTREAM_DOMAINS]
         else:
-            split_domains = [d.strip() for d in str(args.split_domains).split(",") if d.strip()]
+            split_domains = [d.strip() for d in str(args.split_domains).split(",") if d.strip() and d.strip() not in SUPPRESSED_DOWNSTREAM_DOMAINS]
 
     if split_domains:
         print(f"[extract_all] Stage split: running split detection for {len(split_domains)} domain(s)...", flush=True)
