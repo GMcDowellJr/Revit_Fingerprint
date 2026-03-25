@@ -122,8 +122,10 @@ def _discover_domains_from_exports(exports_dir: Path) -> List[str]:
     exports_dir = Path(exports_dir)
     domains: set[str] = set()
 
-    # Scan a limited set first for speed; fall back to full scan if needed.
-    candidates = sorted(exports_dir.glob("*.json"))
+    # Prefer fingerprint files; fall back to generic .json if none found.
+    candidates = sorted(exports_dir.glob("*__fingerprint.json"))
+    if not candidates:
+        candidates = [p for p in exports_dir.glob("*.json") if not p.name.lower().endswith(".legacy.json")]
     if not candidates:
         return []
 
@@ -207,17 +209,16 @@ def _detect_surfaces(exports_dir: Path) -> Dict[str, int]:
     details = sum(1 for n in names if n.lower().endswith(".details.json"))
     index = sum(1 for n in names if n.lower().endswith(".index.json"))
     legacy = sum(1 for n in names if n.lower().endswith(".legacy.json"))
-    plain = sum(
-        1
-        for n in names
-        if n.lower().endswith(".json")
-        and not (
-            n.lower().endswith(".details.json")
-            or n.lower().endswith(".index.json")
-            or n.lower().endswith(".legacy.json")
-        )
-    )
-    return {"details": details, "index": index, "legacy": legacy, "plain_json": plain, "total_json": len(names)}
+    fingerprint = sum(1 for n in names if n.lower().endswith("__fingerprint.json"))
+    plain = len(names) - details - index - legacy - fingerprint
+    return {
+        "details": details,
+        "index": index,
+        "legacy": legacy,
+        "fingerprint_json": fingerprint,
+        "plain_json": plain,
+        "total_json": len(names),
+    }
 
 
 def _merge_index_details(index_fp: Dict[str, Any], details_fp: Dict[str, Any]) -> Dict[str, Any]:
@@ -233,10 +234,20 @@ def _merge_index_details(index_fp: Dict[str, Any], details_fp: Dict[str, Any]) -
 def _pick_sample_file(exports_dir: Path) -> Tuple[Optional[Path], Optional[Path]]:
     """Pick sample files for domain inference.
 
+    Priority order:
+      1. *__fingerprint.json monolithic exports
+      2. *.details.json / *.index.json split exports
+      3. other non-legacy *.json files
+      4. *.legacy.json files
+
     Returns (index_path, details_path) tuple. Both may be None if no files found.
     For split exports, returns both index and details paths.
-    For legacy/plain exports, returns (path, None).
+    For monolithic, plain, or legacy exports, returns (path, None).
     """
+    fingerprints = sorted(exports_dir.glob("*__fingerprint.json"))
+    if fingerprints:
+        return (fingerprints[0], None)
+
     details = sorted(exports_dir.glob("*.details.json"))
     index = sorted(exports_dir.glob("*.index.json"))
 
@@ -256,7 +267,7 @@ def _pick_sample_file(exports_dir: Path) -> Tuple[Optional[Path], Optional[Path]
     if details:
         return (None, details[0])
 
-    plain = sorted([p for p in exports_dir.glob("*.json") if not p.name.lower().endswith(".legacy.json")])
+    plain = sorted([p for p in exports_dir.glob("*.json") if not (p.name.lower().endswith(".legacy.json") or p.name.lower().endswith("__fingerprint.json"))])
     if plain:
         return (plain[0], None)
 
@@ -363,7 +374,7 @@ def main() -> None:
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    ap.add_argument("exports_dir", help="Folder containing fingerprint exports (*.details.json / *.index.json).")
+    ap.add_argument("exports_dir", help="Folder containing fingerprint exports (*__fingerprint.json, or legacy *.details.json / *.index.json).")
     ap.add_argument("--out-root", required=True, help="Output root folder.")
     ap.add_argument("--config", default=None, help="Phase1 config path (required when stage analyze1 is included).")
     ap.add_argument("--seed-baseline", default=None, help="Optional seed baseline fingerprint JSON path for analyze1.")
@@ -562,15 +573,25 @@ def main() -> None:
 
     if "analyze2" in selected_stages and args.emit_legacy:
         _ensure_dir(phase2_root)
+        dimtype_domains_seen: List[str] = []
         for dom in domains:
             dom_out = phase2_root / dom
             _ensure_dir(dom_out)
             for mod in ["run_joinhash_label_population", "run_joinhash_parameter_population", "run_candidate_joinkey_simulation", "run_population_stability"]:
                 _run([sys.executable, "-m", f"tools.phase2_analysis.{mod}", str(exports_dir), "--domain", dom, "--out", str(dom_out)], env=env)
-            if dom.startswith("dimension_types_") and not args.no_dimtypes_by_family:
-                cmd2e = [sys.executable, "-m", "tools.phase2_analysis.run_dimension_types_by_family", str(exports_dir), "--domain", dom, "--out", str(dom_out)]
-                cmd2e += ["--baseline", str(args.baseline), "--families_from", "baseline"] if args.baseline else ["--families_from", "all"]
-                _run(cmd2e, env=env)
+            if dom.startswith("dimension_types_") and dom not in dimtype_domains_seen:
+                dimtype_domains_seen.append(dom)
+
+        if dimtype_domains_seen and not args.no_dimtypes_by_family:
+            canonical_dimtype_domain = dimtype_domains_seen[0]
+            dom_out = phase2_root / canonical_dimtype_domain
+            sys.stderr.write(
+                "[DEBUG run_extract_all] Invoking run_dimension_types_by_family once "
+                f"for {len(dimtype_domains_seen)} dimension_types_* domain(s) using {canonical_dimtype_domain}.\n"
+            )
+            cmd2e = [sys.executable, "-m", "tools.phase2_analysis.run_dimension_types_by_family", str(exports_dir), "--domain", canonical_dimtype_domain, "--out", str(dom_out)]
+            cmd2e += ["--baseline", str(args.baseline), "--families_from", "baseline"] if args.baseline else ["--families_from", "all"]
+            _run(cmd2e, env=env)
 
     split_domains: List[str] = []
     if "split" in selected_stages:
