@@ -739,10 +739,13 @@ def emit_analysis_v21(
     ], _sort_rows(domain_metrics, ["domain", "join_key_schema", "join_hash"]))
 
     _write_csv(out_dir / "domain_patterns.csv", [
+        # Keep legacy first 11 columns in the original order for Power BI queries
+        # that pin Csv.Document([Columns=11]) and/or type-steps against that shape.
         "schema_version", "analysis_run_id", "domain", "pattern_id", "pattern_label",
-        "pattern_label_human", "pattern_label_source", "pattern_label_fallback",
         "source_cluster_id", "pattern_size_records", "pattern_size_files", "pattern_rank",
         "is_candidate_standard", "notes",
+        # v2.1 human-readable/audit extensions are appended for compatibility.
+        "pattern_label_human", "pattern_label_source", "pattern_label_fallback",
     ], _sort_rows(domain_patterns, ["analysis_run_id", "domain", "pattern_id"]))
 
     _write_csv(out_dir / "record_pattern_membership.csv", [
