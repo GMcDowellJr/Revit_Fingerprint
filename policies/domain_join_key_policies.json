@@ -36,19 +36,25 @@
         "File-local identifiers remain excluded from canonical identity evidence and join-key hashing."
       ]
     },
-    "phase_filters": {
-      "join_key_schema": "phase_filters.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "phase_filter.name"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [],
-      "notes": [
-        "Pareto evidence showed zero fragmentation and zero collisions with name-only in the evaluated population.",
-        "This is a label-based join pending availability/export of definition-bearing identity fields for phase filters; treat as provisional."
-      ]
-    },
+	"phase_filters": {
+	  "join_key_schema": "phase_filters.join_key.v2",
+	  "hash_alg": "md5_utf8_join_pipe",
+	  "required_items": [
+		"phase_filter.demolished.presentation_id",
+		"phase_filter.existing.presentation_id",
+		"phase_filter.new.presentation_id",
+		"phase_filter.temporary.presentation_id"
+	  ],
+	  "optional_items": [],
+	  "explicitly_excluded_items": [
+		"phase_filter.name"
+	  ],
+	  "notes": [
+		"Policy aligned to canonical identity evidence emitted by domains/phase_filters.py.",
+		"Join identity is defined by the four per-status presentation ids; phase_filter.name remains a phase2 coordination/label field only.",
+		"This replaces the provisional name-only policy, which no longer matched the exported identity_items surface."
+	  ]
+	},
     "phases": {
       "join_key_schema": "phases.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
