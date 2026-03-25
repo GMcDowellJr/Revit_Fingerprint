@@ -171,6 +171,51 @@ def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
         return [{str(k): "" if v is None else str(v) for k, v in row.items()} for row in csv.DictReader(f)]
 
 
+def _ensure_domain_scoped_identity_items(phase0_dir: Path) -> Optional[Path]:
+    src = phase0_dir / "phase0_identity_items.csv"
+    if not src.is_file():
+        return None
+
+    shard_dir = phase0_dir / "phase0_identity_items_by_domain"
+    shard_dir.mkdir(parents=True, exist_ok=True)
+    sentinel = shard_dir / ".complete"
+
+    try:
+        if sentinel.is_file() and sentinel.stat().st_mtime >= src.stat().st_mtime:
+            return shard_dir
+    except OSError:
+        pass
+
+    for old in shard_dir.glob("*.csv"):
+        old.unlink(missing_ok=True)
+
+    handles: Dict[str, Any] = {}
+    writers: Dict[str, csv.DictWriter] = {}
+    try:
+        with src.open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            fieldnames = list(reader.fieldnames or [])
+            if not fieldnames:
+                return shard_dir
+            for row in reader:
+                domain = str(row.get("domain", "")).strip()
+                if not domain:
+                    continue
+                if domain not in writers:
+                    fp = (shard_dir / f"{domain}.csv").open("w", encoding="utf-8", newline="")
+                    handles[domain] = fp
+                    w = csv.DictWriter(fp, fieldnames=fieldnames)
+                    w.writeheader()
+                    writers[domain] = w
+                writers[domain].writerow({k: row.get(k, "") for k in fieldnames})
+    finally:
+        for fp in handles.values():
+            fp.close()
+
+    sentinel.write_text(str(src.stat().st_mtime), encoding="utf-8")
+    return shard_dir
+
+
 def _emit_join_policy_diagnostics(rows: List[Dict[str, str]], diagnostics_dir: Path, domains: Optional[List[str]] = None) -> List[Dict[str, str]]:
     import csv
 
@@ -555,6 +600,10 @@ def main() -> None:
         if (v21_phase0_dir / "file_metadata.csv").is_file():
             meta_rows = _read_csv_rows(v21_phase0_dir / "file_metadata.csv")
         if meta_rows and record_rows:
+            shard_dir = _ensure_domain_scoped_identity_items(v21_phase0_dir)
+            if shard_dir is not None:
+                report["notes"].append(f"identity_items_shards={shard_dir}")
+
             # Ensure modal label population artifacts exist for the active v2.1 emit path.
             cmd_label_pop = [
                 sys.executable,

@@ -238,16 +238,27 @@ def _sort_rows(rows: List[Dict[str, str]], keys: List[str]) -> List[Dict[str, st
     return sorted(rows, key=lambda r: tuple(r.get(k, "") for k in keys))
 
 
-def _load_identity_items_by_record(phase0_dir: Optional[Path]) -> Dict[str, List[Dict[str, Any]]]:
+def _load_identity_items_by_record(phase0_dir: Optional[Path], domain: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
     if phase0_dir is None:
         return {}
-    csv_path = phase0_dir / "phase0_identity_items.csv"
-    if not csv_path.is_file():
-        return {}
+
+    csv_path: Optional[Path] = None
+    if domain:
+        scoped = phase0_dir / "phase0_identity_items_by_domain" / f"{domain}.csv"
+        if scoped.is_file():
+            csv_path = scoped
+
+    if csv_path is None:
+        fallback = phase0_dir / "phase0_identity_items.csv"
+        if not fallback.is_file():
+            return {}
+        csv_path = fallback
 
     out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
+            if domain and _safe_str(row.get("domain")) and _safe_str(row.get("domain")) != domain:
+                continue
             record_pk = _safe_str(row.get("record_pk"))
             if not record_pk:
                 continue
@@ -515,10 +526,9 @@ def emit_analysis_v21(
     records_by_domain: Dict[str, List[Dict[str, str]]] = defaultdict(list)
     for r in records:
         records_by_domain[r["domain"]].append(r)
-    identity_items_by_record = _load_identity_items_by_record(phase0_dir)
-
     pattern_id_by_cluster: Dict[Tuple[str, str, str], str] = {}
     for dom in domains:
+        identity_items_by_record = _load_identity_items_by_record(phase0_dir, dom)
         cluster_items = dom_clusters.get(dom, [])
         domain_records = records_by_domain.get(dom, [])
         domain_files_present = len({r["export_run_id"] for r in domain_records})
