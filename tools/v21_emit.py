@@ -272,6 +272,11 @@ def compute_hhi_from_shares(
 
 
 def compute_effective_clusters(hhi_value: Optional[float]) -> Optional[float]:
+    """Return effective cluster count (1/HHI) or None when undefined.
+
+    This helper is null-safe and never divides by zero. It does not coerce
+    undefined inputs into numeric defaults.
+    """
     if hhi_value is None or hhi_value <= 0.0:
         return None
     return 1.0 / hhi_value
@@ -658,6 +663,7 @@ def emit_analysis_v21(
         files_present_sum = sum(int(c["files_present"]) for c in sorted_clusters)
         dominant_files_by_pattern: Dict[str, int] = defaultdict(int)
         dominant_files_with_valid_pattern = 0
+        files_with_tied_dominant = 0
         near_dup_merge_map = find_near_duplicate_merges(sorted_clusters)
         resolved_labels: Dict[str, Tuple[str, str]] = {}
 
@@ -790,6 +796,8 @@ def emit_analysis_v21(
                     dominant_pid = dominant_ties[0]
                     dominant_files_by_pattern[dominant_pid] += 1
                     dominant_files_with_valid_pattern += 1
+                else:
+                    files_with_tied_dominant += 1
             shares_file_records = [cnt / total for cnt in per_pat.values()] if total > 0 else []
             if total > 0 and unknown > 0:
                 # Records universe rule: include unknown/unassigned bucket so shares close.
@@ -852,6 +860,9 @@ def emit_analysis_v21(
             shares_domain_records.append(unknown_domain / total_domain)
         hhi_domain_records = compute_hhi_from_shares(shares_domain_records) if total_domain > 0 else None
         eff_clusters_domain_records = compute_effective_clusters(hhi_domain_records)
+        files_excluded_from_dominance = files_total - dominant_files_with_valid_pattern
+        # unknown_rate_pct tracks records not assigned to any resolved pattern
+        # (missing join_hash and any other unresolved/unassigned cases).
         unknown_rate = (unknown_domain / total_domain) if total_domain else 0.0
         rec_grain = "DOMAIN_OK"
         if total_domain < MIN_RECORDS_FOR_DOMAIN or domain_files_present < MIN_FILES_FOR_DOMAIN:
@@ -876,6 +887,10 @@ def emit_analysis_v21(
             "eff_clusters_domain_dominance": _fmt_metric(eff_clusters_domain_dominance),
             "hhi_domain_records": _fmt_metric(hhi_domain_records),
             "eff_clusters_domain_records": _fmt_metric(eff_clusters_domain_records),
+            "files_total": str(files_total),
+            "files_with_unique_dominant": str(dominant_files_with_valid_pattern),
+            "files_with_tied_dominant": str(files_with_tied_dominant),
+            "files_excluded_from_dominance": str(files_excluded_from_dominance),
         })
         print(
             f"[v21_emit] domain={dom} (done) clusters={len(sorted_clusters)} records={len(domain_records)}",
@@ -940,6 +955,7 @@ def emit_analysis_v21(
         "hhi_domain_presence", "eff_clusters_domain_presence",
         "hhi_domain_dominance", "eff_clusters_domain_dominance",
         "hhi_domain_records", "eff_clusters_domain_records",
+        "files_total", "files_with_unique_dominant", "files_with_tied_dominant", "files_excluded_from_dominance",
     ], _sort_rows(diag_rows, ["analysis_run_id", "domain"]))
 
     return analysis_run_id
