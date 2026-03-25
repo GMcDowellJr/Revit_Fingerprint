@@ -553,6 +553,16 @@ def main() -> None:
         if (v21_phase0_dir / "file_metadata.csv").is_file() and not meta_rows:
             meta_rows = _read_csv_rows(v21_phase0_dir / "file_metadata.csv")
         if meta_rows and record_rows:
+            # Ensure modal label population artifacts exist for the active v2.1 emit path.
+            cmd_label_pop = [
+                sys.executable,
+                "tools/label_synthesis/build_label_population.py",
+                "--out-root",
+                str(out_root),
+            ]
+            report["commands"].append({"stage": "analyze", "cmd": cmd_label_pop})
+            _run(cmd_label_pop, env=env)
+
             _ensure_dir(v21_analysis_dir)
             analysis_run_id = emit_analysis_v21(
                 meta_rows,
