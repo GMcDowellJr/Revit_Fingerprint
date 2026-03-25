@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,10 +51,13 @@ def _iter_export_files(exports_dir: Path) -> List[Tuple[str, Path, Optional[Path
     files = [p for p in exports_dir.glob("*.json") if p.is_file() and not p.name.lower().endswith(".legacy.json")]
     index_by_base: Dict[str, Path] = {}
     details_by_base: Dict[str, Path] = {}
+    fingerprint: List[Tuple[str, Path, Optional[Path]]] = []
     plain: List[Tuple[str, Path, Optional[Path]]] = []
     for p in files:
         lower = p.name.lower()
-        if lower.endswith(".index.json"):
+        if lower.endswith("__fingerprint.json"):
+            fingerprint.append((p.name, p, None))
+        elif lower.endswith(".index.json"):
             base = lower[:-len(".index.json")]
             index_by_base[base] = p
         elif lower.endswith(".details.json"):
@@ -62,14 +66,23 @@ def _iter_export_files(exports_dir: Path) -> List[Tuple[str, Path, Optional[Path
         else:
             plain.append((p.name, p, None))
 
-    merged: List[Tuple[str, Path, Optional[Path]]] = []
+    split_pairs: List[Tuple[str, Path, Optional[Path]]] = []
     for base in sorted(set(index_by_base) | set(details_by_base)):
         idx = index_by_base.get(base)
         det = details_by_base.get(base)
         if idx is not None:
-            merged.append((idx.name, idx, det))
+            split_pairs.append((idx.name, idx, det))
         elif det is not None:
-            merged.append((det.name, det, None))
+            split_pairs.append((det.name, det, None))
+
+    sys.stderr.write(
+        "[INFO v21_emit] export surfaces: "
+        f"fingerprint={len(fingerprint)} split_pairs={len(split_pairs)} plain={len(plain)}\n"
+    )
+
+    merged: List[Tuple[str, Path, Optional[Path]]] = []
+    merged.extend(sorted(fingerprint, key=lambda t: t[0].lower()))
+    merged.extend(split_pairs)
     merged.extend(sorted(plain, key=lambda t: t[0].lower()))
     return merged
 
