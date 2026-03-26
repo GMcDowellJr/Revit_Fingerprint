@@ -11,7 +11,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 
 SCHEMA_VERSION = "2.1.0"
@@ -31,6 +31,40 @@ def _write_csv(path: Path, fieldnames: List[str], rows: List[Dict[str, str]]) ->
         for row in rows:
             writer.writerow({k: row.get(k, "") for k in fieldnames})
 
+
+def _domain_record_count(phase0_csv_path: Path, domain: str) -> int:
+    """Return number of phase0 records for a given domain."""
+    if not phase0_csv_path.exists():
+        return 0
+    return sum(1 for row in _read_csv(phase0_csv_path) if row.get("domain", "").strip() == domain)
+
+
+def _domain_has_records(phase0_csv_path: Path, domain: str) -> bool:
+    """True if phase0 has at least one record for the domain."""
+    return _domain_record_count(phase0_csv_path, domain) > 0
+
+
+def _write_no_data_stub_reports(out_root: Path, domain: str) -> None:
+    """Write no-data stub reports so downstream consumers have deterministic artifacts."""
+    payload: Dict[str, Any] = {
+        "domain": domain,
+        "status": "no_data",
+        "files_total": 0,
+        "files_clustered": 0,
+        "clusters": [],
+        "notes": "No records found in phase0 for this domain",
+    }
+    file_level_report = out_root / "file_level" / f"{domain}.file_clustering_report.json"
+    file_level_report.parent.mkdir(parents=True, exist_ok=True)
+    with file_level_report.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+        f.write("\n")
+
+    # Compatibility path requested by some downstream wrappers.
+    root_report = out_root / "file_clustering_report.json"
+    with root_report.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+        f.write("\n")
 
 
 
@@ -281,8 +315,7 @@ def run_split_detection_workflow(
     analysis_dir: str | None = None,
 ) -> None:
     """Run complete split detection workflow."""
-    
-    _validate_join_policy_ready(phase0_dir, domain, allow_sig_hash_join_key)
+
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
     
@@ -297,6 +330,19 @@ def run_split_detection_workflow(
     element_out.mkdir(exist_ok=True)
     intradomain_out.mkdir(exist_ok=True)
     join_keys_out.mkdir(exist_ok=True)
+
+    is_empty_domain = False
+    phase0_records_csv = Path(phase0_dir) / "phase0_records.csv" if phase0_dir else None
+    if phase0_records_csv and phase0_records_csv.exists():
+        is_empty_domain = not _domain_has_records(phase0_records_csv, domain)
+        if is_empty_domain:
+            print(f"[SKIP] {domain}: no records in phase0")
+            _write_no_data_stub_reports(out_root, domain)
+            _finalize_split_outputs(out_root, domain=domain, phase0_dir=phase0_dir, analysis_dir=analysis_dir)
+            print(f"[INFO] Domain {domain} skipped (no data in phase0)")
+            return
+
+    _validate_join_policy_ready(phase0_dir, domain, allow_sig_hash_join_key)
     
     # Phase 1: File-level clustering
     clusters_csv = file_level_out / f"{domain}.file_clusters.csv"
@@ -319,6 +365,12 @@ def run_split_detection_workflow(
     report_json = file_level_out / f"{domain}.file_clustering_report.json"
     
     if not report_json.exists():
+        if phase0_records_csv and phase0_records_csv.exists() and not _domain_has_records(phase0_records_csv, domain):
+            print(f"[SKIP] {domain}: no records in phase0")
+            _write_no_data_stub_reports(out_root, domain)
+            _finalize_split_outputs(out_root, domain=domain, phase0_dir=phase0_dir, analysis_dir=analysis_dir)
+            print(f"[INFO] Domain {domain} skipped (no data in phase0)")
+            return
         sys.stderr.write("[ERROR] File clustering report not found\n")
         sys.exit(1)
     
