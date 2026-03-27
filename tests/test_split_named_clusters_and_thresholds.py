@@ -7,11 +7,7 @@ import pytest
 
 pd = pytest.importorskip("pandas")
 
-from tools.compute_governance_thresholds import (
-    compute_alignment_rates,
-    compute_thresholds,
-    jenks_natural_breaks,
-)
+from tools.compute_governance_thresholds import compute_alignment_rates, compute_thresholds, jenks_natural_breaks
 from tools.phase2_analysis.split_detection_file_level import compute_named_cluster_flags
 from tools.run_split_detection_all import _inject_split_contract_headers
 
@@ -46,23 +42,11 @@ def test_compute_named_cluster_flags_largest_gap_and_equal_shares():
     assert equal_flags.tolist() == [True, True]
 
 
-def test_thresholds_and_fallback_consistency(monkeypatch):
+def test_thresholds_breaks_and_ordering():
     values = [0.21, 0.24, 0.27, 0.55, 0.61, 0.66, 0.84, 0.9, 0.94]
-    with_jenkspy = jenks_natural_breaks(values, n_classes=3)
-
-    import builtins
-
-    real_import = builtins.__import__
-
-    def _block_jenkspy(name, *args, **kwargs):
-        if name == "jenkspy":
-            raise ImportError("blocked for fallback test")
-        return real_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", _block_jenkspy)
-    fallback = jenks_natural_breaks(values, n_classes=3)
-
-    assert fallback == with_jenkspy
+    breaks = jenks_natural_breaks(values, n_classes=3)
+    assert len(breaks) == 2
+    assert breaks[1] > breaks[0] > 0
     thresholds = compute_thresholds({f"d{i}": v for i, v in enumerate(values)})
     assert thresholds["stable_min"] > thresholds["emerging_min"] > 0
 

@@ -64,62 +64,63 @@ def jenks_natural_breaks(values: List[float], n_classes: int) -> List[float]:
     Compute Jenks natural breaks (Fisher-Jenks algorithm).
     Returns list of n_classes - 1 break values.
 
-    Uses jenkspy if available, otherwise falls back to a pure-Python
-    implementation suitable for small N.
+    Pure-Python Fisher-Jenks implementation suitable for small N.
     """
     if n_classes < 2:
         raise ValueError("n_classes must be >= 2")
     if len(values) < n_classes:
         raise ValueError(f"Need at least {n_classes} values. Got {len(values)}.")
 
-    try:
-        import jenkspy
-
-        breaks = jenkspy.jenks_breaks(values, n_classes=n_classes)
-        return sorted(float(v) for v in breaks[1:-1])
-    except ImportError:
-        pass
-
     vals = sorted(float(v) for v in values)
     n = len(vals)
 
-    if n <= n_classes:
+    if n == n_classes:
         return [vals[i] for i in range(1, n)]
 
-    def ssd(start: int, end: int) -> float:
-        sub = vals[start:end]
-        mean = sum(sub) / len(sub)
-        return sum((x - mean) ** 2 for x in sub)
+    lower_class_limits = [[0] * (n_classes + 1) for _ in range(n + 1)]
+    variance_combinations = [[float("inf")] * (n_classes + 1) for _ in range(n + 1)]
 
-    mat = [[float("inf")] * (n_classes + 1) for _ in range(n + 1)]
-    split = [[0] * (n_classes + 1) for _ in range(n + 1)]
+    for i in range(1, n_classes + 1):
+        lower_class_limits[1][i] = 1
+        variance_combinations[1][i] = 0.0
+        for j in range(2, n + 1):
+            variance_combinations[j][i] = float("inf")
 
-    for i in range(1, n + 1):
-        mat[i][1] = ssd(0, i)
-        split[i][1] = 0
+    for l in range(2, n + 1):
+        sum_ = 0.0
+        sum_squares = 0.0
+        w = 0
 
-    for k in range(2, n_classes + 1):
-        for i in range(k, n + 1):
-            best = float("inf")
-            best_j = k - 1
-            for j in range(k - 1, i):
-                cost = mat[j][k - 1] + ssd(j, i)
-                if cost < best:
-                    best = cost
-                    best_j = j
-            mat[i][k] = best
-            split[i][k] = best_j
+        for m in range(1, l + 1):
+            lower_class_limit = l - m + 1
+            val = vals[lower_class_limit - 1]
 
-    breaks_idx: List[int] = []
-    k = n_classes
-    i = n
-    while k > 1:
-        j = split[i][k]
-        breaks_idx.append(j)
-        i = j
-        k -= 1
+            w += 1
+            sum_ += val
+            sum_squares += val * val
+            variance = sum_squares - (sum_ * sum_) / w
 
-    return [vals[idx] for idx in sorted(breaks_idx)]
+            if lower_class_limit != 1:
+                for j in range(2, n_classes + 1):
+                    test_variance = variance + variance_combinations[lower_class_limit - 1][j - 1]
+                    if variance_combinations[l][j] >= test_variance:
+                        lower_class_limits[l][j] = lower_class_limit
+                        variance_combinations[l][j] = test_variance
+
+        lower_class_limits[l][1] = 1
+        variance_combinations[l][1] = variance
+
+    breaks = [0.0] * (n_classes + 1)
+    breaks[n_classes] = vals[-1]
+    breaks[0] = vals[0]
+
+    k = n
+    for j in range(n_classes, 1, -1):
+        idx = lower_class_limits[k][j] - 1
+        breaks[j - 1] = vals[idx]
+        k = lower_class_limits[k][j] - 1
+
+    return sorted(breaks[1:-1])
 
 
 def compute_thresholds(alignment_rates: Dict[str, float], n_classes: int = 3) -> Dict[str, float | int | str]:
