@@ -30,6 +30,45 @@ from .split_detection import (
     build_distance_matrix_from_similarity
 )
 
+def compute_named_cluster_flags(summary_df: pd.DataFrame) -> pd.Series:
+    """
+    Flag clusters as named (governance-relevant) vs long tail using the
+    largest-gap-between-consecutive-shares algorithm.
+
+    Sort clusters by share descending. Compute gaps between consecutive
+    share values. The largest gap is the natural break point — everything
+    above it is is_named_cluster=True, everything below is False.
+
+    Edge cases:
+    - Single cluster: always True
+    - All clusters equal share: all True (no meaningful gap)
+    - Gap at position 0 (largest cluster far ahead of all others): only cluster 0 is True
+    """
+    if len(summary_df) <= 1:
+        return pd.Series([True] * len(summary_df), index=summary_df.index, dtype=bool)
+
+    sorted_df = summary_df.sort_values('percentage', ascending=False).reset_index(drop=True)
+    shares = sorted_df['percentage'].astype(float).values
+
+    gaps = [shares[i] - shares[i + 1] for i in range(len(shares) - 1)]
+    if not gaps or np.isclose(max(gaps), 0.0):
+        return pd.Series([True] * len(summary_df), index=summary_df.index, dtype=bool)
+
+    largest_gap_idx = int(pd.Series(gaps).idxmax())
+    sorted_df['is_named_cluster'] = [i <= largest_gap_idx for i in range(len(shares))]
+
+    # Restore original index order
+    result = summary_df[['cluster_id']].merge(
+        sorted_df[['cluster_id', 'is_named_cluster']],
+        on='cluster_id',
+        how='left',
+        validate='one_to_one',
+    )
+    named_flags = result['is_named_cluster']
+    if named_flags.isna().any():
+        raise ValueError("is_named_cluster computation produced null flags.")
+    return named_flags.astype(bool)
+
 
 def build_element_profiles(exports_dir: str, domain: str, *, phase0_dir: str | None = None) -> Tuple[Dict, Dict]:
     """Build element signature profiles for each file.
@@ -478,10 +517,6 @@ def run_file_level_clustering(
                 'is_representative': (fid == cluster.representative_file)
             })
     
-    assignments_df = pd.DataFrame(assignments)
-    assignments_csv = os.path.join(out_dir, f"{domain}.file_clusters.csv")
-    assignments_df.to_csv(assignments_csv, index=False)
-    
     # Output cluster summary
     summary = []
     for cluster in clusters:
@@ -499,8 +534,30 @@ def run_file_level_clustering(
         })
     
     summary_df = pd.DataFrame(summary)
+    summary_df['is_named_cluster'] = compute_named_cluster_flags(summary_df)
+    summary_df = summary_df[[
+        'cluster_id', 'standard_name', 'size', 'percentage',
+        'avg_internal_similarity', 'is_named_cluster',
+        'representative_file', 'likely_region', 'likely_office', 'date_range'
+    ]]
     summary_csv = os.path.join(out_dir, f"{domain}.cluster_summary.csv")
     summary_df.to_csv(summary_csv, index=False)
+
+    # Output cluster assignments
+    assignments_df = pd.DataFrame(assignments)
+    named_lookup = summary_df.set_index('cluster_id')['is_named_cluster'].to_dict()
+    assignments_df['is_named_cluster'] = assignments_df['cluster_id'].map(named_lookup)
+    if assignments_df['is_named_cluster'].isna().any():
+        missing_ids = sorted(set(assignments_df.loc[assignments_df['is_named_cluster'].isna(), 'cluster_id'].tolist()))
+        raise ValueError(f"Missing is_named_cluster flag(s) for cluster_id(s): {missing_ids}")
+
+    assignments_df = assignments_df[[
+        'file_id', 'cluster_id', 'cluster_size', 'is_named_cluster',
+        'standard_name', 'internal_similarity', 'is_representative'
+    ]]
+    assignments_df['is_named_cluster'] = assignments_df['is_named_cluster'].astype(bool)
+    assignments_csv = os.path.join(out_dir, f"{domain}.file_clusters.csv")
+    assignments_df.to_csv(assignments_csv, index=False)
     
     # JSON report
     report = {
