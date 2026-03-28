@@ -141,3 +141,19 @@ def test_compute_alignment_rates_falls_back_to_percentage_when_size_absent(tmp_p
 
     rates = compute_alignment_rates(split_root)
     assert rates["domain_legacy"] == 0.60
+
+
+def test_compute_alignment_rates_falls_back_to_percentage_when_size_values_are_invalid(tmp_path: Path):
+    split_root = tmp_path / "split"
+    _write_csv(
+        split_root / "domain_partial_legacy" / "file_level" / "domain_partial_legacy.cluster_summary.csv",
+        ["cluster_id", "size", "percentage"],
+        [
+            {"cluster_id": "0", "size": "", "percentage": "60.0"},
+            {"cluster_id": "1", "size": "n/a", "percentage": "25.0"},
+            {"cluster_id": "2", "size": "", "percentage": "15.0"},
+        ],
+    )
+
+    rates = compute_alignment_rates(split_root)
+    assert rates["domain_partial_legacy"] == 0.60
