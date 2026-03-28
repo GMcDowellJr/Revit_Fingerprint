@@ -52,9 +52,21 @@ def compute_alignment_rates(split_root: Path) -> Dict[str, float]:
         if not rows:
             continue
         try:
-            top = max(rows, key=lambda r: float(r.get("percentage", 0)))
-            rates[domain_dir.name] = float(top["percentage"]) / 100.0
-        except (ValueError, KeyError):
+            if "raw_share" in rows[0] and rows[0]["raw_share"]:
+                top = max(rows, key=lambda r: float(r.get("raw_share", 0)))
+                rates[domain_dir.name] = float(top["raw_share"])
+            elif "size" in rows[0]:
+                total = sum(int(r.get("size", 0)) for r in rows)
+                if total > 0:
+                    top = max(rows, key=lambda r: int(r.get("size", 0)))
+                    rates[domain_dir.name] = int(top["size"]) / total
+                elif "percentage" in rows[0]:
+                    top = max(rows, key=lambda r: float(r.get("percentage", 0)))
+                    rates[domain_dir.name] = float(top["percentage"]) / 100.0
+            elif "percentage" in rows[0]:
+                top = max(rows, key=lambda r: float(r.get("percentage", 0)))
+                rates[domain_dir.name] = float(top["percentage"]) / 100.0
+        except (ValueError, KeyError, ZeroDivisionError):
             continue
     return rates
 
