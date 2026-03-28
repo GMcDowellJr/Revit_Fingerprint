@@ -47,8 +47,11 @@ def compute_named_cluster_flags(summary_df: pd.DataFrame) -> pd.Series:
     if len(summary_df) <= 1:
         return pd.Series([True] * len(summary_df), index=summary_df.index, dtype=bool)
 
-    sorted_df = summary_df.sort_values('percentage', ascending=False).reset_index(drop=True)
-    shares = sorted_df['percentage'].astype(float).values
+    if 'raw_share' not in summary_df.columns:
+        raise ValueError("compute_named_cluster_flags requires 'raw_share' column.")
+
+    sorted_df = summary_df.sort_values('raw_share', ascending=False).reset_index(drop=True)
+    shares = sorted_df['raw_share'].astype(float).values
 
     gaps = [shares[i] - shares[i + 1] for i in range(len(shares) - 1)]
     if not gaps or np.isclose(max(gaps), 0.0):
@@ -534,6 +537,8 @@ def run_file_level_clustering(
         })
     
     summary_df = pd.DataFrame(summary)
+    total_files = len(file_profiles)
+    summary_df['raw_share'] = summary_df['size'].astype(float) / float(total_files) if total_files else 0.0
     summary_df['is_named_cluster'] = compute_named_cluster_flags(summary_df)
     summary_df = summary_df[[
         'cluster_id', 'standard_name', 'size', 'percentage',

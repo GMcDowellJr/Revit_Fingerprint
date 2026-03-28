@@ -23,9 +23,9 @@ def _write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) ->
 def test_compute_named_cluster_flags_largest_gap_and_equal_shares():
     summary = pd.DataFrame(
         [
-            {"cluster_id": 0, "percentage": 60.0},
-            {"cluster_id": 1, "percentage": 25.0},
-            {"cluster_id": 2, "percentage": 15.0},
+            {"cluster_id": 0, "percentage": 60.0, "raw_share": 0.60},
+            {"cluster_id": 1, "percentage": 25.0, "raw_share": 0.25},
+            {"cluster_id": 2, "percentage": 15.0, "raw_share": 0.15},
         ]
     )
     flags = compute_named_cluster_flags(summary)
@@ -34,12 +34,23 @@ def test_compute_named_cluster_flags_largest_gap_and_equal_shares():
 
     equal = pd.DataFrame(
         [
-            {"cluster_id": 0, "percentage": 50.0},
-            {"cluster_id": 1, "percentage": 50.0},
+            {"cluster_id": 0, "percentage": 50.0, "raw_share": 0.50},
+            {"cluster_id": 1, "percentage": 50.0, "raw_share": 0.50},
         ]
     )
     equal_flags = compute_named_cluster_flags(equal)
     assert equal_flags.tolist() == [True, True]
+
+
+def test_compute_named_cluster_flags_uses_raw_share_not_rounded_percentage():
+    summary = pd.DataFrame(
+        [
+            {"cluster_id": 0, "size": 201, "percentage": 50.0, "raw_share": 201 / 400},
+            {"cluster_id": 1, "size": 199, "percentage": 50.0, "raw_share": 199 / 400},
+        ]
+    )
+    flags = compute_named_cluster_flags(summary)
+    assert flags.tolist() == [True, False]
 
 
 def test_thresholds_breaks_and_ordering():
