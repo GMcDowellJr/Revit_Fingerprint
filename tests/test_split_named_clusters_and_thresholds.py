@@ -51,6 +51,12 @@ def test_thresholds_breaks_and_ordering():
     assert thresholds["stable_min"] > thresholds["emerging_min"] > 0
 
 
+def test_thresholds_reject_non_three_classes():
+    rates = {"a": 0.3, "b": 0.6, "c": 0.9}
+    with pytest.raises(ValueError, match="expects exactly 3 classes"):
+        compute_thresholds(rates, n_classes=2)
+
+
 def test_compute_alignment_rates_and_contract_header_preserves_is_named_cluster(tmp_path: Path):
     split_root = tmp_path / "split"
     _write_csv(

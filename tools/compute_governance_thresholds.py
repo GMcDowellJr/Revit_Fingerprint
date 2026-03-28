@@ -128,6 +128,12 @@ def compute_thresholds(alignment_rates: Dict[str, float], n_classes: int = 3) ->
     Compute Jenks breaks on alignment rates.
     Returns threshold dict with stable_min and emerging_min.
     """
+    if n_classes != 3:
+        raise ValueError(
+            f"compute_thresholds expects exactly 3 classes "
+            f"(Fragmented/Emerging/Stable). Got n_classes={n_classes}."
+        )
+
     if len(alignment_rates) < n_classes:
         raise ValueError(
             f"Need at least {n_classes} domains to compute {n_classes}-class Jenks breaks. "
@@ -153,7 +159,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Compute governance thresholds via Jenks natural breaks")
     parser.add_argument("--split-root", required=True, help="Root directory of split_analysis outputs")
     parser.add_argument("--out", required=True, help="Output path for thresholds.csv")
-    parser.add_argument("--n-classes", type=int, default=3, help="Number of classes (default: 3)")
+    parser.add_argument(
+        "--n-classes",
+        type=int,
+        default=3,
+        choices=[3],
+        help="Number of classes. Must be 3 (Fragmented/Emerging/Stable).",
+    )
     args = parser.parse_args()
 
     split_root = Path(args.split_root)
