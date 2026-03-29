@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import tempfile
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -51,6 +52,21 @@ def _normalize_parts(parts: Any) -> List[str]:
     return out
 
 
+def _common_components_from_paths(paths: List[str]) -> List[str]:
+    all_components: List[str] = []
+    for path in paths:
+        components = str(path).replace("\\", "/").split("/")
+        all_components.extend([c.lower() for c in components if c])
+
+    if not all_components:
+        return []
+
+    counter = Counter(all_components)
+    threshold = len(paths) * 0.5
+    common = [comp for comp, count in counter.items() if count >= threshold]
+    return sorted(common, key=lambda x: counter[x], reverse=True)
+
+
 def _extract_cluster_common_path_parts(report: Dict[str, Any]) -> Dict[int, str]:
     """Best-effort extraction of cluster_id -> pipe-delimited common path parts.
 
@@ -60,34 +76,69 @@ def _extract_cluster_common_path_parts(report: Dict[str, Any]) -> Dict[int, str]
     - nested under report["clustering_parameters"]["clusters"]
     """
 
-    cluster_entries: List[Dict[str, Any]] = []
-    for candidate in (
-        report.get("clusters"),
-        report.get("cluster_summaries"),
-        (report.get("clustering_parameters") or {}).get("clusters"),
-    ):
-        if isinstance(candidate, list):
-            cluster_entries = [c for c in candidate if isinstance(c, dict)]
-            if cluster_entries:
-                break
-
-    result: Dict[int, str] = {}
-    for entry in cluster_entries:
-        cid = entry.get("cluster_id")
-        try:
-            cluster_id = int(cid)
-        except (TypeError, ValueError):
-            continue
-
+    def _extract_parts_from_entry(entry: Dict[str, Any]) -> List[str]:
         metadata_patterns = entry.get("metadata_patterns")
-        parts = []
+        parts: List[str] = []
         if isinstance(metadata_patterns, dict):
             parts = _normalize_parts(metadata_patterns.get("common_path_parts"))
 
         if not parts:
             parts = _normalize_parts(entry.get("common_path_parts"))
 
+        if parts:
+            return parts
+
+        sample_paths = entry.get("sample_paths")
+        if isinstance(metadata_patterns, dict) and not sample_paths:
+            sample_paths = metadata_patterns.get("sample_paths")
+        if isinstance(sample_paths, list):
+            normalized_paths = [str(p) for p in sample_paths if p is not None and str(p).strip()]
+            if normalized_paths:
+                return _common_components_from_paths(normalized_paths)
+
+        return []
+
+    result: Dict[int, str] = {}
+
+    def _add_cluster_entry(cluster_id_raw: Any, payload: Any) -> None:
+        try:
+            cluster_id = int(cluster_id_raw)
+        except (TypeError, ValueError):
+            return
+
+        if isinstance(payload, dict):
+            parts = _extract_parts_from_entry(payload)
+        else:
+            parts = []
         result[cluster_id] = "|".join(parts) if parts else ""
+
+    # Common list-based layouts.
+    for candidate in (
+        report.get("clusters"),
+        report.get("cluster_summaries"),
+        (report.get("clustering_parameters") or {}).get("clusters"),
+    ):
+        if isinstance(candidate, list):
+            for entry in candidate:
+                if not isinstance(entry, dict):
+                    continue
+                _add_cluster_entry(entry.get("cluster_id"), entry)
+
+    # Support map-based layouts frequently emitted under clustering_parameters, e.g.
+    # {"cluster_metadata_patterns": {"0": {...}, "1": {...}}}
+    cp = report.get("clustering_parameters")
+    if isinstance(cp, dict):
+        for v in cp.values():
+            if not isinstance(v, dict):
+                continue
+            dict_keys = list(v.keys())
+            if not dict_keys:
+                continue
+            numeric_key_share = sum(1 for k in dict_keys if str(k).isdigit()) / float(len(dict_keys))
+            if numeric_key_share < 0.8:
+                continue
+            for cid, payload in v.items():
+                _add_cluster_entry(cid, payload)
 
     # Optionally support a global fallback (same value for all clusters) if present.
     if not result:
