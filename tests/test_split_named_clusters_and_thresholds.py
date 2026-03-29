@@ -109,3 +109,51 @@ def test_compute_alignment_rates_and_contract_header_preserves_is_named_cluster(
         row = next(csv.DictReader(f))
     assert "is_named_cluster" in row
     assert row["is_named_cluster"] == "True"
+
+
+def test_compute_alignment_rates_uses_raw_share_or_size_for_unrounded_result(tmp_path: Path):
+    split_root = tmp_path / "split"
+    _write_csv(
+        split_root / "domain_precision" / "file_level" / "domain_precision.cluster_summary.csv",
+        ["cluster_id", "size", "percentage", "raw_share"],
+        [
+            {"cluster_id": "0", "size": "201", "percentage": "40.2", "raw_share": ""},
+            {"cluster_id": "1", "size": "199", "percentage": "39.8", "raw_share": ""},
+            {"cluster_id": "2", "size": "100", "percentage": "20.0", "raw_share": ""},
+        ],
+    )
+
+    rates = compute_alignment_rates(split_root)
+    assert rates["domain_precision"] == 0.402
+
+
+def test_compute_alignment_rates_falls_back_to_percentage_when_size_absent(tmp_path: Path):
+    split_root = tmp_path / "split"
+    _write_csv(
+        split_root / "domain_legacy" / "file_level" / "domain_legacy.cluster_summary.csv",
+        ["cluster_id", "percentage"],
+        [
+            {"cluster_id": "0", "percentage": "60.0"},
+            {"cluster_id": "1", "percentage": "25.0"},
+            {"cluster_id": "2", "percentage": "15.0"},
+        ],
+    )
+
+    rates = compute_alignment_rates(split_root)
+    assert rates["domain_legacy"] == 0.60
+
+
+def test_compute_alignment_rates_falls_back_to_percentage_when_size_values_are_invalid(tmp_path: Path):
+    split_root = tmp_path / "split"
+    _write_csv(
+        split_root / "domain_partial_legacy" / "file_level" / "domain_partial_legacy.cluster_summary.csv",
+        ["cluster_id", "size", "percentage"],
+        [
+            {"cluster_id": "0", "size": "", "percentage": "60.0"},
+            {"cluster_id": "1", "size": "n/a", "percentage": "25.0"},
+            {"cluster_id": "2", "size": "", "percentage": "15.0"},
+        ],
+    )
+
+    rates = compute_alignment_rates(split_root)
+    assert rates["domain_partial_legacy"] == 0.60

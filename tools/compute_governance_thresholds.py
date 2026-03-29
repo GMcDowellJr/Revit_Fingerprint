@@ -42,6 +42,18 @@ def compute_alignment_rates(split_root: Path) -> Dict[str, float]:
     Returns {domain: leading_cluster_share_pct_as_fraction}.
     """
     rates: Dict[str, float] = {}
+
+    def _parse_size(value: str | None) -> int | None:
+        if value is None:
+            return None
+        parsed = value.strip()
+        if parsed == "":
+            return None
+        try:
+            return int(parsed)
+        except ValueError:
+            return None
+
     for domain_dir in sorted(split_root.iterdir(), key=lambda p: p.name.lower()):
         if not domain_dir.is_dir():
             continue
@@ -52,9 +64,27 @@ def compute_alignment_rates(split_root: Path) -> Dict[str, float]:
         if not rows:
             continue
         try:
-            top = max(rows, key=lambda r: float(r.get("percentage", 0)))
-            rates[domain_dir.name] = float(top["percentage"]) / 100.0
-        except (ValueError, KeyError):
+            if "raw_share" in rows[0] and rows[0]["raw_share"]:
+                top = max(rows, key=lambda r: float(r.get("raw_share", 0)))
+                rates[domain_dir.name] = float(top["raw_share"])
+            elif "size" in rows[0]:
+                parsed_sizes = [_parse_size(r.get("size")) for r in rows]
+                sizes_available = all(size is not None for size in parsed_sizes)
+                if sizes_available:
+                    typed_sizes = [int(size) for size in parsed_sizes]
+                    total = sum(typed_sizes)
+                    if total > 0:
+                        rates[domain_dir.name] = max(typed_sizes) / total
+                    elif "percentage" in rows[0]:
+                        top = max(rows, key=lambda r: float(r.get("percentage", 0)))
+                        rates[domain_dir.name] = float(top["percentage"]) / 100.0
+                elif "percentage" in rows[0]:
+                    top = max(rows, key=lambda r: float(r.get("percentage", 0)))
+                    rates[domain_dir.name] = float(top["percentage"]) / 100.0
+            elif "percentage" in rows[0]:
+                top = max(rows, key=lambda r: float(r.get("percentage", 0)))
+                rates[domain_dir.name] = float(top["percentage"]) / 100.0
+        except (ValueError, KeyError, ZeroDivisionError):
             continue
     return rates
 
