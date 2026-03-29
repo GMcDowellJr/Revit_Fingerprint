@@ -61,6 +61,12 @@ def _parse_bool(value: Any) -> bool:
     return str(value).strip().lower() in {"true", "1", "yes", "y", "t"}
 
 
+def _clean_text(value: Any) -> str:
+    if value is None or pd.isna(value):
+        return ""
+    return str(value).strip()
+
+
 def resolve_provenance_label(
     cluster_id: int,
     likely_region: str,
@@ -235,8 +241,8 @@ def annotate_cluster_labels(
         common_parts = _split_common_path_parts(row_data.get("common_path_parts"))
         provenance_label, provenance_source = resolve_provenance_label(
             cluster_id=cluster_id,
-            likely_region=str(row_data.get("likely_region", "")),
-            likely_office=str(row_data.get("likely_office", "")),
+            likely_region=_clean_text(row_data.get("likely_region")),
+            likely_office=_clean_text(row_data.get("likely_office")),
             common_path_parts=common_parts,
             date_range=None if _is_unknown(row_data.get("date_range")) else str(row_data.get("date_range")),
         )
