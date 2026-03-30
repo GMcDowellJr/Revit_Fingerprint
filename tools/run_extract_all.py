@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from emit_element_dominance import emit_element_dominance
 from v21_emit import emit_analysis_v21, emit_phase0_v21
 
 SUPPRESSED_DOWNSTREAM_DOMAINS = {"object_styles_imported"}
@@ -631,6 +632,8 @@ def main() -> None:
                 results_v21_dir=v21_root,
             )
             report["notes"].append(f"analysis_run_id={analysis_run_id}")
+            emit_element_dominance(v21_analysis_dir)
+            report["notes"].append("element_dominance: emitted")
 
     if "analyze1" in selected_stages and args.emit_legacy:
         if not args.config:
