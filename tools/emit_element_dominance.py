@@ -73,9 +73,9 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
         dom = row.get("domain", "")
         if dom not in selected_domains:
             continue
+        run_ids_seen.add(run_id)
         if row.get("is_cad_import", "").strip().lower() == "true":
             continue
-        run_ids_seen.add(run_id)
         pattern_label_human = row.get("pattern_label_human", "")
         element_label, sub_label = _split_label(pattern_label_human)
         grouped[(run_id, dom, element_label, sub_label)].append(row)
@@ -198,9 +198,10 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
             flush=True,
         )
 
-    if not threshold_rows and not domain:
-        fallback_run_ids = sorted(run_ids_seen) if run_ids_seen else [""]
-        for run_id in fallback_run_ids:
+    if not domain:
+        threshold_run_ids = {row.get("analysis_run_id", "") for row in threshold_rows}
+        missing_run_ids = sorted(run_ids_seen - threshold_run_ids)
+        for run_id in missing_run_ids:
             threshold_rows.append({
                 "schema_version": SCHEMA_VERSION,
                 "analysis_run_id": run_id,
@@ -214,6 +215,25 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
             })
             print(
                 f"[emit_element_dominance] thresholds: analysis_run_id={run_id} "
+                f"competitive_min={(STANDARD_PRESENCE_MIN / 2.0):.4f} "
+                f"standard_min={STANDARD_PRESENCE_MIN:.4f} n_elements=0 "
+                "algorithm=fallback_standard_presence_min",
+                flush=True,
+            )
+        if not threshold_rows:
+            threshold_rows.append({
+                "schema_version": SCHEMA_VERSION,
+                "analysis_run_id": "",
+                "algorithm": "fallback_standard_presence_min",
+                "n_classes": "3",
+                "n_elements": "0",
+                "competitive_min": f"{(STANDARD_PRESENCE_MIN / 2.0):.6f}",
+                "standard_min": f"{STANDARD_PRESENCE_MIN:.6f}",
+                "value_min": "0.000000",
+                "value_max": "0.000000",
+            })
+            print(
+                "[emit_element_dominance] thresholds: analysis_run_id= "
                 f"competitive_min={(STANDARD_PRESENCE_MIN / 2.0):.4f} "
                 f"standard_min={STANDARD_PRESENCE_MIN:.4f} n_elements=0 "
                 "algorithm=fallback_standard_presence_min",
