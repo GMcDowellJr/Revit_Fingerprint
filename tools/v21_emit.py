@@ -334,6 +334,17 @@ def _remap_object_style_domain(source_domain: str, rec: Dict[str, Any]) -> Optio
     return source_domain
 
 
+def _remap_vco_domain(source_domain: str, rec: Dict[str, Any]) -> Optional[str]:
+    if source_domain != "view_category_overrides":
+        return source_domain
+    # Suppress CAD import noise records — same pattern as object_styles.
+    # TODO(move-to-exporter): move this suppression upstream into exporter domain emission.
+    candidates = " | ".join([s.lower() for s in _iter_object_style_name_candidates(rec)])
+    if "imports in families" in candidates or ".dwg" in candidates:
+        return None
+    return source_domain
+
+
 def _load_identity_items_by_record(phase0_dir: Optional[Path], domain: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
     if phase0_dir is None:
         return {}
@@ -448,6 +459,9 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
                 if not isinstance(rec, dict):
                     continue
                 domain = _remap_object_style_domain(source_domain, rec)
+                if not domain:
+                    continue
+                domain = _remap_vco_domain(domain, rec)
                 if not domain:
                     continue
                 record_ordinal = f"{i:06d}"

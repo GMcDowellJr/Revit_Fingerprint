@@ -63,6 +63,8 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
         dom = row.get("domain", "")
         if dom not in selected_domains:
             continue
+        if row.get("is_cad_import", "").strip().lower() == "true":
+            continue
         pattern_label_human = row.get("pattern_label_human", "")
         element_label, sub_label = _split_label(pattern_label_human)
         grouped[(dom, element_label, sub_label)].append(row)
