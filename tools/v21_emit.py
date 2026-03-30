@@ -33,6 +33,7 @@ MIN_RECORDS_FOR_DOMAIN = 50
 MIN_FILES_FOR_DOMAIN = 3
 UNKNOWN_RATE_MAX = 0.20
 SUPPRESSED_ANALYSIS_DOMAINS = {"object_styles_imported"}
+ROW_KEY_DOMAINS = {"object_styles_model", "object_styles_annotation", "view_category_overrides"}
 
 # See docs/CENTRAL_PATH_NORM_RULE.md for normalization contract.
 _VOLATILE_SEGMENTS = {
@@ -730,8 +731,16 @@ def emit_analysis_v21(
                 "pattern_size_records": str(cluster_size),
                 "pattern_size_files": str(files_present),
                 "pattern_rank": str(rank),
-                "is_candidate_standard": "true" if presence_pct >= STANDARD_PRESENCE_MIN else "",
+                "is_candidate_standard": "true" if presence_pct >= STANDARD_PRESENCE_MIN else "false",
                 "notes": "",
+                "is_cad_import": (
+                    "true"
+                    if (
+                        dom == "view_category_overrides"
+                        and (".dwg" in resolved_label or resolved_label.startswith("Imports in Families|"))
+                    )
+                    else "false"
+                ),
             })
 
             for r in rows:
@@ -767,6 +776,11 @@ def emit_analysis_v21(
                 "confidence_tier": "high" if presence_pct >= STANDARD_PRESENCE_MIN else "medium",
             })
 
+        domain_pattern_presence_pct: Dict[str, float] = {
+            r["pattern_id"]: float(r["presence_pct"])
+            for r in authority_rows
+            if r.get("domain") == dom and r.get("pattern_id")
+        }
         for export_run_id in exports:
             dom_records = [r for r in domain_records if r["export_run_id"] == export_run_id]
             total = len(dom_records)
@@ -823,7 +837,11 @@ def emit_analysis_v21(
                     "pattern_share_pct": f"{share:.6f}",
                     "is_dominant_pattern": "true" if pid == dominant_pid else "false",
                     "deviation_score": f"{max(0.0, dominant_share - share):.6f}",
-                    "classification": "STANDARD" if share >= STANDARD_PRESENCE_MIN else "VARIANT",
+                    "corpus_classification": (
+                        "CORPUS_STANDARD"
+                        if domain_pattern_presence_pct.get(pid, 0.0) >= STANDARD_PRESENCE_MIN
+                        else "CORPUS_VARIANT"
+                    ),
                 })
             if unknown > 0:
                 presence_rows.append({
@@ -835,7 +853,7 @@ def emit_analysis_v21(
                     "pattern_share_pct": f"{(unknown / total) if total else 0.0:.6f}",
                     "is_dominant_pattern": "false",
                     "deviation_score": "0.000000",
-                    "classification": "UNKNOWN",
+                    "corpus_classification": "UNKNOWN",
                 })
 
         known_domain_records = sum(int(c["records_count"]) for c in sorted_clusters)
@@ -871,6 +889,18 @@ def emit_analysis_v21(
             rec_grain = "KEY_REVISION_REQUIRED"
         elif dominant < DOMINANT_SHARE_MIN:
             rec_grain = "PATTERN_REQUIRED"
+        mixture_flag = dominant < DOMINANT_SHARE_MIN
+        governance_state = "unknown"
+        if dom in ROW_KEY_DOMAINS:
+            governance_state = "element_grain"
+        elif rec_grain == "INSUFFICIENT_EVIDENCE":
+            governance_state = "insufficient_evidence"
+        elif files_with_tied_dominant == files_total and dominant_files_with_valid_pattern == 0:
+            governance_state = "multi_part_standard"
+        elif not mixture_flag and len(sorted_clusters) >= 1:
+            governance_state = "single_standard"
+        elif mixture_flag:
+            governance_state = "mixture"
         diag_rows.append({
             "schema_version": SCHEMA_VERSION,
             "analysis_run_id": analysis_run_id,
@@ -878,7 +908,7 @@ def emit_analysis_v21(
             "pattern_count": str(len(sorted_clusters)),
             "dominant_pattern_share_pct": f"{dominant:.6f}",
             "entropy_index": f"{entropy:.6f}",
-            "mixture_flag": "true" if dominant < DOMINANT_SHARE_MIN else "false",
+            "mixture_flag": "true" if mixture_flag else "false",
             "unknown_rate_pct": f"{unknown_rate:.6f}",
             "recommended_analysis_grain": rec_grain,
             "hhi_domain_presence": _fmt_metric(hhi_domain_presence),
@@ -892,6 +922,7 @@ def emit_analysis_v21(
             "files_with_tied_dominant": str(files_with_tied_dominant),
             "files_excluded_from_dominance": str(files_excluded_from_dominance),
             "pct_files_unique_dominant": f"{(dominant_files_with_valid_pattern / files_total) if files_total else 0.0:.6f}",
+            "governance_state": governance_state,
         })
         print(
             f"[v21_emit] domain={dom} (done) clusters={len(sorted_clusters)} records={len(domain_records)}",
@@ -926,7 +957,7 @@ def emit_analysis_v21(
         "source_cluster_id", "pattern_size_records", "pattern_size_files", "pattern_rank",
         "is_candidate_standard", "notes",
         # v2.1 human-readable/audit extensions are appended for compatibility.
-        "pattern_label_human", "pattern_label_source", "pattern_label_fallback",
+        "pattern_label_human", "pattern_label_source", "pattern_label_fallback", "is_cad_import",
     ], _sort_rows(domain_patterns, ["analysis_run_id", "domain", "pattern_id"]))
 
     _write_csv(out_dir / "record_pattern_membership.csv", [
@@ -942,7 +973,7 @@ def emit_analysis_v21(
 
     _write_csv(out_dir / "pattern_presence_file.csv", [
         "schema_version", "analysis_run_id", "export_run_id", "domain", "pattern_id",
-        "pattern_share_pct", "is_dominant_pattern", "deviation_score", "classification",
+        "pattern_share_pct", "is_dominant_pattern", "deviation_score", "corpus_classification",
     ], _sort_rows(presence_rows, ["analysis_run_id", "export_run_id", "domain", "pattern_id"]))
 
     _write_csv(out_dir / "file_domain_concentration.csv", [
@@ -957,7 +988,7 @@ def emit_analysis_v21(
         "hhi_domain_dominance", "eff_clusters_domain_dominance",
         "hhi_domain_records", "eff_clusters_domain_records",
         "files_total", "files_with_unique_dominant", "files_with_tied_dominant", "files_excluded_from_dominance",
-        "pct_files_unique_dominant",
+        "pct_files_unique_dominant", "governance_state",
     ], _sort_rows(diag_rows, ["analysis_run_id", "domain"]))
 
     return analysis_run_id
