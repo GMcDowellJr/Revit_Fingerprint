@@ -145,6 +145,16 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
 
     thresholds_csv = analysis_dir / "element_characterization_thresholds.csv"
     threshold_rows: List[Dict[str, str]] = []
+    thresholds_by_run: Dict[str, Tuple[float, float]] = {}
+    if domain and thresholds_csv.is_file():
+        for row in _read_csv_rows(thresholds_csv):
+            run_id = row.get("analysis_run_id", "")
+            try:
+                competitive_min = float(row.get("competitive_min", "0") or 0.0)
+                standard_min = float(row.get("standard_min", "0") or 0.0)
+            except ValueError:
+                continue
+            thresholds_by_run[run_id] = (competitive_min, standard_min)
     for run_id in sorted(rows_by_run):
         run_rows = rows_by_run[run_id]
         presence_values = [
@@ -152,7 +162,12 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
             for r in run_rows
             if r.get("dominant_presence_pct", "")
         ]
-        competitive_min, standard_min, algorithm = _compute_breaks(presence_values)
+        algorithm = "jenks_natural_breaks"
+        if domain and run_id in thresholds_by_run:
+            competitive_min, standard_min = thresholds_by_run[run_id]
+            algorithm = "precomputed_thresholds"
+        else:
+            competitive_min, standard_min, algorithm = _compute_breaks(presence_values)
         for row in run_rows:
             try:
                 pct = float(row.get("dominant_presence_pct", "0") or 0.0)
@@ -162,25 +177,26 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
 
         value_min = min(presence_values) if presence_values else 0.0
         value_max = max(presence_values) if presence_values else 0.0
-        threshold_rows.append({
-            "schema_version": SCHEMA_VERSION,
-            "analysis_run_id": run_id,
-            "algorithm": algorithm,
-            "n_classes": "3",
-            "n_elements": str(len(run_rows)),
-            "competitive_min": f"{competitive_min:.6f}",
-            "standard_min": f"{standard_min:.6f}",
-            "value_min": f"{value_min:.6f}",
-            "value_max": f"{value_max:.6f}",
-        })
+        if not domain:
+            threshold_rows.append({
+                "schema_version": SCHEMA_VERSION,
+                "analysis_run_id": run_id,
+                "algorithm": algorithm,
+                "n_classes": "3",
+                "n_elements": str(len(run_rows)),
+                "competitive_min": f"{competitive_min:.6f}",
+                "standard_min": f"{standard_min:.6f}",
+                "value_min": f"{value_min:.6f}",
+                "value_max": f"{value_max:.6f}",
+            })
         print(
             f"[emit_element_dominance] thresholds: analysis_run_id={run_id} "
             f"competitive_min={competitive_min:.4f} standard_min={standard_min:.4f} "
-            f"n_elements={len(run_rows)}",
+            f"n_elements={len(run_rows)} algorithm={algorithm}",
             flush=True,
         )
 
-    if not threshold_rows:
+    if not threshold_rows and not domain:
         threshold_rows.append({
             "schema_version": SCHEMA_VERSION,
             "analysis_run_id": "",
@@ -233,7 +249,14 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
         key=lambda r: (r["analysis_run_id"], r["domain"], r["element_label"], r["sub_label"]),
     )
     _write_csv_atomic(out_csv, fieldnames, sorted_rows)
-    _write_csv_atomic(thresholds_csv, threshold_fieldnames, threshold_rows)
+    if domain:
+        print(
+            f"[emit_element_dominance] thresholds: skipped write for --domain={domain} "
+            "(using existing run-scoped thresholds when available)",
+            flush=True,
+        )
+    else:
+        _write_csv_atomic(thresholds_csv, threshold_fieldnames, threshold_rows)
 
     for dom in selected_domains:
         print(

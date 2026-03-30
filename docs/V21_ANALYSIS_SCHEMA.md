@@ -32,6 +32,7 @@ Outputs are additive and written under `Results_v21/analysis_v21/`.
 - `element_characterization_thresholds.csv` contains Jenks natural break boundaries for `dominant_presence_pct` across all row_key domain elements.
 - BI reads `competitive_min` and `standard_min` from `element_characterization_thresholds.csv` as threshold parameters for bucket display and What-If override defaults.
 - `element_characterization_thresholds.csv` is run-scoped with one row per `analysis_run_id`; each row is corpus-level across `object_styles_model`, `object_styles_annotation`, and `view_category_overrides` for that run.
+- `element_characterization_thresholds.csv` is only rewritten on full-scope emits; `--domain` runs reuse existing thresholds for bucketing (when available) and do not overwrite the thresholds artifact.
 - Deterministic sorting is explicit per output key:
   - `analysis_export_membership.csv`: `(analysis_run_id, export_run_id)`
   - `phase1_domain_metrics.csv`: `(domain, join_key_schema, join_hash)`
