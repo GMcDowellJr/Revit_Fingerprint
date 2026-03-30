@@ -3,10 +3,17 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from collections import defaultdict
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Dict, List, Optional, Tuple
+
+_TOOLS_DIR = str(Path(__file__).resolve().parent)
+if _TOOLS_DIR not in sys.path:
+    sys.path.insert(0, _TOOLS_DIR)
+
+from compute_governance_thresholds import jenks_natural_breaks
 
 SCHEMA_VERSION = "2.1.0"
 STANDARD_PRESENCE_MIN = 0.75
@@ -89,10 +96,13 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
             candidates.append((presence_pct, pid, p_row, auth))
         if not candidates:
             continue
-        dominant_presence, dominant_pid, dominant_pattern, dominant_authority = sorted(
-            candidates,
-            key=lambda item: (-item[0], item[1]),
-        )[0]
+        sorted_candidates = sorted(candidates, key=lambda item: (-item[0], item[1]))
+        dominant_presence, dominant_pid, dominant_pattern, dominant_authority = sorted_candidates[0]
+        if len(sorted_candidates) >= 2:
+            runner_up_presence = sorted_candidates[1][0]
+            lead_gap = dominant_presence - runner_up_presence
+        else:
+            lead_gap = dominant_presence
         is_candidate_standard = "true" if dominant_presence >= STANDARD_PRESENCE_MIN else "false"
         out_row = {
             "schema_version": SCHEMA_VERSION,
@@ -104,6 +114,7 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
             "variant_count": str(len({r.get('pattern_id', '') for r in rows if r.get('pattern_id', '')})),
             "dominant_pattern_id": dominant_pid,
             "dominant_presence_pct": f"{dominant_presence:.6f}",
+            "lead_gap": f"{lead_gap:.6f}",
             "dominant_files_present": dominant_authority.get("files_present", ""),
             "files_total": dominant_authority.get("files_total", ""),
             "is_element_candidate_standard": is_candidate_standard,
@@ -115,6 +126,62 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
         if is_candidate_standard == "true":
             by_domain_candidates[dom] += 1
 
+    presence_values = [
+        float(r["dominant_presence_pct"])
+        for r in output_rows
+        if r.get("dominant_presence_pct", "")
+    ]
+    n_classes = 3
+    algorithm = "jenks_natural_breaks"
+    if len(set(presence_values)) >= n_classes:
+        breaks = sorted(jenks_natural_breaks(presence_values, n_classes))
+        competitive_min = breaks[0]
+        standard_min = breaks[1]
+    else:
+        competitive_min = STANDARD_PRESENCE_MIN / 2.0
+        standard_min = STANDARD_PRESENCE_MIN
+        algorithm = "fallback_standard_presence_min"
+
+    def _bucket(presence_pct: float) -> str:
+        if presence_pct >= standard_min:
+            return "standard"
+        if presence_pct >= competitive_min:
+            return "competitive"
+        return "fragmented"
+
+    for row in output_rows:
+        try:
+            pct = float(row.get("dominant_presence_pct", "0") or 0.0)
+        except ValueError:
+            pct = 0.0
+        row["element_dominance_bucket"] = _bucket(pct)
+
+    thresholds_csv = analysis_dir / "element_characterization_thresholds.csv"
+    value_min = min(presence_values) if presence_values else 0.0
+    value_max = max(presence_values) if presence_values else 0.0
+    threshold_row = {
+        "schema_version": SCHEMA_VERSION,
+        "analysis_run_id": output_rows[0].get("analysis_run_id", "") if output_rows else "",
+        "algorithm": algorithm,
+        "n_classes": "3",
+        "n_elements": str(len(output_rows)),
+        "competitive_min": f"{competitive_min:.6f}",
+        "standard_min": f"{standard_min:.6f}",
+        "value_min": f"{value_min:.6f}",
+        "value_max": f"{value_max:.6f}",
+    }
+    threshold_fieldnames = [
+        "schema_version",
+        "analysis_run_id",
+        "algorithm",
+        "n_classes",
+        "n_elements",
+        "competitive_min",
+        "standard_min",
+        "value_min",
+        "value_max",
+    ]
+
     fieldnames = [
         "schema_version",
         "analysis_run_id",
@@ -125,9 +192,11 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
         "variant_count",
         "dominant_pattern_id",
         "dominant_presence_pct",
+        "lead_gap",
         "dominant_files_present",
         "files_total",
         "is_element_candidate_standard",
+        "element_dominance_bucket",
         "is_cad_import",
         "confidence_tier",
     ]
@@ -136,6 +205,13 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
         key=lambda r: (r["analysis_run_id"], r["domain"], r["element_label"], r["sub_label"]),
     )
     _write_csv_atomic(out_csv, fieldnames, sorted_rows)
+    _write_csv_atomic(thresholds_csv, threshold_fieldnames, [threshold_row])
+
+    print(
+        f"[emit_element_dominance] thresholds: competitive_min={competitive_min:.4f} "
+        f"standard_min={standard_min:.4f} n_elements={len(output_rows)}",
+        flush=True,
+    )
 
     for dom in selected_domains:
         print(
