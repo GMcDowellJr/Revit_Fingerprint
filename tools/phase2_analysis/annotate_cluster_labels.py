@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
-from tools.label_synthesis.label_resolver import _try_synopsis
+TOOLS_ROOT = Path(__file__).resolve().parents[1]
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
+
+from label_synthesis.label_resolver import _try_synopsis
 
 
 NOISE_TOKENS = {
