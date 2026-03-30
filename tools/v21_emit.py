@@ -751,7 +751,10 @@ def emit_analysis_v21(
                     "true"
                     if (
                         dom == "view_category_overrides"
-                        and (".dwg" in resolved_label or resolved_label.startswith("Imports in Families|"))
+                        and (
+                            ".dwg" in resolved_label.lower()
+                            or resolved_label.lower().startswith("imports in families|")
+                        )
                     )
                     else "false"
                 ),
@@ -909,7 +912,9 @@ def emit_analysis_v21(
             governance_state = "element_grain"
         elif rec_grain == "INSUFFICIENT_EVIDENCE":
             governance_state = "insufficient_evidence"
-        elif files_with_tied_dominant == files_total and dominant_files_with_valid_pattern == 0:
+        elif rec_grain == "KEY_REVISION_REQUIRED":
+            governance_state = "key_revision_required"
+        elif files_with_tied_dominant == domain_files_present and dominant_files_with_valid_pattern == 0:
             governance_state = "multi_part_standard"
         elif not mixture_flag and len(sorted_clusters) >= 1:
             governance_state = "single_standard"

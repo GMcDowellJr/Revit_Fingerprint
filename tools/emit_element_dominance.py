@@ -55,11 +55,13 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
     patterns_rows = _read_csv_rows(domain_patterns_csv)
     authority_rows = _read_csv_rows(authority_csv)
 
-    authority_by_domain_pid: Dict[Tuple[str, str], Dict[str, str]] = {
-        (r.get("domain", ""), r.get("pattern_id", "")): r for r in authority_rows
+    authority_by_run_domain_pid: Dict[Tuple[str, str, str], Dict[str, str]] = {
+        (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("pattern_id", "")): r
+        for r in authority_rows
     }
-    grouped: Dict[Tuple[str, str, str], List[Dict[str, str]]] = defaultdict(list)
+    grouped: Dict[Tuple[str, str, str, str], List[Dict[str, str]]] = defaultdict(list)
     for row in patterns_rows:
+        run_id = row.get("analysis_run_id", "")
         dom = row.get("domain", "")
         if dom not in selected_domains:
             continue
@@ -67,17 +69,17 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
             continue
         pattern_label_human = row.get("pattern_label_human", "")
         element_label, sub_label = _split_label(pattern_label_human)
-        grouped[(dom, element_label, sub_label)].append(row)
+        grouped[(run_id, dom, element_label, sub_label)].append(row)
 
     output_rows: List[Dict[str, str]] = []
     by_domain_counts: Dict[str, int] = defaultdict(int)
     by_domain_candidates: Dict[str, int] = defaultdict(int)
 
-    for (dom, element_label, sub_label), rows in sorted(grouped.items(), key=lambda kv: kv[0]):
+    for (run_id, dom, element_label, sub_label), rows in sorted(grouped.items(), key=lambda kv: kv[0]):
         candidates: List[Tuple[float, str, Dict[str, str], Dict[str, str]]] = []
         for p_row in rows:
             pid = p_row.get("pattern_id", "")
-            auth = authority_by_domain_pid.get((dom, pid))
+            auth = authority_by_run_domain_pid.get((run_id, dom, pid))
             if not auth:
                 continue
             try:
@@ -94,7 +96,7 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
         is_candidate_standard = "true" if dominant_presence >= STANDARD_PRESENCE_MIN else "false"
         out_row = {
             "schema_version": SCHEMA_VERSION,
-            "analysis_run_id": dominant_pattern.get("analysis_run_id", ""),
+            "analysis_run_id": run_id,
             "domain": dom,
             "element_label": element_label,
             "sub_label": sub_label,
@@ -129,7 +131,10 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
         "is_cad_import",
         "confidence_tier",
     ]
-    sorted_rows = sorted(output_rows, key=lambda r: (r["domain"], r["element_label"], r["sub_label"]))
+    sorted_rows = sorted(
+        output_rows,
+        key=lambda r: (r["analysis_run_id"], r["domain"], r["element_label"], r["sub_label"]),
+    )
     _write_csv_atomic(out_csv, fieldnames, sorted_rows)
 
     for dom in selected_domains:

@@ -26,7 +26,7 @@ Outputs are additive and written under `Results_v21/analysis_v21/`.
 - `MIN_FILES_FOR_DOMAIN` evidence checks use files where the specific domain is present (not corpus-wide export count).
 - `element_dominance.csv` is a post-emit artifact generated after `domain_patterns.csv` and `phase2_authority_pattern.csv`.
 - `element_dominance.csv` scope is row_key domains only: `object_styles_model`, `object_styles_annotation`, `view_category_overrides`.
-- `element_dominance.csv` grain is `(domain, element_label, sub_label)` where each row corresponds to a distinct `pattern_label_human` within row_key domains.
+- `element_dominance.csv` is run-scoped to avoid cross-run joins in additive directories; grain is `(analysis_run_id, domain, element_label, sub_label)` where each row corresponds to a distinct `pattern_label_human` within row_key domains.
 - Deterministic sorting is explicit per output key:
   - `analysis_export_membership.csv`: `(analysis_run_id, export_run_id)`
   - `phase1_domain_metrics.csv`: `(domain, join_key_schema, join_hash)`
@@ -35,4 +35,4 @@ Outputs are additive and written under `Results_v21/analysis_v21/`.
   - `phase2_authority_pattern.csv`: `(analysis_run_id, domain, pattern_id)`
   - `pattern_presence_file.csv`: `(analysis_run_id, export_run_id, domain, pattern_id)`
   - `domain_pattern_diagnostics.csv`: `(analysis_run_id, domain)`
-  - `element_dominance.csv`: `(domain, element_label, sub_label)`
+  - `element_dominance.csv`: `(analysis_run_id, domain, element_label, sub_label)`
