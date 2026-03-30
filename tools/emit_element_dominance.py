@@ -67,6 +67,7 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
         for r in authority_rows
     }
     grouped: Dict[Tuple[str, str, str, str], List[Dict[str, str]]] = defaultdict(list)
+    run_ids_seen: set[str] = set()
     for row in patterns_rows:
         run_id = row.get("analysis_run_id", "")
         dom = row.get("domain", "")
@@ -74,6 +75,7 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
             continue
         if row.get("is_cad_import", "").strip().lower() == "true":
             continue
+        run_ids_seen.add(run_id)
         pattern_label_human = row.get("pattern_label_human", "")
         element_label, sub_label = _split_label(pattern_label_human)
         grouped[(run_id, dom, element_label, sub_label)].append(row)
@@ -127,7 +129,7 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
             by_domain_candidates[dom] += 1
 
     def _compute_breaks(values: List[float], n_classes: int = 3) -> Tuple[float, float, str]:
-        if len(set(values)) >= n_classes:
+        if len(values) >= n_classes:
             breaks = sorted(jenks_natural_breaks(values, n_classes))
             return breaks[0], breaks[1], "jenks_natural_breaks"
         return STANDARD_PRESENCE_MIN / 2.0, STANDARD_PRESENCE_MIN, "fallback_standard_presence_min"
@@ -197,23 +199,26 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
         )
 
     if not threshold_rows and not domain:
-        threshold_rows.append({
-            "schema_version": SCHEMA_VERSION,
-            "analysis_run_id": "",
-            "algorithm": "fallback_standard_presence_min",
-            "n_classes": "3",
-            "n_elements": "0",
-            "competitive_min": f"{(STANDARD_PRESENCE_MIN / 2.0):.6f}",
-            "standard_min": f"{STANDARD_PRESENCE_MIN:.6f}",
-            "value_min": "0.000000",
-            "value_max": "0.000000",
-        })
-        print(
-            "[emit_element_dominance] thresholds: analysis_run_id= "
-            f"competitive_min={(STANDARD_PRESENCE_MIN / 2.0):.4f} "
-            f"standard_min={STANDARD_PRESENCE_MIN:.4f} n_elements=0",
-            flush=True,
-        )
+        fallback_run_ids = sorted(run_ids_seen) if run_ids_seen else [""]
+        for run_id in fallback_run_ids:
+            threshold_rows.append({
+                "schema_version": SCHEMA_VERSION,
+                "analysis_run_id": run_id,
+                "algorithm": "fallback_standard_presence_min",
+                "n_classes": "3",
+                "n_elements": "0",
+                "competitive_min": f"{(STANDARD_PRESENCE_MIN / 2.0):.6f}",
+                "standard_min": f"{STANDARD_PRESENCE_MIN:.6f}",
+                "value_min": "0.000000",
+                "value_max": "0.000000",
+            })
+            print(
+                f"[emit_element_dominance] thresholds: analysis_run_id={run_id} "
+                f"competitive_min={(STANDARD_PRESENCE_MIN / 2.0):.4f} "
+                f"standard_min={STANDARD_PRESENCE_MIN:.4f} n_elements=0 "
+                "algorithm=fallback_standard_presence_min",
+                flush=True,
+            )
     threshold_fieldnames = [
         "schema_version",
         "analysis_run_id",
