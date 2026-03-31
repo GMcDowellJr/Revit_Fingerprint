@@ -246,10 +246,17 @@ def build_semantic_groups(
     force_refresh: bool,
     max_patterns: Optional[int],
 ) -> None:
-    results_v21 = out_root / "Results_v21"
+    if (out_root / "analysis_v21").is_dir() and (out_root / "phase0_v21").is_dir():
+        results_v21 = out_root
+    else:
+        results_v21 = out_root / "Results_v21"
     analysis_dir = results_v21 / "analysis_v21"
     shards_dir = results_v21 / "phase0_v21" / "identity_items_shards"
     cache_path = results_v21 / "label_synthesis" / "label_semantic_groups.json"
+    print(f"[build_semantic_groups] results_v21={results_v21}")
+    print(f"[build_semantic_groups] analysis_dir={analysis_dir}")
+    print(f"[build_semantic_groups] shards_dir={shards_dir}")
+    print(f"[build_semantic_groups] cache_path={cache_path}")
 
     if domain and domain not in SEMANTIC_GROUPING_DOMAINS:
         raise ValueError(f"--domain must be one of {SEMANTIC_GROUPING_DOMAINS}")
@@ -262,6 +269,9 @@ def build_semantic_groups(
 
     analysis_run_id = _load_analysis_run_id(analysis_dir)
     patterns_by_domain = _load_pattern_rows(analysis_dir, domain)
+    if not patterns_by_domain:
+        print("[build_semantic_groups] WARN: no eligible patterns found in scope.")
+        print("[build_semantic_groups] Check --out-root and ensure domain_patterns.csv has non-missing pattern_label_human/source.")
     for d in SEMANTIC_GROUPING_DOMAINS:
         if domain and d != domain:
             continue
@@ -270,6 +280,7 @@ def build_semantic_groups(
     for d, pattern_rows in patterns_by_domain.items():
         if not pattern_rows:
             continue
+        print(f"[build_semantic_groups] domain={d} eligible_patterns={len(pattern_rows)}")
         pattern_to_record = _load_pattern_to_record_pk(analysis_dir, d)
         identity_by_record = _load_identity_items_by_record(shards_dir, d)
         if identity_by_record is None:
