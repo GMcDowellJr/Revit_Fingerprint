@@ -489,6 +489,75 @@ def _write_json(path: Path, payload: Any) -> None:
         json.dump(payload, f, indent=2, ensure_ascii=False)
 
 
+def _resolve_export_target(cache_path: Path, export_arg: Path) -> Path:
+    """Place export files alongside label_semantic_groups.json."""
+    return cache_path.parent / export_arg.name
+
+
+def _write_export_batches(base_path: Path, prompts: list[Dict[str, str]], batch_size: Optional[int]) -> list[Path]:
+    if not batch_size or batch_size <= 0:
+        _write_json(base_path, prompts)
+        return [base_path]
+
+    written: list[Path] = []
+    total = len(prompts)
+    if total == 0:
+        _write_json(base_path, prompts)
+        return [base_path]
+
+    stem = base_path.stem
+    suffix = base_path.suffix or '.json'
+    for idx, start in enumerate(range(0, total, batch_size), start=1):
+        chunk = prompts[start:start + batch_size]
+        chunk_path = base_path.with_name(f"{stem}.batch_{idx:03d}{suffix}")
+        _write_json(chunk_path, chunk)
+        written.append(chunk_path)
+    return written
+
+
+def _load_export_progress(path: Path) -> Dict[str, set[str]]:
+    if not path.is_file():
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return {}
+    raw = data.get("exported_pattern_ids", {}) if isinstance(data, dict) else {}
+    if not isinstance(raw, dict):
+        return {}
+    out: Dict[str, set[str]] = {}
+    for domain, values in raw.items():
+        if isinstance(values, list):
+            out[str(domain)] = {str(v).strip() for v in values if str(v).strip()}
+    return out
+
+
+def _save_export_progress(path: Path, progress: Dict[str, set[str]]) -> None:
+    serializable = {
+        "schema_version": "1.0",
+        "updated_at": _utc_now_iso(),
+        "exported_pattern_ids": {k: sorted(v) for k, v in sorted(progress.items())},
+    }
+    _write_json(path, serializable)
+
+
+def _derive_element_label(domain: str, items: Dict[str, str], fallback: str) -> str:
+    candidate_keys: Dict[str, List[str]] = {
+        "text_types": ["text_type.name", "text_type.type_name", "text_type.label"],
+        "arrowheads": ["arrowhead.name", "arrowhead.type_name", "arrowhead.label"],
+        "line_patterns": ["line_pattern.name", "line_pattern.label"],
+        "line_styles": ["line_style.name", "line_style.subcategory_name", "line_style.label"],
+        "fill_patterns_drafting": ["fill_pattern.name", "fill_pattern.label"],
+        "fill_patterns_model": ["fill_pattern.name", "fill_pattern.label"],
+    }
+    for key in candidate_keys.get(domain, []):
+        val = (items.get(key) or "").strip()
+        if val:
+            return val
+    return fallback
+
+
 def _load_pattern_rows(analysis_dir: Path, only_domain: Optional[str]) -> Dict[str, List[Dict[str, str]]]:
     domain_patterns_csv = analysis_dir / "domain_patterns.csv"
     if not domain_patterns_csv.is_file():
@@ -711,6 +780,7 @@ def build_semantic_groups(
     export_prompts: Optional[Path],
     import_results: Optional[Path],
     peer_vocab_from_cache: bool,
+    export_batch_size: Optional[int],
 ) -> None:
     if (out_root / "analysis_v21").is_dir() and (out_root / "phase0_v21").is_dir():
         results_v21 = out_root
@@ -722,13 +792,17 @@ def build_semantic_groups(
     if not shards_dir.is_dir():
         shards_dir = phase0_dir / "phase0_identity_items_by_domain"
     cache_path = results_v21 / "label_synthesis" / "label_semantic_groups.json"
+    export_progress_path = results_v21 / "label_synthesis" / "prompt_export_progress.json"
     print(f"[build_semantic_groups] results_v21={results_v21}")
     print(f"[build_semantic_groups] analysis_dir={analysis_dir}")
     print(f"[build_semantic_groups] shards_dir={shards_dir}")
     print(f"[build_semantic_groups] cache_path={cache_path}")
+    print(f"[build_semantic_groups] export_progress_path={export_progress_path}")
 
     if domain and domain not in SEMANTIC_GROUPING_DOMAINS:
         raise ValueError(f"--domain must be one of {SEMANTIC_GROUPING_DOMAINS}")
+    if export_batch_size is not None and export_batch_size <= 0:
+        raise ValueError("--export-batch-size must be a positive integer.")
 
     cache = _load_cache(cache_path)
     cache_groups = cache.get("groups", {})
@@ -794,6 +868,7 @@ def build_semantic_groups(
         print("[build_semantic_groups] Check --out-root and ensure domain_patterns.csv has non-missing pattern_label_human/source.")
 
     exported_prompts: list[Dict[str, str]] = []
+    export_progress = _load_export_progress(export_progress_path) if export_prompts else {}
 
     for d, pattern_rows in patterns_by_domain.items():
         if not pattern_rows:
@@ -816,11 +891,14 @@ def build_semantic_groups(
                 and str(entry.get("semantic_group", "")).strip()
                 and str(entry.get("semantic_group", "")).strip() != "__parse_error__"
             })
+        previously_exported = export_progress.get(d, set()) if export_prompts and peer_vocab_from_cache else set()
 
         for row in pattern_rows:
             pattern_id = row["pattern_id"]
             pattern_label_human = row["pattern_label_human"]
             if not force_refresh and pattern_id in cache_groups[d]:
+                continue
+            if not force_refresh and pattern_id in previously_exported:
                 continue
             if max_patterns is not None and processed >= max_patterns:
                 break
@@ -828,6 +906,7 @@ def build_semantic_groups(
             record_pk = pattern_to_record.get(pattern_id, "")
             identity_items = identity_by_record.get(record_pk, {}) if record_pk else {}
             behavioral_props = _extract_behavioral_props(d, identity_items)
+            element_label = _derive_element_label(d, identity_items, pattern_label_human)
             peer_group_labels = sorted({g for g in assigned_this_run if g} | set(seeded_peer_vocab))
 
             if dry_run:
@@ -836,6 +915,7 @@ def build_semantic_groups(
                     "domain": d,
                     "pattern_id": pattern_id,
                     "pattern_label_human": pattern_label_human,
+                    "element_label": element_label,
                     "behavioral_props": behavioral_props,
                     "peer_group_labels": peer_group_labels,
                 }, indent=2, ensure_ascii=False))
@@ -855,9 +935,12 @@ def build_semantic_groups(
                     "pattern_id": pattern_id,
                     "domain": d,
                     "pattern_label_human": pattern_label_human,
+                    "element_label": element_label,
                     "system_prompt": SYSTEM_PROMPT,
                     "user_prompt": prompt,
                 })
+                if peer_vocab_from_cache:
+                    export_progress.setdefault(d, set()).add(pattern_id)
                 response_payload = {
                     "semantic_group": "__exported__",
                     "confidence": "low",
@@ -895,8 +978,26 @@ def build_semantic_groups(
         print(f"[build_semantic_groups] domain={d} processed={processed}")
 
     if export_prompts:
-        _write_json(export_prompts, exported_prompts)
-        print(f"[build_semantic_groups] Exported {len(exported_prompts)} prompts to {export_prompts}")
+        export_base_path = _resolve_export_target(cache_path, export_prompts)
+        if export_prompts.parent != export_base_path.parent:
+            print(
+                "[build_semantic_groups] NOTE: export output is written beside label_semantic_groups.json at "
+                f"{export_base_path.parent}"
+            )
+        written_paths = _write_export_batches(export_base_path, exported_prompts, export_batch_size)
+        if peer_vocab_from_cache:
+            _save_export_progress(export_progress_path, export_progress)
+        print(
+            f"[build_semantic_groups] Exported {len(exported_prompts)} prompts "
+            f"into {len(written_paths)} file(s) under {export_base_path.parent}"
+        )
+        for path in written_paths:
+            print(f"[build_semantic_groups]   - {path}")
+        if peer_vocab_from_cache:
+            print(
+                "[build_semantic_groups] Resume tracking enabled: updated exported pattern progress at "
+                f"{export_progress_path}"
+            )
         print("[build_semantic_groups] Export mode: cache was not modified.")
         return
 
@@ -928,7 +1029,19 @@ def main() -> None:
     ap.add_argument(
         "--peer-vocab-from-cache",
         action="store_true",
-        help="When used with --export-prompts, seed peer vocabulary from existing cached semantic_group labels.",
+        help=(
+            "When used with --export-prompts, seed peer vocabulary from cached semantic_group labels and "
+            "track exported pattern_ids to resume later batches without re-exporting prior items."
+        ),
+    )
+    ap.add_argument(
+        "--export-batch-size",
+        type=int,
+        default=None,
+        help=(
+            "When used with --export-prompts, split exported prompts into sequential JSON batches of this size "
+            "in Results_v21/label_synthesis/."
+        ),
     )
     args = ap.parse_args()
 
@@ -938,6 +1051,8 @@ def main() -> None:
         raise ValueError("--peer-vocab-from-cache can only be used with --export-prompts.")
     if args.dry_run and (args.export_prompts or args.import_results):
         raise ValueError("--dry-run cannot be combined with --export-prompts or --import-results.")
+    if args.export_batch_size is not None and not args.export_prompts:
+        raise ValueError("--export-batch-size can only be used with --export-prompts.")
 
     build_semantic_groups(
         out_root=Path(args.out_root).resolve(),
@@ -948,6 +1063,7 @@ def main() -> None:
         export_prompts=Path(args.export_prompts).resolve() if args.export_prompts else None,
         import_results=Path(args.import_results).resolve() if args.import_results else None,
         peer_vocab_from_cache=bool(args.peer_vocab_from_cache),
+        export_batch_size=args.export_batch_size,
     )
 
 
