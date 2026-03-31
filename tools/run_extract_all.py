@@ -32,6 +32,10 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
         fieldnames = list((rows[0].keys() if rows else [
             "schema_version", "export_run_id", "file_id", "domain", "record_id", "record_ordinal", "record_pk", "item_index", "k", "q", "v",
         ]))
+    key_col = "k" if "k" in fieldnames else "item_key"
+    quality_col = "q" if "q" in fieldnames else "item_value_type"
+    value_col = "v" if "v" in fieldnames else "item_value"
+    item_index_col = "item_index" if "item_index" in fieldnames else "item_role"
 
     grouped: Dict[str, List[Dict[str, str]]] = {}
     for r in rows:
@@ -43,18 +47,18 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
     ok = 0
     missing = 0
     for record_pk, group in grouped.items():
-        seg_rows = [r for r in group if _LP_SEGMENT_KEY_RE.match(str(r.get("k", "")))]
+        seg_rows = [r for r in group if _LP_SEGMENT_KEY_RE.match(str(r.get(key_col, "")))]
         status = "ok"
         hash_v = ""
 
-        if not seg_rows or any(str(r.get("q", "")) != "ok" for r in seg_rows):
+        if not seg_rows or any(str(r.get(quality_col, "")) != "ok" for r in seg_rows):
             status = "missing"
             missing += 1
         else:
             segments: Dict[int, Dict[str, float]] = {}
             parse_error = False
             for r in seg_rows:
-                m = _LP_SEGMENT_KEY_RE.match(str(r.get("k", "")))
+                m = _LP_SEGMENT_KEY_RE.match(str(r.get(key_col, "")))
                 if not m:
                     continue
                 idx = int(m.group(1))
@@ -62,9 +66,9 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
                 segments.setdefault(idx, {})
                 try:
                     if key == "kind":
-                        segments[idx]["kind"] = int(str(r.get("v", "")))
+                        segments[idx]["kind"] = int(str(r.get(value_col, "")))
                     else:
-                        segments[idx]["length"] = float(str(r.get("v", "")))
+                        segments[idx]["length"] = float(str(r.get(value_col, "")))
                 except Exception:
                     parse_error = True
                     break
@@ -96,10 +100,10 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
             "record_id": str(base.get("record_id", "")),
             "record_ordinal": str(base.get("record_ordinal", "")),
             "record_pk": record_pk,
-            "item_index": "synthetic",
-            "k": "line_pattern.segments_norm_hash",
-            "q": status,
-            "v": hash_v,
+            item_index_col: "synthetic",
+            key_col: "line_pattern.segments_norm_hash",
+            quality_col: status,
+            value_col: hash_v,
         })
 
     if out_rows:
@@ -110,8 +114,8 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
                 str(r.get("export_run_id", "")),
                 str(r.get("domain", "")),
                 str(r.get("record_pk", "")),
-                str(r.get("k", "")),
-                str(r.get("v", "")),
+                str(r.get(key_col, "")),
+                str(r.get(value_col, "")),
             ),
         )
         with items_csv.open("w", encoding="utf-8", newline="") as f:
