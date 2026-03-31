@@ -50,6 +50,7 @@ EXPECTED_COLUMNS = [
 ]
 
 SEGMENT_KEY_RE = re.compile(r"^line_pattern\.(?:seg|segment)\[(\d{3})\]\.(kind|length)$")
+SEGMENT_COUNT_KEY = "line_pattern.segment_count"
 
 
 def _synthetic_line_patterns(items_df: pd.DataFrame) -> Tuple[pd.DataFrame, int, int]:
@@ -66,7 +67,22 @@ def _synthetic_line_patterns(items_df: pd.DataFrame) -> Tuple[pd.DataFrame, int,
         out_q = "ok"
         out_v = ""
 
-        if segment_rows.empty or (segment_rows["q"] != "ok").any():
+        if segment_rows.empty:
+            seg_count_rows = group[group["k"] == SEGMENT_COUNT_KEY]
+            seg_count_v = str(seg_count_rows.iloc[0]["v"]).strip() if not seg_count_rows.empty else ""
+            seg_count_q = str(seg_count_rows.iloc[0]["q"]).strip() if not seg_count_rows.empty else ""
+            try:
+                seg_count_is_zero = int(seg_count_v) == 0
+            except Exception:
+                seg_count_is_zero = False
+
+            if seg_count_q == "ok" and seg_count_is_zero:
+                out_v = hashlib.md5("segment_count=0".encode("utf-8")).hexdigest()
+                ok_count += 1
+            else:
+                out_q = "missing"
+                missing_count += 1
+        elif (segment_rows["q"] != "ok").any():
             out_q = "missing"
             missing_count += 1
         else:

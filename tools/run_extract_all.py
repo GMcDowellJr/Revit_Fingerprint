@@ -20,6 +20,7 @@ SUPPRESSED_DOWNSTREAM_DOMAINS = {"object_styles_imported"}
 
 
 _LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.(?:seg|segment)\[(\d{3})\]\.(kind|length)$")
+_LP_SEGMENT_COUNT_KEY = "line_pattern.segment_count"
 
 
 def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
@@ -51,7 +52,22 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
         status = "ok"
         hash_v = ""
 
-        if not seg_rows or any(str(r.get(quality_col, "")) != "ok" for r in seg_rows):
+        if not seg_rows:
+            seg_count_rows = [r for r in group if str(r.get(key_col, "")) == _LP_SEGMENT_COUNT_KEY]
+            seg_count_v = str(seg_count_rows[0].get(value_col, "")).strip() if seg_count_rows else ""
+            seg_count_q = str(seg_count_rows[0].get(quality_col, "")).strip() if seg_count_rows else ""
+            try:
+                seg_count_is_zero = int(seg_count_v) == 0
+            except Exception:
+                seg_count_is_zero = False
+
+            if seg_count_q == "ok" and seg_count_is_zero:
+                hash_v = hashlib.md5("segment_count=0".encode("utf-8")).hexdigest()
+                ok += 1
+            else:
+                status = "missing"
+                missing += 1
+        elif any(str(r.get(quality_col, "")) != "ok" for r in seg_rows):
             status = "missing"
             missing += 1
         else:
