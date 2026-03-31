@@ -95,12 +95,15 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
             else:
                 ordered = [(idx, int(v["kind"]), float(v["length"])) for idx, v in sorted(segments.items())]
                 non_dot_total = sum(length for _, kind, length in ordered if kind != 2)
-                epsilon = non_dot_total * 0.01 if non_dot_total > 0 else 1e-9
+                has_non_dot = any(kind != 2 for _, kind, _ in ordered)
                 dot_count = sum(1 for _, kind, _ in ordered if kind == 2)
-                eff_total = non_dot_total + (dot_count * epsilon)
+                eff_total = non_dot_total if has_non_dot else float(dot_count)
                 tokens: List[str] = []
                 for idx, kind, length in ordered:
-                    eff_length = epsilon if kind == 2 else length
+                    if kind == 2:
+                        eff_length = 0.0 if has_non_dot else 1.0
+                    else:
+                        eff_length = length
                     norm = (eff_length / eff_total) if eff_total > 0 else 0.0
                     tokens.append(f"seg[{idx:03d}].kind={kind}")
                     tokens.append(f"seg[{idx:03d}].norm_length={norm:.9f}")
