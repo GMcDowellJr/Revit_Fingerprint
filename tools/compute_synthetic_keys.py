@@ -96,11 +96,15 @@ def _synthetic_line_patterns(items_df: pd.DataFrame) -> Tuple[pd.DataFrame, int,
                 missing_count += 1
             else:
                 ordered = [(idx, int(v["kind"]), float(v["length"])) for idx, v in sorted(segments.items())]
-                total = sum(length for _, kind, length in ordered if kind != 2)
+                non_dot_total = sum(length for _, kind, length in ordered if kind != 2)
+                epsilon = non_dot_total * 0.01 if non_dot_total > 0 else 1e-9
+                dot_count = sum(1 for _, kind, _ in ordered if kind == 2)
+                eff_total = non_dot_total + (dot_count * epsilon)
 
                 tokens = []
                 for idx, kind, length in ordered:
-                    norm = (length / total) if total > 0 else 0.0
+                    eff_length = epsilon if kind == 2 else length
+                    norm = (eff_length / eff_total) if eff_total > 0 else 0.0
                     tokens.append(f"seg[{idx:03d}].kind={kind}")
                     tokens.append(f"seg[{idx:03d}].norm_length={norm:.9f}")
 

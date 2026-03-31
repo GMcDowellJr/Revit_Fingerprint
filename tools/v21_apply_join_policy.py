@@ -47,6 +47,30 @@ def main() -> None:
     items = _read_csv(phase0_dir / "phase0_identity_items.csv")
     identity_index = build_identity_index(items)
 
+    line_pattern_record_pks = {
+        (r.get("record_pk") or "").strip()
+        for r in records
+        if (r.get("domain") or "").strip() == "line_patterns" and (r.get("record_pk") or "").strip()
+    }
+    if line_pattern_record_pks:
+        line_pattern_norm_hash_pks = {
+            (i.get("record_pk") or "").strip()
+            for i in items
+            if (i.get("domain") or "").strip() == "line_patterns"
+            and (i.get("item_key") or "").strip() == "line_pattern.segments_norm_hash"
+            and (i.get("record_pk") or "").strip()
+        }
+        missing_norm_hash_pks = sorted(line_pattern_record_pks - line_pattern_norm_hash_pks)
+        if missing_norm_hash_pks:
+            preview = ",".join(missing_norm_hash_pks[:10])
+            more = "" if len(missing_norm_hash_pks) <= 10 else f" (+{len(missing_norm_hash_pks) - 10} more)"
+            raise SystemExit(
+                "[apply] line_patterns records detected but missing required synthetic item "
+                f"line_pattern.segments_norm_hash for {len(missing_norm_hash_pks)} records. "
+                "Run flatten stage that appends synthetic norm hashes before apply. "
+                f"sample_record_pks={preview}{more}"
+            )
+
     policy = json.loads(policy_path.read_text(encoding="utf-8"))
     dom_policies = policy.get("domains") if isinstance(policy, dict) else {}
     if not isinstance(dom_policies, dict):

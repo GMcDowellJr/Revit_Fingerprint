@@ -74,10 +74,14 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
                 missing += 1
             else:
                 ordered = [(idx, int(v["kind"]), float(v["length"])) for idx, v in sorted(segments.items())]
-                total = sum(length for _, kind, length in ordered if kind != 2)
+                non_dot_total = sum(length for _, kind, length in ordered if kind != 2)
+                epsilon = non_dot_total * 0.01 if non_dot_total > 0 else 1e-9
+                dot_count = sum(1 for _, kind, _ in ordered if kind == 2)
+                eff_total = non_dot_total + (dot_count * epsilon)
                 tokens: List[str] = []
                 for idx, kind, length in ordered:
-                    norm = (length / total) if total > 0 else 0.0
+                    eff_length = epsilon if kind == 2 else length
+                    norm = (eff_length / eff_total) if eff_total > 0 else 0.0
                     tokens.append(f"seg[{idx:03d}].kind={kind}")
                     tokens.append(f"seg[{idx:03d}].norm_length={norm:.9f}")
                 hash_v = hashlib.md5("|".join(tokens).encode("utf-8")).hexdigest()
@@ -545,19 +549,18 @@ def main() -> None:
         print(f"[extract_all] Stage flatten complete: rows={len(record_rows)} files={len(meta_rows)} out={v21_phase0_dir}", flush=True)
 
         synthetic_domains = {d.strip() for d in str(args.synthetic_domains).split(",") if d.strip()}
-        if synthetic_domains:
-            unsupported = sorted([d for d in synthetic_domains if d != "line_patterns"])
-            for d in unsupported:
-                sys.stderr.write(f"[WARN extract_all] synthetic domain not supported yet: {d}\n")
-            if "line_patterns" in synthetic_domains:
-                items_csv = v21_phase0_dir / "phase0_identity_items.csv"
-                stats = _append_line_pattern_synthetic_norm_hash(items_csv)
-                note = (
-                    "synthetic line_patterns segments_norm_hash: "
-                    f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}"
-                )
-                report["notes"].append(note)
-                print(f"[extract_all] {note}", flush=True)
+        unsupported = sorted([d for d in synthetic_domains if d != "line_patterns"])
+        for d in unsupported:
+            sys.stderr.write(f"[WARN extract_all] synthetic domain not supported yet: {d}\n")
+
+        items_csv = v21_phase0_dir / "phase0_identity_items.csv"
+        stats = _append_line_pattern_synthetic_norm_hash(items_csv)
+        note = (
+            "line_patterns segments_norm_hash: "
+            f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}"
+        )
+        report["notes"].append(note)
+        print(f"[extract_all] {note}", flush=True)
 
     if "discover" in selected_stages:
         print("[extract_all] Stage discover (T1): exploring join policy candidates (discover/validate/harsh CSVs)...", flush=True)

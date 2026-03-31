@@ -90,21 +90,25 @@
       ]
     },
     "line_patterns": {
-      "join_key_schema": "line_patterns.join_key.v2",
+      "join_key_schema": "line_patterns.join_key.v3",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "line_pattern.segments_def_hash"
+        "line_pattern.segments_norm_hash"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
         "line_pattern.uid",
         "line_pattern.name",
         "line_pattern.element_id",
-        "line_pattern.uid_or_namekey"
+        "line_pattern.uid_or_namekey",
+        "line_pattern.segments_def_hash"
       ],
       "notes": [
-        "Identity is definition-based via ordered segment (kind,length) sequence; segments are collapsed into line_pattern.segments_def_hash.",
-        "line_pattern.segments_def_hash must be derived only from segment kinds and lengths in order and must not incorporate UID, name, or element_id.",
+        "Upgraded from v2 (segments_def_hash) to v3 (segments_norm_hash) for scale-invariant identity.",
+        "segments_norm_hash encodes segment kind sequence + length ratios (length / non_dot_total).",
+        "Scale variants of the same structural type collapse to the same pattern.",
+        "Dot segments use relative epsilon (1% of non_dot_total) to preserve scale invariance.",
+        "segments_def_hash moved to explicitly_excluded — retains exact identity in identity_basis for forensics.",
         "Names are labels only and must not participate in joins.",
         "lp.is_import added to coordination_items in extractor v2."
       ]

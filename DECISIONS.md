@@ -458,6 +458,34 @@ When category 3 (view-local overrides) is implemented:
 
 ---
 
+## D-017 — line_patterns Join Key Upgraded to Scale-Invariant Normalized Segments
+**Status:** Accepted
+**Date:** 2026-03-31
+### Decision
+Upgrade `line_patterns` join identity from exact segment definition hash
+(`line_pattern.segments_def_hash`) to normalized segment ratio hash
+(`line_pattern.segments_norm_hash`) using `line_patterns.join_key.v3`.
+### Rationale
+Governance identity for line patterns is structural type, not absolute scale.
+Observed outputs showed 2,083 exact-length variants where the governance-meaningful
+distinct population is estimated around 50–200 structural patterns. Scale variants
+such as Hidden 1/8 and Hidden 1/4 should resolve to one governance unit.
+### Normalization rule
+- Preserve ordered segment kind sequence.
+- Normalize segment lengths by ratio relative to non-dot total length.
+- Dot segments use relative epsilon = 1% of non-dot total to keep dot participation
+  scale-invariant.
+- Pure-dot safeguard: if non-dot total is zero, use tiny fallback epsilon `1e-9`.
+### Consequences
+- `line_pattern.segments_norm_hash` must be computed during flatten by default
+  (no opt-in flag required).
+- `line_pattern.segments_def_hash` remains emitted in identity evidence for forensic
+  analysis but is explicitly excluded from join participation.
+- Pattern cardinality should collapse materially for structurally equivalent,
+  differently-scaled line patterns.
+
+---
+
 ## Notes
 
 - This document is **append-only**.
