@@ -131,7 +131,7 @@ def _load_pattern_to_record_pk(analysis_dir: Path, domain: str) -> Dict[str, str
     rows = _read_csv_rows(membership_csv)
     out: Dict[str, str] = {}
     for row in rows:
-        if (row.get("domain") or "").strip() != domain:
+        if (row.get("domain") or "").strip().lower() != domain:
             continue
         pattern_id = (row.get("pattern_id") or "").strip()
         record_pk = (row.get("record_pk") or "").strip()
@@ -140,15 +140,32 @@ def _load_pattern_to_record_pk(analysis_dir: Path, domain: str) -> Dict[str, str
     return out
 
 
-def _load_identity_items_by_record(shards_dir: Path, domain: str) -> Optional[Dict[str, Dict[str, str]]]:
-    shard_csv = shards_dir / f"{domain}.identity_items.csv"
-    if not shard_csv.is_file():
-        print(f"[build_semantic_groups] WARN: missing shard for domain '{domain}': {shard_csv}")
+def _resolve_identity_items_source(phase0_dir: Path, shards_dir: Path, domain: str) -> Optional[Path]:
+    shard_candidates = [
+        shards_dir / f"{domain}.identity_items.csv",
+        shards_dir / f"{domain}.csv",
+    ]
+    for candidate in shard_candidates:
+        if candidate.is_file():
+            return candidate
+    fallback = phase0_dir / "phase0_identity_items.csv"
+    if fallback.is_file():
+        return fallback
+    print(
+        "[build_semantic_groups] WARN: missing identity-items source for domain "
+        f"'{domain}'. looked for shard(s) and fallback: {fallback}"
+    )
+    return None
+
+
+def _load_identity_items_by_record(phase0_dir: Path, shards_dir: Path, domain: str) -> Optional[Dict[str, Dict[str, str]]]:
+    src_csv = _resolve_identity_items_source(phase0_dir, shards_dir, domain)
+    if src_csv is None:
         return None
-    rows = _read_csv_rows(shard_csv)
+    rows = _read_csv_rows(src_csv)
     out: Dict[str, Dict[str, str]] = defaultdict(dict)
     for row in rows:
-        if (row.get("domain") or "").strip() != domain:
+        if (row.get("domain") or "").strip().lower() != domain:
             continue
         record_pk = (row.get("record_pk") or "").strip()
         key = (row.get("k") or "").strip()
@@ -158,6 +175,7 @@ def _load_identity_items_by_record(shards_dir: Path, domain: str) -> Optional[Di
             continue
         if value:
             out[record_pk][key] = value
+    print(f"[build_semantic_groups] domain={domain} identity_items_source={src_csv}")
     return out
 
 
@@ -264,7 +282,10 @@ def build_semantic_groups(
     else:
         results_v21 = out_root / "Results_v21"
     analysis_dir = results_v21 / "analysis_v21"
-    shards_dir = results_v21 / "phase0_v21" / "identity_items_shards"
+    phase0_dir = results_v21 / "phase0_v21"
+    shards_dir = phase0_dir / "identity_items_shards"
+    if not shards_dir.is_dir():
+        shards_dir = phase0_dir / "phase0_identity_items_by_domain"
     cache_path = results_v21 / "label_synthesis" / "label_semantic_groups.json"
     print(f"[build_semantic_groups] results_v21={results_v21}")
     print(f"[build_semantic_groups] analysis_dir={analysis_dir}")
@@ -295,7 +316,7 @@ def build_semantic_groups(
             continue
         print(f"[build_semantic_groups] domain={d} eligible_patterns={len(pattern_rows)}")
         pattern_to_record = _load_pattern_to_record_pk(analysis_dir, d)
-        identity_by_record = _load_identity_items_by_record(shards_dir, d)
+        identity_by_record = _load_identity_items_by_record(phase0_dir, shards_dir, d)
         if identity_by_record is None:
             continue
 
