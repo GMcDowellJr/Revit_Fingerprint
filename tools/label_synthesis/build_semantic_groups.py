@@ -37,7 +37,392 @@ def build_grouping_prompt(
     behavioral_props: dict[str, str],
     peer_group_labels: list[str],
 ) -> str:
-    raise NotImplementedError("Prompt 3 — LLM instruction — not yet written")
+    """
+    Build the user-turn prompt for the LLM grouping call.
+    System prompt is passed separately.
+    """
+    if domain == "text_types":
+        return _prompt_text_types(pattern_label_human, behavioral_props, peer_group_labels)
+    if domain == "arrowheads":
+        return _prompt_arrowheads(pattern_label_human, behavioral_props, peer_group_labels)
+    if domain == "line_patterns":
+        return _prompt_line_patterns(pattern_label_human, behavioral_props, peer_group_labels)
+    if domain == "line_styles":
+        return _prompt_line_styles(pattern_label_human, behavioral_props, peer_group_labels)
+    if domain in ("fill_patterns_drafting", "fill_patterns_model"):
+        return _prompt_fill_patterns(domain, pattern_label_human, behavioral_props, peer_group_labels)
+    raise ValueError(f"No grouping prompt defined for domain: {domain}")
+
+
+def _peer_block(peer_group_labels: list[str]) -> str:
+    """Format the peer vocabulary block."""
+    if not peer_group_labels:
+        return "EXISTING GROUPS IN THIS DOMAIN: (none yet — you are establishing the vocabulary)"
+    labels = sorted(set(peer_group_labels))
+    lines = ["EXISTING GROUPS IN THIS DOMAIN (reuse these labels when appropriate):"]
+    for label in labels:
+        lines.append(f"  - {label}")
+    lines.append("Only create a new label if none of the above fits.")
+    return "\n".join(lines)
+
+
+def _normalize_text_size(size_raw: str) -> str:
+    """
+    Convert decimal inch value to readable fraction string.
+    Input may be "0.125000" or '1/8"' already.
+    """
+    if not size_raw:
+        return "unknown"
+    if '"' in size_raw or "/" in size_raw:
+        return size_raw
+    try:
+        val = float(size_raw)
+    except ValueError:
+        return size_raw
+
+    size_map = {
+        0.046875: '3/64"',
+        0.0625: '1/16"',
+        0.078125: '5/64"',
+        0.09375: '3/32"',
+        0.109375: '7/64"',
+        0.125: '1/8"',
+        0.15625: '5/32"',
+        0.1875: '3/16"',
+        0.21875: '7/32"',
+        0.25: '1/4"',
+        0.3125: '5/16"',
+        0.375: '3/8"',
+        0.5: '1/2"',
+        0.75: '3/4"',
+        1.0: '1"',
+        1.5: '1-1/2"',
+        2.0: '2"',
+        2.4: '2.4"',
+        3.0: '3"',
+    }
+
+    for standard, label in size_map.items():
+        if abs(val - standard) < 0.002:
+            return label
+    return f'{val:.3g}"'
+
+
+def _prompt_text_types(label: str, props: dict[str, str], peers: list[str]) -> str:
+    size_raw = props.get("size_in", "")
+    size_display = _normalize_text_size(size_raw)
+
+    font = props.get("font", "")
+    bold = props.get("bold", "")
+    italic = props.get("italic", "")
+    color = props.get("color_rgb", "")
+    show_border = props.get("show_border", "")
+    background = props.get("background_raw", "")
+
+    format_parts: list[str] = []
+    if bold == "True":
+        format_parts.append("bold")
+    if italic == "True":
+        format_parts.append("italic")
+    if show_border == "True":
+        format_parts.append("bordered")
+    format_str = ", ".join(format_parts) if format_parts else "regular"
+
+    color_note = ""
+    if color and color not in ("0,0,0", "000000", "0"):
+        color_note = f"  Color: {color} (non-black — may indicate special annotation role)\n"
+
+    background_note = ""
+    if background and background not in ("0", "transparent", ""):
+        background_note = "  Background: opaque\n"
+
+    return f"""PATTERN: Text Type
+
+LABEL: {label}
+FONT: {font}
+SIZE: {size_display}
+FORMAT: {format_str}
+{color_note}{background_note}
+CONTEXT:
+Text types in Revit serve specific annotation roles. Size and format together indicate intended use:
+- Very small (≤ 1/16"): reference numbers, keynote tags, room schedule callouts
+- Small (3/32"–1/8"): standard general notes, typical body text for most annotation
+- Medium (3/16"–1/4"): headings, sub-headings, zone labels
+- Large (3/8"+): drawing titles, sheet titles, major callouts
+- Very large (1"+): title block elements, cover sheet graphics
+- Bold text at any size: headings, emphasis, title text
+- Bordered text: revision clouds, special callout boxes, keynotes
+- Non-black color: revision markup, coordination notes, discipline-specific annotation
+
+Size and format define separate groups. A bold 1/8" type and a regular 1/8" type serve different governance roles even if the same font.
+
+Firm naming conventions in Stantec projects often include:
+- ".01_" or numeric prefixes: standard firm styles in preferred sort order
+- "AR-", "ST-", "ME-": discipline prefixes (Architecture, Structural, MEP)
+- "Title", "Note", "Tag", "Label", "Head": role suffixes
+
+{_peer_block(peers)}
+
+Assign a semantic group for this text type. Examples of valid group labels:
+  standard-note (regular small annotation text, no border)
+  bold-heading (bold text used for headings or section labels)
+  drawing-title (large text for drawing/sheet titles)
+  keynote-tag (small bordered or specially formatted text for keynotes)
+  room-tag (text used in room/space tags)
+  title-block-text (very large text for title block elements)
+  revision-markup (non-black or bordered text for revision annotation)
+  dimension-prefix (very small text used as dimension prefix/suffix)
+
+Respond with ONLY the JSON object."""
+
+
+def _prompt_arrowheads(label: str, props: dict[str, str], peers: list[str]) -> str:
+    style = props.get("style", "")
+    size = props.get("tick_size_in", "")
+    filled = props.get("fill_tick", "")
+    heavy_end = props.get("heavy_end_pen_weight", "")
+
+    size_display = "unknown"
+    if size:
+        try:
+            size_display = f'{float(size):.4f}"'
+        except ValueError:
+            size_display = size
+
+    style_context = {
+        "Arrow": "Standard arrow head. Used on leaders and annotation leaders. Filled vs open arrow indicates different conventions.",
+        "Diagonal": "Diagonal tick mark. The dominant arrowhead style in architectural practice — standard for linear dimensions.",
+        "Dot": "Dot arrowhead. Used on radial dimensions, spot elevations, or as an alternative leader terminator.",
+        "Loop": "Loop arrowhead. Less common; used in some structural or specialty annotation conventions.",
+        "Box": "Box terminator. Rare; used in specialty dimensions or imported from CAD standards.",
+        "Heavy end tick mark": "Heavy end tick. Used in structural dimension conventions for emphasis.",
+        "Datum triangle": "Datum triangle. Used on elevation markers and datum references.",
+        "Elevation Target": "Elevation target symbol. Used on interior elevation markers.",
+    }.get(style, f"Style: {style}")
+
+    filled_note = ""
+    if filled == "True":
+        filled_note = "  Filled: yes\n"
+    elif filled == "False":
+        filled_note = "  Filled: no (open)\n"
+
+    heavy_note = ""
+    if heavy_end and heavy_end not in ("", "0", "None"):
+        heavy_note = f"  Heavy end pen weight: {heavy_end}\n"
+
+    return f"""PATTERN: Arrowhead Type
+
+LABEL: {label}
+STYLE: {style}
+SIZE: {size_display}
+{filled_note}{heavy_note}
+CONTEXT:
+{style_context}
+
+Size matters within a style family: a large diagonal tick and a small diagonal tick may serve different dimension type families (e.g., a large tick for primary structural dimensions, small tick for interior dimensions).
+
+{_peer_block(peers)}
+
+Assign a semantic group for this arrowhead. Examples of valid group labels:
+  diagonal-tick (standard architectural dimension tick, any size)
+  filled-arrow (filled/closed arrowhead for leaders)
+  open-arrow (open arrowhead for leaders)
+  dot-terminator (dot used on radial dimensions or leaders)
+  datum-marker (datum triangle or elevation target)
+  structural-tick (heavy end or specialty tick for structural dimensions)
+  loop-terminator (loop style for specialty annotation)
+
+Respond with ONLY the JSON object."""
+
+
+def _prompt_line_patterns(label: str, props: dict[str, str], peers: list[str]) -> str:
+    seg_count = props.get("segment_count", "")
+
+    return f"""PATTERN: Line Pattern
+
+LABEL: {label}
+SEGMENT COUNT: {seg_count if seg_count else "unknown"}
+
+CONTEXT:
+Line patterns in Revit are referenced by line styles (which add weight and color) and by object styles. The pattern itself defines only the dash/dot/space rhythm.
+
+Key pattern families in architectural practice:
+- Solid (0 segments): continuous line — used for visible edges, walls, most objects
+- Dash patterns (Dash-Space, Dash-Space-Dash-Space): hidden lines, beyond-cut elements, dashed annotation
+- Dash-dot patterns (Dash-Space-Dot-Space, Dash-Dot-Space): centerlines, grid lines, reference planes
+- Dot patterns (Dot-Space, Dot-Space-Dot-Space): property lines, setback lines, cloud annotation
+- Complex patterns (many segments, "N seg"): specialty patterns from CAD imports or custom definitions
+
+The label encodes the segment sequence. "Dash-Space | 2 seg" is a simple hidden-line pattern. "Dash-Space-Dot-Space | 4 seg" is a centerline. Patterns with 6+ segments without a readable sequence ("8 seg", "12 seg") are likely complex or custom.
+
+{_peer_block(peers)}
+
+Assign a semantic group for this line pattern. Examples of valid group labels:
+  solid (continuous line, no dashes)
+  hidden-line (simple dash pattern, typically Dash-Space or Dash-Dash-Space)
+  centerline (dash-dot pattern, Dash-Dot-Space or similar)
+  property-line (dot or complex dot pattern)
+  custom-complex (pattern with many segments, no standard sequence)
+  annotation-dash (short dash pattern used for annotation clouds or borders)
+
+Respond with ONLY the JSON object."""
+
+
+def _prompt_line_styles(label: str, props: dict[str, str], peers: list[str]) -> str:
+    weight = props.get("weight_projection", "")
+    color = props.get("color_rgb", "")
+    pattern_synopsis = props.get("pattern_synopsis", "[solid]")
+
+    color_note = ""
+    if color and color not in ("0,0,0", "000000", "0"):
+        color_note = f"  Color: {color} (non-black)\n"
+
+    try:
+        w = int(weight)
+        if w <= 2:
+            weight_desc = f"LW{w} (hairline/fine)"
+        elif w <= 4:
+            weight_desc = f"LW{w} (light)"
+        elif w <= 6:
+            weight_desc = f"LW{w} (medium)"
+        elif w <= 8:
+            weight_desc = f"LW{w} (medium-heavy)"
+        else:
+            weight_desc = f"LW{w} (heavy)"
+    except (ValueError, TypeError):
+        weight_desc = str(weight)
+
+    return f"""PATTERN: Line Style
+
+LABEL: {label}
+LINE WEIGHT: {weight_desc}
+LINE PATTERN: {pattern_synopsis}
+{color_note}
+CONTEXT:
+A line style combines weight + color + pattern. It is applied to model elements via object styles or directly to detail lines. The governance question is: what drawing convention does this line style represent?
+
+Common line style roles in architectural production:
+- Thin solid black: fine detail lines, text leaders, annotation work
+- Medium solid black: standard visible edges, general linework
+- Heavy solid black: section cuts, major element boundaries, walls in plan
+- Dashed/hidden lines: elements below cut plane, hidden edges, dashed dimension lines
+- Dash-dot (centerline weight): centerlines, grid lines, reference lines
+- Colored lines: discipline-specific markup, coordination, phasing indicators
+- Non-black solid: often phasing (demolished, new construction) or discipline color-coding
+
+Firm naming conventions:
+- "LW" prefix with number: pen weight designation (matches label format)
+- Color in name: explicit color designation
+- Pattern type in name: indicates intended use (Hidden, Center, Phantom)
+
+{_peer_block(peers)}
+
+Assign a semantic group for this line style. Examples of valid group labels:
+  thin-solid (fine/hairline solid black line)
+  medium-solid (standard weight solid black line)
+  heavy-solid (heavy weight solid line, section cuts)
+  hidden-line (dashed pattern, any weight)
+  centerline (dash-dot or centerline pattern)
+  colored-line (non-black line, discipline or phase marking)
+  demolition-line (typically dashed, may be colored, phasing)
+  annotation-line (thin lines for leaders, detail annotation)
+
+Respond with ONLY the JSON object."""
+
+
+def _prompt_fill_patterns(domain: str, label: str, props: dict[str, str], peers: list[str]) -> str:
+    grid_count_raw = props.get("grid_count", "")
+    spacing_raw = props.get("spacing_in", "")
+    target = "Drafting" if "drafting" in domain else "Model"
+
+    try:
+        gc = int(grid_count_raw)
+    except (ValueError, TypeError):
+        gc = None
+
+    is_solid = gc == 0 or (gc is None and not spacing_raw)
+
+    if is_solid:
+        complexity = "solid fill (no grid — completely filled region)"
+        spacing_note = ""
+    elif gc is not None and gc >= 10:
+        complexity = f"complex pattern ({gc} grids — likely imported from PAT file)"
+        spacing_note = "  The pattern geometry is too complex to summarize; name is the primary signal.\n"
+    else:
+        complexity = f"geometric pattern ({gc} grids)" if gc else "geometric pattern"
+        if spacing_raw:
+            try:
+                sp = float(spacing_raw)
+                if "drafting" in domain:
+                    if sp <= 0.16:
+                        density = 'fine (≤ 0.16" spacing)'
+                    elif sp <= 0.39:
+                        density = 'medium (0.16–0.39" spacing)'
+                    else:
+                        density = 'coarse (> 0.39" spacing)'
+                else:
+                    if sp <= 10:
+                        density = 'fine (≤ 10" spacing)'
+                    elif sp <= 31:
+                        density = 'medium (10–31" spacing)'
+                    else:
+                        density = 'coarse (> 31" spacing)'
+                spacing_note = f'  Spacing: {sp:.3f}" — {density}\n'
+            except ValueError:
+                spacing_note = f"  Spacing: {spacing_raw}\n"
+        else:
+            spacing_note = ""
+
+    is_fallback = "join_key.v1" in label or "Variant" in label
+    is_cad_import = ".dwg" in label or "-" in label.split(".")[-1].split("-")[-1]
+
+    if is_fallback:
+        label_note = "NOTE: The pattern name is a system-generated fallback — no human-readable name is available. Base your grouping decision primarily on the geometry (type and density).\n"
+    elif is_cad_import:
+        label_note = "NOTE: The pattern name appears to be derived from a CAD import (contains .dwg reference or import suffix). The name may not reflect Revit convention intent.\n"
+    else:
+        label_note = ""
+
+    name_context = """
+Known fill pattern naming conventions:
+- Revit built-in patterns: "Concrete", "Earth", "Sand", "Gravel", "Diagonal Crosshatch", "Horizontal", "Vertical", "Steel", "Wood"
+- Autodesk pattern prefixes: "AR-" (architectural hatches from AutoCAD: AR-CONC, AR-BRSTD, AR-SAND, AR-HBONE)
+- ANSI patterns: "ANSI31" (steel/iron), "ANSI32" (steel), "ANSI33" (bronze), "ANSI34" (rubber/plastic), "ANSI35" (fire brick), "ANSI36" (marble/glass), "ANSI37" (lead/zinc), "ANSI38" (aluminum)
+- Scale suffixes: "Small", "Medium", "Large", "Dense", "2mm", "4mm" — indicate pattern density variant
+- Application suffixes: "(Cut)" vs "(Surface)" — indicates which surface the pattern applies to
+- Custom firm patterns often use material names directly: "Concrete Block", "CMU", "Batt Insulation", "Rigid Insulation"
+"""
+
+    return f"""PATTERN: Fill Pattern ({target})
+
+LABEL: {label}
+COMPLEXITY: {complexity}
+{spacing_note}{label_note}
+CONTEXT:
+{name_context}
+Fill patterns are applied to cut or surface regions of building materials in Revit sections and plans. The semantic group should reflect the material or drawing convention the fill represents.
+
+{_peer_block(peers)}
+
+Assign a semantic group for this fill pattern. Examples of valid group labels:
+  solid-fill (completely opaque fill, no pattern)
+  concrete-hatch (concrete material pattern)
+  earth-fill (earth/soil/grade material)
+  insulation-batt (batt insulation wavy lines)
+  insulation-rigid (rigid insulation diagonal lines)
+  masonry-brick (brick coursing pattern)
+  masonry-cmu (concrete block/CMU pattern)
+  diagonal-line (simple diagonal line pattern, no specific material)
+  crosshatch (crossing diagonal lines, steel or general)
+  horizontal-line (horizontal line pattern)
+  vertical-line (vertical line pattern)
+  sand-gravel (sand or gravel aggregate pattern)
+  wood-grain (wood grain or board pattern)
+  metal-steel (steel or metal hatch, ANSI patterns)
+  complex-import (complex PAT-file pattern, ungroupable by name alone)
+  unknown-fill (fallback pattern with no usable name or geometry signal)
+
+Respond with ONLY the JSON object."""
 
 
 def _utc_now_iso() -> str:
@@ -192,44 +577,55 @@ def _is_nullish(value: str) -> bool:
 def _extract_behavioral_props(domain: str, items: Dict[str, str]) -> Dict[str, str]:
     props: Dict[str, str] = {}
     if domain == "text_types":
-        for k in [
-            "text_type.font",
-            "text_type.size_in",
-            "text_type.bold",
-            "text_type.italic",
-            "text_type.color_rgb",
-            "text_type.show_border",
-            "text_type.background_raw",
-        ]:
-            if items.get(k):
-                props[k] = items[k]
+        key_map = {
+            "text_type.font": "font",
+            "text_type.size_in": "size_in",
+            "text_type.bold": "bold",
+            "text_type.italic": "italic",
+            "text_type.color_rgb": "color_rgb",
+            "text_type.show_border": "show_border",
+            "text_type.background_raw": "background_raw",
+        }
+        for src_key, dst_key in key_map.items():
+            if items.get(src_key):
+                props[dst_key] = items[src_key]
     elif domain == "arrowheads":
-        for k in [
-            "arrowhead.style",
-            "arrowhead.tick_size_in",
-            "arrowhead.filled",
-            "arrowhead.heavy_end_pen_weight",
-        ]:
-            if items.get(k):
-                props[k] = items[k]
+        key_map = {
+            "arrowhead.style": "style",
+            "arrowhead.tick_size_in": "tick_size_in",
+            "arrowhead.filled": "fill_tick",
+            "arrowhead.heavy_end_pen_weight": "heavy_end_pen_weight",
+        }
+        for src_key, dst_key in key_map.items():
+            if items.get(src_key):
+                props[dst_key] = items[src_key]
     elif domain == "line_patterns":
         if items.get("line_pattern.segment_count"):
-            props["line_pattern.segment_count"] = items["line_pattern.segment_count"]
-        for seg_key in _line_pattern_segment_keys(items):
-            props[seg_key] = items[seg_key]
+            props["segment_count"] = items["line_pattern.segment_count"]
     elif domain == "line_styles":
-        for k in ["line_style.color.rgb", "line_style.weight.projection"]:
-            if items.get(k):
-                props[k] = items[k]
-        sig_hash = items.get("line_style.pattern_ref.sig_hash", "")
-        if _is_nullish(sig_hash):
-            props["line pattern"] = "[solid]"
+        if items.get("line_style.color.rgb"):
+            props["color_rgb"] = items["line_style.color.rgb"]
+        if items.get("line_style.weight.projection"):
+            props["weight_projection"] = items["line_style.weight.projection"]
+        pattern_synopsis = (
+            items.get("line_style.pattern_ref.pattern_label_human", "")
+            or items.get("line_style.pattern_ref.label", "")
+            or items.get("line_style.pattern_ref.synopsis", "")
+        )
+        if pattern_synopsis:
+            props["pattern_synopsis"] = pattern_synopsis
         else:
-            props["line pattern"] = sig_hash
+            sig_hash = items.get("line_style.pattern_ref.sig_hash", "")
+            props["pattern_synopsis"] = "[solid]" if _is_nullish(sig_hash) else sig_hash
     elif domain in {"fill_patterns_drafting", "fill_patterns_model"}:
-        for k in ["fill_pattern.is_solid", "fill_pattern.grid_count"]:
-            if items.get(k):
-                props[k] = items[k]
+        if items.get("fill_pattern.grid_count"):
+            props["grid_count"] = items["fill_pattern.grid_count"]
+        offset = items.get("fill_pattern.grid[000].offset", "")
+        if offset:
+            try:
+                props["spacing_in"] = str(abs(float(offset)) * 12.0)
+            except ValueError:
+                props["spacing_in"] = offset
     return props
 
 
