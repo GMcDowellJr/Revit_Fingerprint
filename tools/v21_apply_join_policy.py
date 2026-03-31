@@ -111,9 +111,10 @@ def main() -> None:
         )
         policy_id = str(p.get("policy_id") or f"{domain}.join_key.v21")
         policy_version = str(p.get("policy_version") or "1")
+        join_key_schema = str(p.get("join_key_schema") or f"policy.{policy_id}.v{policy_version}")
         r["join_key_policy_id"] = policy_id
         r["join_key_policy_version"] = policy_version
-        r["join_key_schema"] = f"policy.{policy_id}.v{policy_version}"
+        r["join_key_schema"] = join_key_schema
 
         if status != "ok":
             r["join_hash"] = ""

@@ -49,7 +49,7 @@ EXPECTED_COLUMNS = [
     "v",
 ]
 
-SEGMENT_KEY_RE = re.compile(r"^line_pattern\.seg\[(\d{3})\]\.(kind|length)$")
+SEGMENT_KEY_RE = re.compile(r"^line_pattern\.(?:seg|segment)\[(\d{3})\]\.(kind|length)$")
 
 
 def _synthetic_line_patterns(items_df: pd.DataFrame) -> Tuple[pd.DataFrame, int, int]:

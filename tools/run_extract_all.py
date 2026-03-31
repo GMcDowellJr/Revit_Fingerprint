@@ -19,7 +19,7 @@ from v21_emit import emit_analysis_v21, emit_phase0_v21
 SUPPRESSED_DOWNSTREAM_DOMAINS = {"object_styles_imported"}
 
 
-_LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.seg\[(\d{3})\]\.(kind|length)$")
+_LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.(?:seg|segment)\[(\d{3})\]\.(kind|length)$")
 
 
 def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
