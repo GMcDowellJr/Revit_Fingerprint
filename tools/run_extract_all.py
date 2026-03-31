@@ -106,7 +106,7 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
                         eff_length = length
                     norm = (eff_length / eff_total) if eff_total > 0 else 0.0
                     tokens.append(f"seg[{idx:03d}].kind={kind}")
-                    tokens.append(f"seg[{idx:03d}].norm_length={norm:.9f}")
+                    tokens.append(f"seg[{idx:03d}].norm_length={norm:.6f}")
                 hash_v = hashlib.md5("|".join(tokens).encode("utf-8")).hexdigest()
                 ok += 1
 

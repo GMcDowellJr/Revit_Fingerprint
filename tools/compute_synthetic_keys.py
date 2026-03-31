@@ -125,7 +125,7 @@ def _synthetic_line_patterns(items_df: pd.DataFrame) -> Tuple[pd.DataFrame, int,
                         eff_length = length
                     norm = (eff_length / eff_total) if eff_total > 0 else 0.0
                     tokens.append(f"seg[{idx:03d}].kind={kind}")
-                    tokens.append(f"seg[{idx:03d}].norm_length={norm:.9f}")
+                    tokens.append(f"seg[{idx:03d}].norm_length={norm:.6f}")
 
                 out_v = hashlib.md5("|".join(tokens).encode("utf-8")).hexdigest()
                 ok_count += 1
