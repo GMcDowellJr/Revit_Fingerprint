@@ -484,6 +484,14 @@ such as Hidden 1/8 and Hidden 1/4 should resolve to one governance unit.
 - Pattern cardinality should collapse materially for structurally equivalent,
   differently-scaled line patterns.
 
+### Validation extension (accepted operating practice)
+- Precision sensitivity must be evaluated around the active normalization token
+  precision (currently `.6f`) using neighbor sweeps (typically ±2 decimals).
+- Precision selection is determined by elbow behavior: maximize collapse of
+  floating-noise fragmentation while preserving stable structural distinctions.
+- Evaluation should track not only unique hash count, but also split/merge
+  behavior by dominant labels and shape-sequence consistency.
+
 ---
 
 ## Notes
