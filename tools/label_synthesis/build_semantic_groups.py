@@ -29,6 +29,19 @@ SEMANTIC_GROUPING_DOMAINS = [
 ]
 
 CACHE_SCHEMA_VERSION = "1.0"
+SYSTEM_PROMPT = """You are a Revit standards governance analyst at a large architecture and engineering firm. Your task is to assign a short semantic group label to a Revit configuration pattern. The label should capture what this configuration is *for* — its governance intent — not just describe its properties.
+
+Governance groups are used by standards managers to identify where the firm has converged on common practice and where drift exists. A good group label answers the question: "What role does this configuration play in a Revit project?"
+
+Rules:
+- Return ONLY a JSON object with exactly three keys: "semantic_group", "confidence", and "rationale"
+- "semantic_group": a lowercase label, 2–5 words, hyphen-separated if multi-word (e.g. "standard-note", "hidden-line", "concrete-fill")
+- "confidence": exactly "high", "medium", or "low"
+- "rationale": one sentence (max 20 words) explaining your grouping decision
+- Do not add any text before or after the JSON object
+- Do not use markdown code fences
+
+If the pattern name or properties are too ambiguous to group with confidence, assign the closest plausible group and set confidence to "low"."""
 
 
 def build_grouping_prompt(
@@ -470,6 +483,12 @@ def _save_cache(cache_path: Path, cache: Dict[str, Any]) -> None:
         json.dump(cache, f, indent=2, sort_keys=True, ensure_ascii=False)
 
 
+def _write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+
+
 def _load_pattern_rows(analysis_dir: Path, only_domain: Optional[str]) -> Dict[str, List[Dict[str, str]]]:
     domain_patterns_csv = analysis_dir / "domain_patterns.csv"
     if not domain_patterns_csv.is_file():
@@ -661,6 +680,23 @@ def _parse_grouping_response(raw_text: str) -> Dict[str, str]:
         }
 
 
+def _normalize_import_payload(row: Dict[str, Any]) -> Dict[str, str]:
+    semantic_group = str(row.get("semantic_group", "")).strip()
+    confidence = str(row.get("confidence", "low")).strip().lower()
+    rationale = str(row.get("rationale", "")).strip()
+    if confidence not in {"high", "medium", "low"}:
+        confidence = "low"
+    if not semantic_group:
+        semantic_group = "__parse_error__"
+        confidence = "low"
+        rationale = rationale or "Missing semantic_group in imported result."
+    return {
+        "semantic_group": semantic_group,
+        "confidence": confidence,
+        "rationale": rationale,
+    }
+
+
 def _call_grouping_llm(prompt: str) -> str:
     raise NotImplementedError("LLM call wiring for semantic grouping is not implemented yet.")
 
@@ -672,6 +708,9 @@ def build_semantic_groups(
     dry_run: bool,
     force_refresh: bool,
     max_patterns: Optional[int],
+    export_prompts: Optional[Path],
+    import_results: Optional[Path],
+    peer_vocab_from_cache: bool,
 ) -> None:
     if (out_root / "analysis_v21").is_dir() and (out_root / "phase0_v21").is_dir():
         results_v21 = out_root
@@ -698,14 +737,63 @@ def build_semantic_groups(
         cache["groups"] = cache_groups
 
     analysis_run_id = _load_analysis_run_id(analysis_dir)
-    patterns_by_domain = _load_pattern_rows(analysis_dir, domain)
-    if not patterns_by_domain:
-        print("[build_semantic_groups] WARN: no eligible patterns found in scope.")
-        print("[build_semantic_groups] Check --out-root and ensure domain_patterns.csv has non-missing pattern_label_human/source.")
     for d in SEMANTIC_GROUPING_DOMAINS:
         if domain and d != domain:
             continue
         cache_groups.setdefault(d, {})
+
+    if import_results:
+        with import_results.open("r", encoding="utf-8") as f:
+            rows = json.load(f)
+        if not isinstance(rows, list):
+            raise ValueError("--import-results must point to a JSON array.")
+        imported = 0
+        skipped = 0
+        for row in rows:
+            if not isinstance(row, dict):
+                skipped += 1
+                continue
+            d = str(row.get("domain", "")).strip()
+            pattern_id = str(row.get("pattern_id", "")).strip()
+            if not d or not pattern_id:
+                skipped += 1
+                continue
+            if domain and d != domain:
+                skipped += 1
+                continue
+            if d not in SEMANTIC_GROUPING_DOMAINS:
+                skipped += 1
+                continue
+            cache_groups.setdefault(d, {})
+            if not force_refresh and pattern_id in cache_groups[d]:
+                skipped += 1
+                continue
+            payload = _normalize_import_payload(row)
+            cache_groups[d][pattern_id] = {
+                "semantic_group": payload["semantic_group"],
+                "confidence": payload["confidence"],
+                "rationale": payload["rationale"],
+                "pattern_label_human": str(row.get("pattern_label_human", "")).strip(),
+                "reviewed": False,
+            }
+            imported += 1
+        cache["schema_version"] = CACHE_SCHEMA_VERSION
+        cache["analysis_run_id"] = analysis_run_id
+        cache["generated_at"] = _utc_now_iso()
+        cache["groups"] = cache_groups
+        _save_cache(cache_path, cache)
+        print(
+            f"[build_semantic_groups] Imported {imported} results from {import_results} "
+            f"(skipped={skipped}) and wrote cache: {cache_path}"
+        )
+        return
+
+    patterns_by_domain = _load_pattern_rows(analysis_dir, domain)
+    if not patterns_by_domain:
+        print("[build_semantic_groups] WARN: no eligible patterns found in scope.")
+        print("[build_semantic_groups] Check --out-root and ensure domain_patterns.csv has non-missing pattern_label_human/source.")
+
+    exported_prompts: list[Dict[str, str]] = []
 
     for d, pattern_rows in patterns_by_domain.items():
         if not pattern_rows:
@@ -719,6 +807,15 @@ def build_semantic_groups(
         print(f"[build_semantic_groups] domain={d} patterns={len(pattern_rows)}")
         processed = 0
         assigned_this_run: List[str] = []
+        seeded_peer_vocab: List[str] = []
+        if export_prompts and peer_vocab_from_cache:
+            seeded_peer_vocab = sorted({
+                str(entry.get("semantic_group", "")).strip()
+                for entry in cache_groups.get(d, {}).values()
+                if isinstance(entry, dict)
+                and str(entry.get("semantic_group", "")).strip()
+                and str(entry.get("semantic_group", "")).strip() != "__parse_error__"
+            })
 
         for row in pattern_rows:
             pattern_id = row["pattern_id"]
@@ -731,7 +828,7 @@ def build_semantic_groups(
             record_pk = pattern_to_record.get(pattern_id, "")
             identity_items = identity_by_record.get(record_pk, {}) if record_pk else {}
             behavioral_props = _extract_behavioral_props(d, identity_items)
-            peer_group_labels = sorted({g for g in assigned_this_run if g})
+            peer_group_labels = sorted({g for g in assigned_this_run if g} | set(seeded_peer_vocab))
 
             if dry_run:
                 print("\n--- semantic grouping prompt (dry-run) ---")
@@ -746,6 +843,25 @@ def build_semantic_groups(
                     "semantic_group": "__dry_run__",
                     "confidence": "low",
                     "rationale": "Dry run; LLM call skipped.",
+                }
+            elif export_prompts:
+                prompt = build_grouping_prompt(
+                    domain=d,
+                    pattern_label_human=pattern_label_human,
+                    behavioral_props=behavioral_props,
+                    peer_group_labels=peer_group_labels,
+                )
+                exported_prompts.append({
+                    "pattern_id": pattern_id,
+                    "domain": d,
+                    "pattern_label_human": pattern_label_human,
+                    "system_prompt": SYSTEM_PROMPT,
+                    "user_prompt": prompt,
+                })
+                response_payload = {
+                    "semantic_group": "__exported__",
+                    "confidence": "low",
+                    "rationale": "Prompt exported; LLM call skipped.",
                 }
             else:
                 try:
@@ -772,11 +888,17 @@ def build_semantic_groups(
                 "reviewed": False,
             }
             group_value = response_payload["semantic_group"]
-            if group_value and group_value != "__parse_error__":
+            if group_value and group_value not in {"__parse_error__", "__exported__", "__dry_run__"}:
                 assigned_this_run.append(group_value)
             processed += 1
 
         print(f"[build_semantic_groups] domain={d} processed={processed}")
+
+    if export_prompts:
+        _write_json(export_prompts, exported_prompts)
+        print(f"[build_semantic_groups] Exported {len(exported_prompts)} prompts to {export_prompts}")
+        print("[build_semantic_groups] Export mode: cache was not modified.")
+        return
 
     cache["schema_version"] = CACHE_SCHEMA_VERSION
     cache["analysis_run_id"] = analysis_run_id
@@ -793,7 +915,29 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true", help="Print prompt inputs; do not call LLM API.")
     ap.add_argument("--force-refresh", action="store_true", help="Regenerate groups even if cached.")
     ap.add_argument("--max-patterns", type=int, default=None, help="Limit patterns processed per domain.")
+    ap.add_argument(
+        "--export-prompts",
+        default=None,
+        help="Write assembled prompts to this JSON path instead of calling LLM and without writing cache.",
+    )
+    ap.add_argument(
+        "--import-results",
+        default=None,
+        help="Import semantic-grouping results from a JSON array and write cache (no LLM calls).",
+    )
+    ap.add_argument(
+        "--peer-vocab-from-cache",
+        action="store_true",
+        help="When used with --export-prompts, seed peer vocabulary from existing cached semantic_group labels.",
+    )
     args = ap.parse_args()
+
+    if args.export_prompts and args.import_results:
+        raise ValueError("--export-prompts and --import-results are mutually exclusive.")
+    if args.peer_vocab_from_cache and not args.export_prompts:
+        raise ValueError("--peer-vocab-from-cache can only be used with --export-prompts.")
+    if args.dry_run and (args.export_prompts or args.import_results):
+        raise ValueError("--dry-run cannot be combined with --export-prompts or --import-results.")
 
     build_semantic_groups(
         out_root=Path(args.out_root).resolve(),
@@ -801,6 +945,9 @@ def main() -> None:
         dry_run=bool(args.dry_run),
         force_refresh=bool(args.force_refresh),
         max_patterns=args.max_patterns,
+        export_prompts=Path(args.export_prompts).resolve() if args.export_prompts else None,
+        import_results=Path(args.import_results).resolve() if args.import_results else None,
+        peer_vocab_from_cache=bool(args.peer_vocab_from_cache),
     )
 
 
