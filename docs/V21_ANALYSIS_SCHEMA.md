@@ -42,3 +42,10 @@ Outputs are additive and written under `Results_v21/analysis_v21/`.
   - `pattern_presence_file.csv`: `(analysis_run_id, export_run_id, domain, pattern_id)`
   - `domain_pattern_diagnostics.csv`: `(analysis_run_id, domain)`
   - `element_dominance.csv`: `(analysis_run_id, domain, element_label, sub_label)`
+
+## `domain_patterns.csv` additive column
+
+- `semantic_group` (string)
+  - Source: `Results_v21/label_synthesis/label_semantic_groups.json` lookup by `(domain, pattern_id)`.
+  - Default: empty string when the cache is missing, domain is out of grouping scope, or pattern has no grouped entry yet.
+  - Population workflow: written by `tools/label_synthesis/build_semantic_groups.py`; entries are curator-reviewable via each cache record's `reviewed` flag.

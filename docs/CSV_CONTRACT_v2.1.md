@@ -39,3 +39,9 @@ Trace/back-compat:
 - Preferred linkage source is `record_pattern_membership.csv`.
 - For cluster-level linkage, emit `split_cluster_to_pattern_map.csv` with:
   - `analysis_run_id,domain,cluster_id,pattern_id,mapping_quality,mapping_reason`
+
+## `domain_patterns.csv` semantic grouping column
+- `semantic_group` is an additive string column in `domain_patterns.csv`.
+- Source of truth is `Results_v21/label_synthesis/label_semantic_groups.json`, keyed by `groups[domain][pattern_id]`.
+- Emit behavior is nullable-by-design: when no cache entry exists, output empty string.
+- Population is performed offline by `tools/label_synthesis/build_semantic_groups.py`; cache rows include `reviewed` for human curation state.

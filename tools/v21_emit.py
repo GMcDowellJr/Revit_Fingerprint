@@ -412,6 +412,40 @@ def _load_label_resolution_inputs(results_v21_dir: Optional[Path], domain: str) 
     return label_pop, annotations, llm_cache
 
 
+def _load_semantic_groups(results_v21_dir: Optional[Path]) -> Dict[str, Dict[str, str]]:
+    if results_v21_dir is None:
+        return {}
+    cache_path = results_v21_dir / "label_synthesis" / "label_semantic_groups.json"
+    if not cache_path.is_file():
+        return {}
+    try:
+        with cache_path.open("r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except Exception:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    groups = payload.get("groups")
+    if not isinstance(groups, dict):
+        return {}
+
+    out: Dict[str, Dict[str, str]] = {}
+    for domain, by_pattern in groups.items():
+        if not isinstance(domain, str) or not isinstance(by_pattern, dict):
+            continue
+        out[domain] = {}
+        for pattern_id, entry in by_pattern.items():
+            if not isinstance(pattern_id, str):
+                continue
+            semantic_group = ""
+            if isinstance(entry, dict):
+                semantic_group = _safe_str(entry.get("semantic_group"))
+            elif isinstance(entry, str):
+                semantic_group = entry
+            out[domain][pattern_id] = semantic_group
+    return out
+
+
 def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename") -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     exported_utc = _utc_now_iso()
     tool_version = _get_tool_version()
@@ -580,6 +614,7 @@ def emit_analysis_v21(
     scope_src = "|".join(exports)
     analysis_scope_hash = hashlib.sha1(scope_src.encode("utf-8")).hexdigest()
     analysis_run_id = f"ana_{analysis_scope_hash[:12]}"
+    semantic_groups = _load_semantic_groups(results_v21_dir)
 
     _write_csv(out_dir / "analysis_manifest.csv", [
         "schema_version", "analysis_run_id", "analysis_scope_hash", "export_run_count", "domain_count",
@@ -758,6 +793,7 @@ def emit_analysis_v21(
                     )
                     else "false"
                 ),
+                "semantic_group": semantic_groups.get(dom, {}).get(pid, ""),
             })
 
             for r in rows:
@@ -977,6 +1013,7 @@ def emit_analysis_v21(
         "is_candidate_standard", "notes",
         # v2.1 human-readable/audit extensions are appended for compatibility.
         "pattern_label_human", "pattern_label_source", "pattern_label_fallback", "is_cad_import",
+        "semantic_group",
     ], _sort_rows(domain_patterns, ["analysis_run_id", "domain", "pattern_id"]))
 
     _write_csv(out_dir / "record_pattern_membership.csv", [
