@@ -57,7 +57,7 @@ def main() -> None:
             (i.get("record_pk") or "").strip()
             for i in items
             if (i.get("domain") or "").strip() == "line_patterns"
-            and (i.get("item_key") or "").strip() == "line_pattern.segments_norm_hash"
+            and (i.get("k") or "").strip() == "line_pattern.segments_norm_hash"
             and (i.get("record_pk") or "").strip()
         }
         missing_norm_hash_pks = sorted(line_pattern_record_pks - line_pattern_norm_hash_pks)
