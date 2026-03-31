@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import hashlib
+
 from core.hashing import make_hash
 from core.join_key_builder import build_join_key_from_policy
 from core.join_key_policy import load_join_key_policies, get_domain_join_key_policy
@@ -21,6 +23,13 @@ def _line_patterns_policy():
 def test_line_patterns_canonical_evidence_selectors_and_hashing():
     segments = [_Seg(0, 1.25), _Seg(2, 999.0)]
     segments_def_hash_v, segments_def_hash_q = _line_pattern_segments_def_hash(segments=segments)
+    segments_norm_tokens = [
+        "seg[000].kind=0",
+        "seg[000].norm_length=1.000000",
+        "seg[001].kind=2",
+        "seg[001].norm_length=0.000000",
+    ]
+    segments_norm_hash_v = hashlib.md5("|".join(segments_norm_tokens).encode("utf-8")).hexdigest()
 
     # Canonical evidence superset (identity_basis.items) includes both semantic and optional detail.
     canonical_items = [
@@ -29,6 +38,7 @@ def test_line_patterns_canonical_evidence_selectors_and_hashing():
         make_identity_item("line_pattern.seg[000].length", "1.250000000", "ok"),
         make_identity_item("line_pattern.seg[001].kind", "2", "ok"),
         make_identity_item("line_pattern.seg[001].length", "0.000000000", "ok"),
+        make_identity_item("line_pattern.segments_norm_hash", segments_norm_hash_v, "ok"),
         make_identity_item("line_pattern.segments_def_hash", segments_def_hash_v, segments_def_hash_q),
     ]
 
@@ -42,7 +52,7 @@ def test_line_patterns_canonical_evidence_selectors_and_hashing():
     )
 
     assert missing == []
-    assert join_key["keys_used"] == ["line_pattern.segments_def_hash"]
+    assert join_key["keys_used"] == ["line_pattern.segments_norm_hash"]
 
     hashed_items = [
         it for it in canonical_items if it.get("k") in set(join_key["keys_used"])

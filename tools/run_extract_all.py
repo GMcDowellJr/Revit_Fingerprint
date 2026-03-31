@@ -19,7 +19,8 @@ from v21_emit import emit_analysis_v21, emit_phase0_v21
 SUPPRESSED_DOWNSTREAM_DOMAINS = {"object_styles_imported"}
 
 
-_LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.seg\[(\d{3})\]\.(kind|length)$")
+_LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.(?:seg|segment)\[(\d{3})\]\.(kind|length)$")
+_LP_SEGMENT_COUNT_KEY = "line_pattern.segment_count"
 
 
 def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
@@ -30,8 +31,12 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
     with items_csv.open("r", encoding="utf-8-sig", newline="") as f:
         rows = list(csv.DictReader(f))
         fieldnames = list((rows[0].keys() if rows else [
-            "schema_version", "export_run_id", "domain", "record_pk", "item_key", "item_value", "item_value_type", "item_role",
+            "schema_version", "export_run_id", "file_id", "domain", "record_id", "record_ordinal", "record_pk", "item_index", "k", "q", "v",
         ]))
+    key_col = "k" if "k" in fieldnames else "item_key"
+    quality_col = "q" if "q" in fieldnames else "item_value_type"
+    value_col = "v" if "v" in fieldnames else "item_value"
+    item_index_col = "item_index" if "item_index" in fieldnames else "item_role"
 
     grouped: Dict[str, List[Dict[str, str]]] = {}
     for r in rows:
@@ -43,18 +48,33 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
     ok = 0
     missing = 0
     for record_pk, group in grouped.items():
-        seg_rows = [r for r in group if _LP_SEGMENT_KEY_RE.match(str(r.get("item_key", "")))]
+        seg_rows = [r for r in group if _LP_SEGMENT_KEY_RE.match(str(r.get(key_col, "")))]
         status = "ok"
         hash_v = ""
 
-        if not seg_rows or any(str(r.get("item_value_type", "")) != "ok" for r in seg_rows):
+        if not seg_rows:
+            seg_count_rows = [r for r in group if str(r.get(key_col, "")) == _LP_SEGMENT_COUNT_KEY]
+            seg_count_v = str(seg_count_rows[0].get(value_col, "")).strip() if seg_count_rows else ""
+            seg_count_q = str(seg_count_rows[0].get(quality_col, "")).strip() if seg_count_rows else ""
+            try:
+                seg_count_is_zero = int(seg_count_v) == 0
+            except Exception:
+                seg_count_is_zero = False
+
+            if seg_count_q == "ok" and seg_count_is_zero:
+                hash_v = hashlib.md5("segment_count=0".encode("utf-8")).hexdigest()
+                ok += 1
+            else:
+                status = "missing"
+                missing += 1
+        elif any(str(r.get(quality_col, "")) != "ok" for r in seg_rows):
             status = "missing"
             missing += 1
         else:
             segments: Dict[int, Dict[str, float]] = {}
             parse_error = False
             for r in seg_rows:
-                m = _LP_SEGMENT_KEY_RE.match(str(r.get("item_key", "")))
+                m = _LP_SEGMENT_KEY_RE.match(str(r.get(key_col, "")))
                 if not m:
                     continue
                 idx = int(m.group(1))
@@ -62,9 +82,9 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
                 segments.setdefault(idx, {})
                 try:
                     if key == "kind":
-                        segments[idx]["kind"] = int(str(r.get("item_value", "")))
+                        segments[idx]["kind"] = int(str(r.get(value_col, "")))
                     else:
-                        segments[idx]["length"] = float(str(r.get("item_value", "")))
+                        segments[idx]["length"] = float(str(r.get(value_col, "")))
                 except Exception:
                     parse_error = True
                     break
@@ -74,12 +94,19 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
                 missing += 1
             else:
                 ordered = [(idx, int(v["kind"]), float(v["length"])) for idx, v in sorted(segments.items())]
-                total = sum(length for _, kind, length in ordered if kind != 2)
+                non_dot_total = sum(length for _, kind, length in ordered if kind != 2)
+                has_non_dot = any(kind != 2 for _, kind, _ in ordered)
+                dot_count = sum(1 for _, kind, _ in ordered if kind == 2)
+                eff_total = non_dot_total if has_non_dot else float(dot_count)
                 tokens: List[str] = []
                 for idx, kind, length in ordered:
-                    norm = (length / total) if total > 0 else 0.0
+                    if kind == 2:
+                        eff_length = 0.0 if has_non_dot else 1.0
+                    else:
+                        eff_length = length
+                    norm = (eff_length / eff_total) if eff_total > 0 else 0.0
                     tokens.append(f"seg[{idx:03d}].kind={kind}")
-                    tokens.append(f"seg[{idx:03d}].norm_length={norm:.9f}")
+                    tokens.append(f"seg[{idx:03d}].norm_length={norm:.6f}")
                 hash_v = hashlib.md5("|".join(tokens).encode("utf-8")).hexdigest()
                 ok += 1
 
@@ -87,12 +114,15 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
         out_rows.append({
             "schema_version": str(base.get("schema_version", "")),
             "export_run_id": str(base.get("export_run_id", "")),
+            "file_id": str(base.get("file_id", "")),
             "domain": "line_patterns",
+            "record_id": str(base.get("record_id", "")),
+            "record_ordinal": str(base.get("record_ordinal", "")),
             "record_pk": record_pk,
-            "item_key": "line_pattern.segments_norm_hash",
-            "item_value": hash_v,
-            "item_value_type": status,
-            "item_role": "synthetic",
+            item_index_col: "synthetic",
+            key_col: "line_pattern.segments_norm_hash",
+            quality_col: status,
+            value_col: hash_v,
         })
 
     if out_rows:
@@ -103,8 +133,8 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
                 str(r.get("export_run_id", "")),
                 str(r.get("domain", "")),
                 str(r.get("record_pk", "")),
-                str(r.get("item_key", "")),
-                str(r.get("item_value", "")),
+                str(r.get(key_col, "")),
+                str(r.get(value_col, "")),
             ),
         )
         with items_csv.open("w", encoding="utf-8", newline="") as f:
@@ -545,19 +575,18 @@ def main() -> None:
         print(f"[extract_all] Stage flatten complete: rows={len(record_rows)} files={len(meta_rows)} out={v21_phase0_dir}", flush=True)
 
         synthetic_domains = {d.strip() for d in str(args.synthetic_domains).split(",") if d.strip()}
-        if synthetic_domains:
-            unsupported = sorted([d for d in synthetic_domains if d != "line_patterns"])
-            for d in unsupported:
-                sys.stderr.write(f"[WARN extract_all] synthetic domain not supported yet: {d}\n")
-            if "line_patterns" in synthetic_domains:
-                items_csv = v21_phase0_dir / "phase0_identity_items.csv"
-                stats = _append_line_pattern_synthetic_norm_hash(items_csv)
-                note = (
-                    "synthetic line_patterns segments_norm_hash: "
-                    f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}"
-                )
-                report["notes"].append(note)
-                print(f"[extract_all] {note}", flush=True)
+        unsupported = sorted([d for d in synthetic_domains if d != "line_patterns"])
+        for d in unsupported:
+            sys.stderr.write(f"[WARN extract_all] synthetic domain not supported yet: {d}\n")
+
+        items_csv = v21_phase0_dir / "phase0_identity_items.csv"
+        stats = _append_line_pattern_synthetic_norm_hash(items_csv)
+        note = (
+            "line_patterns segments_norm_hash: "
+            f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}"
+        )
+        report["notes"].append(note)
+        print(f"[extract_all] {note}", flush=True)
 
     if "discover" in selected_stages:
         print("[extract_all] Stage discover (T1): exploring join policy candidates (discover/validate/harsh CSVs)...", flush=True)

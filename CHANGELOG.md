@@ -11,6 +11,17 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Changed
+- line_patterns join key policy upgraded from `line_patterns.join_key.v2`
+  (`line_pattern.segments_def_hash`) to `line_patterns.join_key.v3`
+  (`line_pattern.segments_norm_hash`) to enforce scale-invariant structural identity;
+  same kind sequence + ratio now collapses length-scaled variants into one pattern
+- `line_pattern.segments_norm_hash` is now computed automatically during flatten
+  in `tools/run_extract_all.py` (no `--synthetic-domains line_patterns` flag required)
+- line_patterns normalized token precision set to `.6f` (from `.9f`) after
+  sensitivity sweep; decision now includes a documented ±2 decimal neighbor
+  validation practice to confirm elbow stability over time
+
 ### Fixed
 - VCO `dflt_map` computation hoisted out of O(templates × categories) inner loop;
   `other_seconds` reduced from ~920s to ~9s on large files, total VCO time reduced ~73%
