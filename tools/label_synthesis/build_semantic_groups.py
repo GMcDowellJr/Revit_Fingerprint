@@ -91,23 +91,36 @@ def _load_pattern_rows(analysis_dir: Path, only_domain: Optional[str]) -> Dict[s
         raise FileNotFoundError(f"Missing required input: {domain_patterns_csv}")
     rows = _read_csv_rows(domain_patterns_csv)
     out: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+    stats: Dict[str, int] = defaultdict(int)
     for row in rows:
-        domain = (row.get("domain") or "").strip()
+        domain = (row.get("domain") or "").strip().lower()
+        stats["rows_total"] += 1
         if domain not in SEMANTIC_GROUPING_DOMAINS:
+            stats["rows_out_of_scope_domain"] += 1
             continue
         if only_domain and domain != only_domain:
+            stats["rows_filtered_by_domain_arg"] += 1
             continue
         pattern_id = (row.get("pattern_id") or "").strip()
         label = (row.get("pattern_label_human") or "").strip()
-        source = (row.get("pattern_label_source") or "").strip()
-        if not pattern_id or not label or source == "missing":
+        source = (row.get("pattern_label_source") or "").strip().lower()
+        if not pattern_id:
+            stats["rows_skipped_missing_pattern_id"] += 1
             continue
+        if source == "missing":
+            stats["rows_skipped_missing_source"] += 1
+            continue
+        if not label:
+            stats["rows_skipped_blank_pattern_label_human"] += 1
+            continue
+        stats["rows_eligible"] += 1
         out[domain].append({
             "pattern_id": pattern_id,
             "pattern_label_human": label,
         })
     for domain in list(out.keys()):
         out[domain] = sorted(out[domain], key=lambda r: r["pattern_id"])
+    print(f"[build_semantic_groups] domain_patterns scan stats: {dict(stats)}")
     return out
 
 
