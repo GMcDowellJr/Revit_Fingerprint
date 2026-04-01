@@ -31,10 +31,14 @@ import argparse
 import csv
 import json
 import os
+import re
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
+
 
 from .label_resolver import (
     is_fragmented,
@@ -49,59 +53,129 @@ from .label_resolver import (
 # API call
 # ---------------------------------------------------------------------------
 
-def _call_claude(
+def _strip_json_fences(raw_text: str) -> str:
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+    return cleaned.strip()
+
+
+def _call_llm(
     system_prompt: str,
     user_prompt: str,
-    model: str = "claude-sonnet-4-6",
+    *,
+    provider: str = "anthropic",
+    model: str | None = None,
     max_tokens: int = 512,
     retry_count: int = 2,
     retry_delay: float = 2.0,
+    groups_vocab: Optional[Dict[str, str]] = None,
 ) -> Optional[Dict[str, Any]]:
-    """
-    Call Claude API and parse JSON response.
+    """Call the configured LLM provider and parse JSON response."""
+    resolved_prompt = user_prompt
+    if groups_vocab:
+        lines = ["EXISTING GROUPS IN THIS DOMAIN:"]
+        for label, definition in sorted(groups_vocab.items()):
+            lines.append(f"  {label}: {definition}")
+        resolved_prompt = resolved_prompt.replace(
+            "EXISTING GROUPS IN THIS DOMAIN: (none yet — you are establishing the vocabulary)",
+            "\n".join(lines),
+        )
 
-    Returns parsed dict with keys: candidates, recommended, rationale
-    Returns None on failure (caller logs and skips).
-    """
-    try:
-        import anthropic
-    except ImportError:
-        print("ERROR: anthropic package not installed. Run: pip install anthropic")
-        sys.exit(1)
+    provider = provider.lower().strip()
+    if provider not in {"anthropic", "openrouter"}:
+        raise ValueError(f"Unsupported provider: {provider}")
 
-    client = anthropic.Anthropic()
+    if provider == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
+        raise RuntimeError("OPENROUTER_API_KEY is required when --provider openrouter is used")
+
+    resolved_model = model or (
+        "claude-haiku-4-5" if provider == "anthropic" else "anthropic/claude-haiku-4-5"
+    )
+
+    anthropic_client = None
+    if provider == "anthropic":
+        try:
+            import anthropic
+        except ImportError:
+            print("ERROR: anthropic package not installed. Run: pip install anthropic")
+            sys.exit(1)
+        anthropic_client = anthropic.Anthropic()
 
     for attempt in range(retry_count + 1):
         try:
-            response = client.messages.create(
-                model=model,
-                max_tokens=max_tokens,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
-            )
-            raw_text = response.content[0].text.strip()
+            if provider == "anthropic":
+                response = anthropic_client.messages.create(
+                    model=resolved_model,
+                    max_tokens=max_tokens,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": resolved_prompt}],
+                )
+                raw_text = response.content[0].text.strip()
+            else:
+                import requests
 
-            # Strip markdown fences if model emits them despite instructions
-            if raw_text.startswith("```"):
-                raw_text = raw_text.split("\n", 1)[-1]
-                if raw_text.endswith("```"):
-                    raw_text = raw_text[: raw_text.rfind("```")]
+                response = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": resolved_model,
+                        "max_tokens": max_tokens,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": resolved_prompt},
+                        ],
+                    },
+                    timeout=60,
+                )
+                response.raise_for_status()
+                data = response.json()
+                raw_text = data["choices"][0]["message"]["content"].strip()
 
-            result = json.loads(raw_text)
-            # Validate expected keys
+            result = json.loads(_strip_json_fences(raw_text))
             if "recommended" not in result:
                 raise ValueError("Missing 'recommended' key in response")
             return result
-
         except json.JSONDecodeError as e:
-            print(f"  WARN: JSON parse failed (attempt {attempt+1}): {e}")
+            print(f"  WARN: JSON parse failed (attempt {attempt + 1}): {e}")
         except Exception as e:
-            print(f"  WARN: API call failed (attempt {attempt+1}): {e}")
+            print(f"  WARN: API call failed (attempt {attempt + 1}): {e}")
 
         if attempt < retry_count:
             time.sleep(retry_delay)
 
     return None
+
+
+def _groups_vocab_path(cache_path: str) -> str:
+    stem, _ = os.path.splitext(cache_path)
+    return f"{stem}_groups.json"
+
+
+def load_groups_vocab(cache_path: str) -> Dict[str, str]:
+    groups_path = _groups_vocab_path(cache_path)
+    if not os.path.exists(groups_path):
+        return {}
+    try:
+        with open(groups_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {str(k): str(v) for k, v in data.items()}
+
+
+def save_groups_vocab(cache_path: str, vocab: Dict[str, str]) -> None:
+    groups_path = _groups_vocab_path(cache_path)
+    os.makedirs(os.path.dirname(os.path.abspath(groups_path)), exist_ok=True)
+    with open(groups_path, "w", encoding="utf-8") as f:
+        json.dump(dict(sorted(vocab.items())), f, indent=2, ensure_ascii=False)
+        f.write("\n")
 
 
 # ---------------------------------------------------------------------------
@@ -221,12 +295,21 @@ def synthesize(
     force_refresh: bool = False,
     only_unreviewed: bool = False,
     review_csv: Optional[str] = None,
+    provider: str = "anthropic",
+    model: Optional[str] = None,
+    workers: int = 3,
 ) -> None:
     print(f"\n=== Label Synthesis: {domain} ===")
     print(f"  Exports dir:   {exports_dir}")
     print(f"  Analysis dir:  {analysis_dir}")
     print(f"  Cache path:    {cache_path}")
     print(f"  Dry run:       {dry_run}")
+    print(f"  Provider:      {provider}")
+    print(f"  Model:         {model or '(provider default)'}")
+    print(f"  Workers:       {workers}")
+
+    if provider == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
+        raise RuntimeError("OPENROUTER_API_KEY is required when --provider openrouter is used")
 
     # Load domain prompt module
     prompt_mod = _load_domain_prompt_module(domain)
@@ -290,61 +373,107 @@ def synthesize(
     success = 0
     failed = 0
     today = date.today().isoformat()
+    groups_vocab = load_groups_vocab(cache_path)
+    discovered_groups: Dict[str, str] = {}
+    cache_lock = threading.Lock()
 
-    for i, jh in enumerate(to_process, 1):
+    def _process_join_hash(jh: str):
         rows = label_pop_by_hash.get(jh, [])
-        # Sort by files_count desc
         rows_sorted = sorted(rows, key=lambda r: -int(r.get("files_count", 0)))
-
-        # Get representative identity_items
         identity_items = _load_representative_identity_items(exports_dir, domain, jh)
-
-        # Build prompt
         user_prompt = build_prompt_fn(
             join_hash=jh,
             observed_labels=rows_sorted,
             identity_items=identity_items,
         )
-
-        print(f"\n  [{i}/{len(to_process)}] join_hash={jh[:16]}...")
-        print(f"    Labels: {[r['label_v'] for r in rows_sorted[:5]]}")
-
         if dry_run:
-            print(f"    --- SYSTEM PROMPT (first 300 chars) ---")
-            print(f"    {system_prompt[:300]}...")
-            print(f"    --- USER PROMPT ---")
-            print(f"    {user_prompt[:500]}...")
-            print(f"    [DRY RUN — skipping API call]")
-            continue
+            return (
+                jh,
+                {
+                    "dry_run": True,
+                    "user_prompt": user_prompt,
+                    "labels": [r.get("label_v", "") for r in rows_sorted[:5]],
+                },
+                rows_sorted,
+            )
 
-        result = _call_claude(system_prompt=system_prompt, user_prompt=user_prompt)
+        result = _call_llm(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            provider=provider,
+            model=model,
+            groups_vocab=groups_vocab,
+        )
+        return (jh, result, rows_sorted)
 
-        if result is None:
-            print(f"    FAILED — skipping")
-            failed += 1
-            continue
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
+        futures = {executor.submit(_process_join_hash, jh): jh for jh in to_process}
 
-        recommended = result.get("recommended", "")
-        candidates = result.get("candidates", [])
-        rationale = result.get("rationale", "")
-        print(f"    Recommended: {recommended!r}")
-        print(f"    Candidates:  {candidates}")
+        for i, fut in enumerate(as_completed(futures), 1):
+            jh = futures[fut]
+            try:
+                jh, result, rows_sorted = fut.result()
+            except Exception as e:
+                print(f"\n  [{i}/{len(to_process)}] join_hash={jh[:16]}...")
+                print(f"    FAILED — worker exception: {e}")
+                failed += 1
+                continue
 
-        cache[jh] = {
-            "domain": domain,
-            "recommended": recommended,
-            "candidates": candidates,
-            "rationale": rationale,
-            "reviewed": False,
-            "generated_at": today,
-            "observed_labels": [r.get("label_v", "") for r in rows_sorted[:10]],
-        }
-        success += 1
+            print(f"\n  [{i}/{len(to_process)}] join_hash={jh[:16]}...")
+            print(f"    Labels: {[r.get('label_v', '') for r in rows_sorted[:5]]}")
 
-        # Save after each entry (safe against interruption)
-        save_llm_cache(cache_path, cache)
+            if dry_run:
+                print("    --- SYSTEM PROMPT (first 300 chars) ---")
+                print(f"    {system_prompt[:300]}...")
+                injected_prompt = result["user_prompt"]
+                if groups_vocab:
+                    vocab_lines = ["EXISTING GROUPS IN THIS DOMAIN:"]
+                    for label, definition in sorted(groups_vocab.items()):
+                        vocab_lines.append(f"  {label}: {definition}")
+                    injected_prompt = injected_prompt.replace(
+                        "EXISTING GROUPS IN THIS DOMAIN: (none yet — you are establishing the vocabulary)",
+                        "\n".join(vocab_lines),
+                    )
+                print("    --- USER PROMPT ---")
+                print(f"    {injected_prompt[:500]}...")
+                print("    [DRY RUN — skipping API call]")
+                continue
+
+            if result is None:
+                print("    FAILED — skipping")
+                failed += 1
+                continue
+
+            recommended = result.get("recommended", "")
+            candidates = result.get("candidates", [])
+            rationale = result.get("rationale", "")
+            print(f"    Recommended: {recommended!r}")
+            print(f"    Candidates:  {candidates}")
+
+            semantic_group = (result.get("semantic_group") or "").strip()
+            if semantic_group and semantic_group not in groups_vocab:
+                discovered_groups[semantic_group] = rationale
+
+            with cache_lock:
+                cache[jh] = {
+                    "domain": domain,
+                    "recommended": recommended,
+                    "candidates": candidates,
+                    "rationale": rationale,
+                    "reviewed": False,
+                    "generated_at": today,
+                    "observed_labels": [r.get("label_v", "") for r in rows_sorted[:10]],
+                }
+                save_llm_cache(cache_path, cache)
+            success += 1
+
+    if not dry_run:
+        if discovered_groups:
+            groups_vocab.update(discovered_groups)
+        save_groups_vocab(cache_path, groups_vocab)
 
     print(f"\n  Done. Success: {success}  Failed: {failed}  Skipped: {len(to_process) - success - failed}")
+
 
     if review_csv and not dry_run:
         _write_review_csv(review_csv, cache, domain)
@@ -405,6 +534,12 @@ def main():
                     help="Only process cache entries where reviewed=false")
     ap.add_argument("--review-csv", default=None,
                     help="Path to write pending-review CSV for curator workflow")
+    ap.add_argument("--provider", choices=["anthropic", "openrouter"], default="anthropic",
+                    help="LLM provider backend")
+    ap.add_argument("--model", default=None,
+                    help="Optional model override for selected provider")
+    ap.add_argument("--workers", type=int, default=3,
+                    help="Concurrent worker count for API calls")
     args = ap.parse_args()
 
     synthesize(
@@ -416,6 +551,9 @@ def main():
         force_refresh=args.force_refresh,
         only_unreviewed=args.only_unreviewed,
         review_csv=args.review_csv,
+        provider=args.provider,
+        model=args.model,
+        workers=args.workers,
     )
 
 
