@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .common import atomic_write_csv, read_csv_rows
+if __package__ in (None, ""):
+    _THIS_DIR = Path(__file__).resolve().parent
+    if str(_THIS_DIR) not in sys.path:
+        sys.path.insert(0, str(_THIS_DIR))
+    from common import atomic_write_csv, read_csv_rows
+else:
+    from .common import atomic_write_csv, read_csv_rows
 
 
 def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:

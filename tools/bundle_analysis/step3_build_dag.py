@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-from .common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows
+if __package__ in (None, ""):
+    _THIS_DIR = Path(__file__).resolve().parent
+    if str(_THIS_DIR) not in sys.path:
+        sys.path.insert(0, str(_THIS_DIR))
+    from common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows
+else:
+    from .common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows
 
 
 def build_dag_for_domain(out_dir: Path, domain: str) -> Dict[str, int]:

@@ -1,18 +1,32 @@
 from __future__ import annotations
 
 import argparse
+import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .common import read_csv_rows, resolve_analysis_run_id
-from .step1_membership_matrix import build_membership_matrix
-from .step2_find_bundles import find_bundles_for_domain
-from .step3_build_dag import build_dag_for_domain
-from .step4_difference_sets import emit_stub as emit_step4
-from .step5_classify_patterns import emit_stub as emit_step5
-from .step6_classify_files import emit_stub as emit_step6
-from .step7_overlap_report import emit_stub as emit_step7
+if __package__ in (None, ""):
+    _THIS_DIR = Path(__file__).resolve().parent
+    if str(_THIS_DIR) not in sys.path:
+        sys.path.insert(0, str(_THIS_DIR))
+    from common import read_csv_rows, resolve_analysis_run_id
+    from step1_membership_matrix import build_membership_matrix
+    from step2_find_bundles import find_bundles_for_domain
+    from step3_build_dag import build_dag_for_domain
+    from step4_difference_sets import emit_stub as emit_step4
+    from step5_classify_patterns import emit_stub as emit_step5
+    from step6_classify_files import emit_stub as emit_step6
+    from step7_overlap_report import emit_stub as emit_step7
+else:
+    from .common import read_csv_rows, resolve_analysis_run_id
+    from .step1_membership_matrix import build_membership_matrix
+    from .step2_find_bundles import find_bundles_for_domain
+    from .step3_build_dag import build_dag_for_domain
+    from .step4_difference_sets import emit_stub as emit_step4
+    from .step5_classify_patterns import emit_stub as emit_step5
+    from .step6_classify_files import emit_stub as emit_step6
+    from .step7_overlap_report import emit_stub as emit_step7
 
 
 def run_bundle_analysis(

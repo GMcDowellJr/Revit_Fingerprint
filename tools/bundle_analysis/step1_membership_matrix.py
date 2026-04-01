@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-from .common import SCHEMA_VERSION, atomic_write_csv, derive_scope_key, read_csv_rows, resolve_analysis_run_id
+if __package__ in (None, ""):
+    _THIS_DIR = Path(__file__).resolve().parent
+    if str(_THIS_DIR) not in sys.path:
+        sys.path.insert(0, str(_THIS_DIR))
+    from common import SCHEMA_VERSION, atomic_write_csv, derive_scope_key, read_csv_rows, resolve_analysis_run_id
+else:
+    from .common import SCHEMA_VERSION, atomic_write_csv, derive_scope_key, read_csv_rows, resolve_analysis_run_id
 
 
 def build_membership_matrix(

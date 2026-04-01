@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import argparse
 import itertools
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, FrozenSet, List, Optional, Set
 
-from .common import SCHEMA_VERSION, atomic_write_csv, compute_effective_support, make_bundle_id, read_csv_rows
+if __package__ in (None, ""):
+    _THIS_DIR = Path(__file__).resolve().parent
+    if str(_THIS_DIR) not in sys.path:
+        sys.path.insert(0, str(_THIS_DIR))
+    from common import SCHEMA_VERSION, atomic_write_csv, compute_effective_support, make_bundle_id, read_csv_rows
+else:
+    from .common import SCHEMA_VERSION, atomic_write_csv, compute_effective_support, make_bundle_id, read_csv_rows
 
 
 # Scale note: at larger corpus sizes replace pairwise intersection candidate generation
