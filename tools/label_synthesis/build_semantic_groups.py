@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -121,11 +122,41 @@ def _normalize_text_size(size_raw: str) -> str:
     return f'{val:.3g}"'
 
 
+def _parse_text_type_label_fields(pattern_label_human: str) -> tuple[Optional[str], Optional[str], list[str]]:
+    tokens = [t.strip() for t in pattern_label_human.split("|") if t.strip()]
+    if not tokens:
+        return None, None, []
+
+    format_keywords = {"bold", "regular", "underline", "border", "opaque", "italic", "bordered"}
+    size_pattern = re.compile(r'^\d+(?:\.\d+)?"$|^\d+/\d+"$|^\d+-\d+/\d+"$')
+
+    font = None
+    size = None
+    remaining: list[str] = []
+
+    for token in tokens:
+        lower = token.lower()
+        if size is None and size_pattern.match(token):
+            size = token
+            continue
+        if font is None and '"' not in token and '/' not in token and lower not in format_keywords:
+            font = token
+            continue
+        remaining.append(token)
+
+    return font, size, remaining
+
+
 def _prompt_text_types(label: str, props: dict[str, str], peers: list[str]) -> str:
     size_raw = props.get("size_in", "")
     size_display = _normalize_text_size(size_raw)
 
-    font = props.get("font", "")
+    parsed_font, parsed_size, parsed_format_tokens = _parse_text_type_label_fields(label)
+
+    font = parsed_font or props.get("font", "")
+    if parsed_size:
+        size_display = parsed_size
+
     bold = props.get("bold", "")
     italic = props.get("italic", "")
     color = props.get("color_rgb", "")
@@ -133,13 +164,20 @@ def _prompt_text_types(label: str, props: dict[str, str], peers: list[str]) -> s
     background = props.get("background_raw", "")
 
     format_parts: list[str] = []
-    if bold == "True":
-        format_parts.append("bold")
-    if italic == "True":
-        format_parts.append("italic")
-    if show_border == "True":
-        format_parts.append("bordered")
-    format_str = ", ".join(format_parts) if format_parts else "regular"
+    if parsed_format_tokens:
+        format_parts.extend(parsed_format_tokens)
+    else:
+        if bold == "True":
+            format_parts.append("Bold")
+        if italic == "True":
+            format_parts.append("Italic")
+        if show_border == "True":
+            format_parts.append("Border")
+        if background and background not in ("0", "transparent", ""):
+            format_parts.append("Opaque")
+        if not format_parts:
+            format_parts.append("Regular")
+    format_str = ", ".join(format_parts)
 
     color_note = ""
     if color and color not in ("0,0,0", "000000", "0"):
