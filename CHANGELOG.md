@@ -16,6 +16,10 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   (`line_pattern.segments_def_hash`) to `line_patterns.join_key.v3`
   (`line_pattern.segments_norm_hash`) to enforce scale-invariant structural identity;
   same kind sequence + ratio now collapses length-scaled variants into one pattern
+- Bundle analysis `bundle_id` stability explicitly scopes hash identity to
+  `(domain, scope_key, sorted_pattern_ids)`; identical pattern sets in different
+  scope keys (for example `dimension_types` linear vs angular) intentionally
+  receive different bundle IDs and are not cross-scope comparable
 - `line_pattern.segments_norm_hash` is now computed automatically during flatten
   in `tools/run_extract_all.py` (no `--synthetic-domains line_patterns` flag required)
 - line_patterns normalized token precision set to `.6f` (from `.9f`) after

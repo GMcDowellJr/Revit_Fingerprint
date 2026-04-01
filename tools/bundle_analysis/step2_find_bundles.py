@@ -12,6 +12,18 @@ from .common import SCHEMA_VERSION, atomic_write_csv, compute_effective_support,
 # Scale note: at larger corpus sizes replace pairwise intersection candidate generation
 # with FP-Growth closed-itemset mining while preserving I/O interfaces.
 
+
+def _supporting_files_by_superset(
+    file_sets: Dict[str, FrozenSet[str]],
+    itemset: FrozenSet[str],
+) -> List[str]:
+    """Return files whose pattern set is a superset of ``itemset``.
+
+    Important: support is not the number of file pairs that generated ``itemset``.
+    """
+    return sorted([fid for fid, pset in file_sets.items() if pset.issuperset(itemset)])
+
+
 def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int = 3, min_support_pct: float = 0.0) -> Dict[str, int]:
     domain_out_dir = out_dir / domain
     membership_rows = read_csv_rows(domain_out_dir / "membership_matrix.csv")
@@ -47,7 +59,7 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
         support_map: Dict[FrozenSet[str], int] = {}
         files_for_candidate: Dict[FrozenSet[str], List[str]] = {}
         for cand in sorted(candidates, key=lambda s: (len(s), tuple(sorted(s)))):
-            matched_files = [fid for fid, pset in file_sets.items() if pset.issuperset(cand)]
+            matched_files = _supporting_files_by_superset(file_sets, cand)
             support = len(matched_files)
             if support >= effective_support:
                 support_map[cand] = support
