@@ -76,6 +76,43 @@ def _select_populations(substantial_roots: List[Dict[str, object]], max_populati
     return selected
 
 
+def _collapse_subset_related_roots(substantial_roots: List[Dict[str, object]]) -> List[Dict[str, object]]:
+    """Collapse subset/superset-related roots to most general representatives."""
+    ordered = sorted(
+        substantial_roots,
+        key=lambda r: (len(set(r["pattern_ids"])), -int(r["files_present"]), tuple(sorted(set(r["pattern_ids"])))),
+    )
+    collapsed: List[Dict[str, object]] = []
+    for root in ordered:
+        root_patterns = set(root["pattern_ids"])
+        is_redundant = False
+        replaced_idx: Optional[int] = None
+        for idx, kept in enumerate(collapsed):
+            kept_patterns = set(kept["pattern_ids"])
+            if root_patterns > kept_patterns:
+                is_redundant = True
+                break
+            if root_patterns < kept_patterns:
+                replaced_idx = idx
+                break
+        if is_redundant:
+            continue
+        if replaced_idx is not None:
+            collapsed.pop(replaced_idx)
+        collapsed.append(root)
+
+    # postcondition: no subset relationships remain
+    for i, a in enumerate(collapsed):
+        pa = set(a["pattern_ids"])
+        for j, b in enumerate(collapsed):
+            if i == j:
+                continue
+            pb = set(b["pattern_ids"])
+            if pa < pb or pb < pa:
+                raise ValueError("Subset-collapse invariant violated: retained roots remain subset-related.")
+    return collapsed
+
+
 def discover_populations(
     analysis_dir: Path,
     out_dir: Path,
@@ -145,6 +182,16 @@ def discover_populations(
 
             roots = find_root_bundles(file_sets, min_support=discovery_support, min_bundle_size=2) if files_total >= 2 else []
             substantial_roots = [r for r in roots if int(r["files_present"]) >= min_pop_size_effective]
+            substantial_roots_count = len(substantial_roots)
+            before_collapse = len(substantial_roots)
+            substantial_roots = _collapse_subset_related_roots(substantial_roots)
+            after_collapse = len(substantial_roots)
+            print(
+                f"[step0_collapse] domain={dom} scope={scope_key!r} "
+                f"substantial_roots_before_collapse={before_collapse} "
+                f"substantial_roots_after_collapse={after_collapse} "
+                f"collapsed={before_collapse - after_collapse}"
+            )
             before_cap = len(substantial_roots)
             substantial_roots = sorted(substantial_roots, key=lambda r: (-int(r["files_present"]), tuple(sorted(r["pattern_ids"]))))
 
@@ -161,11 +208,11 @@ def discover_populations(
                 retained = int(substantial_roots[MAX_POPULATION_CANDIDATES - 1]["files_present"])
                 discarded = before_cap - MAX_POPULATION_CANDIDATES
                 print(
-                    f"[step0_cap_WARNING] domain={dom} scope={scope_key!r} substantial_roots_before_cap={before_cap} "
+                    f"[step0_cap_WARNING] domain={dom} scope={scope_key!r} substantial_roots_after_collapse={before_cap} "
                     f"capped_to={MAX_POPULATION_CANDIDATES} lowest_retained_support={retained} discarded={discarded} "
-                    "ACTION_REQUIRED: roots with substantial file support were discarded. "
-                    "Inspect this domain/scope for unexpected configuration diversity. "
-                    "Consider raising --discovery-support-pct to reduce roots before cap applies."
+                    "ACTION_REQUIRED: genuinely distinct roots (not subset-related) were discarded. "
+                    "This indicates unexpected configuration diversity that warrants investigation. "
+                    "Consider raising --discovery-support-pct or inspecting this domain/scope manually."
                 )
             substantial_roots = substantial_roots[:MAX_POPULATION_CANDIDATES]
             after_cap = len(substantial_roots)
@@ -323,6 +370,9 @@ def discover_populations(
                 "max_population_overlap": f"{max_population_overlap:.6f}",
                 "min_population_jaccard": f"{min_population_jaccard:.6f}",
                 "roots_found": str(len(roots)),
+                "substantial_roots": str(substantial_roots_count),
+                "substantial_roots_before_collapse": str(before_collapse),
+                "substantial_roots_after_collapse": str(after_collapse),
                 "substantial_roots_before_cap": str(before_cap),
                 "substantial_roots_after_cap": str(after_cap),
                 "populations_identified": str(len(viable_populations)),
@@ -376,7 +426,7 @@ def discover_populations(
     atomic_write_csv(out_dir / "corpus_populations.csv", ["schema_version", "analysis_run_id", "domain", "scope_key", "export_run_id", "population_id", "population_role", "is_ambiguous", "population_notes"], populations_merged)
     atomic_write_csv(out_dir / "corpus_population_summary.csv", ["schema_version", "analysis_run_id", "domain", "scope_key", "population_id", "population_role", "file_count", "pct_of_corpus", "root_pattern_count", "root_bundle_id", "discovery_support_used", "min_population_size_used", "population_notes"], summaries_merged)
     atomic_write_csv(out_dir / "corpus_population_root_patterns.csv", ["schema_version", "analysis_run_id", "domain", "scope_key", "population_id", "pattern_id", "pattern_rank"], root_patterns_merged)
-    atomic_write_csv(out_dir / "corpus_population_parameters.csv", ["schema_version", "analysis_run_id", "domain", "scope_key", "files_total", "discovery_support_pct", "discovery_support_count", "min_population_size_effective", "max_population_overlap", "min_population_jaccard", "roots_found", "substantial_roots_before_cap", "substantial_roots_after_cap", "populations_identified", "viability_checks_run", "viability_checks_passed", "viability_checks_failed", "outlier_file_count", "viability_estimated_threshold", "viability_result", "viability_notes"], params_merged)
+    atomic_write_csv(out_dir / "corpus_population_parameters.csv", ["schema_version", "analysis_run_id", "domain", "scope_key", "files_total", "discovery_support_pct", "discovery_support_count", "min_population_size_effective", "max_population_overlap", "min_population_jaccard", "roots_found", "substantial_roots", "substantial_roots_before_collapse", "substantial_roots_after_collapse", "substantial_roots_before_cap", "substantial_roots_after_cap", "populations_identified", "viability_checks_run", "viability_checks_passed", "viability_checks_failed", "outlier_file_count", "viability_estimated_threshold", "viability_result", "viability_notes"], params_merged)
 
     return {"domains": len(domains), "population_rows": len(all_population_rows)}
 
