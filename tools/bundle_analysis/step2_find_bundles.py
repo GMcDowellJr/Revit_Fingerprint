@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import itertools
 import json
 import math
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 if __package__ in (None, ""):
     _THIS_DIR = Path(__file__).resolve().parent
@@ -18,9 +17,11 @@ if __package__ in (None, ""):
         sys.path.insert(0, str(_TOOLS_DIR))
     from common import SCHEMA_VERSION, atomic_write_csv, compute_effective_support, make_bundle_id, read_csv_rows
     from compute_governance_thresholds import jenks_natural_breaks
+    from utils import find_closed_itemsets
 else:
     from .common import SCHEMA_VERSION, atomic_write_csv, compute_effective_support, make_bundle_id, read_csv_rows
     from ..compute_governance_thresholds import jenks_natural_breaks
+    from .utils import find_closed_itemsets
 
 
 # Scale note: at larger corpus sizes replace pairwise intersection candidate generation
@@ -116,17 +117,6 @@ def compute_auto_threshold(
         "cooccurrence_count": len(cooccurrence_values),
         "cooccurrence_distribution": dict(sorted(cooccurrence_distribution.items())),
     }
-
-
-def _supporting_files_by_superset(
-    file_sets: Dict[str, FrozenSet[str]],
-    itemset: FrozenSet[str],
-) -> List[str]:
-    """Return files whose pattern set is a superset of ``itemset``.
-
-    Important: support is not the number of file pairs that generated ``itemset``.
-    """
-    return sorted([fid for fid, pset in file_sets.items() if pset.issuperset(itemset)])
 
 
 def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int = 3, min_support_pct: float = 0.0) -> Dict[str, int]:
@@ -229,40 +219,19 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
             continue
 
         effective_support = compute_effective_support(files_total, effective_min_support, min_support_pct)
-        candidates: Set[FrozenSet[str]] = set()
-        file_ids = sorted(file_sets.keys())
-        for a, b in itertools.combinations(file_ids, 2):
-            intersection = file_sets[a] & file_sets[b]
-            if len(intersection) >= 2:
-                candidates.add(frozenset(intersection))
+        closed_itemsets = find_closed_itemsets(file_sets, min_support=effective_support, min_bundle_size=2)
 
-        support_map: Dict[FrozenSet[str], int] = {}
-        files_for_candidate: Dict[FrozenSet[str], List[str]] = {}
-        for cand in sorted(candidates, key=lambda s: (len(s), tuple(sorted(s)))):
-            matched_files = _supporting_files_by_superset(file_sets, cand)
-            support = len(matched_files)
-            if support >= effective_support:
-                support_map[cand] = support
-                files_for_candidate[cand] = sorted(matched_files)
-
-        closed_sets: List[FrozenSet[str]] = []
-        support_items = list(support_map.items())
-        for s, s_support in support_items:
-            is_closed = True
-            for other, other_support in support_items:
-                if len(other) <= len(s):
-                    continue
-                if s.issubset(other) and s_support == other_support:
-                    is_closed = False
-                    break
-            if is_closed:
-                closed_sets.append(s)
-
-        closed_sets.sort(key=lambda s: (-support_map[s], make_bundle_id(domain, scope_key, sorted(s))))
-        for rank, itemset in enumerate(closed_sets, start=1):
+        closed_itemsets.sort(
+            key=lambda item: (
+                -int(item["files_present"]),
+                make_bundle_id(domain, scope_key, sorted(item["pattern_ids"])),
+            )
+        )
+        for rank, item in enumerate(closed_itemsets, start=1):
+            itemset = item["pattern_ids"]
             pattern_ids_sorted = sorted(itemset)
             bundle_id = make_bundle_id(domain, scope_key, pattern_ids_sorted)
-            files_present = support_map[itemset]
+            files_present = int(item["files_present"])
             if len(itemset) < 2:
                 raise ValueError("Invalid bundle with <2 patterns encountered")
             if files_present < effective_support:
@@ -293,7 +262,7 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
                         "pattern_id": pid,
                     }
                 )
-            for export_run_id in files_for_candidate[itemset]:
+            for export_run_id in sorted(item["file_ids"]):
                 bundle_file_rows.append(
                     {
                         "schema_version": SCHEMA_VERSION,
@@ -305,10 +274,10 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
                     }
                 )
 
-        patterns_covered = len({p for s in closed_sets for p in s})
-        files_covered = len({f for s in closed_sets for f in files_for_candidate.get(s, [])})
+        patterns_covered = len({p for item in closed_itemsets for p in item["pattern_ids"]})
+        files_covered = len({f for item in closed_itemsets for f in item["file_ids"]})
         print(
-            f"[step2] domain={domain} scope={scope_key!r} bundles_found={len(closed_sets)} patterns_covered={patterns_covered} "
+            f"[step2] domain={domain} scope={scope_key!r} bundles_found={len(closed_itemsets)} patterns_covered={patterns_covered} "
             f"files_covered={files_covered} effective_threshold={effective_min_support}"
         )
 

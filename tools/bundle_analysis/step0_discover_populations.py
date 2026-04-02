@@ -1,0 +1,379 @@
+from __future__ import annotations
+
+import argparse
+import math
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Set
+
+if __package__ in (None, ""):
+    _THIS_DIR = Path(__file__).resolve().parent
+    if str(_THIS_DIR) not in sys.path:
+        sys.path.insert(0, str(_THIS_DIR))
+    from common import SCHEMA_VERSION, atomic_write_csv, make_bundle_id, read_csv_rows, resolve_analysis_run_id
+    from utils import find_root_bundles
+else:
+    from .common import SCHEMA_VERSION, atomic_write_csv, make_bundle_id, read_csv_rows, resolve_analysis_run_id
+    from .utils import find_root_bundles
+
+
+def _pattern_token(pattern_ids: Set[str]) -> str:
+    return "|".join(sorted(pattern_ids))
+
+
+def _population_id(domain: str, pattern_ids: Set[str]) -> str:
+    return make_bundle_id(domain, "", sorted(pattern_ids)).replace("bnd_", "pop_", 1)
+
+
+def _select_populations(
+    substantial_roots: List[Dict[str, object]],
+    max_population_overlap: float,
+    min_population_jaccard: float,
+) -> List[Dict[str, object]]:
+    survivors = sorted(
+        substantial_roots,
+        key=lambda r: (-int(r["files_present"]), -len(r["pattern_ids"]), tuple(sorted(r["pattern_ids"]))),
+    )
+    selected: List[Dict[str, object]] = []
+    for candidate in survivors:
+        keep = True
+        for existing in selected:
+            files_a = set(candidate["file_ids"])
+            files_b = set(existing["file_ids"])
+            in_both = len(files_a & files_b)
+            overlap_a = in_both / len(files_a) if files_a else 0.0
+            overlap_b = in_both / len(files_b) if files_b else 0.0
+            overlap = max(overlap_a, overlap_b)
+
+            pa = set(candidate["pattern_ids"])
+            pb = set(existing["pattern_ids"])
+            union = len(pa | pb)
+            jaccard_similarity = (len(pa & pb) / union) if union else 1.0
+            jaccard_dissimilarity = 1.0 - jaccard_similarity
+
+            distinct = overlap < max_population_overlap and jaccard_dissimilarity >= min_population_jaccard
+            if not distinct:
+                keep = False
+                break
+        if keep:
+            selected.append(candidate)
+    return selected
+
+
+def discover_populations(
+    analysis_dir: Path,
+    out_dir: Path,
+    domain: str = "",
+    analysis_run_id: str = "",
+    min_population_size: int = 0,
+    max_population_overlap: float = 0.20,
+    min_population_jaccard: float = 0.30,
+    discovery_support_pct: float = 0.10,
+) -> Dict[str, int]:
+    pattern_presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
+    domain_pattern_rows = read_csv_rows(analysis_dir / "domain_patterns.csv")
+    run_id = resolve_analysis_run_id(pattern_presence_rows, analysis_run_id)
+    domains = [domain] if domain else sorted(
+        {r.get("domain", "") for r in pattern_presence_rows if r.get("analysis_run_id", "") == run_id and r.get("domain", "")}
+    )
+
+    cad_patterns_by_domain: Dict[str, Set[str]] = {}
+    for row in domain_pattern_rows:
+        if row.get("analysis_run_id", "") != run_id:
+            continue
+        dom = row.get("domain", "")
+        if not dom:
+            continue
+        if (row.get("is_cad_import", "") or "").strip().lower() == "true" and row.get("pattern_id", ""):
+            cad_patterns_by_domain.setdefault(dom, set()).add(row["pattern_id"])
+
+    discovery_dir = out_dir / "_population_discovery"
+    all_population_rows: List[Dict[str, str]] = []
+    all_summary_rows: List[Dict[str, str]] = []
+    all_parameter_rows: List[Dict[str, str]] = []
+
+    for dom in domains:
+        cad_patterns = cad_patterns_by_domain.get(dom, set())
+        per_file_patterns: Dict[str, Set[str]] = {}
+        for row in pattern_presence_rows:
+            if row.get("analysis_run_id", "") != run_id or row.get("domain", "") != dom:
+                continue
+            fid = (row.get("export_run_id", "") or "").strip()
+            pid = (row.get("pattern_id", "") or "").strip()
+            if not fid or not pid or pid in cad_patterns:
+                continue
+            per_file_patterns.setdefault(fid, set()).add(pid)
+
+        file_sets = {fid: frozenset(pids) for fid, pids in per_file_patterns.items() if pids}
+        files_total = len(file_sets)
+        discovery_support = max(3, int(math.ceil(files_total * discovery_support_pct))) if files_total else 3
+        effective_min_population_size = max(int(min_population_size or 0), max(5, int(math.ceil(files_total * 0.05)))) if files_total else 5
+
+        roots = find_root_bundles(file_sets, min_support=discovery_support, min_bundle_size=2) if files_total >= 2 else []
+        substantial_roots = [r for r in roots if int(r["files_present"]) >= effective_min_population_size]
+        populations = _select_populations(substantial_roots, max_population_overlap, min_population_jaccard)
+
+        for pop in populations:
+            pop["population_id"] = _population_id(dom, set(pop["pattern_ids"]))
+
+        root_debug_rows: List[Dict[str, str]] = []
+        for root in roots:
+            root_debug_rows.append(
+                {
+                    "schema_version": SCHEMA_VERSION,
+                    "analysis_run_id": run_id,
+                    "domain": dom,
+                    "root_pattern_ids": _pattern_token(set(root["pattern_ids"])),
+                    "root_pattern_count": str(len(root["pattern_ids"])),
+                    "files_present": str(int(root["files_present"])),
+                    "is_substantial": "true" if int(root["files_present"]) >= effective_min_population_size else "false",
+                }
+            )
+        atomic_write_csv(
+            discovery_dir / f"{dom}_roots.csv",
+            ["schema_version", "analysis_run_id", "domain", "root_pattern_ids", "root_pattern_count", "files_present", "is_substantial"],
+            sorted(root_debug_rows, key=lambda r: (r["analysis_run_id"], r["domain"], r["root_pattern_ids"])),
+        )
+
+        assignments: List[Dict[str, str]] = []
+        outlier_count = 0
+        for fid in sorted(file_sets.keys()):
+            file_patterns = set(file_sets[fid])
+            matches: List[Dict[str, object]] = [
+                p for p in populations if file_patterns.issuperset(set(p["pattern_ids"]))
+            ]
+            if not matches:
+                notes = ""
+                for root in roots:
+                    if int(root["files_present"]) >= effective_min_population_size:
+                        continue
+                    if file_patterns.issuperset(set(root["pattern_ids"])):
+                        notes = f"matched_non_substantial_root:{_pattern_token(set(root['pattern_ids']))}"
+                        break
+                assignments.append(
+                    {
+                        "schema_version": SCHEMA_VERSION,
+                        "analysis_run_id": run_id,
+                        "domain": dom,
+                        "export_run_id": fid,
+                        "population_id": "outlier",
+                        "population_role": "outlier",
+                        "root_bundle_pattern_ids": "",
+                        "is_ambiguous": "false",
+                        "population_notes": notes,
+                    }
+                )
+                outlier_count += 1
+                continue
+
+            best = max(
+                matches,
+                key=lambda p: (
+                    len(file_patterns & set(p["pattern_ids"])) / len(file_patterns | set(p["pattern_ids"])) if (file_patterns | set(p["pattern_ids"])) else 0.0,
+                    int(p["files_present"]),
+                ),
+            )
+            ambiguous = len(matches) > 1
+            assignments.append(
+                {
+                    "schema_version": SCHEMA_VERSION,
+                    "analysis_run_id": run_id,
+                    "domain": dom,
+                    "export_run_id": fid,
+                    "population_id": str(best["population_id"]),
+                    "population_role": "primary",
+                    "root_bundle_pattern_ids": _pattern_token(set(best["pattern_ids"])),
+                    "is_ambiguous": "true" if ambiguous else "false",
+                    "population_notes": "matched_multiple_populations" if ambiguous else "",
+                }
+            )
+
+        assignments.sort(key=lambda r: (r["analysis_run_id"], r["domain"], r["population_id"], r["export_run_id"]))
+        all_population_rows.extend(assignments)
+
+        pop_counts: Dict[str, int] = {}
+        for row in assignments:
+            if row["population_role"] == "primary":
+                pop_counts[row["population_id"]] = pop_counts.get(row["population_id"], 0) + 1
+
+        for pop in populations:
+            pid = str(pop["population_id"])
+            count = pop_counts.get(pid, 0)
+            all_summary_rows.append(
+                {
+                    "schema_version": SCHEMA_VERSION,
+                    "analysis_run_id": run_id,
+                    "domain": dom,
+                    "population_id": pid,
+                    "population_role": "primary",
+                    "file_count": str(count),
+                    "pct_of_corpus": f"{((100.0 * count / files_total) if files_total else 0.0):.6f}",
+                    "root_pattern_count": str(len(pop["pattern_ids"])),
+                    "root_pattern_ids": _pattern_token(set(pop["pattern_ids"])),
+                    "root_bundle_id": make_bundle_id(dom, "", sorted(pop["pattern_ids"])),
+                    "discovery_support_used": str(discovery_support),
+                    "min_population_size_used": str(effective_min_population_size),
+                    "population_notes": "",
+                }
+            )
+            print(
+                f"[step0_population] domain={dom} population_id={pid} file_count={count} "
+                f"pct_of_corpus={(100.0 * count / files_total) if files_total else 0.0:.1f}% "
+                f"root_pattern_count={len(pop['pattern_ids'])} role=primary"
+            )
+
+        if outlier_count > 0:
+            all_summary_rows.append(
+                {
+                    "schema_version": SCHEMA_VERSION,
+                    "analysis_run_id": run_id,
+                    "domain": dom,
+                    "population_id": "outlier",
+                    "population_role": "outlier",
+                    "file_count": str(outlier_count),
+                    "pct_of_corpus": f"{((100.0 * outlier_count / files_total) if files_total else 0.0):.6f}",
+                    "root_pattern_count": "0",
+                    "root_pattern_ids": "",
+                    "root_bundle_id": "",
+                    "discovery_support_used": str(discovery_support),
+                    "min_population_size_used": str(effective_min_population_size),
+                    "population_notes": "files unmatched_or_non_substantial",
+                }
+            )
+            print(f"[step0_outliers] domain={dom} outlier_count={outlier_count} reason_summary=\"0 linked/reference files, {outlier_count} unmatched files\"")
+
+        all_parameter_rows.append(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "analysis_run_id": run_id,
+                "domain": dom,
+                "files_total": str(files_total),
+                "discovery_support_pct": f"{discovery_support_pct:.6f}",
+                "discovery_support_count": str(discovery_support),
+                "min_population_size_effective": str(effective_min_population_size),
+                "max_population_overlap": f"{max_population_overlap:.6f}",
+                "min_population_jaccard": f"{min_population_jaccard:.6f}",
+                "roots_found": str(len(roots)),
+                "substantial_roots": str(len(substantial_roots)),
+                "populations_identified": str(len(populations)),
+                "outlier_file_count": str(outlier_count),
+            }
+        )
+        print(
+            f"[step0] domain={dom} files_total={files_total} roots_found={len(roots)} "
+            f"substantial_roots={len(substantial_roots)} populations_identified={len(populations)} "
+            f"outlier_files={outlier_count} discovery_support={discovery_support}"
+        )
+
+    processed_domains = set(domains)
+
+    def _merge(path: Path, new_rows: List[Dict[str, str]], sort_key):
+        existing = read_csv_rows(path) if path.exists() else []
+        keep_existing = [r for r in existing if r.get("analysis_run_id", "") != run_id or r.get("domain", "") not in processed_domains]
+        merged = keep_existing + new_rows
+        merged.sort(key=sort_key)
+        return merged
+
+    populations_merged = _merge(
+        out_dir / "corpus_populations.csv",
+        all_population_rows,
+        lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("export_run_id", "")),
+    )
+    summaries_merged = _merge(
+        out_dir / "corpus_population_summary.csv",
+        all_summary_rows,
+        lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")),
+    )
+    params_merged = _merge(
+        out_dir / "corpus_population_parameters.csv",
+        all_parameter_rows,
+        lambda r: (r.get("analysis_run_id", ""), r.get("domain", "")),
+    )
+
+    atomic_write_csv(
+        out_dir / "corpus_populations.csv",
+        [
+            "schema_version",
+            "analysis_run_id",
+            "domain",
+            "export_run_id",
+            "population_id",
+            "population_role",
+            "root_bundle_pattern_ids",
+            "is_ambiguous",
+            "population_notes",
+        ],
+        populations_merged,
+    )
+    atomic_write_csv(
+        out_dir / "corpus_population_summary.csv",
+        [
+            "schema_version",
+            "analysis_run_id",
+            "domain",
+            "population_id",
+            "population_role",
+            "file_count",
+            "pct_of_corpus",
+            "root_pattern_count",
+            "root_pattern_ids",
+            "root_bundle_id",
+            "discovery_support_used",
+            "min_population_size_used",
+            "population_notes",
+        ],
+        summaries_merged,
+    )
+    atomic_write_csv(
+        out_dir / "corpus_population_parameters.csv",
+        [
+            "schema_version",
+            "analysis_run_id",
+            "domain",
+            "files_total",
+            "discovery_support_pct",
+            "discovery_support_count",
+            "min_population_size_effective",
+            "max_population_overlap",
+            "min_population_jaccard",
+            "roots_found",
+            "substantial_roots",
+            "populations_identified",
+            "outlier_file_count",
+        ],
+        params_merged,
+    )
+
+    return {"domains": len(domains), "population_rows": len(all_population_rows)}
+
+
+def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Discover corpus populations for bundle analysis")
+    parser.add_argument("--analysis-dir", required=True, type=Path)
+    parser.add_argument("--out-dir", required=True, type=Path)
+    parser.add_argument("--domain", default="")
+    parser.add_argument("--analysis-run-id", default="")
+    parser.add_argument("--min-population-size", type=int, default=0)
+    parser.add_argument("--max-population-overlap", type=float, default=0.20)
+    parser.add_argument("--min-population-jaccard", type=float, default=0.30)
+    parser.add_argument("--discovery-support-pct", type=float, default=0.10)
+    return parser.parse_args(argv)
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    args = _parse_args(argv)
+    discover_populations(
+        analysis_dir=args.analysis_dir,
+        out_dir=args.out_dir,
+        domain=args.domain,
+        analysis_run_id=args.analysis_run_id,
+        min_population_size=args.min_population_size,
+        max_population_overlap=args.max_population_overlap,
+        min_population_jaccard=args.min_population_jaccard,
+        discovery_support_pct=args.discovery_support_pct,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
