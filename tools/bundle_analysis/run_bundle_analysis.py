@@ -31,6 +31,8 @@ else:
     from .step6_classify_files import emit_stub as emit_step6
     from .step7_overlap_report import emit_stub as emit_step7
 
+TIMING_FIELDNAMES = ["schema_version", "analysis_run_id", "domain", "population_id", "step", "seconds"]
+
 
 def _run_pipeline_once(
     analysis_dir: Path,
@@ -178,7 +180,7 @@ def run_bundle_analysis(
         existing_timing_rows = read_csv_rows(out_dir / "bundle_analysis_timing.csv") if (out_dir / "bundle_analysis_timing.csv").exists() else []
         merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + timing_rows
         merged_timing_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("step", "")))
-        atomic_write_csv(out_dir / "bundle_analysis_timing.csv", merged_timing_rows)
+        atomic_write_csv(out_dir / "bundle_analysis_timing.csv", TIMING_FIELDNAMES, merged_timing_rows)
 
         print(
             f"[run] complete domains_processed={processed} total_bundles_found={total_bundles} "
@@ -322,7 +324,7 @@ def run_bundle_analysis(
     existing_timing_rows = read_csv_rows(out_dir / "bundle_analysis_timing.csv") if (out_dir / "bundle_analysis_timing.csv").exists() else []
     merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + timing_rows
     merged_timing_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("step", "")))
-    atomic_write_csv(out_dir / "bundle_analysis_timing.csv", merged_timing_rows)
+    atomic_write_csv(out_dir / "bundle_analysis_timing.csv", TIMING_FIELDNAMES, merged_timing_rows)
 
     return {
         "domains_processed": processed,
