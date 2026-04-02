@@ -2,6 +2,7 @@
 
 This directory contains the multi-step bundle analysis pipeline:
 
+0. `step0_discover_populations.py` *(optional pre-pass)*
 1. `step1_membership_matrix.py`
 2. `step2_find_bundles.py`
 3. `step3_build_dag.py`
@@ -11,6 +12,59 @@ This directory contains the multi-step bundle analysis pipeline:
 7. `step7_overlap_report.py`
 
 Use `run_bundle_analysis.py` to orchestrate end-to-end execution.
+
+---
+
+## Population-aware mode (Step 0 + per-population runs)
+
+`run_bundle_analysis.py` supports two modes:
+
+- **Single-pass mode (default)**: runs steps 1–7 once per domain.
+- **Population-aware mode** (`--discover-populations`): runs:
+  1. Step 0 discovery pre-pass
+  2. Steps 1–7 once per discovered primary population
+
+### Discovery flags
+
+`run_bundle_analysis.py` and `step0_discover_populations.py` expose:
+
+- `--discover-populations` (orchestrator only)
+- `--min-population-size`
+- `--max-population-overlap`
+- `--min-population-jaccard`
+- `--discovery-support-pct` (default `0.50`, minimum `0.05`)
+
+### Step 0 output files
+
+Step 0 writes corpus-level outputs to `bundle_analysis/`:
+
+- `corpus_populations.csv`
+- `corpus_population_summary.csv`
+- `corpus_population_root_patterns.csv`
+- `corpus_population_parameters.csv`
+
+And debug outputs to:
+
+- `bundle_analysis/_population_discovery/`
+
+### Scope-aware discovery
+
+Step 0 uses the same scope derivation logic as step 1 (`derive_scope_key`):
+
+- Normal domains: scope is `""`
+- Row-key domains: scope per element label
+- Shape-gated domains: scope per schema key
+
+As a result, corpus-level outputs include `scope_key` and are keyed by
+`analysis_run_id × domain × scope_key × ...`.
+
+### Per-population output directories
+
+In population-aware mode, each population run is staged and then written to:
+
+- `bundle_analysis/{domain}/{population_id}/`
+
+`population_id` already includes the `pop_` prefix.
 
 ---
 
