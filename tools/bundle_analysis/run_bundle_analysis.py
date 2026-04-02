@@ -11,7 +11,7 @@ if __package__ in (None, ""):
     _THIS_DIR = Path(__file__).resolve().parent
     if str(_THIS_DIR) not in sys.path:
         sys.path.insert(0, str(_THIS_DIR))
-    from common import read_csv_rows, resolve_analysis_run_id
+    from common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id
     from step0_discover_populations import discover_populations
     from step1_membership_matrix import build_membership_matrix
     from step2_find_bundles import find_bundles_for_domain
@@ -21,7 +21,7 @@ if __package__ in (None, ""):
     from step6_classify_files import emit_stub as emit_step6
     from step7_overlap_report import emit_stub as emit_step7
 else:
-    from .common import read_csv_rows, resolve_analysis_run_id
+    from .common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id
     from .step0_discover_populations import discover_populations
     from .step1_membership_matrix import build_membership_matrix
     from .step2_find_bundles import find_bundles_for_domain
@@ -40,8 +40,9 @@ def _run_pipeline_once(
     min_support_count: int,
     min_support_pct: float,
     population_id: Optional[str] = None,
+    analysis_run_id: str = "",
     population_registry_dir: Optional[Path] = None,
-) -> Dict[str, int]:
+) -> Dict[str, object]:
     total_bundles = 0
     total_edges = 0
     total_files_no_bundle = 0
@@ -102,6 +103,15 @@ def _run_pipeline_once(
         "total_bundles_found": total_bundles,
         "total_dag_edges": total_edges,
         "files_with_no_bundle_match": total_files_no_bundle,
+        "step_times": {
+            "step1": t1,
+            "step2": t2,
+            "step3": t3,
+            "step4": t4,
+            "step5": t5,
+            "step6": t6,
+            "step7": t7,
+        },
     }
 
 
@@ -129,6 +139,7 @@ def run_bundle_analysis(
     processed = 0
     domain_elapsed_seconds: Dict[str, float] = {}
     domain_population_counts: Dict[str, int] = {}
+    timing_rows: List[Dict[str, str]] = []
 
     if not discover_populations_flag:
         for dom in domains:
@@ -144,12 +155,30 @@ def run_bundle_analysis(
                     run_id=run_id,
                     min_support_count=min_support_count,
                     min_support_pct=min_support_pct,
+                    analysis_run_id=run_id,
                 )
                 total_bundles += stats["total_bundles_found"]
                 total_edges += stats["total_dag_edges"]
                 total_files_no_bundle += stats["files_with_no_bundle_match"]
+                step_times = stats.get("step_times", {})
+                for step_name in ("step1", "step2", "step3", "step4", "step5", "step6", "step7"):
+                    timing_rows.append(
+                        {
+                            "schema_version": SCHEMA_VERSION,
+                            "analysis_run_id": run_id,
+                            "domain": dom,
+                            "population_id": "",
+                            "step": step_name,
+                            "seconds": f"{float(step_times.get(step_name, 0.0)):.3f}",
+                        }
+                    )
             except Exception as exc:
                 print(f"[run][error] domain={dom} failed: {exc}")
+
+        existing_timing_rows = read_csv_rows(out_dir / "bundle_analysis_timing.csv") if (out_dir / "bundle_analysis_timing.csv").exists() else []
+        merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + timing_rows
+        merged_timing_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("step", "")))
+        atomic_write_csv(out_dir / "bundle_analysis_timing.csv", merged_timing_rows)
 
         print(
             f"[run] complete domains_processed={processed} total_bundles_found={total_bundles} "
@@ -162,6 +191,7 @@ def run_bundle_analysis(
             "files_with_no_bundle_match": total_files_no_bundle,
         }
 
+    step0_times: Dict[str, float] = {}
     for dom in domains:
         if not dom:
             continue
@@ -178,7 +208,9 @@ def run_bundle_analysis(
                 min_population_jaccard=min_population_jaccard,
                 discovery_support_pct=discovery_support_pct,
             )
-            print(f"[timing] stage=step0 domain={dom} seconds={time.time() - t0:.2f}")
+            step0_elapsed = time.time() - t0
+            step0_times[dom] = step0_elapsed
+            print(f"[timing] stage=step0 domain={dom} seconds={step0_elapsed:.2f}")
         except Exception as exc:
             print(f"[run][error] domain={dom} step0 failed: {exc}")
 
@@ -227,12 +259,25 @@ def run_bundle_analysis(
                     min_support_count=min_support_count,
                     min_support_pct=min_support_pct,
                     population_id=pid,
+                    analysis_run_id=run_id,
                     population_registry_dir=out_dir,
                 )
                 domain_elapsed_seconds[dom] = domain_elapsed_seconds.get(dom, 0.0) + (time.time() - t0)
                 total_bundles += stats["total_bundles_found"]
                 total_edges += stats["total_dag_edges"]
                 total_files_no_bundle += stats["files_with_no_bundle_match"]
+                step_times = stats.get("step_times", {})
+                for step_name in ("step1", "step2", "step3", "step4", "step5", "step6", "step7"):
+                    timing_rows.append(
+                        {
+                            "schema_version": SCHEMA_VERSION,
+                            "analysis_run_id": run_id,
+                            "domain": dom,
+                            "population_id": pid,
+                            "step": step_name,
+                            "seconds": f"{float(step_times.get(step_name, 0.0)):.3f}",
+                        }
+                    )
 
                 produced = stage_out / dom
                 final_out.parent.mkdir(parents=True, exist_ok=True)
@@ -262,6 +307,22 @@ def run_bundle_analysis(
             f"[timing] domain_total domain={dom} populations={domain_population_counts.get(dom, 0)} "
             f"total_seconds={domain_elapsed_seconds.get(dom, 0.0):.2f}"
         )
+        if dom in step0_times:
+            timing_rows.append(
+                {
+                    "schema_version": SCHEMA_VERSION,
+                    "analysis_run_id": run_id,
+                    "domain": dom,
+                    "population_id": "",
+                    "step": "step0",
+                    "seconds": f"{step0_times.get(dom, 0.0):.3f}",
+                }
+            )
+
+    existing_timing_rows = read_csv_rows(out_dir / "bundle_analysis_timing.csv") if (out_dir / "bundle_analysis_timing.csv").exists() else []
+    merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + timing_rows
+    merged_timing_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("step", "")))
+    atomic_write_csv(out_dir / "bundle_analysis_timing.csv", merged_timing_rows)
 
     return {
         "domains_processed": processed,
