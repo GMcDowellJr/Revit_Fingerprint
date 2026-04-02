@@ -55,34 +55,48 @@ def _run_pipeline_once(
         population_id,
         population_registry_dir,
     )
-    print(f"[run] domain={domain} step1_seconds={time.time() - t0:.3f}")
+    t1 = time.time() - t0
+    print(f"[run] domain={domain} step1_seconds={t1:.3f}")
 
     t0 = time.time()
     step2 = find_bundles_for_domain(work_out_dir, domain, min_support_count, min_support_pct)
     total_bundles += step2.get("bundles", 0)
-    print(f"[run] domain={domain} step2_seconds={time.time() - t0:.3f}")
+    t2 = time.time() - t0
+    print(f"[run] domain={domain} step2_seconds={t2:.3f}")
 
     t0 = time.time()
     step3 = build_dag_for_domain(work_out_dir, domain)
     total_edges += step3.get("edges", 0)
-    print(f"[run] domain={domain} step3_seconds={time.time() - t0:.3f}")
+    t3 = time.time() - t0
+    print(f"[run] domain={domain} step3_seconds={t3:.3f}")
 
     t0 = time.time()
     emit_step4(work_out_dir, domain)
-    print(f"[run] domain={domain} step4_seconds={time.time() - t0:.3f}")
+    t4 = time.time() - t0
+    print(f"[run] domain={domain} step4_seconds={t4:.3f}")
 
     t0 = time.time()
     emit_step5(work_out_dir, domain)
-    print(f"[run] domain={domain} step5_seconds={time.time() - t0:.3f}")
+    t5 = time.time() - t0
+    print(f"[run] domain={domain} step5_seconds={t5:.3f}")
 
     t0 = time.time()
     step6 = emit_step6(work_out_dir, domain)
     total_files_no_bundle += step6.get("files_no_bundle", 0)
-    print(f"[run] domain={domain} step6_seconds={time.time() - t0:.3f}")
+    t6 = time.time() - t0
+    print(f"[run] domain={domain} step6_seconds={t6:.3f}")
 
     t0 = time.time()
     emit_step7(work_out_dir, domain)
-    print(f"[run] domain={domain} step7_seconds={time.time() - t0:.3f}")
+    t7 = time.time() - t0
+    print(f"[run] domain={domain} step7_seconds={t7:.3f}")
+
+    total = t1 + t2 + t3 + t4 + t5 + t6 + t7
+    print(
+        f"[timing] summary domain={domain} population_id={population_id or 'none'} "
+        f"step1={t1:.2f} step2={t2:.2f} step3={t3:.2f} step4={t4:.2f} "
+        f"step5={t5:.2f} step6={t6:.2f} step7={t7:.2f} total={total:.2f}"
+    )
 
     return {
         "total_bundles_found": total_bundles,
@@ -113,6 +127,8 @@ def run_bundle_analysis(
     total_edges = 0
     total_files_no_bundle = 0
     processed = 0
+    domain_elapsed_seconds: Dict[str, float] = {}
+    domain_population_counts: Dict[str, int] = {}
 
     if not discover_populations_flag:
         for dom in domains:
@@ -151,6 +167,7 @@ def run_bundle_analysis(
             continue
         processed += 1
         try:
+            t0 = time.time()
             discover_populations(
                 analysis_dir=analysis_dir,
                 out_dir=out_dir,
@@ -161,6 +178,7 @@ def run_bundle_analysis(
                 min_population_jaccard=min_population_jaccard,
                 discovery_support_pct=discovery_support_pct,
             )
+            print(f"[timing] stage=step0 domain={dom} seconds={time.time() - t0:.2f}")
         except Exception as exc:
             print(f"[run][error] domain={dom} step0 failed: {exc}")
 
@@ -191,6 +209,7 @@ def run_bundle_analysis(
         for pid in pop_ids:
             print(f"[run] domain={dom} population_id={pid} start")
             populations_analyzed += 1
+            domain_population_counts[dom] = domain_population_counts.get(dom, 0) + 1
             stage_out = staging_root / f"{dom}__{pid}"
             # `pid` already includes the "pop_" prefix from step0.
             final_out = out_dir / dom / pid
@@ -199,6 +218,7 @@ def run_bundle_analysis(
             if final_out.exists():
                 shutil.rmtree(final_out)
             try:
+                t0 = time.time()
                 stats = _run_pipeline_once(
                     analysis_dir=analysis_dir,
                     work_out_dir=stage_out,
@@ -209,6 +229,7 @@ def run_bundle_analysis(
                     population_id=pid,
                     population_registry_dir=out_dir,
                 )
+                domain_elapsed_seconds[dom] = domain_elapsed_seconds.get(dom, 0.0) + (time.time() - t0)
                 total_bundles += stats["total_bundles_found"]
                 total_edges += stats["total_dag_edges"]
                 total_files_no_bundle += stats["files_with_no_bundle_match"]
@@ -233,6 +254,13 @@ def run_bundle_analysis(
         print(
             f"    {dom}: {len(set(domain_populations.get(dom, [])))} populations, "
             f"{outliers_by_domain.get(dom, 0)} outliers"
+        )
+    for dom in domains:
+        if not dom:
+            continue
+        print(
+            f"[timing] domain_total domain={dom} populations={domain_population_counts.get(dom, 0)} "
+            f"total_seconds={domain_elapsed_seconds.get(dom, 0.0):.2f}"
         )
 
     return {
