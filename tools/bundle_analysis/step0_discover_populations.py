@@ -18,6 +18,14 @@ else:
     from .step2_find_bundles import compute_auto_threshold
     from .utils import find_root_bundles
 
+# Population discovery considers only the top 20 roots by file count.
+# Any configuration family not in the top 20 is too minor to warrant
+# a separate governance analysis track at any corpus scale. This cap
+# also bounds computational complexity: pairwise tests are O(n^2) in
+# candidate root count, so capping at 20 limits to 190 pairwise tests
+# regardless of how many roots survive the support threshold.
+MAX_POPULATION_CANDIDATES = 20
+
 
 def _pattern_token(pattern_ids: Set[str]) -> str:
     return "|".join(sorted(pattern_ids))
@@ -74,8 +82,15 @@ def discover_populations(
     min_population_size: int = 0,
     max_population_overlap: float = 0.20,
     min_population_jaccard: float = 0.30,
-    discovery_support_pct: float = 0.10,
+    discovery_support_pct: float = 0.50,
 ) -> Dict[str, int]:
+    if discovery_support_pct < 0.05:
+        raise ValueError(
+            f"--discovery-support-pct must be >= 0.05, got {discovery_support_pct}. "
+            "Values below 0.05 produce degenerate behavior with hundreds of "
+            "candidate roots and prohibitive runtime."
+        )
+
     pattern_presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     domain_pattern_rows = read_csv_rows(analysis_dir / "domain_patterns.csv")
     run_id = resolve_analysis_run_id(pattern_presence_rows, analysis_run_id)
@@ -117,7 +132,22 @@ def discover_populations(
 
         roots = find_root_bundles(file_sets, min_support=discovery_support, min_bundle_size=2) if files_total >= 2 else []
         substantial_roots = [r for r in roots if int(r["files_present"]) >= effective_min_population_size]
-        candidate_populations = _select_populations(substantial_roots, max_population_overlap, min_population_jaccard)
+        substantial_roots_before_cap = len(substantial_roots)
+        substantial_roots_sorted = sorted(
+            substantial_roots,
+            key=lambda r: (-int(r["files_present"]), -len(r["pattern_ids"]), tuple(sorted(r["pattern_ids"]))),
+        )
+        capped_roots = substantial_roots_sorted[:MAX_POPULATION_CANDIDATES]
+        substantial_roots_after_cap = len(capped_roots)
+        capped_out_roots = substantial_roots_sorted[MAX_POPULATION_CANDIDATES:]
+        if substantial_roots_before_cap > MAX_POPULATION_CANDIDATES:
+            lowest_retained_support = int(capped_roots[-1]["files_present"]) if capped_roots else 0
+            print(
+                f"[step0_cap] domain={dom} substantial_roots_before_cap={substantial_roots_before_cap} "
+                f"capped_to={MAX_POPULATION_CANDIDATES} lowest_retained_support={lowest_retained_support} "
+                f"discarded={substantial_roots_before_cap - MAX_POPULATION_CANDIDATES} roots below cap"
+            )
+        candidate_populations = _select_populations(capped_roots, max_population_overlap, min_population_jaccard)
         for pop in candidate_populations:
             pop["population_id"] = _population_id(dom, set(pop["pattern_ids"]))
 
@@ -183,7 +213,8 @@ def discover_populations(
                     "max_population_overlap": f"{max_population_overlap:.6f}",
                     "min_population_jaccard": f"{min_population_jaccard:.6f}",
                     "roots_found": str(len(roots)),
-                    "substantial_roots": str(len(substantial_roots)),
+                    "substantial_roots_before_cap": str(substantial_roots_before_cap),
+                    "substantial_roots_after_cap": str(substantial_roots_after_cap),
                     "populations_identified": str(0),
                     "viability_checks_run": str(0),
                     "viability_checks_passed": str(0),
@@ -238,6 +269,11 @@ def discover_populations(
                         if file_patterns.issuperset(set(root["pattern_ids"])):
                             note = f"matched_non_substantial_root: {_pattern_summary(set(root['pattern_ids']))}"
                             break
+                    if note == "no_substantial_root_found":
+                        for root in capped_out_roots:
+                            if file_patterns.issuperset(set(root["pattern_ids"])):
+                                note = f"root_below_candidate_cap: support={int(root['files_present'])}"
+                                break
                 assignments.append(
                     {
                         "schema_version": SCHEMA_VERSION,
@@ -358,7 +394,8 @@ def discover_populations(
                     "max_population_overlap": f"{max_population_overlap:.6f}",
                     "min_population_jaccard": f"{min_population_jaccard:.6f}",
                     "roots_found": str(len(roots)),
-                    "substantial_roots": str(len(substantial_roots)),
+                    "substantial_roots_before_cap": str(substantial_roots_before_cap),
+                    "substantial_roots_after_cap": str(substantial_roots_after_cap),
                     "populations_identified": "0",
                     "viability_checks_run": "0",
                     "viability_checks_passed": "0",
@@ -372,7 +409,7 @@ def discover_populations(
 
         print(
             f"[step0] domain={dom} files_total={files_total} roots_found={len(roots)} "
-            f"substantial_roots={len(substantial_roots)} populations_identified={len(viable_populations)} "
+            f"substantial_roots={substantial_roots_after_cap} populations_identified={len(viable_populations)} "
             f"outlier_files={outlier_count} discovery_support={discovery_support}"
         )
 
@@ -453,7 +490,8 @@ def discover_populations(
             "max_population_overlap",
             "min_population_jaccard",
             "roots_found",
-            "substantial_roots",
+            "substantial_roots_before_cap",
+            "substantial_roots_after_cap",
             "populations_identified",
             "viability_checks_run",
             "viability_checks_passed",
@@ -478,7 +516,17 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--min-population-size", type=int, default=0)
     parser.add_argument("--max-population-overlap", type=float, default=0.20)
     parser.add_argument("--min-population-jaccard", type=float, default=0.30)
-    parser.add_argument("--discovery-support-pct", type=float, default=0.10)
+    parser.add_argument(
+        "--discovery-support-pct",
+        type=float,
+        default=0.50,
+        help=(
+            "Minimum fraction of corpus files a root bundle must appear in to be considered a population "
+            "candidate. Higher values find only major configuration families; lower values find minor "
+            "subgroups at the cost of significantly more computation. Default: 0.50 "
+            "(root must appear in 50%+ of files). Minimum: 0.05. Note: also bounded by --min-population-size floor."
+        ),
+    )
     return parser.parse_args(argv)
 
 
