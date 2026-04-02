@@ -40,13 +40,21 @@ def _run_pipeline_once(
     min_support_count: int,
     min_support_pct: float,
     population_id: Optional[str] = None,
+    population_registry_dir: Optional[Path] = None,
 ) -> Dict[str, int]:
     total_bundles = 0
     total_edges = 0
     total_files_no_bundle = 0
 
     t0 = time.time()
-    build_membership_matrix(analysis_dir, work_out_dir, domain, run_id, population_id)
+    build_membership_matrix(
+        analysis_dir,
+        work_out_dir,
+        domain,
+        run_id,
+        population_id,
+        population_registry_dir,
+    )
     print(f"[run] domain={domain} step1_seconds={time.time() - t0:.3f}")
 
     t0 = time.time()
@@ -198,6 +206,7 @@ def run_bundle_analysis(
                     min_support_count=min_support_count,
                     min_support_pct=min_support_pct,
                     population_id=pid,
+                    population_registry_dir=out_dir,
                 )
                 total_bundles += stats["total_bundles_found"]
                 total_edges += stats["total_dag_edges"]

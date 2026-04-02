@@ -15,8 +15,8 @@ else:
     from .common import SCHEMA_VERSION, atomic_write_csv, derive_scope_key, read_csv_rows, resolve_analysis_run_id
 
 
-def _load_population_file_ids(out_dir: Path, domain: str, population_id: str, run_id: str) -> Set[str]:
-    corpus_path = out_dir / "corpus_populations.csv"
+def _load_population_file_ids(registry_dir: Path, domain: str, population_id: str, run_id: str) -> Set[str]:
+    corpus_path = registry_dir / "corpus_populations.csv"
     if not corpus_path.is_file():
         raise FileNotFoundError(
             "corpus_populations.csv not found. Run step0 with --discover-populations "
@@ -51,6 +51,7 @@ def build_membership_matrix(
     domain: str,
     analysis_run_id: str = "",
     population_id: Optional[str] = None,
+    population_registry_dir: Optional[Path] = None,
 ) -> Dict[str, int]:
     pattern_presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     domain_pattern_rows = read_csv_rows(analysis_dir / "domain_patterns.csv")
@@ -63,7 +64,8 @@ def build_membership_matrix(
         if row.get("analysis_run_id", "") == run_id and row.get("domain", "") == domain and (row.get("export_run_id", "") or "").strip()
     }
     if population_id:
-        population_file_ids = _load_population_file_ids(out_dir, domain, population_id, run_id)
+        registry_dir = population_registry_dir if population_registry_dir is not None else out_dir
+        population_file_ids = _load_population_file_ids(registry_dir, domain, population_id, run_id)
         print(
             f"[step1] domain={domain} population_id={population_id} files_after_filter={len(population_file_ids)} "
             f"files_excluded={max(0, len(all_domain_files) - len(population_file_ids))} (population filter applied)"
@@ -169,12 +171,20 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--domain", required=True)
     p.add_argument("--analysis-run-id", default="")
     p.add_argument("--population-id", default=None)
+    p.add_argument("--population-registry-dir", type=Path, default=None)
     return p.parse_args(argv)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = _parse_args(argv)
-    build_membership_matrix(args.analysis_dir, args.out_dir, args.domain, args.analysis_run_id, args.population_id)
+    build_membership_matrix(
+        args.analysis_dir,
+        args.out_dir,
+        args.domain,
+        args.analysis_run_id,
+        args.population_id,
+        args.population_registry_dir,
+    )
     return 0
 
 
