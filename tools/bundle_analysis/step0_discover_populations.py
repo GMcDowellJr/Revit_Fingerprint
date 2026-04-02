@@ -177,7 +177,7 @@ def discover_populations(
                 threshold_value = max(3, int(math.ceil(population_size * 0.10)))
                 viability_notes = f"fallback_heuristic: auto_threshold_failed={truncated}"
 
-            viable = population_size > threshold_value
+            viable = population_size >= threshold_value
             print(
                 f"[step0_viability] domain={dom} population_id={pid} "
                 f"population_files={population_size} estimated_threshold={threshold_value} viable={viable}"
@@ -198,7 +198,7 @@ def discover_populations(
                     f"[step0_viability_fail] domain={dom} candidate_root={_pattern_summary(pop_patterns)} "
                     f"population_files={population_size} estimated_threshold={threshold_value} "
                     f"files_demoted_to_outlier={population_size} "
-                    f"reason=\"population_size <= estimated_bundle_threshold\""
+                    f"reason=\"population_size < estimated_bundle_threshold\""
                 )
 
             all_parameter_rows.append(
