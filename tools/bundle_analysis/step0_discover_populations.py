@@ -112,6 +112,7 @@ def discover_populations(
     all_population_rows: List[Dict[str, str]] = []
     all_summary_rows: List[Dict[str, str]] = []
     all_parameter_rows: List[Dict[str, str]] = []
+    all_root_pattern_rows: List[Dict[str, str]] = []
 
     for dom in domains:
         cad_patterns = cad_patterns_by_domain.get(dom, set())
@@ -282,7 +283,6 @@ def discover_populations(
                         "export_run_id": fid,
                         "population_id": "outlier",
                         "population_role": "outlier",
-                        "root_bundle_pattern_ids": "",
                         "is_ambiguous": "false",
                         "population_notes": note,
                     }
@@ -310,7 +310,6 @@ def discover_populations(
                     "export_run_id": fid,
                     "population_id": str(best["population_id"]),
                     "population_role": "primary",
-                    "root_bundle_pattern_ids": _pattern_token(set(best["pattern_ids"])),
                     "is_ambiguous": "true" if ambiguous else "false",
                     "population_notes": notes,
                 }
@@ -327,6 +326,7 @@ def discover_populations(
         for pop in viable_populations:
             pid = str(pop["population_id"])
             count = pop_counts.get(pid, 0)
+            root_patterns_sorted = sorted(set(pop["pattern_ids"]))
             all_summary_rows.append(
                 {
                     "schema_version": SCHEMA_VERSION,
@@ -336,14 +336,24 @@ def discover_populations(
                     "population_role": "primary",
                     "file_count": str(count),
                     "pct_of_corpus": f"{((100.0 * count / files_total) if files_total else 0.0):.6f}",
-                    "root_pattern_count": str(len(pop["pattern_ids"])),
-                    "root_pattern_ids": _pattern_token(set(pop["pattern_ids"])),
-                    "root_bundle_id": make_bundle_id(dom, "", sorted(pop["pattern_ids"])),
+                    "root_pattern_count": str(len(root_patterns_sorted)),
+                    "root_bundle_id": make_bundle_id(dom, "", root_patterns_sorted),
                     "discovery_support_used": str(discovery_support),
                     "min_population_size_used": str(effective_min_population_size),
                     "population_notes": "",
                 }
             )
+            for idx, pattern_id in enumerate(root_patterns_sorted, start=1):
+                all_root_pattern_rows.append(
+                    {
+                        "schema_version": SCHEMA_VERSION,
+                        "analysis_run_id": run_id,
+                        "domain": dom,
+                        "population_id": pid,
+                        "pattern_id": pattern_id,
+                        "pattern_rank": str(idx),
+                    }
+                )
             print(
                 f"[step0_population] domain={dom} population_id={pid} file_count={count} "
                 f"pct_of_corpus={(100.0 * count / files_total) if files_total else 0.0:.1f}% "
@@ -361,7 +371,6 @@ def discover_populations(
                     "file_count": str(outlier_count),
                     "pct_of_corpus": f"{((100.0 * outlier_count / files_total) if files_total else 0.0):.6f}",
                     "root_pattern_count": "0",
-                    "root_pattern_ids": "",
                     "root_bundle_id": "",
                     "discovery_support_used": str(discovery_support),
                     "min_population_size_used": str(effective_min_population_size),
@@ -432,6 +441,16 @@ def discover_populations(
         all_summary_rows,
         lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")),
     )
+    root_patterns_merged = _merge(
+        out_dir / "corpus_population_root_patterns.csv",
+        all_root_pattern_rows,
+        lambda r: (
+            r.get("analysis_run_id", ""),
+            r.get("domain", ""),
+            r.get("population_id", ""),
+            int(r.get("pattern_rank", "0") or "0"),
+        ),
+    )
     params_merged = _merge(
         out_dir / "corpus_population_parameters.csv",
         all_parameter_rows,
@@ -452,7 +471,6 @@ def discover_populations(
             "export_run_id",
             "population_id",
             "population_role",
-            "root_bundle_pattern_ids",
             "is_ambiguous",
             "population_notes",
         ],
@@ -469,13 +487,24 @@ def discover_populations(
             "file_count",
             "pct_of_corpus",
             "root_pattern_count",
-            "root_pattern_ids",
             "root_bundle_id",
             "discovery_support_used",
             "min_population_size_used",
             "population_notes",
         ],
         summaries_merged,
+    )
+    atomic_write_csv(
+        out_dir / "corpus_population_root_patterns.csv",
+        [
+            "schema_version",
+            "analysis_run_id",
+            "domain",
+            "population_id",
+            "pattern_id",
+            "pattern_rank",
+        ],
+        root_patterns_merged,
     )
     atomic_write_csv(
         out_dir / "corpus_population_parameters.csv",
