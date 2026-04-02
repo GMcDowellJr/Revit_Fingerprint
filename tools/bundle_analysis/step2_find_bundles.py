@@ -2,22 +2,120 @@ from __future__ import annotations
 
 import argparse
 import itertools
+import json
+import math
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, FrozenSet, List, Optional, Set
+from typing import Any, Dict, FrozenSet, List, Optional, Set
 
 if __package__ in (None, ""):
     _THIS_DIR = Path(__file__).resolve().parent
     if str(_THIS_DIR) not in sys.path:
         sys.path.insert(0, str(_THIS_DIR))
+    _TOOLS_DIR = _THIS_DIR.parent
+    if str(_TOOLS_DIR) not in sys.path:
+        sys.path.insert(0, str(_TOOLS_DIR))
     from common import SCHEMA_VERSION, atomic_write_csv, compute_effective_support, make_bundle_id, read_csv_rows
+    from compute_governance_thresholds import jenks_natural_breaks
 else:
     from .common import SCHEMA_VERSION, atomic_write_csv, compute_effective_support, make_bundle_id, read_csv_rows
+    from ..compute_governance_thresholds import jenks_natural_breaks
 
 
 # Scale note: at larger corpus sizes replace pairwise intersection candidate generation
 # with FP-Growth closed-itemset mining while preserving I/O interfaces.
+EXPECTED_MULTIPLIER = 2.0
+
+
+def _percentile(values: List[float], percentile: float) -> float:
+    if not values:
+        return 0.0
+    if len(values) == 1:
+        return float(values[0])
+    sorted_values = sorted(values)
+    rank = (len(sorted_values) - 1) * percentile
+    lower = int(math.floor(rank))
+    upper = int(math.ceil(rank))
+    if lower == upper:
+        return float(sorted_values[lower])
+    lower_value = float(sorted_values[lower])
+    upper_value = float(sorted_values[upper])
+    weight = rank - lower
+    return lower_value + (upper_value - lower_value) * weight
+
+
+def compute_auto_threshold(
+    file_sets: Dict[str, frozenset],
+    files_total: int,
+) -> Dict[str, Any]:
+    if files_total <= 0:
+        raise ValueError(f"files_total must be > 0. Got {files_total}.")
+
+    pattern_presence_counts: Dict[str, int] = defaultdict(int)
+    for pattern_ids in file_sets.values():
+        for pattern_id in pattern_ids:
+            pattern_presence_counts[pattern_id] += 1
+
+    pattern_ids_sorted = sorted(pattern_presence_counts.keys())
+    expected_values: List[float] = []
+    # SCALE NOTE: O(P^2) pairwise loop. At thousands of patterns per domain,
+    # consider switching to sparse matrix co-occurrence or sampling-based
+    # approximation. Acceptable at v21 scale (< 1000 patterns per domain).
+    for idx, pattern_i in enumerate(pattern_ids_sorted):
+        count_i = pattern_presence_counts[pattern_i]
+        for pattern_j in pattern_ids_sorted[idx + 1 :]:
+            count_j = pattern_presence_counts[pattern_j]
+            expected_values.append((count_i * count_j) / files_total)
+
+    cooccurrence_p90 = _percentile(expected_values, 0.90)
+    expected_floor = max(2, int(math.ceil(cooccurrence_p90 * EXPECTED_MULTIPLIER)))
+    expected_method_detail = (
+        f"expected_floor=ceil(p90_expected_cooccurrence*{EXPECTED_MULTIPLIER:.1f}); "
+        f"p90={cooccurrence_p90:.6f}; expected_pairs={len(expected_values)}"
+    )
+
+    eligible_pattern_ids = sorted([pid for pid, count in pattern_presence_counts.items() if count >= 2])
+    cooccurrence_values: List[int] = []
+    cooccurrence_distribution: Dict[int, int] = defaultdict(int)
+    # SCALE NOTE: O(P^2) pairwise loop. At thousands of patterns per domain,
+    # consider switching to sparse matrix co-occurrence or sampling-based
+    # approximation. Acceptable at v21 scale (< 1000 patterns per domain).
+    for idx, pattern_i in enumerate(eligible_pattern_ids):
+        for pattern_j in eligible_pattern_ids[idx + 1 :]:
+            cooccurrence = 0
+            for pattern_set in file_sets.values():
+                if pattern_i in pattern_set and pattern_j in pattern_set:
+                    cooccurrence += 1
+            if cooccurrence >= 2:
+                cooccurrence_values.append(cooccurrence)
+                cooccurrence_distribution[cooccurrence] += 1
+
+    distinct_cooccurrence_values = sorted(set(cooccurrence_values))
+    if len(distinct_cooccurrence_values) < 4:
+        natural_breaks_floor = expected_floor
+        natural_breaks_method_detail = (
+            "fallback_to_expected_floor_due_to_insufficient_distinct_values;"
+            f" distinct_values={len(distinct_cooccurrence_values)}"
+        )
+    else:
+        breaks = sorted(jenks_natural_breaks([float(v) for v in cooccurrence_values], 3))
+        natural_breaks_floor = max(2, int(math.ceil(breaks[1])))
+        natural_breaks_method_detail = (
+            f"natural_breaks_floor=ceil(jenks_break_1); breaks={','.join(f'{b:.6f}' for b in breaks)}"
+        )
+
+    return {
+        "cooccurrence_p90": cooccurrence_p90,
+        "expected_floor": expected_floor,
+        "natural_breaks_floor": natural_breaks_floor,
+        "chosen": natural_breaks_floor,
+        "method": "natural_breaks_primary_expected_secondary",
+        "expected_method_detail": expected_method_detail,
+        "natural_breaks_method_detail": natural_breaks_method_detail,
+        "cooccurrence_count": len(cooccurrence_values),
+        "cooccurrence_distribution": dict(sorted(cooccurrence_distribution.items())),
+    }
 
 
 def _supporting_files_by_superset(
@@ -48,14 +146,89 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
     bundles_rows: List[Dict[str, str]] = []
     bundle_membership_rows: List[Dict[str, str]] = []
     bundle_file_rows: List[Dict[str, str]] = []
+    threshold_rows: List[Dict[str, str]] = []
 
     for scope_key in sorted(files_total_by_scope.keys() | file_sets_by_scope.keys()):
         file_sets = {k: frozenset(v) for k, v in file_sets_by_scope.get(scope_key, {}).items() if len(v) >= 2}
         files_total = files_total_by_scope.get(scope_key, len(file_sets))
+        patterns_in_scope = len({pid for pset in file_sets.values() for pid in pset})
+
+        threshold_result: Dict[str, Any]
+        try:
+            threshold_result = compute_auto_threshold(file_sets, files_total)
+            required_keys = {
+                "cooccurrence_p90",
+                "expected_floor",
+                "natural_breaks_floor",
+                "chosen",
+                "method",
+                "expected_method_detail",
+                "natural_breaks_method_detail",
+                "cooccurrence_count",
+                "cooccurrence_distribution",
+            }
+            missing_keys = sorted(required_keys - set(threshold_result.keys()))
+            if missing_keys:
+                raise ValueError(f"missing threshold result keys: {missing_keys}")
+            print(
+                f"[step2_threshold] domain={domain} scope={scope_key!r} "
+                f"expected_floor={threshold_result['expected_floor']} "
+                f"natural_breaks_floor={threshold_result['natural_breaks_floor']} "
+                f"chosen={threshold_result['chosen']} cli_floor={min_support_count} "
+                f"effective={max(min_support_count, int(threshold_result['chosen']))}"
+            )
+        except Exception as exc:
+            reason = str(exc)
+            print(
+                f"[step2_threshold_fallback] domain={domain} scope={scope_key!r} "
+                f"reason={reason} using_cli_floor={min_support_count}"
+            )
+            threshold_result = {
+                "cooccurrence_p90": 0.0,
+                "expected_floor": max(2, min_support_count),
+                "natural_breaks_floor": max(2, min_support_count),
+                "chosen": max(2, min_support_count),
+                "method": "fallback_exception",
+                "expected_method_detail": "fallback_to_cli_floor_due_to_threshold_exception",
+                "natural_breaks_method_detail": reason[:200],
+                "cooccurrence_count": 0,
+                "cooccurrence_distribution": {},
+            }
+
+        effective_min_support = max(2, min_support_count, int(threshold_result["chosen"]))
+        threshold_rows.append(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "analysis_run_id": analysis_run_id,
+                "domain": domain,
+                "scope_key": scope_key,
+                "files_in_scope": str(files_total),
+                "patterns_in_scope": str(patterns_in_scope),
+                "cooccurrence_pairs": str(threshold_result["cooccurrence_count"]),
+                "cooccurrence_p90": f"{float(threshold_result['cooccurrence_p90']):.6f}",
+                "expected_floor": str(threshold_result["expected_floor"]),
+                "natural_breaks_floor": str(threshold_result["natural_breaks_floor"]),
+                "chosen_auto_threshold": str(threshold_result["chosen"]),
+                "cli_floor": str(min_support_count),
+                "effective_threshold": str(effective_min_support),
+                "derivation_method": str(threshold_result["method"]),
+                "expected_method_detail": str(threshold_result["expected_method_detail"]),
+                "natural_breaks_method_detail": str(threshold_result["natural_breaks_method_detail"]),
+                "cooccurrence_histogram": json.dumps(
+                    {str(k): v for k, v in dict(threshold_result["cooccurrence_distribution"]).items()},
+                    sort_keys=True,
+                ),
+            }
+        )
+
         if len(file_sets) < 2:
+            print(
+                f"[step2] domain={domain} scope={scope_key!r} bundles_found=0 patterns_covered=0 files_covered=0 "
+                f"effective_threshold={effective_min_support}"
+            )
             continue
 
-        effective_support = compute_effective_support(files_total, min_support_count, min_support_pct)
+        effective_support = compute_effective_support(files_total, effective_min_support, min_support_pct)
         candidates: Set[FrozenSet[str]] = set()
         file_ids = sorted(file_sets.keys())
         for a, b in itertools.combinations(file_ids, 2):
@@ -135,7 +308,8 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
         patterns_covered = len({p for s in closed_sets for p in s})
         files_covered = len({f for s in closed_sets for f in files_for_candidate.get(s, [])})
         print(
-            f"[step2] domain={domain} scope={scope_key!r} bundles_found={len(closed_sets)} patterns_covered={patterns_covered} files_covered={files_covered}"
+            f"[step2] domain={domain} scope={scope_key!r} bundles_found={len(closed_sets)} patterns_covered={patterns_covered} "
+            f"files_covered={files_covered} effective_threshold={effective_min_support}"
         )
 
     key_set = set()
@@ -175,6 +349,30 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
         domain_out_dir / "bundle_file_membership.csv",
         ["schema_version", "analysis_run_id", "domain", "scope_key", "bundle_id", "export_run_id"],
         bundle_file_rows,
+    )
+    threshold_rows.sort(key=lambda r: (r["analysis_run_id"], r["domain"], r["scope_key"]))
+    atomic_write_csv(
+        domain_out_dir / "bundle_analysis_thresholds.csv",
+        [
+            "schema_version",
+            "analysis_run_id",
+            "domain",
+            "scope_key",
+            "files_in_scope",
+            "patterns_in_scope",
+            "cooccurrence_pairs",
+            "cooccurrence_p90",
+            "expected_floor",
+            "natural_breaks_floor",
+            "chosen_auto_threshold",
+            "cli_floor",
+            "effective_threshold",
+            "derivation_method",
+            "expected_method_detail",
+            "natural_breaks_method_detail",
+            "cooccurrence_histogram",
+        ],
+        threshold_rows,
     )
 
     return {"bundles": len(bundles_rows), "files_with_bundles": len({r['export_run_id'] for r in bundle_file_rows})}
