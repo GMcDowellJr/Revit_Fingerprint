@@ -194,6 +194,14 @@ def run_bundle_analysis(
         }
 
     step0_times: Dict[str, float] = {}
+    domain_primary_counts: Dict[str, int] = {}
+    outliers_by_domain: Dict[str, int] = {}
+
+    populations_analyzed = 0
+    staging_root = out_dir / "_population_runs"
+    if staging_root.exists():
+        shutil.rmtree(staging_root)
+
     for dom in domains:
         if not dom:
             continue
@@ -215,28 +223,28 @@ def run_bundle_analysis(
             print(f"[timing] stage=step0 domain={dom} seconds={step0_elapsed:.2f}")
         except Exception as exc:
             print(f"[run][error] domain={dom} step0 failed: {exc}")
-
-    summary_rows = read_csv_rows(out_dir / "corpus_population_summary.csv") if (out_dir / "corpus_population_summary.csv").exists() else []
-    domain_populations: Dict[str, List[str]] = {}
-    outliers_by_domain: Dict[str, int] = {}
-    for row in summary_rows:
-        if row.get("analysis_run_id", "") != run_id:
             continue
-        dom = row.get("domain", "")
-        if row.get("population_role", "") == "primary":
-            domain_populations.setdefault(dom, []).append(row.get("population_id", ""))
-        elif row.get("population_role", "") == "outlier":
-            outliers_by_domain[dom] = int(row.get("file_count", "0") or "0")
 
-    populations_analyzed = 0
-    staging_root = out_dir / "_population_runs"
-    if staging_root.exists():
-        shutil.rmtree(staging_root)
-
-    for dom in domains:
-        if not dom:
-            continue
-        pop_ids = sorted(set(pid for pid in domain_populations.get(dom, []) if pid))
+        summary_rows = read_csv_rows(out_dir / "corpus_population_summary.csv") if (out_dir / "corpus_population_summary.csv").exists() else []
+        pop_ids = sorted(
+            {
+                row.get("population_id", "")
+                for row in summary_rows
+                if row.get("analysis_run_id", "") == run_id
+                and row.get("domain", "") == dom
+                and row.get("population_role", "") == "primary"
+                and row.get("population_id", "")
+            }
+        )
+        domain_primary_counts[dom] = len(pop_ids)
+        outlier_count = sum(
+            int(row.get("file_count", "0") or "0")
+            for row in summary_rows
+            if row.get("analysis_run_id", "") == run_id
+            and row.get("domain", "") == dom
+            and row.get("population_role", "") == "outlier"
+        )
+        outliers_by_domain[dom] = outlier_count
         if not pop_ids:
             print(f"[run][warn] domain={dom} has no primary populations; skipping main pass")
             continue
@@ -299,7 +307,7 @@ def run_bundle_analysis(
         if not dom:
             continue
         print(
-            f"    {dom}: {len(set(domain_populations.get(dom, [])))} populations, "
+            f"    {dom}: {domain_primary_counts.get(dom, 0)} populations, "
             f"{outliers_by_domain.get(dom, 0)} outliers"
         )
     for dom in domains:
