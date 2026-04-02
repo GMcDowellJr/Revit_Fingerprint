@@ -10,40 +10,47 @@ if __package__ in (None, ""):
     _THIS_DIR = Path(__file__).resolve().parent
     if str(_THIS_DIR) not in sys.path:
         sys.path.insert(0, str(_THIS_DIR))
-    from common import SCHEMA_VERSION, atomic_write_csv, make_bundle_id, read_csv_rows, resolve_analysis_run_id
+    from common import (
+        ROW_KEY_DOMAINS,
+        SCHEMA_VERSION,
+        atomic_write_csv,
+        derive_scope_key,
+        make_bundle_id,
+        read_csv_rows,
+        resolve_analysis_run_id,
+    )
     from step2_find_bundles import compute_auto_threshold
     from utils import find_root_bundles
 else:
-    from .common import SCHEMA_VERSION, atomic_write_csv, make_bundle_id, read_csv_rows, resolve_analysis_run_id
+    from .common import (
+        ROW_KEY_DOMAINS,
+        SCHEMA_VERSION,
+        atomic_write_csv,
+        derive_scope_key,
+        make_bundle_id,
+        read_csv_rows,
+        resolve_analysis_run_id,
+    )
     from .step2_find_bundles import compute_auto_threshold
     from .utils import find_root_bundles
 
-# Population discovery considers only the top 20 roots by file count.
-# Any configuration family not in the top 20 is too minor to warrant
-# a separate governance analysis track at any corpus scale. This cap
-# also bounds computational complexity: pairwise tests are O(n^2) in
-# candidate root count, so capping at 20 limits to 190 pairwise tests
-# regardless of how many roots survive the support threshold.
 MAX_POPULATION_CANDIDATES = 20
-
-
-def _pattern_token(pattern_ids: Set[str]) -> str:
-    return "|".join(sorted(pattern_ids))
 
 
 def _pattern_summary(pattern_ids: Set[str]) -> str:
     return "|".join(sorted(pattern_ids)[:3])
 
 
-def _population_id(domain: str, pattern_ids: Set[str]) -> str:
-    return make_bundle_id(domain, "", sorted(pattern_ids)).replace("bnd_", "pop_", 1)
+def _population_id(domain: str, scope_key: str, pattern_ids: Set[str]) -> str:
+    # Population ID includes scope_key to prevent collisions between
+    # element_label scopes within row-key domains. scope_key is "" for
+    # unscoped domains. NOTE: adding scope_key to hash is a breaking
+    # change from runs prior to this implementation — existing
+    # population IDs are not forward-compatible.
+    return make_bundle_id(domain, scope_key, sorted(pattern_ids)).replace("bnd_", "pop_", 1)
 
 
-def _select_populations(
-    substantial_roots: List[Dict[str, object]],
-    max_population_overlap: float,
-    min_population_jaccard: float,
-) -> List[Dict[str, object]]:
+def _select_populations(substantial_roots: List[Dict[str, object]], max_population_overlap: float, min_population_jaccard: float) -> List[Dict[str, object]]:
     survivors = sorted(
         substantial_roots,
         key=lambda r: (-int(r["files_present"]), -len(r["pattern_ids"]), tuple(sorted(r["pattern_ids"]))),
@@ -55,18 +62,13 @@ def _select_populations(
             files_a = set(candidate["file_ids"])
             files_b = set(existing["file_ids"])
             in_both = len(files_a & files_b)
-            overlap_a = in_both / len(files_a) if files_a else 0.0
-            overlap_b = in_both / len(files_b) if files_b else 0.0
-            overlap = max(overlap_a, overlap_b)
+            overlap = max(in_both / len(files_a) if files_a else 0.0, in_both / len(files_b) if files_b else 0.0)
 
             pa = set(candidate["pattern_ids"])
             pb = set(existing["pattern_ids"])
             union = len(pa | pb)
-            jaccard_similarity = (len(pa & pb) / union) if union else 1.0
-            jaccard_dissimilarity = 1.0 - jaccard_similarity
-
-            distinct = overlap < max_population_overlap and jaccard_dissimilarity >= min_population_jaccard
-            if not distinct:
+            dissim = 1.0 - ((len(pa & pb) / union) if union else 1.0)
+            if not (overlap < max_population_overlap and dissim >= min_population_jaccard):
                 keep = False
                 break
         if keep:
@@ -94,29 +96,29 @@ def discover_populations(
     pattern_presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     domain_pattern_rows = read_csv_rows(analysis_dir / "domain_patterns.csv")
     run_id = resolve_analysis_run_id(pattern_presence_rows, analysis_run_id)
-    domains = [domain] if domain else sorted(
-        {r.get("domain", "") for r in pattern_presence_rows if r.get("analysis_run_id", "") == run_id and r.get("domain", "")}
-    )
+    domains = [domain] if domain else sorted({r.get("domain", "") for r in pattern_presence_rows if r.get("analysis_run_id", "") == run_id and r.get("domain", "")})
 
-    cad_patterns_by_domain: Dict[str, Set[str]] = {}
-    for row in domain_pattern_rows:
-        if row.get("analysis_run_id", "") != run_id:
-            continue
-        dom = row.get("domain", "")
-        if not dom:
-            continue
-        if (row.get("is_cad_import", "") or "").strip().lower() == "true" and row.get("pattern_id", ""):
-            cad_patterns_by_domain.setdefault(dom, set()).add(row["pattern_id"])
-
-    discovery_dir = out_dir / "_population_discovery"
     all_population_rows: List[Dict[str, str]] = []
     all_summary_rows: List[Dict[str, str]] = []
     all_parameter_rows: List[Dict[str, str]] = []
     all_root_pattern_rows: List[Dict[str, str]] = []
 
+    discovery_dir = out_dir / "_population_discovery"
+
     for dom in domains:
-        cad_patterns = cad_patterns_by_domain.get(dom, set())
-        per_file_patterns: Dict[str, Set[str]] = {}
+        pattern_meta: Dict[str, Dict[str, str]] = {}
+        cad_patterns: Set[str] = set()
+        for row in domain_pattern_rows:
+            if row.get("analysis_run_id", "") != run_id or row.get("domain", "") != dom:
+                continue
+            pid = row.get("pattern_id", "")
+            if not pid:
+                continue
+            pattern_meta[pid] = row
+            if (row.get("is_cad_import", "") or "").strip().lower() == "true":
+                cad_patterns.add(pid)
+
+        file_patterns_by_scope: Dict[str, Dict[str, Set[str]]] = {}
         for row in pattern_presence_rows:
             if row.get("analysis_run_id", "") != run_id or row.get("domain", "") != dom:
                 continue
@@ -124,248 +126,180 @@ def discover_populations(
             pid = (row.get("pattern_id", "") or "").strip()
             if not fid or not pid or pid in cad_patterns:
                 continue
-            per_file_patterns.setdefault(fid, set()).add(pid)
+            meta = pattern_meta.get(pid)
+            if meta is None:
+                continue
+            scope_key = derive_scope_key(dom, meta)
+            file_patterns_by_scope.setdefault(scope_key, {}).setdefault(fid, set()).add(pid)
 
-        file_sets = {fid: frozenset(pids) for fid, pids in per_file_patterns.items() if pids}
-        files_total = len(file_sets)
-        discovery_support = max(3, int(math.ceil(files_total * discovery_support_pct))) if files_total else 3
-        effective_min_population_size = max(int(min_population_size or 0), max(5, int(math.ceil(files_total * 0.05)))) if files_total else 5
+        domain_populations = 0
+        domain_outliers = 0
+        scopes_processed = 0
 
-        roots = find_root_bundles(file_sets, min_support=discovery_support, min_bundle_size=2) if files_total >= 2 else []
-        substantial_roots = [r for r in roots if int(r["files_present"]) >= effective_min_population_size]
-        substantial_roots_before_cap = len(substantial_roots)
-        substantial_roots_sorted = sorted(
-            substantial_roots,
-            key=lambda r: (-int(r["files_present"]), -len(r["pattern_ids"]), tuple(sorted(r["pattern_ids"]))),
-        )
-        capped_roots = substantial_roots_sorted[:MAX_POPULATION_CANDIDATES]
-        substantial_roots_after_cap = len(capped_roots)
-        capped_out_roots = substantial_roots_sorted[MAX_POPULATION_CANDIDATES:]
-        if substantial_roots_before_cap > MAX_POPULATION_CANDIDATES:
-            lowest_retained_support = int(capped_roots[-1]["files_present"]) if capped_roots else 0
-            print(
-                f"[step0_cap] domain={dom} substantial_roots_before_cap={substantial_roots_before_cap} "
-                f"capped_to={MAX_POPULATION_CANDIDATES} lowest_retained_support={lowest_retained_support} "
-                f"discarded={substantial_roots_before_cap - MAX_POPULATION_CANDIDATES} roots below cap"
-            )
-        candidate_populations = _select_populations(capped_roots, max_population_overlap, min_population_jaccard)
-        for pop in candidate_populations:
-            pop["population_id"] = _population_id(dom, set(pop["pattern_ids"]))
+        for scope_key in sorted(file_patterns_by_scope.keys()):
+            scopes_processed += 1
+            file_sets = {fid: frozenset(pids) for fid, pids in file_patterns_by_scope[scope_key].items() if pids}
+            files_total = len(file_sets)
+            discovery_support = max(3, int(math.ceil(files_total * discovery_support_pct))) if files_total else 3
+            min_pop_size_effective = max(int(min_population_size or 0), max(5, int(math.ceil(files_total * 0.05)))) if files_total else 5
 
-        viability_checks_run = 0
-        viability_checks_passed = 0
-        viability_checks_failed = 0
-        viable_populations: List[Dict[str, object]] = []
-        failed_population_notes: Dict[str, str] = {}
+            roots = find_root_bundles(file_sets, min_support=discovery_support, min_bundle_size=2) if files_total >= 2 else []
+            substantial_roots = [r for r in roots if int(r["files_present"]) >= min_pop_size_effective]
+            before_cap = len(substantial_roots)
+            substantial_roots = sorted(substantial_roots, key=lambda r: (-int(r["files_present"]), tuple(sorted(r["pattern_ids"]))))
 
-        for pop in candidate_populations:
-            pid = str(pop["population_id"])
-            pop_patterns = set(pop["pattern_ids"])
-            population_file_sets = {
-                fid: pset for fid, pset in file_sets.items() if set(pset).issuperset(pop_patterns)
-            }
-            population_size = len(population_file_sets)
-
-            viability_checks_run += 1
-            threshold_value: int
-            viability_notes = ""
-            try:
-                threshold_result = compute_auto_threshold(population_file_sets, files_total=population_size)
-                threshold_value = int(threshold_result.get("chosen", 0))
-            except Exception as exc:
-                truncated = str(exc)[:100]
-                print(f"[step0_viability_warn] domain={dom} auto_threshold_failed={truncated} falling_back_to_heuristic")
-                threshold_value = max(3, int(math.ceil(population_size * 0.10)))
-                viability_notes = f"fallback_heuristic: auto_threshold_failed={truncated}"
-
-            viable = population_size >= threshold_value
-            print(
-                f"[step0_viability] domain={dom} population_id={pid} "
-                f"population_files={population_size} estimated_threshold={threshold_value} viable={viable}"
-            )
-            if viable:
-                viability_checks_passed += 1
-                viable_populations.append(pop)
-                viability_result = "viable"
-            else:
-                viability_checks_failed += 1
-                viability_result = "not_viable"
-                fail_note = (
-                    "insufficient_files_for_bundle_analysis: "
-                    f"population_size={population_size} estimated_threshold={threshold_value}"
+            is_row_key_domain = dom in ROW_KEY_DOMAINS
+            if is_row_key_domain and before_cap > MAX_POPULATION_CANDIDATES:
+                raise ValueError(
+                    f"Row-key domain {dom} scope {scope_key!r} has {before_cap} substantial roots after scoping. "
+                    f"Expected <= {MAX_POPULATION_CANDIDATES}. Check scope derivation logic — row-key domains should produce "
+                    "few roots per element_label scope."
                 )
-                failed_population_notes[pid] = fail_note
+
+            capped_out_roots = substantial_roots[MAX_POPULATION_CANDIDATES:]
+            if before_cap > MAX_POPULATION_CANDIDATES:
+                retained = int(substantial_roots[MAX_POPULATION_CANDIDATES - 1]["files_present"])
+                discarded = before_cap - MAX_POPULATION_CANDIDATES
                 print(
-                    f"[step0_viability_fail] domain={dom} candidate_root={_pattern_summary(pop_patterns)} "
-                    f"population_files={population_size} estimated_threshold={threshold_value} "
-                    f"files_demoted_to_outlier={population_size} "
-                    f"reason=\"population_size < estimated_bundle_threshold\""
+                    f"[step0_cap_WARNING] domain={dom} scope={scope_key!r} substantial_roots_before_cap={before_cap} "
+                    f"capped_to={MAX_POPULATION_CANDIDATES} lowest_retained_support={retained} discarded={discarded} "
+                    "ACTION_REQUIRED: roots with substantial file support were discarded. "
+                    "Inspect this domain/scope for unexpected configuration diversity. "
+                    "Consider raising --discovery-support-pct to reduce roots before cap applies."
                 )
+            substantial_roots = substantial_roots[:MAX_POPULATION_CANDIDATES]
+            after_cap = len(substantial_roots)
 
-            all_parameter_rows.append(
-                {
-                    "schema_version": SCHEMA_VERSION,
-                    "analysis_run_id": run_id,
-                    "domain": dom,
-                    "files_total": str(files_total),
-                    "discovery_support_pct": f"{discovery_support_pct:.6f}",
-                    "discovery_support_count": str(discovery_support),
-                    "min_population_size_effective": str(effective_min_population_size),
-                    "max_population_overlap": f"{max_population_overlap:.6f}",
-                    "min_population_jaccard": f"{min_population_jaccard:.6f}",
-                    "roots_found": str(len(roots)),
-                    "substantial_roots_before_cap": str(substantial_roots_before_cap),
-                    "substantial_roots_after_cap": str(substantial_roots_after_cap),
-                    "populations_identified": str(0),
-                    "viability_checks_run": str(0),
-                    "viability_checks_passed": str(0),
-                    "viability_checks_failed": str(0),
-                    "outlier_file_count": str(0),
-                    "viability_estimated_threshold": str(threshold_value),
-                    "viability_result": viability_result,
-                    "viability_notes": viability_notes,
-                }
-            )
+            candidate_populations = _select_populations(substantial_roots, max_population_overlap, min_population_jaccard)
+            for pop in candidate_populations:
+                pop["population_id"] = _population_id(dom, scope_key, set(pop["pattern_ids"]))
 
-        root_debug_rows: List[Dict[str, str]] = []
-        for root in roots:
-            root_debug_rows.append(
-                {
-                    "schema_version": SCHEMA_VERSION,
-                    "analysis_run_id": run_id,
-                    "domain": dom,
-                    "root_pattern_ids": _pattern_token(set(root["pattern_ids"])),
-                    "root_pattern_count": str(len(root["pattern_ids"])),
-                    "files_present": str(int(root["files_present"])),
-                    "is_substantial": "true" if int(root["files_present"]) >= effective_min_population_size else "false",
-                }
-            )
-        atomic_write_csv(
-            discovery_dir / f"{dom}_roots.csv",
-            ["schema_version", "analysis_run_id", "domain", "root_pattern_ids", "root_pattern_count", "files_present", "is_substantial"],
-            sorted(root_debug_rows, key=lambda r: (r["analysis_run_id"], r["domain"], r["root_pattern_ids"])),
-        )
+            viable_populations: List[Dict[str, object]] = []
+            failed_notes: Dict[str, str] = {}
+            checks_run = checks_passed = checks_failed = 0
+            if candidate_populations:
+                threshold_values: List[int] = []
+                for pop in candidate_populations:
+                    checks_run += 1
+                    pop_patterns = set(pop["pattern_ids"])
+                    pop_size = len([1 for pset in file_sets.values() if set(pset).issuperset(pop_patterns)])
+                    try:
+                        th = int(compute_auto_threshold({fid: p for fid, p in file_sets.items() if set(p).issuperset(pop_patterns)}, files_total=pop_size).get("chosen", 0))
+                    except Exception as exc:
+                        truncated = str(exc)[:100]
+                        print(f"[step0_viability_warn] domain={dom} scope={scope_key!r} auto_threshold_failed={truncated} falling_back_to_heuristic")
+                        th = max(3, int(math.ceil(pop_size * 0.10)))
+                    threshold_values.append(th)
+                    viable = pop_size >= th
+                    print(f"[step0_viability] domain={dom} scope={scope_key!r} population_id={pop['population_id']} population_files={pop_size} estimated_threshold={th} viable={viable}")
+                    if viable:
+                        checks_passed += 1
+                        viable_populations.append(pop)
+                    else:
+                        checks_failed += 1
+                        note = f"insufficient_files_for_bundle_analysis: population_size={pop_size} estimated_threshold={th}"
+                        failed_notes[str(pop["population_id"])] = note
+                        print(
+                            f"[step0_viability_fail] domain={dom} scope={scope_key!r} candidate_root={_pattern_summary(pop_patterns)} "
+                            f"population_files={pop_size} estimated_threshold={th} files_demoted_to_outlier={pop_size} "
+                            f"reason=\"population_size < estimated_bundle_threshold\""
+                        )
+                viability_threshold = "|".join(str(v) for v in sorted(set(threshold_values)))
+                viability_result = "mixed" if checks_passed and checks_failed else ("viable" if checks_passed else "not_viable")
+                viability_notes = ""
+            else:
+                viability_threshold = ""
+                viability_result = "skipped"
+                viability_notes = "no_candidate_populations"
 
-        assignments: List[Dict[str, str]] = []
-        outlier_count = 0
-        for fid in sorted(file_sets.keys()):
-            file_patterns = set(file_sets[fid])
-            matches: List[Dict[str, object]] = [
-                p for p in viable_populations if file_patterns.issuperset(set(p["pattern_ids"]))
-            ]
-            if not matches:
-                failed_matches = [
-                    p
-                    for p in candidate_populations
-                    if str(p["population_id"]) in failed_population_notes and file_patterns.issuperset(set(p["pattern_ids"]))
-                ]
-                if failed_matches:
-                    best_failed = max(failed_matches, key=lambda p: int(p["files_present"]))
-                    note = failed_population_notes.get(str(best_failed["population_id"]), "no_substantial_root_found")
-                else:
+            assignments: List[Dict[str, str]] = []
+            outlier_count = 0
+            for fid, file_patterns in sorted(file_sets.items()):
+                file_pattern_set = set(file_patterns)
+                matches = [p for p in viable_populations if file_pattern_set.issuperset(set(p["pattern_ids"]))]
+                if not matches:
                     note = "no_substantial_root_found"
                     for root in roots:
-                        if int(root["files_present"]) >= effective_min_population_size:
-                            continue
-                        if file_patterns.issuperset(set(root["pattern_ids"])):
+                        if int(root["files_present"]) < min_pop_size_effective and file_pattern_set.issuperset(set(root["pattern_ids"])):
                             note = f"matched_non_substantial_root: {_pattern_summary(set(root['pattern_ids']))}"
                             break
                     if note == "no_substantial_root_found":
                         for root in capped_out_roots:
-                            if file_patterns.issuperset(set(root["pattern_ids"])):
+                            if file_pattern_set.issuperset(set(root["pattern_ids"])):
                                 note = f"root_below_candidate_cap: support={int(root['files_present'])}"
                                 break
-                assignments.append(
-                    {
+                    assignments.append({
                         "schema_version": SCHEMA_VERSION,
                         "analysis_run_id": run_id,
                         "domain": dom,
+                        "scope_key": scope_key,
                         "export_run_id": fid,
                         "population_id": "outlier",
                         "population_role": "outlier",
                         "is_ambiguous": "false",
                         "population_notes": note,
-                    }
-                )
-                outlier_count += 1
-                continue
+                    })
+                    outlier_count += 1
+                else:
+                    best = max(matches, key=lambda p: int(p["files_present"]))
+                    ambiguous = len(matches) > 1
+                    assignments.append({
+                        "schema_version": SCHEMA_VERSION,
+                        "analysis_run_id": run_id,
+                        "domain": dom,
+                        "scope_key": scope_key,
+                        "export_run_id": fid,
+                        "population_id": str(best["population_id"]),
+                        "population_role": "primary",
+                        "is_ambiguous": "true" if ambiguous else "false",
+                        "population_notes": f"ambiguous_assignment_resolved_to: {best['population_id']}" if ambiguous else "",
+                    })
 
-            best = max(
-                matches,
-                key=lambda p: (
-                    len(file_patterns & set(p["pattern_ids"]))
-                    / len(file_patterns | set(p["pattern_ids"]))
-                    if (file_patterns | set(p["pattern_ids"]))
-                    else 0.0,
-                    int(p["files_present"]),
-                ),
-            )
-            ambiguous = len(matches) > 1
-            notes = f"ambiguous_assignment_resolved_to: {best['population_id']}" if ambiguous else ""
-            assignments.append(
-                {
+            assignments.sort(key=lambda r: (r["analysis_run_id"], r["domain"], r["scope_key"], r["export_run_id"], r["population_id"]))
+            all_population_rows.extend(assignments)
+
+            pop_counts: Dict[str, int] = {}
+            for row in assignments:
+                if row["population_role"] == "primary":
+                    pop_counts[row["population_id"]] = pop_counts.get(row["population_id"], 0) + 1
+
+            for pop in viable_populations:
+                pid = str(pop["population_id"])
+                root_patterns_sorted = sorted(set(pop["pattern_ids"]))
+                count = pop_counts.get(pid, 0)
+                all_summary_rows.append({
                     "schema_version": SCHEMA_VERSION,
                     "analysis_run_id": run_id,
                     "domain": dom,
-                    "export_run_id": fid,
-                    "population_id": str(best["population_id"]),
-                    "population_role": "primary",
-                    "is_ambiguous": "true" if ambiguous else "false",
-                    "population_notes": notes,
-                }
-            )
-
-        assignments.sort(key=lambda r: (r["analysis_run_id"], r["domain"], r["population_id"], r["export_run_id"]))
-        all_population_rows.extend(assignments)
-
-        pop_counts: Dict[str, int] = {}
-        for row in assignments:
-            if row["population_role"] == "primary":
-                pop_counts[row["population_id"]] = pop_counts.get(row["population_id"], 0) + 1
-
-        for pop in viable_populations:
-            pid = str(pop["population_id"])
-            count = pop_counts.get(pid, 0)
-            root_patterns_sorted = sorted(set(pop["pattern_ids"]))
-            all_summary_rows.append(
-                {
-                    "schema_version": SCHEMA_VERSION,
-                    "analysis_run_id": run_id,
-                    "domain": dom,
+                    "scope_key": scope_key,
                     "population_id": pid,
                     "population_role": "primary",
                     "file_count": str(count),
                     "pct_of_corpus": f"{((100.0 * count / files_total) if files_total else 0.0):.6f}",
                     "root_pattern_count": str(len(root_patterns_sorted)),
-                    "root_bundle_id": make_bundle_id(dom, "", root_patterns_sorted),
+                    "root_bundle_id": make_bundle_id(dom, scope_key, root_patterns_sorted),
                     "discovery_support_used": str(discovery_support),
-                    "min_population_size_used": str(effective_min_population_size),
+                    "min_population_size_used": str(min_pop_size_effective),
                     "population_notes": "",
-                }
-            )
-            for idx, pattern_id in enumerate(root_patterns_sorted, start=1):
-                all_root_pattern_rows.append(
-                    {
+                })
+                for idx, pattern_id in enumerate(root_patterns_sorted, start=1):
+                    all_root_pattern_rows.append({
                         "schema_version": SCHEMA_VERSION,
                         "analysis_run_id": run_id,
                         "domain": dom,
+                        "scope_key": scope_key,
                         "population_id": pid,
                         "pattern_id": pattern_id,
                         "pattern_rank": str(idx),
-                    }
-                )
-            print(
-                f"[step0_population] domain={dom} population_id={pid} file_count={count} "
-                f"pct_of_corpus={(100.0 * count / files_total) if files_total else 0.0:.1f}% "
-                f"root_pattern_count={len(pop['pattern_ids'])} role=primary"
-            )
+                    })
+                print(f"[step0_population] domain={dom} scope={scope_key!r} population_id={pid} file_count={count} pct_of_corpus={(100.0 * count / files_total) if files_total else 0.0:.1f}% root_pattern_count={len(root_patterns_sorted)} role=primary")
 
-        if outlier_count > 0:
-            all_summary_rows.append(
-                {
+            if outlier_count > 0:
+                all_summary_rows.append({
                     "schema_version": SCHEMA_VERSION,
                     "analysis_run_id": run_id,
                     "domain": dom,
+                    "scope_key": scope_key,
                     "population_id": "outlier",
                     "population_role": "outlier",
                     "file_count": str(outlier_count),
@@ -373,53 +307,56 @@ def discover_populations(
                     "root_pattern_count": "0",
                     "root_bundle_id": "",
                     "discovery_support_used": str(discovery_support),
-                    "min_population_size_used": str(effective_min_population_size),
+                    "min_population_size_used": str(min_pop_size_effective),
                     "population_notes": "files unmatched_or_non_substantial",
-                }
-            )
-            print(
-                f"[step0_outliers] domain={dom} outlier_count={outlier_count} "
-                f"reason_summary=\"0 linked/reference files, {outlier_count} unmatched files\""
-            )
+                })
 
-        for row in all_parameter_rows:
-            if row["analysis_run_id"] == run_id and row["domain"] == dom:
-                row["populations_identified"] = str(len(viable_populations))
-                row["viability_checks_run"] = str(viability_checks_run)
-                row["viability_checks_passed"] = str(viability_checks_passed)
-                row["viability_checks_failed"] = str(viability_checks_failed)
-                row["outlier_file_count"] = str(outlier_count)
+            all_parameter_rows.append({
+                "schema_version": SCHEMA_VERSION,
+                "analysis_run_id": run_id,
+                "domain": dom,
+                "scope_key": scope_key,
+                "files_total": str(files_total),
+                "discovery_support_pct": f"{discovery_support_pct:.6f}",
+                "discovery_support_count": str(discovery_support),
+                "min_population_size_effective": str(min_pop_size_effective),
+                "max_population_overlap": f"{max_population_overlap:.6f}",
+                "min_population_jaccard": f"{min_population_jaccard:.6f}",
+                "roots_found": str(len(roots)),
+                "substantial_roots_before_cap": str(before_cap),
+                "substantial_roots_after_cap": str(after_cap),
+                "populations_identified": str(len(viable_populations)),
+                "viability_checks_run": str(checks_run),
+                "viability_checks_passed": str(checks_passed),
+                "viability_checks_failed": str(checks_failed),
+                "outlier_file_count": str(outlier_count),
+                "viability_estimated_threshold": viability_threshold,
+                "viability_result": viability_result,
+                "viability_notes": viability_notes,
+            })
 
-        if not candidate_populations:
-            all_parameter_rows.append(
-                {
+            print(f"[step0] domain={dom} scope={scope_key!r} files_total={files_total} roots_found={len(roots)} substantial_roots={after_cap} populations_identified={len(viable_populations)} outlier_files={outlier_count} discovery_support={discovery_support}")
+
+            domain_populations += len(viable_populations)
+            domain_outliers += outlier_count
+
+        print(f"[step0_domain_summary] domain={dom} scopes_processed={scopes_processed} total_populations={domain_populations} total_outlier_files={domain_outliers}")
+
+        root_debug_rows = []
+        for scope_key, scoped_files in sorted(file_patterns_by_scope.items()):
+            for fid, pids in scoped_files.items():
+                root_debug_rows.append({
                     "schema_version": SCHEMA_VERSION,
                     "analysis_run_id": run_id,
                     "domain": dom,
-                    "files_total": str(files_total),
-                    "discovery_support_pct": f"{discovery_support_pct:.6f}",
-                    "discovery_support_count": str(discovery_support),
-                    "min_population_size_effective": str(effective_min_population_size),
-                    "max_population_overlap": f"{max_population_overlap:.6f}",
-                    "min_population_jaccard": f"{min_population_jaccard:.6f}",
-                    "roots_found": str(len(roots)),
-                    "substantial_roots_before_cap": str(substantial_roots_before_cap),
-                    "substantial_roots_after_cap": str(substantial_roots_after_cap),
-                    "populations_identified": "0",
-                    "viability_checks_run": "0",
-                    "viability_checks_passed": "0",
-                    "viability_checks_failed": "0",
-                    "outlier_file_count": str(outlier_count),
-                    "viability_estimated_threshold": "",
-                    "viability_result": "skipped",
-                    "viability_notes": "no_candidate_populations",
-                }
-            )
-
-        print(
-            f"[step0] domain={dom} files_total={files_total} roots_found={len(roots)} "
-            f"substantial_roots={substantial_roots_after_cap} populations_identified={len(viable_populations)} "
-            f"outlier_files={outlier_count} discovery_support={discovery_support}"
+                    "scope_key": scope_key,
+                    "export_run_id": fid,
+                    "pattern_count": str(len(pids)),
+                })
+        atomic_write_csv(
+            discovery_dir / f"{dom}_roots.csv",
+            ["schema_version", "analysis_run_id", "domain", "scope_key", "export_run_id", "pattern_count"],
+            sorted(root_debug_rows, key=lambda r: (r["analysis_run_id"], r["domain"], r["scope_key"], r["export_run_id"])),
         )
 
     processed_domains = set(domains)
@@ -431,107 +368,15 @@ def discover_populations(
         merged.sort(key=sort_key)
         return merged
 
-    populations_merged = _merge(
-        out_dir / "corpus_populations.csv",
-        all_population_rows,
-        lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("export_run_id", "")),
-    )
-    summaries_merged = _merge(
-        out_dir / "corpus_population_summary.csv",
-        all_summary_rows,
-        lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")),
-    )
-    root_patterns_merged = _merge(
-        out_dir / "corpus_population_root_patterns.csv",
-        all_root_pattern_rows,
-        lambda r: (
-            r.get("analysis_run_id", ""),
-            r.get("domain", ""),
-            r.get("population_id", ""),
-            int(r.get("pattern_rank", "0") or "0"),
-        ),
-    )
-    params_merged = _merge(
-        out_dir / "corpus_population_parameters.csv",
-        all_parameter_rows,
-        lambda r: (
-            r.get("analysis_run_id", ""),
-            r.get("domain", ""),
-            r.get("viability_result", ""),
-            r.get("viability_estimated_threshold", ""),
-        ),
-    )
+    populations_merged = _merge(out_dir / "corpus_populations.csv", all_population_rows, lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("scope_key", ""), r.get("export_run_id", ""), r.get("population_id", "")))
+    summaries_merged = _merge(out_dir / "corpus_population_summary.csv", all_summary_rows, lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("scope_key", ""), r.get("population_id", "")))
+    root_patterns_merged = _merge(out_dir / "corpus_population_root_patterns.csv", all_root_pattern_rows, lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("scope_key", ""), r.get("population_id", ""), int(r.get("pattern_rank", "0") or "0")))
+    params_merged = _merge(out_dir / "corpus_population_parameters.csv", all_parameter_rows, lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("scope_key", "")))
 
-    atomic_write_csv(
-        out_dir / "corpus_populations.csv",
-        [
-            "schema_version",
-            "analysis_run_id",
-            "domain",
-            "export_run_id",
-            "population_id",
-            "population_role",
-            "is_ambiguous",
-            "population_notes",
-        ],
-        populations_merged,
-    )
-    atomic_write_csv(
-        out_dir / "corpus_population_summary.csv",
-        [
-            "schema_version",
-            "analysis_run_id",
-            "domain",
-            "population_id",
-            "population_role",
-            "file_count",
-            "pct_of_corpus",
-            "root_pattern_count",
-            "root_bundle_id",
-            "discovery_support_used",
-            "min_population_size_used",
-            "population_notes",
-        ],
-        summaries_merged,
-    )
-    atomic_write_csv(
-        out_dir / "corpus_population_root_patterns.csv",
-        [
-            "schema_version",
-            "analysis_run_id",
-            "domain",
-            "population_id",
-            "pattern_id",
-            "pattern_rank",
-        ],
-        root_patterns_merged,
-    )
-    atomic_write_csv(
-        out_dir / "corpus_population_parameters.csv",
-        [
-            "schema_version",
-            "analysis_run_id",
-            "domain",
-            "files_total",
-            "discovery_support_pct",
-            "discovery_support_count",
-            "min_population_size_effective",
-            "max_population_overlap",
-            "min_population_jaccard",
-            "roots_found",
-            "substantial_roots_before_cap",
-            "substantial_roots_after_cap",
-            "populations_identified",
-            "viability_checks_run",
-            "viability_checks_passed",
-            "viability_checks_failed",
-            "outlier_file_count",
-            "viability_estimated_threshold",
-            "viability_result",
-            "viability_notes",
-        ],
-        params_merged,
-    )
+    atomic_write_csv(out_dir / "corpus_populations.csv", ["schema_version", "analysis_run_id", "domain", "scope_key", "export_run_id", "population_id", "population_role", "is_ambiguous", "population_notes"], populations_merged)
+    atomic_write_csv(out_dir / "corpus_population_summary.csv", ["schema_version", "analysis_run_id", "domain", "scope_key", "population_id", "population_role", "file_count", "pct_of_corpus", "root_pattern_count", "root_bundle_id", "discovery_support_used", "min_population_size_used", "population_notes"], summaries_merged)
+    atomic_write_csv(out_dir / "corpus_population_root_patterns.csv", ["schema_version", "analysis_run_id", "domain", "scope_key", "population_id", "pattern_id", "pattern_rank"], root_patterns_merged)
+    atomic_write_csv(out_dir / "corpus_population_parameters.csv", ["schema_version", "analysis_run_id", "domain", "scope_key", "files_total", "discovery_support_pct", "discovery_support_count", "min_population_size_effective", "max_population_overlap", "min_population_jaccard", "roots_found", "substantial_roots_before_cap", "substantial_roots_after_cap", "populations_identified", "viability_checks_run", "viability_checks_passed", "viability_checks_failed", "outlier_file_count", "viability_estimated_threshold", "viability_result", "viability_notes"], params_merged)
 
     return {"domains": len(domains), "population_rows": len(all_population_rows)}
 
@@ -545,17 +390,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--min-population-size", type=int, default=0)
     parser.add_argument("--max-population-overlap", type=float, default=0.20)
     parser.add_argument("--min-population-jaccard", type=float, default=0.30)
-    parser.add_argument(
-        "--discovery-support-pct",
-        type=float,
-        default=0.50,
-        help=(
-            "Minimum fraction of corpus files a root bundle must appear in to be considered a population "
-            "candidate. Higher values find only major configuration families; lower values find minor "
-            "subgroups at the cost of significantly more computation. Default: 0.50 "
-            "(root must appear in 50%+ of files). Minimum: 0.05. Note: also bounded by --min-population-size floor."
-        ),
-    )
+    parser.add_argument("--discovery-support-pct", type=float, default=0.50)
     return parser.parse_args(argv)
 
 
