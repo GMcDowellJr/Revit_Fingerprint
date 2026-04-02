@@ -75,6 +75,12 @@ def compute_auto_threshold(
         f"expected_floor=ceil(p90_expected_cooccurrence*{EXPECTED_MULTIPLIER:.1f}); "
         f"p90={cooccurrence_p90:.6f}; expected_pairs={len(expected_values)}"
     )
+    if expected_floor >= files_total:
+        expected_method_detail += (
+            "; WARNING: expected_floor exceeds files_total, likely due to high pattern "
+            "frequency correlation — natural_breaks result preferred"
+        )
+        expected_floor = files_total
 
     eligible_pattern_ids = sorted([pid for pid, count in pattern_presence_counts.items() if count >= 2])
     cooccurrence_values: List[int] = []
