@@ -77,7 +77,12 @@ def _select_populations(substantial_roots: List[Dict[str, object]], max_populati
 
 
 def _collapse_subset_related_roots(substantial_roots: List[Dict[str, object]]) -> List[Dict[str, object]]:
-    """Collapse subset/superset-related roots to most general representatives."""
+    """Collapse subset/superset-related roots to most general representatives.
+
+    This function assumes root candidates are close to antichain behavior
+    (as produced by `find_root_bundles`), and uses a postcondition check to
+    fail fast if any subset relation survives.
+    """
     ordered = sorted(
         substantial_roots,
         key=lambda r: (len(set(r["pattern_ids"])), -int(r["files_present"]), tuple(sorted(set(r["pattern_ids"])))),

@@ -192,7 +192,8 @@ def run_bundle_analysis(
             print(f"[run] domain={dom} population_id={pid} start")
             populations_analyzed += 1
             stage_out = staging_root / f"{dom}__{pid}"
-            final_out = out_dir / dom / f"pop_{pid}"
+            # `pid` already includes the "pop_" prefix from step0.
+            final_out = out_dir / dom / pid
             if stage_out.exists():
                 shutil.rmtree(stage_out)
             if final_out.exists():
