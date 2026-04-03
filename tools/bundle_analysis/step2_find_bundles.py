@@ -24,8 +24,6 @@ else:
     from .utils import find_closed_itemsets
 
 
-# Scale note: at larger corpus sizes replace pairwise intersection candidate generation
-# with FP-Growth closed-itemset mining while preserving I/O interfaces.
 EXPECTED_MULTIPLIER = 2.0
 
 
@@ -59,29 +57,6 @@ def compute_auto_threshold(
             pattern_presence_counts[pattern_id] += 1
 
     pattern_ids_sorted = sorted(pattern_presence_counts.keys())
-    expected_values: List[float] = []
-    # SCALE NOTE: O(P^2) pairwise loop. At thousands of patterns per domain,
-    # consider switching to sparse matrix co-occurrence or sampling-based
-    # approximation. Acceptable at v21 scale (< 1000 patterns per domain).
-    for idx, pattern_i in enumerate(pattern_ids_sorted):
-        count_i = pattern_presence_counts[pattern_i]
-        for pattern_j in pattern_ids_sorted[idx + 1 :]:
-            count_j = pattern_presence_counts[pattern_j]
-            expected_values.append((count_i * count_j) / files_total)
-
-    cooccurrence_p90 = _percentile(expected_values, 0.90)
-    expected_floor = max(2, int(math.ceil(cooccurrence_p90 * EXPECTED_MULTIPLIER)))
-    expected_method_detail = (
-        f"expected_floor=ceil(p90_expected_cooccurrence*{EXPECTED_MULTIPLIER:.1f}); "
-        f"p90={cooccurrence_p90:.6f}; expected_pairs={len(expected_values)}"
-    )
-    if expected_floor >= files_total:
-        expected_method_detail += (
-            "; WARNING: expected_floor exceeds files_total, likely due to high pattern "
-            "frequency correlation — natural_breaks result preferred"
-        )
-        expected_floor = files_total
-
     eligible_pattern_ids = sorted([pid for pid, count in pattern_presence_counts.items() if count >= 2])
     cooccurrence_values: List[int] = []
     cooccurrence_distribution: Dict[int, int] = defaultdict(int)
@@ -100,12 +75,37 @@ def compute_auto_threshold(
 
     distinct_cooccurrence_values = sorted(set(cooccurrence_values))
     if len(distinct_cooccurrence_values) < 4:
+        expected_values: List[float] = []
+        # SCALE NOTE: O(P^2) pairwise loop. At thousands of patterns per domain,
+        # consider switching to sparse matrix co-occurrence or sampling-based
+        # approximation. Acceptable at v21 scale (< 1000 patterns per domain).
+        for idx, pattern_i in enumerate(pattern_ids_sorted):
+            count_i = pattern_presence_counts[pattern_i]
+            for pattern_j in pattern_ids_sorted[idx + 1 :]:
+                count_j = pattern_presence_counts[pattern_j]
+                expected_values.append((count_i * count_j) / files_total)
+
+        cooccurrence_p90 = _percentile(expected_values, 0.90)
+        expected_floor = max(2, int(math.ceil(cooccurrence_p90 * EXPECTED_MULTIPLIER)))
+        expected_method_detail = (
+            f"expected_floor=ceil(p90_expected_cooccurrence*{EXPECTED_MULTIPLIER:.1f}); "
+            f"p90={cooccurrence_p90:.6f}; expected_pairs={len(expected_values)}"
+        )
+        if expected_floor >= files_total:
+            expected_method_detail += (
+                "; WARNING: expected_floor exceeds files_total, likely due to high pattern "
+                "frequency correlation — natural_breaks result preferred"
+            )
+            expected_floor = files_total
         natural_breaks_floor = expected_floor
         natural_breaks_method_detail = (
             "fallback_to_expected_floor_due_to_insufficient_distinct_values;"
             f" distinct_values={len(distinct_cooccurrence_values)}"
         )
     else:
+        cooccurrence_p90 = None
+        expected_floor = None
+        expected_method_detail = "not_computed_natural_breaks_succeeded"
         breaks = sorted(jenks_natural_breaks([float(v) for v in cooccurrence_values], 3))
         natural_breaks_floor = max(2, int(math.ceil(breaks[1])))
         natural_breaks_method_detail = (
@@ -201,8 +201,10 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
                 "files_in_scope": str(files_total),
                 "patterns_in_scope": str(patterns_in_scope),
                 "cooccurrence_pairs": str(threshold_result["cooccurrence_count"]),
-                "cooccurrence_p90": f"{float(threshold_result['cooccurrence_p90']):.6f}",
-                "expected_floor": str(threshold_result["expected_floor"]),
+                "cooccurrence_p90": (
+                    "" if threshold_result["cooccurrence_p90"] is None else f"{float(threshold_result['cooccurrence_p90']):.6f}"
+                ),
+                "expected_floor": "" if threshold_result["expected_floor"] is None else str(threshold_result["expected_floor"]),
                 "natural_breaks_floor": str(threshold_result["natural_breaks_floor"]),
                 "chosen_auto_threshold": str(threshold_result["chosen"]),
                 "cli_floor": str(min_support_count),
