@@ -1,17 +1,88 @@
 from __future__ import annotations
 
-from itertools import combinations
-from typing import Dict, FrozenSet, List, Set, Tuple
+from collections import defaultdict
+from typing import Dict, FrozenSet, List, Optional, Tuple
 
-try:
-    import pandas as pd
-except ImportError:  # pragma: no cover - fallback path for minimal environments
-    pd = None
 
-try:
-    from mlxtend.frequent_patterns import fpgrowth
-except ImportError:  # pragma: no cover - fallback path for minimal environments
-    fpgrowth = None
+class _FPTreeNode:
+    def __init__(self, item: Optional[str], parent: Optional["_FPTreeNode"]) -> None:
+        self.item = item
+        self.parent = parent
+        self.count = 0
+        self.children: Dict[str, _FPTreeNode] = {}
+        self.link: Optional[_FPTreeNode] = None
+
+
+def _build_fp_tree(
+    transactions: List[Tuple[List[str], int]],
+    min_support: int,
+) -> Tuple[_FPTreeNode, Dict[str, int], Dict[str, _FPTreeNode]]:
+    item_supports: Dict[str, int] = defaultdict(int)
+    for items, weight in transactions:
+        for item in items:
+            item_supports[item] += weight
+
+    frequent_items = {item: support for item, support in item_supports.items() if support >= min_support}
+    root = _FPTreeNode(item=None, parent=None)
+    header_heads: Dict[str, _FPTreeNode] = {}
+    header_tails: Dict[str, _FPTreeNode] = {}
+
+    if not frequent_items:
+        return root, {}, {}
+
+    for items, weight in transactions:
+        filtered_items = [item for item in items if item in frequent_items]
+        if not filtered_items:
+            continue
+        filtered_items.sort(key=lambda item: (-frequent_items[item], item))
+        current = root
+        for item in filtered_items:
+            child = current.children.get(item)
+            if child is None:
+                child = _FPTreeNode(item=item, parent=current)
+                current.children[item] = child
+                if item not in header_heads:
+                    header_heads[item] = child
+                    header_tails[item] = child
+                else:
+                    header_tails[item].link = child
+                    header_tails[item] = child
+            child.count += weight
+            current = child
+
+    return root, frequent_items, header_heads
+
+
+def _conditional_pattern_base(node: _FPTreeNode) -> List[Tuple[List[str], int]]:
+    pattern_base: List[Tuple[List[str], int]] = []
+    current = node
+    while current is not None:
+        path: List[str] = []
+        parent = current.parent
+        while parent is not None and parent.item is not None:
+            path.append(parent.item)
+            parent = parent.parent
+        if path:
+            path.reverse()
+            pattern_base.append((path, current.count))
+        current = current.link
+    return pattern_base
+
+
+def _mine_fp_tree(
+    frequent_items: Dict[str, int],
+    header_heads: Dict[str, _FPTreeNode],
+    min_support: int,
+    prefix: FrozenSet[str],
+    support_map: Dict[FrozenSet[str], int],
+) -> None:
+    for item in sorted(frequent_items.keys(), key=lambda value: (frequent_items[value], value)):
+        pattern = frozenset(set(prefix) | {item})
+        support_map[pattern] = frequent_items[item]
+        conditional_transactions = _conditional_pattern_base(header_heads[item])
+        _, conditional_supports, conditional_headers = _build_fp_tree(conditional_transactions, min_support)
+        if conditional_supports:
+            _mine_fp_tree(conditional_supports, conditional_headers, min_support, pattern, support_map)
 
 
 def _supporting_files_by_superset(
@@ -26,7 +97,7 @@ def find_closed_itemsets(
     min_support: int,
     min_bundle_size: int = 2,
 ) -> List[Dict[str, object]]:
-    """Find closed frequent itemsets via FP-Growth with graceful fallback."""
+    """Find closed frequent itemsets via a pure-Python FP-Growth implementation."""
     if min_support < 1:
         raise ValueError("min_support must be >= 1")
     if min_bundle_size < 1:
@@ -35,43 +106,27 @@ def find_closed_itemsets(
     if not file_sets:
         return []
 
-    if fpgrowth is None or pd is None:
-        print("[warn] mlxtend/pandas unavailable; using pairwise closed-itemset fallback")
-        return _find_closed_itemsets_pairwise(file_sets, min_support, min_bundle_size)
+    transaction_counts: Dict[Tuple[str, ...], int] = defaultdict(int)
+    for patterns in file_sets.values():
+        if patterns:
+            transaction_counts[tuple(sorted(patterns))] += 1
 
-    file_ids = sorted(file_sets.keys())
-    transactions = [sorted(file_sets[file_id]) for file_id in file_ids]
+    transactions = [(list(items), weight) for items, weight in transaction_counts.items()]
     if not transactions:
         return []
 
-    all_items = sorted({item for txn in transactions for item in txn})
-    if not all_items:
-        return []
-
-    one_hot_df = pd.DataFrame(False, index=range(len(transactions)), columns=all_items)
-    for row_idx, txn in enumerate(transactions):
-        if txn:
-            one_hot_df.loc[row_idx, txn] = True
-
-    min_support_fraction = float(min_support) / float(len(transactions))
-    frequent_itemsets = fpgrowth(one_hot_df, min_support=min_support_fraction, use_colnames=True)
-    if frequent_itemsets.empty:
-        return []
-
     support_map: Dict[FrozenSet[str], int] = {}
-    for _, row in frequent_itemsets.iterrows():
-        itemset = frozenset(str(item) for item in row["itemsets"])
-        if len(itemset) < min_bundle_size:
-            continue
-        support_count = int(round(float(row["support"]) * len(transactions)))
-        if support_count >= min_support:
-            support_map[itemset] = support_count
+    _, frequent_items, header_heads = _build_fp_tree(transactions, min_support)
+    if not frequent_items:
+        return []
+    _mine_fp_tree(frequent_items, header_heads, min_support, frozenset(), support_map)
 
-    if not support_map:
+    frequent_itemsets = {itemset: support for itemset, support in support_map.items() if len(itemset) >= min_bundle_size}
+    if not frequent_itemsets:
         return []
 
     closed_sets: List[FrozenSet[str]] = []
-    support_items = list(support_map.items())
+    support_items = list(frequent_itemsets.items())
     for itemset, itemset_support in support_items:
         is_closed = True
         for other, other_support in support_items:
@@ -88,54 +143,8 @@ def find_closed_itemsets(
     return [
         {
             "pattern_ids": itemset,
-            "files_present": support_map[itemset],
+            "files_present": frequent_itemsets[itemset],
             "file_ids": frozenset(_supporting_files_by_superset(file_sets, itemset)),
-        }
-        for itemset in closed_sets
-    ]
-
-
-def _find_closed_itemsets_pairwise(
-    file_sets: Dict[str, FrozenSet[str]],
-    min_support: int,
-    min_bundle_size: int,
-) -> List[Dict[str, object]]:
-    """Legacy pairwise-intersection closed itemset finder."""
-
-    candidates: Set[FrozenSet[str]] = set()
-    file_ids = sorted(file_sets.keys())
-    for left, right in combinations(file_ids, 2):
-        intersection = file_sets[left] & file_sets[right]
-        if len(intersection) >= min_bundle_size:
-            candidates.add(frozenset(intersection))
-
-    support_map: Dict[FrozenSet[str], int] = {}
-    files_for_candidate: Dict[FrozenSet[str], FrozenSet[str]] = {}
-    for cand in sorted(candidates, key=lambda s: (len(s), tuple(sorted(s)))):
-        matched_files = frozenset(_supporting_files_by_superset(file_sets, cand))
-        support = len(matched_files)
-        if support >= min_support:
-            support_map[cand] = support
-            files_for_candidate[cand] = matched_files
-
-    closed_sets: List[FrozenSet[str]] = []
-    support_items: List[Tuple[FrozenSet[str], int]] = list(support_map.items())
-    for itemset, itemset_support in support_items:
-        is_closed = True
-        for other, other_support in support_items:
-            if len(other) <= len(itemset):
-                continue
-            if itemset.issubset(other) and itemset_support == other_support:
-                is_closed = False
-                break
-        if is_closed:
-            closed_sets.append(itemset)
-
-    return [
-        {
-            "pattern_ids": itemset,
-            "files_present": support_map[itemset],
-            "file_ids": files_for_candidate[itemset],
         }
         for itemset in closed_sets
     ]
