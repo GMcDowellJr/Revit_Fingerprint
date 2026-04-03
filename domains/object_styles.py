@@ -39,6 +39,7 @@ except ImportError:
     CategoryType = None
 
 _CTX_CATEGORIES_CACHE_KEY = "_object_styles_categories_cache"
+_EXCLUDED_TOP_LEVEL_CATEGORIES = frozenset(["Lines"])
 _MODEL_SEMANTIC_KEYS = sorted([
     "obj_style.color.rgb",
     "obj_style.pattern_ref.sig_hash",
@@ -52,22 +53,61 @@ _NON_MODEL_SEMANTIC_KEYS = sorted([
 ])
 
 
-def _collect_categories(doc, ctx):
-    if ctx is not None and _CTX_CATEGORIES_CACHE_KEY in ctx:
-        return ctx[_CTX_CATEGORIES_CACHE_KEY]
+def _is_model_category_int0(cat):
+    try:
+        return int(getattr(cat, "CategoryType", -1)) == 0
+    except Exception:
+        try:
+            return getattr(cat, "CategoryType", None) == getattr(CategoryType, "Model", None)
+        except Exception:
+            return False
+
+
+def _collect_categories(doc, ctx, kind=None):
+    cache_key = _CTX_CATEGORIES_CACHE_KEY if kind is None else "{}::{}".format(_CTX_CATEGORIES_CACHE_KEY, safe_str(kind))
+    if ctx is not None and cache_key in ctx:
+        return ctx[cache_key]
     result = []
+    excluded_top_level_names = set()
+    excluded_parent_ids = set()
     try:
         for cat in doc.Settings.Categories:
+            is_excluded_top_level = False
+            try:
+                cat_name = canon_str(getattr(cat, "Name", None))
+            except Exception:
+                cat_name = None
+            if kind == "model" and _is_model_category_int0(cat) and cat_name in _EXCLUDED_TOP_LEVEL_CATEGORIES:
+                is_excluded_top_level = True
+                if cat_name:
+                    excluded_top_level_names.add(cat_name)
+                try:
+                    excluded_parent_ids.add(int(getattr(getattr(cat, "Id", None), "IntegerValue", 0)))
+                except Exception:
+                    pass
+
+            if is_excluded_top_level:
+                continue
+
             result.append((cat, False, None))
             try:
                 for sub in list(getattr(cat, "SubCategories", []) or []):
+                    if kind == "model":
+                        try:
+                            parent_id = int(getattr(getattr(cat, "Id", None), "IntegerValue", 0))
+                        except Exception:
+                            parent_id = 0
+                        if parent_id in excluded_parent_ids:
+                            continue
                     result.append((sub, True, cat))
             except Exception:
                 pass
     except Exception:
         pass
     if ctx is not None:
-        ctx[_CTX_CATEGORIES_CACHE_KEY] = result
+        ctx[cache_key] = result
+        if kind == "model":
+            ctx["{}_excluded_top_level_names".format(cache_key)] = sorted(excluded_top_level_names)
     return result
 
 
@@ -140,9 +180,19 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
         lp_uid_to_sig_hash_v2 = None
 
     try:
-        cats = _collect_categories(doc, ctx)
+        cats = _collect_categories(doc, ctx, kind=kind)
     except Exception:
         return info
+
+    if kind == "model":
+        excluded_names = []
+        if ctx is not None:
+            try:
+                excluded_names = ctx.get("{}::{}_excluded_top_level_names".format(_CTX_CATEGORIES_CACHE_KEY, safe_str(kind)), []) or []
+            except Exception:
+                excluded_names = []
+        if "Lines" in set(excluded_names):
+            print("[object_styles_model] excluded_top_level_category name='Lines' reason='covered_by_line_styles'")
 
     semantic_keys = _MODEL_SEMANTIC_KEYS if include_cut_weight else _NON_MODEL_SEMANTIC_KEYS
     v2_records = []
