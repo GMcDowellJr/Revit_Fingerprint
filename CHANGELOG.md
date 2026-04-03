@@ -12,6 +12,12 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Changed
+- Bundle analysis `derive_scope_key()` for row-key domains
+  (`object_styles_model`, `object_styles_annotation`, `view_category_overrides`)
+  now uses full `pattern_label_human` (for example `Walls|self`,
+  `Generic Models|Toilet Partition`) as `scope_key` instead of collapsing
+  to parent category; this is a breaking scope change requiring full
+  bundle-analysis re-run for those three domains
 - line_patterns join key policy upgraded from `line_patterns.join_key.v2`
   (`line_pattern.segments_def_hash`) to `line_patterns.join_key.v3`
   (`line_pattern.segments_norm_hash`) to enforce scale-invariant structural identity;
