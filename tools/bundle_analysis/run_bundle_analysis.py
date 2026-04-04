@@ -259,7 +259,6 @@ def run_bundle_analysis(
                     if row.get("analysis_run_id", "") == run_id
                     and row.get("domain", "") == dom
                     and row.get("population_id", "") == pid
-                    and (row.get("scope_key", "") or "").strip()
                 }
             )
             if not scope_keys_for_population:
