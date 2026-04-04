@@ -44,6 +44,7 @@ def _run_pipeline_once(
     population_id: Optional[str] = None,
     analysis_run_id: str = "",
     population_registry_dir: Optional[Path] = None,
+    scope_key_filter: Optional[str] = None,
 ) -> Dict[str, object]:
     total_bundles = 0
     total_edges = 0
@@ -57,6 +58,7 @@ def _run_pipeline_once(
         run_id,
         population_id,
         population_registry_dir,
+        scope_key_filter,
     )
     t1 = time.time() - t0
     print(f"[run] domain={domain} step1_seconds={t1:.3f}")
@@ -226,9 +228,9 @@ def run_bundle_analysis(
             continue
 
         summary_rows = read_csv_rows(out_dir / "corpus_population_summary.csv") if (out_dir / "corpus_population_summary.csv").exists() else []
-        pop_ids = sorted(
+        pop_scope_pairs = sorted(
             {
-                row.get("population_id", "")
+                (row.get("population_id", ""), row.get("scope_key", ""))
                 for row in summary_rows
                 if row.get("analysis_run_id", "") == run_id
                 and row.get("domain", "") == dom
@@ -236,7 +238,7 @@ def run_bundle_analysis(
                 and row.get("population_id", "")
             }
         )
-        domain_primary_counts[dom] = len(pop_ids)
+        domain_primary_counts[dom] = len(pop_scope_pairs)
         outlier_count = sum(
             int(row.get("file_count", "0") or "0")
             for row in summary_rows
@@ -245,10 +247,10 @@ def run_bundle_analysis(
             and row.get("population_role", "") == "outlier"
         )
         outliers_by_domain[dom] = outlier_count
-        if not pop_ids:
+        if not pop_scope_pairs:
             print(f"[run][warn] domain={dom} has no primary populations; skipping main pass")
             continue
-        for pid in pop_ids:
+        for pid, scope_key_for_pop in pop_scope_pairs:
             print(f"[run] domain={dom} population_id={pid} start")
             populations_analyzed += 1
             domain_population_counts[dom] = domain_population_counts.get(dom, 0) + 1
@@ -271,6 +273,7 @@ def run_bundle_analysis(
                     population_id=pid,
                     analysis_run_id=run_id,
                     population_registry_dir=out_dir,
+                    scope_key_filter=scope_key_for_pop,
                 )
                 domain_elapsed_seconds[dom] = domain_elapsed_seconds.get(dom, 0.0) + (time.time() - t0)
                 total_bundles += stats["total_bundles_found"]
