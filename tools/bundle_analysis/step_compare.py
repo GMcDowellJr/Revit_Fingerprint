@@ -138,19 +138,33 @@ def run_compare_for_domain(
     compare_out_dir: Optional[Path] = None,
     population_id: str = "",
     eligible_export_run_ids: Optional[Set[str]] = None,
+    reset_domain_rows: bool = False,
 ) -> Dict[str, str]:
     compare_dir = compare_out_dir if compare_out_dir is not None else out_dir.parent / "compare"
     compare_dir.mkdir(parents=True, exist_ok=True)
     gap_path = compare_dir / "file_gap_report.csv"
     domain_rows = _compute_gap_rows(analysis_dir, out_dir, reference, domain, population_id, eligible_export_run_ids)
+    presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
+    current_run_id = resolve_analysis_run_id(presence_rows, "")
 
     with _GAP_REPORT_LOCK:
         existing = read_csv_rows(gap_path) if gap_path.is_file() else []
-        merged = [
-            row
-            for row in existing
-            if not (row.get("domain", "") == domain and row.get("population_id", "") == population_id)
-        ] + domain_rows
+        if reset_domain_rows:
+            merged = [
+                row
+                for row in existing
+                if not (row.get("analysis_run_id", "") == current_run_id and row.get("domain", "") == domain)
+            ] + domain_rows
+        else:
+            merged = [
+                row
+                for row in existing
+                if not (
+                    row.get("analysis_run_id", "") == current_run_id
+                    and row.get("domain", "") == domain
+                    and row.get("population_id", "") == population_id
+                )
+            ] + domain_rows
         merged.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("export_run_id", "")))
         atomic_write_csv(gap_path, _GAP_FIELDNAMES, merged)
 

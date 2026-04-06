@@ -6,7 +6,7 @@ import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 if __package__ in (None, ""):
     _THIS_DIR = Path(__file__).resolve().parent
@@ -328,6 +328,7 @@ def run_bundle_analysis(
     step0_times: Dict[str, float] = {}
     domain_primary_counts: Dict[str, int] = {}
     outliers_by_domain: Dict[str, int] = {}
+    compare_reset_domains: Set[str] = set()
 
     populations_analyzed = 0
     staging_root = out_dir / "_population_runs"
@@ -456,7 +457,9 @@ def run_bundle_analysis(
                         compare_out_dir=out_dir.parent / "compare",
                         population_id=pid,
                         eligible_export_run_ids=eligible_export_run_ids,
+                        reset_domain_rows=dom not in compare_reset_domains,
                     )
+                    compare_reset_domains.add(dom)
                     compare_summary_rows.append(compare_summary)
                 produced = stage_out / dom
                 final_out.parent.mkdir(parents=True, exist_ok=True)
