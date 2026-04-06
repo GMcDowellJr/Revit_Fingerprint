@@ -107,7 +107,7 @@ def build_membership_matrix(
         if meta is None:
             continue
         scope_key = derive_scope_key(domain, meta)
-        if scope_key_filter is not None and scope_key_filter != "" and scope_key != scope_key_filter:
+        if scope_key_filter is not None and scope_key != scope_key_filter:
             continue
         pair = (export_run_id, pattern_id)
         if pair in pairs_seen[scope_key]:
