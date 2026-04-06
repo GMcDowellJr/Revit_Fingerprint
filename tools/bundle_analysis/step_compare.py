@@ -15,6 +15,7 @@ _GAP_FIELDNAMES = [
     "effective_date",
     "analysis_run_id",
     "domain",
+    "population_id",
     "export_run_id",
     "patterns_required",
     "patterns_present",
@@ -31,6 +32,7 @@ def _compute_gap_rows(
     out_dir: Path,
     reference: Dict[str, object],
     domain: str,
+    population_id: str = "",
     eligible_export_run_ids: Optional[Set[str]] = None,
 ) -> List[Dict[str, str]]:
     presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
@@ -83,6 +85,7 @@ def _compute_gap_rows(
                 "effective_date": str(reference.get("effective_date", "")),
                 "analysis_run_id": run_id,
                 "domain": domain,
+                "population_id": population_id,
                 "export_run_id": export_run_id,
                 "patterns_required": "0",
                 "patterns_present": "0",
@@ -114,6 +117,7 @@ def _compute_gap_rows(
                 "effective_date": str(reference.get("effective_date", "")),
                 "analysis_run_id": run_id,
                 "domain": domain,
+                "population_id": population_id,
                 "export_run_id": export_run_id,
                 "patterns_required": str(required_count),
                 "patterns_present": str(present_count),
@@ -132,17 +136,22 @@ def run_compare_for_domain(
     reference: Dict[str, object],
     domain: str,
     compare_out_dir: Optional[Path] = None,
+    population_id: str = "",
     eligible_export_run_ids: Optional[Set[str]] = None,
 ) -> Dict[str, str]:
     compare_dir = compare_out_dir if compare_out_dir is not None else out_dir.parent / "compare"
     compare_dir.mkdir(parents=True, exist_ok=True)
     gap_path = compare_dir / "file_gap_report.csv"
-    domain_rows = _compute_gap_rows(analysis_dir, out_dir, reference, domain, eligible_export_run_ids)
+    domain_rows = _compute_gap_rows(analysis_dir, out_dir, reference, domain, population_id, eligible_export_run_ids)
 
     with _GAP_REPORT_LOCK:
         existing = read_csv_rows(gap_path) if gap_path.is_file() else []
-        merged = [row for row in existing if row.get("domain", "") != domain] + domain_rows
-        merged.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("export_run_id", "")))
+        merged = [
+            row
+            for row in existing
+            if not (row.get("domain", "") == domain and row.get("population_id", "") == population_id)
+        ] + domain_rows
+        merged.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("export_run_id", "")))
         atomic_write_csv(gap_path, _GAP_FIELDNAMES, merged)
 
     counts = Counter(row.get("coverage_status", "") for row in domain_rows)
@@ -151,6 +160,7 @@ def run_compare_for_domain(
         "effective_date": str(reference.get("effective_date", "")),
         "analysis_run_id": (domain_rows[0].get("analysis_run_id", "") if domain_rows else ""),
         "domain": domain,
+        "population_id": population_id,
         "files_scored": str(len(domain_rows)),
         "full_count": str(counts.get("full", 0)),
         "partial_count": str(counts.get("partial", 0)),

@@ -296,7 +296,7 @@ def run_bundle_analysis(
         atomic_write_csv(out_dir / "bundle_analysis_timing.csv", TIMING_FIELDNAMES, merged_timing_rows)
         if compare:
             compare_rows = [r for r in compare_summary_rows if r.get("analysis_run_id", "") == run_id]
-            compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", "")))
+            compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
             atomic_write_csv(
                 out_dir.parent / "compare" / "compare_run_summary.csv",
                 [
@@ -304,6 +304,7 @@ def run_bundle_analysis(
                     "effective_date",
                     "analysis_run_id",
                     "domain",
+                    "population_id",
                     "files_scored",
                     "full_count",
                     "partial_count",
@@ -453,6 +454,7 @@ def run_bundle_analysis(
                         reference=reference,
                         domain=dom,
                         compare_out_dir=out_dir.parent / "compare",
+                        population_id=pid,
                         eligible_export_run_ids=eligible_export_run_ids,
                     )
                     compare_summary_rows.append(compare_summary)
@@ -502,7 +504,7 @@ def run_bundle_analysis(
     atomic_write_csv(out_dir / "bundle_analysis_timing.csv", TIMING_FIELDNAMES, merged_timing_rows)
     if compare:
         compare_rows = [r for r in compare_summary_rows if r.get("analysis_run_id", "") == run_id]
-        compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", "")))
+        compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
         atomic_write_csv(
             out_dir.parent / "compare" / "compare_run_summary.csv",
             [
@@ -510,6 +512,7 @@ def run_bundle_analysis(
                 "effective_date",
                 "analysis_run_id",
                 "domain",
+                "population_id",
                 "files_scored",
                 "full_count",
                 "partial_count",
