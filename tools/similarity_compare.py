@@ -1044,11 +1044,16 @@ def write_details_json(details: List[SimilarityDetail], out_path: str) -> List[s
     by_domain: Dict[str, List[Dict[str, Any]]] = {}
     for comparison in details:
         for domain_detail in comparison.domains:
+            domain_payload = _domain_detail_payload(domain_detail)
             by_domain.setdefault(domain_detail.domain, []).append({
                 "file_a": comparison.file_a,
                 "file_b": comparison.file_b,
                 "summary": _detail_summary_payload(comparison.summary),
-                "domain": _domain_detail_payload(domain_detail),
+                # Backward-compatible shape for tools/details_to_csv.py:
+                # it expects row["domains"] to be a list of domain objects.
+                "domains": [domain_payload],
+                # Keep single-domain convenience payload in parallel.
+                "domain": domain_payload,
             })
 
     written_paths: List[str] = []
