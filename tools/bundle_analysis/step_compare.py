@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Dict, List, Set
 
 if __package__ in (None, ""):
-    from common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id
+    from common import atomic_write_csv, read_csv_rows, resolve_analysis_run_id
 else:
-    from .common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id
+    from .common import atomic_write_csv, read_csv_rows, resolve_analysis_run_id
 
 _GAP_FIELDNAMES = [
     "reference_bundle_id",
@@ -32,9 +32,20 @@ def _compute_gap_rows(
     reference: Dict[str, object],
     domain: str,
 ) -> List[Dict[str, str]]:
+    presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
+    run_id = resolve_analysis_run_id(presence_rows, "")
     membership_rows = read_csv_rows(out_dir / domain / "membership_matrix.csv")
-    run_id = resolve_analysis_run_id(membership_rows, "")
     seed_export_run_id = str(reference.get("seed_export_run_id", "")).strip()
+    all_export_ids = sorted(
+        {
+            str(row.get("export_run_id", "")).strip()
+            for row in presence_rows
+            if row.get("analysis_run_id", "") == run_id
+            and row.get("domain", "") == domain
+            and str(row.get("export_run_id", "")).strip()
+            and str(row.get("export_run_id", "")).strip() != seed_export_run_id
+        }
+    )
     required_patterns = {
         str(pid).strip()
         for pid in (reference.get("domains", {}) or {}).get(domain, [])
@@ -52,6 +63,8 @@ def _compute_gap_rows(
         if seed_export_run_id and export_run_id == seed_export_run_id:
             continue
         present_by_export.setdefault(export_run_id, set()).add(pattern_id)
+    for export_run_id in all_export_ids:
+        present_by_export.setdefault(export_run_id, set())
 
     if not required_patterns:
         return [
@@ -68,12 +81,12 @@ def _compute_gap_rows(
                 "coverage_pct": "",
                 "coverage_status": "NO_REFERENCE_DEFINED",
             }
-            for export_run_id in sorted(present_by_export.keys())
+            for export_run_id in all_export_ids
         ]
 
     rows: List[Dict[str, str]] = []
     required_count = len(required_patterns)
-    for export_run_id in sorted(present_by_export.keys()):
+    for export_run_id in all_export_ids:
         present = present_by_export[export_run_id]
         present_count = len(present & required_patterns)
         missing = sorted(required_patterns - present)
