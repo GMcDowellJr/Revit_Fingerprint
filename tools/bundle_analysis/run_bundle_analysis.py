@@ -6,7 +6,7 @@ import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 if __package__ in (None, ""):
     _THIS_DIR = Path(__file__).resolve().parent
@@ -182,7 +182,7 @@ def run_bundle_analysis(
     min_support_count: int = 3,
     min_support_pct: float = 0.0,
     analysis_run_id: str = "",
-    discover_populations_flag: bool = False,
+    discover_populations_flag: bool = True,
     min_population_size: int = 0,
     max_population_overlap: float = 0.20,
     min_population_jaccard: float = 0.30,
@@ -205,8 +205,6 @@ def run_bundle_analysis(
     reference: Optional[Dict[str, object]] = None
 
     if compare:
-        if discover_populations_flag:
-            raise ValueError("--compare is not supported with --discover-populations.")
         reference = load_and_validate(analysis_dir, SCHEMA_VERSION)
         compare_dir = out_dir.parent / "compare"
         compare_dir.mkdir(parents=True, exist_ok=True)
@@ -298,7 +296,7 @@ def run_bundle_analysis(
         atomic_write_csv(out_dir / "bundle_analysis_timing.csv", TIMING_FIELDNAMES, merged_timing_rows)
         if compare:
             compare_rows = [r for r in compare_summary_rows if r.get("analysis_run_id", "") == run_id]
-            compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", "")))
+            compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
             atomic_write_csv(
                 out_dir.parent / "compare" / "compare_run_summary.csv",
                 [
@@ -306,6 +304,7 @@ def run_bundle_analysis(
                     "effective_date",
                     "analysis_run_id",
                     "domain",
+                    "population_id",
                     "files_scored",
                     "full_count",
                     "partial_count",
@@ -329,6 +328,7 @@ def run_bundle_analysis(
     step0_times: Dict[str, float] = {}
     domain_primary_counts: Dict[str, int] = {}
     outliers_by_domain: Dict[str, int] = {}
+    compare_reset_domains: Set[str] = set()
 
     populations_analyzed = 0
     staging_root = out_dir / "_population_runs"
@@ -442,6 +442,25 @@ def run_bundle_analysis(
                         }
                     )
 
+                if compare and reference is not None:
+                    membership_rows = read_csv_rows(stage_out / dom / "membership_matrix.csv")
+                    eligible_export_run_ids = {
+                        str(row.get("export_run_id", "")).strip()
+                        for row in membership_rows
+                        if row.get("analysis_run_id", "") == run_id and str(row.get("export_run_id", "")).strip()
+                    }
+                    compare_summary = run_compare_for_domain(
+                        analysis_dir=analysis_dir,
+                        out_dir=stage_out,
+                        reference=reference,
+                        domain=dom,
+                        compare_out_dir=out_dir.parent / "compare",
+                        population_id=pid,
+                        eligible_export_run_ids=eligible_export_run_ids,
+                        reset_domain_rows=dom not in compare_reset_domains,
+                    )
+                    compare_reset_domains.add(dom)
+                    compare_summary_rows.append(compare_summary)
                 produced = stage_out / dom
                 final_out.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(produced), str(final_out))
@@ -486,6 +505,25 @@ def run_bundle_analysis(
     merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + timing_rows
     merged_timing_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("step", "")))
     atomic_write_csv(out_dir / "bundle_analysis_timing.csv", TIMING_FIELDNAMES, merged_timing_rows)
+    if compare:
+        compare_rows = [r for r in compare_summary_rows if r.get("analysis_run_id", "") == run_id]
+        compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
+        atomic_write_csv(
+            out_dir.parent / "compare" / "compare_run_summary.csv",
+            [
+                "reference_bundle_id",
+                "effective_date",
+                "analysis_run_id",
+                "domain",
+                "population_id",
+                "files_scored",
+                "full_count",
+                "partial_count",
+                "none_count",
+                "no_reference_count",
+            ],
+            compare_rows,
+        )
 
     return {
         "domains_processed": processed,
@@ -505,7 +543,8 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--analysis-run-id", default="")
     p.add_argument("--min-support-count", type=int, default=3)
     p.add_argument("--min-support-pct", type=float, default=0.0)
-    p.add_argument("--discover-populations", action="store_true")
+    p.add_argument("--no-discover-populations", dest="discover_populations", action="store_false")
+    p.set_defaults(discover_populations=True)
     p.add_argument("--min-population-size", type=int, default=0)
     p.add_argument("--max-population-overlap", type=float, default=0.20)
     p.add_argument("--min-population-jaccard", type=float, default=0.30)
