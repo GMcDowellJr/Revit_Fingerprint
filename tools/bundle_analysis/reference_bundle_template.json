@@ -1,0 +1,18 @@
+{
+  "_comment": "Template for compare-mode reference bundles. Replace all placeholder values before production use.",
+  "reference_bundle_id": "REPLACE_WITH_REFERENCE_BUNDLE_ID",
+  "effective_date": "REPLACE_WITH_YYYY-MM-DD",
+  "extractor_schema_version": "REPLACE_WITH_CURRENT_SCHEMA_VERSION",
+  "seed_export_run_id": "REPLACE_WITH_SEED_EXPORT_RUN_ID",
+  "domains": {
+    "_comment": "Each domain must map to a non-empty list of exact pattern_id strings.",
+    "dimension_types": [
+      "pid_dimension_placeholder_001",
+      "pid_dimension_placeholder_002"
+    ],
+    "text_types": [
+      "pid_text_placeholder_001",
+      "pid_text_placeholder_002"
+    ]
+  }
+}

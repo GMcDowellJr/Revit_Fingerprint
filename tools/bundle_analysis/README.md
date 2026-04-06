@@ -125,3 +125,127 @@ Per scope, Step 2 logs:
 - `[step2_threshold] ... expected_floor=... natural_breaks_floor=... chosen=... cli_floor=... effective=...`
 - `[step2_threshold_fallback] ...` when auto-threshold computation errors
 - `[step2] ... effective_threshold=...` on step summary
+
+---
+
+## Compare Mode
+
+Use `run_compare_mode.py` when you already have a known standard bundle and want to score each file against that standard. This differs from discovery mode (`run_bundle_analysis.py`), which mines bundles inductively from corpus convergence.
+
+### When to use compare mode vs discovery mode
+
+- **Discovery mode**: corpus mining, threshold-driven, useful for large populations and emergent standards.
+- **Compare mode**: direct compliance scoring against a pre-authored (or derived) reference bundle, useful for small corpora and standards validation.
+
+### Reference input paths (`--reference`)
+
+`run_compare_mode.py` accepts two reference path types:
+
+1. **JSON reference bundle** (`.json`)
+   - Loaded and validated directly.
+   - Hard-stops on schema mismatch (`extractor_schema_version` must equal current extractor schema version).
+
+2. **Revit seed file** (`.rvt`)
+   - The script runs `tools/run_extract_all.py` into `--out-dir/_rvt_extract_<rvt_stem>/`.
+   - It reads the generated `domain_patterns.csv` + `pattern_presence_file.csv` and derives a bundle.
+   - It writes a sidecar JSON next to the `.rvt`:
+     - `<rvt_parent>/<rvt_stem>_reference_bundle.json`
+
+Path selection is automatic based on extension:
+- `.rvt` -> extraction + derive sidecar
+- everything else -> JSON load/validate
+
+### Sidecar JSON behavior for `.rvt` references
+
+For `.rvt` references, compare mode writes the sidecar bundle JSON before scoring so standards managers can inspect and reuse it without re-running extraction.
+
+Auto-populated in sidecar:
+- `seed_export_run_id` (from extraction output)
+- `extractor_schema_version` (from extraction output)
+- `effective_date` (today, placeholder)
+- `reference_bundle_id` (`<rvt_stem>-derived`, placeholder)
+
+After writing, compare mode emits this reminder to stderr:
+
+`[compare] Sidecar reference bundle written to <path>. Review and set reference_bundle_id and effective_date before using as a standalone reference.`
+
+### Reference bundle format (required fields)
+
+Required top-level fields:
+- `reference_bundle_id`
+- `effective_date` (ISO 8601 date string)
+- `extractor_schema_version` (must match current schema exactly)
+- `seed_export_run_id`
+- `domains` (non-empty object: `domain -> non-empty list of non-empty pattern_id strings`)
+
+Example shape:
+
+```json
+{
+  "reference_bundle_id": "stantec-v1",
+  "effective_date": "2026-04-06",
+  "extractor_schema_version": "2.1",
+  "seed_export_run_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "domains": {
+    "dimension_types": ["pid_abc123", "pid_def456"],
+    "text_types": ["pid_ghi789"]
+  }
+}
+```
+
+A template is provided at:
+- `tools/bundle_analysis/reference_bundle_template.json`
+
+### Deriving pattern IDs from `domain_patterns.csv`
+
+Pattern IDs used in reference bundles come directly from `pattern_id` values in `domain_patterns.csv` for each target domain. Compare mode performs exact string matching only (no normalization/fuzzy matching).
+
+### Seed exclusion behavior
+
+Compare mode excludes `seed_export_run_id` from scoring population before coverage calculations. This applies regardless of whether the reference was loaded from JSON or derived from `.rvt`.
+
+### `NO_REFERENCE_DEFINED` sentinel behavior
+
+If a domain exists in membership matrices but is missing from `reference.domains`, compare mode emits a sentinel row with:
+- `coverage_status = NO_REFERENCE_DEFINED`
+- empty pattern count / gap fields
+
+This is a visibility signal for downstream BI, not a pipeline failure.
+
+### Outputs
+
+Compare mode writes:
+- `file_gap_report.csv` with columns:
+  - `reference_bundle_id,effective_date,analysis_run_id,domain,export_run_id,patterns_required,patterns_present,patterns_missing,gap_pattern_ids,coverage_pct,coverage_status`
+- `compare_run_summary.csv` with per-domain rollups:
+  - `reference_bundle_id,effective_date,analysis_run_id,domain,files_scored,full_count,partial_count,none_count,no_reference_count`
+
+### Example invocations
+
+JSON reference path:
+
+```bash
+python tools/bundle_analysis/run_compare_mode.py \
+  --analysis-dir results/bundle_analysis \
+  --out-dir results/bundle_compare \
+  --reference tools/bundle_analysis/reference_bundle_template.json
+```
+
+RVT reference path:
+
+```bash
+python tools/bundle_analysis/run_compare_mode.py \
+  --analysis-dir results/bundle_analysis \
+  --out-dir results/bundle_compare \
+  --reference /path/to/seed_model.rvt
+```
+
+Optional single-domain run:
+
+```bash
+python tools/bundle_analysis/run_compare_mode.py \
+  --analysis-dir results/bundle_analysis \
+  --out-dir results/bundle_compare \
+  --reference /path/to/reference_bundle.json \
+  --domain dimension_types
+```
