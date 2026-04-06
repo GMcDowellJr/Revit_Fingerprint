@@ -441,12 +441,19 @@ def run_bundle_analysis(
                     )
 
                 if compare and reference is not None:
+                    membership_rows = read_csv_rows(stage_out / dom / "membership_matrix.csv")
+                    eligible_export_run_ids = {
+                        str(row.get("export_run_id", "")).strip()
+                        for row in membership_rows
+                        if row.get("analysis_run_id", "") == run_id and str(row.get("export_run_id", "")).strip()
+                    }
                     compare_summary = run_compare_for_domain(
                         analysis_dir=analysis_dir,
                         out_dir=stage_out,
                         reference=reference,
                         domain=dom,
                         compare_out_dir=out_dir.parent / "compare",
+                        eligible_export_run_ids=eligible_export_run_ids,
                     )
                     compare_summary_rows.append(compare_summary)
                 produced = stage_out / dom

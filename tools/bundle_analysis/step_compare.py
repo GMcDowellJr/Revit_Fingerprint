@@ -31,21 +31,31 @@ def _compute_gap_rows(
     out_dir: Path,
     reference: Dict[str, object],
     domain: str,
+    eligible_export_run_ids: Optional[Set[str]] = None,
 ) -> List[Dict[str, str]]:
     presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     run_id = resolve_analysis_run_id(presence_rows, "")
     membership_rows = read_csv_rows(out_dir / domain / "membership_matrix.csv")
     seed_export_run_id = str(reference.get("seed_export_run_id", "")).strip()
-    all_export_ids = sorted(
-        {
-            str(row.get("export_run_id", "")).strip()
-            for row in presence_rows
-            if row.get("analysis_run_id", "") == run_id
-            and row.get("domain", "") == domain
-            and str(row.get("export_run_id", "")).strip()
-            and str(row.get("export_run_id", "")).strip() != seed_export_run_id
-        }
-    )
+    if eligible_export_run_ids is None:
+        all_export_ids = sorted(
+            {
+                str(row.get("export_run_id", "")).strip()
+                for row in presence_rows
+                if row.get("analysis_run_id", "") == run_id
+                and row.get("domain", "") == domain
+                and str(row.get("export_run_id", "")).strip()
+                and str(row.get("export_run_id", "")).strip() != seed_export_run_id
+            }
+        )
+    else:
+        all_export_ids = sorted(
+            {
+                export_run_id.strip()
+                for export_run_id in eligible_export_run_ids
+                if export_run_id.strip() and export_run_id.strip() != seed_export_run_id
+            }
+        )
     required_patterns = {
         str(pid).strip()
         for pid in (reference.get("domains", {}) or {}).get(domain, [])
@@ -122,11 +132,12 @@ def run_compare_for_domain(
     reference: Dict[str, object],
     domain: str,
     compare_out_dir: Optional[Path] = None,
+    eligible_export_run_ids: Optional[Set[str]] = None,
 ) -> Dict[str, str]:
     compare_dir = compare_out_dir if compare_out_dir is not None else out_dir.parent / "compare"
     compare_dir.mkdir(parents=True, exist_ok=True)
     gap_path = compare_dir / "file_gap_report.csv"
-    domain_rows = _compute_gap_rows(analysis_dir, out_dir, reference, domain)
+    domain_rows = _compute_gap_rows(analysis_dir, out_dir, reference, domain, eligible_export_run_ids)
 
     with _GAP_REPORT_LOCK:
         existing = read_csv_rows(gap_path) if gap_path.is_file() else []
