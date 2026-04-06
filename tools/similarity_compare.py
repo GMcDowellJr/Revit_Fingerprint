@@ -17,9 +17,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import itertools
 import json
 import os
+import re
 import sys
 from collections import Counter
 from dataclasses import dataclass
@@ -1022,9 +1024,22 @@ def _domain_detail_payload(detail: DomainDetail) -> Dict[str, Any]:
     }
 
 
+def _safe_domain_file_stem(domain_name: str) -> str:
+    """
+    Convert an arbitrary domain key into a safe filename stem.
+    """
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", domain_name).strip("._-")
+    if not safe:
+        safe = f"domain_{hashlib.sha1(domain_name.encode('utf-8')).hexdigest()[:12]}"
+    if safe in {".", ".."}:
+        safe = f"domain_{hashlib.sha1(domain_name.encode('utf-8')).hexdigest()[:12]}"
+    return safe
+
+
 def write_details_json(details: List[SimilarityDetail], out_path: str) -> List[str]:
     out_dir = Path(out_path).parent
     out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir_resolved = out_dir.resolve()
 
     by_domain: Dict[str, List[Dict[str, Any]]] = {}
     for comparison in details:
@@ -1037,8 +1052,19 @@ def write_details_json(details: List[SimilarityDetail], out_path: str) -> List[s
             })
 
     written_paths: List[str] = []
+    used_stems: Dict[str, int] = {}
     for domain_name, payload in sorted(by_domain.items()):
-        file_path = out_dir / f"{domain_name}_details.json"
+        stem = _safe_domain_file_stem(domain_name)
+        suffix = used_stems.get(stem, 0)
+        used_stems[stem] = suffix + 1
+        if suffix:
+            stem = f"{stem}_{suffix}"
+
+        file_path = out_dir / f"{stem}_details.json"
+        resolved_path = file_path.resolve()
+        if out_dir_resolved not in resolved_path.parents:
+            raise ValueError(f"unsafe_details_domain_filename:{domain_name}")
+
         file_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         written_paths.append(str(file_path))
 
