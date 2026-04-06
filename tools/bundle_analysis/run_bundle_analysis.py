@@ -206,7 +206,7 @@ def run_bundle_analysis(
 
     if compare:
         reference = load_and_validate(analysis_dir, SCHEMA_VERSION)
-        compare_dir = out_dir.parent / "compare" if not discover_populations_flag else out_dir / "compare"
+        compare_dir = out_dir.parent / "compare"
         compare_dir.mkdir(parents=True, exist_ok=True)
 
     if not discover_populations_flag:
@@ -440,18 +440,18 @@ def run_bundle_analysis(
                         }
                     )
 
-                produced = stage_out / dom
-                final_out.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(produced), str(final_out))
                 if compare and reference is not None:
                     compare_summary = run_compare_for_domain(
                         analysis_dir=analysis_dir,
                         out_dir=stage_out,
                         reference=reference,
                         domain=dom,
-                        compare_out_dir=out_dir / "compare",
+                        compare_out_dir=out_dir.parent / "compare",
                     )
                     compare_summary_rows.append(compare_summary)
+                produced = stage_out / dom
+                final_out.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(produced), str(final_out))
             except Exception as exc:
                 print(f"[run][error] domain={dom} population_id={pid} failed: {exc}")
 
@@ -497,7 +497,7 @@ def run_bundle_analysis(
         compare_rows = [r for r in compare_summary_rows if r.get("analysis_run_id", "") == run_id]
         compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", "")))
         atomic_write_csv(
-            out_dir / "compare" / "compare_run_summary.csv",
+            out_dir.parent / "compare" / "compare_run_summary.csv",
             [
                 "reference_bundle_id",
                 "effective_date",
