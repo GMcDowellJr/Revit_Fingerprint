@@ -239,7 +239,7 @@ def run_bundle_analysis(
                 and row.get("population_id", "")
             }
         )
-        domain_primary_counts[dom] = len(pop_scope_pairs)
+        domain_primary_counts[dom] = len(pop_ids)
         outlier_count = sum(
             int(row.get("file_count", "0") or "0")
             for row in summary_rows
