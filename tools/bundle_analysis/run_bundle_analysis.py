@@ -251,7 +251,7 @@ def run_bundle_analysis(
         if not pop_ids:
             print(f"[run][warn] domain={dom} has no primary populations; skipping main pass")
             continue
-        for pid in pop_ids:
+        for pid, _scope_key_from_summary in pop_ids:
             scope_keys_for_population = sorted(
                 {
                     (row.get("scope_key", "") or "").strip()
