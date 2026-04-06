@@ -17,9 +17,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import itertools
 import json
 import os
+import re
 import sys
 from collections import Counter
 from dataclasses import dataclass
@@ -975,63 +977,103 @@ def compare_two_detailed(fp_a: FingerprintData, fp_b: FingerprintData, top_k: in
     return SimilarityDetail(file_a=fp_a.path, file_b=fp_b.path, summary=summary, domains=domains)
 
 
-def write_details_json(details: List[SimilarityDetail], out_path: str) -> None:
-    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+def _detail_summary_payload(summary: SimilarityResult) -> Dict[str, Any]:
+    return {
+        "domain_hash_identity_jaccard": {
+            "value": summary.domain_hash_identity_jaccard.value,
+            "reason": summary.domain_hash_identity_jaccard.reason,
+        },
+        "domain_status_layout_jaccard": {
+            "value": summary.domain_status_layout_jaccard.value,
+            "reason": summary.domain_status_layout_jaccard.reason,
+        },
+        "signature_multiset_similarity": {
+            "value": summary.signature_multiset_similarity.value,
+            "reason": summary.signature_multiset_similarity.reason,
+        },
+        "domains_total": summary.domains_total,
+        "domains_compared_signatures": summary.domains_compared_signatures,
+        "domains_undefined_blocked": summary.domains_undefined_blocked,
+        "domains_undefined_unreadable": summary.domains_undefined_unreadable,
+        "domains_missing": summary.domains_missing,
+        "note": summary.note,
+    }
 
-    payload = []
-    for d in details:
-        doms = []
-        for dd in d.domains:
-            doms.append({
-                "domain": dd.domain,
-                "status_a": dd.status_a,
-                "status_b": dd.status_b,
-                "comparable": dd.comparable,
-                "reason": dd.reason,
-                "set_jaccard": {"value": dd.set_jaccard.value, "reason": dd.set_jaccard.reason},
-                "multiset_jaccard": {"value": dd.multiset_jaccard.value, "reason": dd.multiset_jaccard.reason},
-                "a_total": dd.a_total,
-                "b_total": dd.b_total,
-                "matched": dd.matched,
-                "added_in_b": dd.added_in_b,
-                "removed_from_a": dd.removed_from_a,
-                "union_mass": dd.union_mass,
-                "top_matched": (dd.top_matched.items if dd.top_matched else None),
-                "top_added": (dd.top_added.items if dd.top_added else None),
-                "top_removed": (dd.top_removed.items if dd.top_removed else None),
-                "sig_label_meta_a": dd.sig_label_meta_a,
-                "sig_label_meta_b": dd.sig_label_meta_b,
-                "sig_label_meta": dd.sig_label_meta,
+
+def _domain_detail_payload(detail: DomainDetail) -> Dict[str, Any]:
+    return {
+        "domain": detail.domain,
+        "status_a": detail.status_a,
+        "status_b": detail.status_b,
+        "comparable": detail.comparable,
+        "reason": detail.reason,
+        "set_jaccard": {"value": detail.set_jaccard.value, "reason": detail.set_jaccard.reason},
+        "multiset_jaccard": {"value": detail.multiset_jaccard.value, "reason": detail.multiset_jaccard.reason},
+        "a_total": detail.a_total,
+        "b_total": detail.b_total,
+        "matched": detail.matched,
+        "added_in_b": detail.added_in_b,
+        "removed_from_a": detail.removed_from_a,
+        "union_mass": detail.union_mass,
+        "top_matched": (detail.top_matched.items if detail.top_matched else None),
+        "top_added": (detail.top_added.items if detail.top_added else None),
+        "top_removed": (detail.top_removed.items if detail.top_removed else None),
+        "sig_label_meta_a": detail.sig_label_meta_a,
+        "sig_label_meta_b": detail.sig_label_meta_b,
+        "sig_label_meta": detail.sig_label_meta,
+    }
+
+
+def _safe_domain_file_stem(domain_name: str) -> str:
+    """
+    Convert an arbitrary domain key into a safe filename stem.
+    """
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", domain_name).strip("._-")
+    if not safe:
+        safe = f"domain_{hashlib.sha1(domain_name.encode('utf-8')).hexdigest()[:12]}"
+    if safe in {".", ".."}:
+        safe = f"domain_{hashlib.sha1(domain_name.encode('utf-8')).hexdigest()[:12]}"
+    return safe
+
+
+def write_details_json(details: List[SimilarityDetail], out_path: str) -> List[str]:
+    out_dir = Path(out_path).parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir_resolved = out_dir.resolve()
+
+    by_domain: Dict[str, List[Dict[str, Any]]] = {}
+    for comparison in details:
+        for domain_detail in comparison.domains:
+            domain_payload = _domain_detail_payload(domain_detail)
+            by_domain.setdefault(domain_detail.domain, []).append({
+                "file_a": comparison.file_a,
+                "file_b": comparison.file_b,
+                "summary": _detail_summary_payload(comparison.summary),
+                # Backward-compatible shape for tools/details_to_csv.py:
+                # it expects row["domains"] to be a list of domain objects.
+                "domains": [domain_payload],
+                # Keep single-domain convenience payload in parallel.
+                "domain": domain_payload,
             })
 
+    written_paths: List[str] = []
+    used_stems: Dict[str, int] = {}
+    for domain_name, payload in sorted(by_domain.items()):
+        stem = _safe_domain_file_stem(domain_name)
+        suffix = used_stems.get(stem, 0)
+        used_stems[stem] = suffix + 1
+        if suffix:
+            stem = f"{stem}_{suffix}"
 
-        payload.append({
-            "file_a": d.file_a,
-            "file_b": d.file_b,
-            "summary": {
-                "domain_hash_identity_jaccard": {
-                    "value": d.summary.domain_hash_identity_jaccard.value,
-                    "reason": d.summary.domain_hash_identity_jaccard.reason,
-                },
-                "domain_status_layout_jaccard": {
-                    "value": d.summary.domain_status_layout_jaccard.value,
-                    "reason": d.summary.domain_status_layout_jaccard.reason,
-                },
-                "signature_multiset_similarity": {
-                    "value": d.summary.signature_multiset_similarity.value,
-                    "reason": d.summary.signature_multiset_similarity.reason,
-                },
-                "domains_total": d.summary.domains_total,
-                "domains_compared_signatures": d.summary.domains_compared_signatures,
-                "domains_undefined_blocked": d.summary.domains_undefined_blocked,
-                "domains_undefined_unreadable": d.summary.domains_undefined_unreadable,
-                "domains_missing": d.summary.domains_missing,
-                "note": d.summary.note,
-            },
-            "domains": doms,
-        })
+        file_path = out_dir / f"{stem}_details.json"
+        resolved_path = file_path.resolve()
+        if out_dir_resolved not in resolved_path.parents:
+            raise ValueError(f"unsafe_details_domain_filename:{domain_name}")
 
-    Path(out_path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        file_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        written_paths.append(str(file_path))
+
+    return written_paths
 
 # -----------------------------
 # Batch drivers
@@ -1404,8 +1446,8 @@ File format notes:
             print(f"Wrote pairwise JSON to: {out_pairwise_json}")
 
     if details_json:
-        write_details_json(details, details_json)
-        print(f"Wrote details JSON to: {details_json}")
+        written_detail_files = write_details_json(details, details_json)
+        print(f"Wrote {len(written_detail_files)} domain detail JSON files under: {Path(details_json).parent}")
 
     return 0
 
