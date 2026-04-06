@@ -248,7 +248,7 @@ def run_bundle_analysis(
             and row.get("population_role", "") == "outlier"
         )
         outliers_by_domain[dom] = outlier_count
-        if not pop_scope_pairs:
+        if not pop_ids:
             print(f"[run][warn] domain={dom} has no primary populations; skipping main pass")
             continue
         for pid in pop_ids:
