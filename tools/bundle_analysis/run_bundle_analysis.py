@@ -231,7 +231,7 @@ def run_bundle_analysis(
         corpus_population_rows = read_csv_rows(out_dir / "corpus_populations.csv") if (out_dir / "corpus_populations.csv").exists() else []
         pop_ids = sorted(
             {
-                row.get("population_id", "")
+                (row.get("population_id", ""), row.get("scope_key", ""))
                 for row in summary_rows
                 if row.get("analysis_run_id", "") == run_id
                 and row.get("domain", "") == dom
@@ -239,7 +239,7 @@ def run_bundle_analysis(
                 and row.get("population_id", "")
             }
         )
-        domain_primary_counts[dom] = len(pop_ids)
+        domain_primary_counts[dom] = len(pop_scope_pairs)
         outlier_count = sum(
             int(row.get("file_count", "0") or "0")
             for row in summary_rows
@@ -248,7 +248,7 @@ def run_bundle_analysis(
             and row.get("population_role", "") == "outlier"
         )
         outliers_by_domain[dom] = outlier_count
-        if not pop_ids:
+        if not pop_scope_pairs:
             print(f"[run][warn] domain={dom} has no primary populations; skipping main pass")
             continue
         for pid in pop_ids:
