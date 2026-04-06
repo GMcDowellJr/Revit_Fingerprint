@@ -208,7 +208,7 @@ def run_bundle_analysis(
         if discover_populations_flag:
             raise ValueError("--compare is not supported with --discover-populations.")
         reference = load_and_validate(analysis_dir, SCHEMA_VERSION)
-        compare_dir = out_dir / "compare"
+        compare_dir = out_dir.parent / "compare"
         compare_dir.mkdir(parents=True, exist_ok=True)
 
     if not discover_populations_flag:
@@ -300,7 +300,7 @@ def run_bundle_analysis(
             compare_rows = [r for r in compare_summary_rows if r.get("analysis_run_id", "") == run_id]
             compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", "")))
             atomic_write_csv(
-                out_dir / "compare" / "compare_run_summary.csv",
+                out_dir.parent / "compare" / "compare_run_summary.csv",
                 [
                     "reference_bundle_id",
                     "effective_date",

@@ -109,7 +109,7 @@ def run_compare_for_domain(
     reference: Dict[str, object],
     domain: str,
 ) -> Dict[str, str]:
-    compare_dir = out_dir / "compare"
+    compare_dir = out_dir.parent / "compare"
     compare_dir.mkdir(parents=True, exist_ok=True)
     gap_path = compare_dir / "file_gap_report.csv"
     domain_rows = _compute_gap_rows(analysis_dir, out_dir, reference, domain)
