@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from emit_element_dominance import emit_element_dominance
 from v21_emit import emit_analysis_v21, emit_phase0_v21
+from bundle_analysis.common import atomic_write_csv, read_csv_rows
+from bundle_analysis.reference_bundle import write_sidecar
 
 SUPPRESSED_DOWNSTREAM_DOMAINS = {"object_styles_imported"}
 
@@ -456,6 +458,7 @@ def main() -> None:
     ap.add_argument("--out-root", required=True, help="Output root folder.")
     ap.add_argument("--config", default=None, help="Phase1 config path (required when stage analyze1 is included).")
     ap.add_argument("--seed-baseline", default=None, help="Optional seed baseline fingerprint JSON path for analyze1.")
+    ap.add_argument("--seed", default=None, help="Optional path to a single fingerprint JSON to treat as the seed file.")
     ap.add_argument("--domains", default=None, help="Comma list of domains; if omitted, infer from exports.")
     ap.add_argument("--baseline", default=None, help="Baseline export filename for analyze2 dimension_types by-family packet.")
     ap.add_argument("--emit-legacy", action="store_true", help="Also emit legacy phase0/phase1/phase2 artifacts when analyze1/analyze2 run.")
@@ -653,13 +656,106 @@ def main() -> None:
             _run(cmd_label_pop, env=env)
 
             _ensure_dir(v21_analysis_dir)
-            analysis_run_id = emit_analysis_v21(
-                meta_rows,
-                record_rows,
-                v21_analysis_dir,
-                phase0_dir=v21_phase0_dir,
-                results_v21_dir=v21_root,
-            )
+            seed_export_run_id = ""
+            seed_path = Path(args.seed).resolve() if args.seed else None
+            if seed_path is not None:
+                candidate_ids = sorted(
+                    {
+                        str(r.get("export_run_id", "")).strip()
+                        for r in meta_rows
+                        if str(r.get("file_id", "")).strip() == seed_path.name
+                    }
+                )
+                if len(candidate_ids) != 1:
+                    raise ValueError(
+                        f"Expected exactly one export_run_id for seed file {seed_path.name!r}; found {candidate_ids}"
+                    )
+                seed_export_run_id = candidate_ids[0]
+
+            if seed_export_run_id:
+                full_seed_dir = v21_analysis_dir / "_seed_full"
+                _ensure_dir(full_seed_dir)
+                emit_analysis_v21(
+                    meta_rows,
+                    record_rows,
+                    full_seed_dir,
+                    phase0_dir=v21_phase0_dir,
+                    results_v21_dir=v21_root,
+                )
+                corpus_meta_rows = [r for r in meta_rows if str(r.get("export_run_id", "")).strip() != seed_export_run_id]
+                corpus_record_rows = [r for r in record_rows if str(r.get("export_run_id", "")).strip() != seed_export_run_id]
+                analysis_run_id = emit_analysis_v21(
+                    corpus_meta_rows,
+                    corpus_record_rows,
+                    v21_analysis_dir,
+                    phase0_dir=v21_phase0_dir,
+                    results_v21_dir=v21_root,
+                )
+
+                corpus_domain_patterns = read_csv_rows(v21_analysis_dir / "domain_patterns.csv")
+                full_domain_patterns = read_csv_rows(full_seed_dir / "domain_patterns.csv")
+                full_presence = read_csv_rows(full_seed_dir / "pattern_presence_file.csv")
+                seed_pattern_keys = {
+                    (str(r.get("domain", "")).strip(), str(r.get("pattern_id", "")).strip())
+                    for r in full_presence
+                    if str(r.get("export_run_id", "")).strip() == seed_export_run_id
+                    and str(r.get("domain", "")).strip()
+                    and str(r.get("pattern_id", "")).strip()
+                }
+                merged_domain_patterns: List[Dict[str, str]] = []
+                existing_keys: set[Tuple[str, str]] = set()
+                for row in corpus_domain_patterns:
+                    key = (str(row.get("domain", "")).strip(), str(row.get("pattern_id", "")).strip())
+                    existing_keys.add(key)
+                    new_row = dict(row)
+                    new_row["is_seed"] = "true" if key in seed_pattern_keys else "false"
+                    merged_domain_patterns.append(new_row)
+                for row in full_domain_patterns:
+                    key = (str(row.get("domain", "")).strip(), str(row.get("pattern_id", "")).strip())
+                    if key in existing_keys or key not in seed_pattern_keys:
+                        continue
+                    new_row = dict(row)
+                    new_row["analysis_run_id"] = analysis_run_id
+                    new_row["is_seed"] = "true"
+                    merged_domain_patterns.append(new_row)
+
+                merged_domain_patterns.sort(
+                    key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("pattern_id", ""))
+                )
+                if merged_domain_patterns:
+                    fieldnames = list(merged_domain_patterns[0].keys())
+                    if "is_seed" not in fieldnames:
+                        fieldnames.append("is_seed")
+                    atomic_write_csv(v21_analysis_dir / "domain_patterns.csv", fieldnames, merged_domain_patterns)
+
+                schema_version = read_csv_rows(v21_analysis_dir / "analysis_manifest.csv")[0].get("schema_version", "")
+                seed_sidecar_rows = [
+                    {
+                        "domain": dom,
+                        "pattern_id": pid,
+                        "is_seed": "true",
+                        "seed_file_stem": seed_path.stem if seed_path is not None else "",
+                    }
+                    for dom, pid in sorted(seed_pattern_keys)
+                ]
+                sidecar_path = write_sidecar(v21_analysis_dir, seed_export_run_id, seed_sidecar_rows, schema_version)
+                print(f"[extract] Seed reference bundle written to {sidecar_path}")
+            else:
+                analysis_run_id = emit_analysis_v21(
+                    meta_rows,
+                    record_rows,
+                    v21_analysis_dir,
+                    phase0_dir=v21_phase0_dir,
+                    results_v21_dir=v21_root,
+                )
+                domain_patterns = read_csv_rows(v21_analysis_dir / "domain_patterns.csv")
+                for row in domain_patterns:
+                    row["is_seed"] = "false"
+                if domain_patterns:
+                    fieldnames = list(domain_patterns[0].keys())
+                    if "is_seed" not in fieldnames:
+                        fieldnames.append("is_seed")
+                    atomic_write_csv(v21_analysis_dir / "domain_patterns.csv", fieldnames, domain_patterns)
             report["notes"].append(f"analysis_run_id={analysis_run_id}")
             emit_element_dominance(v21_analysis_dir)
             report["notes"].append("element_dominance: emitted")
