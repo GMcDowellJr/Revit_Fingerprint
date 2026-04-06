@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import shutil
 import sys
 import time
@@ -20,6 +21,8 @@ if __package__ in (None, ""):
     from step5_classify_patterns import emit_stub as emit_step5
     from step6_classify_files import emit_stub as emit_step6
     from step7_overlap_report import emit_stub as emit_step7
+    from reference_bundle import load_and_validate
+    from step_compare import run_compare_for_domain
 else:
     from .common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id
     from .step0_discover_populations import discover_populations
@@ -30,6 +33,8 @@ else:
     from .step5_classify_patterns import emit_stub as emit_step5
     from .step6_classify_files import emit_stub as emit_step6
     from .step7_overlap_report import emit_stub as emit_step7
+    from .reference_bundle import load_and_validate
+    from .step_compare import run_compare_for_domain
 
 TIMING_FIELDNAMES = ["schema_version", "analysis_run_id", "domain", "population_id", "step", "seconds"]
 
@@ -119,6 +124,57 @@ def _run_pipeline_once(
     }
 
 
+def _run_step2_to_step7(
+    work_out_dir: Path,
+    domain: str,
+    min_support_count: int,
+    min_support_pct: float,
+) -> Dict[str, object]:
+    total_bundles = 0
+    total_edges = 0
+    total_files_no_bundle = 0
+
+    t0 = time.time()
+    step2 = find_bundles_for_domain(work_out_dir, domain, min_support_count, min_support_pct)
+    total_bundles += step2.get("bundles", 0)
+    t2 = time.time() - t0
+    print(f"[run] domain={domain} step2_seconds={t2:.3f}")
+
+    t0 = time.time()
+    step3 = build_dag_for_domain(work_out_dir, domain)
+    total_edges += step3.get("edges", 0)
+    t3 = time.time() - t0
+    print(f"[run] domain={domain} step3_seconds={t3:.3f}")
+
+    t0 = time.time()
+    emit_step4(work_out_dir, domain)
+    t4 = time.time() - t0
+    print(f"[run] domain={domain} step4_seconds={t4:.3f}")
+
+    t0 = time.time()
+    emit_step5(work_out_dir, domain)
+    t5 = time.time() - t0
+    print(f"[run] domain={domain} step5_seconds={t5:.3f}")
+
+    t0 = time.time()
+    step6 = emit_step6(work_out_dir, domain)
+    total_files_no_bundle += step6.get("files_no_bundle", 0)
+    t6 = time.time() - t0
+    print(f"[run] domain={domain} step6_seconds={t6:.3f}")
+
+    t0 = time.time()
+    emit_step7(work_out_dir, domain)
+    t7 = time.time() - t0
+    print(f"[run] domain={domain} step7_seconds={t7:.3f}")
+
+    return {
+        "total_bundles_found": total_bundles,
+        "total_dag_edges": total_edges,
+        "files_with_no_bundle_match": total_files_no_bundle,
+        "step_times": {"step2": t2, "step3": t3, "step4": t4, "step5": t5, "step6": t6, "step7": t7},
+    }
+
+
 def run_bundle_analysis(
     analysis_dir: Path,
     out_dir: Path,
@@ -131,6 +187,7 @@ def run_bundle_analysis(
     max_population_overlap: float = 0.20,
     min_population_jaccard: float = 0.30,
     discovery_support_pct: float = 0.10,
+    compare: bool = False,
 ) -> Dict[str, int]:
     presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     run_id = resolve_analysis_run_id(presence_rows, analysis_run_id)
@@ -144,6 +201,15 @@ def run_bundle_analysis(
     domain_elapsed_seconds: Dict[str, float] = {}
     domain_population_counts: Dict[str, int] = {}
     timing_rows: List[Dict[str, str]] = []
+    compare_summary_rows: List[Dict[str, str]] = []
+    reference: Optional[Dict[str, object]] = None
+
+    if compare:
+        if discover_populations_flag:
+            raise ValueError("--compare is not supported with --discover-populations.")
+        reference = load_and_validate(analysis_dir, SCHEMA_VERSION)
+        compare_dir = out_dir.parent / "compare"
+        compare_dir.mkdir(parents=True, exist_ok=True)
 
     if not discover_populations_flag:
         for dom in domains:
@@ -152,15 +218,62 @@ def run_bundle_analysis(
             processed += 1
             print(f"[run] domain={dom} start")
             try:
-                stats = _run_pipeline_once(
-                    analysis_dir=analysis_dir,
-                    work_out_dir=out_dir,
-                    domain=dom,
-                    run_id=run_id,
-                    min_support_count=min_support_count,
-                    min_support_pct=min_support_pct,
-                    analysis_run_id=run_id,
-                )
+                if not compare:
+                    stats = _run_pipeline_once(
+                        analysis_dir=analysis_dir,
+                        work_out_dir=out_dir,
+                        domain=dom,
+                        run_id=run_id,
+                        min_support_count=min_support_count,
+                        min_support_pct=min_support_pct,
+                        analysis_run_id=run_id,
+                    )
+                else:
+                    t0 = time.time()
+                    build_membership_matrix(
+                        analysis_dir,
+                        out_dir,
+                        dom,
+                        run_id,
+                        None,
+                        None,
+                        None,
+                    )
+                    t1 = time.time() - t0
+                    print(f"[run] domain={dom} step1_seconds={t1:.3f}")
+
+                    workers = max(2, min(4, (len(domains) or 1)))
+                    with ThreadPoolExecutor(max_workers=workers) as executor:
+                        discovery_future = executor.submit(
+                            _run_step2_to_step7,
+                            out_dir,
+                            dom,
+                            min_support_count,
+                            min_support_pct,
+                        )
+                        compare_started = time.time()
+                        compare_future = executor.submit(
+                            run_compare_for_domain,
+                            analysis_dir,
+                            out_dir,
+                            reference or {},
+                            dom,
+                        )
+                        tail = discovery_future.result()
+                        compare_summary = compare_future.result()
+                    compare_seconds = time.time() - compare_started
+                    compare_summary_rows.append(compare_summary)
+                    step_times = {"step1": t1, **tail.get("step_times", {})}
+                    print(
+                        f"[timing] domain={dom} discovery_seconds={sum(float(step_times.get(k, 0.0)) for k in ('step1','step2','step3','step4','step5','step6','step7')):.3f} "
+                        f"compare_seconds={compare_seconds:.3f}"
+                    )
+                    stats = {
+                        "total_bundles_found": tail.get("total_bundles_found", 0),
+                        "total_dag_edges": tail.get("total_dag_edges", 0),
+                        "files_with_no_bundle_match": tail.get("files_with_no_bundle_match", 0),
+                        "step_times": step_times,
+                    }
                 total_bundles += stats["total_bundles_found"]
                 total_edges += stats["total_dag_edges"]
                 total_files_no_bundle += stats["files_with_no_bundle_match"]
@@ -183,6 +296,24 @@ def run_bundle_analysis(
         merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + timing_rows
         merged_timing_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("step", "")))
         atomic_write_csv(out_dir / "bundle_analysis_timing.csv", TIMING_FIELDNAMES, merged_timing_rows)
+        if compare:
+            compare_rows = [r for r in compare_summary_rows if r.get("analysis_run_id", "") == run_id]
+            compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", "")))
+            atomic_write_csv(
+                out_dir.parent / "compare" / "compare_run_summary.csv",
+                [
+                    "reference_bundle_id",
+                    "effective_date",
+                    "analysis_run_id",
+                    "domain",
+                    "files_scored",
+                    "full_count",
+                    "partial_count",
+                    "none_count",
+                    "no_reference_count",
+                ],
+                compare_rows,
+            )
 
         print(
             f"[run] complete domains_processed={processed} total_bundles_found={total_bundles} "
@@ -379,6 +510,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--max-population-overlap", type=float, default=0.20)
     p.add_argument("--min-population-jaccard", type=float, default=0.30)
     p.add_argument("--discovery-support-pct", type=float, default=0.10)
+    p.add_argument("--compare", action="store_true")
     return p.parse_args(argv)
 
 
@@ -396,6 +528,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         max_population_overlap=args.max_population_overlap,
         min_population_jaccard=args.min_population_jaccard,
         discovery_support_pct=args.discovery_support_pct,
+        compare=args.compare,
     )
     return 0
 
