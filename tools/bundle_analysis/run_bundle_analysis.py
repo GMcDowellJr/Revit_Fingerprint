@@ -228,7 +228,8 @@ def run_bundle_analysis(
             continue
 
         summary_rows = read_csv_rows(out_dir / "corpus_population_summary.csv") if (out_dir / "corpus_population_summary.csv").exists() else []
-        pop_scope_pairs = sorted(
+        corpus_population_rows = read_csv_rows(out_dir / "corpus_populations.csv") if (out_dir / "corpus_populations.csv").exists() else []
+        pop_ids = sorted(
             {
                 (row.get("population_id", ""), row.get("scope_key", ""))
                 for row in summary_rows
@@ -250,7 +251,25 @@ def run_bundle_analysis(
         if not pop_scope_pairs:
             print(f"[run][warn] domain={dom} has no primary populations; skipping main pass")
             continue
-        for pid, scope_key_for_pop in pop_scope_pairs:
+        for pid in pop_ids:
+            scope_keys_for_population = sorted(
+                {
+                    (row.get("scope_key", "") or "").strip()
+                    for row in corpus_population_rows
+                    if row.get("analysis_run_id", "") == run_id
+                    and row.get("domain", "") == dom
+                    and row.get("population_id", "") == pid
+                }
+            )
+            if not scope_keys_for_population:
+                print(f"[run][warn] domain={dom} population_id={pid} has no scope_key mapping; skipping")
+                continue
+            if len(scope_keys_for_population) > 1:
+                raise ValueError(
+                    f"Population invariant violation for analysis_run_id={run_id}, domain={dom!r}, "
+                    f"population_id={pid!r}: expected exactly one scope_key, found {scope_keys_for_population}"
+                )
+            population_scope_key = scope_keys_for_population[0]
             print(f"[run] domain={dom} population_id={pid} start")
             populations_analyzed += 1
             domain_population_counts[dom] = domain_population_counts.get(dom, 0) + 1
@@ -273,7 +292,7 @@ def run_bundle_analysis(
                     population_id=pid,
                     analysis_run_id=run_id,
                     population_registry_dir=out_dir,
-                    scope_key_filter=scope_key_for_pop,
+                    scope_key_filter=population_scope_key,
                 )
                 domain_elapsed_seconds[dom] = domain_elapsed_seconds.get(dom, 0.0) + (time.time() - t0)
                 total_bundles += stats["total_bundles_found"]

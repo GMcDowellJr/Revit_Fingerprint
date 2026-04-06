@@ -71,6 +71,8 @@ def build_membership_matrix(
             f"[step1] domain={domain} population_id={population_id} files_after_filter={len(population_file_ids)} "
             f"files_excluded={max(0, len(all_domain_files) - len(population_file_ids))} (population filter applied)"
         )
+    if scope_key_filter:
+        print(f"[step1] domain={domain} scope_key_filter={scope_key_filter!r} (scope filter applied)")
 
     pattern_meta: Dict[str, Dict[str, str]] = {}
     cad_patterns: Set[str] = set()
@@ -105,7 +107,7 @@ def build_membership_matrix(
         if meta is None:
             continue
         scope_key = derive_scope_key(domain, meta)
-        if scope_key_filter is not None and scope_key_filter != "" and scope_key != scope_key_filter:
+        if scope_key_filter is not None and scope_key != scope_key_filter:
             continue
         pair = (export_run_id, pattern_id)
         if pair in pairs_seen[scope_key]:
