@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 if __package__ in (None, ""):
     from common import atomic_write_csv, read_csv_rows, resolve_analysis_run_id
@@ -121,8 +121,9 @@ def run_compare_for_domain(
     out_dir: Path,
     reference: Dict[str, object],
     domain: str,
+    compare_out_dir: Optional[Path] = None,
 ) -> Dict[str, str]:
-    compare_dir = out_dir.parent / "compare"
+    compare_dir = compare_out_dir if compare_out_dir is not None else out_dir.parent / "compare"
     compare_dir.mkdir(parents=True, exist_ok=True)
     gap_path = compare_dir / "file_gap_report.csv"
     domain_rows = _compute_gap_rows(analysis_dir, out_dir, reference, domain)
