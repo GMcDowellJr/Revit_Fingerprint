@@ -20,6 +20,7 @@ if __package__ in (None, ""):
     from step5_classify_patterns import emit_stub as emit_step5
     from step6_classify_files import emit_stub as emit_step6
     from step7_overlap_report import emit_stub as emit_step7
+    from run_compare_mode import run_compare_mode
 else:
     from .common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id
     from .step0_discover_populations import discover_populations
@@ -30,6 +31,7 @@ else:
     from .step5_classify_patterns import emit_stub as emit_step5
     from .step6_classify_files import emit_stub as emit_step6
     from .step7_overlap_report import emit_stub as emit_step7
+    from .run_compare_mode import run_compare_mode
 
 TIMING_FIELDNAMES = ["schema_version", "analysis_run_id", "domain", "population_id", "step", "seconds"]
 
@@ -379,11 +381,23 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--max-population-overlap", type=float, default=0.20)
     p.add_argument("--min-population-jaccard", type=float, default=0.30)
     p.add_argument("--discovery-support-pct", type=float, default=0.10)
+    p.add_argument("--compare-reference", type=Path, default=None, help="Run compare mode with this reference bundle (JSON or .rvt)")
     return p.parse_args(argv)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = _parse_args(argv)
+
+    if args.compare_reference is not None:
+        run_compare_mode(
+            analysis_dir=args.analysis_dir,
+            out_dir=args.out_dir,
+            reference_path=args.compare_reference,
+            domain=args.domain,
+            analysis_run_id=args.analysis_run_id,
+        )
+        return 0
+
     run_bundle_analysis(
         analysis_dir=args.analysis_dir,
         out_dir=args.out_dir,

@@ -76,12 +76,18 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
-    args = _parse_args(argv)
-    out_dir: Path = args.out_dir
+
+
+def run_compare_mode(
+    analysis_dir: Path,
+    out_dir: Path,
+    reference_path: Path,
+    domain: str = "",
+    analysis_run_id: str = "",
+) -> List[Dict[str, str]]:
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    ref_path = Path(args.reference)
+    ref_path = Path(reference_path)
     if ref_path.suffix.lower() == ".rvt":
         work_dir = out_dir / f"_rvt_extract_{ref_path.stem}"
         analysis_out_dir = _extract_from_rvt(ref_path, work_dir)
@@ -90,29 +96,29 @@ def main(argv: Optional[List[str]] = None) -> int:
         reference = load_and_validate(ref_path, SCHEMA_VERSION)
 
     reference_for_compare = dict(reference)
-    if args.analysis_run_id:
-        reference_for_compare["_analysis_run_id_filter"] = args.analysis_run_id
+    if analysis_run_id:
+        reference_for_compare["_analysis_run_id_filter"] = analysis_run_id
 
-    membership_domains = _discover_membership_domains(args.analysis_dir)
+    membership_domains = _discover_membership_domains(analysis_dir)
     reference_domains = set(reference_for_compare.get("domains", {}).keys())
     domains = sorted(reference_domains | membership_domains)
-    if args.domain:
-        domains = [d for d in domains if d == args.domain]
+    if domain:
+        domains = [d for d in domains if d == domain]
 
     summary_rows: List[Dict[str, str]] = []
 
-    for domain in domains:
-        if domain not in membership_domains:
+    for dom in domains:
+        if dom not in membership_domains:
             continue
 
         stats = run_compare(
-            analysis_dir=args.analysis_dir,
+            analysis_dir=analysis_dir,
             out_dir=out_dir,
             reference=reference_for_compare,
-            domain=domain,
+            domain=dom,
         )
         print(
-            f"[compare] domain={domain} files_scored={stats['files_scored']} "
+            f"[compare] domain={dom} files_scored={stats['files_scored']} "
             f"full={stats['full']} partial={stats['partial']} none={stats['none']} "
             f"no_reference={stats['no_reference']}"
         )
@@ -122,7 +128,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "reference_bundle_id": str(reference_for_compare["reference_bundle_id"]),
                 "effective_date": str(reference_for_compare["effective_date"]),
                 "analysis_run_id": str(stats["analysis_run_id"]),
-                "domain": domain,
+                "domain": dom,
                 "files_scored": str(stats["files_scored"]),
                 "full_count": str(stats["full"]),
                 "partial_count": str(stats["partial"]),
@@ -133,6 +139,18 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     summary_rows.sort(key=lambda r: (r["analysis_run_id"], r["domain"]))
     atomic_write_csv(out_dir / "compare_run_summary.csv", SUMMARY_FIELDNAMES, summary_rows)
+    return summary_rows
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    args = _parse_args(argv)
+    run_compare_mode(
+        analysis_dir=args.analysis_dir,
+        out_dir=args.out_dir,
+        reference_path=args.reference,
+        domain=args.domain,
+        analysis_run_id=args.analysis_run_id,
+    )
     return 0
 
 

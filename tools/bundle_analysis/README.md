@@ -220,6 +220,19 @@ Compare mode writes:
 - `compare_run_summary.csv` with per-domain rollups:
   - `reference_bundle_id,effective_date,analysis_run_id,domain,files_scored,full_count,partial_count,none_count,no_reference_count`
 
+### Entrypoint integration
+
+You can run compare mode either directly (`run_compare_mode.py`) or via the main orchestrator entrypoint:
+
+```bash
+python tools/bundle_analysis/run_bundle_analysis.py \
+  --analysis-dir results/bundle_analysis \
+  --out-dir results/bundle_compare \
+  --compare-reference /path/to/reference_bundle.json
+```
+
+When `--compare-reference` is provided, `run_bundle_analysis.py` dispatches to compare mode instead of running discovery steps 1-7.
+
 ### Example invocations
 
 JSON reference path:
