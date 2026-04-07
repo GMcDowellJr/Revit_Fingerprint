@@ -55,7 +55,20 @@ def load_and_validate(analysis_out_dir: Path, current_schema_version: str) -> Di
     if not path.is_file():
         raise ValueError(f"Missing reference bundle sidecar: {path}")
     with path.open("r", encoding="utf-8") as f:
-        payload = json.load(f)
+        payload_raw = f.read()
+    try:
+        payload = json.loads(payload_raw)
+    except json.JSONDecodeError as exc:
+        # Some historical sidecars can contain raw control characters in string
+        # values (for example, an unescaped tab). Python's default strict parser
+        # rejects those files. Retrying with strict=False keeps the parser
+        # standards-compliant for structure while allowing legacy string content.
+        if "Invalid control character" not in str(exc):
+            raise ValueError(f"Invalid reference bundle JSON in {path}: {exc}") from exc
+        try:
+            payload = json.loads(payload_raw, strict=False)
+        except json.JSONDecodeError as retry_exc:
+            raise ValueError(f"Invalid reference bundle JSON in {path}: {retry_exc}") from retry_exc
     if not isinstance(payload, dict):
         raise ValueError(f"Invalid reference bundle JSON shape in {path}: expected object root.")
 
