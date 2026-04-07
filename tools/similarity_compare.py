@@ -105,6 +105,23 @@ class SimilarityResult:
     note: Optional[str]
 
 
+@dataclass(frozen=True)
+class DomainSimilarityRow:
+    file_a: str
+    file_b: str
+    domain: str
+    comparable: bool
+    not_comparable_reason: Optional[str]
+    a_total: Optional[int]
+    b_total: Optional[int]
+    matched: Optional[int]
+    added_in_b: Optional[int]
+    removed_from_a: Optional[int]
+    union_mass: Optional[int]
+    set_jaccard: Optional[float]
+    multiset_jaccard: Optional[float]
+
+
 # -----------------------------
 # Parsing helpers (tolerant, explicit)
 # -----------------------------
@@ -462,25 +479,28 @@ def _domain_union_mass(sig_a: Optional[List[str]], sig_b: Optional[List[str]]) -
     return mass
 
 
-def compare_two(fp_a: FingerprintData, fp_b: FingerprintData) -> SimilarityResult:
+def compare_two_full(fp_a: FingerprintData, fp_b: FingerprintData) -> Tuple[SimilarityResult, List[DomainSimilarityRow]]:
     # If a file is unreadable, all metrics are undefined (explicit)
     if not fp_a.ok or not fp_b.ok:
         reason = "file_unreadable"
         note = f"a_error={fp_a.error!r} b_error={fp_b.error!r}"
-        return SimilarityResult(
-            file_a=fp_a.path,
-            file_b=fp_b.path,
+        return (
+            SimilarityResult(
+                file_a=fp_a.path,
+                file_b=fp_b.path,
 
-            domain_hash_identity_jaccard=SimilarityScalar(None, reason),
-            domain_status_layout_jaccard=SimilarityScalar(None, reason),
-            signature_multiset_similarity=SimilarityScalar(None, reason),
+                domain_hash_identity_jaccard=SimilarityScalar(None, reason),
+                domain_status_layout_jaccard=SimilarityScalar(None, reason),
+                signature_multiset_similarity=SimilarityScalar(None, reason),
 
-            domains_total=0,
-            domains_compared_signatures=0,
-            domains_undefined_blocked=0,
-            domains_undefined_unreadable=0,
-            domains_missing=0,
-            note=note,
+                domains_total=0,
+                domains_compared_signatures=0,
+                domains_undefined_blocked=0,
+                domains_undefined_unreadable=0,
+                domains_missing=0,
+                note=note,
+            ),
+            [],
         )
 
     domain_names = sorted(set(fp_a.domains.keys()) | set(fp_b.domains.keys()))
@@ -554,39 +574,175 @@ def compare_two(fp_a: FingerprintData, fp_b: FingerprintData) -> SimilarityResul
     # Fallback: if signatures unavailable for a domain, use exact domain-hash equality (OK-only).
     # ----------------
     per_domain_scores: List[Tuple[float, int]] = []  # (score, weight)
+    domain_rows: List[DomainSimilarityRow] = []
     domains_compared_signatures = 0
 
     for d in domain_names:
         da = fp_a.domains.get(d)
         db = fp_b.domains.get(d)
         if da is None or db is None:
+            domain_rows.append(DomainSimilarityRow(
+                file_a=fp_a.path,
+                file_b=fp_b.path,
+                domain=d,
+                comparable=False,
+                not_comparable_reason="missing",
+                a_total=None,
+                b_total=None,
+                matched=None,
+                added_in_b=None,
+                removed_from_a=None,
+                union_mass=None,
+                set_jaccard=None,
+                multiset_jaccard=None,
+            ))
             continue
         if da.missing or db.missing:
+            domain_rows.append(DomainSimilarityRow(
+                file_a=fp_a.path,
+                file_b=fp_b.path,
+                domain=d,
+                comparable=False,
+                not_comparable_reason="missing",
+                a_total=None,
+                b_total=None,
+                matched=None,
+                added_in_b=None,
+                removed_from_a=None,
+                union_mass=None,
+                set_jaccard=None,
+                multiset_jaccard=None,
+            ))
             continue
         if da.unreadable or db.unreadable:
+            domain_rows.append(DomainSimilarityRow(
+                file_a=fp_a.path,
+                file_b=fp_b.path,
+                domain=d,
+                comparable=False,
+                not_comparable_reason="unreadable",
+                a_total=None,
+                b_total=None,
+                matched=None,
+                added_in_b=None,
+                removed_from_a=None,
+                union_mass=None,
+                set_jaccard=None,
+                multiset_jaccard=None,
+            ))
             continue
         if da.status == STATUS_BLOCKED or db.status == STATUS_BLOCKED:
+            domain_rows.append(DomainSimilarityRow(
+                file_a=fp_a.path,
+                file_b=fp_b.path,
+                domain=d,
+                comparable=False,
+                not_comparable_reason="blocked",
+                a_total=None,
+                b_total=None,
+                matched=None,
+                added_in_b=None,
+                removed_from_a=None,
+                union_mass=None,
+                set_jaccard=None,
+                multiset_jaccard=None,
+            ))
             continue
         if da.status != STATUS_OK or db.status != STATUS_OK:
+            domain_rows.append(DomainSimilarityRow(
+                file_a=fp_a.path,
+                file_b=fp_b.path,
+                domain=d,
+                comparable=False,
+                not_comparable_reason="not_ok_status",
+                a_total=None,
+                b_total=None,
+                matched=None,
+                added_in_b=None,
+                removed_from_a=None,
+                union_mass=None,
+                set_jaccard=None,
+                multiset_jaccard=None,
+            ))
             continue
 
         if da.sig_hashes is not None and db.sig_hashes is not None:
-            score = jaccard_multiset(Counter(da.sig_hashes), Counter(db.sig_hashes))
+            ca = Counter(da.sig_hashes)
+            cb = Counter(db.sig_hashes)
+            score = jaccard_multiset(ca, cb)
             if score.value is None:
                 continue
             weight = _domain_union_mass(da.sig_hashes, db.sig_hashes)
             if weight is None:
                 continue
-            per_domain_scores.append((score.value, max(weight, 1)))
+            set_score = jaccard_set(ca.keys(), cb.keys())
+            keys = set(ca.keys()) | set(cb.keys())
+            matched = 0
+            added_in_b = 0
+            removed_from_a = 0
+            for k in keys:
+                count_a = int(ca.get(k, 0))
+                count_b = int(cb.get(k, 0))
+                matched += min(count_a, count_b)
+                if count_b > count_a:
+                    added_in_b += count_b - count_a
+                if count_a > count_b:
+                    removed_from_a += count_a - count_b
+            per_domain_scores.append((score.value, weight))
             domains_compared_signatures += 1
+            domain_rows.append(DomainSimilarityRow(
+                file_a=fp_a.path,
+                file_b=fp_b.path,
+                domain=d,
+                comparable=True,
+                not_comparable_reason=None,
+                a_total=len(da.sig_hashes),
+                b_total=len(db.sig_hashes),
+                matched=matched,
+                added_in_b=added_in_b,
+                removed_from_a=removed_from_a,
+                union_mass=weight,
+                set_jaccard=set_score.value,
+                multiset_jaccard=score.value,
+            ))
             continue
 
         if isinstance(da.domain_hash, str) and da.domain_hash and isinstance(db.domain_hash, str) and db.domain_hash:
             score_val = 1.0 if da.domain_hash == db.domain_hash else 0.0
             per_domain_scores.append((score_val, 1))
             domains_compared_signatures += 1
+            domain_rows.append(DomainSimilarityRow(
+                file_a=fp_a.path,
+                file_b=fp_b.path,
+                domain=d,
+                comparable=True,
+                not_comparable_reason=None,
+                a_total=None,
+                b_total=None,
+                matched=1 if score_val == 1.0 else 0,
+                added_in_b=0 if score_val == 1.0 else 1,
+                removed_from_a=0 if score_val == 1.0 else 1,
+                union_mass=1,
+                set_jaccard=score_val,
+                multiset_jaccard=score_val,
+            ))
             continue
 
+        domain_rows.append(DomainSimilarityRow(
+            file_a=fp_a.path,
+            file_b=fp_b.path,
+            domain=d,
+            comparable=False,
+            not_comparable_reason="no_signatures",
+            a_total=None,
+            b_total=None,
+            matched=None,
+            added_in_b=None,
+            removed_from_a=None,
+            union_mass=None,
+            set_jaccard=None,
+            multiset_jaccard=None,
+        ))
         continue
 
     if not per_domain_scores:
@@ -600,21 +756,29 @@ def compare_two(fp_a: FingerprintData, fp_b: FingerprintData) -> SimilarityResul
         )
 
     note = None
-    return SimilarityResult(
-        file_a=fp_a.path,
-        file_b=fp_b.path,
+    return (
+        SimilarityResult(
+            file_a=fp_a.path,
+            file_b=fp_b.path,
 
-        domain_hash_identity_jaccard=metric_domain_hash_identity_jaccard,
-        domain_status_layout_jaccard=metric_domain_status_layout_jaccard,
-        signature_multiset_similarity=metric_signature_multiset_similarity,
+            domain_hash_identity_jaccard=metric_domain_hash_identity_jaccard,
+            domain_status_layout_jaccard=metric_domain_status_layout_jaccard,
+            signature_multiset_similarity=metric_signature_multiset_similarity,
 
-        domains_total=domains_total,
-        domains_compared_signatures=domains_compared_signatures,
-        domains_undefined_blocked=undefined_blocked,
-        domains_undefined_unreadable=undefined_unreadable,
-        domains_missing=missing,
-        note=note,
+            domains_total=domains_total,
+            domains_compared_signatures=domains_compared_signatures,
+            domains_undefined_blocked=undefined_blocked,
+            domains_undefined_unreadable=undefined_unreadable,
+            domains_missing=missing,
+            note=note,
+        ),
+        domain_rows,
     )
+
+
+def compare_two(fp_a: FingerprintData, fp_b: FingerprintData) -> SimilarityResult:
+    result, _ = compare_two_full(fp_a, fp_b)
+    return result
 
 @dataclass(frozen=True)
 class DomainSigTopK:
@@ -925,7 +1089,7 @@ def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_
 
 
 def compare_two_detailed(fp_a: FingerprintData, fp_b: FingerprintData, top_k: int, domain_filter: Optional[set]) -> SimilarityDetail:
-    summary = compare_two(fp_a, fp_b)
+    summary, _ = compare_two_full(fp_a, fp_b)
 
     # If unreadable, details are empty but explicit
     if not fp_a.ok or not fp_b.ok:
@@ -1309,6 +1473,44 @@ def write_csv(results: List[SimilarityResult], out_path: str) -> None:
             ])
 
 
+def write_domain_csv(rows: List[DomainSimilarityRow], out_path: str) -> None:
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    sorted_rows = sorted(rows, key=lambda r: (r.file_a, r.file_b, r.domain))
+    with open(out_path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow([
+            "file_a",
+            "file_b",
+            "domain",
+            "comparable",
+            "not_comparable_reason",
+            "a_total",
+            "b_total",
+            "matched",
+            "added_in_b",
+            "removed_from_a",
+            "union_mass",
+            "set_jaccard",
+            "multiset_jaccard",
+        ])
+        for r in sorted_rows:
+            w.writerow([
+                r.file_a,
+                r.file_b,
+                r.domain,
+                "true" if r.comparable else "false",
+                r.not_comparable_reason or "",
+                "" if r.a_total is None else r.a_total,
+                "" if r.b_total is None else r.b_total,
+                "" if r.matched is None else r.matched,
+                "" if r.added_in_b is None else r.added_in_b,
+                "" if r.removed_from_a is None else r.removed_from_a,
+                "" if r.union_mass is None else r.union_mass,
+                "" if r.set_jaccard is None else f"{r.set_jaccard:.6f}",
+                "" if r.multiset_jaccard is None else f"{r.multiset_jaccard:.6f}",
+            ])
+
+
 def write_json(results: List[SimilarityResult], out_path: str) -> None:
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     payload = []
@@ -1388,6 +1590,7 @@ File format notes:
     out_baseline_json = _resolve_out(args.out_baseline_json)
     out_pairwise_csv = _resolve_out(args.out_pairwise)
     out_pairwise_json = _resolve_out(args.out_pairwise_json)
+    out_domain_csv = str(out_base / "domain_similarity.csv")
 
     details_json = _resolve_out(args.details_json)
 
@@ -1397,7 +1600,17 @@ File format notes:
 
     baseline_results: List[SimilarityResult] = []
     pairwise_results: List[SimilarityResult] = []
+    domain_similarity_rows: List[DomainSimilarityRow] = []
+    domain_similarity_keys: set = set()
     details: List[SimilarityDetail] = []
+
+    def _extend_unique_domain_rows(rows: List[DomainSimilarityRow]) -> None:
+        for row in rows:
+            key = (row.file_a, row.file_b, row.domain)
+            if key in domain_similarity_keys:
+                continue
+            domain_similarity_keys.add(key)
+            domain_similarity_rows.append(row)
 
     base_fp = None
     if args.mode in ("baseline", "both"):
@@ -1408,8 +1621,9 @@ File format notes:
         for fpath in json_files:
             if os.path.abspath(fpath) == os.path.abspath(args.baseline):
                 continue
-            r = compare_two(base_fp, fps[fpath])
+            r, domain_rows = compare_two_full(base_fp, fps[fpath])
             baseline_results.append(r)
+            _extend_unique_domain_rows(domain_rows)
             if details_json:
                 details.append(compare_two_detailed(base_fp, fps[fpath], top_k=args.details_top_k, domain_filter=domain_filter))
 
@@ -1423,8 +1637,9 @@ File format notes:
             files_for_pairwise.sort()
 
         for a, b in itertools.combinations(files_for_pairwise, 2):
-            r = compare_two(fps[a], fps[b])
+            r, domain_rows = compare_two_full(fps[a], fps[b])
             pairwise_results.append(r)
+            _extend_unique_domain_rows(domain_rows)
             if details_json:
                 details.append(compare_two_detailed(fps[a], fps[b], top_k=args.details_top_k, domain_filter=domain_filter))
 
@@ -1448,6 +1663,8 @@ File format notes:
     if details_json:
         written_detail_files = write_details_json(details, details_json)
         print(f"Wrote {len(written_detail_files)} domain detail JSON files under: {Path(details_json).parent}")
+    write_domain_csv(domain_similarity_rows, out_domain_csv)
+    print(f"Wrote {len(domain_similarity_rows)} domain similarity rows to: {out_domain_csv}")
 
     return 0
 
