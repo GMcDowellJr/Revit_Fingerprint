@@ -7,6 +7,56 @@ from tempfile import NamedTemporaryFile
 from typing import Dict, List
 
 
+def _escape_control_chars_in_json_strings(raw_json: str) -> str:
+    """Return JSON text with raw control characters escaped only inside strings."""
+    out: List[str] = []
+    in_string = False
+    escaped = False
+
+    for ch in raw_json:
+        if in_string:
+            if escaped:
+                out.append(ch)
+                escaped = False
+                continue
+
+            if ch == "\\":
+                out.append(ch)
+                escaped = True
+                continue
+
+            if ch == '"':
+                out.append(ch)
+                in_string = False
+                continue
+
+            code = ord(ch)
+            if code < 0x20:
+                if ch == "\n":
+                    out.append("\\n")
+                elif ch == "\r":
+                    out.append("\\r")
+                elif ch == "\t":
+                    out.append("\\t")
+                elif ch == "\b":
+                    out.append("\\b")
+                elif ch == "\f":
+                    out.append("\\f")
+                else:
+                    out.append(f"\\u{code:04x}")
+                continue
+
+            out.append(ch)
+            continue
+
+        out.append(ch)
+        if ch == '"':
+            in_string = True
+            escaped = False
+
+    return "".join(out)
+
+
 def write_sidecar(
     analysis_out_dir: Path,
     seed_export_run_id: str,
@@ -60,13 +110,12 @@ def load_and_validate(analysis_out_dir: Path, current_schema_version: str) -> Di
         payload = json.loads(payload_raw)
     except json.JSONDecodeError as exc:
         # Some historical sidecars can contain raw control characters in string
-        # values (for example, an unescaped tab). Python's default strict parser
-        # rejects those files. Retrying with strict=False keeps the parser
-        # standards-compliant for structure while allowing legacy string content.
+        # values (for example, unescaped tabs/newlines). Escape those characters
+        # and retry parsing.
         if "Invalid control character" not in str(exc):
             raise ValueError(f"Invalid reference bundle JSON in {path}: {exc}") from exc
         try:
-            payload = json.loads(payload_raw, strict=False)
+            payload = json.loads(_escape_control_chars_in_json_strings(payload_raw))
         except json.JSONDecodeError as retry_exc:
             raise ValueError(f"Invalid reference bundle JSON in {path}: {retry_exc}") from retry_exc
     if not isinstance(payload, dict):
