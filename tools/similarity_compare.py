@@ -688,7 +688,7 @@ def compare_two_full(fp_a: FingerprintData, fp_b: FingerprintData) -> Tuple[Simi
                     added_in_b += count_b - count_a
                 if count_a > count_b:
                     removed_from_a += count_a - count_b
-            per_domain_scores.append((score.value, max(weight, 1)))
+            per_domain_scores.append((score.value, weight))
             domains_compared_signatures += 1
             domain_rows.append(DomainSimilarityRow(
                 file_a=fp_a.path,
@@ -701,7 +701,7 @@ def compare_two_full(fp_a: FingerprintData, fp_b: FingerprintData) -> Tuple[Simi
                 matched=matched,
                 added_in_b=added_in_b,
                 removed_from_a=removed_from_a,
-                union_mass=max(weight, 1),
+                union_mass=weight,
                 set_jaccard=set_score.value,
                 multiset_jaccard=score.value,
             ))
@@ -1601,7 +1601,16 @@ File format notes:
     baseline_results: List[SimilarityResult] = []
     pairwise_results: List[SimilarityResult] = []
     domain_similarity_rows: List[DomainSimilarityRow] = []
+    domain_similarity_keys: set = set()
     details: List[SimilarityDetail] = []
+
+    def _extend_unique_domain_rows(rows: List[DomainSimilarityRow]) -> None:
+        for row in rows:
+            key = (row.file_a, row.file_b, row.domain)
+            if key in domain_similarity_keys:
+                continue
+            domain_similarity_keys.add(key)
+            domain_similarity_rows.append(row)
 
     base_fp = None
     if args.mode in ("baseline", "both"):
@@ -1614,7 +1623,7 @@ File format notes:
                 continue
             r, domain_rows = compare_two_full(base_fp, fps[fpath])
             baseline_results.append(r)
-            domain_similarity_rows.extend(domain_rows)
+            _extend_unique_domain_rows(domain_rows)
             if details_json:
                 details.append(compare_two_detailed(base_fp, fps[fpath], top_k=args.details_top_k, domain_filter=domain_filter))
 
@@ -1630,7 +1639,7 @@ File format notes:
         for a, b in itertools.combinations(files_for_pairwise, 2):
             r, domain_rows = compare_two_full(fps[a], fps[b])
             pairwise_results.append(r)
-            domain_similarity_rows.extend(domain_rows)
+            _extend_unique_domain_rows(domain_rows)
             if details_json:
                 details.append(compare_two_detailed(fps[a], fps[b], top_k=args.details_top_k, domain_filter=domain_filter))
 
