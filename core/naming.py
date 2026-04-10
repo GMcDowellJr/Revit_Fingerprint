@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import re
+import hashlib
 from typing import Any, Dict, Optional
 
 
@@ -97,6 +98,45 @@ def _short_uid(uid: Optional[str], *, take: int = 12) -> str:
         return safe_slug(s, max_len=take)
     return safe_slug(s[-take:], max_len=take)
 
+
+def _doc_identity_seed(doc: Any) -> str:
+    """
+    Build a document-identity seed for scoping caches/artifacts.
+
+    Priority:
+    1) ProjectInformation.UniqueId (document-unique in Revit)
+    2) Central/file path + title composite (best-effort fallback)
+    3) Title-only fallback
+
+    Explicitly excludes app/version metadata such as VersionBuild because those
+    are shared across many documents and are not document-unique.
+    """
+    pi = _project_information(doc)
+    uid = (pi.get("unique_id") or "").strip()
+    if uid:
+        return "uid:{0}".format(uid)
+
+    path = ""
+    title = ""
+    try:
+        path = str(getattr(doc, "PathName", None) or "").strip()
+    except Exception:
+        path = ""
+    try:
+        title = str(getattr(doc, "Title", None) or "").strip()
+    except Exception:
+        title = ""
+
+    if path or title:
+        return "path_title:{0}|{1}".format(path.lower(), title.lower())
+    return "title:{0}".format(title.lower())
+
+
+def _doc_identity_short(doc: Any, *, take: int = 10) -> str:
+    seed = _doc_identity_seed(doc)
+    digest = hashlib.sha1(seed.encode("utf-8")).hexdigest()
+    return digest[:take]
+
 def derive_doc_key(doc: Any) -> Dict[str, str]:
     """
     Returns identifiers suitable for filenames and indexing.
@@ -108,12 +148,14 @@ def derive_doc_key(doc: Any) -> Dict[str, str]:
     # Optional short UID to reduce collisions when files share names
     pi = _project_information(doc)
     pi_uid_short = _short_uid(pi.get("unique_id"), take=8)
+    doc_identity_short = _doc_identity_short(doc, take=10)
 
-    key = "fp__rvt-{0}__{1}".format(file_stem, pi_uid_short)
+    key = "fp__rvt-{0}__{1}__{2}".format(file_stem, pi_uid_short, doc_identity_short)
 
     return {
         "rvt_file_stem": file_stem,
         "projectinfo_uid_short": pi_uid_short,
+        "doc_identity_short": doc_identity_short,
         "key": key,
     }
 
@@ -146,4 +188,3 @@ def build_output_filename(
 
     base = "__".join(parts)
     return "{0}.{1}".format(base, safe_slug(ext, max_len=8))
-
