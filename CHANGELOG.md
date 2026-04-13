@@ -12,6 +12,8 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Changed
+- file_metadata.csv: `project_label` now extracted from Autodesk Docs:// central path
+  (ACC projects only); blank for non-ACC paths
 - line_patterns join key policy upgraded from `line_patterns.join_key.v2`
   (`line_pattern.segments_def_hash`) to `line_patterns.join_key.v3`
   (`line_pattern.segments_norm_hash`) to enforce scale-invariant structural identity;
@@ -27,6 +29,8 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   validation practice to confirm elbow stability over time
 
 ### Fixed
+- file_metadata.csv: re-running the pipeline now preserves existing non-empty
+  `client_label` and `governance_role` values by `export_run_id`
 - VCO `dflt_map` computation hoisted out of O(templates × categories) inner loop;
   `other_seconds` reduced from ~920s to ~9s on large files, total VCO time reduced ~73%
 - FEC cache deduplication: all `(doc, View, instances)` collection sites normalized to
@@ -37,6 +41,8 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   timing report merge restored to correct location inside `run_fingerprint()`
 
 ### Added
+- file_metadata.csv: added `client_label` and `governance_role` columns
+  (empty strings, manually curated)
 - `TimingCollector.record_elapsed()` for hot-loop accumulation without per-iteration
   lock overhead
 - VCO inner loop sub-timers: `vco.enumerate_categories`, `vco.get_param_ids`,
