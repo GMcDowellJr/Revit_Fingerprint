@@ -172,6 +172,7 @@ def _identity_metadata(data: Dict[str, Any]) -> Dict[str, str]:
             or identity.get("filename")
             or identity.get("model_title")
             or contract_ident.get("model_title")
+            or _model_label_from_path(central_path)
         ),
         "central_path": central_path,
         "central_path_norm": _safe_str(lineage_items.get("central_path_norm") or _norm_central_path(central_path)),
@@ -193,6 +194,16 @@ def _extract_acc_project_label(central_path: str) -> str:
     parts = remainder.replace("\\", "/").split("/")
     folder = parts[0].strip() if parts else ""
     return folder
+
+
+def _model_label_from_path(central_path: str) -> str:
+    """Extract model filename stem from central path. Works for ACC and server paths."""
+    s = (central_path or "").strip().replace("\\", "/")
+    if not s:
+        return ""
+    basename = s.split("/")[-1]
+    stem, _ = os.path.splitext(basename)
+    return stem
 
 
 def _norm_central_path(path: str) -> str:
