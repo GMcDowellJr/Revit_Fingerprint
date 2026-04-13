@@ -166,12 +166,13 @@ def _identity_metadata(data: Dict[str, Any]) -> Dict[str, str]:
         or data.get("central_path")
     )
     return {
-        "project_label": _safe_str(identity.get("project_title") or contract_ident.get("project_title")),
+        "project_label": _extract_acc_project_label(central_path),
         "model_label": _safe_str(
             lineage_items.get("filename")
             or identity.get("filename")
             or identity.get("model_title")
             or contract_ident.get("model_title")
+            or _model_label_from_path(central_path)
         ),
         "central_path": central_path,
         "central_path_norm": _safe_str(lineage_items.get("central_path_norm") or _norm_central_path(central_path)),
@@ -181,6 +182,28 @@ def _identity_metadata(data: Dict[str, Any]) -> Dict[str, str]:
         "revit_build": _safe_str(identity.get("revit_build") or contract_ident.get("revit_build")),
         "is_workshared": _safe_str(identity.get("is_workshared") if "is_workshared" in identity else contract_ident.get("is_workshared")),
     }
+
+
+def _extract_acc_project_label(central_path: str) -> str:
+    """Extract project folder name from Autodesk Docs:// path. Returns empty string for non-ACC paths."""
+    s = (central_path or "").strip()
+    prefix = "Autodesk Docs://"
+    if not s.lower().startswith(prefix.lower()):
+        return ""
+    remainder = s[len(prefix):]
+    parts = remainder.replace("\\", "/").split("/")
+    folder = parts[0].strip() if parts else ""
+    return folder
+
+
+def _model_label_from_path(central_path: str) -> str:
+    """Extract model filename stem from central path. Works for ACC and server paths."""
+    s = (central_path or "").strip().replace("\\", "/")
+    if not s:
+        return ""
+    basename = s.split("/")[-1]
+    stem, _ = os.path.splitext(basename)
+    return stem
 
 
 def _norm_central_path(path: str) -> str:
@@ -234,6 +257,15 @@ def _write_csv(path: Path, fieldnames: List[str], rows: List[Dict[str, str]]) ->
         w.writeheader()
         for row in rows:
             w.writerow({k: row.get(k, "") for k in fieldnames})
+
+
+def _read_existing_csv(path: Path) -> List[Dict[str, str]]:
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            return [{k: ("" if v is None else str(v)) for k, v in row.items()} for row in reader]
+    except Exception:
+        return []
 
 
 def _sort_rows(rows: List[Dict[str, str]], keys: List[str]) -> List[Dict[str, str]]:
@@ -482,6 +514,8 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
             "is_workshared": identity_meta["is_workshared"],
             "tool_version": tool_version,
             "exported_utc": exported_utc,
+            "client_label": "",
+            "governance_role": "",
         })
 
         for source_domain in _iter_domains(data):
@@ -571,11 +605,32 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
                             "component_order": str(order),
                         })
 
+    # Preserve manually-entered annotations from existing file_metadata.csv
+    existing_meta_path = out_dir / "file_metadata.csv"
+    annotation_columns = ["client_label", "governance_role"]
+    existing_annotations: Dict[str, Dict[str, str]] = {}
+
+    if existing_meta_path.exists():
+        for row in _read_existing_csv(existing_meta_path):
+            eid = row.get("export_run_id", "").strip()
+            if eid:
+                preserved = {col: row.get(col, "").strip() for col in annotation_columns}
+                if any(v for v in preserved.values()):
+                    existing_annotations[eid] = preserved
+
+    for row in meta_rows:
+        eid = row.get("export_run_id", "").strip()
+        if eid in existing_annotations:
+            for col in annotation_columns:
+                if not row.get(col, "").strip():
+                    row[col] = existing_annotations[eid].get(col, "")
+
     _write_csv(out_dir / "file_metadata.csv", [
         "schema_version", "export_run_id", "file_id", "project_id", "model_id",
         "project_label", "model_label", "central_path", "central_path_norm",
         "lineage_hash", "revit_version_number", "revit_version_name", "revit_build",
         "is_workshared", "tool_version", "exported_utc",
+        "client_label", "governance_role",
     ], _sort_rows(meta_rows, ["export_run_id"]))
 
     _write_csv(out_dir / "phase0_records.csv", [
