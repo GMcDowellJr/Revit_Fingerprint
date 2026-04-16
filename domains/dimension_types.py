@@ -16,7 +16,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types
+from core.collect import collect_types, is_type_purgeable
 from core.rows import first_param, _as_string, _as_value_string, _as_double, _as_int, format_len_inches
 from core.canon import canon_str, S_MISSING, S_UNREADABLE
 from core.record_v2 import (
@@ -83,33 +83,6 @@ _DIAMETER_EXPECTED_FAMILY = "Diameter Dimension Style"
 _SPOT_ELEV_EXPECTED_FAMILY = "Spot Elevations"
 _SPOT_COORD_EXPECTED_FAMILY = "Spot Coordinates"
 _SPOT_SLOPE_EXPECTED_FAMILY = "Spot Slopes"
-
-
-def _is_type_purgeable(doc, type_id, bic):
-    """
-    Returns True if no instances reference this type (safe to purge).
-    Returns False if at least one instance references it.
-    Returns None if the API check fails.
-
-    Only valid for types exposed in Revit's Purge Unused UI.
-    Other domains intentionally emit None for this field by design.
-    """
-    try:
-        from Autodesk.Revit.DB import FilteredElementCollector
-
-        count = 0
-        collector = (
-            FilteredElementCollector(doc)
-            .OfCategory(bic)
-            .WhereElementIsNotElementType()
-        )
-        for elem in collector:
-            if elem.GetTypeId() == type_id:
-                count += 1
-                break  # early exit — we only need to know if > 0
-        return count == 0
-    except Exception:
-        return None
 
 
 def _collect_dim_types(doc, ctx):
@@ -326,7 +299,7 @@ def extract_linear(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
-            is_purgeable = _is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -590,7 +563,7 @@ def extract_angular(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
-            is_purgeable = _is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -874,7 +847,7 @@ def extract_radial(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
-            is_purgeable = _is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -1158,7 +1131,7 @@ def extract_diameter(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
-            is_purgeable = _is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -1517,7 +1490,7 @@ def extract_spot_elevation(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
-            is_purgeable = _is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -1894,7 +1867,7 @@ def extract_spot_coordinate(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
-            is_purgeable = _is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -2146,7 +2119,7 @@ def extract_spot_slope(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
-            is_purgeable = _is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,

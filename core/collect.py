@@ -404,3 +404,51 @@ def collect_instances(
         cctx=cctx,
         cache_key=cache_key,
     )
+
+
+def is_type_purgeable(
+    doc: Any,
+    type_id: Any,
+    bic: Any,
+    *,
+    cctx: Optional[CollectCtx] = None,
+    cache_key: Optional[CacheKey] = None,
+) -> Optional[bool]:
+    """
+    Returns True if no instances reference this type (safe to purge).
+    Returns False if at least one instance references it.
+    Returns None if the API check fails.
+
+    Only valid for types exposed in Revit's Purge Unused UI.
+    Other domains intentionally emit None for this field by design.
+    """
+    try:
+        if type_id is None or bic is None:
+            return None
+
+        def _matches_type(elem: Any) -> bool:
+            try:
+                getter = getattr(elem, "GetTypeId", None)
+                if getter is None:
+                    return False
+                return getter() == type_id
+            except Exception:
+                return False
+
+        type_id_int = None
+        try:
+            type_id_int = int(getattr(type_id, "IntegerValue", type_id))
+        except Exception:
+            type_id_int = None
+
+        matches = collect_instances(
+            doc,
+            of_category=bic,
+            where=_matches_type,
+            where_key=("instance_type_match", type_id_int),
+            cctx=cctx,
+            cache_key=cache_key,
+        )
+        return len(matches) == 0
+    except Exception:
+        return None
