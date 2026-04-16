@@ -52,15 +52,13 @@ from core.record_v2 import (
     build_record_v2,
 )
 from core.join_key_policy import get_domain_join_key_policy
-from core.collect import collect_types
+from core.collect import collect_instances, collect_types
 from core.join_key_builder import build_join_key_from_policy
 
 try:
-    from Autodesk.Revit.DB import DimensionType, ElementType, TextNoteType
+    from Autodesk.Revit.DB import BuiltInCategory, ElementType
 except ImportError:
     ElementType = None
-    DimensionType = None
-    TextNoteType = None
 
 
 def _fmt_deg_from_rad(rad):
@@ -229,66 +227,77 @@ def _is_arrowhead_type(doc, t):
         return False
 
 
-def _collect_arrowhead_reference_type_ids(doc, ctx=None):
+def _read_arrowhead_id_from_element(elem):
     """
-    Build a set of arrowhead type ElementId.IntegerValue referenced by type parameters.
+    Best-effort read of an arrowhead/tick-mark ElementId from an element or type.
+    """
+    try:
+        p_arrow = first_param(
+            elem,
+            bip_names=["LEADER_ARROWHEAD", "DIM_LEADER_ARROWHEAD", "TICK_MARK", "DIM_TICK_MARK"],
+            ui_names=["Leader Arrowhead", "Tick Mark"],
+        )
+        if p_arrow is None:
+            return None
+        aid = p_arrow.AsElementId()
+        aiv = getattr(aid, "IntegerValue", None)
+        if aiv is not None and int(aiv) > 0:
+            return int(aiv)
+    except Exception:
+        pass
+    return None
 
-    Usage sources intentionally mirror how this codebase resolves arrowhead usage:
-    - TextNoteType: LEADER_ARROWHEAD
-    - DimensionType: DIM_LEADER_ARROWHEAD / TICK_MARK / DIM_TICK_MARK
+
+def _collect_used_arrowhead_type_ids(doc, ctx=None):
     """
-    cache_key = "_arrowhead_referenced_type_ids"
+    Build a set of arrowhead type ids that are actually used by placed instances.
+
+    This aligns with Purge Unused behavior better than scanning all type defaults.
+    """
+    cache_key = "_arrowhead_used_type_ids_from_instances"
     if ctx is not None and cache_key in ctx:
         return ctx[cache_key]
 
     try:
-        referenced = set()
+        used = set()
+        cctx = (ctx or {}).get("_collect") if ctx is not None else None
 
-        if TextNoteType is not None:
-            text_types = collect_types(
-                doc,
-                of_class=TextNoteType,
-                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="arrowheads:TextNoteType:types_for_purgeability",
-            )
-            for t in text_types:
-                try:
-                    p_arrow = first_param(t, bip_names=["LEADER_ARROWHEAD"], ui_names=["Leader Arrowhead"])
-                    if p_arrow is None:
-                        continue
-                    aid = p_arrow.AsElementId()
-                    aiv = getattr(aid, "IntegerValue", None)
-                    if aiv is not None and int(aiv) > 0:
-                        referenced.add(int(aiv))
-                except Exception:
-                    continue
+        instance_categories = [
+            getattr(BuiltInCategory, "OST_TextNotes", None),
+            getattr(BuiltInCategory, "OST_Dimensions", None),
+            getattr(BuiltInCategory, "OST_SpotElevations", None),
+            getattr(BuiltInCategory, "OST_SpotCoordinates", None),
+            getattr(BuiltInCategory, "OST_SpotSlopes", None),
+        ]
 
-        if DimensionType is not None:
-            dim_types = collect_types(
+        for cat in [c for c in instance_categories if c is not None]:
+            instances = collect_instances(
                 doc,
-                of_class=DimensionType,
-                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="arrowheads:DimensionType:types_for_purgeability",
+                of_category=cat,
+                cctx=cctx,
+                cache_key="arrowheads:instances:{}".format(int(cat) if hasattr(cat, "__int__") else safe_str(cat)),
             )
-            for d in dim_types:
+            for inst in instances:
                 try:
-                    p_tick = first_param(
-                        d,
-                        bip_names=["DIM_LEADER_ARROWHEAD", "TICK_MARK", "DIM_TICK_MARK"],
-                        ui_names=["Tick Mark"],
-                    )
-                    if p_tick is None:
-                        continue
-                    aid = p_tick.AsElementId()
-                    aiv = getattr(aid, "IntegerValue", None)
-                    if aiv is not None and int(aiv) > 0:
-                        referenced.add(int(aiv))
+                    aid = _read_arrowhead_id_from_element(inst)
+                    if aid is not None:
+                        used.add(aid)
                 except Exception:
-                    continue
+                    pass
+
+                try:
+                    tid = getattr(inst, "GetTypeId", lambda: None)()
+                    typ = doc.GetElement(tid) if tid is not None else None
+                    if typ is not None:
+                        aid_t = _read_arrowhead_id_from_element(typ)
+                        if aid_t is not None:
+                            used.add(aid_t)
+                except Exception:
+                    pass
 
         if ctx is not None:
-            ctx[cache_key] = referenced
-        return referenced
+            ctx[cache_key] = used
+        return used
     except Exception:
         if ctx is not None:
             ctx[cache_key] = None
@@ -348,7 +357,7 @@ def extract(doc, ctx=None):
         v2_blocked = True
         v2_reasons[str(reason_key)] = True
 
-    referenced_arrow_type_ids = _collect_arrowhead_reference_type_ids(doc, ctx)
+    used_arrow_type_ids = _collect_used_arrowhead_type_ids(doc, ctx)
 
     for t in arrow_types:
         # Stable ID
@@ -555,11 +564,11 @@ def extract(doc, ctx=None):
 
         record_id = "arrowhead_type_id:{}".format(type_id_s) if type_id_s else "arrowhead"
         type_id_for_purge = getattr(getattr(t, "Id", None), "IntegerValue", None)
-        if referenced_arrow_type_ids is None:
+        if used_arrow_type_ids is None:
             is_purgeable = None
         else:
             try:
-                is_purgeable = int(type_id_for_purge) not in referenced_arrow_type_ids
+                is_purgeable = int(type_id_for_purge) not in used_arrow_type_ids
             except Exception:
                 is_purgeable = None
 
