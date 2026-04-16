@@ -227,25 +227,55 @@ def _is_arrowhead_type(doc, t):
         return False
 
 
-def _read_arrowhead_id_from_element(elem):
+def _iter_arrowhead_ids_from_element(elem):
     """
-    Best-effort read of an arrowhead/tick-mark ElementId from an element or type.
+    Yield all arrowhead/tick-mark ElementId.IntegerValue values found on an element/type.
+
+    Covers both known BIPs and additional tick-mark/arrowhead variants discovered in probes.
     """
+    if elem is None:
+        return set()
+
+    out = set()
+
+    # Fast path for common known params.
     try:
         p_arrow = first_param(
             elem,
             bip_names=["LEADER_ARROWHEAD", "DIM_LEADER_ARROWHEAD", "TICK_MARK", "DIM_TICK_MARK"],
             ui_names=["Leader Arrowhead", "Tick Mark"],
         )
-        if p_arrow is None:
-            return None
-        aid = p_arrow.AsElementId()
-        aiv = getattr(aid, "IntegerValue", None)
-        if aiv is not None and int(aiv) > 0:
-            return int(aiv)
+        if p_arrow is not None:
+            aid = p_arrow.AsElementId()
+            aiv = getattr(aid, "IntegerValue", None)
+            if aiv is not None and int(aiv) > 0:
+                out.add(int(aiv))
     except Exception:
         pass
-    return None
+
+    # Exhaustive pass: include any ElementId-backed parameter with a tick/arrow naming signal.
+    try:
+        params = getattr(elem, "Parameters", None)
+        if params is not None:
+            for p in params:
+                try:
+                    d = getattr(p, "Definition", None)
+                    n = getattr(d, "Name", None) if d is not None else None
+                    n_l = safe_str(n).strip().lower()
+                    if not n_l:
+                        continue
+                    if ("tick mark" not in n_l) and ("arrowhead" not in n_l) and ("arrow head" not in n_l):
+                        continue
+                    aid = p.AsElementId()
+                    aiv = getattr(aid, "IntegerValue", None)
+                    if aiv is not None and int(aiv) > 0:
+                        out.add(int(aiv))
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    return out
 
 
 def _collect_used_arrowhead_type_ids(doc, ctx=None):
@@ -279,9 +309,7 @@ def _collect_used_arrowhead_type_ids(doc, ctx=None):
             )
             for inst in instances:
                 try:
-                    aid = _read_arrowhead_id_from_element(inst)
-                    if aid is not None:
-                        used.add(aid)
+                    used.update(_iter_arrowhead_ids_from_element(inst))
                 except Exception:
                     pass
 
@@ -289,9 +317,7 @@ def _collect_used_arrowhead_type_ids(doc, ctx=None):
                     tid = getattr(inst, "GetTypeId", lambda: None)()
                     typ = doc.GetElement(tid) if tid is not None else None
                     if typ is not None:
-                        aid_t = _read_arrowhead_id_from_element(typ)
-                        if aid_t is not None:
-                            used.add(aid_t)
+                        used.update(_iter_arrowhead_ids_from_element(typ))
                 except Exception:
                     pass
 
