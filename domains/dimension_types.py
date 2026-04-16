@@ -16,7 +16,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types
+from core.collect import collect_types, is_type_purgeable
 from core.rows import first_param, _as_string, _as_value_string, _as_double, _as_int, format_len_inches
 from core.canon import canon_str, S_MISSING, S_UNREADABLE
 from core.record_v2 import (
@@ -64,7 +64,7 @@ from core.dimension_type_helpers import (
 )
 
 try:
-    from Autodesk.Revit.DB import DimensionType
+    from Autodesk.Revit.DB import BuiltInCategory, DimensionType
 except ImportError:
     DimensionType = None
 
@@ -83,6 +83,18 @@ _DIAMETER_EXPECTED_FAMILY = "Diameter Dimension Style"
 _SPOT_ELEV_EXPECTED_FAMILY = "Spot Elevations"
 _SPOT_COORD_EXPECTED_FAMILY = "Spot Coordinates"
 _SPOT_SLOPE_EXPECTED_FAMILY = "Spot Slopes"
+_SPOT_ELEV_PURGE_CATEGORY = (
+    getattr(BuiltInCategory, "OST_SpotElevations", BuiltInCategory.OST_Dimensions)
+    if "BuiltInCategory" in globals() and BuiltInCategory is not None else None
+)
+_SPOT_COORD_PURGE_CATEGORY = (
+    getattr(BuiltInCategory, "OST_SpotCoordinates", BuiltInCategory.OST_Dimensions)
+    if "BuiltInCategory" in globals() and BuiltInCategory is not None else None
+)
+_SPOT_SLOPE_PURGE_CATEGORY = (
+    getattr(BuiltInCategory, "OST_SpotSlopes", BuiltInCategory.OST_Dimensions)
+    if "BuiltInCategory" in globals() and BuiltInCategory is not None else None
+)
 
 
 def _collect_dim_types(doc, ctx):
@@ -299,6 +311,7 @@ def extract_linear(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -313,6 +326,7 @@ def extract_linear(doc, ctx=None):
                     "provenance": "revit.DimensionType.params",
                 },
             )
+            rec_v2["is_purgeable"] = is_purgeable
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -561,6 +575,7 @@ def extract_angular(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -575,6 +590,7 @@ def extract_angular(doc, ctx=None):
                     "provenance": "revit.DimensionType.params",
                 },
             )
+            rec_v2["is_purgeable"] = is_purgeable
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -843,6 +859,7 @@ def extract_radial(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -857,6 +874,7 @@ def extract_radial(doc, ctx=None):
                     "provenance": "revit.DimensionType.params",
                 },
             )
+            rec_v2["is_purgeable"] = is_purgeable
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -1125,6 +1143,7 @@ def extract_diameter(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -1139,6 +1158,7 @@ def extract_diameter(doc, ctx=None):
                     "provenance": "revit.DimensionType.params",
                 },
             )
+            rec_v2["is_purgeable"] = is_purgeable
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -1482,6 +1502,7 @@ def extract_spot_elevation(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), _SPOT_ELEV_PURGE_CATEGORY)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -1496,6 +1517,7 @@ def extract_spot_elevation(doc, ctx=None):
                     "provenance": "revit.DimensionType.params",
                 },
             )
+            rec_v2["is_purgeable"] = is_purgeable
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -1857,6 +1879,7 @@ def extract_spot_coordinate(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), _SPOT_COORD_PURGE_CATEGORY)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -1871,6 +1894,7 @@ def extract_spot_coordinate(doc, ctx=None):
                     "provenance": "revit.DimensionType.params",
                 },
             )
+            rec_v2["is_purgeable"] = is_purgeable
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -2107,6 +2131,7 @@ def extract_spot_slope(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), _SPOT_SLOPE_PURGE_CATEGORY)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -2121,6 +2146,7 @@ def extract_spot_slope(doc, ctx=None):
                     "provenance": "revit.DimensionType.params",
                 },
             )
+            rec_v2["is_purgeable"] = is_purgeable
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(

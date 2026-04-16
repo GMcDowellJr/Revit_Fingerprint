@@ -52,11 +52,11 @@ from core.record_v2 import (
     build_record_v2,
 )
 from core.join_key_policy import get_domain_join_key_policy
-from core.collect import collect_types
+from core.collect import collect_instances, collect_types
 from core.join_key_builder import build_join_key_from_policy
 
 try:
-    from Autodesk.Revit.DB import ElementType
+    from Autodesk.Revit.DB import BuiltInCategory, ElementType
 except ImportError:
     ElementType = None
 
@@ -227,6 +227,109 @@ def _is_arrowhead_type(doc, t):
         return False
 
 
+def _iter_arrowhead_ids_from_element(elem):
+    """
+    Yield all arrowhead/tick-mark ElementId.IntegerValue values found on an element/type.
+
+    Covers both known BIPs and additional tick-mark/arrowhead variants discovered in probes.
+    """
+    if elem is None:
+        return set()
+
+    out = set()
+
+    # Fast path for common known params.
+    try:
+        p_arrow = first_param(
+            elem,
+            bip_names=["LEADER_ARROWHEAD", "DIM_LEADER_ARROWHEAD", "TICK_MARK", "DIM_TICK_MARK"],
+            ui_names=["Leader Arrowhead", "Tick Mark"],
+        )
+        if p_arrow is not None:
+            aid = p_arrow.AsElementId()
+            aiv = getattr(aid, "IntegerValue", None)
+            if aiv is not None and int(aiv) > 0:
+                out.add(int(aiv))
+    except Exception:
+        pass
+
+    # Exhaustive pass: include any ElementId-backed parameter with a tick/arrow naming signal.
+    try:
+        params = getattr(elem, "Parameters", None)
+        if params is not None:
+            for p in params:
+                try:
+                    d = getattr(p, "Definition", None)
+                    n = getattr(d, "Name", None) if d is not None else None
+                    n_l = safe_str(n).strip().lower()
+                    if not n_l:
+                        continue
+                    if ("tick mark" not in n_l) and ("arrowhead" not in n_l) and ("arrow head" not in n_l):
+                        continue
+                    aid = p.AsElementId()
+                    aiv = getattr(aid, "IntegerValue", None)
+                    if aiv is not None and int(aiv) > 0:
+                        out.add(int(aiv))
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    return out
+
+
+def _collect_used_arrowhead_type_ids(doc, ctx=None):
+    """
+    Build a set of arrowhead type ids that are actually used by placed instances.
+
+    This aligns with Purge Unused behavior better than scanning all type defaults.
+    """
+    cache_key = "_arrowhead_used_type_ids_from_instances"
+    if ctx is not None and cache_key in ctx:
+        return ctx[cache_key]
+
+    try:
+        used = set()
+        cctx = (ctx or {}).get("_collect") if ctx is not None else None
+
+        instance_categories = [
+            getattr(BuiltInCategory, "OST_TextNotes", None),
+            getattr(BuiltInCategory, "OST_Dimensions", None),
+            getattr(BuiltInCategory, "OST_SpotElevations", None),
+            getattr(BuiltInCategory, "OST_SpotCoordinates", None),
+            getattr(BuiltInCategory, "OST_SpotSlopes", None),
+        ]
+
+        for cat in [c for c in instance_categories if c is not None]:
+            instances = collect_instances(
+                doc,
+                of_category=cat,
+                cctx=cctx,
+                cache_key="arrowheads:instances:{}".format(int(cat) if hasattr(cat, "__int__") else safe_str(cat)),
+            )
+            for inst in instances:
+                try:
+                    used.update(_iter_arrowhead_ids_from_element(inst))
+                except Exception:
+                    pass
+
+                try:
+                    tid = getattr(inst, "GetTypeId", lambda: None)()
+                    typ = doc.GetElement(tid) if tid is not None else None
+                    if typ is not None:
+                        used.update(_iter_arrowhead_ids_from_element(typ))
+                except Exception:
+                    pass
+
+        if ctx is not None:
+            ctx[cache_key] = used
+        return used
+    except Exception:
+        if ctx is not None:
+            ctx[cache_key] = None
+        return None
+
+
 def extract(doc, ctx=None):
     info = {
         "count": 0,
@@ -279,6 +382,8 @@ def extract(doc, ctx=None):
         nonlocal v2_blocked
         v2_blocked = True
         v2_reasons[str(reason_key)] = True
+
+    used_arrow_type_ids = _collect_used_arrowhead_type_ids(doc, ctx)
 
     for t in arrow_types:
         # Stable ID
@@ -484,6 +589,14 @@ def extract(doc, ctx=None):
         }
 
         record_id = "arrowhead_type_id:{}".format(type_id_s) if type_id_s else "arrowhead"
+        type_id_for_purge = getattr(getattr(t, "Id", None), "IntegerValue", None)
+        if used_arrow_type_ids is None:
+            is_purgeable = None
+        else:
+            try:
+                is_purgeable = int(type_id_for_purge) not in used_arrow_type_ids
+            except Exception:
+                is_purgeable = None
 
         rec_v2 = build_record_v2(
             domain="arrowheads",
@@ -506,6 +619,7 @@ def extract(doc, ctx=None):
                 "width_angle_param_names": safe_str(debug_param_names) if debug_param_names else "",
             },
         )
+        rec_v2["is_purgeable"] = is_purgeable
 
         # Phase-2 (join-key candidates live ONLY here; identity remains authoritative)
         cosmetic_items = []
