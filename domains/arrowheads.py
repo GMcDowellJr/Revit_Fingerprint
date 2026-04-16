@@ -52,13 +52,15 @@ from core.record_v2 import (
     build_record_v2,
 )
 from core.join_key_policy import get_domain_join_key_policy
-from core.collect import collect_types, is_type_purgeable
+from core.collect import collect_types
 from core.join_key_builder import build_join_key_from_policy
 
 try:
-    from Autodesk.Revit.DB import BuiltInCategory, ElementType
+    from Autodesk.Revit.DB import DimensionType, ElementType, TextNoteType
 except ImportError:
     ElementType = None
+    DimensionType = None
+    TextNoteType = None
 
 
 def _fmt_deg_from_rad(rad):
@@ -227,6 +229,72 @@ def _is_arrowhead_type(doc, t):
         return False
 
 
+def _collect_arrowhead_reference_type_ids(doc, ctx=None):
+    """
+    Build a set of arrowhead type ElementId.IntegerValue referenced by type parameters.
+
+    Usage sources intentionally mirror how this codebase resolves arrowhead usage:
+    - TextNoteType: LEADER_ARROWHEAD
+    - DimensionType: DIM_LEADER_ARROWHEAD / TICK_MARK / DIM_TICK_MARK
+    """
+    cache_key = "_arrowhead_referenced_type_ids"
+    if ctx is not None and cache_key in ctx:
+        return ctx[cache_key]
+
+    try:
+        referenced = set()
+
+        if TextNoteType is not None:
+            text_types = collect_types(
+                doc,
+                of_class=TextNoteType,
+                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+                cache_key="arrowheads:TextNoteType:types_for_purgeability",
+            )
+            for t in text_types:
+                try:
+                    p_arrow = first_param(t, bip_names=["LEADER_ARROWHEAD"], ui_names=["Leader Arrowhead"])
+                    if p_arrow is None:
+                        continue
+                    aid = p_arrow.AsElementId()
+                    aiv = getattr(aid, "IntegerValue", None)
+                    if aiv is not None and int(aiv) > 0:
+                        referenced.add(int(aiv))
+                except Exception:
+                    continue
+
+        if DimensionType is not None:
+            dim_types = collect_types(
+                doc,
+                of_class=DimensionType,
+                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+                cache_key="arrowheads:DimensionType:types_for_purgeability",
+            )
+            for d in dim_types:
+                try:
+                    p_tick = first_param(
+                        d,
+                        bip_names=["DIM_LEADER_ARROWHEAD", "TICK_MARK", "DIM_TICK_MARK"],
+                        ui_names=["Tick Mark"],
+                    )
+                    if p_tick is None:
+                        continue
+                    aid = p_tick.AsElementId()
+                    aiv = getattr(aid, "IntegerValue", None)
+                    if aiv is not None and int(aiv) > 0:
+                        referenced.add(int(aiv))
+                except Exception:
+                    continue
+
+        if ctx is not None:
+            ctx[cache_key] = referenced
+        return referenced
+    except Exception:
+        if ctx is not None:
+            ctx[cache_key] = None
+        return None
+
+
 def extract(doc, ctx=None):
     info = {
         "count": 0,
@@ -279,6 +347,8 @@ def extract(doc, ctx=None):
         nonlocal v2_blocked
         v2_blocked = True
         v2_reasons[str(reason_key)] = True
+
+    referenced_arrow_type_ids = _collect_arrowhead_reference_type_ids(doc, ctx)
 
     for t in arrow_types:
         # Stable ID
@@ -484,13 +554,14 @@ def extract(doc, ctx=None):
         }
 
         record_id = "arrowhead_type_id:{}".format(type_id_s) if type_id_s else "arrowhead"
-        is_purgeable = is_type_purgeable(
-            doc,
-            getattr(t, "Id", None),
-            BuiltInCategory.OST_Arrowheads,
-            cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-            cache_key=("arrowheads:is_purgeable", type_id_s),
-        )
+        type_id_for_purge = getattr(getattr(t, "Id", None), "IntegerValue", None)
+        if referenced_arrow_type_ids is None:
+            is_purgeable = None
+        else:
+            try:
+                is_purgeable = int(type_id_for_purge) not in referenced_arrow_type_ids
+            except Exception:
+                is_purgeable = None
 
         rec_v2 = build_record_v2(
             domain="arrowheads",

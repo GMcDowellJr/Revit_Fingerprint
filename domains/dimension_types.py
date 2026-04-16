@@ -83,6 +83,18 @@ _DIAMETER_EXPECTED_FAMILY = "Diameter Dimension Style"
 _SPOT_ELEV_EXPECTED_FAMILY = "Spot Elevations"
 _SPOT_COORD_EXPECTED_FAMILY = "Spot Coordinates"
 _SPOT_SLOPE_EXPECTED_FAMILY = "Spot Slopes"
+_SPOT_ELEV_PURGE_CATEGORY = (
+    getattr(BuiltInCategory, "OST_SpotElevations", BuiltInCategory.OST_Dimensions)
+    if "BuiltInCategory" in globals() and BuiltInCategory is not None else None
+)
+_SPOT_COORD_PURGE_CATEGORY = (
+    getattr(BuiltInCategory, "OST_SpotCoordinates", BuiltInCategory.OST_Dimensions)
+    if "BuiltInCategory" in globals() and BuiltInCategory is not None else None
+)
+_SPOT_SLOPE_PURGE_CATEGORY = (
+    getattr(BuiltInCategory, "OST_SpotSlopes", BuiltInCategory.OST_Dimensions)
+    if "BuiltInCategory" in globals() and BuiltInCategory is not None else None
+)
 
 
 def _collect_dim_types(doc, ctx):
@@ -1490,7 +1502,7 @@ def extract_spot_elevation(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
-            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), _SPOT_ELEV_PURGE_CATEGORY)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -1867,7 +1879,7 @@ def extract_spot_coordinate(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
-            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), _SPOT_COORD_PURGE_CATEGORY)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,
@@ -2119,7 +2131,7 @@ def extract_spot_slope(doc, ctx=None):
                 uid_raw = None
 
             label_str = type_name
-            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), BuiltInCategory.OST_Dimensions)
+            is_purgeable = is_type_purgeable(doc, getattr(d, "Id", None), _SPOT_SLOPE_PURGE_CATEGORY)
             rec_v2 = build_record_v2(
                 domain=DOMAIN_NAME,
                 record_id=safe_str(type_id_int) if type_id_int is not None else DOMAIN_NAME,

@@ -423,32 +423,27 @@ def is_type_purgeable(
     Other domains intentionally emit None for this field by design.
     """
     try:
-        if type_id is None or bic is None:
+        _require_revit_api()
+        if doc is None or type_id is None or bic is None:
             return None
 
-        def _matches_type(elem: Any) -> bool:
+        categories = bic if isinstance(bic, (list, tuple, set, frozenset)) else (bic,)
+        for cat in categories:
             try:
-                getter = getattr(elem, "GetTypeId", None)
-                if getter is None:
-                    return False
-                return getter() == type_id
+                fec = FilteredElementCollector(doc).OfCategory(cat).WhereElementIsNotElementType()
             except Exception:
-                return False
+                return None
 
-        type_id_int = None
-        try:
-            type_id_int = int(getattr(type_id, "IntegerValue", type_id))
-        except Exception:
-            type_id_int = None
+            for elem in fec:
+                try:
+                    getter = getattr(elem, "GetTypeId", None)
+                    if getter is None:
+                        continue
+                    if getter() == type_id:
+                        return False
+                except Exception:
+                    continue
 
-        matches = collect_instances(
-            doc,
-            of_category=bic,
-            where=_matches_type,
-            where_key=("instance_type_match", type_id_int),
-            cctx=cctx,
-            cache_key=cache_key,
-        )
-        return len(matches) == 0
+        return True
     except Exception:
         return None
