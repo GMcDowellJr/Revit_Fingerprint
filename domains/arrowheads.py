@@ -56,7 +56,7 @@ from core.collect import collect_types
 from core.join_key_builder import build_join_key_from_policy
 
 try:
-    from Autodesk.Revit.DB import ElementType
+    from Autodesk.Revit.DB import BuiltInCategory, ElementType
 except ImportError:
     ElementType = None
 
@@ -207,6 +207,33 @@ STYLE_BUCKET_TICK = frozenset({"Heavy end tick mark"})
 STYLE_BUCKET_SIZE_ONLY = frozenset({
     "Dot", "Diagonal", "Box", "Loop", "Elevation Target", "Datum triangle"
 })
+
+
+def _is_type_purgeable(doc, type_id, bic):
+    """
+    Returns True if no instances reference this type (safe to purge).
+    Returns False if at least one instance references it.
+    Returns None if the API check fails.
+
+    Only valid for types exposed in Revit's Purge Unused UI.
+    Other domains intentionally emit None for this field by design.
+    """
+    try:
+        from Autodesk.Revit.DB import FilteredElementCollector
+
+        count = 0
+        collector = (
+            FilteredElementCollector(doc)
+            .OfCategory(bic)
+            .WhereElementIsNotElementType()
+        )
+        for elem in collector:
+            if elem.GetTypeId() == type_id:
+                count += 1
+                break  # early exit — we only need to know if > 0
+        return count == 0
+    except Exception:
+        return None
 
 
 def _is_arrowhead_type(doc, t):
@@ -484,6 +511,7 @@ def extract(doc, ctx=None):
         }
 
         record_id = "arrowhead_type_id:{}".format(type_id_s) if type_id_s else "arrowhead"
+        is_purgeable = _is_type_purgeable(doc, getattr(t, "Id", None), BuiltInCategory.OST_Arrowheads)
 
         rec_v2 = build_record_v2(
             domain="arrowheads",
@@ -506,6 +534,7 @@ def extract(doc, ctx=None):
                 "width_angle_param_names": safe_str(debug_param_names) if debug_param_names else "",
             },
         )
+        rec_v2["is_purgeable"] = is_purgeable
 
         # Phase-2 (join-key candidates live ONLY here; identity remains authoritative)
         cosmetic_items = []
