@@ -149,7 +149,9 @@ def run(
             continue
         entries: List[Tuple[str, float, float, int]] = []
         for file_key, file_domains in corpus_sigs.items():
-            corp_counter = file_domains.get(domain, Counter())
+            if domain not in file_domains:
+                continue
+            corp_counter = file_domains[domain]
             j_score = jaccard_multiset(tmpl_counter, corp_counter)
             if j_score is None:
                 continue
