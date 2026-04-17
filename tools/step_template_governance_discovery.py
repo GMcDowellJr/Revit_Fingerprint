@@ -87,7 +87,7 @@ def run(
             sig_hash = (row.get("sig_hash") or "").strip()
             domain = (row.get("domain") or "").strip()
 
-            if status != "ok" or not sig_hash or not domain:
+            if status not in ("ok", "degraded") or not sig_hash or not domain:
                 continue
 
             if file_key == template_id:
@@ -129,7 +129,7 @@ def run(
 
     for domain, tmpl_counter in template_sigs.items():
         if not tmpl_counter:
-            # Template has no OK records for this domain — skip
+            # Template has no usable records for this domain — skip
             continue
         entries: List[Tuple[str, float, int]] = []
         for file_key, file_domains in corpus_sigs.items():
