@@ -33,6 +33,21 @@ def jaccard_multiset(ca: Counter, cb: Counter) -> Optional[float]:
     return matched / union_mass if union_mass > 0 else None
 
 
+def containment_score(template_counter: Counter, corpus_counter: Counter) -> Optional[float]:
+    """Share of template's sig_hashes present in the corpus file.
+
+    Iterates template keys only — a corpus file with extra types beyond the
+    template still scores 1.0 if it contains every template type.
+    Returns None only when template_counter is empty (already an exclusion
+    condition in the caller).
+    """
+    if not template_counter:
+        return None
+    numerator = sum(min(template_counter[k], corpus_counter.get(k, 0)) for k in template_counter)
+    denominator = sum(template_counter.values())
+    return numerator / denominator if denominator > 0 else None
+
+
 # ---------------------------------------------------------------------------
 # Governance classification
 # ---------------------------------------------------------------------------
@@ -123,24 +138,25 @@ def run(
     print("[INFO] Computing per-domain alignment...")
 
     # ------------------------------------------------------------------
-    # Step 2 — per-file, per-domain multiset Jaccard
+    # Step 2 — per-file, per-domain Jaccard + containment
     # ------------------------------------------------------------------
-    # {domain: [(file_key, score, union_mass), ...]}
-    domain_scores: Dict[str, List[Tuple[str, float, int]]] = {}
+    # {domain: [(file_key, jaccard_score, cont_score, union_mass), ...]}
+    domain_scores: Dict[str, List[Tuple[str, float, float, int]]] = {}
 
     for domain, tmpl_counter in template_sigs.items():
         if not tmpl_counter:
             # Template has no usable records for this domain — skip
             continue
-        entries: List[Tuple[str, float, int]] = []
+        entries: List[Tuple[str, float, float, int]] = []
         for file_key, file_domains in corpus_sigs.items():
             corp_counter = file_domains.get(domain, Counter())
-            score = jaccard_multiset(tmpl_counter, corp_counter)
-            if score is None:
+            j_score = jaccard_multiset(tmpl_counter, corp_counter)
+            if j_score is None:
                 continue
+            c_score = containment_score(tmpl_counter, corp_counter)
             keys = set(tmpl_counter.keys()) | set(corp_counter.keys())
             union_mass = sum(max(tmpl_counter.get(k, 0), corp_counter.get(k, 0)) for k in keys)
-            entries.append((file_key, score, union_mass))
+            entries.append((file_key, j_score, c_score if c_score is not None else 0.0, union_mass))
         domain_scores[domain] = entries
 
     # ------------------------------------------------------------------
@@ -150,8 +166,9 @@ def run(
 
     for domain, entries in domain_scores.items():
         files_comparable = len(entries)
-        scores = [s for _, s, _ in entries]
-        union_masses = [u for _, _, u in entries]
+        j_scores = [j for _, j, _, _ in entries]
+        c_scores = [c for _, _, c, _ in entries]
+        union_masses = [u for _, _, _, u in entries]
 
         if files_comparable == 0:
             alignment_rate = 0.0
@@ -159,19 +176,33 @@ def run(
             p25: Optional[float] = None
             p75: Optional[float] = None
             mean_um: Optional[float] = None
+            cont_alignment_rate = 0.0
+            median_cont: Optional[float] = None
+            p25_cont: Optional[float] = None
+            p75_cont: Optional[float] = None
         else:
-            aligned = sum(1 for s in scores if s >= threshold)
+            aligned = sum(1 for s in j_scores if s >= threshold)
             alignment_rate = aligned / files_comparable
 
-            median_sim = statistics.median(scores)
+            median_sim = statistics.median(j_scores)
             if files_comparable >= 4:
-                qs = statistics.quantiles(scores, n=4)
+                qs = statistics.quantiles(j_scores, n=4)
                 p25 = qs[0]
                 p75 = qs[2]
             else:
                 p25 = None
                 p75 = None
             mean_um = sum(union_masses) / len(union_masses)
+
+            cont_alignment_rate = sum(1 for c in c_scores if c >= threshold) / files_comparable
+            median_cont = statistics.median(c_scores)
+            if files_comparable >= 4:
+                cqs = statistics.quantiles(c_scores, n=4)
+                p25_cont = cqs[0]
+                p75_cont = cqs[2]
+            else:
+                p25_cont = None
+                p75_cont = None
 
         state = classify(alignment_rate, files_comparable, threshold)
         tmpl_rec_count = sum(template_sigs[domain].values())
@@ -180,10 +211,14 @@ def run(
             "domain": domain,
             "governance_state": state,
             "alignment_rate": alignment_rate,
+            "containment_alignment_rate": cont_alignment_rate,
             "files_comparable": files_comparable,
             "median_similarity": median_sim,
             "p25_similarity": p25,
             "p75_similarity": p75,
+            "median_containment": median_cont,
+            "p25_containment": p25_cont,
+            "p75_containment": p75_cont,
             "mean_union_mass": mean_um,
             "template_record_count": tmpl_rec_count,
             "threshold_used": threshold,
@@ -218,10 +253,14 @@ def run(
         "domain",
         "governance_state",
         "alignment_rate",
+        "containment_alignment_rate",
         "files_comparable",
         "median_similarity",
         "p25_similarity",
         "p75_similarity",
+        "median_containment",
+        "p25_containment",
+        "p75_containment",
         "mean_union_mass",
         "template_record_count",
         "threshold_used",
@@ -230,9 +269,13 @@ def run(
 
     float_fields = {
         "alignment_rate",
+        "containment_alignment_rate",
         "median_similarity",
         "p25_similarity",
         "p75_similarity",
+        "median_containment",
+        "p25_containment",
+        "p75_containment",
         "mean_union_mass",
         "threshold_used",
     }
@@ -277,6 +320,11 @@ def run(
         "notes": (
             "domains_in_scope contains stable domains only. "
             "domains_emerging_candidates listed for reference but excluded from scope."
+        ),
+        "containment_note": (
+            "containment_alignment_rate measures share of files containing >= threshold of the "
+            "template's records for that domain, independent of project additions. "
+            "Compare with alignment_rate (Jaccard-based) to distinguish extension from divergence."
         ),
     }
 
