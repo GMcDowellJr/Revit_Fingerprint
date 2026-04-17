@@ -90,7 +90,8 @@ def run(
             if status not in ("ok", "degraded") or not sig_hash or not domain:
                 continue
 
-            if file_key == template_id:
+            is_template = template_id in (export_run_id, file_id) and template_id != ""
+            if is_template:
                 template_found = True
                 template_sigs.setdefault(domain, Counter())[sig_hash] += 1
             else:
