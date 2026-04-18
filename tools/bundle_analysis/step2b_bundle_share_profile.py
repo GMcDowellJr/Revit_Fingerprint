@@ -36,9 +36,11 @@ def build_bundle_share_profile(
         print(f"[step2b][warn] pattern_presence_file.csv not found in {analysis_dir} — skipping share profile")
         return {"bundles_profiled": 0, "member_rows": 0, "rollup_rows": 0}
 
-    bundle_file_path = domain_out_dir / "bundle_file.csv"
+    bundle_file_path = domain_out_dir / "bundle_file_membership.csv"
     bundle_membership_path = domain_out_dir / "bundle_membership.csv"
-    bundle_file_rows = read_csv_rows(bundle_file_path) if bundle_file_path.is_file() else []
+    if not bundle_file_path.is_file():
+        raise FileNotFoundError(f"Required input missing for step2b: {bundle_file_path}")
+    bundle_file_rows = read_csv_rows(bundle_file_path)
     bundle_membership_rows = read_csv_rows(bundle_membership_path) if bundle_membership_path.is_file() else []
     if not bundle_file_rows and not bundle_membership_rows:
         atomic_write_csv(
