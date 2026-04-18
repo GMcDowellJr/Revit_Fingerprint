@@ -64,7 +64,7 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
         scope_key = _norm(row.get("scope_key", ""))
         bundle_id = _norm(row.get("bundle_id", ""))
         pattern_id = _norm(row.get("pattern_id", ""))
-        if not scope_key or not bundle_id or not pattern_id:
+        if not bundle_id or not pattern_id:
             continue
         pattern_to_bundles[scope_key][pattern_id].add(bundle_id)
         scope_bundles[scope_key].add(bundle_id)
@@ -82,7 +82,7 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
         for row in nodes_rows:
             scope_key = _norm(row.get("scope_key", ""))
             bundle_id = _norm(row.get("bundle_id", ""))
-            if not scope_key or not bundle_id:
+            if not bundle_id:
                 continue
             root_flag = _truthy(row.get("is_root", ""))
             leaf_flag = _truthy(row.get("is_leaf", ""))
@@ -101,7 +101,7 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
             scope_key = _norm(row.get("scope_key", ""))
             child = _norm(row.get("child_bundle_id", ""))
             parent = _norm(row.get("parent_bundle_id", ""))
-            if not scope_key or not child or not parent:
+            if not child or not parent:
                 continue
             parents_of[scope_key][child].add(parent)
             children_of[scope_key][parent].add(child)
@@ -128,7 +128,7 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
                 scope_key = _norm(row.get("scope_key", ""))
                 pattern_id = _norm(row.get("pattern_id", ""))
                 export_run_id = _norm(row.get("export_run_id", ""))
-                if not scope_key or not pattern_id or not export_run_id:
+                if not pattern_id or not export_run_id:
                     continue
                 pattern_presence_runs[scope_key][pattern_id].add(export_run_id)
 
@@ -137,8 +137,6 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
         with scope_registry_path.open("r", encoding="utf-8", newline="") as f:
             for row in csv.DictReader(f):
                 scope_key = _norm(row.get("scope_key", ""))
-                if not scope_key:
-                    continue
                 try:
                     files_in_scope[scope_key] = int(_norm(row.get("files_in_scope", "0")) or "0")
                 except ValueError:
