@@ -17,6 +17,10 @@ else:
 def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
     import csv
     from collections import defaultdict
+    if __package__ in (None, ""):
+        from common import SCHEMA_VERSION
+    else:
+        from .common import SCHEMA_VERSION
 
     domain_dir = out_dir / domain
 
@@ -152,7 +156,8 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
         if bundle_count == "0":
             files_no_bundle += 1
             noise_count_primary = file_pattern_count
-            noise_count_any = file_pattern_count
+            any_patterns = any_bundle_patterns_by_scope.get(scope_key, set())
+            noise_count_any = sum(1 for p in file_patterns if p not in any_patterns)
         else:
             primary_patterns = bundle_patterns_by_scope[scope_key].get(primary_bundle_id, set())
             any_patterns = any_bundle_patterns_by_scope.get(scope_key, set())
@@ -168,7 +173,7 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
 
         out_rows.append(
             {
-                "schema_version": "1.0",
+                "schema_version": SCHEMA_VERSION,
                 "analysis_run_id": analysis_run_id,
                 "domain": domain,
                 "export_run_id": export_run_id,
