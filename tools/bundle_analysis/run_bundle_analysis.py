@@ -16,6 +16,7 @@ if __package__ in (None, ""):
     from step0_discover_populations import discover_populations
     from step1_membership_matrix import build_membership_matrix
     from step2_find_bundles import find_bundles_for_domain
+    from step2b_bundle_share_profile import build_bundle_share_profile
     from step3_build_dag import build_dag_for_domain
     from step4_difference_sets import emit_stub as emit_step4
     from step5_classify_patterns import emit_stub as emit_step5
@@ -28,6 +29,7 @@ else:
     from .step0_discover_populations import discover_populations
     from .step1_membership_matrix import build_membership_matrix
     from .step2_find_bundles import find_bundles_for_domain
+    from .step2b_bundle_share_profile import build_bundle_share_profile
     from .step3_build_dag import build_dag_for_domain
     from .step4_difference_sets import emit_stub as emit_step4
     from .step5_classify_patterns import emit_stub as emit_step5
@@ -37,6 +39,7 @@ else:
     from .step_compare import run_compare_for_domain
 
 TIMING_FIELDNAMES = ["schema_version", "analysis_run_id", "domain", "population_id", "step", "seconds"]
+TIMING_STEPS = ("step1", "step2", "step2b", "step3", "step4", "step5", "step6", "step7")
 
 
 def _run_pipeline_once(
@@ -46,6 +49,7 @@ def _run_pipeline_once(
     run_id: str,
     min_support_count: int,
     min_support_pct: float,
+    compute_share_profile: bool = False,
     population_id: Optional[str] = None,
     analysis_run_id: str = "",
     population_registry_dir: Optional[Path] = None,
@@ -74,6 +78,19 @@ def _run_pipeline_once(
     t2 = time.time() - t0
     print(f"[run] domain={domain} step2_seconds={t2:.3f}")
 
+    t2b = 0.0
+    if compute_share_profile:
+        t0 = time.time()
+        build_bundle_share_profile(
+            analysis_dir=analysis_dir,
+            domain_out_dir=work_out_dir / domain,
+            domain=domain,
+            analysis_run_id=run_id,
+            scope_key=scope_key_filter,
+        )
+        t2b = time.time() - t0
+        print(f"[run] domain={domain} step2b_seconds={t2b:.3f}")
+
     t0 = time.time()
     step3 = build_dag_for_domain(work_out_dir, domain)
     total_edges += step3.get("edges", 0)
@@ -101,10 +118,10 @@ def _run_pipeline_once(
     t7 = time.time() - t0
     print(f"[run] domain={domain} step7_seconds={t7:.3f}")
 
-    total = t1 + t2 + t3 + t4 + t5 + t6 + t7
+    total = t1 + t2 + t2b + t3 + t4 + t5 + t6 + t7
     print(
         f"[timing] summary domain={domain} population_id={population_id or 'none'} "
-        f"step1={t1:.2f} step2={t2:.2f} step3={t3:.2f} step4={t4:.2f} "
+        f"step1={t1:.2f} step2={t2:.2f} step2b={t2b:.2f} step3={t3:.2f} step4={t4:.2f} "
         f"step5={t5:.2f} step6={t6:.2f} step7={t7:.2f} total={total:.2f}"
     )
 
@@ -115,6 +132,7 @@ def _run_pipeline_once(
         "step_times": {
             "step1": t1,
             "step2": t2,
+            "step2b": t2b,
             "step3": t3,
             "step4": t4,
             "step5": t5,
@@ -125,10 +143,13 @@ def _run_pipeline_once(
 
 
 def _run_step2_to_step7(
+    analysis_dir: Path,
     work_out_dir: Path,
     domain: str,
     min_support_count: int,
     min_support_pct: float,
+    run_id: str,
+    compute_share_profile: bool = False,
 ) -> Dict[str, object]:
     total_bundles = 0
     total_edges = 0
@@ -140,6 +161,18 @@ def _run_step2_to_step7(
     t2 = time.time() - t0
     print(f"[run] domain={domain} step2_seconds={t2:.3f}")
 
+    t2b = 0.0
+    if compute_share_profile:
+        t0 = time.time()
+        build_bundle_share_profile(
+            analysis_dir=analysis_dir,
+            domain_out_dir=work_out_dir / domain,
+            domain=domain,
+            analysis_run_id=run_id,
+        )
+        t2b = time.time() - t0
+        print(f"[run] domain={domain} step2b_seconds={t2b:.3f}")
+
     t0 = time.time()
     step3 = build_dag_for_domain(work_out_dir, domain)
     total_edges += step3.get("edges", 0)
@@ -171,7 +204,7 @@ def _run_step2_to_step7(
         "total_bundles_found": total_bundles,
         "total_dag_edges": total_edges,
         "files_with_no_bundle_match": total_files_no_bundle,
-        "step_times": {"step2": t2, "step3": t3, "step4": t4, "step5": t5, "step6": t6, "step7": t7},
+        "step_times": {"step2": t2, "step2b": t2b, "step3": t3, "step4": t4, "step5": t5, "step6": t6, "step7": t7},
     }
 
 
@@ -188,6 +221,7 @@ def run_bundle_analysis(
     min_population_jaccard: float = 0.30,
     discovery_support_pct: float = 0.10,
     compare: bool = False,
+    compute_share_profile: bool = False,
 ) -> Dict[str, int]:
     presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     run_id = resolve_analysis_run_id(presence_rows, analysis_run_id)
@@ -224,6 +258,7 @@ def run_bundle_analysis(
                         run_id=run_id,
                         min_support_count=min_support_count,
                         min_support_pct=min_support_pct,
+                        compute_share_profile=compute_share_profile,
                         analysis_run_id=run_id,
                     )
                 else:
@@ -244,10 +279,13 @@ def run_bundle_analysis(
                     with ThreadPoolExecutor(max_workers=workers) as executor:
                         discovery_future = executor.submit(
                             _run_step2_to_step7,
+                            analysis_dir,
                             out_dir,
                             dom,
                             min_support_count,
                             min_support_pct,
+                            run_id,
+                            compute_share_profile,
                         )
                         compare_started = time.time()
                         compare_future = executor.submit(
@@ -263,7 +301,7 @@ def run_bundle_analysis(
                     compare_summary_rows.append(compare_summary)
                     step_times = {"step1": t1, **tail.get("step_times", {})}
                     print(
-                        f"[timing] domain={dom} discovery_seconds={sum(float(step_times.get(k, 0.0)) for k in ('step1','step2','step3','step4','step5','step6','step7')):.3f} "
+                        f"[timing] domain={dom} discovery_seconds={sum(float(step_times.get(k, 0.0)) for k in ('step1','step2','step2b','step3','step4','step5','step6','step7')):.3f} "
                         f"compare_seconds={compare_seconds:.3f}"
                     )
                     stats = {
@@ -276,7 +314,7 @@ def run_bundle_analysis(
                 total_edges += stats["total_dag_edges"]
                 total_files_no_bundle += stats["files_with_no_bundle_match"]
                 step_times = stats.get("step_times", {})
-                for step_name in ("step1", "step2", "step3", "step4", "step5", "step6", "step7"):
+                for step_name in TIMING_STEPS:
                     timing_rows.append(
                         {
                             "schema_version": SCHEMA_VERSION,
@@ -420,6 +458,7 @@ def run_bundle_analysis(
                     run_id=run_id,
                     min_support_count=min_support_count,
                     min_support_pct=min_support_pct,
+                    compute_share_profile=compute_share_profile,
                     population_id=pid,
                     analysis_run_id=run_id,
                     population_registry_dir=out_dir,
@@ -430,7 +469,7 @@ def run_bundle_analysis(
                 total_edges += stats["total_dag_edges"]
                 total_files_no_bundle += stats["files_with_no_bundle_match"]
                 step_times = stats.get("step_times", {})
-                for step_name in ("step1", "step2", "step3", "step4", "step5", "step6", "step7"):
+                for step_name in TIMING_STEPS:
                     timing_rows.append(
                         {
                             "schema_version": SCHEMA_VERSION,
@@ -550,6 +589,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--min-population-jaccard", type=float, default=0.30)
     p.add_argument("--discovery-support-pct", type=float, default=0.10)
     p.add_argument("--compare", action="store_true")
+    p.add_argument("--compute-share-profile", action="store_true")
     return p.parse_args(argv)
 
 
@@ -568,6 +608,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         min_population_jaccard=args.min_population_jaccard,
         discovery_support_pct=args.discovery_support_pct,
         compare=args.compare,
+        compute_share_profile=args.compute_share_profile,
     )
     return 0
 
