@@ -217,7 +217,11 @@ def _normalise_angle(deg: float) -> float:
 
 
 def _is_angle_close(value: float, target: float, tol: float = 5.0) -> bool:
-    return abs(_normalise_angle(value) - _normalise_angle(target)) <= tol
+    value_n = _normalise_angle(value)
+    target_n = _normalise_angle(target)
+    diff = abs(value_n - target_n)
+    circular_diff = min(diff, 180.0 - diff)
+    return circular_diff <= tol
 
 
 def _infer_geometry_description(grid_count: int, grid_angles: List[float]) -> str:
