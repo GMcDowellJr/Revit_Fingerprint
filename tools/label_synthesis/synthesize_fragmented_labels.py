@@ -328,6 +328,28 @@ def synthesize(
     print(f"  Model:         {model or '(provider default)'}")
     print(f"  Workers:       {workers}")
 
+    # Load existing cache
+    cache = load_llm_cache(cache_path)
+    print(f"  Existing cache entries: {len(cache)}")
+
+    if import_results:
+        with open(import_results, "r", encoding="utf-8") as f:
+            imported_entries = json.load(f)
+        for entry in imported_entries:
+            join_hash = entry["join_hash"]
+            cache[join_hash] = {
+                "domain": domain,
+                "recommended": entry["recommended"],
+                "candidates": entry.get("candidates", [entry["recommended"]]),
+                "rationale": entry.get("rationale", ""),
+                "reviewed": False,
+                "generated_at": date.today().isoformat(),
+                "source": "import",
+            }
+        save_llm_cache(cache_path, cache)
+        print(f"  Imported {len(imported_entries)} results → cache written to {cache_path}")
+        return
+
     if provider == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
         raise RuntimeError("OPENROUTER_API_KEY is required when --provider openrouter is used")
 
@@ -365,28 +387,6 @@ def synthesize(
 
     if not fragmented_hashes:
         print("  Nothing to synthesize.")
-        return
-
-    # Load existing cache
-    cache = load_llm_cache(cache_path)
-    print(f"  Existing cache entries: {len(cache)}")
-
-    if import_results:
-        with open(import_results, "r", encoding="utf-8") as f:
-            imported_entries = json.load(f)
-        for entry in imported_entries:
-            join_hash = entry["join_hash"]
-            cache[join_hash] = {
-                "domain": domain,
-                "recommended": entry["recommended"],
-                "candidates": entry.get("candidates", [entry["recommended"]]),
-                "rationale": entry.get("rationale", ""),
-                "reviewed": False,
-                "generated_at": date.today().isoformat(),
-                "source": "import",
-            }
-        save_llm_cache(cache_path, cache)
-        print(f"  Imported {len(imported_entries)} results → cache written to {cache_path}")
         return
 
     # Determine which hashes need synthesis
