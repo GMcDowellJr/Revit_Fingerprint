@@ -61,7 +61,7 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
         scope_key = row.get("scope_key", "")
         bundle_id = row.get("bundle_id", "")
         pattern_id = row.get("pattern_id", "")
-        if not scope_key or not bundle_id or not pattern_id:
+        if not bundle_id or not pattern_id:
             continue
         bundle_patterns.setdefault((scope_key, bundle_id), set()).add(pattern_id)
 
@@ -69,8 +69,6 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
     for row in scope_rows:
         scope_key = row.get("scope_key", "")
         files_raw = row.get("files_in_scope", "")
-        if not scope_key:
-            continue
         try:
             scope_files_total[scope_key] = int(files_raw)
         except (TypeError, ValueError):
@@ -81,7 +79,7 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
         scope_key = row.get("scope_key", "")
         pattern_id = row.get("pattern_id", "")
         export_run_id = row.get("export_run_id", "")
-        if not scope_key or not pattern_id or not export_run_id:
+        if not pattern_id or not export_run_id:
             continue
         pattern_export_runs.setdefault((scope_key, pattern_id), set()).add(export_run_id)
 
@@ -92,7 +90,7 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
         scope_key = edge.get("scope_key", "")
         child_bundle_id = edge.get("child_bundle_id", "")
         parent_bundle_id = edge.get("parent_bundle_id", "")
-        if not scope_key or not child_bundle_id or not parent_bundle_id:
+        if not child_bundle_id or not parent_bundle_id:
             continue
 
         child_patterns = bundle_patterns.get((scope_key, child_bundle_id), set())
