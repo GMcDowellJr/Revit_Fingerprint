@@ -235,14 +235,30 @@ def _get_domain_records(data: Any, domain: str) -> List[Dict[str, Any]]:
 # Domain prompt loader
 # ---------------------------------------------------------------------------
 
+_SHAPE_SUFFIXES = frozenset({
+    "_linear", "_radial", "_angular", "_diameter",
+    "_spot_elevation", "_spot_coordinate", "_spot_slope",
+})
+
+
 def _load_domain_prompt_module(domain: str):
     """Import domain prompt module. Returns None if not implemented."""
+    import importlib
+
     try:
-        import importlib
         return importlib.import_module(
             f"tools.label_synthesis.domain_prompts.{domain}"
         )
     except ImportError:
+        for suffix in _SHAPE_SUFFIXES:
+            if domain.endswith(suffix):
+                base = domain[:-len(suffix)]
+                try:
+                    return importlib.import_module(
+                        f"tools.label_synthesis.domain_prompts.{base}"
+                    )
+                except ImportError:
+                    break
         return None
 
 
@@ -295,6 +311,8 @@ def synthesize(
     force_refresh: bool = False,
     only_unreviewed: bool = False,
     review_csv: Optional[str] = None,
+    export_prompts: Optional[str] = None,
+    import_results: Optional[str] = None,
     provider: str = "anthropic",
     model: Optional[str] = None,
     workers: int = 3,
@@ -304,6 +322,8 @@ def synthesize(
     print(f"  Analysis dir:  {analysis_dir}")
     print(f"  Cache path:    {cache_path}")
     print(f"  Dry run:       {dry_run}")
+    print(f"  Export prompts: {export_prompts or '(disabled)'}")
+    print(f"  Import results: {import_results or '(disabled)'}")
     print(f"  Provider:      {provider}")
     print(f"  Model:         {model or '(provider default)'}")
     print(f"  Workers:       {workers}")
@@ -351,6 +371,24 @@ def synthesize(
     cache = load_llm_cache(cache_path)
     print(f"  Existing cache entries: {len(cache)}")
 
+    if import_results:
+        with open(import_results, "r", encoding="utf-8") as f:
+            imported_entries = json.load(f)
+        for entry in imported_entries:
+            join_hash = entry["join_hash"]
+            cache[join_hash] = {
+                "domain": domain,
+                "recommended": entry["recommended"],
+                "candidates": entry.get("candidates", [entry["recommended"]]),
+                "rationale": entry.get("rationale", ""),
+                "reviewed": False,
+                "generated_at": date.today().isoformat(),
+                "source": "import",
+            }
+        save_llm_cache(cache_path, cache)
+        print(f"  Imported {len(imported_entries)} results → cache written to {cache_path}")
+        return
+
     # Determine which hashes need synthesis
     to_process = []
     for jh in fragmented_hashes:
@@ -367,6 +405,30 @@ def synthesize(
         print("  Cache is current. Use --force-refresh to re-synthesize.")
         if review_csv:
             _write_review_csv(review_csv, cache, domain)
+        return
+
+    if export_prompts:
+        prompt_exports = []
+        for jh in to_process:
+            rows = label_pop_by_hash.get(jh, [])
+            rows_sorted = sorted(rows, key=lambda r: -int(r.get("files_count", 0)))
+            identity_items = _load_representative_identity_items(exports_dir, domain, jh)
+            user_prompt = build_prompt_fn(
+                join_hash=jh,
+                observed_labels=rows_sorted,
+                identity_items=identity_items,
+            )
+            prompt_exports.append({
+                "join_hash": jh,
+                "domain": domain,
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+            })
+        os.makedirs(os.path.dirname(os.path.abspath(export_prompts)), exist_ok=True)
+        with open(export_prompts, "w", encoding="utf-8") as f:
+            json.dump(prompt_exports, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        print(f"  Exported {len(prompt_exports)} prompts → {export_prompts}")
         return
 
     # Process each fragmented hash
@@ -534,6 +596,16 @@ def main():
                     help="Only process cache entries where reviewed=false")
     ap.add_argument("--review-csv", default=None,
                     help="Path to write pending-review CSV for curator workflow")
+    ap.add_argument(
+        "--export-prompts", default=None, metavar="PATH",
+        help="Write assembled prompts to this JSON file instead of calling the API. "
+             "No API calls are made and the cache is not written.",
+    )
+    ap.add_argument(
+        "--import-results", default=None, metavar="PATH",
+        help="Import LLM results from this JSON file and merge into cache. "
+             "No API calls are made.",
+    )
     ap.add_argument("--provider", choices=["anthropic", "openrouter"], default="anthropic",
                     help="LLM provider backend")
     ap.add_argument("--model", default=None,
@@ -541,6 +613,11 @@ def main():
     ap.add_argument("--workers", type=int, default=3,
                     help="Concurrent worker count for API calls")
     args = ap.parse_args()
+
+    if args.export_prompts and args.import_results:
+        ap.error("--export-prompts and --import-results are mutually exclusive.")
+    if args.dry_run and (args.export_prompts or args.import_results):
+        ap.error("--dry-run cannot be combined with --export-prompts or --import-results.")
 
     synthesize(
         exports_dir=args.exports_dir,
@@ -551,6 +628,8 @@ def main():
         force_refresh=args.force_refresh,
         only_unreviewed=args.only_unreviewed,
         review_csv=args.review_csv,
+        export_prompts=args.export_prompts,
+        import_results=args.import_results,
         provider=args.provider,
         model=args.model,
         workers=args.workers,
