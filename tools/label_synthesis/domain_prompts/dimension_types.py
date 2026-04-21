@@ -50,7 +50,8 @@ dim_type.accuracy
 
 dim_type.witness_line_control   [LINEAR only]
   Controls the gap between the element being dimensioned and the witness line.
-  Values: "Gap and Line" (standard), "Gap Only", "No Gap"
+  Values: "Gap to Element" (standard), "Gap Only", "No Gap", "Gap and Line" (older Revit versions)
+  "Gap to Element" is the current Revit API string; "Gap and Line" may appear in exports from older versions.
   Affects code compliance and drawing legibility in different disciplines.
 
 dim_type.center_marks / dim_type.center_mark_size   [RADIAL/DIAMETER only]
@@ -124,7 +125,7 @@ def build_prompt(
     if observed_labels:
         total_files = sum(int(r.get("files_count", 0)) for r in observed_labels)
         for row in observed_labels:
-            label = row.get("label_v", "").strip()
+            label = str(row.get("label_v", "")).split(":", 1)[-1].strip()
             count = int(row.get("files_count", 0))
             pct = (count / total_files * 100) if total_files else 0
             lines.append(f'  "{label}"  ({count} files, {pct:.0f}%)')
