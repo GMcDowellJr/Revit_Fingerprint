@@ -75,27 +75,35 @@ def _load_governance_join_hashes(
 
     analysis_path = Path(analysis_dir)
     dp_path = analysis_path / "domain_patterns.csv"
+    if not dp_path.exists():
+        raise FileNotFoundError(
+            f"domain_patterns.csv is required for --filter-mode {filter_mode!r} "
+            f"but was not found at: {dp_path}"
+        )
 
     candidate_jhs: set = set()
     jh_to_pid: dict = {}
     pid_to_jh: dict = {}
 
-    if dp_path.exists():
-        with dp_path.open(newline="", encoding="utf-8") as f:
-            for row in csv.DictReader(f):
-                if row.get("domain") != domain:
-                    continue
-                pid = row.get("pattern_id", "").strip()
-                raw_src = row.get("source_cluster_id", "").strip()
-                jh = raw_src.split("|")[-1] if raw_src else ""
-                is_cand = row.get("is_candidate_standard", "").strip().lower()
-                if pid and jh:
-                    jh_to_pid[jh] = pid
-                    pid_to_jh[pid] = jh
-                if is_cand == "true" and jh:
-                    candidate_jhs.add(jh)
+    with dp_path.open(newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if row.get("domain") != domain:
+                continue
+            pid = row.get("pattern_id", "").strip()
+            raw_src = row.get("source_cluster_id", "").strip()
+            jh = raw_src.split("|")[-1] if raw_src else ""
+            is_cand = row.get("is_candidate_standard", "").strip().lower()
+            if pid and jh:
+                jh_to_pid[jh] = pid
+                pid_to_jh[pid] = jh
+            if is_cand == "true" and jh:
+                candidate_jhs.add(jh)
 
     bundle_jhs: set = set()
+    if filter_mode in ("bundles", "governance") and bundle_dir is None:
+        raise ValueError(
+            f"--bundle-dir is required when --filter-mode is {filter_mode!r}"
+        )
     if filter_mode in ("bundles", "governance") and bundle_dir is not None:
         bm_path = Path(bundle_dir) / "bundle_membership.csv"
         if bm_path.exists():
@@ -732,6 +740,8 @@ def main():
         ap.error("--export-prompts and --import-results are mutually exclusive.")
     if args.dry_run and (args.export_prompts or args.import_results):
         ap.error("--dry-run cannot be combined with --export-prompts or --import-results.")
+    if args.filter_mode in ("bundles", "governance") and not args.bundle_dir:
+        ap.error("--bundle-dir is required when --filter-mode is 'bundles' or 'governance'.")
 
     synthesize(
         exports_dir=args.exports_dir,
