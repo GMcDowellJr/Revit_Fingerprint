@@ -346,8 +346,10 @@ def _load_domain_prompt_module(domain: str):
     import importlib
 
     parts = domain.split("_")
-    # Try from full name down to 2-segment base (never try single-word fallback)
-    for n in range(len(parts), 1, -1):
+    # Try from full name down to 1-segment base.
+    # This preserves underscore fallback behavior while still supporting
+    # single-word domains like "arrowheads".
+    for n in range(len(parts), 0, -1):
         candidate = "_".join(parts[:n])
         try:
             return importlib.import_module(
