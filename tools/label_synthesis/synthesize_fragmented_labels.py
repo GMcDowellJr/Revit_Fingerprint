@@ -37,6 +37,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
@@ -47,6 +48,104 @@ from .label_resolver import (
     save_llm_cache,
     MODAL_THRESHOLD,
 )
+
+
+def _load_governance_join_hashes(
+    *,
+    domain: str,
+    filter_mode: str,
+    analysis_dir: str,
+    domain_patterns_csv: Optional[str] = None,
+    bundle_dir: Optional[str] = None,
+) -> Optional[set]:
+    """
+    Return the set of join_hashes eligible for synthesis under filter_mode.
+    Returns None when filter_mode == 'all' (no filtering).
+
+    Join surface:
+      domain_patterns.csv  →  source_cluster_id column is pipe-delimited:
+                               {domain}|{join_key_schema}|{join_hash}
+                               join_hash = split('|')[-1]
+
+      bundle_membership.csv  →  (domain, pattern_id) rows;
+                                 pattern_id joins to domain_patterns.pattern_id
+                                 to recover join_hash
+    """
+    if filter_mode == "all":
+        return None
+
+    analysis_path = Path(analysis_dir)
+    candidate_paths = []
+    if domain_patterns_csv:
+        candidate_paths.append(Path(domain_patterns_csv))
+    else:
+        candidate_paths.extend([
+            analysis_path / "domain_patterns.csv",
+            analysis_path.parent / "analysis_v21" / "domain_patterns.csv",
+        ])
+    dp_path = next((p for p in candidate_paths if p.exists()), candidate_paths[0])
+    if not dp_path.exists():
+        searched_paths = ", ".join(str(p) for p in candidate_paths)
+        raise FileNotFoundError(
+            f"domain_patterns.csv is required for --filter-mode {filter_mode!r} "
+            f"but was not found. Looked at: {searched_paths}"
+        )
+
+    candidate_jhs: set = set()
+    jh_to_pid: dict = {}
+    pid_to_jh: dict = {}
+
+    with dp_path.open(newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if row.get("domain") != domain:
+                continue
+            pid = row.get("pattern_id", "").strip()
+            raw_src = row.get("source_cluster_id", "").strip()
+            jh = raw_src.split("|")[-1] if raw_src else ""
+            is_cand = row.get("is_candidate_standard", "").strip().lower()
+            if pid and jh:
+                jh_to_pid[jh] = pid
+                pid_to_jh[pid] = jh
+            if is_cand == "true" and jh:
+                candidate_jhs.add(jh)
+
+    bundle_jhs: set = set()
+    if filter_mode in ("bundles", "governance") and bundle_dir is None:
+        raise ValueError(
+            f"--bundle-dir is required when --filter-mode is {filter_mode!r}"
+        )
+    if filter_mode in ("bundles", "governance") and bundle_dir is not None:
+        bm_path = Path(bundle_dir) / "bundle_membership.csv"
+        if bm_path.exists():
+            with bm_path.open(newline="", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    if row.get("domain") != domain:
+                        continue
+                    pid = row.get("pattern_id", "").strip()
+                    if pid and pid in pid_to_jh:
+                        bundle_jhs.add(pid_to_jh[pid])
+        else:
+            print(
+                f"  WARN: bundle_membership.csv not found at {bm_path}. "
+                f"Bundle filter will match nothing."
+            )
+
+    if filter_mode == "candidates":
+        result = candidate_jhs
+    elif filter_mode == "bundles":
+        result = bundle_jhs
+    elif filter_mode == "governance":
+        result = candidate_jhs | bundle_jhs
+    else:
+        raise ValueError(f"Unknown filter_mode: {filter_mode!r}")
+
+    print(
+        f"  [filter_mode={filter_mode}] "
+        f"candidates={len(candidate_jhs)} "
+        f"bundle_members={len(bundle_jhs)} "
+        f"eligible={len(result)}"
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +412,9 @@ def synthesize(
     provider: str = "anthropic",
     model: Optional[str] = None,
     workers: int = 3,
+    filter_mode: str = "all",
+    domain_patterns_csv: Optional[str] = None,
+    bundle_dir: Optional[str] = None,
 ) -> None:
     print(f"\n=== Label Synthesis: {domain} ===")
     print(f"  Exports dir:   {exports_dir}")
@@ -393,6 +495,20 @@ def synthesize(
                 pass  # already cached, skip
             continue
         to_process.append(jh)
+
+    # governance filter
+    if filter_mode != "all":
+        eligible_jhs = _load_governance_join_hashes(
+            domain=domain,
+            filter_mode=filter_mode,
+            analysis_dir=analysis_dir,
+            domain_patterns_csv=domain_patterns_csv,
+            bundle_dir=bundle_dir,
+        )
+        if eligible_jhs is not None:
+            before = len(to_process)
+            to_process = [jh for jh in to_process if jh in eligible_jhs]
+            print(f"  Filter applied: {before} → {len(to_process)} patterns")
 
     print(f"  To process: {len(to_process)}")
     if not to_process:
@@ -609,12 +725,45 @@ def main():
                     help="Optional model override for selected provider")
     ap.add_argument("--workers", type=int, default=3,
                     help="Concurrent worker count for API calls")
+    ap.add_argument(
+        "--filter-mode",
+        choices=["all", "candidates", "bundles", "governance"],
+        default="all",
+        help=(
+            "Which patterns to synthesize. "
+            "'all' = every fragmented pattern (default). "
+            "'candidates' = is_candidate_standard=true only. "
+            "'bundles' = patterns in at least one bundle. "
+            "'governance' = union of candidates and bundle members."
+        ),
+    )
+    ap.add_argument(
+        "--bundle-dir",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Directory containing bundle_membership.csv "
+            "(required when --filter-mode is 'bundles' or 'governance')."
+        ),
+    )
+    ap.add_argument(
+        "--domain-patterns-csv",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Optional explicit path to domain_patterns.csv used by non-'all' filter modes. "
+            "Defaults to <analysis-dir>/domain_patterns.csv, then "
+            "<analysis-dir>/../analysis_v21/domain_patterns.csv."
+        ),
+    )
     args = ap.parse_args()
 
     if args.export_prompts and args.import_results:
         ap.error("--export-prompts and --import-results are mutually exclusive.")
     if args.dry_run and (args.export_prompts or args.import_results):
         ap.error("--dry-run cannot be combined with --export-prompts or --import-results.")
+    if args.filter_mode in ("bundles", "governance") and not args.bundle_dir:
+        ap.error("--bundle-dir is required when --filter-mode is 'bundles' or 'governance'.")
 
     synthesize(
         exports_dir=args.exports_dir,
@@ -630,6 +779,9 @@ def main():
         provider=args.provider,
         model=args.model,
         workers=args.workers,
+        filter_mode=args.filter_mode,
+        domain_patterns_csv=args.domain_patterns_csv,
+        bundle_dir=args.bundle_dir,
     )
 
 
