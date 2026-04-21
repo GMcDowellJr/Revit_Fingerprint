@@ -154,15 +154,14 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
             else:
                 if total_bundles > 0 and bundle_count == total_bundles:
                     bundle_role = "universal"
-                elif any(b in roots.get(scope_key, set()) for b in bundles):
+                elif any(b in roots.get(scope_key, set()) for b in bundles) and not any(
+                    is_leaf[scope_key].get(b, False) for b in bundles
+                ):
                     bundle_role = "foundation"
+                elif any(is_leaf[scope_key].get(b, False) for b in bundles):
+                    bundle_role = "differentiating"
                 elif bundles:
-                    has_leaf_membership = any(is_leaf[scope_key].get(b, False) for b in bundles)
-                    has_non_leaf_membership = any(not is_leaf[scope_key].get(b, False) for b in bundles)
-                    if has_leaf_membership and not has_non_leaf_membership:
-                        bundle_role = "differentiating"
-                    else:
-                        bundle_role = "intermediate"
+                    bundle_role = "intermediate"
                 else:
                     bundle_role = "orphan"
 
