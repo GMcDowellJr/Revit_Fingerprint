@@ -156,12 +156,9 @@ def emit_stub(out_dir: Path, domain: str) -> Dict[str, int]:
                     bundle_role = "universal"
                 elif any(b in roots.get(scope_key, set()) for b in bundles):
                     bundle_role = "foundation"
-                elif bundles and all(is_leaf[scope_key].get(b, False) for b in bundles):
+                elif any(is_leaf[scope_key].get(b, False) for b in bundles):
                     bundle_role = "differentiating"
-                elif bundles and all(
-                    (not is_root[scope_key].get(b, False)) and (not is_leaf[scope_key].get(b, False))
-                    for b in bundles
-                ):
+                elif bundles:
                     bundle_role = "intermediate"
                 else:
                     bundle_role = "orphan"
