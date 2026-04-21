@@ -235,31 +235,28 @@ def _get_domain_records(data: Any, domain: str) -> List[Dict[str, Any]]:
 # Domain prompt loader
 # ---------------------------------------------------------------------------
 
-_SHAPE_SUFFIXES = frozenset({
-    "_linear", "_radial", "_angular", "_diameter",
-    "_spot_elevation", "_spot_coordinate", "_spot_slope",
-})
-
-
 def _load_domain_prompt_module(domain: str):
-    """Import domain prompt module. Returns None if not implemented."""
+    """Import domain prompt module, with progressive base-name fallback.
+
+    Tries exact match first, then progressively strips trailing underscore
+    segments to find a base module. Examples:
+      dimension_types_linear  → dimension_types_linear, dimension_types
+      fill_patterns_drafting  → fill_patterns_drafting, fill_patterns
+      object_styles_model     → object_styles_model, object_styles
+    """
     import importlib
 
-    try:
-        return importlib.import_module(
-            f"tools.label_synthesis.domain_prompts.{domain}"
-        )
-    except ImportError:
-        for suffix in _SHAPE_SUFFIXES:
-            if domain.endswith(suffix):
-                base = domain[:-len(suffix)]
-                try:
-                    return importlib.import_module(
-                        f"tools.label_synthesis.domain_prompts.{base}"
-                    )
-                except ImportError:
-                    break
-        return None
+    parts = domain.split("_")
+    # Try from full name down to 2-segment base (never try single-word fallback)
+    for n in range(len(parts), 1, -1):
+        candidate = "_".join(parts[:n])
+        try:
+            return importlib.import_module(
+                f"tools.label_synthesis.domain_prompts.{candidate}"
+            )
+        except ImportError:
+            continue
+    return None
 
 
 # ---------------------------------------------------------------------------
