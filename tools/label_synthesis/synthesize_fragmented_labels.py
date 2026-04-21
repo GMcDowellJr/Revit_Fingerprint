@@ -350,9 +350,6 @@ def synthesize(
         print(f"  Imported {len(imported_entries)} results → cache written to {cache_path}")
         return
 
-    if provider == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
-        raise RuntimeError("OPENROUTER_API_KEY is required when --provider openrouter is used")
-
     # Load domain prompt module
     prompt_mod = _load_domain_prompt_module(domain)
     if prompt_mod is None:
@@ -430,6 +427,9 @@ def synthesize(
             f.write("\n")
         print(f"  Exported {len(prompt_exports)} prompts → {export_prompts}")
         return
+
+    if not dry_run and provider == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
+        raise RuntimeError("OPENROUTER_API_KEY is required when --provider openrouter is used")
 
     # Process each fragmented hash
     success = 0
