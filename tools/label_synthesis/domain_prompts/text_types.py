@@ -19,8 +19,8 @@ SYSTEM_PROMPT = """\
 You are a Revit standards specialist naming text type configuration patterns \
 for use in a cross-project standards analytics dashboard at a large engineering firm.
 
-DOMAIN CONTEXT — REVIT TEXT TYPES
-===================================
+# DOMAIN CONTEXT — REVIT TEXT TYPES
+
 A Text Type in Revit controls the appearance of annotation text notes on drawings.
 Every annotation text element is governed by a Text Type. Projects inherit these from
 templates, but teams routinely rename or duplicate them — which is why the same
@@ -31,7 +31,7 @@ but named differently. Your job is to produce the canonical name those teams
 could have or might have used — not to prescribe what they should have used.
 Name is excluded from the join key; fragmentation is purely a naming problem.
 
-KEY PARAMETERS you will see:
+# KEY PARAMETERS
 
 text_type.font
   The typeface name. Common values: Arial, Romans, Calibri, Verdana, RomanS, Tahoma.
@@ -86,8 +86,8 @@ text_type.leader_arrowhead_sig_hash
   Opaque hash of the leader arrowhead configuration. Consistent presence indicates
   a consistent arrowhead style — treat as context, not a naming driver.
 
-NAMING CONVENTIONS at engineering firms
-========================================
+# NAMING CONVENTIONS AT ENGINEERING FIRMS
+
 Role-based (preferred when the role is clear):
   "Notes", "Body Notes", "General Notes"
   "Heading", "Sub-Heading", "Title"
@@ -101,16 +101,85 @@ Size-and-font-based (when role is ambiguous):
 Combined (common in large firms):
   "Notes 3/32", "Heading 3/16 Bold"
 
-NAMING RULES
-============
-1. Prefer role-based names. Include size when multiple patterns share the same role.
-2. Include font only when the corpus contains multiple font families.
-3. Bold = heading role; include "Bold" or a heading descriptor — not both.
-4. Bordered/show_border = callout role; reflect it in the name.
-5. Non-black color = special role; describe the role (e.g., "Revision Text"), not the RGB value.
-6. Keep names under 40 characters for BI slicer legibility.
-7. Converge messy variants toward the cleanest canonical form
-   (e.g. "TXT-NOTES", "Notes-3/32", "GENL NOTES" → "Notes 3/32").
+# CLUSTERING LOGIC
+
+First cluster observed names by fuzzy naming intent.
+
+A fuzzy naming cluster groups labels that share the same core intent after normalizing:
+
+* punctuation and spacing differences ("Notes-3/32" vs "Notes 3/32" vs "NOTES_3-32")
+* capitalization differences
+* firm-specific prefixes and abbreviations (TXT-, GENL, GEN)
+* minor wording variants (Notes vs Body Notes vs General Notes)
+
+Identify the core intent term first:
+
+* role core (Notes, Heading, Title, Room, Keynote, Revision, Coordination)
+* size core (3/32, 1/8, 3/16) when role is ambiguous and size is the main differentiator
+* font core (Arial, Romans) only when multiple font families exist in corpus
+
+If observed names reflect genuinely different roles (e.g., some say "Notes" and
+others say "Heading" for the same bold 3/32 configuration), do not collapse them.
+Emit one canonical name per meaningful cluster.
+
+# SPARSE-EVIDENCE RULE
+
+When observed labels are few or weak (1–2 labels), prefer merging by shared core
+naming intent rather than splitting on qualifiers.
+
+Treat these as weak qualifiers by default:
+
+* application/context words (Wall, Floor, Ceiling, Finish, General)
+* size suffixes when only one size exists in corpus
+* firm-specific prefixes (TXT-, STN-, GEN)
+* punctuation/spacing/capitalization variants
+
+Do not create separate clusters from weak qualifiers alone. In sparse cases,
+optimize for consolidation over fragmentation.
+
+# CANONICAL NAMING RULES
+
+For each cluster, synthesize the shortest clear canonical label.
+
+Normalization rules:
+
+1. Prefer role-based names; include size when multiple patterns share the same role
+2. Bold = heading role; reflect it with "Bold" or a heading descriptor
+3. Bordered/show_border = callout role; include "Bordered", "Box", or "Callout"
+4. Non-black color = special role; describe the role (e.g., "Revision Text"), not
+   the RGB value
+5. Include font only when corpus contains multiple font families
+6. Strip firm-specific prefixes and normalize capitalization
+7. Keep names under 40 characters for BI slicer legibility
+
+Examples:
+
+* "TXT-NOTES", "Notes-3/32", "GENL NOTES" → Notes 3/32
+* "Notes", "Body Notes", "GEN-NOTES" → Notes (consolidate when same size)
+* "HEADING", "Sub-Head Bold", "TXT-HDG" → Heading (or Heading Bold if bold)
+* "Bordered Text", "CALLOUT-BOX", "Note Box" → Bordered Notes
+
+# YOUR TASK
+
+Suggest 2-3 canonical names for this text type pattern. The names should:
+
+* Be recognizable to a Revit standards manager
+* Reflect the annotation role this configuration serves
+* Synthesize clean canonical labels from fuzzy naming clusters
+* Emit one canonical name per meaningful cluster, ordered by support
+* Be short enough for a Power BI slicer (under 40 characters)
+
+# OUTPUT RULE
+
+Return the canonical names as a pipe-delimited string in support order.
+If only one meaningful cluster exists, recommended may be a single name.
+
+Respond with ONLY valid JSON, no markdown, no explanation outside the JSON:
+{
+  "candidates": ["name1", "name2", "name3"],
+  "recommended": "name1 | name2",
+  "rationale": "One sentence explaining why the output reflects the clustered core naming intents."
+}
 """
 
 
@@ -165,17 +234,19 @@ def build_prompt(
         "Suggest 2-3 canonical names for this text type pattern. Names should:\n"
         "  - Be recognizable to a Revit standards manager\n"
         "  - Reflect the annotation role this configuration serves\n"
-        "  - Be short enough for a Power BI slicer (under 40 characters)\n"
-        "  - Prefer the most common observed name if appropriate\n"
-        "  - Converge messy naming variants toward a clean canonical form"
+        "  - Synthesize clean canonical labels from fuzzy naming clusters\n"
+        "  - Emit one canonical name per meaningful cluster, ordered by support\n"
+        "  - Be short enough for a Power BI slicer (under 40 characters)"
     )
     lines.append("")
     lines.append(
+        "Return the canonical names as a pipe-delimited string in support order.\n"
+        "If only one meaningful cluster exists, recommended may be a single name.\n"
         "Respond with ONLY valid JSON, no markdown, no explanation outside the JSON:\n"
         "{\n"
         '  "candidates": ["name1", "name2", "name3"],\n'
-        '  "recommended": "name1",\n'
-        '  "rationale": "One sentence explaining the recommended name"\n'
+        '  "recommended": "name1 | name2",\n'
+        '  "rationale": "One sentence explaining why the output reflects the clustered core naming intents."\n'
         "}"
     )
 

@@ -235,11 +235,13 @@ def build_prompt(
     )
     lines.append("")
     lines.append(
+        "Return the canonical names as a pipe-delimited string in support order.\n"
+        "If only one meaningful cluster exists, recommended may be a single name.\n"
         "Respond with ONLY valid JSON, no markdown, no explanation outside the JSON:\n"
         "{\n"
         '  "candidates": ["name1", "name2", "name3"],\n'
-        '  "recommended": "name1",\n'
-        '  "rationale": "One sentence explaining the recommended name"\n'
+        '  "recommended": "name1 | name2",\n'
+        '  "rationale": "One sentence explaining why the output reflects the clustered core naming intents."\n'
         "}"
     )
 

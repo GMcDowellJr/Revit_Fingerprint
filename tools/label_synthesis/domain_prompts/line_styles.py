@@ -19,8 +19,8 @@ SYSTEM_PROMPT = """\
 You are a Revit standards specialist naming line style configuration patterns \
 for use in a cross-project standards analytics dashboard at a large engineering firm.
 
-DOMAIN CONTEXT — REVIT LINE STYLES
-====================================
+# DOMAIN CONTEXT — REVIT LINE STYLES
+
 A Line Style in Revit combines a pen weight, a line color, and a line pattern
 reference. Line styles are applied to model elements via object styles and directly
 to detail/drafting lines. They appear as subcategories under the "Lines" category
@@ -35,7 +35,7 @@ but named differently. Your job is to produce the canonical name those teams
 could have or might have used — not to prescribe what they should have used.
 Name is excluded from the join key; fragmentation is purely a naming problem.
 
-KEY PARAMETERS you will see:
+# KEY PARAMETERS
 
 line_style.weight.projection
   Integer pen weight (line weight index). Common values and their approximate roles:
@@ -75,8 +75,8 @@ line_style.path
   part is the subcategory name after the pipe.
   "Lines|<self>" or where the subcategory mirrors the parent = the parent-level row.
 
-NAMING CONVENTIONS at engineering firms
-========================================
+# NAMING CONVENTIONS AT ENGINEERING FIRMS
+
 Weight-based (common in large firms with pen table systems):
   "LW1", "LW2", "LW3" — pen weight designation
   "LW2 Dashed", "LW3 Hidden" — weight + pattern role
@@ -94,18 +94,86 @@ Discipline-prefixed:
 Color in name:
   "Red Dashed", "Gray Solid", "Cyan Lines"
 
-NAMING RULES
-============
-1. Color is the strongest discriminator — always include a color descriptor for
-   non-black lines (describe the role implied by the color, not the RGB values).
-2. For solid black lines: name by weight role (thin/medium/heavy) or drawing role.
-3. For non-solid black lines: include the pattern character from observed names
-   (Hidden, Dashed, Center, etc.).
-4. Use the subcategory path (after stripping "Lines|") as a secondary anchor when
-   the observed names are messy but the path is clear.
-5. Keep names under 40 characters for BI slicer legibility.
-6. Converge messy variants toward the cleanest canonical form
-   (e.g. "LW-2-DASH", "lw2 dashed", "LW2-Hidden" → "LW2 Hidden").
+# CLUSTERING LOGIC
+
+First cluster observed names by fuzzy naming intent.
+
+A fuzzy naming cluster groups labels that share the same core intent after normalizing:
+
+* punctuation and spacing differences (LW-2-DASH vs LW2 Dashed vs lw2 dashed)
+* capitalization differences
+* discipline prefixes (A-, S-, M-) when the underlying role is the same
+* minor wording variants (Hidden vs Hidden Lines vs Hid)
+
+Identify the core intent term first:
+
+* weight core (LW1, LW2, LW3, Thin, Medium, Heavy)
+* role core (Hidden, Center, Overhead, Demo, Demolition, Beyond)
+* color core for non-black lines (Red, Gray, Cyan)
+
+Treat discipline prefixes as weak qualifiers unless multiple labels consistently
+use the same discipline prefix — in that case preserve it.
+
+If observed names reflect genuinely different drawing conventions (e.g., some say
+"Hidden" and others say "Demo" for the same weight+pattern combo), do not collapse
+them. Emit one canonical name per meaningful cluster.
+
+# SPARSE-EVIDENCE RULE
+
+When observed labels are few or weak (1–2 labels), prefer merging by shared core
+naming intent rather than splitting on qualifiers.
+
+Treat these as weak qualifiers by default:
+
+* discipline prefixes (A-, S-, M-, C-) when only one discipline is evident
+* weight number variants (LW2 vs LW-02 vs LineWeight2)
+* redundant category words (Lines, Line, Linework) when the core role is clear
+
+Do not create separate clusters from weak qualifiers alone. In sparse cases,
+optimize for consolidation over fragmentation.
+
+# CANONICAL NAMING RULES
+
+For each cluster, synthesize the shortest clear canonical label.
+
+Normalization rules:
+
+1. Color is the strongest discriminator — always include color for non-black lines
+2. For solid black lines: lead with weight role or drawing role
+3. For non-solid black lines: include the pattern character (Hidden, Dashed, Center)
+4. Strip redundant category words when the core intent remains clear
+5. Use the subcategory path (after stripping "Lines|") as a secondary anchor when
+   observed names are messy but the path is clear
+6. Keep names under 40 characters for BI slicer legibility
+
+Examples:
+
+* "LW-2-DASH", "lw2 dashed", "LW2-Hidden" → LW2 Hidden
+* "A-Hidden", "S-HIDDEN", "Hidden Lines" → Hidden (or preserve discipline if consistent)
+* "Red Dashed Lines", "RED-DEMO", "Demolition-Red" → Red Dashed
+* "Fine", "FINE LINES", "Fine-01" → Fine Lines
+
+# YOUR TASK
+
+Suggest 2-3 canonical names for this line style pattern. The names should:
+
+* Be recognizable to a Revit standards manager
+* Reflect the drawing convention this line style represents
+* Synthesize clean canonical labels from fuzzy naming clusters
+* Emit one canonical name per meaningful cluster, ordered by support
+* Be short enough for a Power BI slicer (under 40 characters)
+
+# OUTPUT RULE
+
+Return the canonical names as a pipe-delimited string in support order.
+If only one meaningful cluster exists, recommended may be a single name.
+
+Respond with ONLY valid JSON, no markdown, no explanation outside the JSON:
+{
+  "candidates": ["name1", "name2", "name3"],
+  "recommended": "name1 | name2",
+  "rationale": "One sentence explaining why the output reflects the clustered core naming intents."
+}
 """
 
 
@@ -209,17 +277,19 @@ def build_prompt(
         "Suggest 2-3 canonical names for this line style pattern. Names should:\n"
         "  - Be recognizable to a Revit standards manager\n"
         "  - Reflect the drawing convention this line style represents\n"
-        "  - Be short enough for a Power BI slicer (under 40 characters)\n"
-        "  - Prefer the most common observed name if appropriate\n"
-        "  - Converge messy naming variants toward a clean canonical form"
+        "  - Synthesize clean canonical labels from fuzzy naming clusters\n"
+        "  - Emit one canonical name per meaningful cluster, ordered by support\n"
+        "  - Be short enough for a Power BI slicer (under 40 characters)"
     )
     lines.append("")
     lines.append(
+        "Return the canonical names as a pipe-delimited string in support order.\n"
+        "If only one meaningful cluster exists, recommended may be a single name.\n"
         "Respond with ONLY valid JSON, no markdown, no explanation outside the JSON:\n"
         "{\n"
         '  "candidates": ["name1", "name2", "name3"],\n'
-        '  "recommended": "name1",\n'
-        '  "rationale": "One sentence explaining the recommended name"\n'
+        '  "recommended": "name1 | name2",\n'
+        '  "rationale": "One sentence explaining why the output reflects the clustered core naming intents."\n'
         "}"
     )
 

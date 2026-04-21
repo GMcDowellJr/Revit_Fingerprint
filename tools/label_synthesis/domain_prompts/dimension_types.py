@@ -190,6 +190,61 @@ Spot Coordinate:
 Spot Slope:
   "Spot Slope", "Slope Arrow", "Slope - Percent"
 
+# CLUSTERING LOGIC
+
+First cluster observed names by fuzzy naming intent.
+
+A fuzzy naming cluster groups labels that share the same core intent after normalizing:
+
+* punctuation and spacing differences ("Dim-Standard" vs "DIM_STD" vs "Standard Dim")
+* capitalization differences
+* discipline prefixes (Structural, Civil, Arch, S-, A-) when the underlying
+  configuration is the same
+* minor wording variants (Standard vs Default vs Typical)
+
+Identify the core intent term first — shape family is always the anchor:
+
+* shape core (Linear, Radial, Spot Elev, Angular, etc.)
+* precision qualifier (Fine, Coarse, Standard, Detail, Schematic)
+* discipline qualifier only when consistently applied across multiple labels
+
+If observed names span disciplines but share the same shape and precision
+(e.g., "Structural Linear 1/8" and "Arch Linear 1/8"), prefer the most
+transferable name and note the discipline spread in rationale.
+
+# SPARSE-EVIDENCE RULE
+
+When observed labels are few or weak (1–2 labels), prefer merging by shared core
+naming intent rather than splitting on qualifiers.
+
+Treat these as weak qualifiers by default:
+
+* discipline prefixes when only one discipline is evident
+* precision descriptors when only one accuracy exists in corpus
+* formatting variants (DIM-, STD-, _STD)
+
+Do not create separate clusters from weak qualifiers alone. In sparse cases,
+optimize for consolidation over fragmentation.
+
+# CANONICAL NAMING RULES
+
+For each cluster, synthesize the shortest clear canonical label.
+
+Normalization rules:
+
+1. Always lead with the shape family name (Linear, Radial, Spot Elev, etc.)
+2. Include accuracy when it differentiates — if all patterns share the same
+   accuracy, omit it; if multiple accuracies exist, always include it
+3. For spot types: symbol_name is the strongest differentiator after shape
+4. Strip firm-specific prefixes and normalize capitalization
+5. Keep names under 40 characters for BI slicer legibility
+
+Examples:
+
+* "Dim-Standard", "DIM_STD", "Standard Dim" → Linear Standard
+* "Linear 1/8", "STD-LINEAR", "Arch-Lin-Std" → Linear Standard (or Linear 1/8 if accuracy varies)
+* "Spot-Elev", "SE STANDARD", "Spot Elevation" → Spot Elevation
+
 NAMING RULES
 ============
 1. Always start with the shape family name (Linear, Radial, Spot Elev, etc.)
@@ -322,17 +377,19 @@ def build_prompt(
         "  - Be recognizable to a Revit standards manager\n"
         "  - Start with the shape family (Linear, Radial, Spot Elev, etc.)\n"
         "  - Reflect what the configuration actually does\n"
-        "  - Be short enough for a Power BI slicer (under 40 characters)\n"
-        "  - Prefer the most common observed name if appropriate\n"
-        "  - Converge messy naming variants toward a clean canonical form"
+        "  - Synthesize clean canonical labels from fuzzy naming clusters\n"
+        "  - Emit one canonical name per meaningful cluster, ordered by support\n"
+        "  - Be short enough for a Power BI slicer (under 40 characters)"
     )
     lines.append("")
     lines.append(
+        "Return the canonical names as a pipe-delimited string in support order.\n"
+        "If only one meaningful cluster exists, recommended may be a single name.\n"
         "Respond with ONLY valid JSON, no markdown, no explanation outside the JSON:\n"
         "{\n"
         '  "candidates": ["name1", "name2", "name3"],\n'
-        '  "recommended": "name1",\n'
-        '  "rationale": "One sentence explaining the recommended name"\n'
+        '  "recommended": "name1 | name2",\n'
+        '  "rationale": "One sentence explaining why the output reflects the clustered core naming intents."\n'
         "}"
     )
 
