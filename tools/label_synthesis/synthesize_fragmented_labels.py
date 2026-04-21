@@ -55,6 +55,7 @@ def _load_governance_join_hashes(
     domain: str,
     filter_mode: str,
     analysis_dir: str,
+    domain_patterns_csv: Optional[str] = None,
     bundle_dir: Optional[str] = None,
 ) -> Optional[set]:
     """
@@ -74,11 +75,20 @@ def _load_governance_join_hashes(
         return None
 
     analysis_path = Path(analysis_dir)
-    dp_path = analysis_path / "domain_patterns.csv"
+    candidate_paths = []
+    if domain_patterns_csv:
+        candidate_paths.append(Path(domain_patterns_csv))
+    else:
+        candidate_paths.extend([
+            analysis_path / "domain_patterns.csv",
+            analysis_path.parent / "analysis_v21" / "domain_patterns.csv",
+        ])
+    dp_path = next((p for p in candidate_paths if p.exists()), candidate_paths[0])
     if not dp_path.exists():
+        searched_paths = ", ".join(str(p) for p in candidate_paths)
         raise FileNotFoundError(
             f"domain_patterns.csv is required for --filter-mode {filter_mode!r} "
-            f"but was not found at: {dp_path}"
+            f"but was not found. Looked at: {searched_paths}"
         )
 
     candidate_jhs: set = set()
@@ -403,6 +413,7 @@ def synthesize(
     model: Optional[str] = None,
     workers: int = 3,
     filter_mode: str = "all",
+    domain_patterns_csv: Optional[str] = None,
     bundle_dir: Optional[str] = None,
 ) -> None:
     print(f"\n=== Label Synthesis: {domain} ===")
@@ -491,6 +502,7 @@ def synthesize(
             domain=domain,
             filter_mode=filter_mode,
             analysis_dir=analysis_dir,
+            domain_patterns_csv=domain_patterns_csv,
             bundle_dir=bundle_dir,
         )
         if eligible_jhs is not None:
@@ -734,6 +746,16 @@ def main():
             "(required when --filter-mode is 'bundles' or 'governance')."
         ),
     )
+    ap.add_argument(
+        "--domain-patterns-csv",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Optional explicit path to domain_patterns.csv used by non-'all' filter modes. "
+            "Defaults to <analysis-dir>/domain_patterns.csv, then "
+            "<analysis-dir>/../analysis_v21/domain_patterns.csv."
+        ),
+    )
     args = ap.parse_args()
 
     if args.export_prompts and args.import_results:
@@ -758,6 +780,7 @@ def main():
         model=args.model,
         workers=args.workers,
         filter_mode=args.filter_mode,
+        domain_patterns_csv=args.domain_patterns_csv,
         bundle_dir=args.bundle_dir,
     )
 
