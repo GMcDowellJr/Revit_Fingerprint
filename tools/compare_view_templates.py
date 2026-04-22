@@ -100,8 +100,16 @@ def load_json(path):
 
 
 def get_domain_payload(raw, domain):
+    if not isinstance(raw, dict):
+        return None
+
     if "_domains" in raw:
         return raw.get(domain)
+
+    domains_obj = raw.get("domains")
+    if isinstance(domains_obj, dict):
+        return domains_obj.get(domain)
+
     return raw.get(domain)
 
 
@@ -283,7 +291,7 @@ def compare_entries(entry_a, entry_b, include_same):
         b_item = items_b.get(key)
 
         if a_item and b_item:
-            if a_item["v"] == b_item["v"]:
+            if a_item["v"] == b_item["v"] and a_item["q"] == b_item["q"]:
                 diff = "same"
                 stats["items_same"] += 1
             else:
