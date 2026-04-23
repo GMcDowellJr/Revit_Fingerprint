@@ -489,8 +489,9 @@ def main():
             only_a.append((a_name, entry_a))
 
     matched_b_keys = {b_name for _, b_name, _, _ in matched_pairs}
+    blocked_b_keys = set(dup_a.keys()) | set(dup_b.keys())
     for b_name, entry_b in unique_b.items():
-        if b_name not in matched_b_keys:
+        if b_name not in matched_b_keys and b_name not in blocked_b_keys:
             only_b.append((b_name, entry_b))
 
     summary_rows = []
@@ -626,9 +627,11 @@ def main():
 
     duplicate_names = sorted(set(dup_a.keys()) | set(dup_b.keys()))
     for dup_name in duplicate_names:
+        entries_a = dup_a.get(dup_name, [])
+        entries_b = dup_b.get(dup_name, [])
         entries = []
-        entries.extend(dup_a.get(dup_name, []))
-        entries.extend(dup_b.get(dup_name, []))
+        entries.extend(entries_a)
+        entries.extend(entries_b)
 
         template_name = entries[0]["display_name"] if entries else dup_name
         summary_rows.append(
@@ -653,12 +656,19 @@ def main():
             }
         )
 
+        if entries_a and entries_b:
+            duplicate_source = "both_duplicate"
+        elif entries_a:
+            duplicate_source = "file_a"
+        else:
+            duplicate_source = "file_b"
+
         for entry in entries:
             unmatched_rows.append(
                 {
                     "template_name": entry["display_name"],
                     "partition": entry["domain"],
-                    "source_file": "both_duplicate",
+                    "source_file": duplicate_source,
                     "sig_hash": entry["sig_hash"],
                     "record_id": entry["record_id"],
                     "status": entry["status"],
