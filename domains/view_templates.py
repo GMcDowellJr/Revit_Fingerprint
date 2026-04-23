@@ -455,11 +455,6 @@ def extract_floor_structural_area_plans(doc, ctx=None):
             sig.append("include_filters=False")
 
         try:
-            sig.append("include_vg={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_OVERRIDES")))
-        except Exception:
-            sig.append("include_vg=False")
-
-        try:
             sig.append("include_appearance={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_APPEARANCE")))
         except Exception:
             sig.append("include_appearance=False")
@@ -922,11 +917,6 @@ def extract_ceiling_plans(doc, ctx=None):
             sig.append("include_filters={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_FILTERS")))
         except Exception:
             sig.append("include_filters=False")
-
-        try:
-            sig.append("include_vg={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_OVERRIDES")))
-        except Exception:
-            sig.append("include_vg=False")
 
         try:
             sig.append("include_appearance={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_APPEARANCE")))
@@ -1426,11 +1416,6 @@ def extract_elevations_sections_detail(doc, ctx=None):
             sig.append("include_filters=False")
 
         try:
-            sig.append("include_vg={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_OVERRIDES")))
-        except Exception:
-            sig.append("include_vg=False")
-
-        try:
             sig.append("include_appearance={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_APPEARANCE")))
         except Exception:
             sig.append("include_appearance=False")
@@ -1902,11 +1887,6 @@ def extract_renderings_drafting(doc, ctx=None):
             sig.append("include_filters={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_FILTERS")))
         except Exception:
             sig.append("include_filters=False")
-
-        try:
-            sig.append("include_vg={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_OVERRIDES")))
-        except Exception:
-            sig.append("include_vg=False")
 
         try:
             sig.append("include_appearance={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_APPEARANCE")))
@@ -2386,15 +2366,6 @@ def extract_schedules(doc, ctx=None):
             )
         except Exception:
             sig.append("include_filters=False")
-
-        try:
-            sig.append(
-                "include_vg={}".format(
-                    _is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_OVERRIDES")
-                )
-            )
-        except Exception:
-            sig.append("include_vg=False")
 
         try:
             sig.append(

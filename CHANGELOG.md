@@ -27,6 +27,13 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 - line_patterns normalized token precision set to `.6f` (from `.9f`) after
   sensitivity sweep; decision now includes a documented ±2 decimal neighbor
   validation practice to confirm elbow stability over time
+- view_category_overrides split into `view_category_overrides_model` and
+  `view_category_overrides_annotation` partitions; `vco.include_controlled`
+  coordination item removed; include state now sourced from
+  `view_templates.include_vg_model` / `view_templates.include_vg_annotation`
+- view_templates V/G include surface changed from a single `include_vg` flag
+  to per-tab flags: `include_vg_model`, `include_vg_annotation`,
+  `include_vg_analytical`
 
 ### Fixed
 - file_metadata.csv: re-running the pipeline now preserves existing non-empty

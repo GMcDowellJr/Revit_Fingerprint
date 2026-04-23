@@ -52,6 +52,27 @@ _BUILTIN_PARAM_SPECS = [
         "partitions": None,
     },
     {
+        "key": "vg_model",
+        "include_bip": "VIS_GRAPHICS_OVERRIDES",
+        "value_bip": None,
+        "storage": "include_only",
+        "partitions": None,
+    },
+    {
+        "key": "vg_annotation",
+        "include_bip": "VIS_GRAPHICS_ANNOTATION_OVERRIDES",
+        "value_bip": None,
+        "storage": "include_only",
+        "partitions": None,
+    },
+    {
+        "key": "vg_analytical",
+        "include_bip": "VIS_GRAPHICS_ANALYTICAL_MODEL_OVERRIDES",
+        "value_bip": None,
+        "storage": "include_only",
+        "partitions": None,
+    },
+    {
         "key": "display_model",
         "include_bip": "VIEW_MODEL_DISPLAY_MODE",
         "value_bip": "VIEW_MODEL_DISPLAY_MODE",
@@ -225,6 +246,12 @@ def emit_builtin_params(v, domain_name, tpl_bips, non_ctrl_bips, sig, sig_v2, de
                 include_flag = False
             else:
                 include_flag = any(bip_int not in non_ctrl_bips for bip_int in include_bip_ints)
+
+        if spec.get("storage") == "include_only":
+            include_entry = "include_{}={}".format(key, include_flag)
+            sig.append(include_entry)
+            sig_v2.append(include_entry)
+            continue
 
         _, value_str, _ = _read_bip_int(
             v,

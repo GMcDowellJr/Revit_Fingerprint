@@ -108,6 +108,8 @@ from domains import arrowheads, text_types
 from domains import view_filter_definitions, view_filter_applications_view_templates
 from domains import phases, phase_filters, phase_graphics
 from domains import view_category_overrides
+from domains import view_category_overrides_model
+from domains import view_category_overrides_annotation
 # Split domains: object_styles
 from domains import object_styles
 from domains import fill_patterns
@@ -671,7 +673,7 @@ def run_fingerprint(doc, timing=None):
         if legacy is not None:
             fingerprint["view_filter_applications_view_templates"] = legacy
 
-    if _enabled("view_category_overrides"):
+    if _enabled("view_category_overrides_model"):
         # Hard dependencies: must run after object_styles_model + line_patterns.
         # VCO cannot produce meaningful output without the model baseline or
         # line pattern refs, so these remain hard requirements.
@@ -684,18 +686,16 @@ def run_fingerprint(doc, timing=None):
             for _fp_dep in ["fill_patterns_drafting", "fill_patterns_model"]:
                 if _fp_dep not in contract_domains:
                     runner_notes.append(
-                        "view_category_overrides: {} not run; "
+                        "view_category_overrides_model: {} not run; "
                         "fill pattern refs in overrides will degrade to q=missing".format(
                             _fp_dep)
                     )
             # Soft requirements — emit note if absent but do not block VCO
             # (these partitions are legitimately empty in most files)
-            for _soft_dep in ["object_styles_annotation",
-                              "object_styles_analytical",
-                              "object_styles_imported"]:
+            for _soft_dep in ["object_styles_annotation"]:
                 if _soft_dep not in contract_domains:
                     runner_notes.append(
-                        "view_category_overrides: {} not run; "
+                        "view_category_overrides_model: {} not run; "
                         "{} category overrides will have no baseline".format(
                             _soft_dep,
                             _soft_dep.replace("object_styles_", "")
@@ -703,8 +703,8 @@ def run_fingerprint(doc, timing=None):
                     )
 
             legacy = _domain_run(
-                "view_category_overrides",
-                view_category_overrides.extract,
+                "view_category_overrides_model",
+                view_category_overrides_model.extract,
                 doc,
                 ctx,
                 contract_domains,
@@ -712,10 +712,10 @@ def run_fingerprint(doc, timing=None):
                 runner_notes,
             )
             if legacy is not None:
-                fingerprint["view_category_overrides"] = legacy
+                fingerprint["view_category_overrides_model"] = legacy
         except Blocked as b:
-            contract_domains["view_category_overrides"] = contracts.new_domain_envelope(
-                domain="view_category_overrides",
+            contract_domains["view_category_overrides_model"] = contracts.new_domain_envelope(
+                domain="view_category_overrides_model",
                 domain_version=_DOMAIN_VERSION,
                 status=contracts.DOMAIN_STATUS_BLOCKED,
                 block_reasons=list(b.reasons),
@@ -728,11 +728,37 @@ def run_fingerprint(doc, timing=None):
             )
             contracts.add_bounded_error(
                 run_diag,
-                domain="view_category_overrides",
+                domain="view_category_overrides_model",
                 status=contracts.DOMAIN_STATUS_BLOCKED,
                 code=b.code,
                 message=";".join(list(b.reasons)),
             )
+
+    if _enabled("view_category_overrides_annotation"):
+        legacy = _domain_run(
+            "view_category_overrides_annotation",
+            view_category_overrides_annotation.extract,
+            doc,
+            ctx,
+            contract_domains,
+            run_diag,
+            runner_notes,
+        )
+        if legacy is not None:
+            fingerprint["view_category_overrides_annotation"] = legacy
+
+    if _enabled("view_category_overrides"):
+        legacy = _domain_run(
+            "view_category_overrides",
+            view_category_overrides.extract,
+            doc,
+            ctx,
+            contract_domains,
+            run_diag,
+            runner_notes,
+        )
+        if legacy is not None:
+            fingerprint["view_category_overrides"] = legacy
 
     # view_templates split domains.
     # Non-schedule domains require both phase_filters and view_filter_definitions
