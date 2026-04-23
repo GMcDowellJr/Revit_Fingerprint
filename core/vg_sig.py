@@ -144,25 +144,26 @@ _BUILTIN_PARAM_SPECS = [
 ]
 
 
-def _read_bip_int(v, bip_enum_name, tpl_bips, debug_counters=None, storage="int"):
+def _read_bip_int(v, bip_enum_name, tpl_bips, include_flag=True, debug_counters=None, storage="int"):
     """Read a BuiltInParameter integer value from a view template element.
 
     Returns (include_flag: bool, value_str: str, readable: bool).
     """
+    fallback = "<UNREADABLE>" if include_flag else "<NOT_APPLICABLE>"
     if BuiltInParameter is None:
-        return (False, "<UNREADABLE>", False)
+        return (include_flag, fallback, False)
 
     try:
         bip_int = int(getattr(BuiltInParameter, bip_enum_name))
     except Exception:
-        return (False, "<UNREADABLE>", False)
+        return (include_flag, fallback, False)
 
     include_flag = bip_int in (tpl_bips or set())
 
     try:
         p = v.get_Parameter(getattr(BuiltInParameter, bip_enum_name))
         if p is None:
-            return (include_flag, "<UNREADABLE>", False)
+            return (include_flag, fallback, False)
 
         if storage == "double":
             try:
@@ -181,9 +182,9 @@ def _read_bip_int(v, bip_enum_name, tpl_bips, debug_counters=None, storage="int"
             eid = p.AsElementId()
             return (include_flag, safe_str(getattr(eid, "IntegerValue", None)), True)
         except Exception:
-            return (include_flag, "<UNREADABLE>", False)
+            return (include_flag, fallback, False)
     except Exception:
-        return (include_flag, "<UNREADABLE>", False)
+        return (include_flag, fallback, False)
 
 
 def emit_builtin_params(v, domain_name, tpl_bips, non_ctrl_bips, sig, sig_v2, debug_counters=None):
@@ -229,6 +230,7 @@ def emit_builtin_params(v, domain_name, tpl_bips, non_ctrl_bips, sig, sig_v2, de
             v,
             spec.get("value_bip"),
             tpl_bips,
+            include_flag=include_flag,
             debug_counters=debug_counters,
             storage=spec.get("storage", "int"),
         )

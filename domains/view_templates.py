@@ -113,6 +113,60 @@ def _append_assigned_view_count_cosmetic_item(rec, doc, v, ctx):
     rec["phase2"]["cosmetic_items"] = list(rec["phase2"].get("cosmetic_items") or []) + [assigned_item]
 
 
+def _append_phase_filter_value(
+    v,
+    doc,
+    include_pf,
+    phase_filter_map,
+    phase_filter_map_v2,
+    sig,
+    sig_v2,
+    v2_ok,
+    v2_block_fn,
+    debug_counters=None,
+):
+    sentinel = None
+    try:
+        p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
+        has_value = bool(getattr(p, "HasValue", False)) if p is not None else False
+        if p is None or not has_value:
+            sentinel = S_MISSING if include_pf else S_NOT_APPLICABLE
+        else:
+            pf_id = p.AsElementId()
+            if not pf_id or canon_id(pf_id) == S_MISSING:
+                sentinel = S_MISSING if include_pf else S_NOT_APPLICABLE
+            else:
+                pf_elem = doc.GetElement(pf_id)
+                if pf_elem:
+                    pf_uid = canon_str(getattr(pf_elem, "UniqueId", None))
+                    pf_hash = phase_filter_map.get(pf_uid) if pf_uid else None
+                    if pf_hash:
+                        sig.append("phase_filter={}".format(canon_str(pf_hash)))
+                        if v2_ok:
+                            pf_hash_v2 = None
+                            try:
+                                pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
+                            except Exception:
+                                pf_hash_v2 = None
+                            if pf_hash_v2:
+                                sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
+                            elif include_pf:
+                                v2_block_fn("phase_filter_unresolved")
+                                v2_ok = False
+                        return v2_ok
+                sentinel = S_UNREADABLE if include_pf else S_NOT_APPLICABLE
+    except Exception:
+        if debug_counters is not None:
+            debug_counters["debug_fail_read"] = debug_counters.get("debug_fail_read", 0) + 1
+        sentinel = S_UNREADABLE if include_pf else S_NOT_APPLICABLE
+
+    sig.append("phase_filter={}".format(sentinel))
+    if include_pf and sentinel in (S_UNREADABLE, S_MISSING) and v2_ok:
+        v2_block_fn("phase_filter_unresolved")
+        v2_ok = False
+    return v2_ok
+
+
 def _phase2_items_from_def_signature(def_signature):
     """Convert legacy def_signature entries ('k=v') into IdentityItems safely."""
     out = []
@@ -412,9 +466,16 @@ def extract_floor_structural_area_plans(doc, ctx=None):
 
         # Domain-specific: view range (floor/area plans support view depth)
         try:
-            sig.append("include_view_range={}".format(_is_template_param_included(non_ctrl_bips, "VIEWER_VOLUME_OF_INTEREST_CROP")))
+            include_view_range = (
+                int(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP) not in non_ctrl_bips
+            )
+            sig.append("include_view_range={}".format(include_view_range))
+            if v2_ok:
+                sig_v2.append("include_view_range={}".format(include_view_range))
         except Exception:
             sig.append("include_view_range=False")
+            if v2_ok:
+                sig_v2.append("include_view_range=False")
 
         # Phase Filter (resolved via phase_filters domain)
         try:
@@ -422,39 +483,18 @@ def extract_floor_structural_area_plans(doc, ctx=None):
         except Exception:
             include_pf = False
 
-        if include_pf:
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-                if p is None:
-                    sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                else:
-                    pf_id = p.AsElementId()
-                    if not pf_id or canon_id(pf_id) == S_MISSING:
-                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                    else:
-                        pf_elem = doc.GetElement(pf_id)
-                        if pf_elem:
-                            pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                            pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                            sig.append("phase_filter={}".format(canon_str(pf_hash)))
-                            if v2_ok:
-                                pf_hash_v2 = None
-                                try:
-                                    pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                                except Exception:
-                                    pf_hash_v2 = None
-                                if not pf_hash_v2:
-                                    _v2_block("phase_filter_unresolved")
-                                    v2_ok = False
-                                else:
-                                    sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
-                        else:
-                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-            except Exception:
-                info["debug_fail_read"] += 1
-                sig.append(f"phase_filter={S_UNREADABLE}")
-        else:
-            sig.append(f"phase_filter={S_MISSING}")
+        v2_ok = _append_phase_filter_value(
+            v=v,
+            doc=doc,
+            include_pf=include_pf,
+            phase_filter_map=phase_filter_map,
+            phase_filter_map_v2=phase_filter_map_v2,
+            sig=sig,
+            sig_v2=sig_v2,
+            v2_ok=v2_ok,
+            v2_block_fn=_v2_block,
+            debug_counters=info,
+        )
 
         # Filter stack (order-sensitive)
         try:
@@ -895,9 +935,16 @@ def extract_ceiling_plans(doc, ctx=None):
 
         # Domain-specific: view range (ceiling plans support view depth)
         try:
-            sig.append("include_view_range={}".format(_is_template_param_included(non_ctrl_bips, "VIEWER_VOLUME_OF_INTEREST_CROP")))
+            include_view_range = (
+                int(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP) not in non_ctrl_bips
+            )
+            sig.append("include_view_range={}".format(include_view_range))
+            if v2_ok:
+                sig_v2.append("include_view_range={}".format(include_view_range))
         except Exception:
             sig.append("include_view_range=False")
+            if v2_ok:
+                sig_v2.append("include_view_range=False")
 
         # Phase Filter (resolved via phase_filters domain)
         try:
@@ -905,39 +952,18 @@ def extract_ceiling_plans(doc, ctx=None):
         except Exception:
             include_pf = False
 
-        if include_pf:
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-                if p is None:
-                    sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                else:
-                    pf_id = p.AsElementId()
-                    if not pf_id or canon_id(pf_id) == S_MISSING:
-                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                    else:
-                        pf_elem = doc.GetElement(pf_id)
-                        if pf_elem:
-                            pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                            pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                            sig.append("phase_filter={}".format(canon_str(pf_hash)))
-                            if v2_ok:
-                                pf_hash_v2 = None
-                                try:
-                                    pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                                except Exception:
-                                    pf_hash_v2 = None
-                                if not pf_hash_v2:
-                                    _v2_block("phase_filter_unresolved")
-                                    v2_ok = False
-                                else:
-                                    sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
-                        else:
-                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-            except Exception:
-                info["debug_fail_read"] += 1
-                sig.append(f"phase_filter={S_UNREADABLE}")
-        else:
-            sig.append(f"phase_filter={S_MISSING}")
+        v2_ok = _append_phase_filter_value(
+            v=v,
+            doc=doc,
+            include_pf=include_pf,
+            phase_filter_map=phase_filter_map,
+            phase_filter_map_v2=phase_filter_map_v2,
+            sig=sig,
+            sig_v2=sig_v2,
+            v2_ok=v2_ok,
+            v2_block_fn=_v2_block,
+            debug_counters=info,
+        )
 
         # Filter stack (order-sensitive)
         try:
@@ -1421,39 +1447,18 @@ def extract_elevations_sections_detail(doc, ctx=None):
         except Exception:
             include_pf = False
 
-        if include_pf:
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-                if p is None:
-                    sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                else:
-                    pf_id = p.AsElementId()
-                    if not pf_id or canon_id(pf_id) == S_MISSING:
-                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                    else:
-                        pf_elem = doc.GetElement(pf_id)
-                        if pf_elem:
-                            pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                            pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                            sig.append("phase_filter={}".format(canon_str(pf_hash)))
-                            if v2_ok:
-                                pf_hash_v2 = None
-                                try:
-                                    pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                                except Exception:
-                                    pf_hash_v2 = None
-                                if not pf_hash_v2:
-                                    _v2_block("phase_filter_unresolved")
-                                    v2_ok = False
-                                else:
-                                    sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
-                        else:
-                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-            except Exception:
-                info["debug_fail_read"] += 1
-                sig.append(f"phase_filter={S_UNREADABLE}")
-        else:
-            sig.append(f"phase_filter={S_MISSING}")
+        v2_ok = _append_phase_filter_value(
+            v=v,
+            doc=doc,
+            include_pf=include_pf,
+            phase_filter_map=phase_filter_map,
+            phase_filter_map_v2=phase_filter_map_v2,
+            sig=sig,
+            sig_v2=sig_v2,
+            v2_ok=v2_ok,
+            v2_block_fn=_v2_block,
+            debug_counters=info,
+        )
 
         # Filter stack (order-sensitive)
         try:
@@ -1914,39 +1919,18 @@ def extract_renderings_drafting(doc, ctx=None):
         except Exception:
             include_pf = False
 
-        if include_pf:
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-                if p is None:
-                    sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                else:
-                    pf_id = p.AsElementId()
-                    if not pf_id or canon_id(pf_id) == S_MISSING:
-                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                    else:
-                        pf_elem = doc.GetElement(pf_id)
-                        if pf_elem:
-                            pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                            pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                            sig.append("phase_filter={}".format(canon_str(pf_hash)))
-                            if v2_ok:
-                                pf_hash_v2 = None
-                                try:
-                                    pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                                except Exception:
-                                    pf_hash_v2 = None
-                                if not pf_hash_v2:
-                                    _v2_block("phase_filter_unresolved")
-                                    v2_ok = False
-                                else:
-                                    sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
-                        else:
-                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-            except Exception:
-                info["debug_fail_read"] += 1
-                sig.append(f"phase_filter={S_UNREADABLE}")
-        else:
-            sig.append(f"phase_filter={S_MISSING}")
+        v2_ok = _append_phase_filter_value(
+            v=v,
+            doc=doc,
+            include_pf=include_pf,
+            phase_filter_map=phase_filter_map,
+            phase_filter_map_v2=phase_filter_map_v2,
+            sig=sig,
+            sig_v2=sig_v2,
+            v2_ok=v2_ok,
+            v2_block_fn=_v2_block,
+            debug_counters=info,
+        )
 
         # Filter stack (order-sensitive)
         try:
@@ -2427,43 +2411,18 @@ def extract_schedules(doc, ctx=None):
         except Exception:
             include_pf = False
 
-        if include_pf:
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-                if p is None:
-                    # Schedule templates often don't expose phase filter meaningfully.
-                    sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                else:
-                    pf_id = p.AsElementId()
-                    # Invalid/None phase filter for schedules should be treated as NOT_APPLICABLE
-                    if not pf_id or canon_id(pf_id) == S_MISSING:
-                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                    else:
-                        pf_elem = doc.GetElement(pf_id)
-                        if pf_elem:
-                            pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                            pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                            sig.append("phase_filter={}".format(canon_str(pf_hash)))
-                            # v2: require upstream v2 hash when phase filter is present
-                            if v2_ok:
-                                pf_hash_v2 = None
-                                try:
-                                    pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                                except Exception:
-                                    pf_hash_v2 = None
-                                if not pf_hash_v2:
-                                    _v2_block("phase_filter_unresolved")
-                                    v2_ok = False
-                                else:
-                                    sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
-                        else:
-                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-            except Exception:
-                info["debug_fail_read"] += 1
-                sig.append(f"phase_filter={S_UNREADABLE}")
-
-        else:
-            sig.append(f"phase_filter={S_MISSING}")
+        v2_ok = _append_phase_filter_value(
+            v=v,
+            doc=doc,
+            include_pf=include_pf,
+            phase_filter_map=phase_filter_map,
+            phase_filter_map_v2=phase_filter_map_v2,
+            sig=sig,
+            sig_v2=sig_v2,
+            v2_ok=v2_ok,
+            v2_block_fn=_v2_block,
+            debug_counters=info,
+        )
 
         # Built-in visual/behavioural parameters
         emit_builtin_params(v, DOMAIN_NAME, tpl_bips, non_ctrl_bips, sig, sig_v2,
