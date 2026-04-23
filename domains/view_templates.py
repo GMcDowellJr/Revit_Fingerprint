@@ -447,6 +447,10 @@ def extract_floor_structural_area_plans(doc, ctx=None):
             int(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP) in non_ctrl_bips
             if BuiltInParameter is not None else "bip_none"
         )
+        info["debug_plan_view_range_bip_in_non_ctrl"] = (
+            int(BuiltInParameter.PLAN_VIEW_RANGE) in non_ctrl_bips
+            if BuiltInParameter is not None else "bip_none"
+        )
 
         # Common include flags
         try:
