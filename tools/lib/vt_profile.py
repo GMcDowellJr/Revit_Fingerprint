@@ -59,6 +59,16 @@ _GRAPHIC_SUFFIXES = frozenset(
     }
 )
 
+# object_styles identity keys to normalized VCO/property suffix space.
+# object_styles emits compact keys (weight.projection/color/pattern_ref),
+# while VCO emits projection.* / cut.* keys.
+_OBJECT_STYLE_BASELINE_KEY_MAP = {
+    "obj_style.weight.projection": "projection.line_weight",
+    "obj_style.color.rgb": "projection.color.rgb",
+    "obj_style.pattern_ref.sig_hash": "projection.pattern_ref.sig_hash",
+    "obj_style.weight.cut": "cut.line_weight",
+}
+
 
 def _get_domain_payload(raw, domain_key):
     """Resolve domain payload across flat, _domains, and domains wrappers."""
@@ -209,6 +219,23 @@ def _extract_graphic_fields(record, prefix):
 
 
 
+
+def _extract_object_style_baseline_fields(record):
+    """Extract baseline object-style graphics mapped into VCO suffix space."""
+    if not isinstance(record, dict):
+        return {}
+
+    result = {}
+    for it in (record.get("identity_basis") or {}).get("items") or []:
+        if not isinstance(it, dict):
+            continue
+        mapped_suffix = _OBJECT_STYLE_BASELINE_KEY_MAP.get(it.get("k", ""))
+        if not mapped_suffix:
+            continue
+        result[mapped_suffix] = (it.get("v"), it.get("q", ""))
+    return result
+
+
 def _is_non_ok_quality(q):
     qn = (q or "").strip().lower()
     return qn in {
@@ -269,7 +296,7 @@ def _reconstruct_effective(baseline_record, vco_record):
     """
     effective = {}
     if baseline_record is not None:
-        effective.update(_extract_graphic_fields(baseline_record, "obj_style."))
+        effective.update(_extract_object_style_baseline_fields(baseline_record))
     effective.update(_extract_active_vco_fields(vco_record))
     return effective
 

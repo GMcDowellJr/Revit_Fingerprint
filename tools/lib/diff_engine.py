@@ -452,6 +452,10 @@ def run_comparison(profile: DomainProfile, args: argparse.Namespace) -> None:
         for (xentry_a, xentry_b) in pair.get("extra_entries", []):
             _, xdetails = compare_entries(profile, xentry_a, xentry_b, args.include_same, maps_a, maps_b)
             for xdetail in xdetails:
+                if xdetail["diff_status"].endswith("changed") or xdetail["diff_status"].endswith(
+                    "only_in_a"
+                ) or xdetail["diff_status"].endswith("only_in_b"):
+                    total_item_diffs += 1
                 detail_rows.append(
                     {
                         "template_name": xentry_a["norm_name"],
