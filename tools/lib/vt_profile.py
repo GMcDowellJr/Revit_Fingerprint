@@ -262,9 +262,10 @@ def _is_default_vco_value(suffix, value, quality):
     if suffix in ("transparency",):
         return value in (None, "", 0, "0")
 
-    if suffix.endswith(".color.rgb") or suffix.endswith(".pattern_ref.sig_hash") or suffix.endswith(
-        ".fill_pattern_ref.sig_hash"
-    ):
+    if suffix.endswith(".color.rgb"):
+        return value in (None, "", "-1--1--1", "-1,-1,-1")
+
+    if suffix.endswith(".pattern_ref.sig_hash") or suffix.endswith(".fill_pattern_ref.sig_hash"):
         return value in (None, "")
 
     return False
