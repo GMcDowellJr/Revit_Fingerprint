@@ -60,9 +60,21 @@ _GRAPHIC_SUFFIXES = frozenset(
 )
 
 
+def _get_domain_payload(raw, domain_key):
+    """Resolve domain payload across flat, _domains, and domains wrappers."""
+    if not isinstance(raw, dict):
+        return None
+    if "_domains" in raw:
+        return raw.get(domain_key)
+    domains_obj = raw.get("domains")
+    if isinstance(domains_obj, dict):
+        return domains_obj.get(domain_key)
+    return raw.get(domain_key)
+
+
 def _load_domain_records(raw, domain_key):
     """Return records list from raw[domain_key]["records"], or [] if absent/malformed."""
-    payload = raw.get(domain_key)
+    payload = _get_domain_payload(raw, domain_key)
     if not isinstance(payload, dict):
         return []
     records = payload.get("records")
@@ -194,6 +206,53 @@ def _extract_graphic_fields(record, prefix):
     return result
 
 
+
+
+
+def _is_non_ok_quality(q):
+    qn = (q or "").strip().lower()
+    return qn in {
+        "missing",
+        "unsupported",
+        "unsupported_not_applicable",
+        "unreadable",
+        "error",
+        "",
+    }
+
+
+def _is_default_vco_value(suffix, value, quality):
+    """Return True when a VCO field represents default/non-active OGS state."""
+    if _is_non_ok_quality(quality):
+        return True
+
+    if suffix.endswith(".line_weight"):
+        return value in (None, "", -1, "-1")
+
+    if suffix in ("halftone",):
+        return value in (None, "", False, 0, "0", "false", "False")
+
+    if suffix in ("transparency",):
+        return value in (None, "", 0, "0")
+
+    if suffix.endswith(".color.rgb") or suffix.endswith(".pattern_ref.sig_hash") or suffix.endswith(
+        ".fill_pattern_ref.sig_hash"
+    ):
+        return value in (None, "")
+
+    return False
+
+
+def _extract_active_vco_fields(record):
+    """Extract only active/non-default override properties from a VCO record."""
+    fields = _extract_graphic_fields(record, "vco.")
+    active = {}
+    for suffix, (value, quality) in fields.items():
+        if not _is_default_vco_value(suffix, value, quality):
+            active[suffix] = (value, quality)
+    return active
+
+
 def _reconstruct_effective(baseline_record, vco_record):
     """
     Reconstruct the effective rendered graphics for one (template, category) pair.
@@ -211,7 +270,7 @@ def _reconstruct_effective(baseline_record, vco_record):
     effective = {}
     if baseline_record is not None:
         effective.update(_extract_graphic_fields(baseline_record, "obj_style."))
-    effective.update(_extract_graphic_fields(vco_record, "vco."))
+    effective.update(_extract_active_vco_fields(vco_record))
     return effective
 
 
