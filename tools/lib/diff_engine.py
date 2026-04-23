@@ -281,6 +281,48 @@ def write_csv(path, headers, rows):
             writer.writerow(out)
 
 
+def _pair_name(pair, explicit_name_key, entry_key, unique_index):
+    name = pair.get(explicit_name_key)
+    if name and name in unique_index:
+        return name
+
+    entry = pair.get(entry_key) or {}
+    candidate = entry.get("norm_name")
+    if candidate and candidate in unique_index:
+        return candidate
+    return ""
+
+
+def rebuild_unmatched(unique_a, unique_b, dup_a, dup_b, a_to_b, matched_pairs):
+    matched_a_names = set()
+    matched_b_names = set()
+    for pair in matched_pairs:
+        a_name = _pair_name(pair, "a_name", "entry_a", unique_a)
+        b_name = _pair_name(pair, "b_name", "entry_b", unique_b)
+        if a_name:
+            matched_a_names.add(a_name)
+        if b_name:
+            matched_b_names.add(b_name)
+
+    only_a = []
+    for a_name, entry_a in unique_a.items():
+        target_b_name = a_to_b.get(a_name, a_name)
+        if target_b_name in dup_b:
+            continue
+        if a_name not in matched_a_names:
+            only_a.append((a_name, entry_a))
+
+    only_b = []
+    blocked_b_keys = set(dup_a.keys()) | set(dup_b.keys())
+    for b_name, entry_b in unique_b.items():
+        if b_name in blocked_b_keys:
+            continue
+        if b_name not in matched_b_names:
+            only_b.append((b_name, entry_b))
+
+    return only_a, only_b
+
+
 def _validate_paths(args):
     file_a = Path(args.file_a).expanduser().resolve()
     file_b = Path(args.file_b).expanduser().resolve()
@@ -342,6 +384,7 @@ def run_comparison(profile: DomainProfile, args: argparse.Namespace) -> None:
             only_b.append((b_name, entry_b))
 
     matched_pairs = profile.reconstruct(matched_pairs, raw_a, raw_b)
+    only_a, only_b = rebuild_unmatched(unique_a, unique_b, dup_a, dup_b, a_to_b, matched_pairs)
 
     summary_rows = []
     detail_rows = []

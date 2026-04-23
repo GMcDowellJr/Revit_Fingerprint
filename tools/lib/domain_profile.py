@@ -38,7 +38,9 @@ class DomainProfile:
             domain = spec.source_domain
             records = []
             try:
-                records = raw.get(domain, {}).get("records", []) or []
+                payload = self._get_domain_payload(raw, domain)
+                if isinstance(payload, dict):
+                    records = payload.get("records", []) or []
             except Exception:
                 pass
             mapping = {}
@@ -51,6 +53,19 @@ class DomainProfile:
                     mapping[sh] = name
             maps[domain] = mapping
         return maps
+
+    def _get_domain_payload(self, raw: Dict[str, Any], domain: str) -> Any:
+        if not isinstance(raw, dict):
+            return None
+
+        if "_domains" in raw:
+            return raw.get(domain)
+
+        domains_obj = raw.get("domains")
+        if isinstance(domains_obj, dict):
+            return domains_obj.get(domain)
+
+        return raw.get(domain)
 
     def _extract_name(self, rec: Dict[str, Any], name_path: str) -> str:
         try:
