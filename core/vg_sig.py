@@ -85,6 +85,7 @@ _BUILTIN_PARAM_SPECS = [
         "value_bip": "VIEW_SCALE",
         "storage": "int",
         "partitions": None,
+        "include_bip_alternates": ["VIEW_SCALE_PULLDOWN_IMPERIAL"],
         "include_bip_fallback": "VIEW_SCALE",
         "debug_note": "include_bip_uncertain",
     },
@@ -122,7 +123,7 @@ _BUILTIN_PARAM_SPECS = [
         "key": "far_clip_offset",
         "include_bip": "VIEWER_BOUND_OFFSET_FAR",
         "value_bip": "VIEWER_BOUND_OFFSET_FAR",
-        "storage": "int",
+        "storage": "double",
         "partitions": [
             "view_templates_floor_structural_area_plans",
             "view_templates_ceiling_plans",
@@ -153,7 +154,7 @@ _BUILTIN_PARAM_SPECS = [
 ]
 
 
-def _read_bip_int(v, bip_enum_name, tpl_bips, debug_counters=None):
+def _read_bip_int(v, bip_enum_name, tpl_bips, debug_counters=None, storage="int"):
     """Read a BuiltInParameter integer value from a view template element.
 
     Returns (include_flag: bool, value_str: str, readable: bool).
@@ -173,11 +174,18 @@ def _read_bip_int(v, bip_enum_name, tpl_bips, debug_counters=None):
         if p is None:
             return (include_flag, "<UNREADABLE>", False)
 
-        try:
-            val = p.AsInteger()
-            return (include_flag, safe_str(val), True)
-        except Exception:
-            pass
+        if storage == "double":
+            try:
+                val = p.AsDouble()
+                return (include_flag, safe_str(val), True)
+            except Exception:
+                pass
+        else:
+            try:
+                val = p.AsInteger()
+                return (include_flag, safe_str(val), True)
+            except Exception:
+                pass
 
         try:
             eid = p.AsElementId()
@@ -200,32 +208,43 @@ def emit_builtin_params(v, domain_name, tpl_bips, sig, sig_v2, debug_counters=No
             continue
 
         include_flag = False
-        include_name = spec.get("include_bip")
-        include_bip_int = None
+        include_names = [spec.get("include_bip")]
+        include_names.extend(spec.get("include_bip_alternates") or [])
+        include_bip_ints = []
 
         if BuiltInParameter is None:
-            include_bip_int = None
+            include_bip_ints = []
         else:
-            try:
-                include_bip_int = int(getattr(BuiltInParameter, include_name))
-            except Exception:
-                include_bip_int = None
+            for include_name in include_names:
+                if not include_name:
+                    continue
+                try:
+                    include_bip_ints.append(int(getattr(BuiltInParameter, include_name)))
+                except Exception:
+                    continue
+            if not include_bip_ints:
                 fallback = spec.get("include_bip_fallback")
                 if fallback:
                     try:
-                        include_bip_int = int(getattr(BuiltInParameter, fallback))
+                        include_bip_ints.append(int(getattr(BuiltInParameter, fallback)))
                     except Exception:
-                        include_bip_int = None
+                        pass
 
-        if include_bip_int is None:
+        if not include_bip_ints:
             include_flag = False
             if debug_counters is not None:
                 k = "debug_bip_unresolved_{}".format(key)
                 debug_counters[k] = debug_counters.get(k, 0) + 1
         else:
-            include_flag = include_bip_int in (tpl_bips or set())
+            include_flag = any(bip_int in (tpl_bips or set()) for bip_int in include_bip_ints)
 
-        _, value_str, _ = _read_bip_int(v, spec.get("value_bip"), tpl_bips, debug_counters=debug_counters)
+        _, value_str, _ = _read_bip_int(
+            v,
+            spec.get("value_bip"),
+            tpl_bips,
+            debug_counters=debug_counters,
+            storage=spec.get("storage", "int"),
+        )
 
         include_entry = "include_{}={}".format(key, include_flag)
         value_entry = "{}={}".format(key, value_str)
