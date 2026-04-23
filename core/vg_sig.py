@@ -349,16 +349,41 @@ def _semantic_keys_from_identity_items(identity_items):
     Returns:
         Sorted list of key strings (excluding view_template.def_hash)
     """
-    keys = sorted(
-        {
-            safe_str(it.get("k", ""))
-            for it in (identity_items or [])
-            if isinstance(it.get("k"), str)
-            and safe_str(it.get("k", ""))
-            and safe_str(it.get("k", "")) != "view_template.def_hash"
-        }
-    )
-    return [k for k in keys if k]
+    include_map = {}
+    for it in (identity_items or []):
+        try:
+            k = safe_str(it.get("k", ""))
+        except Exception:
+            continue
+        if not k.startswith("view_template.sig.include_"):
+            continue
+        base = k.replace("view_template.sig.include_", "", 1)
+        try:
+            raw_v = safe_str(it.get("v", "")).strip().lower()
+        except Exception:
+            raw_v = ""
+        include_map[base] = raw_v == "true"
+
+    keys = set()
+    for it in (identity_items or []):
+        if not isinstance(it.get("k"), str):
+            continue
+        key = safe_str(it.get("k", ""))
+        if (not key) or key == "view_template.def_hash":
+            continue
+
+        if key.startswith("view_template.sig.include_"):
+            keys.add(key)
+            continue
+
+        if key.startswith("view_template.sig."):
+            sig_key = key.replace("view_template.sig.", "", 1)
+            if sig_key in include_map and not include_map.get(sig_key, False):
+                continue
+
+        keys.add(key)
+
+    return sorted(keys)
 
 
 def _traceability_unknown_items(elem):
