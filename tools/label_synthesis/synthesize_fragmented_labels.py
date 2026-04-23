@@ -190,7 +190,7 @@ def _call_llm(
         raise RuntimeError("OPENROUTER_API_KEY is required when --provider openrouter is used")
 
     resolved_model = model or (
-        "claude-haiku-4-5" if provider == "anthropic" else "anthropic/claude-haiku-4-5"
+        "anthropic/claude-haiku-4-5" if provider == "openrouter" else "claude-haiku-4-5"
     )
 
     anthropic_client = None
@@ -213,27 +213,30 @@ def _call_llm(
                 )
                 raw_text = response.content[0].text.strip()
             else:
-                import requests
+                import urllib.request
+                import urllib.error
 
-                response = requests.post(
+                payload = json.dumps({
+                    "model": resolved_model,
+                    "max_tokens": max_tokens,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": resolved_prompt},
+                    ],
+                }).encode("utf-8")
+
+                req = urllib.request.Request(
                     "https://openrouter.ai/api/v1/chat/completions",
+                    data=payload,
                     headers={
                         "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
                         "Content-Type": "application/json",
                     },
-                    json={
-                        "model": resolved_model,
-                        "max_tokens": max_tokens,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": resolved_prompt},
-                        ],
-                    },
-                    timeout=60,
+                    method="POST",
                 )
-                response.raise_for_status()
-                data = response.json()
-                raw_text = data["choices"][0]["message"]["content"].strip()
+                with urllib.request.urlopen(req) as resp:
+                    response_body = json.loads(resp.read().decode("utf-8"))
+                raw_text = response_body["choices"][0]["message"]["content"].strip()
 
             result = json.loads(_strip_json_fences(raw_text))
             if "recommended" not in result:
@@ -721,7 +724,7 @@ def main():
         help="Import LLM results from this JSON file and merge into cache. "
              "No API calls are made.",
     )
-    ap.add_argument("--provider", choices=["anthropic", "openrouter"], default="anthropic",
+    ap.add_argument("--provider", choices=["anthropic", "openrouter"], default="openrouter",
                     help="LLM provider backend")
     ap.add_argument("--model", default=None,
                     help="Optional model override for selected provider")
