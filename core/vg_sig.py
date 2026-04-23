@@ -53,46 +53,62 @@ _BUILTIN_PARAM_SPECS = [
     },
     {
         "key": "display_model",
-        "include_bip": "VIEW_DISPLAY_MODEL",
-        "value_bip": "VIEW_DISPLAY_MODEL",
+        "include_bip": "VIEW_MODEL_DISPLAY_MODE",
+        "value_bip": "VIEW_MODEL_DISPLAY_MODE",
         "storage": "int",
-        "partitions": None,
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+            "view_templates_elevations_sections_detail",
+        ],
     },
     {
         "key": "parts_visibility",
         "include_bip": "VIEW_PARTS_VISIBILITY",
         "value_bip": "VIEW_PARTS_VISIBILITY",
         "storage": "int",
-        "partitions": None,
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+            "view_templates_elevations_sections_detail",
+        ],
     },
     {
         "key": "show_hidden_lines",
-        "include_bip": "VIS_SHOW_HIDDEN_LINES",
-        "value_bip": "VIS_SHOW_HIDDEN_LINES",
+        "include_bip": "VIEW_SHOW_HIDDEN_LINES",
+        "value_bip": "VIEW_SHOW_HIDDEN_LINES",
         "storage": "int",
-        "partitions": None,
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+            "view_templates_elevations_sections_detail",
+        ],
     },
     {
         "key": "visual_style",
-        "include_bip": "VIEW_VISUAL_STYLE",
-        "value_bip": "VIEW_VISUAL_STYLE",
+        "include_bip": "MODEL_GRAPHICS_STYLE_ANON_DRAFT",
+        "value_bip": "MODEL_GRAPHICS_STYLE_ANON_DRAFT",
         "storage": "int",
-        "partitions": None,
+        "partitions": [
+            "view_templates_renderings_drafting",
+        ],
     },
     {
         "key": "view_scale",
-        "include_bip": "VIEW_SCALE_PULLDOWN_METRIC",
+        "include_bip_any_of": [
+            "VIEW_SCALE",
+            "VIEW_SCALE_PULLDOWN_IMPERIAL",
+            "VIEW_SCALE_PULLDOWN_METRIC",
+        ],
         "value_bip": "VIEW_SCALE",
         "storage": "int",
         "partitions": None,
-        "include_bip_alternates": ["VIEW_SCALE_PULLDOWN_IMPERIAL"],
-        "include_bip_fallback": "VIEW_SCALE",
-        "debug_note": "include_bip_uncertain",
+        "debug_note": "include requires any of three BIPs per API docs",
     },
     {
         "key": "orientation",
-        "include_bip": "VIEW_ORIENTATION",
-        "value_bip": "VIEW_ORIENTATION",
+        "include_bip": "PLAN_VIEW_NORTH",
+        "value_bip": "PLAN_VIEW_NORTH",
         "storage": "int",
         "partitions": [
             "view_templates_floor_structural_area_plans",
@@ -111,43 +127,21 @@ _BUILTIN_PARAM_SPECS = [
     },
     {
         "key": "depth_clipping",
-        "include_bip": "VIEWER_BOUND_FAR_CLIPPING",
-        "value_bip": "VIEWER_BOUND_FAR_CLIPPING",
+        "include_bip": "VIEW_BACK_CLIPPING",
+        "value_bip": "VIEW_BACK_CLIPPING",
         "storage": "int",
         "partitions": [
             "view_templates_floor_structural_area_plans",
             "view_templates_ceiling_plans",
-        ],
-    },
-    {
-        "key": "far_clip_offset",
-        "include_bip": "VIEWER_BOUND_OFFSET_FAR",
-        "value_bip": "VIEWER_BOUND_OFFSET_FAR",
-        "storage": "double",
-        "partitions": [
-            "view_templates_floor_structural_area_plans",
-            "view_templates_ceiling_plans",
-            "view_templates_elevations_sections_detail",
         ],
     },
     {
         "key": "color_scheme_location",
-        "include_bip": "VIEW_COLOR_SCHEME_LOCATION",
-        "value_bip": "VIEW_COLOR_SCHEME_LOCATION",
+        "include_bip": "COLOR_SCHEME_LOCATION",
+        "value_bip": "COLOR_SCHEME_LOCATION",
         "storage": "int",
         "partitions": [
             "view_templates_floor_structural_area_plans",
-            "view_templates_ceiling_plans",
-        ],
-    },
-    {
-        "key": "sun_path",
-        "include_bip": "VIEW_SUNPATH_DISPLAYED",
-        "value_bip": "VIEW_SUNPATH_DISPLAYED",
-        "storage": "int",
-        "partitions": [
-            "view_templates_floor_structural_area_plans",
-            "view_templates_ceiling_plans",
             "view_templates_elevations_sections_detail",
         ],
     },
@@ -177,7 +171,7 @@ def _read_bip_int(v, bip_enum_name, tpl_bips, debug_counters=None, storage="int"
         if storage == "double":
             try:
                 val = p.AsDouble()
-                return (include_flag, safe_str(val), True)
+                return (include_flag, "{:.6f}".format(float(val)), True)
             except Exception:
                 pass
         else:
@@ -208,8 +202,9 @@ def emit_builtin_params(v, domain_name, tpl_bips, sig, sig_v2, debug_counters=No
             continue
 
         include_flag = False
-        include_names = [spec.get("include_bip")]
-        include_names.extend(spec.get("include_bip_alternates") or [])
+        include_names = spec.get("include_bip_any_of")
+        if include_names is None:
+            include_names = [spec.get("include_bip")]
         include_bip_ints = []
 
         if BuiltInParameter is None:
@@ -222,13 +217,6 @@ def emit_builtin_params(v, domain_name, tpl_bips, sig, sig_v2, debug_counters=No
                     include_bip_ints.append(int(getattr(BuiltInParameter, include_name)))
                 except Exception:
                     continue
-            if not include_bip_ints:
-                fallback = spec.get("include_bip_fallback")
-                if fallback:
-                    try:
-                        include_bip_ints.append(int(getattr(BuiltInParameter, fallback)))
-                    except Exception:
-                        pass
 
         if not include_bip_ints:
             include_flag = False
@@ -261,6 +249,8 @@ def emit_shared_params_stub(v, domain_name, tpl_param_ids, sig, sig_v2, debug_co
     tpl_param_ids: full list of ParameterId objects from
                    v.GetTemplateParameterIds() (not filtered to BIPs only).
     """
+    # sun_path: VIEW_SUNPATH_DISPLAYED not confirmed as template BIP.
+    # Investigate via View property surface rather than parameter API.
     pass
 
 
