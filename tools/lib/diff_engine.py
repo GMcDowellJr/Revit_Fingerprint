@@ -32,6 +32,7 @@ DETAIL_HEADERS = [
     "template_name",
     "partition_a",
     "partition_b",
+    "domain",
     "item_key",
     "bucket",
     "diff_status",
@@ -260,6 +261,7 @@ def compare_entries(profile, entry_a, entry_b, include_same, maps_a, maps_b):
             details.append(
                 {
                     "item_key": key,
+                    "domain": entry_a["domain"],
                     "bucket": bucket,
                     "diff_status": output_diff,
                     "value_a": value_a,
