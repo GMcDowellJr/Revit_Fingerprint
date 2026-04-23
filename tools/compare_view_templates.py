@@ -479,12 +479,16 @@ def main():
     matched_pairs = []
     only_a = []
     only_b = []
+    used_b_names = set()
 
     for a_name, entry_a in unique_a.items():
         target_b_name = a_to_b[a_name]
+        if target_b_name in dup_b:
+            continue
         entry_b = unique_b.get(target_b_name)
-        if entry_b:
+        if entry_b and target_b_name not in used_b_names:
             matched_pairs.append((a_name, target_b_name, entry_a, entry_b))
+            used_b_names.add(target_b_name)
         else:
             only_a.append((a_name, entry_a))
 
