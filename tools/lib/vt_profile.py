@@ -128,6 +128,29 @@ def _index_vco_by_template(records):
     return index
 
 
+
+
+def _normalize_template_name(name):
+    return (name or "").strip().casefold()
+
+
+def _build_template_lookup(index):
+    """Build normalized template-name lookup for case-insensitive fallback."""
+    lookup = {}
+    for name, by_category in (index or {}).items():
+        norm_name = _normalize_template_name(name)
+        if norm_name and norm_name not in lookup:
+            lookup[norm_name] = by_category
+    return lookup
+
+
+def _get_template_vco(index, lookup, template_name):
+    """Return VCO category map by exact template name, then normalized fallback."""
+    if template_name in index:
+        return index.get(template_name) or {}
+    return lookup.get(_normalize_template_name(template_name), {})
+
+
 def _index_object_styles_by_row_key(raw):
     """
     Load object_styles_model + object_styles_annotation records from raw and
@@ -155,6 +178,9 @@ def _extract_graphic_fields(record, prefix):
     prefix is either "obj_style." (for baseline records) or "vco." (for
     VCO override records). The suffix space is identical for both.
     """
+    if not isinstance(record, dict):
+        return {}
+
     result = {}
     for it in (record.get("identity_basis") or {}).get("items") or []:
         if not isinstance(it, dict):
@@ -215,8 +241,8 @@ def _build_synthetic_items_for_pair(tpl_vco_a, tpl_vco_b, os_index_a, os_index_b
         os_rec_a = os_index_a.get(cat_path)
         os_rec_b = os_index_b.get(cat_path)
 
-        eff_a = _reconstruct_effective(os_rec_a, rec_a) if rec_a is not None else {}
-        eff_b = _reconstruct_effective(os_rec_b, rec_b) if rec_b is not None else {}
+        eff_a = _reconstruct_effective(os_rec_a, rec_a)
+        eff_b = _reconstruct_effective(os_rec_b, rec_b)
 
         all_suffixes = sorted(set(eff_a) | set(eff_b))
 
@@ -306,12 +332,15 @@ class ViewTemplateDomainProfile(DomainProfile):
 
         vco_index_a = _index_vco_by_template(vco_records_a)
         vco_index_b = _index_vco_by_template(vco_records_b)
+        vco_lookup_a = _build_template_lookup(vco_index_a)
+        vco_lookup_b = _build_template_lookup(vco_index_b)
 
         for pair in matched_pairs:
-            template_name = pair["entry_a"]["display_name"]
+            template_name_a = pair["entry_a"]["display_name"]
+            template_name_b = pair["entry_b"]["display_name"]
 
-            tpl_vco_a = vco_index_a.get(template_name, {})
-            tpl_vco_b = vco_index_b.get(template_name, {})
+            tpl_vco_a = _get_template_vco(vco_index_a, vco_lookup_a, template_name_a)
+            tpl_vco_b = _get_template_vco(vco_index_b, vco_lookup_b, template_name_b)
 
             if not tpl_vco_a and not tpl_vco_b:
                 continue
@@ -324,7 +353,7 @@ class ViewTemplateDomainProfile(DomainProfile):
             base_record = pair["entry_a"]["record"]
             syn_entry_a = {
                 "domain": "view_category_overrides",
-                "display_name": template_name,
+                "display_name": template_name_a,
                 "norm_name": pair["entry_a"]["norm_name"],
                 "record": base_record,
                 "record_id": pair["entry_a"]["record_id"],
@@ -335,7 +364,7 @@ class ViewTemplateDomainProfile(DomainProfile):
             }
             syn_entry_b = {
                 "domain": "view_category_overrides",
-                "display_name": template_name,
+                "display_name": template_name_b,
                 "norm_name": pair["entry_b"]["norm_name"],
                 "record": pair["entry_b"]["record"],
                 "record_id": pair["entry_b"]["record_id"],
