@@ -107,7 +107,6 @@ from domains import identity, units, line_patterns, line_styles
 from domains import arrowheads, text_types
 from domains import view_filter_definitions, view_filter_applications_view_templates
 from domains import phases, phase_filters, phase_graphics
-from domains import view_category_overrides
 from domains import view_category_overrides_model
 from domains import view_category_overrides_annotation
 # Split domains: object_styles
@@ -747,18 +746,9 @@ def run_fingerprint(doc, timing=None):
         if legacy is not None:
             fingerprint["view_category_overrides_annotation"] = legacy
 
-    if _enabled("view_category_overrides"):
-        legacy = _domain_run(
-            "view_category_overrides",
-            view_category_overrides.extract,
-            doc,
-            ctx,
-            contract_domains,
-            run_diag,
-            runner_notes,
-        )
-        if legacy is not None:
-            fingerprint["view_category_overrides"] = legacy
+    # Deprecated aggregate output intentionally omitted.
+    # Keep split domains only: view_category_overrides_model +
+    # view_category_overrides_annotation.
 
     # view_templates split domains.
     # Non-schedule domains require both phase_filters and view_filter_definitions
