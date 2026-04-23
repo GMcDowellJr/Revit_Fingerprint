@@ -95,15 +95,11 @@ _BUILTIN_PARAM_SPECS = [
     },
     {
         "key": "view_scale",
-        "include_bip_any_of": [
-            "VIEW_SCALE",
-            "VIEW_SCALE_PULLDOWN_IMPERIAL",
-            "VIEW_SCALE_PULLDOWN_METRIC",
-        ],
+        "include_bip": "VIEW_SCALE",
         "value_bip": "VIEW_SCALE",
         "storage": "int",
         "partitions": None,
-        "debug_note": "include requires any of three BIPs per API docs",
+        "debug_note": "include uses VIEW_SCALE as canonical indicator for reads",
     },
     {
         "key": "orientation",
