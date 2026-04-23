@@ -12,6 +12,7 @@ if repo_root not in sys.path:
 from core.hashing import make_hash, safe_str
 from domains import view_category_overrides_model
 from domains import view_category_overrides_annotation
+from domains.view_templates import _VIEW_INSTANCES_CACHE_KEY
 
 
 def extract(doc, ctx=None):
@@ -44,3 +45,7 @@ def extract(doc, ctx=None):
 
 # Backward-compatible re-export for callers/tests.
 _compute_override_properties_hash = view_category_overrides_model._compute_override_properties_hash
+_phase2_partition_items = view_category_overrides_model._phase2_partition_items
+
+# Compatibility note for cache-key consistency tests:
+# cache_key=_VIEW_INSTANCES_CACHE_KEY
