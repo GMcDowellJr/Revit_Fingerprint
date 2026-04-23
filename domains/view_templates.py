@@ -443,6 +443,10 @@ def extract_floor_structural_area_plans(doc, ctx=None):
 
         non_ctrl_bips = _non_ctrl_bips_from_view(v)
         info["debug_non_ctrl_bips_count"] = len(non_ctrl_bips)
+        info["debug_view_range_bip_in_non_ctrl"] = (
+            int(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP) in non_ctrl_bips
+            if BuiltInParameter is not None else "bip_none"
+        )
 
         # Common include flags
         try:
