@@ -186,7 +186,7 @@ def _read_bip_int(v, bip_enum_name, tpl_bips, debug_counters=None, storage="int"
         return (include_flag, "<UNREADABLE>", False)
 
 
-def emit_builtin_params(v, domain_name, tpl_bips, sig, sig_v2, debug_counters=None):
+def emit_builtin_params(v, domain_name, tpl_bips, non_ctrl_bips, sig, sig_v2, debug_counters=None):
     """Emit include-flag + value items for built-in params for a domain."""
     for spec in _BUILTIN_PARAM_SPECS:
         key = spec.get("key")
@@ -220,7 +220,10 @@ def emit_builtin_params(v, domain_name, tpl_bips, sig, sig_v2, debug_counters=No
                 k = "debug_bip_unresolved_{}".format(key)
                 debug_counters[k] = debug_counters.get(k, 0) + 1
         else:
-            include_flag = any(bip_int in (tpl_bips or set()) for bip_int in include_bip_ints)
+            if not non_ctrl_bips:
+                include_flag = False
+            else:
+                include_flag = any(bip_int not in non_ctrl_bips for bip_int in include_bip_ints)
 
         _, value_str, _ = _read_bip_int(
             v,
