@@ -94,19 +94,10 @@ def _load_domain_records(raw, domain_key):
 
 
 def _load_vco_records(raw):
-    """
-    Load VCO records from raw, preferring split partition keys over legacy aggregate.
-
-    Tries view_category_overrides_model and view_category_overrides_annotation first.
-    Falls back to view_category_overrides (legacy aggregate) only if both split
-    keys return empty. Never double-counts: if split keys produce records the
-    legacy key is ignored even if present.
-    """
+    """Load VCO records from split model + annotation partitions only."""
     model = _load_domain_records(raw, "view_category_overrides_model")
     annot = _load_domain_records(raw, "view_category_overrides_annotation")
-    if model or annot:
-        return model + annot
-    return _load_domain_records(raw, "view_category_overrides")
+    return model + annot
 
 
 def _get_phase2_cosmetic_value(rec, key):
