@@ -447,6 +447,21 @@ def run_comparison(profile: DomainProfile, args: argparse.Namespace) -> None:
                 }
             )
 
+        # P3: process extra entry pairs injected by reconstruct()
+        # extra_entries contribute to detail_rows only — not to summary_rows.
+        for (xentry_a, xentry_b) in pair.get("extra_entries", []):
+            _, xdetails = compare_entries(profile, xentry_a, xentry_b, args.include_same, maps_a, maps_b)
+            for xdetail in xdetails:
+                detail_rows.append(
+                    {
+                        "template_name": xentry_a["norm_name"],
+                        "partition_a": xentry_a["domain"],
+                        "partition_b": xentry_b["domain"],
+                        **xdetail,
+                    }
+                )
+
+
     for _, entry_a in only_a:
         summary_rows.append(
             {
