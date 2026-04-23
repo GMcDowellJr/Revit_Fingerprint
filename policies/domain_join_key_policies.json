@@ -284,7 +284,61 @@
         "vco.baseline_category_path identifies WHICH category is being overridden.",
         "vco.baseline_sig_hash identifies the object_styles baseline definition being overridden.",
         "vco.override_properties_hash collapses all delta properties into a single behavioral signature.",
-        "Individual delta properties (line_weight, color, etc.) are forensic detail, excluded from joins."
+        "Individual delta properties (line_weight, color, etc.) are forensic detail, excluded from joins.",
+        "Deprecated aggregate domain. Use view_category_overrides_model and view_category_overrides_annotation."
+      ]
+    },
+    "view_category_overrides_model": {
+      "join_key_schema": "view_category_overrides_model.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vco.category_path",
+        "vco.projection.line_weight",
+        "vco.projection.line_pattern_ref.sig_hash",
+        "vco.projection.line_color.rgb",
+        "vco.cut.line_weight",
+        "vco.cut.line_pattern_ref.sig_hash",
+        "vco.cut.line_color.rgb",
+        "vco.halftone",
+        "vco.transparency"
+      ],
+      "notes": [
+        "Domain family: view_category_overrides.",
+        "Contains: CategoryType.Model categories and subcategories.",
+        "include_controlled removed — include state sourced from view_templates.include_vg_model.",
+        "vco.vg_tab = Model in coordination_items for downstream join."
+      ]
+    },
+    "view_category_overrides_annotation": {
+      "join_key_schema": "view_category_overrides_annotation.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vco.category_path",
+        "vco.projection.line_weight",
+        "vco.projection.line_pattern_ref.sig_hash",
+        "vco.projection.line_color.rgb",
+        "vco.halftone",
+        "vco.transparency"
+      ],
+      "notes": [
+        "Domain family: view_category_overrides.",
+        "Contains: CategoryType.Annotation categories.",
+        "Cut weight not applicable to annotation categories — excluded.",
+        "include_controlled removed — include state sourced from view_templates.include_vg_annotation.",
+        "vco.vg_tab = Annotation in coordination_items for downstream join.",
+        "Baseline: object_styles_annotation ctx map."
       ]
     },
     "dimension_types_linear": {

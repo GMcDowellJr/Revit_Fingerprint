@@ -52,47 +52,80 @@ _BUILTIN_PARAM_SPECS = [
         "partitions": None,
     },
     {
-        "key": "display_model",
-        "include_bip": "VIEW_DISPLAY_MODEL",
-        "value_bip": "VIEW_DISPLAY_MODEL",
-        "storage": "int",
+        "key": "vg_model",
+        "include_bip": "VIS_GRAPHICS_MODEL",
+        "value_bip": None,
+        "storage": "include_only",
         "partitions": None,
+    },
+    {
+        "key": "vg_annotation",
+        "include_bip": "VIS_GRAPHICS_ANNOTATION",
+        "value_bip": None,
+        "storage": "include_only",
+        "partitions": None,
+    },
+    {
+        "key": "vg_analytical",
+        "include_bip": "VIS_GRAPHICS_ANALYTICAL_MODEL",
+        "value_bip": None,
+        "storage": "include_only",
+        "partitions": None,
+    },
+    {
+        "key": "display_model",
+        "include_bip": "VIEW_MODEL_DISPLAY_MODE",
+        "value_bip": "VIEW_MODEL_DISPLAY_MODE",
+        "storage": "int",
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+            "view_templates_elevations_sections_detail",
+        ],
     },
     {
         "key": "parts_visibility",
         "include_bip": "VIEW_PARTS_VISIBILITY",
         "value_bip": "VIEW_PARTS_VISIBILITY",
         "storage": "int",
-        "partitions": None,
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+            "view_templates_elevations_sections_detail",
+        ],
     },
     {
         "key": "show_hidden_lines",
-        "include_bip": "VIS_SHOW_HIDDEN_LINES",
-        "value_bip": "VIS_SHOW_HIDDEN_LINES",
+        "include_bip": "VIEW_SHOW_HIDDEN_LINES",
+        "value_bip": "VIEW_SHOW_HIDDEN_LINES",
         "storage": "int",
-        "partitions": None,
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+            "view_templates_elevations_sections_detail",
+        ],
     },
     {
         "key": "visual_style",
-        "include_bip": "VIEW_VISUAL_STYLE",
-        "value_bip": "VIEW_VISUAL_STYLE",
+        "include_bip": "MODEL_GRAPHICS_STYLE_ANON_DRAFT",
+        "value_bip": "MODEL_GRAPHICS_STYLE_ANON_DRAFT",
         "storage": "int",
-        "partitions": None,
+        "partitions": [
+            "view_templates_renderings_drafting",
+        ],
     },
     {
         "key": "view_scale",
-        "include_bip": "VIEW_SCALE_PULLDOWN_METRIC",
+        "include_bip": "VIEW_SCALE",
         "value_bip": "VIEW_SCALE",
         "storage": "int",
         "partitions": None,
-        "include_bip_alternates": ["VIEW_SCALE_PULLDOWN_IMPERIAL"],
-        "include_bip_fallback": "VIEW_SCALE",
-        "debug_note": "include_bip_uncertain",
+        "debug_note": "include uses VIEW_SCALE as canonical indicator for reads",
     },
     {
         "key": "orientation",
-        "include_bip": "VIEW_ORIENTATION",
-        "value_bip": "VIEW_ORIENTATION",
+        "include_bip": "PLAN_VIEW_NORTH",
+        "value_bip": "PLAN_VIEW_NORTH",
         "storage": "int",
         "partitions": [
             "view_templates_floor_structural_area_plans",
@@ -111,73 +144,52 @@ _BUILTIN_PARAM_SPECS = [
     },
     {
         "key": "depth_clipping",
-        "include_bip": "VIEWER_BOUND_FAR_CLIPPING",
-        "value_bip": "VIEWER_BOUND_FAR_CLIPPING",
+        "include_bip": "VIEW_BACK_CLIPPING",
+        "value_bip": "VIEW_BACK_CLIPPING",
         "storage": "int",
         "partitions": [
             "view_templates_floor_structural_area_plans",
             "view_templates_ceiling_plans",
-        ],
-    },
-    {
-        "key": "far_clip_offset",
-        "include_bip": "VIEWER_BOUND_OFFSET_FAR",
-        "value_bip": "VIEWER_BOUND_OFFSET_FAR",
-        "storage": "double",
-        "partitions": [
-            "view_templates_floor_structural_area_plans",
-            "view_templates_ceiling_plans",
-            "view_templates_elevations_sections_detail",
         ],
     },
     {
         "key": "color_scheme_location",
-        "include_bip": "VIEW_COLOR_SCHEME_LOCATION",
-        "value_bip": "VIEW_COLOR_SCHEME_LOCATION",
+        "include_bip": "COLOR_SCHEME_LOCATION",
+        "value_bip": "COLOR_SCHEME_LOCATION",
         "storage": "int",
         "partitions": [
             "view_templates_floor_structural_area_plans",
-            "view_templates_ceiling_plans",
-        ],
-    },
-    {
-        "key": "sun_path",
-        "include_bip": "VIEW_SUNPATH_DISPLAYED",
-        "value_bip": "VIEW_SUNPATH_DISPLAYED",
-        "storage": "int",
-        "partitions": [
-            "view_templates_floor_structural_area_plans",
-            "view_templates_ceiling_plans",
             "view_templates_elevations_sections_detail",
         ],
     },
 ]
 
 
-def _read_bip_int(v, bip_enum_name, tpl_bips, debug_counters=None, storage="int"):
+def _read_bip_int(v, bip_enum_name, tpl_bips, include_flag=True, debug_counters=None, storage="int"):
     """Read a BuiltInParameter integer value from a view template element.
 
     Returns (include_flag: bool, value_str: str, readable: bool).
     """
+    fallback = "<UNREADABLE>" if include_flag else "<NOT_APPLICABLE>"
     if BuiltInParameter is None:
-        return (False, "<UNREADABLE>", False)
+        return (include_flag, fallback, False)
 
     try:
         bip_int = int(getattr(BuiltInParameter, bip_enum_name))
     except Exception:
-        return (False, "<UNREADABLE>", False)
+        return (include_flag, fallback, False)
 
     include_flag = bip_int in (tpl_bips or set())
 
     try:
         p = v.get_Parameter(getattr(BuiltInParameter, bip_enum_name))
         if p is None:
-            return (include_flag, "<UNREADABLE>", False)
+            return (include_flag, fallback, False)
 
         if storage == "double":
             try:
                 val = p.AsDouble()
-                return (include_flag, safe_str(val), True)
+                return (include_flag, "{:.6f}".format(float(val)), True)
             except Exception:
                 pass
         else:
@@ -191,12 +203,12 @@ def _read_bip_int(v, bip_enum_name, tpl_bips, debug_counters=None, storage="int"
             eid = p.AsElementId()
             return (include_flag, safe_str(getattr(eid, "IntegerValue", None)), True)
         except Exception:
-            return (include_flag, "<UNREADABLE>", False)
+            return (include_flag, fallback, False)
     except Exception:
-        return (include_flag, "<UNREADABLE>", False)
+        return (include_flag, fallback, False)
 
 
-def emit_builtin_params(v, domain_name, tpl_bips, sig, sig_v2, debug_counters=None):
+def emit_builtin_params(v, domain_name, tpl_bips, non_ctrl_bips, sig, sig_v2, debug_counters=None):
     """Emit include-flag + value items for built-in params for a domain."""
     for spec in _BUILTIN_PARAM_SPECS:
         key = spec.get("key")
@@ -208,8 +220,9 @@ def emit_builtin_params(v, domain_name, tpl_bips, sig, sig_v2, debug_counters=No
             continue
 
         include_flag = False
-        include_names = [spec.get("include_bip")]
-        include_names.extend(spec.get("include_bip_alternates") or [])
+        include_names = spec.get("include_bip_any_of")
+        if include_names is None:
+            include_names = [spec.get("include_bip")]
         include_bip_ints = []
 
         if BuiltInParameter is None:
@@ -222,13 +235,6 @@ def emit_builtin_params(v, domain_name, tpl_bips, sig, sig_v2, debug_counters=No
                     include_bip_ints.append(int(getattr(BuiltInParameter, include_name)))
                 except Exception:
                     continue
-            if not include_bip_ints:
-                fallback = spec.get("include_bip_fallback")
-                if fallback:
-                    try:
-                        include_bip_ints.append(int(getattr(BuiltInParameter, fallback)))
-                    except Exception:
-                        pass
 
         if not include_bip_ints:
             include_flag = False
@@ -236,12 +242,22 @@ def emit_builtin_params(v, domain_name, tpl_bips, sig, sig_v2, debug_counters=No
                 k = "debug_bip_unresolved_{}".format(key)
                 debug_counters[k] = debug_counters.get(k, 0) + 1
         else:
-            include_flag = any(bip_int in (tpl_bips or set()) for bip_int in include_bip_ints)
+            if not non_ctrl_bips:
+                include_flag = False
+            else:
+                include_flag = any(bip_int not in non_ctrl_bips for bip_int in include_bip_ints)
+
+        if spec.get("storage") == "include_only":
+            include_entry = "include_{}={}".format(key, include_flag)
+            sig.append(include_entry)
+            sig_v2.append(include_entry)
+            continue
 
         _, value_str, _ = _read_bip_int(
             v,
             spec.get("value_bip"),
             tpl_bips,
+            include_flag=include_flag,
             debug_counters=debug_counters,
             storage=spec.get("storage", "int"),
         )
@@ -261,6 +277,8 @@ def emit_shared_params_stub(v, domain_name, tpl_param_ids, sig, sig_v2, debug_co
     tpl_param_ids: full list of ParameterId objects from
                    v.GetTemplateParameterIds() (not filtered to BIPs only).
     """
+    # sun_path: VIEW_SUNPATH_DISPLAYED not confirmed as template BIP.
+    # Investigate via View property surface rather than parameter API.
     pass
 
 

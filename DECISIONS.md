@@ -434,12 +434,22 @@ governance implications:
    on non-templated views or on views where the template does not control
    that category.
 ### Decision
-Implement categories 1 and 2 in the same domain with the same record schema.
+Implement categories 1 and 2 as a domain family split:
+- `view_category_overrides_model` (CategoryType.Model)
+- `view_category_overrides_annotation` (CategoryType.Annotation)
+
+`vco.include_controlled` is removed from VCO coordination_items. Include state is
+owned by view_templates via per-tab include flags:
+- `view_template.sig.include_vg_model`
+- `view_template.sig.include_vg_annotation`
+- `view_template.sig.include_vg_analytical`
+
+VCO records now emit `vco.vg_tab` (`Model`/`Annotation`) and downstream tools
+derive category 1 vs category 2 by joining `vco.vg_tab` to the corresponding
+`view_template.sig.include_vg_<tab>` flag.
+
 Category 3 is deferred.
-The `vco.include_controlled` coordination_item (true/false) distinguishes
-category 1 from category 2. BI governance measures filter on
-`vco.include_controlled = true` to scope to the governed population.
-Category 2 records (latent overrides) are included because a latent override
+Category 2 records (latent overrides) remain included because a latent override
 that diverges from the standard is a governance risk: if the V/G checkbox is
 later checked, the non-standard override activates silently.
 ### Category 3 hooks
@@ -449,10 +459,12 @@ When category 3 (view-local overrides) is implemented:
 - Add `vco.view_element_id` in unknown_items for traceability
 - No changes to category 1/2 records, join-key policy, or sig_hash
 ### Consequences
-- VCO depends on `object_styles_model` and `object_styles_annotation` ctx maps
-  for baseline sig_hash resolution
+- VCO model partition depends on `object_styles_model` ctx map; annotation
+  partition consumes `object_styles_annotation` ctx map when present
 - VCO reads view templates directly from the Revit API — it does NOT depend on
   view_template_* domain extractors
+- Include control for governance filtering is sourced from view_templates and
+  joined via `vco.vg_tab` → `include_vg_<tab>` mapping
 - View-local overrides (category 3) may be a large population; implement with
   record-count ceiling and non-default-only filter when deferred work begins
 

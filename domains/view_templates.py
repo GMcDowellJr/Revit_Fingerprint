@@ -65,6 +65,108 @@ def _collect_templates(doc, ctx):
     return col
 
 
+def _non_ctrl_bips_from_view(v):
+    try:
+        non_ctrl_ids = v.GetNonControlledTemplateParameterIds() or []
+        return set(
+            pid.IntegerValue for pid in non_ctrl_ids
+            if hasattr(pid, "IntegerValue") and pid.IntegerValue < 0
+        )
+    except Exception:
+        return set()
+
+
+def _is_template_param_included(non_ctrl_bips, bip_name):
+    if BuiltInParameter is None or not non_ctrl_bips:
+        return False
+    try:
+        return int(getattr(BuiltInParameter, bip_name)) not in non_ctrl_bips
+    except Exception:
+        return False
+
+
+def _append_assigned_view_count_cosmetic_item(rec, doc, v, ctx):
+    assigned_count = 0
+    try:
+        col = collect_instances(
+            doc,
+            of_class=View,
+            require_unique_id=False,
+            cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+            cache_key="view_templates:all_view_instances",
+        )
+        template_id = getattr(v, "Id", None)
+        assigned_count = sum(
+            1 for view in (col or [])
+            if not getattr(view, "IsTemplate", False)
+            and getattr(view, "ViewTemplateId", None) == template_id
+        )
+    except Exception:
+        assigned_count = None
+
+    if assigned_count is not None:
+        ac_v, ac_q = canonicalize_int(assigned_count)
+    else:
+        ac_v, ac_q = (None, ITEM_Q_UNREADABLE)
+
+    assigned_item = make_identity_item("vt.assigned_view_count", ac_v, ac_q)
+    rec["phase2"]["cosmetic_items"] = list(rec["phase2"].get("cosmetic_items") or []) + [assigned_item]
+
+
+def _append_phase_filter_value(
+    v,
+    doc,
+    include_pf,
+    phase_filter_map,
+    phase_filter_map_v2,
+    sig,
+    sig_v2,
+    v2_ok,
+    v2_block_fn,
+    debug_counters=None,
+):
+    sentinel = None
+    try:
+        p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
+        has_value = bool(getattr(p, "HasValue", False)) if p is not None else False
+        if p is None or not has_value:
+            sentinel = S_MISSING if include_pf else S_NOT_APPLICABLE
+        else:
+            pf_id = p.AsElementId()
+            if not pf_id or canon_id(pf_id) == S_MISSING:
+                sentinel = S_MISSING if include_pf else S_NOT_APPLICABLE
+            else:
+                pf_elem = doc.GetElement(pf_id)
+                if pf_elem:
+                    pf_uid = canon_str(getattr(pf_elem, "UniqueId", None))
+                    pf_hash = phase_filter_map.get(pf_uid) if pf_uid else None
+                    if pf_hash:
+                        sig.append("phase_filter={}".format(canon_str(pf_hash)))
+                        if v2_ok:
+                            pf_hash_v2 = None
+                            try:
+                                pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
+                            except Exception:
+                                pf_hash_v2 = None
+                            if pf_hash_v2:
+                                sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
+                            elif include_pf:
+                                v2_block_fn("phase_filter_unresolved")
+                                v2_ok = False
+                        return v2_ok
+                sentinel = S_UNREADABLE if include_pf else S_NOT_APPLICABLE
+    except Exception:
+        if debug_counters is not None:
+            debug_counters["debug_fail_read"] = debug_counters.get("debug_fail_read", 0) + 1
+        sentinel = S_UNREADABLE if include_pf else S_NOT_APPLICABLE
+
+    sig.append("phase_filter={}".format(sentinel))
+    if include_pf and sentinel in (S_UNREADABLE, S_MISSING) and v2_ok:
+        v2_block_fn("phase_filter_unresolved")
+        v2_ok = False
+    return v2_ok
+
+
 def _phase2_items_from_def_signature(def_signature):
     """Convert legacy def_signature entries ('k=v') into IdentityItems safely."""
     out = []
@@ -339,72 +441,64 @@ def extract_floor_structural_area_plans(doc, ctx=None):
             tpl_ids = []
             tpl_bips = set()
 
+        non_ctrl_bips = _non_ctrl_bips_from_view(v)
+        info["debug_non_ctrl_bips_count"] = len(non_ctrl_bips)
+        info["debug_view_range_bip_in_non_ctrl"] = (
+            int(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP) in non_ctrl_bips
+            if BuiltInParameter is not None else "bip_none"
+        )
+        info["debug_plan_view_range_bip_in_non_ctrl"] = (
+            int(BuiltInParameter.PLAN_VIEW_RANGE) in non_ctrl_bips
+            if BuiltInParameter is not None else "bip_none"
+        )
+
         # Common include flags
         try:
-            sig.append("include_phase_filter={}".format(int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips))
+            sig.append("include_phase_filter={}".format(_is_template_param_included(non_ctrl_bips, "VIEW_PHASE_FILTER")))
         except Exception:
             sig.append("include_phase_filter=False")
 
         try:
-            sig.append("include_filters={}".format(int(BuiltInParameter.VIS_GRAPHICS_FILTERS) in tpl_bips))
+            sig.append("include_filters={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_FILTERS")))
         except Exception:
             sig.append("include_filters=False")
 
         try:
-            sig.append("include_vg={}".format(int(BuiltInParameter.VIS_GRAPHICS_OVERRIDES) in tpl_bips))
-        except Exception:
-            sig.append("include_vg=False")
-
-        try:
-            sig.append("include_appearance={}".format(int(BuiltInParameter.VIS_GRAPHICS_APPEARANCE) in tpl_bips))
+            sig.append("include_appearance={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_APPEARANCE")))
         except Exception:
             sig.append("include_appearance=False")
 
         # Domain-specific: view range (floor/area plans support view depth)
         try:
-            sig.append("include_view_range={}".format(int(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP) in tpl_bips))
+            include_view_range = (
+                int(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP) not in non_ctrl_bips
+            )
+            sig.append("include_view_range={}".format(include_view_range))
+            if v2_ok:
+                sig_v2.append("include_view_range={}".format(include_view_range))
         except Exception:
             sig.append("include_view_range=False")
+            if v2_ok:
+                sig_v2.append("include_view_range=False")
 
         # Phase Filter (resolved via phase_filters domain)
         try:
-            include_pf = int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
+            include_pf = _is_template_param_included(non_ctrl_bips, "VIEW_PHASE_FILTER")
         except Exception:
             include_pf = False
 
-        if include_pf:
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-                if p is None:
-                    sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                else:
-                    pf_id = p.AsElementId()
-                    if not pf_id or canon_id(pf_id) == S_MISSING:
-                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                    else:
-                        pf_elem = doc.GetElement(pf_id)
-                        if pf_elem:
-                            pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                            pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                            sig.append("phase_filter={}".format(canon_str(pf_hash)))
-                            if v2_ok:
-                                pf_hash_v2 = None
-                                try:
-                                    pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                                except Exception:
-                                    pf_hash_v2 = None
-                                if not pf_hash_v2:
-                                    _v2_block("phase_filter_unresolved")
-                                    v2_ok = False
-                                else:
-                                    sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
-                        else:
-                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-            except Exception:
-                info["debug_fail_read"] += 1
-                sig.append(f"phase_filter={S_UNREADABLE}")
-        else:
-            sig.append(f"phase_filter={S_MISSING}")
+        v2_ok = _append_phase_filter_value(
+            v=v,
+            doc=doc,
+            include_pf=include_pf,
+            phase_filter_map=phase_filter_map,
+            phase_filter_map_v2=phase_filter_map_v2,
+            sig=sig,
+            sig_v2=sig_v2,
+            v2_ok=v2_ok,
+            v2_block_fn=_v2_block,
+            debug_counters=info,
+        )
 
         # Filter stack (order-sensitive)
         try:
@@ -485,7 +579,7 @@ def extract_floor_structural_area_plans(doc, ctx=None):
                         v2_ok = False
 
         # Built-in visual/behavioural parameters
-        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, sig, sig_v2,
+        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, non_ctrl_bips, sig, sig_v2,
                             debug_counters=info)
 
         # Shared/project parameters (stub — no-op until GUIDs confirmed)
@@ -562,6 +656,7 @@ def extract_floor_structural_area_plans(doc, ctx=None):
             ],
             "unknown_items": _traceability_unknown_items(v),
         }
+        _append_assigned_view_count_cosmetic_item(rec, doc, v, ctx)
 
         rec["sig_basis"] = {
             "hash_alg": "md5_utf8_join_pipe",
@@ -819,72 +914,56 @@ def extract_ceiling_plans(doc, ctx=None):
             tpl_ids = []
             tpl_bips = set()
 
+        non_ctrl_bips = _non_ctrl_bips_from_view(v)
+        info["debug_non_ctrl_bips_count"] = len(non_ctrl_bips)
+
         # Common include flags
         try:
-            sig.append("include_phase_filter={}".format(int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips))
+            sig.append("include_phase_filter={}".format(_is_template_param_included(non_ctrl_bips, "VIEW_PHASE_FILTER")))
         except Exception:
             sig.append("include_phase_filter=False")
 
         try:
-            sig.append("include_filters={}".format(int(BuiltInParameter.VIS_GRAPHICS_FILTERS) in tpl_bips))
+            sig.append("include_filters={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_FILTERS")))
         except Exception:
             sig.append("include_filters=False")
 
         try:
-            sig.append("include_vg={}".format(int(BuiltInParameter.VIS_GRAPHICS_OVERRIDES) in tpl_bips))
-        except Exception:
-            sig.append("include_vg=False")
-
-        try:
-            sig.append("include_appearance={}".format(int(BuiltInParameter.VIS_GRAPHICS_APPEARANCE) in tpl_bips))
+            sig.append("include_appearance={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_APPEARANCE")))
         except Exception:
             sig.append("include_appearance=False")
 
         # Domain-specific: view range (ceiling plans support view depth)
         try:
-            sig.append("include_view_range={}".format(int(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP) in tpl_bips))
+            include_view_range = (
+                int(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP) not in non_ctrl_bips
+            )
+            sig.append("include_view_range={}".format(include_view_range))
+            if v2_ok:
+                sig_v2.append("include_view_range={}".format(include_view_range))
         except Exception:
             sig.append("include_view_range=False")
+            if v2_ok:
+                sig_v2.append("include_view_range=False")
 
         # Phase Filter (resolved via phase_filters domain)
         try:
-            include_pf = int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
+            include_pf = _is_template_param_included(non_ctrl_bips, "VIEW_PHASE_FILTER")
         except Exception:
             include_pf = False
 
-        if include_pf:
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-                if p is None:
-                    sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                else:
-                    pf_id = p.AsElementId()
-                    if not pf_id or canon_id(pf_id) == S_MISSING:
-                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                    else:
-                        pf_elem = doc.GetElement(pf_id)
-                        if pf_elem:
-                            pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                            pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                            sig.append("phase_filter={}".format(canon_str(pf_hash)))
-                            if v2_ok:
-                                pf_hash_v2 = None
-                                try:
-                                    pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                                except Exception:
-                                    pf_hash_v2 = None
-                                if not pf_hash_v2:
-                                    _v2_block("phase_filter_unresolved")
-                                    v2_ok = False
-                                else:
-                                    sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
-                        else:
-                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-            except Exception:
-                info["debug_fail_read"] += 1
-                sig.append(f"phase_filter={S_UNREADABLE}")
-        else:
-            sig.append(f"phase_filter={S_MISSING}")
+        v2_ok = _append_phase_filter_value(
+            v=v,
+            doc=doc,
+            include_pf=include_pf,
+            phase_filter_map=phase_filter_map,
+            phase_filter_map_v2=phase_filter_map_v2,
+            sig=sig,
+            sig_v2=sig_v2,
+            v2_ok=v2_ok,
+            v2_block_fn=_v2_block,
+            debug_counters=info,
+        )
 
         # Filter stack (order-sensitive)
         try:
@@ -965,7 +1044,7 @@ def extract_ceiling_plans(doc, ctx=None):
                         v2_ok = False
 
         # Built-in visual/behavioural parameters
-        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, sig, sig_v2,
+        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, non_ctrl_bips, sig, sig_v2,
                             debug_counters=info)
 
         # Shared/project parameters (stub — no-op until GUIDs confirmed)
@@ -1042,6 +1121,7 @@ def extract_ceiling_plans(doc, ctx=None):
             ],
             "unknown_items": _traceability_unknown_items(v),
         }
+        _append_assigned_view_count_cosmetic_item(rec, doc, v, ctx)
 
         rec["sig_basis"] = {
             "hash_alg": "md5_utf8_join_pipe",
@@ -1332,72 +1412,49 @@ def extract_elevations_sections_detail(doc, ctx=None):
             tpl_ids = []
             tpl_bips = set()
 
+        non_ctrl_bips = _non_ctrl_bips_from_view(v)
+        info["debug_non_ctrl_bips_count"] = len(non_ctrl_bips)
+
         # Common include flags
         try:
-            sig.append("include_phase_filter={}".format(int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips))
+            sig.append("include_phase_filter={}".format(_is_template_param_included(non_ctrl_bips, "VIEW_PHASE_FILTER")))
         except Exception:
             sig.append("include_phase_filter=False")
 
         try:
-            sig.append("include_filters={}".format(int(BuiltInParameter.VIS_GRAPHICS_FILTERS) in tpl_bips))
+            sig.append("include_filters={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_FILTERS")))
         except Exception:
             sig.append("include_filters=False")
 
         try:
-            sig.append("include_vg={}".format(int(BuiltInParameter.VIS_GRAPHICS_OVERRIDES) in tpl_bips))
-        except Exception:
-            sig.append("include_vg=False")
-
-        try:
-            sig.append("include_appearance={}".format(int(BuiltInParameter.VIS_GRAPHICS_APPEARANCE) in tpl_bips))
+            sig.append("include_appearance={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_APPEARANCE")))
         except Exception:
             sig.append("include_appearance=False")
 
         # Domain-specific: far clip (elevations/sections control far clipping)
         try:
-            sig.append("include_far_clip={}".format(int(BuiltInParameter.VIEWER_BOUND_FAR_CLIPPING) in tpl_bips))
+            sig.append("include_far_clip={}".format(_is_template_param_included(non_ctrl_bips, "VIEWER_BOUND_FAR_CLIPPING")))
         except Exception:
             sig.append("include_far_clip=False")
 
         # Phase Filter (resolved via phase_filters domain)
         try:
-            include_pf = int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
+            include_pf = _is_template_param_included(non_ctrl_bips, "VIEW_PHASE_FILTER")
         except Exception:
             include_pf = False
 
-        if include_pf:
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-                if p is None:
-                    sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                else:
-                    pf_id = p.AsElementId()
-                    if not pf_id or canon_id(pf_id) == S_MISSING:
-                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                    else:
-                        pf_elem = doc.GetElement(pf_id)
-                        if pf_elem:
-                            pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                            pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                            sig.append("phase_filter={}".format(canon_str(pf_hash)))
-                            if v2_ok:
-                                pf_hash_v2 = None
-                                try:
-                                    pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                                except Exception:
-                                    pf_hash_v2 = None
-                                if not pf_hash_v2:
-                                    _v2_block("phase_filter_unresolved")
-                                    v2_ok = False
-                                else:
-                                    sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
-                        else:
-                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-            except Exception:
-                info["debug_fail_read"] += 1
-                sig.append(f"phase_filter={S_UNREADABLE}")
-        else:
-            sig.append(f"phase_filter={S_MISSING}")
+        v2_ok = _append_phase_filter_value(
+            v=v,
+            doc=doc,
+            include_pf=include_pf,
+            phase_filter_map=phase_filter_map,
+            phase_filter_map_v2=phase_filter_map_v2,
+            sig=sig,
+            sig_v2=sig_v2,
+            v2_ok=v2_ok,
+            v2_block_fn=_v2_block,
+            debug_counters=info,
+        )
 
         # Filter stack (order-sensitive)
         try:
@@ -1478,7 +1535,7 @@ def extract_elevations_sections_detail(doc, ctx=None):
                         v2_ok = False
 
         # Built-in visual/behavioural parameters
-        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, sig, sig_v2,
+        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, non_ctrl_bips, sig, sig_v2,
                             debug_counters=info)
 
         # Shared/project parameters (stub — no-op until GUIDs confirmed)
@@ -1555,6 +1612,7 @@ def extract_elevations_sections_detail(doc, ctx=None):
             ],
             "unknown_items": _traceability_unknown_items(v),
         }
+        _append_assigned_view_count_cosmetic_item(rec, doc, v, ctx)
 
         rec["sig_basis"] = {
             "hash_alg": "md5_utf8_join_pipe",
@@ -1828,66 +1886,43 @@ def extract_renderings_drafting(doc, ctx=None):
             tpl_ids = []
             tpl_bips = set()
 
+        non_ctrl_bips = _non_ctrl_bips_from_view(v)
+        info["debug_non_ctrl_bips_count"] = len(non_ctrl_bips)
+
         # Common include flags
         try:
-            sig.append("include_phase_filter={}".format(int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips))
+            sig.append("include_phase_filter={}".format(_is_template_param_included(non_ctrl_bips, "VIEW_PHASE_FILTER")))
         except Exception:
             sig.append("include_phase_filter=False")
 
         try:
-            sig.append("include_filters={}".format(int(BuiltInParameter.VIS_GRAPHICS_FILTERS) in tpl_bips))
+            sig.append("include_filters={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_FILTERS")))
         except Exception:
             sig.append("include_filters=False")
 
         try:
-            sig.append("include_vg={}".format(int(BuiltInParameter.VIS_GRAPHICS_OVERRIDES) in tpl_bips))
-        except Exception:
-            sig.append("include_vg=False")
-
-        try:
-            sig.append("include_appearance={}".format(int(BuiltInParameter.VIS_GRAPHICS_APPEARANCE) in tpl_bips))
+            sig.append("include_appearance={}".format(_is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_APPEARANCE")))
         except Exception:
             sig.append("include_appearance=False")
 
         # Phase Filter (resolved via phase_filters domain)
         try:
-            include_pf = int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
+            include_pf = _is_template_param_included(non_ctrl_bips, "VIEW_PHASE_FILTER")
         except Exception:
             include_pf = False
 
-        if include_pf:
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-                if p is None:
-                    sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                else:
-                    pf_id = p.AsElementId()
-                    if not pf_id or canon_id(pf_id) == S_MISSING:
-                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                    else:
-                        pf_elem = doc.GetElement(pf_id)
-                        if pf_elem:
-                            pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                            pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                            sig.append("phase_filter={}".format(canon_str(pf_hash)))
-                            if v2_ok:
-                                pf_hash_v2 = None
-                                try:
-                                    pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                                except Exception:
-                                    pf_hash_v2 = None
-                                if not pf_hash_v2:
-                                    _v2_block("phase_filter_unresolved")
-                                    v2_ok = False
-                                else:
-                                    sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
-                        else:
-                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-            except Exception:
-                info["debug_fail_read"] += 1
-                sig.append(f"phase_filter={S_UNREADABLE}")
-        else:
-            sig.append(f"phase_filter={S_MISSING}")
+        v2_ok = _append_phase_filter_value(
+            v=v,
+            doc=doc,
+            include_pf=include_pf,
+            phase_filter_map=phase_filter_map,
+            phase_filter_map_v2=phase_filter_map_v2,
+            sig=sig,
+            sig_v2=sig_v2,
+            v2_ok=v2_ok,
+            v2_block_fn=_v2_block,
+            debug_counters=info,
+        )
 
         # Filter stack (order-sensitive)
         try:
@@ -1968,7 +2003,7 @@ def extract_renderings_drafting(doc, ctx=None):
                         v2_ok = False
 
         # Built-in visual/behavioural parameters
-        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, sig, sig_v2,
+        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, non_ctrl_bips, sig, sig_v2,
                             debug_counters=info)
 
         # Shared/project parameters (stub — no-op until GUIDs confirmed)
@@ -2045,6 +2080,7 @@ def extract_renderings_drafting(doc, ctx=None):
             ],
             "unknown_items": _traceability_unknown_items(v),
         }
+        _append_assigned_view_count_cosmetic_item(rec, doc, v, ctx)
 
         rec["sig_basis"] = {
             "hash_alg": "md5_utf8_join_pipe",
@@ -2322,11 +2358,14 @@ def extract_schedules(doc, ctx=None):
             tpl_ids = []
             tpl_bips = set()
 
+        non_ctrl_bips = _non_ctrl_bips_from_view(v)
+        info["debug_non_ctrl_bips_count"] = len(non_ctrl_bips)
+
         # Include flags (stable)
         try:
             sig.append(
                 "include_phase_filter={}".format(
-                    int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
+                    _is_template_param_included(non_ctrl_bips, "VIEW_PHASE_FILTER")
                 )
             )
         except Exception:
@@ -2335,7 +2374,7 @@ def extract_schedules(doc, ctx=None):
         try:
             sig.append(
                 "include_filters={}".format(
-                    int(BuiltInParameter.VIS_GRAPHICS_FILTERS) in tpl_bips
+                    _is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_FILTERS")
                 )
             )
         except Exception:
@@ -2343,17 +2382,8 @@ def extract_schedules(doc, ctx=None):
 
         try:
             sig.append(
-                "include_vg={}".format(
-                    int(BuiltInParameter.VIS_GRAPHICS_OVERRIDES) in tpl_bips
-                )
-            )
-        except Exception:
-            sig.append("include_vg=False")
-
-        try:
-            sig.append(
                 "include_appearance={}".format(
-                    int(BuiltInParameter.VIS_GRAPHICS_APPEARANCE) in tpl_bips
+                    _is_template_param_included(non_ctrl_bips, "VIS_GRAPHICS_APPEARANCE")
                 )
             )
         except Exception:
@@ -2361,50 +2391,25 @@ def extract_schedules(doc, ctx=None):
 
         # Phase Filter (reference global phase_filters domain) - legacy
         try:
-            include_pf = int(BuiltInParameter.VIEW_PHASE_FILTER) in tpl_bips
+            include_pf = _is_template_param_included(non_ctrl_bips, "VIEW_PHASE_FILTER")
         except Exception:
             include_pf = False
 
-        if include_pf:
-            try:
-                p = v.get_Parameter(BuiltInParameter.VIEW_PHASE_FILTER)
-                if p is None:
-                    # Schedule templates often don't expose phase filter meaningfully.
-                    sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                else:
-                    pf_id = p.AsElementId()
-                    # Invalid/None phase filter for schedules should be treated as NOT_APPLICABLE
-                    if not pf_id or canon_id(pf_id) == S_MISSING:
-                        sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-                    else:
-                        pf_elem = doc.GetElement(pf_id)
-                        if pf_elem:
-                            pf_uid = canon_str(getattr(pf_elem, "UniqueId", None)) if pf_elem else None
-                            pf_hash = phase_filter_map.get(pf_uid, S_UNREADABLE) if pf_uid else S_MISSING
-                            sig.append("phase_filter={}".format(canon_str(pf_hash)))
-                            # v2: require upstream v2 hash when phase filter is present
-                            if v2_ok:
-                                pf_hash_v2 = None
-                                try:
-                                    pf_hash_v2 = phase_filter_map_v2.get(pf_uid) if pf_uid else None
-                                except Exception:
-                                    pf_hash_v2 = None
-                                if not pf_hash_v2:
-                                    _v2_block("phase_filter_unresolved")
-                                    v2_ok = False
-                                else:
-                                    sig_v2.append("phase_filter_hash={}".format(canon_str(pf_hash_v2)))
-                        else:
-                            sig.append(f"phase_filter={S_NOT_APPLICABLE}")
-            except Exception:
-                info["debug_fail_read"] += 1
-                sig.append(f"phase_filter={S_UNREADABLE}")
-
-        else:
-            sig.append(f"phase_filter={S_MISSING}")
+        v2_ok = _append_phase_filter_value(
+            v=v,
+            doc=doc,
+            include_pf=include_pf,
+            phase_filter_map=phase_filter_map,
+            phase_filter_map_v2=phase_filter_map_v2,
+            sig=sig,
+            sig_v2=sig_v2,
+            v2_ok=v2_ok,
+            v2_block_fn=_v2_block,
+            debug_counters=info,
+        )
 
         # Built-in visual/behavioural parameters
-        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, sig, sig_v2,
+        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, non_ctrl_bips, sig, sig_v2,
                             debug_counters=info)
 
         # Shared/project parameters (stub — no-op until GUIDs confirmed)
@@ -2481,6 +2486,7 @@ def extract_schedules(doc, ctx=None):
             "coordination_items": [],
             "unknown_items": _traceability_unknown_items(v),
         }
+        _append_assigned_view_count_cosmetic_item(rec, doc, v, ctx)
 
         rec["sig_basis"] = {
             "hash_alg": "md5_utf8_join_pipe",
