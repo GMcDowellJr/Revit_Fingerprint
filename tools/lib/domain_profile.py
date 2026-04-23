@@ -45,6 +45,8 @@ class DomainProfile:
                 pass
             mapping = {}
             for rec in records:
+                if not isinstance(rec, dict):
+                    continue
                 sh = (rec.get("sig_hash") or "").strip()
                 if not sh:
                     continue
@@ -134,7 +136,12 @@ class DomainProfile:
             ):
                 items = phase2.get(bucket_key) or []
                 for item in items:
-                    if item.get("k") == key:
+                    item_key = ""
+                    if isinstance(item, dict):
+                        item_key = item.get("k")
+                    else:
+                        item_key = item
+                    if item_key == key:
                         return bucket_name
         return "other"
 
