@@ -80,7 +80,7 @@ BUCKET_SORT_ORDER = {
     "cosmetic": 1,
     "coordination": 2,
     "unknown": 3,
-    "unclassified": 4,
+    "other": 4,
 }
 
 
@@ -173,6 +173,8 @@ def get_items(record):
         key = ensure_str(item.get("k"))
         if not key:
             continue
+        if key == "view_template.def_hash":
+            continue
         cleaned.append(
             {
                 "k": key,
@@ -183,31 +185,73 @@ def get_items(record):
     return cleaned
 
 
+def extract_key_set(raw_items):
+    key_set = set()
+    if not isinstance(raw_items, list):
+        return key_set
+
+    for raw_item in raw_items:
+        key = ""
+        if isinstance(raw_item, dict):
+            key = ensure_str(raw_item.get("k"))
+        else:
+            key = ensure_str(raw_item)
+        if key:
+            key_set.add(key)
+    return key_set
+
+
 def build_bucket_lookup(record):
     phase2 = record.get("phase2")
-    if not isinstance(phase2, dict):
+    phase2 = phase2 if isinstance(phase2, dict) else {}
+    sig_basis = record.get("sig_basis")
+    sig_basis = sig_basis if isinstance(sig_basis, dict) else {}
+
+    return {
+        "semantic": extract_key_set(sig_basis.get("keys_used")),
+        "coordination": extract_key_set(phase2.get("coordination_items")),
+        "unknown": extract_key_set(phase2.get("unknown_items")),
+        "cosmetic": extract_key_set(phase2.get("cosmetic_items")),
+    }
+
+
+def get_resolution_name(record, domain):
+    label = record.get("label")
+    if not isinstance(label, dict):
+        return ""
+
+    if domain == "view_filter_definitions":
+        components = label.get("components")
+        if isinstance(components, dict):
+            comp_name = ensure_str(components.get("name")).strip()
+            if comp_name:
+                return comp_name
+
+    return ensure_str(label.get("display")).strip()
+
+
+def build_hash_resolution_map(raw, domain, file_key):
+    payload = get_domain_payload(raw, domain)
+    if not isinstance(payload, dict):
+        print("  WARNING: domain '{}' not found in {} — hash resolution unavailable".format(domain, file_key))
         return {}
 
-    mapping = {
-        "semantic_items": "semantic",
-        "cosmetic_items": "cosmetic",
-        "coordination_items": "coordination",
-        "unknown_items": "unknown",
-    }
-    lookup = {}
-    for src_key, bucket in mapping.items():
-        bucket_items = phase2.get(src_key)
-        if not isinstance(bucket_items, list):
+    records = payload.get("records")
+    if not isinstance(records, list):
+        print("  WARNING: domain '{}' not found in {} — hash resolution unavailable".format(domain, file_key))
+        return {}
+
+    mapping = {}
+    for record in records:
+        if not isinstance(record, dict):
             continue
-        for raw_item in bucket_items:
-            key = ""
-            if isinstance(raw_item, dict):
-                key = ensure_str(raw_item.get("k"))
-            else:
-                key = ensure_str(raw_item)
-            if key:
-                lookup[key] = bucket
-    return lookup
+        sig_hash = ensure_str(record.get("sig_hash"))
+        if not sig_hash:
+            continue
+        resolved = get_resolution_name(record, domain)
+        if resolved:
+            mapping[sig_hash] = resolved
+    return mapping
 
 
 def build_index(records):
@@ -265,10 +309,48 @@ def index_items_by_key(items):
 
 
 def pick_bucket(item_key, a_lookup, b_lookup):
-    return a_lookup.get(item_key) or b_lookup.get(item_key) or "unclassified"
+    semantic = set()
+    semantic.update(a_lookup.get("semantic", set()))
+    semantic.update(b_lookup.get("semantic", set()))
+    if item_key in semantic:
+        return "semantic"
+
+    coordination = set()
+    coordination.update(a_lookup.get("coordination", set()))
+    coordination.update(b_lookup.get("coordination", set()))
+    if item_key in coordination:
+        return "coordination"
+
+    unknown = set()
+    unknown.update(a_lookup.get("unknown", set()))
+    unknown.update(b_lookup.get("unknown", set()))
+    if item_key in unknown:
+        return "unknown"
+
+    cosmetic = set()
+    cosmetic.update(a_lookup.get("cosmetic", set()))
+    cosmetic.update(b_lookup.get("cosmetic", set()))
+    if item_key in cosmetic:
+        return "cosmetic"
+
+    return "other"
 
 
-def compare_entries(entry_a, entry_b, include_same):
+def resolve_hash(value, key, map_a, map_b):
+    if value in ("", None):
+        return value, value
+
+    resolved_a = map_a.get(value)
+    resolved_b = map_b.get(value)
+
+    if not resolved_a:
+        resolved_a = "{} (unresolved)".format(value)
+    if not resolved_b:
+        resolved_b = "{} (unresolved)".format(value)
+    return resolved_a, resolved_b
+
+
+def compare_entries(entry_a, entry_b, include_same, phase_filter_map_a, phase_filter_map_b, vf_def_map_a, vf_def_map_b):
     items_a = index_items_by_key(entry_a["items"])
     items_b = index_items_by_key(entry_b["items"])
     all_keys = sorted(set(items_a.keys()) | set(items_b.keys()))
@@ -309,14 +391,23 @@ def compare_entries(entry_a, entry_b, include_same):
             stats["semantic_diffs"] += 1
 
         output_diff = partition_prefix + diff
+        value_a = a_item["v"] if a_item else ""
+        value_b = b_item["v"] if b_item else ""
+        if key == "view_template.sig.phase_filter":
+            value_a, _ = resolve_hash(value_a, key, phase_filter_map_a, phase_filter_map_b)
+            _, value_b = resolve_hash(value_b, key, phase_filter_map_a, phase_filter_map_b)
+        elif key.startswith("view_template.sig.filter[") and key.endswith(".def_sig"):
+            value_a, _ = resolve_hash(value_a, key, vf_def_map_a, vf_def_map_b)
+            _, value_b = resolve_hash(value_b, key, vf_def_map_a, vf_def_map_b)
+
         if include_same or diff != "same":
             details.append(
                 {
                     "item_key": key,
                     "bucket": bucket,
                     "diff_status": output_diff,
-                    "value_a": a_item["v"] if a_item else "",
-                    "value_b": b_item["v"] if b_item else "",
+                    "value_a": value_a,
+                    "value_b": value_b,
                     "q_a": a_item["q"] if a_item else "",
                     "q_b": b_item["q"] if b_item else "",
                 }
@@ -367,6 +458,11 @@ def main():
     raw_a = load_json(file_a)
     raw_b = load_json(file_b)
 
+    phase_filter_map_a = build_hash_resolution_map(raw_a, "phase_filters", "file_a")
+    phase_filter_map_b = build_hash_resolution_map(raw_b, "phase_filters", "file_b")
+    vf_def_map_a = build_hash_resolution_map(raw_a, "view_filter_definitions", "file_a")
+    vf_def_map_b = build_hash_resolution_map(raw_b, "view_filter_definitions", "file_b")
+
     records_a, included_a, skipped_a = extract_records(raw_a, "file_a")
     records_b, included_b, skipped_b = extract_records(raw_b, "file_b")
 
@@ -406,7 +502,15 @@ def main():
     total_item_diffs = 0
 
     for _, _, entry_a, entry_b in matched_pairs:
-        stats, details = compare_entries(entry_a, entry_b, args.include_same)
+        stats, details = compare_entries(
+            entry_a,
+            entry_b,
+            args.include_same,
+            phase_filter_map_a,
+            phase_filter_map_b,
+            vf_def_map_a,
+            vf_def_map_b,
+        )
         is_partition_mismatch = entry_a["domain"] != entry_b["domain"]
         if is_partition_mismatch:
             match_status = "partition_mismatch"
@@ -599,6 +703,12 @@ def main():
         "domains_included": VIEW_TEMPLATE_DOMAINS,
         "domains_skipped": sorted(set(skipped_a) | set(skipped_b)),
         "domains_deferred": DEFERRED_DOMAINS,
+        "hash_resolution": {
+            "phase_filter_map_a_size": len(phase_filter_map_a),
+            "phase_filter_map_b_size": len(phase_filter_map_b),
+            "vf_def_map_a_size": len(vf_def_map_a),
+            "vf_def_map_b_size": len(vf_def_map_b),
+        },
         "summary": {
             "matched": matched_count,
             "only_in_a": len(only_a),
