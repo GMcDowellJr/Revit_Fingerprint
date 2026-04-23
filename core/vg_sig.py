@@ -30,6 +30,239 @@ from core.phase2 import (
     phase2_qv_from_legacy_sentinel_str,
 )
 
+try:
+    from Autodesk.Revit.DB import BuiltInParameter
+except Exception:
+    BuiltInParameter = None
+
+
+_BUILTIN_PARAM_SPECS = [
+    {
+        "key": "detail_level",
+        "include_bip": "VIEW_DETAIL_LEVEL",
+        "value_bip": "VIEW_DETAIL_LEVEL",
+        "storage": "int",
+        "partitions": None,
+    },
+    {
+        "key": "discipline",
+        "include_bip": "VIEW_DISCIPLINE",
+        "value_bip": "VIEW_DISCIPLINE",
+        "storage": "int",
+        "partitions": None,
+    },
+    {
+        "key": "display_model",
+        "include_bip": "VIEW_DISPLAY_MODEL",
+        "value_bip": "VIEW_DISPLAY_MODEL",
+        "storage": "int",
+        "partitions": None,
+    },
+    {
+        "key": "parts_visibility",
+        "include_bip": "VIEW_PARTS_VISIBILITY",
+        "value_bip": "VIEW_PARTS_VISIBILITY",
+        "storage": "int",
+        "partitions": None,
+    },
+    {
+        "key": "show_hidden_lines",
+        "include_bip": "VIS_SHOW_HIDDEN_LINES",
+        "value_bip": "VIS_SHOW_HIDDEN_LINES",
+        "storage": "int",
+        "partitions": None,
+    },
+    {
+        "key": "visual_style",
+        "include_bip": "VIEW_VISUAL_STYLE",
+        "value_bip": "VIEW_VISUAL_STYLE",
+        "storage": "int",
+        "partitions": None,
+    },
+    {
+        "key": "view_scale",
+        "include_bip": "VIEW_SCALE_PULLDOWN_METRIC",
+        "value_bip": "VIEW_SCALE",
+        "storage": "int",
+        "partitions": None,
+        "include_bip_alternates": ["VIEW_SCALE_PULLDOWN_IMPERIAL"],
+        "include_bip_fallback": "VIEW_SCALE",
+        "debug_note": "include_bip_uncertain",
+    },
+    {
+        "key": "orientation",
+        "include_bip": "VIEW_ORIENTATION",
+        "value_bip": "VIEW_ORIENTATION",
+        "storage": "int",
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+        ],
+    },
+    {
+        "key": "underlay_orientation",
+        "include_bip": "VIEW_UNDERLAY_ORIENTATION",
+        "value_bip": "VIEW_UNDERLAY_ORIENTATION",
+        "storage": "int",
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+        ],
+    },
+    {
+        "key": "depth_clipping",
+        "include_bip": "VIEWER_BOUND_FAR_CLIPPING",
+        "value_bip": "VIEWER_BOUND_FAR_CLIPPING",
+        "storage": "int",
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+        ],
+    },
+    {
+        "key": "far_clip_offset",
+        "include_bip": "VIEWER_BOUND_OFFSET_FAR",
+        "value_bip": "VIEWER_BOUND_OFFSET_FAR",
+        "storage": "double",
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+            "view_templates_elevations_sections_detail",
+        ],
+    },
+    {
+        "key": "color_scheme_location",
+        "include_bip": "VIEW_COLOR_SCHEME_LOCATION",
+        "value_bip": "VIEW_COLOR_SCHEME_LOCATION",
+        "storage": "int",
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+        ],
+    },
+    {
+        "key": "sun_path",
+        "include_bip": "VIEW_SUNPATH_DISPLAYED",
+        "value_bip": "VIEW_SUNPATH_DISPLAYED",
+        "storage": "int",
+        "partitions": [
+            "view_templates_floor_structural_area_plans",
+            "view_templates_ceiling_plans",
+            "view_templates_elevations_sections_detail",
+        ],
+    },
+]
+
+
+def _read_bip_int(v, bip_enum_name, tpl_bips, debug_counters=None, storage="int"):
+    """Read a BuiltInParameter integer value from a view template element.
+
+    Returns (include_flag: bool, value_str: str, readable: bool).
+    """
+    if BuiltInParameter is None:
+        return (False, "<UNREADABLE>", False)
+
+    try:
+        bip_int = int(getattr(BuiltInParameter, bip_enum_name))
+    except Exception:
+        return (False, "<UNREADABLE>", False)
+
+    include_flag = bip_int in (tpl_bips or set())
+
+    try:
+        p = v.get_Parameter(getattr(BuiltInParameter, bip_enum_name))
+        if p is None:
+            return (include_flag, "<UNREADABLE>", False)
+
+        if storage == "double":
+            try:
+                val = p.AsDouble()
+                return (include_flag, safe_str(val), True)
+            except Exception:
+                pass
+        else:
+            try:
+                val = p.AsInteger()
+                return (include_flag, safe_str(val), True)
+            except Exception:
+                pass
+
+        try:
+            eid = p.AsElementId()
+            return (include_flag, safe_str(getattr(eid, "IntegerValue", None)), True)
+        except Exception:
+            return (include_flag, "<UNREADABLE>", False)
+    except Exception:
+        return (include_flag, "<UNREADABLE>", False)
+
+
+def emit_builtin_params(v, domain_name, tpl_bips, sig, sig_v2, debug_counters=None):
+    """Emit include-flag + value items for built-in params for a domain."""
+    for spec in _BUILTIN_PARAM_SPECS:
+        key = spec.get("key")
+        if not key:
+            continue
+
+        partitions = spec.get("partitions")
+        if partitions is not None and domain_name not in partitions:
+            continue
+
+        include_flag = False
+        include_names = [spec.get("include_bip")]
+        include_names.extend(spec.get("include_bip_alternates") or [])
+        include_bip_ints = []
+
+        if BuiltInParameter is None:
+            include_bip_ints = []
+        else:
+            for include_name in include_names:
+                if not include_name:
+                    continue
+                try:
+                    include_bip_ints.append(int(getattr(BuiltInParameter, include_name)))
+                except Exception:
+                    continue
+            if not include_bip_ints:
+                fallback = spec.get("include_bip_fallback")
+                if fallback:
+                    try:
+                        include_bip_ints.append(int(getattr(BuiltInParameter, fallback)))
+                    except Exception:
+                        pass
+
+        if not include_bip_ints:
+            include_flag = False
+            if debug_counters is not None:
+                k = "debug_bip_unresolved_{}".format(key)
+                debug_counters[k] = debug_counters.get(k, 0) + 1
+        else:
+            include_flag = any(bip_int in (tpl_bips or set()) for bip_int in include_bip_ints)
+
+        _, value_str, _ = _read_bip_int(
+            v,
+            spec.get("value_bip"),
+            tpl_bips,
+            debug_counters=debug_counters,
+            storage=spec.get("storage", "int"),
+        )
+
+        include_entry = "include_{}={}".format(key, include_flag)
+        value_entry = "{}={}".format(key, value_str)
+
+        sig.append(include_entry)
+        sig.append(value_entry)
+        sig_v2.append(include_entry)
+        sig_v2.append(value_entry)
+
+
+def emit_shared_params_stub(v, domain_name, tpl_param_ids, sig, sig_v2, debug_counters=None):
+    """Stub for shared/project parameter extraction.
+
+    tpl_param_ids: full list of ParameterId objects from
+                   v.GetTemplateParameterIds() (not filtered to BIPs only).
+    """
+    pass
+
 
 def _phase2_items_from_def_signature(def_signature):
     """Convert legacy def_signature entries ('k=v') into IdentityItems safely.

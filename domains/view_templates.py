@@ -32,7 +32,7 @@ from core.phase2 import phase2_sorted_items, phase2_qv_from_legacy_sentinel_str,
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 from core.graphic_overrides import extract_projection_graphics, extract_cut_graphics, extract_halftone, extract_transparency
-from core.vg_sig import _traceability_unknown_items
+from core.vg_sig import _traceability_unknown_items, emit_builtin_params, emit_shared_params_stub
 
 try:
     from Autodesk.Revit.DB import View, ViewSchedule, BuiltInParameter
@@ -297,6 +297,7 @@ def extract_floor_structural_area_plans(doc, ctx=None):
                 if hasattr(pid, "IntegerValue") and pid.IntegerValue < 0
             )
         except Exception:
+            tpl_ids = []
             tpl_bips = set()
 
         # Common include flags
@@ -443,6 +444,14 @@ def extract_floor_structural_area_plans(doc, ctx=None):
                     if v2_ok:
                         _v2_block("filter_overrides_unreadable")
                         v2_ok = False
+
+        # Built-in visual/behavioural parameters
+        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, sig, sig_v2,
+                            debug_counters=info)
+
+        # Shared/project parameters (stub — no-op until GUIDs confirmed)
+        emit_shared_params_stub(v, DOMAIN_NAME, tpl_ids, sig, sig_v2,
+                                debug_counters=info)
 
         # Finalize signature (deterministic)
         sig_final = sorted(sig)
@@ -768,6 +777,7 @@ def extract_ceiling_plans(doc, ctx=None):
                 if hasattr(pid, "IntegerValue") and pid.IntegerValue < 0
             )
         except Exception:
+            tpl_ids = []
             tpl_bips = set()
 
         # Common include flags
@@ -914,6 +924,14 @@ def extract_ceiling_plans(doc, ctx=None):
                     if v2_ok:
                         _v2_block("filter_overrides_unreadable")
                         v2_ok = False
+
+        # Built-in visual/behavioural parameters
+        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, sig, sig_v2,
+                            debug_counters=info)
+
+        # Shared/project parameters (stub — no-op until GUIDs confirmed)
+        emit_shared_params_stub(v, DOMAIN_NAME, tpl_ids, sig, sig_v2,
+                                debug_counters=info)
 
         # Finalize signature (deterministic)
         sig_final = sorted(sig)
@@ -1272,6 +1290,7 @@ def extract_elevations_sections_detail(doc, ctx=None):
                 if hasattr(pid, "IntegerValue") and pid.IntegerValue < 0
             )
         except Exception:
+            tpl_ids = []
             tpl_bips = set()
 
         # Common include flags
@@ -1418,6 +1437,14 @@ def extract_elevations_sections_detail(doc, ctx=None):
                     if v2_ok:
                         _v2_block("filter_overrides_unreadable")
                         v2_ok = False
+
+        # Built-in visual/behavioural parameters
+        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, sig, sig_v2,
+                            debug_counters=info)
+
+        # Shared/project parameters (stub — no-op until GUIDs confirmed)
+        emit_shared_params_stub(v, DOMAIN_NAME, tpl_ids, sig, sig_v2,
+                                debug_counters=info)
 
         # Finalize signature (deterministic)
         sig_final = sorted(sig)
@@ -1759,6 +1786,7 @@ def extract_renderings_drafting(doc, ctx=None):
                 if hasattr(pid, "IntegerValue") and pid.IntegerValue < 0
             )
         except Exception:
+            tpl_ids = []
             tpl_bips = set()
 
         # Common include flags
@@ -1899,6 +1927,14 @@ def extract_renderings_drafting(doc, ctx=None):
                     if v2_ok:
                         _v2_block("filter_overrides_unreadable")
                         v2_ok = False
+
+        # Built-in visual/behavioural parameters
+        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, sig, sig_v2,
+                            debug_counters=info)
+
+        # Shared/project parameters (stub — no-op until GUIDs confirmed)
+        emit_shared_params_stub(v, DOMAIN_NAME, tpl_ids, sig, sig_v2,
+                                debug_counters=info)
 
         # Finalize signature (deterministic)
         sig_final = sorted(sig)
@@ -2244,6 +2280,7 @@ def extract_schedules(doc, ctx=None):
                 if hasattr(pid, "IntegerValue") and pid.IntegerValue < 0
             )
         except Exception:
+            tpl_ids = []
             tpl_bips = set()
 
         # Include flags (stable)
@@ -2326,6 +2363,14 @@ def extract_schedules(doc, ctx=None):
 
         else:
             sig.append(f"phase_filter={S_MISSING}")
+
+        # Built-in visual/behavioural parameters
+        emit_builtin_params(v, DOMAIN_NAME, tpl_bips, sig, sig_v2,
+                            debug_counters=info)
+
+        # Shared/project parameters (stub — no-op until GUIDs confirmed)
+        emit_shared_params_stub(v, DOMAIN_NAME, tpl_ids, sig, sig_v2,
+                                debug_counters=info)
 
         # NOTE: Schedule filter stack + VG signatures are not consistently supported across versions.
         # We keep schedule signature minimal and stable.
