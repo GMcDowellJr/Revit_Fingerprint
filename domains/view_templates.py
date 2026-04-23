@@ -442,6 +442,7 @@ def extract_floor_structural_area_plans(doc, ctx=None):
             tpl_bips = set()
 
         non_ctrl_bips = _non_ctrl_bips_from_view(v)
+        info["debug_non_ctrl_bips_count"] = len(non_ctrl_bips)
 
         # Common include flags
         try:
@@ -906,6 +907,7 @@ def extract_ceiling_plans(doc, ctx=None):
             tpl_bips = set()
 
         non_ctrl_bips = _non_ctrl_bips_from_view(v)
+        info["debug_non_ctrl_bips_count"] = len(non_ctrl_bips)
 
         # Common include flags
         try:
@@ -1403,6 +1405,7 @@ def extract_elevations_sections_detail(doc, ctx=None):
             tpl_bips = set()
 
         non_ctrl_bips = _non_ctrl_bips_from_view(v)
+        info["debug_non_ctrl_bips_count"] = len(non_ctrl_bips)
 
         # Common include flags
         try:
@@ -1876,6 +1879,7 @@ def extract_renderings_drafting(doc, ctx=None):
             tpl_bips = set()
 
         non_ctrl_bips = _non_ctrl_bips_from_view(v)
+        info["debug_non_ctrl_bips_count"] = len(non_ctrl_bips)
 
         # Common include flags
         try:
@@ -2347,6 +2351,7 @@ def extract_schedules(doc, ctx=None):
             tpl_bips = set()
 
         non_ctrl_bips = _non_ctrl_bips_from_view(v)
+        info["debug_non_ctrl_bips_count"] = len(non_ctrl_bips)
 
         # Include flags (stable)
         try:
