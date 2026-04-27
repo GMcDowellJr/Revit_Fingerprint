@@ -140,8 +140,63 @@ def _is_repo_root(p):
     missing_local = [x for x in expected_local if not os.path.exists(x)]
     return (len(missing_local) == 0), missing_local
 
+def _iter_dyn_path_candidates():
+    out = []
+
+    # Explicit overrides from host/invoker
+    for k in (
+        "REVIT_FINGERPRINT_DYN_PATH",
+        "DYNAMO_GRAPH_PATH",
+        "DYNAMO_FILE_PATH",
+    ):
+        try:
+            v = str(os.environ.get(k, "")).strip()
+        except Exception:
+            v = ""
+        if v:
+            out.append(("env:{}".format(k), v))
+
+    # Optional thin-runner input extension: IN[3] = .dyn path or containing folder
+    try:
+        if IN is not None and len(IN) > 3 and IN[3] is not None:
+            v = str(IN[3]).strip()
+            if v:
+                out.append(("in:IN[3]", v))
+    except Exception:
+        pass
+
+    return out
+
+def _nearest_repo_root_from_path(p, max_up=10):
+    try:
+        cur = os.path.abspath(str(p))
+    except Exception:
+        return None
+
+    if os.path.isfile(cur):
+        cur = os.path.dirname(cur)
+
+    steps = 0
+    while steps <= int(max_up):
+        ok, missing = _is_repo_root(cur)
+        if ok:
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+        steps += 1
+    return None
+
 def _candidate_repo_dirs():
     tried = []
+
+    # 0) If a Dynamo graph path is known, discover the nearest repo root upward
+    # from the .dyn file/folder location.
+    for src, p in _iter_dyn_path_candidates():
+        rr = _nearest_repo_root_from_path(p)
+        if rr:
+            tried.append((src + ":nearest_repo_root", rr))
 
     # 1) Optional override: power users can set this once
     try:
