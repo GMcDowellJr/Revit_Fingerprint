@@ -112,6 +112,11 @@ def _layer_function_str(layer):
     except Exception:
         return S_UNREADABLE
 
+def _stack_hash_field(v):
+    if v is None:
+        return ""
+    return safe_str(v)
+
 
 def _read_compound_structure(cs, doc, ctx, family):
     rows = []
@@ -212,8 +217,17 @@ def _read_compound_structure(cs, doc, ctx, family):
             }
         )
 
-        loose_parts.append("{}|{}|{}".format(safe_str(fn_str), safe_str(mat_class or ""), safe_str(width_in or "")))
-        strict_parts.append("{}|{}|{}|{}".format(safe_str(fn_str), safe_str(mat_class or ""), safe_str(width_in or ""), safe_str(mat_name or "")))
+        loose_parts.append("{}|{}|{}".format(
+            _stack_hash_field(fn_str),
+            _stack_hash_field(mat_class),
+            _stack_hash_field(width_in),
+        ))
+        strict_parts.append("{}|{}|{}|{}".format(
+            _stack_hash_field(fn_str),
+            _stack_hash_field(mat_class),
+            _stack_hash_field(width_in),
+            _stack_hash_field(mat_name),
+        ))
         fn_only_parts.append(safe_str(fn_str))
 
         if width_in is not None:
@@ -469,16 +483,20 @@ def extract_wall_types(doc, ctx=None):
         ]
 
         identity_items = sorted((semantic + coordination + cosmetic), key=lambda it: safe_str(it.get("k", "")))
-        sig_hash = make_hash(serialize_identity_items(semantic))
+        required_qs = [it.get("q") for it in semantic]
+        required_not_ok = any(q != ITEM_Q_OK for q in required_qs)
+        status = STATUS_BLOCKED if required_not_ok else STATUS_OK
+        status_reasons = ["required_identity_not_ok"] if required_not_ok else []
+        sig_hash = None if required_not_ok else make_hash(serialize_identity_items(semantic))
 
         rec = build_record_v2(
             domain=_DOMAIN_WALL,
             record_id="wall_type|{}".format(type_name),
-            status=STATUS_OK,
-            status_reasons=[],
+            status=status,
+            status_reasons=status_reasons,
             sig_hash=sig_hash,
             identity_items=identity_items,
-            required_qs=[it.get("q") for it in semantic],
+            required_qs=required_qs,
             label=_label_for_wall_type(type_name),
         )
         rec["sig_basis"] = {
@@ -494,8 +512,14 @@ def extract_wall_types(doc, ctx=None):
         }
         rec["layer_rows"] = cs_data["layer_rows"]
         records.append(rec)
-        sigs.append(sig_hash)
-        info["count"] += 1
+        if sig_hash is not None:
+            sigs.append(sig_hash)
+            info["count"] += 1
+        else:
+            info["debug_v2_blocked"] = True
+            info["debug_v2_block_reasons"]["required_identity_not_ok"] = (
+                info["debug_v2_block_reasons"].get("required_identity_not_ok", 0) + 1
+            )
 
     info["records"] = records
     info["signature_hashes_v2"] = sorted([s for s in sigs if s])

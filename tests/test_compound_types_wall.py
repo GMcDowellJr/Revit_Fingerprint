@@ -34,6 +34,18 @@ class _Layer(object):
         self.IsVariableWidth = variable
 
 
+class _LayerWidthError(_Layer):
+    def __init__(self, fn, width_ft, mat_id, structural=True, variable=False):
+        self.Function = fn
+        self.MaterialId = _Id(mat_id) if isinstance(mat_id, int) else mat_id
+        self.IsStructuralMaterial = structural
+        self.IsVariableWidth = variable
+
+    @property
+    def Width(self):
+        raise RuntimeError("width unreadable")
+
+
 class _CS(object):
     def __init__(self, layers, ext_idx, int_idx, wraps_i="Both", wraps_e="Exterior", sweeps=None):
         self._layers = list(layers)
@@ -62,8 +74,14 @@ class _WallType(object):
     def __init__(self, name, kind, cs, fn="Interior"):
         self.Name = name
         self.Kind = kind
-        self.Function = fn
+        self._fn = fn
         self._cs = cs
+
+    @property
+    def Function(self):
+        if isinstance(self._fn, Exception):
+            raise self._fn
+        return self._fn
 
     def GetCompoundStructure(self):
         return self._cs
@@ -275,3 +293,41 @@ def test_label_has_quality_provenance_and_components(monkeypatch):
     assert label["quality"] == "human"
     assert label["provenance"] == "revit.WallType.Name"
     assert label["components"]["type_name"] == "Named Wall"
+
+
+def test_stack_hash_preserves_zero_vs_unreadable_thickness(monkeypatch):
+    m = _setup_module(monkeypatch)
+    zero_layers = [
+        _Layer("Membrane", 0.0, 101),
+        _Layer("BoundaryMarker", 0.0, -1),
+        _Layer("Finish1", 0.125, 103),
+        _Layer("BoundaryMarker", 0.0, -1),
+    ]
+    err_layers = [
+        _LayerWidthError("Membrane", 0.0, 101),
+        _Layer("BoundaryMarker", 0.0, -1),
+        _Layer("Finish1", 0.125, 103),
+        _Layer("BoundaryMarker", 0.0, -1),
+    ]
+    w1 = _WallType("Zero", 0, _CS(zero_layers, ext_idx=1, int_idx=3))
+    w2 = _WallType("Err", 0, _CS(err_layers, ext_idx=1, int_idx=3))
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [w1, w2])
+    out = m.extract_wall_types(_Doc({101: "m1", 103: "m3"}), _default_ctx(m))
+
+    get = lambda rec, k: [it for it in rec["identity_basis"]["items"] if it["k"] == k][0]["v"]
+    assert get(out["records"][0], "wt.stack_hash_loose") != get(out["records"][1], "wt.stack_hash_loose")
+
+
+def test_required_identity_not_ok_blocks_record(monkeypatch):
+    m = _setup_module(monkeypatch)
+    wall = _basic_wall("BadFn")
+    wall._fn = RuntimeError("cannot read function")
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
+
+    out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
+    rec = out["records"][0]
+
+    assert rec["status"] == "blocked"
+    assert rec["sig_hash"] is None
+    assert "required_identity_not_ok" in rec["status_reasons"]
+    assert out["count"] == 0
