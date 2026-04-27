@@ -183,6 +183,18 @@ def _iter_dyn_path_candidates():
             return
         if not v:
             return
+
+        # This collector is DYN-centric by design:
+        # - accept explicit .dyn files
+        # - accept directories (caller may provide a containing folder)
+        # - reject non-.dyn files (e.g., .rvt) so we do not anchor root discovery
+        #   to a Revit model path.
+        vl = v.lower()
+        if os.path.isfile(v) and (not vl.endswith(".dyn")):
+            return
+        if (not os.path.exists(v)) and (os.path.splitext(vl)[1] not in ("", ".dyn")):
+            return
+
         k = v.lower()
         if k in seen:
             return
@@ -196,7 +208,6 @@ def _iter_dyn_path_candidates():
     except Exception:
         cwd = ""
     if cwd:
-        _add("auto:cwd", cwd)
         try:
             dyns = [x for x in os.listdir(cwd) if str(x).lower().endswith(".dyn")]
             if len(dyns) == 1:
