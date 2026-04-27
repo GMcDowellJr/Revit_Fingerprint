@@ -145,13 +145,62 @@ def _iter_dyn_path_candidates():
     out = []
     seen = set()
 
+    def _normalize_host_path(raw):
+        s = str(raw or "").strip()
+        if not s:
+            return s
+
+        # Trim wrapping quotes often injected by host shells.
+        if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+            s = s[1:-1].strip()
+
+        # file:// URI support
+        if s.lower().startswith("file:///"):
+            s = s[8:].replace("/", os.sep)
+
+        # Windows device paths:
+        #   \\?\C:\path -> C:\path
+        #   \\?\UNC\server\share\path -> \\server\share\path (preserve UNC absoluteness)
+        sl = s.lower()
+        if sl.startswith("\\\\?\\unc\\"):
+            s = "\\\\" + s[8:]
+        elif sl.startswith("\\\\?\\"):
+            s = s[4:]
+
+        return s
+
     def _add(src, value):
+        # Ignore common non-path control values from Dynamo node inputs.
+        if isinstance(value, bool):
+            return
         try:
-            v = os.path.abspath(str(value).strip())
+            raw = _normalize_host_path(value)
+        except Exception:
+            return
+        if not raw:
+            return
+        rlow = raw.strip().lower()
+        if rlow in ("true", "false", "none", "null"):
+            return
+
+        try:
+            v = os.path.abspath(raw)
         except Exception:
             return
         if not v:
             return
+
+        # This collector is DYN-centric by design:
+        # - accept explicit .dyn files
+        # - accept directories (caller may provide a containing folder)
+        # - reject non-.dyn files (e.g., .rvt) so we do not anchor root discovery
+        #   to a Revit model path.
+        vl = v.lower()
+        if os.path.isfile(v) and (not vl.endswith(".dyn")):
+            return
+        if (not os.path.exists(v)) and (os.path.splitext(vl)[1] not in ("", ".dyn")):
+            return
+
         k = v.lower()
         if k in seen:
             return
@@ -165,7 +214,6 @@ def _iter_dyn_path_candidates():
     except Exception:
         cwd = ""
     if cwd:
-        _add("auto:cwd", cwd)
         try:
             dyns = [x for x in os.listdir(cwd) if str(x).lower().endswith(".dyn")]
             if len(dyns) == 1:
@@ -206,13 +254,16 @@ def _iter_dyn_path_candidates():
 
     return out
 
-def _nearest_repo_root_from_path(p, max_up=10):
+def _nearest_repo_root_from_path(p, max_up=64):
     try:
         cur = os.path.abspath(str(p))
     except Exception:
         return None
 
-    if os.path.isfile(cur):
+    # Treat explicit *.dyn values as file paths even if the host has not
+    # materialized them on disk yet (some Dynamo host surfaces provide
+    # unresolved/current-document values).
+    if str(cur).lower().endswith(".dyn") or os.path.isfile(cur):
         cur = os.path.dirname(cur)
 
     steps = 0
@@ -229,10 +280,16 @@ def _nearest_repo_root_from_path(p, max_up=10):
 
 def _candidate_repo_dirs():
     tried = []
+    global _DYN_CANDIDATES
+    _DYN_CANDIDATES = []
 
     # 0) If a Dynamo graph path is known, discover the nearest repo root upward
     # from the .dyn file/folder location.
     for src, p in _iter_dyn_path_candidates():
+        _DYN_CANDIDATES.append({"source": src, "path": p})
+        # Keep the original graph-derived candidate visible in diagnostics even
+        # when it is not itself a repo root.
+        tried.append((src + ":graph_path_candidate", p))
         rr = _nearest_repo_root_from_path(p)
         if rr:
             tried.append((src + ":nearest_repo_root", rr))
@@ -262,6 +319,16 @@ def _candidate_repo_dirs():
     if up:
         tried.append(("userprofile:RevitFingerprint_current", os.path.join(up, "RevitFingerprint", "current")))
 
+    # 5) Network-share friendly convention used by current Dynamo deployments
+    # (user requested explicit fallback root)
+    if up:
+        tried.append(
+            (
+                "userprofile:stantec_general_code",
+                os.path.join(up, "Stantec", "Revit_Fingerprint - General", "Code"),
+            )
+        )
+
     return tried
 
 _selected = None
@@ -290,9 +357,11 @@ if _selected is None:
             "recommended_current": r"%USERPROFILE%\Documents\{ORG}\{APP}\{CH}".format(ORG=ORG_DIR, APP=APP_DIR, CH=CHANNEL_DIR),
             "zip_extract_example": r"%USERPROFILE%\Documents\{ORG}\{APP}\vX.Y.Z".format(ORG=ORG_DIR, APP=APP_DIR),
             "fallback_current_localappdata": r"%LOCALAPPDATA%\{ORG}\{APP}\{CH}".format(ORG=ORG_DIR, APP=APP_DIR, CH=CHANNEL_DIR),
+            "fallback_stantec_general_code": r"%USERPROFILE%\Stantec\Revit_Fingerprint - General\Code",
             "override_env_var": "REVIT_FINGERPRINT_ORG_DIR",
         },
         "tried": _tried,
+        "dyn_candidates": _DYN_CANDIDATES,
         "notes": [
             "Do not run from UNC/network paths (\\\\server\\share\\...).",
             "SharePoint/OneDrive-synced paths are permitted but will emit a warning.",
@@ -302,6 +371,10 @@ if _selected is None:
     }
 else:
     REPO_DIR = _selected["repo_dir"]
+    try:
+        os.environ["REVIT_FINGERPRINT_REPO_ROOT_SELECTED"] = REPO_DIR
+    except Exception:
+        pass
 
     # Ensure this repo wins import resolution
     if REPO_DIR in sys.path:
@@ -357,6 +430,19 @@ else:
                 OUT = json.dumps(_out, indent=2, sort_keys=True)
             except Exception:
                 pass
+        try:
+            _out = OUT if isinstance(OUT, dict) else json.loads(OUT)
+            _out["_thinrunner_repo_resolution"] = {
+                "selected": {
+                    "source": _selected.get("source"),
+                    "repo_dir": REPO_DIR,
+                },
+                "dyn_candidates": _DYN_CANDIDATES,
+                "tried": _tried,
+            }
+            OUT = json.dumps(_out, indent=2, sort_keys=True)
+        except Exception:
+            pass
 
     except Exception as e:
         OUT = {
