@@ -17,7 +17,7 @@ repo_root = os.path.dirname(current_dir)
 if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
-from core.collect import collect_types
+from core.collect import collect_instances
 from core.canon import S_MISSING, S_UNREADABLE
 
 try:
@@ -63,11 +63,11 @@ def extract(doc, ctx=None):
 
     try:
         elems = list(
-            collect_types(
+            collect_instances(
                 doc,
                 of_class=Material,
                 cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="materials:Material:types",
+                cache_key="materials:Material:instances",
             )
         )
     except Exception:

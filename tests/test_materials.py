@@ -29,7 +29,7 @@ def test_ctx_keys_populated(monkeypatch):
     monkeypatch.setattr(m, "Material", object)
     monkeypatch.setattr(
         m,
-        "collect_types",
+        "collect_instances",
         lambda *a, **k: [
             _Elem("uid-1", "Concrete", "Structure"),
             _Elem("uid-2", "Steel", "Metal"),
@@ -49,7 +49,7 @@ def test_unreadable_name_stored_as_sentinel(monkeypatch):
     monkeypatch.setattr(m, "Material", object)
     monkeypatch.setattr(
         m,
-        "collect_types",
+        "collect_instances",
         lambda *a, **k: [_Elem("uid-1", RuntimeError("boom"), "Structure")],
     )
 
@@ -65,7 +65,7 @@ def test_empty_class_stored_as_missing(monkeypatch):
     monkeypatch.setattr(m, "Material", object)
     monkeypatch.setattr(
         m,
-        "collect_types",
+        "collect_instances",
         lambda *a, **k: [_Elem("uid-1", "Concrete", "")],
     )
 
@@ -93,7 +93,7 @@ def test_hash_v2_always_none(monkeypatch):
     monkeypatch.setattr(m, "Material", object)
     monkeypatch.setattr(
         m,
-        "collect_types",
+        "collect_instances",
         lambda *a, **k: [_Elem("uid-1", "Concrete", "Structure")],
     )
 
@@ -107,7 +107,7 @@ def test_records_always_empty(monkeypatch):
     monkeypatch.setattr(m, "Material", object)
     monkeypatch.setattr(
         m,
-        "collect_types",
+        "collect_instances",
         lambda *a, **k: [_Elem("uid-1", "Concrete", "Structure")],
     )
 
