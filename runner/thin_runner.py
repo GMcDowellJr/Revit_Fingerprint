@@ -310,8 +310,12 @@ else:
 
     try:
         # Import triggers execution in this repo (run_dynamo computes OUT at import time)
+        # Force a fresh import from the selected repo each run.
+        # Clearing only runner + runner.run_dynamo avoids stale package paths in
+        # long-lived Dynamo sessions without purging unrelated modules.
+        sys.modules.pop("runner.run_dynamo", None)
+        sys.modules.pop("runner", None)
         exporter = importlib.import_module("runner.run_dynamo")
-        exporter = importlib.reload(exporter)
 
         # Forward the computed OUT from the runner module
         OUT = exporter.OUT
