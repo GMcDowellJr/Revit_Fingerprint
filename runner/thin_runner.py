@@ -143,6 +143,44 @@ def _is_repo_root(p):
 
 def _iter_dyn_path_candidates():
     out = []
+    seen = set()
+
+    def _add(src, value):
+        try:
+            v = os.path.abspath(str(value).strip())
+        except Exception:
+            return
+        if not v:
+            return
+        k = v.lower()
+        if k in seen:
+            return
+        seen.add(k)
+        out.append((src, v))
+
+    # Auto-discovery (best effort): use current process context as "current graph"
+    # starting point when explicit graph path is unavailable.
+    try:
+        cwd = os.getcwd()
+    except Exception:
+        cwd = ""
+    if cwd:
+        _add("auto:cwd", cwd)
+        try:
+            dyns = [x for x in os.listdir(cwd) if str(x).lower().endswith(".dyn")]
+            if len(dyns) == 1:
+                _add("auto:cwd_single_dyn", os.path.join(cwd, dyns[0]))
+        except Exception:
+            pass
+
+    # Some hosts include an opened .dyn path on argv.
+    try:
+        for a in list(sys.argv):
+            s = str(a or "").strip()
+            if s.lower().endswith(".dyn"):
+                _add("auto:argv_dyn", s)
+    except Exception:
+        pass
 
     # Explicit overrides from host/invoker
     for k in (
@@ -155,14 +193,14 @@ def _iter_dyn_path_candidates():
         except Exception:
             v = ""
         if v:
-            out.append(("env:{}".format(k), v))
+            _add("env:{}".format(k), v)
 
     # Optional thin-runner input extension: IN[3] = .dyn path or containing folder
     try:
         if IN is not None and len(IN) > 3 and IN[3] is not None:
             v = str(IN[3]).strip()
             if v:
-                out.append(("in:IN[3]", v))
+                _add("in:IN[3]", v)
     except Exception:
         pass
 
