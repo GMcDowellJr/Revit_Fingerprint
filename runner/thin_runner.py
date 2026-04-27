@@ -145,24 +145,37 @@ def _iter_dyn_path_candidates():
     out = []
     seen = set()
 
+    def _normalize_host_path(raw):
+        s = str(raw or "").strip()
+        if not s:
+            return s
+
+        # Trim wrapping quotes often injected by host shells.
+        if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+            s = s[1:-1].strip()
+
+        # file:// URI support
+        if s.lower().startswith("file:///"):
+            s = s[8:].replace("/", os.sep)
+
+        # Windows device paths:
+        #   \\?\C:\path -> C:\path
+        #   \\?\UNC\server\share\path -> \\server\share\path (preserve UNC absoluteness)
+        sl = s.lower()
+        if sl.startswith("\\\\?\\unc\\"):
+            s = "\\\\" + s[8:]
+        elif sl.startswith("\\\\?\\"):
+            s = s[4:]
+
+        return s
+
     def _add(src, value):
         try:
-            raw = str(value).strip()
+            raw = _normalize_host_path(value)
         except Exception:
             return
         if not raw:
             return
-
-        # Normalize common host-provided path forms:
-        # - quoted strings:  "C:\...\graph.dyn"
-        # - file URIs:       file:///C:/.../graph.dyn
-        # - mixed slashes
-        if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
-            raw = raw[1:-1].strip()
-        if raw.lower().startswith("file:///"):
-            raw = raw[8:]
-            raw = raw.replace("/", os.sep)
-        raw = raw.replace("\\\\?\\", "")
 
         try:
             v = os.path.abspath(raw)
@@ -396,6 +409,18 @@ else:
                 OUT = json.dumps(_out, indent=2, sort_keys=True)
             except Exception:
                 pass
+        try:
+            _out = OUT if isinstance(OUT, dict) else json.loads(OUT)
+            _out["_thinrunner_repo_resolution"] = {
+                "selected": {
+                    "source": _selected.get("source"),
+                    "repo_dir": REPO_DIR,
+                },
+                "tried": _tried,
+            }
+            OUT = json.dumps(_out, indent=2, sort_keys=True)
+        except Exception:
+            pass
 
     except Exception as e:
         OUT = {
