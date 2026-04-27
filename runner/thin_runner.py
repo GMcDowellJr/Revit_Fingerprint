@@ -230,6 +230,24 @@ def _iter_dyn_path_candidates():
     except Exception:
         pass
 
+    # Dynamo-hosted discovery: prefer current workspace path exposed by
+    # DynamoServices execution events when available.
+    # This is typically the most accurate source for the currently running
+    # graph path in Revit-hosted Dynamo and Dynamo Player.
+    try:
+        import clr  # type: ignore
+        clr.AddReference("DynamoServices")
+        from Dynamo.Events import ExecutionEvents  # type: ignore
+
+        _sess = getattr(ExecutionEvents, "ActiveSession", None)
+        if _sess is not None:
+            _add(
+                "auto:dynamo_executionevents_currentworkspace",
+                getattr(_sess, "CurrentWorkspacePath", None),
+            )
+    except Exception:
+        pass
+
     # Explicit overrides from host/invoker
     for k in (
         "REVIT_FINGERPRINT_DYN_PATH",
