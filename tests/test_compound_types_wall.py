@@ -116,7 +116,7 @@ def _basic_wall(name="Wall A"):
         _Layer("Finish1", 0.125, 103),
     ]
     cs = _CS(layers=layers, ext_idx=1, int_idx=3, sweeps=["sweep1"])
-    return _WallType(name=name, kind="Basic", cs=cs)
+    return _WallType(name=name, kind=0, cs=cs)
 
 
 def test_basic_wall_produces_record(monkeypatch):
@@ -136,7 +136,7 @@ def test_basic_wall_produces_record(monkeypatch):
 
 def test_non_basic_wall_produces_blocked_record(monkeypatch):
     m = _setup_module(monkeypatch)
-    wall = _WallType(name="Stacked", kind="Stacked", cs=None)
+    wall = _WallType(name="Stacked", kind=1, cs=None)
     monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
 
     out = m.extract_wall_types(_Doc(), _default_ctx(m))
@@ -209,7 +209,7 @@ def test_stack_hash_order_sensitive(monkeypatch):
     m = _setup_module(monkeypatch)
     w1 = _basic_wall("A")
     rev_layers = list(reversed(_basic_wall("B")._cs.GetLayers()))
-    w2 = _WallType("B", "Basic", _CS(rev_layers, ext_idx=1, int_idx=3, sweeps=[]))
+    w2 = _WallType("B", 0, _CS(rev_layers, ext_idx=1, int_idx=3, sweeps=[]))
     monkeypatch.setattr(m, "collect_types", lambda *a, **k: [w1, w2])
 
     out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))

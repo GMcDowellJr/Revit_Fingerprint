@@ -58,7 +58,14 @@ except ImportError:
     ShellLayerType = None
 
 _DOMAIN_WALL = "wall_types"
-_KIND_BASIC = "Basic"
+_WALL_KIND_BASIC = 0
+_WALL_KIND_STACKED = 1
+_WALL_KIND_CURTAIN = 2
+_WALL_KIND_NAMES = {
+    _WALL_KIND_BASIC: "Basic",
+    _WALL_KIND_STACKED: "Stacked",
+    _WALL_KIND_CURTAIN: "Curtain",
+}
 _CORE_BOUNDARY_SENTINEL = "CORE_BOUNDARY"
 _LAYER_RECORD_ID_PREFIX = "wall_type_layer"
 
@@ -240,11 +247,23 @@ def _read_compound_structure(cs, doc, ctx, family):
 
 
 def _read_type_name(wall_type):
+    # Try .Name property first (works in some runtimes)
     try:
-        n = getattr(wall_type, "Name", None)
+        n = wall_type.Name
+        if n:
+            return safe_str(n)
     except Exception:
-        n = None
-    return safe_str(n) if n is not None else ""
+        pass
+    # Fall back to BIP SYMBOL_NAME_PARAM
+    try:
+        p = wall_type.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM)
+        if p is not None:
+            n = p.AsString()
+            if n:
+                return safe_str(n)
+    except Exception:
+        pass
+    return ""
 
 
 def _blocked_stub_result():
@@ -320,17 +339,20 @@ def extract_wall_types(doc, ctx=None):
         type_name = _read_type_name(wt)
 
         try:
-            kind_str = safe_str(getattr(wt, "Kind", None))
+            kind_int = int(getattr(wt, "Kind", -1))
         except Exception:
-            kind_str = S_UNREADABLE
+            kind_int = -1
+        kind_str = _WALL_KIND_NAMES.get(kind_int, safe_str(getattr(wt, "Kind", S_UNREADABLE)))
+        is_basic = (kind_int == _WALL_KIND_BASIC)
+
         if debug_kind_printed < 5:
             try:
-                print("[compound_types.wall_types] kind_str[{}]={}".format(debug_kind_printed, kind_str))
+                print("[compound_types.wall_types] kind[{}]: int={} str={}".format(debug_kind_printed, kind_int, kind_str))
             except Exception:
                 pass
             debug_kind_printed += 1
 
-        if kind_str != _KIND_BASIC:
+        if not is_basic:
             rec = build_record_v2(
                 domain=_DOMAIN_WALL,
                 record_id="wall_type|{}".format(type_name),
