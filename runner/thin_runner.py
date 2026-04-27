@@ -144,6 +144,7 @@ def _is_repo_root(p):
 def _iter_dyn_path_candidates():
     out = []
     seen = set()
+    probe_notes = []
 
     def _normalize_host_path(raw):
         s = str(raw or "").strip()
@@ -207,6 +208,61 @@ def _iter_dyn_path_candidates():
         seen.add(k)
         out.append((src, v))
 
+    def _probe_dynamo_workspace_path():
+        """
+        Best-effort probe for currently running Dynamo workspace path.
+        Returns a list of (source, value) tuples; value may be empty.
+        """
+        found = []
+
+        # Preferred API path.
+        try:
+            import clr  # type: ignore
+            for _asm in ("DynamoServices", "DynamoCore"):
+                try:
+                    clr.AddReference(_asm)
+                except Exception:
+                    pass
+
+            try:
+                from Dynamo.Events import ExecutionEvents  # type: ignore
+
+                _sess = getattr(ExecutionEvents, "ActiveSession", None)
+                _p = getattr(_sess, "CurrentWorkspacePath", None) if _sess is not None else None
+                found.append(("auto:dynamo_executionevents_currentworkspace", _p))
+            except Exception as _e:
+                probe_notes.append("ExecutionEvents import probe failed: {}".format(_e))
+        except Exception as _e:
+            probe_notes.append("clr/DynamoServices probe unavailable: {}".format(_e))
+
+        # Reflection fallback for environments where namespace import differs.
+        try:
+            import System  # type: ignore
+            _ad = System.AppDomain.CurrentDomain
+            _assemblies = list(_ad.GetAssemblies())
+            _etype = None
+            for _a in _assemblies:
+                try:
+                    _t = _a.GetType("Dynamo.Events.ExecutionEvents")
+                except Exception:
+                    _t = None
+                if _t is not None:
+                    _etype = _t
+                    break
+            if _etype is not None:
+                _flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static
+                _active_prop = _etype.GetProperty("ActiveSession", _flags)
+                _sess = _active_prop.GetValue(None, None) if _active_prop is not None else None
+                _p = None
+                if _sess is not None:
+                    _spath = _sess.GetType().GetProperty("CurrentWorkspacePath")
+                    _p = _spath.GetValue(_sess, None) if _spath is not None else None
+                found.append(("auto:dynamo_executionevents_reflection", _p))
+        except Exception as _e:
+            probe_notes.append("ExecutionEvents reflection probe failed: {}".format(_e))
+
+        return found
+
     # Auto-discovery (best effort): use current process context as "current graph"
     # starting point when explicit graph path is unavailable.
     try:
@@ -230,23 +286,8 @@ def _iter_dyn_path_candidates():
     except Exception:
         pass
 
-    # Dynamo-hosted discovery: prefer current workspace path exposed by
-    # DynamoServices execution events when available.
-    # This is typically the most accurate source for the currently running
-    # graph path in Revit-hosted Dynamo and Dynamo Player.
-    try:
-        import clr  # type: ignore
-        clr.AddReference("DynamoServices")
-        from Dynamo.Events import ExecutionEvents  # type: ignore
-
-        _sess = getattr(ExecutionEvents, "ActiveSession", None)
-        if _sess is not None:
-            _add(
-                "auto:dynamo_executionevents_currentworkspace",
-                getattr(_sess, "CurrentWorkspacePath", None),
-            )
-    except Exception:
-        pass
+    for src, v in _probe_dynamo_workspace_path():
+        _add(src, v)
 
     # Explicit overrides from host/invoker
     for k in (
@@ -270,6 +311,8 @@ def _iter_dyn_path_candidates():
     except Exception:
         pass
 
+    global _DYN_PROBE_NOTES
+    _DYN_PROBE_NOTES = probe_notes
     return out
 
 def _nearest_repo_root_from_path(p, max_up=64):
@@ -298,8 +341,9 @@ def _nearest_repo_root_from_path(p, max_up=64):
 
 def _candidate_repo_dirs():
     tried = []
-    global _DYN_CANDIDATES
+    global _DYN_CANDIDATES, _DYN_PROBE_NOTES
     _DYN_CANDIDATES = []
+    _DYN_PROBE_NOTES = []
 
     # 0) If a Dynamo graph path is known, discover the nearest repo root upward
     # from the .dyn file/folder location.
@@ -380,6 +424,7 @@ if _selected is None:
         },
         "tried": _tried,
         "dyn_candidates": _DYN_CANDIDATES,
+        "dyn_probe_notes": _DYN_PROBE_NOTES,
         "notes": [
             "Do not run from UNC/network paths (\\\\server\\share\\...).",
             "SharePoint/OneDrive-synced paths are permitted but will emit a warning.",
@@ -456,6 +501,7 @@ else:
                     "repo_dir": REPO_DIR,
                 },
                 "dyn_candidates": _DYN_CANDIDATES,
+                "dyn_probe_notes": _DYN_PROBE_NOTES,
                 "tried": _tried,
             }
             OUT = json.dumps(_out, indent=2, sort_keys=True)
