@@ -310,12 +310,31 @@ else:
 
     try:
         # Import triggers execution in this repo (run_dynamo computes OUT at import time)
-        # Force a fresh import from the selected repo each run.
-        # Clearing only runner + runner.run_dynamo avoids stale package paths in
-        # long-lived Dynamo sessions without purging unrelated modules.
-        sys.modules.pop("runner.run_dynamo", None)
-        sys.modules.pop("runner", None)
-        exporter = importlib.import_module("runner.run_dynamo")
+        # Execute exactly once per invocation:
+        # - first run: import
+        # - subsequent runs: reload existing module
+        # If an existing module is bound to a different repo root, drop it and import fresh.
+        _existing = sys.modules.get("runner.run_dynamo", None)
+        if _existing is not None:
+            try:
+                _f = os.path.abspath(str(getattr(_existing, "__file__", "") or ""))
+            except Exception:
+                _f = ""
+            if not _f.startswith(os.path.abspath(REPO_DIR) + os.sep):
+                sys.modules.pop("runner.run_dynamo", None)
+                sys.modules.pop("runner", None)
+                _existing = None
+
+        if _existing is None:
+            exporter = importlib.import_module("runner.run_dynamo")
+        else:
+            try:
+                exporter = importlib.reload(_existing)
+            except ModuleNotFoundError:
+                # Some embedded hosts lose module spec metadata; fall back to fresh import.
+                sys.modules.pop("runner.run_dynamo", None)
+                sys.modules.pop("runner", None)
+                exporter = importlib.import_module("runner.run_dynamo")
 
         # Forward the computed OUT from the runner module
         OUT = exporter.OUT
