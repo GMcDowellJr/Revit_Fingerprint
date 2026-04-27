@@ -245,3 +245,33 @@ def test_layer_rows_attached_to_record(monkeypatch):
 
     assert "layer_rows" in rec
     assert len(rec["layer_rows"]) == 5
+
+
+def test_identity_items_sorted_and_sig_basis_declared(monkeypatch):
+    m = _setup_module(monkeypatch)
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [_basic_wall()])
+    rec = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))["records"][0]
+
+    keys = [it["k"] for it in rec["identity_basis"]["items"]]
+    assert keys == sorted(keys)
+    assert rec["sig_basis"]["schema"] == "wall_types.sig_basis.v1"
+    assert rec["sig_basis"]["keys_used"] == [
+        "wt.function",
+        "wt.wraps_at_inserts",
+        "wt.wraps_at_ends",
+        "wt.layer_count",
+        "wt.total_thickness_in",
+        "wt.stack_hash_loose",
+    ]
+
+
+def test_label_has_quality_provenance_and_components(monkeypatch):
+    m = _setup_module(monkeypatch)
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [_basic_wall("Named Wall")])
+    rec = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))["records"][0]
+
+    label = rec["label"]
+    assert label["display"] == "Named Wall"
+    assert label["quality"] == "human"
+    assert label["provenance"] == "revit.WallType.Name"
+    assert label["components"]["type_name"] == "Named Wall"

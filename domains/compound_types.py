@@ -261,6 +261,14 @@ def _blocked_stub_result():
         "debug_v2_block_reasons": {"not_yet_implemented": 1},
     }
 
+def _label_for_wall_type(type_name):
+    return {
+        "display": safe_str(type_name),
+        "quality": "human",
+        "provenance": "revit.WallType.Name",
+        "components": {"type_name": safe_str(type_name)},
+    }
+
 
 def extract_wall_types(doc, ctx=None):
     info = {
@@ -306,6 +314,7 @@ def extract_wall_types(doc, ctx=None):
 
     records = []
     sigs = []
+    debug_kind_printed = 0
 
     for wt in wall_types:
         type_name = _read_type_name(wt)
@@ -314,6 +323,12 @@ def extract_wall_types(doc, ctx=None):
             kind_str = safe_str(getattr(wt, "Kind", None))
         except Exception:
             kind_str = S_UNREADABLE
+        if debug_kind_printed < 5:
+            try:
+                print("[compound_types.wall_types] kind_str[{}]={}".format(debug_kind_printed, kind_str))
+            except Exception:
+                pass
+            debug_kind_printed += 1
 
         if kind_str != _KIND_BASIC:
             rec = build_record_v2(
@@ -327,7 +342,7 @@ def extract_wall_types(doc, ctx=None):
                     make_identity_item("wt.kind", *_canon_non_sentinel_str(kind_str)),
                 ],
                 required_qs=[ITEM_Q_OK],
-                label={"display": type_name},
+                label=_label_for_wall_type(type_name),
             )
             rec["layer_rows"] = []
             records.append(rec)
@@ -348,7 +363,7 @@ def extract_wall_types(doc, ctx=None):
                 sig_hash=None,
                 identity_items=[make_identity_item("wt.type_name", type_name, ITEM_Q_OK)],
                 required_qs=[ITEM_Q_OK],
-                label={"display": type_name},
+                label=_label_for_wall_type(type_name),
             )
             rec["layer_rows"] = []
             records.append(rec)
@@ -431,7 +446,7 @@ def extract_wall_types(doc, ctx=None):
             make_identity_item("wt.coarse_fill_color_rgb", cfc_v, cfc_q),
         ]
 
-        identity_items = semantic + coordination + cosmetic
+        identity_items = sorted((semantic + coordination + cosmetic), key=lambda it: safe_str(it.get("k", "")))
         sig_hash = make_hash(serialize_identity_items(semantic))
 
         rec = build_record_v2(
@@ -442,8 +457,19 @@ def extract_wall_types(doc, ctx=None):
             sig_hash=sig_hash,
             identity_items=identity_items,
             required_qs=[it.get("q") for it in semantic],
-            label={"display": type_name},
+            label=_label_for_wall_type(type_name),
         )
+        rec["sig_basis"] = {
+            "schema": "wall_types.sig_basis.v1",
+            "keys_used": [
+                "wt.function",
+                "wt.wraps_at_inserts",
+                "wt.wraps_at_ends",
+                "wt.layer_count",
+                "wt.total_thickness_in",
+                "wt.stack_hash_loose",
+            ],
+        }
         rec["layer_rows"] = cs_data["layer_rows"]
         records.append(rec)
         sigs.append(sig_hash)
