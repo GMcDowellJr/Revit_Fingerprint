@@ -170,11 +170,17 @@ def _iter_dyn_path_candidates():
         return s
 
     def _add(src, value):
+        # Ignore common non-path control values from Dynamo node inputs.
+        if isinstance(value, bool):
+            return
         try:
             raw = _normalize_host_path(value)
         except Exception:
             return
         if not raw:
+            return
+        rlow = raw.strip().lower()
+        if rlow in ("true", "false", "none", "null"):
             return
 
         try:
@@ -274,10 +280,13 @@ def _nearest_repo_root_from_path(p, max_up=64):
 
 def _candidate_repo_dirs():
     tried = []
+    global _DYN_CANDIDATES
+    _DYN_CANDIDATES = []
 
     # 0) If a Dynamo graph path is known, discover the nearest repo root upward
     # from the .dyn file/folder location.
     for src, p in _iter_dyn_path_candidates():
+        _DYN_CANDIDATES.append({"source": src, "path": p})
         # Keep the original graph-derived candidate visible in diagnostics even
         # when it is not itself a repo root.
         tried.append((src + ":graph_path_candidate", p))
@@ -352,6 +361,7 @@ if _selected is None:
             "override_env_var": "REVIT_FINGERPRINT_ORG_DIR",
         },
         "tried": _tried,
+        "dyn_candidates": _DYN_CANDIDATES,
         "notes": [
             "Do not run from UNC/network paths (\\\\server\\share\\...).",
             "SharePoint/OneDrive-synced paths are permitted but will emit a warning.",
@@ -427,6 +437,7 @@ else:
                     "source": _selected.get("source"),
                     "repo_dir": REPO_DIR,
                 },
+                "dyn_candidates": _DYN_CANDIDATES,
                 "tried": _tried,
             }
             OUT = json.dumps(_out, indent=2, sort_keys=True)
