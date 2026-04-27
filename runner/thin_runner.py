@@ -147,7 +147,25 @@ def _iter_dyn_path_candidates():
 
     def _add(src, value):
         try:
-            v = os.path.abspath(str(value).strip())
+            raw = str(value).strip()
+        except Exception:
+            return
+        if not raw:
+            return
+
+        # Normalize common host-provided path forms:
+        # - quoted strings:  "C:\...\graph.dyn"
+        # - file URIs:       file:///C:/.../graph.dyn
+        # - mixed slashes
+        if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+            raw = raw[1:-1].strip()
+        if raw.lower().startswith("file:///"):
+            raw = raw[8:]
+            raw = raw.replace("/", os.sep)
+        raw = raw.replace("\\\\?\\", "")
+
+        try:
+            v = os.path.abspath(raw)
         except Exception:
             return
         if not v:
@@ -206,13 +224,16 @@ def _iter_dyn_path_candidates():
 
     return out
 
-def _nearest_repo_root_from_path(p, max_up=10):
+def _nearest_repo_root_from_path(p, max_up=64):
     try:
         cur = os.path.abspath(str(p))
     except Exception:
         return None
 
-    if os.path.isfile(cur):
+    # Treat explicit *.dyn values as file paths even if the host has not
+    # materialized them on disk yet (some Dynamo host surfaces provide
+    # unresolved/current-document values).
+    if str(cur).lower().endswith(".dyn") or os.path.isfile(cur):
         cur = os.path.dirname(cur)
 
     steps = 0
@@ -302,6 +323,10 @@ if _selected is None:
     }
 else:
     REPO_DIR = _selected["repo_dir"]
+    try:
+        os.environ["REVIT_FINGERPRINT_REPO_ROOT_SELECTED"] = REPO_DIR
+    except Exception:
+        pass
 
     # Ensure this repo wins import resolution
     if REPO_DIR in sys.path:

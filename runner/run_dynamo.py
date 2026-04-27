@@ -44,13 +44,41 @@ def _is_probably_sync_path(p):
         return True
     return False
 
-# runner/.. is the repo root
-try:
-    _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-except Exception:
-    _SCRIPT_DIR = os.getcwd()
+def _is_repo_root(p):
+    try:
+        base = os.path.abspath(str(p))
+    except Exception:
+        return False
+    expected = (
+        os.path.join(base, "runner", "run_dynamo.py"),
+        os.path.join(base, "core"),
+        os.path.join(base, "domains"),
+    )
+    for e in expected:
+        if not os.path.exists(e):
+            return False
+    return True
 
-_REPO_ROOT = os.path.dirname(_SCRIPT_DIR)
+# Prefer explicit repo-root signals (thin_runner) before __file__ fallback.
+_repo_override = ""
+for _k in ("REVIT_FINGERPRINT_REPO_ROOT_SELECTED", "REVIT_FINGERPRINT_REPO_DIR"):
+    try:
+        _v = str(os.environ.get(_k, "")).strip()
+    except Exception:
+        _v = ""
+    if _v and _is_repo_root(_v):
+        _repo_override = os.path.abspath(_v)
+        break
+
+if _repo_override:
+    _REPO_ROOT = _repo_override
+else:
+    # runner/.. is the repo root
+    try:
+        _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    except Exception:
+        _SCRIPT_DIR = os.getcwd()
+    _REPO_ROOT = os.path.dirname(_SCRIPT_DIR)
 
 _UNSAFE_REASONS = []
 if _looks_like_unc_path(_REPO_ROOT):
