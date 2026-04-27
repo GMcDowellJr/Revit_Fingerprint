@@ -6,8 +6,6 @@ import traceback
 
 import importlib
 
-sys.dont_write_bytecode = True
-
 # Provide output path to imported runner via env var (import boundary safe)
 try:
     if IN is not None and len(IN) > 0 and IN[0] is not None and str(IN[0]).strip():
@@ -112,8 +110,8 @@ def _looks_like_unc_path(p):
 
 def _is_probably_sync_path(p):
     """
-    Heuristic, Windows-centric: block common SharePoint/OneDrive sync roots.
-    We block (not degrade) because runtime location affects determinism.
+    Heuristic, Windows-centric: previously used to hard-block sync paths.
+    Retained for detection only — callers decide whether to block or warn.
     """
     try:
         s = os.path.abspath(str(p))
@@ -180,15 +178,14 @@ for src, p in _candidate_repo_dirs():
     repo_dir = os.path.abspath(str(p))
     _tried.append({"source": src, "path": repo_dir})
 
-    unsafe = []
-    if _looks_like_unc_path(repo_dir):
-        unsafe.append("repo_dir_is_unc_path")
-    if _is_probably_sync_path(repo_dir):
-        unsafe.append("repo_dir_looks_like_sharepoint_onedrive_sync")
+    unc = _looks_like_unc_path(repo_dir)
+    sync = _is_probably_sync_path(repo_dir)
 
     ok, missing = _is_repo_root(repo_dir)
-    if ok and not unsafe:
+    if ok and not unc:
         _selected = {"repo_dir": repo_dir, "source": src}
+        if sync:
+            _selected["warnings"] = ["repo_dir_looks_like_sharepoint_onedrive_sync"]
         break
 
 if _selected is None:
@@ -203,7 +200,8 @@ if _selected is None:
         },
         "tried": _tried,
         "notes": [
-            "Do not run from SharePoint/OneDrive-synced folders or UNC paths.",
+            "Do not run from UNC/network paths (\\\\server\\share\\...).",
+            "SharePoint/OneDrive-synced paths are permitted but will emit a warning.",
             "Install the code locally, then run the Dynamo Player graph from SharePoint.",
             "Optional override: set REVIT_FINGERPRINT_REPO_DIR to your local install root.",
         ],
@@ -217,17 +215,18 @@ else:
     sys.path.insert(0, REPO_DIR)
 
     try:
-        # ---- CPython 3: purge cached modules so edits on disk are picked up ----
-        prefixes = ("runner", "domains", "core")
-        for name in list(sys.modules.keys()):
-            if name in prefixes or name.startswith("runner.") or name.startswith("domains.") or name.startswith("core."):
-                sys.modules.pop(name, None)
-
         # Import triggers execution in this repo (run_dynamo computes OUT at import time)
         exporter = importlib.import_module("runner.run_dynamo")
 
         # Forward the computed OUT from the runner module
         OUT = exporter.OUT
+        if _selected.get("warnings"):
+            try:
+                _out = OUT if isinstance(OUT, dict) else __import__("json").loads(OUT)
+                _out.setdefault("_runner_warnings", []).extend(_selected["warnings"])
+                OUT = _out
+            except Exception:
+                pass
 
     except Exception as e:
         OUT = {
