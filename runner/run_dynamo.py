@@ -28,6 +28,10 @@ def _looks_like_unc_path(p):
     return s.startswith("\\\\")
 
 def _is_probably_sync_path(p):
+    """
+    Heuristic, Windows-centric: previously used to hard-block sync paths.
+    Retained for detection only — callers decide whether to block or warn.
+    """
     try:
         s = os.path.abspath(str(p))
     except Exception:
@@ -51,8 +55,10 @@ _REPO_ROOT = os.path.dirname(_SCRIPT_DIR)
 _UNSAFE_REASONS = []
 if _looks_like_unc_path(_REPO_ROOT):
     _UNSAFE_REASONS.append("repo_root_is_unc_path")
+
+_SYNC_WARNINGS = []
 if _is_probably_sync_path(_REPO_ROOT):
-    _UNSAFE_REASONS.append("repo_root_looks_like_sharepoint_onedrive_sync")
+    _SYNC_WARNINGS.append("repo_root_looks_like_sharepoint_onedrive_sync")
 
 def _read_tool_version(repo_root):
     try:
@@ -72,9 +78,10 @@ if _UNSAFE_REASONS:
     OUT = json.dumps(
         {
             "status": "blocked",
-            "error": "Unsafe execution location. Install locally and run from there (not SharePoint/OneDrive/UNC).",
+            "error": "Unsafe execution location: UNC/network paths are not supported.",
             "repo_root": _REPO_ROOT,
             "unsafe_reasons": _UNSAFE_REASONS,
+            "sync_warnings": _SYNC_WARNINGS,
             "_meta": {
                 "runner": "M5",
                 "runner_file": __file__,
@@ -953,6 +960,7 @@ try:
         "domains_requested": domains_requested,
         "domains_emitted": domains_emitted,
     }
+    fingerprint["_runner_warnings"] = _SYNC_WARNINGS
 
     # ------------------------------------------------------------
     # Output strategy:

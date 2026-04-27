@@ -1,12 +1,11 @@
 import sys
 import os
 import traceback
+import json
 
 # Explicitly request semantic (v2) hashing
 
 import importlib
-
-sys.dont_write_bytecode = True
 
 # Provide output path to imported runner via env var (import boundary safe)
 try:
@@ -112,8 +111,8 @@ def _looks_like_unc_path(p):
 
 def _is_probably_sync_path(p):
     """
-    Heuristic, Windows-centric: block common SharePoint/OneDrive sync roots.
-    We block (not degrade) because runtime location affects determinism.
+    Heuristic, Windows-centric: previously used to hard-block sync paths.
+    Retained for detection only — callers decide whether to block or warn.
     """
     try:
         s = os.path.abspath(str(p))
@@ -142,8 +141,101 @@ def _is_repo_root(p):
     missing_local = [x for x in expected_local if not os.path.exists(x)]
     return (len(missing_local) == 0), missing_local
 
+def _iter_dyn_path_candidates():
+    out = []
+    seen = set()
+
+    def _add(src, value):
+        try:
+            v = os.path.abspath(str(value).strip())
+        except Exception:
+            return
+        if not v:
+            return
+        k = v.lower()
+        if k in seen:
+            return
+        seen.add(k)
+        out.append((src, v))
+
+    # Auto-discovery (best effort): use current process context as "current graph"
+    # starting point when explicit graph path is unavailable.
+    try:
+        cwd = os.getcwd()
+    except Exception:
+        cwd = ""
+    if cwd:
+        _add("auto:cwd", cwd)
+        try:
+            dyns = [x for x in os.listdir(cwd) if str(x).lower().endswith(".dyn")]
+            if len(dyns) == 1:
+                _add("auto:cwd_single_dyn", os.path.join(cwd, dyns[0]))
+        except Exception:
+            pass
+
+    # Some hosts include an opened .dyn path on argv.
+    try:
+        for a in list(sys.argv):
+            s = str(a or "").strip()
+            if s.lower().endswith(".dyn"):
+                _add("auto:argv_dyn", s)
+    except Exception:
+        pass
+
+    # Explicit overrides from host/invoker
+    for k in (
+        "REVIT_FINGERPRINT_DYN_PATH",
+        "DYNAMO_GRAPH_PATH",
+        "DYNAMO_FILE_PATH",
+    ):
+        try:
+            v = str(os.environ.get(k, "")).strip()
+        except Exception:
+            v = ""
+        if v:
+            _add("env:{}".format(k), v)
+
+    # Optional thin-runner input extension: IN[3] = .dyn path or containing folder
+    try:
+        if IN is not None and len(IN) > 3 and IN[3] is not None:
+            v = str(IN[3]).strip()
+            if v:
+                _add("in:IN[3]", v)
+    except Exception:
+        pass
+
+    return out
+
+def _nearest_repo_root_from_path(p, max_up=10):
+    try:
+        cur = os.path.abspath(str(p))
+    except Exception:
+        return None
+
+    if os.path.isfile(cur):
+        cur = os.path.dirname(cur)
+
+    steps = 0
+    while steps <= int(max_up):
+        ok, missing = _is_repo_root(cur)
+        if ok:
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+        steps += 1
+    return None
+
 def _candidate_repo_dirs():
     tried = []
+
+    # 0) If a Dynamo graph path is known, discover the nearest repo root upward
+    # from the .dyn file/folder location.
+    for src, p in _iter_dyn_path_candidates():
+        rr = _nearest_repo_root_from_path(p)
+        if rr:
+            tried.append((src + ":nearest_repo_root", rr))
 
     # 1) Optional override: power users can set this once
     try:
@@ -180,15 +272,14 @@ for src, p in _candidate_repo_dirs():
     repo_dir = os.path.abspath(str(p))
     _tried.append({"source": src, "path": repo_dir})
 
-    unsafe = []
-    if _looks_like_unc_path(repo_dir):
-        unsafe.append("repo_dir_is_unc_path")
-    if _is_probably_sync_path(repo_dir):
-        unsafe.append("repo_dir_looks_like_sharepoint_onedrive_sync")
+    unc = _looks_like_unc_path(repo_dir)
+    sync = _is_probably_sync_path(repo_dir)
 
     ok, missing = _is_repo_root(repo_dir)
-    if ok and not unsafe:
+    if ok and not unc:
         _selected = {"repo_dir": repo_dir, "source": src}
+        if sync:
+            _selected["warnings"] = ["repo_dir_looks_like_sharepoint_onedrive_sync"]
         break
 
 if _selected is None:
@@ -203,7 +294,8 @@ if _selected is None:
         },
         "tried": _tried,
         "notes": [
-            "Do not run from SharePoint/OneDrive-synced folders or UNC paths.",
+            "Do not run from UNC/network paths (\\\\server\\share\\...).",
+            "SharePoint/OneDrive-synced paths are permitted but will emit a warning.",
             "Install the code locally, then run the Dynamo Player graph from SharePoint.",
             "Optional override: set REVIT_FINGERPRINT_REPO_DIR to your local install root.",
         ],
@@ -217,17 +309,54 @@ else:
     sys.path.insert(0, REPO_DIR)
 
     try:
-        # ---- CPython 3: purge cached modules so edits on disk are picked up ----
-        prefixes = ("runner", "domains", "core")
-        for name in list(sys.modules.keys()):
-            if name in prefixes or name.startswith("runner.") or name.startswith("domains.") or name.startswith("core."):
-                sys.modules.pop(name, None)
-
         # Import triggers execution in this repo (run_dynamo computes OUT at import time)
-        exporter = importlib.import_module("runner.run_dynamo")
+        # Execute exactly once per invocation:
+        # - first run: import
+        # - subsequent runs: reload existing module
+        # If an existing module is bound to a different repo root, drop it and import fresh.
+        _existing = sys.modules.get("runner.run_dynamo", None)
+
+        def _purge_repo_modules():
+            prefixes = ("runner", "core", "domains")
+            for _name in list(sys.modules.keys()):
+                if (
+                    _name in prefixes
+                    or _name.startswith("runner.")
+                    or _name.startswith("core.")
+                    or _name.startswith("domains.")
+                ):
+                    sys.modules.pop(_name, None)
+
+        if _existing is not None:
+            try:
+                _f = os.path.abspath(str(getattr(_existing, "__file__", "") or ""))
+            except Exception:
+                _f = ""
+            if not _f.startswith(os.path.abspath(REPO_DIR) + os.sep):
+                # Repo root switched: purge runner + dependencies so imports come
+                # from the selected repo consistently.
+                _purge_repo_modules()
+                _existing = None
+
+        if _existing is None:
+            exporter = importlib.import_module("runner.run_dynamo")
+        else:
+            try:
+                exporter = importlib.reload(_existing)
+            except ModuleNotFoundError:
+                # Some embedded hosts lose module spec metadata; fall back to fresh import.
+                _purge_repo_modules()
+                exporter = importlib.import_module("runner.run_dynamo")
 
         # Forward the computed OUT from the runner module
         OUT = exporter.OUT
+        if _selected.get("warnings"):
+            try:
+                _out = OUT if isinstance(OUT, dict) else json.loads(OUT)
+                _out.setdefault("_runner_warnings", []).extend(_selected["warnings"])
+                OUT = json.dumps(_out, indent=2, sort_keys=True)
+            except Exception:
+                pass
 
     except Exception as e:
         OUT = {
