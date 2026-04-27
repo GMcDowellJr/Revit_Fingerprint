@@ -254,6 +254,9 @@ def _candidate_repo_dirs():
     # 0) If a Dynamo graph path is known, discover the nearest repo root upward
     # from the .dyn file/folder location.
     for src, p in _iter_dyn_path_candidates():
+        # Keep the original graph-derived candidate visible in diagnostics even
+        # when it is not itself a repo root.
+        tried.append((src + ":graph_path_candidate", p))
         rr = _nearest_repo_root_from_path(p)
         if rr:
             tried.append((src + ":nearest_repo_root", rr))
@@ -283,6 +286,16 @@ def _candidate_repo_dirs():
     if up:
         tried.append(("userprofile:RevitFingerprint_current", os.path.join(up, "RevitFingerprint", "current")))
 
+    # 5) Network-share friendly convention used by current Dynamo deployments
+    # (user requested explicit fallback root)
+    if up:
+        tried.append(
+            (
+                "userprofile:stantec_general_code",
+                os.path.join(up, "Stantec", "Revit_Fingerprint - General", "Code"),
+            )
+        )
+
     return tried
 
 _selected = None
@@ -311,6 +324,7 @@ if _selected is None:
             "recommended_current": r"%USERPROFILE%\Documents\{ORG}\{APP}\{CH}".format(ORG=ORG_DIR, APP=APP_DIR, CH=CHANNEL_DIR),
             "zip_extract_example": r"%USERPROFILE%\Documents\{ORG}\{APP}\vX.Y.Z".format(ORG=ORG_DIR, APP=APP_DIR),
             "fallback_current_localappdata": r"%LOCALAPPDATA%\{ORG}\{APP}\{CH}".format(ORG=ORG_DIR, APP=APP_DIR, CH=CHANNEL_DIR),
+            "fallback_stantec_general_code": r"%USERPROFILE%\Stantec\Revit_Fingerprint - General\Code",
             "override_env_var": "REVIT_FINGERPRINT_ORG_DIR",
         },
         "tried": _tried,
