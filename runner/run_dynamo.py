@@ -147,6 +147,7 @@ from domains import view_category_overrides_annotation
 # Split domains: object_styles
 from domains import object_styles
 from domains import fill_patterns
+from domains import materials
 from domains import dimension_types
 from domains import view_templates
 from core.manifest import build_manifest
@@ -588,6 +589,24 @@ def run_fingerprint(doc, timing=None):
         legacy = _domain_run("fill_patterns_model", fill_patterns.extract_model, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["fill_patterns_model"] = legacy
+
+    # materials: ctx-only domain — populates material_uid_to_name and
+    # material_uid_to_class lookup maps. Runs after fill_patterns so that
+    # when materials is promoted to a governance domain it can consume
+    # fill_pattern_uid_to_sig_hash_v2 from ctx without runner reordering.
+    if _enabled("materials"):
+        legacy = _domain_run(
+            "materials",
+            materials.extract,
+            doc,
+            ctx,
+            contract_domains,
+            run_diag,
+            runner_notes,
+            require_v2_hash=False,
+        )
+        if legacy is not None:
+            fingerprint["materials"] = legacy
 
     if _enabled("arrowheads"):
         legacy = _domain_run("arrowheads", arrowheads.extract, doc, ctx, contract_domains, run_diag, runner_notes)

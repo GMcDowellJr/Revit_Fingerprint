@@ -36,6 +36,7 @@ Examples:
 - view_filters
 - phases
 - view_templates
+- materials *(ctx-only stub; populates material name/class lookup maps)*
 
 ---
 
@@ -69,6 +70,8 @@ The `ctx` dictionary flows through domain execution. Keys are populated by upstr
 | `view_filter_uid_to_sig_hash_v2` | view_filter_definitions | view_templates | dict[str, str] |
 | `line_pattern_uid_to_hash` | line_patterns | object_styles, line_styles | dict[str, str] |
 | `line_pattern_uid_to_hash_v2` | line_patterns | object_styles, line_styles | dict[str, str] |
+| `material_uid_to_name` | materials | compound_types *(upcoming)* | `dict[str, str]` |
+| `material_uid_to_class` | materials | compound_types *(upcoming)* | `dict[str, str]` |
 
 #### Dependency Contract
 
