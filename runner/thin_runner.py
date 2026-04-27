@@ -315,14 +315,27 @@ else:
         # - subsequent runs: reload existing module
         # If an existing module is bound to a different repo root, drop it and import fresh.
         _existing = sys.modules.get("runner.run_dynamo", None)
+
+        def _purge_repo_modules():
+            prefixes = ("runner", "core", "domains")
+            for _name in list(sys.modules.keys()):
+                if (
+                    _name in prefixes
+                    or _name.startswith("runner.")
+                    or _name.startswith("core.")
+                    or _name.startswith("domains.")
+                ):
+                    sys.modules.pop(_name, None)
+
         if _existing is not None:
             try:
                 _f = os.path.abspath(str(getattr(_existing, "__file__", "") or ""))
             except Exception:
                 _f = ""
             if not _f.startswith(os.path.abspath(REPO_DIR) + os.sep):
-                sys.modules.pop("runner.run_dynamo", None)
-                sys.modules.pop("runner", None)
+                # Repo root switched: purge runner + dependencies so imports come
+                # from the selected repo consistently.
+                _purge_repo_modules()
                 _existing = None
 
         if _existing is None:
@@ -332,8 +345,7 @@ else:
                 exporter = importlib.reload(_existing)
             except ModuleNotFoundError:
                 # Some embedded hosts lose module spec metadata; fall back to fresh import.
-                sys.modules.pop("runner.run_dynamo", None)
-                sys.modules.pop("runner", None)
+                _purge_repo_modules()
                 exporter = importlib.import_module("runner.run_dynamo")
 
         # Forward the computed OUT from the runner module
