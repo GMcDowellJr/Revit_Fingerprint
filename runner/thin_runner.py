@@ -1,6 +1,7 @@
 import sys
 import os
 import traceback
+import json
 
 # Explicitly request semantic (v2) hashing
 
@@ -272,14 +273,15 @@ else:
     try:
         # Import triggers execution in this repo (run_dynamo computes OUT at import time)
         exporter = importlib.import_module("runner.run_dynamo")
+        exporter = importlib.reload(exporter)
 
         # Forward the computed OUT from the runner module
         OUT = exporter.OUT
         if _selected.get("warnings"):
             try:
-                _out = OUT if isinstance(OUT, dict) else __import__("json").loads(OUT)
+                _out = OUT if isinstance(OUT, dict) else json.loads(OUT)
                 _out.setdefault("_runner_warnings", []).extend(_selected["warnings"])
-                OUT = _out
+                OUT = json.dumps(_out, indent=2, sort_keys=True)
             except Exception:
                 pass
 
