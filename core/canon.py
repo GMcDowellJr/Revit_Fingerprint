@@ -5,7 +5,7 @@ Core canonicalization and formatting utilities (pure Python, no Revit API).
 PR3 scope (behavior-changing):
 - Single source of truth for canonical primitives.
 - Single set of sentinel strings:
-    <MISSING>, <UNREADABLE>, <NOT_APPLICABLE>
+    <MISSING>, <UNREADABLE>, <NOT_APPLICABLE>, <NONE>, <UNRESOLVED>
 
 Policy:
 - Domains must emit canonicalized primitives (strings) and/or the declared sentinels.
@@ -26,10 +26,12 @@ from .hashing import safe_str
 S_MISSING = "<MISSING>"
 S_UNREADABLE = "<UNREADABLE>"
 S_NOT_APPLICABLE = "<NOT_APPLICABLE>"
+S_NONE = "<NONE>"
+S_UNRESOLVED = "<UNRESOLVED>"
 
 
 def is_sentinel(v: Any) -> bool:
-    return v in (S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE)
+    return v in (S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE, S_NONE, S_UNRESOLVED)
 
 
 # =========================

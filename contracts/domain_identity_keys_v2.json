@@ -614,6 +614,19 @@
       }
     },
 
+    "materials": {
+      "domain_family": "materials",
+      "allowed_keys": [
+        "material.uid"
+      ],
+      "required_keys": [
+        "material.uid"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
     "view_templates_floor_structural_area_plans": {
       "domain_family": "view_templates",
       "allowed_keys": [
