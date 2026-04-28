@@ -63,6 +63,11 @@ except ImportError:
     FloorType = None
 
 try:
+    from Autodesk.Revit.DB import FloorFunction
+except (ImportError, AttributeError):
+    FloorFunction = None
+
+try:
     from Autodesk.Revit.DB import RoofType
 except ImportError:
     RoofType = None
@@ -104,6 +109,7 @@ _WALL_FUNCTION_NAMES = {
     0: "Interior", 1: "Exterior", 2: "Foundation",
     3: "Retaining", 4: "Soffit", 5: "Coreshaft",
 }
+_FLOOR_FUNCTION_NAMES = {0: "Interior", 1: "Exterior"}
 _LAYER_FUNCTION_NAMES = {
     0: "None", 1: "Structure", 2: "Substrate", 3: "Insulation",
     4: "Finish1", 5: "Finish2", 6: "Membrane", 7: "StructuralDeck",
@@ -351,11 +357,11 @@ def _read_compound_structure(cs, doc, ctx, family):
     wraps_at_ends = S_NOT_APPLICABLE
     if family == "wall":
         try:
-            wraps_at_inserts = _enum_name(None, int(cs.WrapAtInserts), _WALL_WRAPPING_NAMES)
+            wraps_at_inserts = _enum_name(None, int(str(cs.WrapAtInserts)), _WALL_WRAPPING_NAMES)
         except Exception:
             wraps_at_inserts = S_UNREADABLE
         try:
-            wraps_at_ends = _enum_name(None, int(cs.WrapAtEnds), _WALL_WRAPPING_NAMES)
+            wraps_at_ends = _enum_name(None, int(str(cs.WrapAtEnds)), _WALL_WRAPPING_NAMES)
         except Exception:
             wraps_at_ends = S_UNREADABLE
 
@@ -404,20 +410,6 @@ def _read_wall_kind(wt):
         pass
     return -1, safe_str(kind_raw)
 
-
-def _blocked_stub_result():
-    return {
-        "count": 0,
-        "raw_count": 0,
-        "hash_v2": None,
-        "records": [],
-        "record_rows": [],
-        "signature_hashes_v2": [],
-        "status": "blocked",
-        "block_reason": "not_yet_implemented",
-        "debug_v2_blocked": True,
-        "debug_v2_block_reasons": {"not_yet_implemented": 1},
-    }
 
 def _label_for_wall_type(type_name):
     return {
@@ -480,49 +472,11 @@ def extract_wall_types(doc, ctx=None):
 
     records = []
     sigs = []
-    debug_kind_printed = 0
 
     for wt in wall_types:
-        # Temporary debug at top of for loop, first iteration only
-        if debug_kind_printed == 0:
-            try:
-                kind_raw = getattr(wt, "Kind", "MISSING_ATTR")
-                print("[DEBUG] Kind raw: {} type: {}".format(kind_raw, type(kind_raw)))
-                print("[DEBUG] Kind dir: {}".format([x for x in dir(kind_raw) if not x.startswith('__')]))
-                print("[DEBUG] wt.Name direct: {}".format(getattr(wt, "Name", "NO_NAME_ATTR")))
-                for bip in ["SYMBOL_NAME_PARAM", "ALL_MODEL_TYPE_NAME", "DATUM_TEXT"]:
-                    try:
-                        p = wt.get_Parameter(getattr(BuiltInParameter, bip))
-                        print("[DEBUG] BIP {}: {}".format(bip, p.AsString() if p else "None"))
-                    except Exception as e:
-                        print("[DEBUG] BIP {} error: {}".format(bip, e))
-            except Exception as e:
-                print("[DEBUG] outer error: {}".format(e))
-
         type_name = _read_type_name(wt)
-        # Temporary: surface first type-name attempts in debug dict for JSON visibility.
-        if len(records) == 0:
-            try:
-                info["debug_v2_block_reasons"]["first_type_name_attempt"] = repr(getattr(wt, "Name", "NO_ATTR"))
-            except Exception:
-                info["debug_v2_block_reasons"]["first_type_name_attempt"] = "ERROR"
-            try:
-                p_dbg = wt.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM)
-                info["debug_v2_block_reasons"]["first_bip_attempt"] = repr(
-                    p_dbg.AsString() if p_dbg else "None"
-                )
-            except Exception:
-                info["debug_v2_block_reasons"]["first_bip_attempt"] = "ERROR"
-
         kind_int, kind_str = _read_wall_kind(wt)
         is_basic = (kind_int == _WALL_KIND_BASIC)
-
-        if debug_kind_printed < 5:
-            try:
-                print("[compound_types.wall_types] kind[{}]: int={} str={}".format(debug_kind_printed, kind_int, kind_str))
-            except Exception:
-                pass
-            debug_kind_printed += 1
 
         if not is_basic:
             blocked_items = [
@@ -590,40 +544,7 @@ def extract_wall_types(doc, ctx=None):
             wt_function = S_UNREADABLE
             wt_function_q = ITEM_Q_UNREADABLE
 
-        # coarse fill pattern sig hash
-        cfpsh_v = None
-        cfpsh_q = ITEM_Q_MISSING
-        try:
-            p = wt.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_PATTERN_ID_FOR_LEGEND)
-            pid = p.AsElementId() if p is not None else None
-            if pid is None or getattr(pid, "IntegerValue", -1) < 0:
-                cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
-            else:
-                pe = doc.GetElement(pid)
-                puid = getattr(pe, "UniqueId", None) if pe is not None else None
-                if puid and puid in fp_uid_to_sig_hash:
-                    cfpsh_v, cfpsh_q = canonicalize_str(fp_uid_to_sig_hash.get(puid))
-                else:
-                    cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
-        except Exception:
-            cfpsh_v, cfpsh_q = (None, ITEM_Q_UNREADABLE)
-
-        # coarse fill color
-        cfc_v = None
-        cfc_q = ITEM_Q_MISSING
-        try:
-            p = wt.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_COLOR)
-            cint = p.AsInteger() if p is not None else None
-            if cint is None:
-                cfc_v, cfc_q = (None, ITEM_Q_MISSING)
-            else:
-                cint = int(cint)
-                r = cint & 255
-                g = (cint >> 8) & 255
-                b = (cint >> 16) & 255
-                cfc_v, cfc_q = canonicalize_str("{},{},{}".format(r, g, b))
-        except Exception:
-            cfc_v, cfc_q = (None, ITEM_Q_UNREADABLE)
+        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(wt, doc, fp_uid_to_sig_hash)
 
         # has embedded sweeps
         sweeps_v = None
@@ -731,42 +652,55 @@ def _label_for_type(type_name):
     }
 
 
-def _coarse_fill_reads(element, doc, fp_uid_to_sig_hash):
+def _coarse_fill_reads(type_elem, doc, fp_uid_to_sig_hash):
+    """Read coarse fill pattern sig hash and color from a compound type element.
+
+    All four compound type families (wall, floor, roof, ceiling) expose these
+    under the same UI parameter names. LookupParameter is used because
+    getattr(BuiltInParameter, name) does not resolve in Dynamo CPython3.
+    """
+    # fill pattern sig hash
     cfpsh_v = None
     cfpsh_q = ITEM_Q_MISSING
     try:
-        p = element.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_PATTERN_ID_FOR_LEGEND)
-        pid = p.AsElementId() if p is not None else None
-        if pid is None or getattr(pid, "IntegerValue", -1) < 0:
+        p = type_elem.LookupParameter("Coarse Scale Fill Pattern")
+        if p is None:
             cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
         else:
-            pe = doc.GetElement(pid)
-            puid = getattr(pe, "UniqueId", None) if pe is not None else None
-            if puid and puid in fp_uid_to_sig_hash:
-                cfpsh_v, cfpsh_q = canonicalize_str(fp_uid_to_sig_hash.get(puid))
-            else:
+            pid = p.AsElementId()
+            if pid is None or getattr(pid, "IntegerValue", -1) < 0:
                 cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
+            else:
+                pe = doc.GetElement(pid)
+                puid = getattr(pe, "UniqueId", None) if pe is not None else None
+                if puid and puid in fp_uid_to_sig_hash:
+                    cfpsh_v, cfpsh_q = canonicalize_str(fp_uid_to_sig_hash.get(puid))
+                else:
+                    cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
     except Exception:
         cfpsh_v, cfpsh_q = (None, ITEM_Q_UNREADABLE)
 
+    # fill color
     cfc_v = None
     cfc_q = ITEM_Q_MISSING
     try:
-        p = element.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_COLOR)
-        cint = p.AsInteger() if p is not None else None
-        if cint is None:
+        p = type_elem.LookupParameter("Coarse Scale Fill Color")
+        if p is None:
             cfc_v, cfc_q = (None, ITEM_Q_MISSING)
         else:
-            cint = int(cint)
-            r = cint & 255
-            g = (cint >> 8) & 255
-            b = (cint >> 16) & 255
-            cfc_v, cfc_q = canonicalize_str("{},{},{}".format(r, g, b))
+            cint = p.AsInteger()
+            if cint is None:
+                cfc_v, cfc_q = (None, ITEM_Q_MISSING)
+            else:
+                cint = int(cint)
+                r = cint & 255
+                g = (cint >> 8) & 255
+                b = (cint >> 16) & 255
+                cfc_v, cfc_q = canonicalize_str("{},{},{}".format(r, g, b))
     except Exception:
         cfc_v, cfc_q = (None, ITEM_Q_UNREADABLE)
 
     return cfpsh_v, cfpsh_q, cfc_v, cfc_q
-
 
 def _family_name_of(element):
     try:
@@ -857,7 +791,7 @@ def extract_floor_types(doc, ctx=None):
 
         try:
             raw = getattr(ft, "Function", None)
-            ft_function = _enum_name(WallFunction, int(str(raw)), _WALL_FUNCTION_NAMES)
+            ft_function = _enum_name(FloorFunction, int(str(raw)), _FLOOR_FUNCTION_NAMES)
             ft_function_q = ITEM_Q_OK
         except Exception:
             ft_function = S_UNREADABLE
