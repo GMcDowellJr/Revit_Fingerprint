@@ -46,6 +46,7 @@ try:
         MaterialFunctionAssignment,
         BuiltInParameter,
         ShellLayerType,
+        Element,
     )
 except ImportError:
     WallType = None
@@ -56,6 +57,7 @@ except ImportError:
     MaterialFunctionAssignment = None
     BuiltInParameter = None
     ShellLayerType = None
+    Element = None
 
 _DOMAIN_WALL = "wall_types"
 _WALL_KIND_BASIC = 0
@@ -143,11 +145,38 @@ def _read_compound_structure(cs, doc, ctx, family):
     except Exception:
         layers = []
 
+    boundary_indices = []
+    for bidx in (exterior_boundary_idx, interior_boundary_idx):
+        if isinstance(bidx, int) and bidx >= 0 and bidx < len(layers) and bidx not in boundary_indices:
+            boundary_indices.append(bidx)
+
+    layer_row_index = 0
+
     for i, layer in enumerate(layers):
-        is_core_boundary = i in (exterior_boundary_idx, interior_boundary_idx)
+        if i in boundary_indices:
+            boundary_row = {
+                "layer_index": layer_row_index,
+                "is_core_boundary": True,
+                "wl.function": _CORE_BOUNDARY_SENTINEL,
+                "wl.thickness_in": None,
+                "wl.material_name": None,
+                "wl.material_class": None,
+                "wl.participates_in_wrapping": None,
+                "wl.structural_material": None,
+                "wl.is_variable": None,
+                "wl.is_structural_deck": None,
+                "wl.deck_usage": None,
+                "wl.deck_profile_name": None,
+            }
+            rows.append(boundary_row)
+            layer_row_index += 1
+            loose_parts.append("{}||".format(_CORE_BOUNDARY_SENTINEL))
+            strict_parts.append("{}|||".format(_CORE_BOUNDARY_SENTINEL))
+            fn_only_parts.append(_CORE_BOUNDARY_SENTINEL)
+
         row = {
-            "layer_index": i,
-            "is_core_boundary": bool(is_core_boundary),
+            "layer_index": layer_row_index,
+            "is_core_boundary": False,
             "wl.function": None,
             "wl.thickness_in": None,
             "wl.material_name": None,
@@ -159,14 +188,6 @@ def _read_compound_structure(cs, doc, ctx, family):
             "wl.deck_usage": None,
             "wl.deck_profile_name": None,
         }
-
-        if is_core_boundary:
-            row["wl.function"] = _CORE_BOUNDARY_SENTINEL
-            loose_parts.append("{}||".format(_CORE_BOUNDARY_SENTINEL))
-            strict_parts.append("{}|||".format(_CORE_BOUNDARY_SENTINEL))
-            fn_only_parts.append(_CORE_BOUNDARY_SENTINEL)
-            rows.append(row)
-            continue
 
         fn_str = _layer_function_str(layer)
         width_in = None
@@ -234,6 +255,7 @@ def _read_compound_structure(cs, doc, ctx, family):
             total_thickness_in += float(width_in)
         layer_count += 1
         rows.append(row)
+        layer_row_index += 1
 
     wraps_at_inserts = S_NOT_APPLICABLE
     wraps_at_ends = S_NOT_APPLICABLE
@@ -261,16 +283,22 @@ def _read_compound_structure(cs, doc, ctx, family):
 
 
 def _read_type_name(wall_type):
-    # Try .Name property first (works in some runtimes)
+    try:
+        n = Element.Name.GetValue(wall_type) if Element is not None else None
+        if n:
+            return safe_str(n)
+    except Exception:
+        pass
+    # Try .Name property next
     try:
         n = wall_type.Name
         if n:
             return safe_str(n)
     except Exception:
         pass
-    # Fall back to BIP SYMBOL_NAME_PARAM
+    # Fall back to type-name parameter for Dynamo/Revit cross-version reliability
     try:
-        p = wall_type.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM)
+        p = wall_type.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME)
         if p is not None:
             n = p.AsString()
             if n:
@@ -278,6 +306,25 @@ def _read_type_name(wall_type):
     except Exception:
         pass
     return ""
+
+
+def _read_wall_kind(wt):
+    kind_raw = getattr(wt, "Kind", -1)
+    try:
+        kind_int = int(kind_raw)
+        return kind_int, _WALL_KIND_NAMES.get(kind_int, safe_str(kind_raw))
+    except Exception:
+        pass
+    try:
+        kind_int = int(getattr(kind_raw, "value__", -1))
+        return kind_int, _WALL_KIND_NAMES.get(kind_int, safe_str(kind_raw))
+    except Exception:
+        pass
+    kind_str = safe_str(kind_raw)
+    for ki, ks in _WALL_KIND_NAMES.items():
+        if safe_str(ks).lower() == safe_str(kind_str).lower():
+            return ki, ks
+    return -1, kind_str if kind_str else S_UNREADABLE
 
 
 def _blocked_stub_result():
@@ -301,6 +348,14 @@ def _label_for_wall_type(type_name):
         "provenance": "revit.WallType.Name",
         "components": {"type_name": safe_str(type_name)},
     }
+
+def _blocked_required_items(wt_function_v=None, wt_function_q=ITEM_Q_UNREADABLE):
+    return [
+        make_identity_item("wt.function", wt_function_v, wt_function_q),
+        make_identity_item("wt.layer_count", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+        make_identity_item("wt.total_thickness_in", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+        make_identity_item("wt.stack_hash_loose", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+    ]
 
 
 def extract_wall_types(doc, ctx=None):
@@ -352,11 +407,7 @@ def extract_wall_types(doc, ctx=None):
     for wt in wall_types:
         type_name = _read_type_name(wt)
 
-        try:
-            kind_int = int(getattr(wt, "Kind", -1))
-        except Exception:
-            kind_int = -1
-        kind_str = _WALL_KIND_NAMES.get(kind_int, safe_str(getattr(wt, "Kind", S_UNREADABLE)))
+        kind_int, kind_str = _read_wall_kind(wt)
         is_basic = (kind_int == _WALL_KIND_BASIC)
 
         if debug_kind_printed < 5:
@@ -367,16 +418,17 @@ def extract_wall_types(doc, ctx=None):
             debug_kind_printed += 1
 
         if not is_basic:
+            blocked_items = [
+                make_identity_item("wt.type_name", type_name, ITEM_Q_OK),
+                make_identity_item("wt.kind", *_canon_non_sentinel_str(kind_str)),
+            ] + _blocked_required_items(wt_function_v=None, wt_function_q=ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
             rec = build_record_v2(
                 domain=_DOMAIN_WALL,
                 record_id="wall_type|{}".format(type_name),
                 status=STATUS_BLOCKED,
                 status_reasons=["kind_not_compound"],
                 sig_hash=None,
-                identity_items=[
-                    make_identity_item("wt.type_name", type_name, ITEM_Q_OK),
-                    make_identity_item("wt.kind", *_canon_non_sentinel_str(kind_str)),
-                ],
+                identity_items=sorted(blocked_items, key=lambda it: safe_str(it.get("k", ""))),
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_wall_type(type_name),
             )
@@ -391,13 +443,19 @@ def extract_wall_types(doc, ctx=None):
             cs = None
 
         if cs is None:
+            try:
+                wt_function_v, wt_function_q = canonicalize_str(getattr(wt, "Function", None))
+            except Exception:
+                wt_function_v, wt_function_q = (None, ITEM_Q_UNREADABLE)
+            blocked_items = [make_identity_item("wt.type_name", type_name, ITEM_Q_OK)]
+            blocked_items.extend(_blocked_required_items(wt_function_v=wt_function_v, wt_function_q=wt_function_q))
             rec = build_record_v2(
                 domain=_DOMAIN_WALL,
                 record_id="wall_type|{}".format(type_name),
                 status=STATUS_BLOCKED,
                 status_reasons=["no_compound_structure"],
                 sig_hash=None,
-                identity_items=[make_identity_item("wt.type_name", type_name, ITEM_Q_OK)],
+                identity_items=sorted(blocked_items, key=lambda it: safe_str(it.get("k", ""))),
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_wall_type(type_name),
             )

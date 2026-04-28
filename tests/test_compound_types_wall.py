@@ -92,7 +92,17 @@ class _WallType(object):
         if bip == "BIP_FILL_COLOR":
             # BGR int encoding expected by extractor
             return _Param(intval=(3 << 16) + (2 << 8) + 1)
+        if bip == "BIP_TYPE_NAME":
+            return _ParamString("Fallback Type Name")
         return None
+
+
+class _ParamString(object):
+    def __init__(self, s):
+        self._s = s
+
+    def AsString(self):
+        return self._s
 
 
 class _Doc(object):
@@ -113,6 +123,7 @@ def _setup_module(monkeypatch):
     monkeypatch.setattr(m, "BuiltInParameter", type("_BIP", (), {
         "COARSE_SCALE_FILL_PATTERN_ID_FOR_LEGEND": "BIP_FILL_PATTERN",
         "COARSE_SCALE_FILL_COLOR": "BIP_FILL_COLOR",
+        "ALL_MODEL_TYPE_NAME": "BIP_TYPE_NAME",
     }))
     return m
 
@@ -128,12 +139,10 @@ def _default_ctx(m):
 def _basic_wall(name="Wall A"):
     layers = [
         _Layer("Structure", 0.5, 101),
-        _Layer("BoundaryMarker", 0.0, -1),
         _Layer("Substrate", 0.25, 102),
-        _Layer("BoundaryMarker", 0.0, -1),
         _Layer("Finish1", 0.125, 103),
     ]
-    cs = _CS(layers=layers, ext_idx=1, int_idx=3, sweeps=["sweep1"])
+    cs = _CS(layers=layers, ext_idx=1, int_idx=2, sweeps=["sweep1"])
     return _WallType(name=name, kind=0, cs=cs)
 
 
@@ -161,7 +170,13 @@ def test_non_basic_wall_produces_blocked_record(monkeypatch):
 
     assert out["count"] == 0
     assert out["debug_blocked_kind"] == 1
-    assert out["records"][0]["status"] == "blocked"
+    rec = out["records"][0]
+    assert rec["status"] == "blocked"
+    keys = {it["k"] for it in rec["identity_basis"]["items"]}
+    assert "wt.function" in keys
+    assert "wt.layer_count" in keys
+    assert "wt.total_thickness_in" in keys
+    assert "wt.stack_hash_loose" in keys
 
 
 def test_core_boundary_in_layer_rows(monkeypatch):
@@ -299,18 +314,14 @@ def test_stack_hash_preserves_zero_vs_unreadable_thickness(monkeypatch):
     m = _setup_module(monkeypatch)
     zero_layers = [
         _Layer("Membrane", 0.0, 101),
-        _Layer("BoundaryMarker", 0.0, -1),
         _Layer("Finish1", 0.125, 103),
-        _Layer("BoundaryMarker", 0.0, -1),
     ]
     err_layers = [
         _LayerWidthError("Membrane", 0.0, 101),
-        _Layer("BoundaryMarker", 0.0, -1),
         _Layer("Finish1", 0.125, 103),
-        _Layer("BoundaryMarker", 0.0, -1),
     ]
-    w1 = _WallType("Zero", 0, _CS(zero_layers, ext_idx=1, int_idx=3))
-    w2 = _WallType("Err", 0, _CS(err_layers, ext_idx=1, int_idx=3))
+    w1 = _WallType("Zero", 0, _CS(zero_layers, ext_idx=0, int_idx=1))
+    w2 = _WallType("Err", 0, _CS(err_layers, ext_idx=0, int_idx=1))
     monkeypatch.setattr(m, "collect_types", lambda *a, **k: [w1, w2])
     out = m.extract_wall_types(_Doc({101: "m1", 103: "m3"}), _default_ctx(m))
 
@@ -331,3 +342,26 @@ def test_required_identity_not_ok_blocks_record(monkeypatch):
     assert rec["sig_hash"] is None
     assert "required_identity_not_ok" in rec["status_reasons"]
     assert out["count"] == 0
+
+
+def test_no_compound_structure_blocked_record_includes_required_keys(monkeypatch):
+    m = _setup_module(monkeypatch)
+    wall = _WallType("NoCS", 0, None)
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
+    out = m.extract_wall_types(_Doc(), _default_ctx(m))
+    rec = out["records"][0]
+    keys = {it["k"] for it in rec["identity_basis"]["items"]}
+    assert rec["status"] == "blocked"
+    assert "wt.function" in keys
+    assert "wt.layer_count" in keys
+    assert "wt.total_thickness_in" in keys
+    assert "wt.stack_hash_loose" in keys
+
+
+def test_type_name_fallback_to_all_model_type_name(monkeypatch):
+    m = _setup_module(monkeypatch)
+    wall = _basic_wall("")
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
+    out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
+    rec = out["records"][0]
+    assert rec["label"]["display"] == "Fallback Type Name"
