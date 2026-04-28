@@ -438,7 +438,7 @@ def _enforce_policy_gate(rows: List[Dict[str, str]], diagnostics_dir: Path, doma
 
 
 def main() -> None:
-    stage_names = ["flatten", "discover", "apply", "split", "analyze1", "analyze2"]
+    stage_names = ["flatten", "discover", "apply", "split", "analyze1", "analyze2", "flat_tables"]
     ap = argparse.ArgumentParser(
         description=(
             "Pipeline orchestrator with explicit stages: flatten (T0), discover (T1), apply (T2), split, analyze1, analyze2. "
@@ -491,6 +491,11 @@ def main() -> None:
         "--synthetic-domains",
         default="",
         help="Optional comma-separated domains for synthetic key augmentation after flatten (currently supports: line_patterns).",
+    )
+    ap.add_argument(
+        "--flat-tables-emit",
+        default="runs,records,status_reasons,identity_items,label_components,layer_stacks",
+        help="Comma-separated emit types for the flat_tables stage (passed to export_to_flat_tables.py).",
     )
     args = ap.parse_args()
 
@@ -548,6 +553,7 @@ def main() -> None:
     v21_phase0_dir = v21_root / "phase0_v21"
     v21_analysis_dir = v21_root / "analysis_v21"
     v21_split_root = v21_root / "split_analysis"
+    flat_tables_dir = v21_root / "flat_tables"
 
     _ensure_dir(out_root)
     surfaces = _detect_surfaces(exports_dir)
@@ -816,6 +822,23 @@ def main() -> None:
             cmd_split = [sys.executable, "tools/run_split_detection_all.py", str(exports_dir), "--domain", split_domain, "--out-root", str(v21_split_root / split_domain), "--mode", str(args.mode), *(["--phase0-dir", str(v21_phase0_dir)] if use_phase0_dir else []), *(["--allow-sig-hash-join-key"] if allow_sig_hash_join_key else [])]
             report["commands"].append({"stage": "split", "domain": split_domain, "cmd": cmd_split})
             _run(cmd_split, env=env)
+
+    if "flat_tables" in selected_stages:
+        print("[extract_all] Stage flat_tables: writing flat CSV tables...", flush=True)
+        _ensure_dir(flat_tables_dir)
+        cmd_flat = [
+            sys.executable,
+            "tools/export_to_flat_tables.py",
+            "--root_dir", str(exports_dir),
+            "--out_dir", str(flat_tables_dir),
+            "--file_id_mode", "basename",
+            "--emit", str(args.flat_tables_emit),
+        ]
+        if args.domains and str(args.domains).strip():
+            cmd_flat += ["--domains", str(args.domains)]
+        report["commands"].append({"stage": "flat_tables", "cmd": cmd_flat})
+        _run(cmd_flat, env=env)
+        print(f"[extract_all] Stage flat_tables complete: out={flat_tables_dir}", flush=True)
 
     report_path = out_root / "extract_all.report.json"
     with report_path.open("w", encoding="utf-8") as f:
