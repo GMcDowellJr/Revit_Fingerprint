@@ -1284,7 +1284,7 @@ try:
             if _is_dev:
                 json.dump(_write_payload, f, indent=2, sort_keys=True)
             else:
-                json.dump(_write_payload, f, separators=(',', ':'))
+                json.dump(_write_payload, f, separators=(',', ':'), sort_keys=True)
 
         bytes_written = None
         try:
