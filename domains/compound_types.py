@@ -57,7 +57,33 @@ except ImportError:
     BuiltInParameter = None
     ShellLayerType = None
 
+try:
+    from Autodesk.Revit.DB import FloorType
+except ImportError:
+    FloorType = None
+
+try:
+    from Autodesk.Revit.DB import RoofType
+except ImportError:
+    RoofType = None
+
+try:
+    from Autodesk.Revit.DB import CeilingType
+except ImportError:
+    CeilingType = None
+
+# DeckEmbeddingType is Revit 2024+. Catch AttributeError too — older runtimes
+# load the module but the name is absent, raising AttributeError, not ImportError.
+# All deck-property reads guard on DeckEmbeddingType is not None before use.
+try:
+    from Autodesk.Revit.DB import DeckEmbeddingType
+except (ImportError, AttributeError):
+    DeckEmbeddingType = None
+
 _DOMAIN_WALL = "wall_types"
+_DOMAIN_FLOOR = "floor_types"
+_DOMAIN_ROOF = "roof_types"
+_DOMAIN_CEILING = "ceiling_types"
 _WALL_KIND_BASIC = 0
 _WALL_KIND_STACKED = 1
 _WALL_KIND_CURTAIN = 2
@@ -84,6 +110,11 @@ _LAYER_FUNCTION_NAMES = {
 }
 _WALL_WRAPPING_NAMES = {
     0: "DoNotWrap", 1: "Exterior", 2: "Interior", 3: "Both",
+}
+_DECK_EMBEDDING_NAMES = {
+    0: "BoundLayerAbove",
+    1: "StandAlone",
+    2: "BoundLayerBelow",
 }
 _CORE_BOUNDARY_SENTINEL = "CORE_BOUNDARY"
 _LAYER_RECORD_ID_PREFIX = "wall_type_layer"
@@ -239,9 +270,40 @@ def _read_compound_structure(cs, doc, ctx, family):
         if family == "ceiling":
             is_variable = S_NOT_APPLICABLE
 
-        is_structural_deck = S_NOT_APPLICABLE if family in ("wall", "roof", "ceiling") else None
-        deck_usage = S_NOT_APPLICABLE if family in ("wall", "roof", "ceiling") else None
-        deck_profile_name = S_NOT_APPLICABLE if family in ("wall", "roof", "ceiling") else None
+        if family in ("wall", "roof", "ceiling"):
+            is_structural_deck = S_NOT_APPLICABLE
+            deck_usage = S_NOT_APPLICABLE
+            deck_profile_name = S_NOT_APPLICABLE
+        else:
+            is_structural_deck = False
+            deck_usage = S_NOT_APPLICABLE
+            deck_profile_name = S_NOT_APPLICABLE
+            try:
+                fn_int = int(str(getattr(layer, "Function", -1)))
+                is_structural_deck = (fn_int == 7)
+            except Exception:
+                is_structural_deck = False
+            if is_structural_deck:
+                try:
+                    raw_usage = cs.GetDeckEmbeddingType(i)
+                    if DeckEmbeddingType is not None:
+                        deck_usage = _enum_name(DeckEmbeddingType, int(str(raw_usage)), _DECK_EMBEDDING_NAMES)
+                    else:
+                        deck_usage = _DECK_EMBEDDING_NAMES.get(int(str(raw_usage)), str(raw_usage))
+                except Exception:
+                    deck_usage = S_UNREADABLE
+                try:
+                    profile_id = cs.GetDeckProfileId(i)
+                    if profile_id is not None and getattr(profile_id, "IntegerValue", -1) >= 0:
+                        profile_el = doc.GetElement(profile_id)
+                        if profile_el is not None:
+                            deck_profile_name = str(profile_el.Name) if profile_el.Name else S_MISSING
+                        else:
+                            deck_profile_name = S_MISSING
+                    else:
+                        deck_profile_name = S_MISSING
+                except Exception:
+                    deck_profile_name = S_UNREADABLE
 
         row.update(
             {
@@ -258,11 +320,19 @@ def _read_compound_structure(cs, doc, ctx, family):
             }
         )
 
-        loose_parts.append("{}|{}|{}".format(
-            _stack_hash_field(fn_str),
-            _stack_hash_field(mat_class),
-            _stack_hash_field(width_in),
-        ))
+        if family == "floor" and is_structural_deck:
+            loose_parts.append("{}|{}|{}|{}".format(
+                _stack_hash_field(fn_str),
+                _stack_hash_field(mat_class),
+                _stack_hash_field(width_in),
+                _stack_hash_field(deck_usage),
+            ))
+        else:
+            loose_parts.append("{}|{}|{}".format(
+                _stack_hash_field(fn_str),
+                _stack_hash_field(mat_class),
+                _stack_hash_field(width_in),
+            ))
         strict_parts.append("{}|{}|{}|{}".format(
             _stack_hash_field(fn_str),
             _stack_hash_field(mat_class),
@@ -652,13 +722,528 @@ def extract_wall_types(doc, ctx=None):
     return info
 
 
+def _label_for_type(type_name):
+    return {
+        "display": safe_str(type_name),
+        "quality": "human",
+        "provenance": "revit.Name",
+        "components": {"type_name": safe_str(type_name)},
+    }
+
+
+def _coarse_fill_reads(element, doc, fp_uid_to_sig_hash):
+    cfpsh_v = None
+    cfpsh_q = ITEM_Q_MISSING
+    try:
+        p = element.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_PATTERN_ID_FOR_LEGEND)
+        pid = p.AsElementId() if p is not None else None
+        if pid is None or getattr(pid, "IntegerValue", -1) < 0:
+            cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
+        else:
+            pe = doc.GetElement(pid)
+            puid = getattr(pe, "UniqueId", None) if pe is not None else None
+            if puid and puid in fp_uid_to_sig_hash:
+                cfpsh_v, cfpsh_q = canonicalize_str(fp_uid_to_sig_hash.get(puid))
+            else:
+                cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
+    except Exception:
+        cfpsh_v, cfpsh_q = (None, ITEM_Q_UNREADABLE)
+
+    cfc_v = None
+    cfc_q = ITEM_Q_MISSING
+    try:
+        p = element.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_COLOR)
+        cint = p.AsInteger() if p is not None else None
+        if cint is None:
+            cfc_v, cfc_q = (None, ITEM_Q_MISSING)
+        else:
+            cint = int(cint)
+            r = cint & 255
+            g = (cint >> 8) & 255
+            b = (cint >> 16) & 255
+            cfc_v, cfc_q = canonicalize_str("{},{},{}".format(r, g, b))
+    except Exception:
+        cfc_v, cfc_q = (None, ITEM_Q_UNREADABLE)
+
+    return cfpsh_v, cfpsh_q, cfc_v, cfc_q
+
+
+def _family_name_of(element):
+    try:
+        return safe_str(getattr(element, "FamilyName", ""))
+    except Exception:
+        return ""
+
+
 def extract_floor_types(doc, ctx=None):
-    return _blocked_stub_result()
+    info = {
+        "count": 0,
+        "raw_count": 0,
+        "hash_v2": None,
+        "records": [],
+        "record_rows": [],
+        "signature_hashes_v2": [],
+        "status": "ok",
+        "debug_blocked_no_cs": 0,
+        "debug_v2_blocked": False,
+        "debug_v2_block_reasons": {},
+    }
+
+    if ctx is None:
+        ctx = {}
+
+    if FloorType is None:
+        info["status"] = "blocked"
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {"api_unreachable": 1}
+        return info
+
+    try:
+        floor_types = list(
+            collect_types(
+                doc,
+                of_class=FloorType,
+                cctx=(ctx or {}).get("_collect"),
+                cache_key="compound_types:floor_types:FloorType:types",
+            )
+        )
+    except Exception:
+        floor_types = []
+
+    info["raw_count"] = len(floor_types)
+
+    fp_uid_to_sig_hash = (ctx or {}).get("fill_pattern_uid_to_sig_hash_v2", None)
+    if not isinstance(fp_uid_to_sig_hash, dict):
+        fp_uid_to_sig_hash = (ctx or {}).get("fill_pattern_uid_to_hash", {}) or {}
+
+    records = []
+    sigs = []
+
+    for ft in floor_types:
+        type_name = _read_type_name(ft)
+
+        try:
+            cs = ft.GetCompoundStructure()
+        except Exception:
+            cs = None
+
+        if cs is None:
+            blocked_items = sorted([
+                make_identity_item("ft.type_name", type_name, ITEM_Q_OK),
+                make_identity_item("ft.layer_count", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+                make_identity_item("ft.total_thickness_in", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+                make_identity_item("ft.stack_hash_loose", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+            ], key=lambda it: safe_str(it.get("k", "")))
+            rec = build_record_v2(
+                domain=_DOMAIN_FLOOR,
+                record_id="floor_type|{}".format(type_name),
+                status=STATUS_BLOCKED,
+                status_reasons=["no_compound_structure"],
+                sig_hash=None,
+                identity_items=blocked_items,
+                required_qs=[ITEM_Q_OK],
+                label=_label_for_type(type_name),
+            )
+            rec["layer_rows"] = []
+            records.append(rec)
+            info["debug_blocked_no_cs"] += 1
+            info["debug_v2_blocked"] = True
+            info["debug_v2_block_reasons"]["no_compound_structure"] = (
+                info["debug_v2_block_reasons"].get("no_compound_structure", 0) + 1
+            )
+            continue
+
+        cs_data = _read_compound_structure(cs, doc, ctx, "floor")
+
+        try:
+            raw = getattr(ft, "Function", None)
+            ft_function = _enum_name(WallFunction, int(str(raw)), _WALL_FUNCTION_NAMES)
+            ft_function_q = ITEM_Q_OK
+        except Exception:
+            ft_function = S_UNREADABLE
+            ft_function_q = ITEM_Q_UNREADABLE
+
+        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(ft, doc, fp_uid_to_sig_hash)
+
+        sweeps_v, sweeps_q = (None, ITEM_Q_UNREADABLE)
+        try:
+            sweeps = cs.GetWallSweepsInfo()
+            sweeps_v, sweeps_q = canonicalize_bool(len(list(sweeps or [])) > 0)
+        except Exception:
+            sweeps_v, sweeps_q = (None, ITEM_Q_UNREADABLE)
+
+        if cs_data.get("has_unreadable_thickness", False):
+            total_thickness_v, total_thickness_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            total_thickness_v, total_thickness_q = canonicalize_float(cs_data["total_thickness_in"], nd=4)
+
+        semantic = [
+            make_identity_item("ft.layer_count", *canonicalize_int(cs_data["layer_count"])),
+            make_identity_item("ft.total_thickness_in", total_thickness_v, total_thickness_q),
+            make_identity_item("ft.stack_hash_loose", *canonicalize_str(cs_data["stack_hash_loose"])),
+        ]
+        coordination = [
+            make_identity_item("ft.function", ft_function if ft_function != S_UNREADABLE else None, ft_function_q),
+            make_identity_item("ft.total_layer_rows", *canonicalize_int(cs_data["total_layer_rows"])),
+            make_identity_item("ft.stack_hash_strict", *canonicalize_str(cs_data["stack_hash_strict"])),
+            make_identity_item("ft.stack_hash_function_only", *canonicalize_str(cs_data["stack_hash_function_only"])),
+            make_identity_item("ft.coarse_fill_pattern_sig_hash", cfpsh_v, cfpsh_q),
+            make_identity_item("ft.has_embedded_sweeps", sweeps_v, sweeps_q),
+        ]
+        cosmetic = [
+            make_identity_item("ft.type_name", *canonicalize_str(type_name)),
+            make_identity_item("ft.coarse_fill_color_rgb", cfc_v, cfc_q),
+        ]
+
+        identity_items = sorted((semantic + coordination + cosmetic), key=lambda it: safe_str(it.get("k", "")))
+        required_keys = {"ft.layer_count", "ft.total_thickness_in", "ft.stack_hash_loose"}
+        required_qs = [it.get("q") for it in semantic if safe_str(it.get("k", "")) in required_keys]
+        required_not_ok = any(q != ITEM_Q_OK for q in required_qs)
+        status = STATUS_BLOCKED if required_not_ok else STATUS_OK
+        status_reasons = ["required_identity_not_ok"] if required_not_ok else []
+        sig_hash = None if required_not_ok else make_hash(serialize_identity_items(semantic))
+
+        rec = build_record_v2(
+            domain=_DOMAIN_FLOOR,
+            record_id="floor_type|{}".format(type_name),
+            status=status,
+            status_reasons=status_reasons,
+            sig_hash=sig_hash,
+            identity_items=identity_items,
+            required_qs=required_qs,
+            label=_label_for_type(type_name),
+        )
+        rec["sig_basis"] = {
+            "schema": "floor_types.sig_basis.v1",
+            "keys_used": ["ft.layer_count", "ft.total_thickness_in", "ft.stack_hash_loose"],
+        }
+        rec["layer_rows"] = cs_data["layer_rows"]
+        records.append(rec)
+        if sig_hash is not None:
+            sigs.append(sig_hash)
+            info["count"] += 1
+        else:
+            info["debug_v2_blocked"] = True
+            info["debug_v2_block_reasons"]["required_identity_not_ok"] = (
+                info["debug_v2_block_reasons"].get("required_identity_not_ok", 0) + 1
+            )
+
+    info["records"] = records
+    info["signature_hashes_v2"] = sorted([s for s in sigs if s])
+    info["record_rows"] = [
+        {
+            "record_key": safe_str(r.get("record_id", "")),
+            "sig_hash": r.get("sig_hash", None),
+            "name": ((r.get("label", {}) or {}).get("display", None) if isinstance(r.get("label", {}), dict) else None),
+        }
+        for r in records
+    ]
+    if (not info["debug_v2_blocked"]) and info["signature_hashes_v2"]:
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
+    else:
+        info["hash_v2"] = None
+    return info
 
 
 def extract_roof_types(doc, ctx=None):
-    return _blocked_stub_result()
+    info = {
+        "count": 0,
+        "raw_count": 0,
+        "hash_v2": None,
+        "records": [],
+        "record_rows": [],
+        "signature_hashes_v2": [],
+        "status": "ok",
+        "debug_blocked_no_cs": 0,
+        "debug_v2_blocked": False,
+        "debug_v2_block_reasons": {},
+    }
+
+    if ctx is None:
+        ctx = {}
+
+    if RoofType is None:
+        info["status"] = "blocked"
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {"api_unreachable": 1}
+        return info
+
+    try:
+        roof_types = list(
+            collect_types(
+                doc,
+                of_class=RoofType,
+                cctx=(ctx or {}).get("_collect"),
+                cache_key="compound_types:roof_types:RoofType:types",
+            )
+        )
+    except Exception:
+        roof_types = []
+
+    info["raw_count"] = len(roof_types)
+
+    fp_uid_to_sig_hash = (ctx or {}).get("fill_pattern_uid_to_sig_hash_v2", None)
+    if not isinstance(fp_uid_to_sig_hash, dict):
+        fp_uid_to_sig_hash = (ctx or {}).get("fill_pattern_uid_to_hash", {}) or {}
+
+    records = []
+    sigs = []
+
+    for rt in roof_types:
+        type_name = _read_type_name(rt)
+
+        try:
+            cs = rt.GetCompoundStructure()
+        except Exception:
+            cs = None
+
+        if cs is None:
+            blocked_items = sorted([
+                make_identity_item("rt.type_name", type_name, ITEM_Q_OK),
+                make_identity_item("rt.layer_count", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+                make_identity_item("rt.total_thickness_in", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+                make_identity_item("rt.stack_hash_loose", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+            ], key=lambda it: safe_str(it.get("k", "")))
+            rec = build_record_v2(
+                domain=_DOMAIN_ROOF,
+                record_id="roof_type|{}".format(type_name),
+                status=STATUS_BLOCKED,
+                status_reasons=["no_compound_structure"],
+                sig_hash=None,
+                identity_items=blocked_items,
+                required_qs=[ITEM_Q_OK],
+                label=_label_for_type(type_name),
+            )
+            rec["layer_rows"] = []
+            records.append(rec)
+            info["debug_blocked_no_cs"] += 1
+            info["debug_v2_blocked"] = True
+            info["debug_v2_block_reasons"]["no_compound_structure"] = (
+                info["debug_v2_block_reasons"].get("no_compound_structure", 0) + 1
+            )
+            continue
+
+        cs_data = _read_compound_structure(cs, doc, ctx, "roof")
+        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(rt, doc, fp_uid_to_sig_hash)
+
+        if cs_data.get("has_unreadable_thickness", False):
+            total_thickness_v, total_thickness_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            total_thickness_v, total_thickness_q = canonicalize_float(cs_data["total_thickness_in"], nd=4)
+
+        semantic = [
+            make_identity_item("rt.layer_count", *canonicalize_int(cs_data["layer_count"])),
+            make_identity_item("rt.total_thickness_in", total_thickness_v, total_thickness_q),
+            make_identity_item("rt.stack_hash_loose", *canonicalize_str(cs_data["stack_hash_loose"])),
+        ]
+        coordination = [
+            make_identity_item("rt.total_layer_rows", *canonicalize_int(cs_data["total_layer_rows"])),
+            make_identity_item("rt.stack_hash_strict", *canonicalize_str(cs_data["stack_hash_strict"])),
+            make_identity_item("rt.stack_hash_function_only", *canonicalize_str(cs_data["stack_hash_function_only"])),
+            make_identity_item("rt.coarse_fill_pattern_sig_hash", cfpsh_v, cfpsh_q),
+        ]
+        cosmetic = [
+            make_identity_item("rt.type_name", *canonicalize_str(type_name)),
+            make_identity_item("rt.coarse_fill_color_rgb", cfc_v, cfc_q),
+        ]
+
+        identity_items = sorted((semantic + coordination + cosmetic), key=lambda it: safe_str(it.get("k", "")))
+        required_keys = {"rt.layer_count", "rt.total_thickness_in", "rt.stack_hash_loose"}
+        required_qs = [it.get("q") for it in semantic if safe_str(it.get("k", "")) in required_keys]
+        required_not_ok = any(q != ITEM_Q_OK for q in required_qs)
+        status = STATUS_BLOCKED if required_not_ok else STATUS_OK
+        status_reasons = ["required_identity_not_ok"] if required_not_ok else []
+        sig_hash = None if required_not_ok else make_hash(serialize_identity_items(semantic))
+
+        rec = build_record_v2(
+            domain=_DOMAIN_ROOF,
+            record_id="roof_type|{}".format(type_name),
+            status=status,
+            status_reasons=status_reasons,
+            sig_hash=sig_hash,
+            identity_items=identity_items,
+            required_qs=required_qs,
+            label=_label_for_type(type_name),
+        )
+        rec["sig_basis"] = {
+            "schema": "roof_types.sig_basis.v1",
+            "keys_used": ["rt.layer_count", "rt.total_thickness_in", "rt.stack_hash_loose"],
+        }
+        rec["layer_rows"] = cs_data["layer_rows"]
+        records.append(rec)
+        if sig_hash is not None:
+            sigs.append(sig_hash)
+            info["count"] += 1
+        else:
+            info["debug_v2_blocked"] = True
+            info["debug_v2_block_reasons"]["required_identity_not_ok"] = (
+                info["debug_v2_block_reasons"].get("required_identity_not_ok", 0) + 1
+            )
+
+    info["records"] = records
+    info["signature_hashes_v2"] = sorted([s for s in sigs if s])
+    info["record_rows"] = [
+        {
+            "record_key": safe_str(r.get("record_id", "")),
+            "sig_hash": r.get("sig_hash", None),
+            "name": ((r.get("label", {}) or {}).get("display", None) if isinstance(r.get("label", {}), dict) else None),
+        }
+        for r in records
+    ]
+    if (not info["debug_v2_blocked"]) and info["signature_hashes_v2"]:
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
+    else:
+        info["hash_v2"] = None
+    return info
 
 
 def extract_ceiling_types(doc, ctx=None):
-    return _blocked_stub_result()
+    info = {
+        "count": 0,
+        "raw_count": 0,
+        "hash_v2": None,
+        "records": [],
+        "record_rows": [],
+        "signature_hashes_v2": [],
+        "status": "ok",
+        "debug_blocked_no_cs": 0,
+        "debug_v2_blocked": False,
+        "debug_v2_block_reasons": {},
+    }
+
+    if ctx is None:
+        ctx = {}
+
+    if CeilingType is None:
+        info["status"] = "blocked"
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {"api_unreachable": 1}
+        return info
+
+    try:
+        ceiling_types = list(
+            collect_types(
+                doc,
+                of_class=CeilingType,
+                cctx=(ctx or {}).get("_collect"),
+                cache_key="compound_types:ceiling_types:CeilingType:types",
+            )
+        )
+    except Exception:
+        ceiling_types = []
+
+    info["raw_count"] = len(ceiling_types)
+
+    fp_uid_to_sig_hash = (ctx or {}).get("fill_pattern_uid_to_sig_hash_v2", None)
+    if not isinstance(fp_uid_to_sig_hash, dict):
+        fp_uid_to_sig_hash = (ctx or {}).get("fill_pattern_uid_to_hash", {}) or {}
+
+    records = []
+    sigs = []
+
+    for ct in ceiling_types:
+        type_name = _read_type_name(ct)
+
+        try:
+            cs = ct.GetCompoundStructure()
+        except Exception:
+            cs = None
+
+        if cs is None:
+            blocked_items = sorted([
+                make_identity_item("ct.type_name", type_name, ITEM_Q_OK),
+                make_identity_item("ct.layer_count", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+                make_identity_item("ct.total_thickness_in", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+                make_identity_item("ct.stack_hash_loose", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
+            ], key=lambda it: safe_str(it.get("k", "")))
+            rec = build_record_v2(
+                domain=_DOMAIN_CEILING,
+                record_id="ceiling_type|{}".format(type_name),
+                status=STATUS_BLOCKED,
+                status_reasons=["no_compound_structure"],
+                sig_hash=None,
+                identity_items=blocked_items,
+                required_qs=[ITEM_Q_OK],
+                label=_label_for_type(type_name),
+            )
+            rec["layer_rows"] = []
+            records.append(rec)
+            info["debug_blocked_no_cs"] += 1
+            info["debug_v2_blocked"] = True
+            info["debug_v2_block_reasons"]["no_compound_structure"] = (
+                info["debug_v2_block_reasons"].get("no_compound_structure", 0) + 1
+            )
+            continue
+
+        cs_data = _read_compound_structure(cs, doc, ctx, "ceiling")
+        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(ct, doc, fp_uid_to_sig_hash)
+
+        if cs_data.get("has_unreadable_thickness", False):
+            total_thickness_v, total_thickness_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            total_thickness_v, total_thickness_q = canonicalize_float(cs_data["total_thickness_in"], nd=4)
+
+        semantic = [
+            make_identity_item("ct.layer_count", *canonicalize_int(cs_data["layer_count"])),
+            make_identity_item("ct.total_thickness_in", total_thickness_v, total_thickness_q),
+            make_identity_item("ct.stack_hash_loose", *canonicalize_str(cs_data["stack_hash_loose"])),
+        ]
+        coordination = [
+            make_identity_item("ct.total_layer_rows", *canonicalize_int(cs_data["total_layer_rows"])),
+            make_identity_item("ct.stack_hash_strict", *canonicalize_str(cs_data["stack_hash_strict"])),
+            make_identity_item("ct.stack_hash_function_only", *canonicalize_str(cs_data["stack_hash_function_only"])),
+            make_identity_item("ct.coarse_fill_pattern_sig_hash", cfpsh_v, cfpsh_q),
+        ]
+        cosmetic = [
+            make_identity_item("ct.type_name", *canonicalize_str(type_name)),
+            make_identity_item("ct.coarse_fill_color_rgb", cfc_v, cfc_q),
+        ]
+
+        identity_items = sorted((semantic + coordination + cosmetic), key=lambda it: safe_str(it.get("k", "")))
+        required_keys = {"ct.layer_count", "ct.total_thickness_in", "ct.stack_hash_loose"}
+        required_qs = [it.get("q") for it in semantic if safe_str(it.get("k", "")) in required_keys]
+        required_not_ok = any(q != ITEM_Q_OK for q in required_qs)
+        status = STATUS_BLOCKED if required_not_ok else STATUS_OK
+        status_reasons = ["required_identity_not_ok"] if required_not_ok else []
+        sig_hash = None if required_not_ok else make_hash(serialize_identity_items(semantic))
+
+        rec = build_record_v2(
+            domain=_DOMAIN_CEILING,
+            record_id="ceiling_type|{}".format(type_name),
+            status=status,
+            status_reasons=status_reasons,
+            sig_hash=sig_hash,
+            identity_items=identity_items,
+            required_qs=required_qs,
+            label=_label_for_type(type_name),
+        )
+        rec["sig_basis"] = {
+            "schema": "ceiling_types.sig_basis.v1",
+            "keys_used": ["ct.layer_count", "ct.total_thickness_in", "ct.stack_hash_loose"],
+        }
+        rec["layer_rows"] = cs_data["layer_rows"]
+        records.append(rec)
+        if sig_hash is not None:
+            sigs.append(sig_hash)
+            info["count"] += 1
+        else:
+            info["debug_v2_blocked"] = True
+            info["debug_v2_block_reasons"]["required_identity_not_ok"] = (
+                info["debug_v2_block_reasons"].get("required_identity_not_ok", 0) + 1
+            )
+
+    info["records"] = records
+    info["signature_hashes_v2"] = sorted([s for s in sigs if s])
+    info["record_rows"] = [
+        {
+            "record_key": safe_str(r.get("record_id", "")),
+            "sig_hash": r.get("sig_hash", None),
+            "name": ((r.get("label", {}) or {}).get("display", None) if isinstance(r.get("label", {}), dict) else None),
+        }
+        for r in records
+    ]
+    if (not info["debug_v2_blocked"]) and info["signature_hashes_v2"]:
+        info["hash_v2"] = make_hash(info["signature_hashes_v2"])
+    else:
+        info["hash_v2"] = None
+    return info

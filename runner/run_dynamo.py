@@ -640,6 +640,90 @@ def run_fingerprint(doc, timing=None):
                 code=b.code, message=";".join(list(b.reasons))
             )
 
+    if _enabled("floor_types"):
+        try:
+            require_domain(contract_domains, "materials")
+            require_domain(contract_domains, "fill_patterns_drafting")
+            require_domain(contract_domains, "fill_patterns_model")
+            legacy = _domain_run(
+                "floor_types",
+                compound_types.extract_floor_types,
+                doc, ctx, contract_domains, run_diag, runner_notes,
+            )
+            if legacy is not None:
+                fingerprint["floor_types"] = legacy
+        except Blocked as b:
+            contract_domains["floor_types"] = contracts.new_domain_envelope(
+                domain="floor_types",
+                domain_version=_DOMAIN_VERSION,
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                block_reasons=list(b.reasons),
+                diag={"blocked_code": b.code, "upstream": b.upstream},
+                records=None,
+                hash_value=None,
+            )
+            contracts.add_bounded_error(
+                run_diag, domain="floor_types",
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                code=b.code, message=";".join(list(b.reasons))
+            )
+
+    if _enabled("roof_types"):
+        try:
+            require_domain(contract_domains, "materials")
+            require_domain(contract_domains, "fill_patterns_drafting")
+            require_domain(contract_domains, "fill_patterns_model")
+            legacy = _domain_run(
+                "roof_types",
+                compound_types.extract_roof_types,
+                doc, ctx, contract_domains, run_diag, runner_notes,
+            )
+            if legacy is not None:
+                fingerprint["roof_types"] = legacy
+        except Blocked as b:
+            contract_domains["roof_types"] = contracts.new_domain_envelope(
+                domain="roof_types",
+                domain_version=_DOMAIN_VERSION,
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                block_reasons=list(b.reasons),
+                diag={"blocked_code": b.code, "upstream": b.upstream},
+                records=None,
+                hash_value=None,
+            )
+            contracts.add_bounded_error(
+                run_diag, domain="roof_types",
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                code=b.code, message=";".join(list(b.reasons))
+            )
+
+    if _enabled("ceiling_types"):
+        try:
+            require_domain(contract_domains, "materials")
+            require_domain(contract_domains, "fill_patterns_drafting")
+            require_domain(contract_domains, "fill_patterns_model")
+            legacy = _domain_run(
+                "ceiling_types",
+                compound_types.extract_ceiling_types,
+                doc, ctx, contract_domains, run_diag, runner_notes,
+            )
+            if legacy is not None:
+                fingerprint["ceiling_types"] = legacy
+        except Blocked as b:
+            contract_domains["ceiling_types"] = contracts.new_domain_envelope(
+                domain="ceiling_types",
+                domain_version=_DOMAIN_VERSION,
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                block_reasons=list(b.reasons),
+                diag={"blocked_code": b.code, "upstream": b.upstream},
+                records=None,
+                hash_value=None,
+            )
+            contracts.add_bounded_error(
+                run_diag, domain="ceiling_types",
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                code=b.code, message=";".join(list(b.reasons))
+            )
+
     if _enabled("arrowheads"):
         legacy = _domain_run("arrowheads", arrowheads.extract, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
