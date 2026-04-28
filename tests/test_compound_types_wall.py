@@ -70,6 +70,22 @@ class _CS(object):
         return self._sweeps
 
 
+class _CSWrapError(_CS):
+    def __init__(self, layers, ext_idx, int_idx, sweeps=None):
+        self._layers = list(layers)
+        self._ext_idx = ext_idx
+        self._int_idx = int_idx
+        self._sweeps = list(sweeps or [])
+
+    @property
+    def WrapAtInserts(self):
+        raise RuntimeError("wrap inserts unreadable")
+
+    @property
+    def WrapAtEnds(self):
+        raise RuntimeError("wrap ends unreadable")
+
+
 class _WallType(object):
     def __init__(self, name, kind, cs, fn="Interior"):
         self.Name = name
@@ -365,3 +381,20 @@ def test_type_name_fallback_to_all_model_type_name(monkeypatch):
     out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
     rec = out["records"][0]
     assert rec["label"]["display"] == "Fallback Type Name"
+
+
+def test_unreadable_wrap_fields_do_not_block_required_identity(monkeypatch):
+    m = _setup_module(monkeypatch)
+    layers = [
+        _Layer("Structure", 0.5, 101),
+        _Layer("Substrate", 0.25, 102),
+        _Layer("Finish1", 0.125, 103),
+    ]
+    wall = _WallType("WrapReadErr", 0, _CSWrapError(layers=layers, ext_idx=1, int_idx=2))
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
+
+    out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
+    rec = out["records"][0]
+
+    assert rec["status"] == "ok"
+    assert rec["sig_hash"] is not None
