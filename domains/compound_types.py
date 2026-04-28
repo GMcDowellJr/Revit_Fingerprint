@@ -46,10 +46,6 @@ try:
         MaterialFunctionAssignment,
         BuiltInParameter,
         ShellLayerType,
-        FloorType,
-        RoofType,
-        CeilingType,
-        DeckEmbeddingType,
     )
 except ImportError:
     WallType = None
@@ -60,9 +56,28 @@ except ImportError:
     MaterialFunctionAssignment = None
     BuiltInParameter = None
     ShellLayerType = None
+
+try:
+    from Autodesk.Revit.DB import FloorType
+except ImportError:
     FloorType = None
+
+try:
+    from Autodesk.Revit.DB import RoofType
+except ImportError:
     RoofType = None
+
+try:
+    from Autodesk.Revit.DB import CeilingType
+except ImportError:
     CeilingType = None
+
+# DeckEmbeddingType is Revit 2024+. Catch AttributeError too — older runtimes
+# load the module but the name is absent, raising AttributeError, not ImportError.
+# All deck-property reads guard on DeckEmbeddingType is not None before use.
+try:
+    from Autodesk.Revit.DB import DeckEmbeddingType
+except (ImportError, AttributeError):
     DeckEmbeddingType = None
 
 _DOMAIN_WALL = "wall_types"
@@ -271,7 +286,10 @@ def _read_compound_structure(cs, doc, ctx, family):
             if is_structural_deck:
                 try:
                     raw_usage = cs.GetDeckEmbeddingType(i)
-                    deck_usage = _enum_name(DeckEmbeddingType, int(str(raw_usage)), _DECK_EMBEDDING_NAMES)
+                    if DeckEmbeddingType is not None:
+                        deck_usage = _enum_name(DeckEmbeddingType, int(str(raw_usage)), _DECK_EMBEDDING_NAMES)
+                    else:
+                        deck_usage = _DECK_EMBEDDING_NAMES.get(int(str(raw_usage)), str(raw_usage))
                 except Exception:
                     deck_usage = S_UNREADABLE
                 try:
