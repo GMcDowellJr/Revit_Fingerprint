@@ -64,6 +64,10 @@ except ImportError:
 
 # Global debug flag (will be configurable via runner later)
 DEBUG_INCLUDE_LINEPATTERN_SIGNATURES = True
+CTX_LINE_PATTERN_UID_TO_HASH = "line_pattern_uid_to_hash"
+CTX_LINE_PATTERN_ID_TO_VALUE = "line_pattern_id_to_value"
+CTX_LINE_PATTERN_SPECIAL_VALUES = "line_pattern_special_values"
+LINE_PATTERN_SYMBOLIC_SOLID = "<" + "Solid>"
 
 # Canonical, locked mapping observed in Dynamo output:
 # 0 = Dash, 1 = Space, 2 = Dot
@@ -189,6 +193,7 @@ def extract(doc, ctx=None):
     v2_records = []
     v2_sig_hashes = []
     uid_to_hash_v2 = {}
+    id_to_value = {}
 
 
 
@@ -468,6 +473,7 @@ def extract(doc, ctx=None):
         # Only publish non-blocked records to dependency map (UID as lookup key)
         if status_v2 != STATUS_BLOCKED and uid_v is not None and raw_uid is not None:
             uid_to_hash_v2[safe_str(raw_uid)] = sig_hash_v2
+            id_to_value[safe_str(e.Id.IntegerValue)] = sig_hash_v2
             v2_sig_hashes.append(sig_hash_v2)
         else:
             info["debug_v2_blocked"] += 1
@@ -482,7 +488,17 @@ def extract(doc, ctx=None):
     info["hash_v2"] = None if info["debug_v2_blocked"] > 0 else make_hash(info["signature_hashes_v2"])
 
     if ctx is not None:
-        ctx["line_pattern_uid_to_hash"] = uid_to_hash_v2
+        existing_uid = ctx.get(CTX_LINE_PATTERN_UID_TO_HASH) or {}
+        existing_uid.update(uid_to_hash_v2)
+        ctx[CTX_LINE_PATTERN_UID_TO_HASH] = existing_uid
+
+        existing_id = ctx.get(CTX_LINE_PATTERN_ID_TO_VALUE) or {}
+        existing_id.update(id_to_value)
+        ctx[CTX_LINE_PATTERN_ID_TO_VALUE] = existing_id
+
+        existing_specials = ctx.get(CTX_LINE_PATTERN_SPECIAL_VALUES) or {}
+        existing_specials.update({"solid": LINE_PATTERN_SYMBOLIC_SOLID})
+        ctx[CTX_LINE_PATTERN_SPECIAL_VALUES] = existing_specials
 
     try:
         recs = info.get("records") or []

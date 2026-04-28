@@ -565,7 +565,7 @@ def extract_wall_types(doc, ctx=None):
             wt_function = S_UNREADABLE
             wt_function_q = ITEM_Q_UNREADABLE
 
-        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(wt, doc, fp_uid_to_sig_hash)
+        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(wt, doc, fp_uid_to_sig_hash, ctx)
 
         # has embedded sweeps
         sweeps_v = None
@@ -673,7 +673,7 @@ def _label_for_type(type_name):
     }
 
 
-def _coarse_fill_reads(type_elem, doc, fp_uid_to_sig_hash):
+def _coarse_fill_reads(type_elem, doc, fp_uid_to_sig_hash, ctx=None):
     """Read coarse fill pattern sig hash and color from a compound type element.
 
     Prefer locale-independent BuiltInParameter access, with UI-name fallback
@@ -682,6 +682,11 @@ def _coarse_fill_reads(type_elem, doc, fp_uid_to_sig_hash):
     # fill pattern sig hash
     cfpsh_v = None
     cfpsh_q = ITEM_Q_MISSING
+    fp_id_to_value = (ctx or {}).get("fill_pattern_id_to_value", {}) or {}
+    fp_special_values = (ctx or {}).get("fill_pattern_special_values", {}) or {}
+    if not isinstance(fp_special_values, dict):
+        fp_special_values = {}
+    no_pattern_symbol = fp_special_values.get("no_pattern", None)
     try:
         p = None
         try:
@@ -694,14 +699,22 @@ def _coarse_fill_reads(type_elem, doc, fp_uid_to_sig_hash):
         else:
             pid = p.AsElementId()
             if pid is None or getattr(pid, "IntegerValue", -1) < 0:
-                cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
-            else:
-                pe = doc.GetElement(pid)
-                puid = getattr(pe, "UniqueId", None) if pe is not None else None
-                if puid and puid in fp_uid_to_sig_hash:
-                    cfpsh_v, cfpsh_q = canonicalize_str(fp_uid_to_sig_hash.get(puid))
+                if no_pattern_symbol:
+                    cfpsh_v, cfpsh_q = canonicalize_str(no_pattern_symbol)
                 else:
                     cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
+            else:
+                pid_key = safe_str(getattr(pid, "IntegerValue", ""))
+                mapped_value = fp_id_to_value.get(pid_key, None)
+                if mapped_value:
+                    cfpsh_v, cfpsh_q = canonicalize_str(mapped_value)
+                else:
+                    pe = doc.GetElement(pid)
+                    puid = getattr(pe, "UniqueId", None) if pe is not None else None
+                    if puid and puid in fp_uid_to_sig_hash:
+                        cfpsh_v, cfpsh_q = canonicalize_str(fp_uid_to_sig_hash.get(puid))
+                    else:
+                        cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
     except Exception:
         cfpsh_v, cfpsh_q = (None, ITEM_Q_UNREADABLE)
 
@@ -830,7 +843,7 @@ def extract_floor_types(doc, ctx=None):
             ft_function = S_UNREADABLE
             ft_function_q = ITEM_Q_UNREADABLE
 
-        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(ft, doc, fp_uid_to_sig_hash)
+        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(ft, doc, fp_uid_to_sig_hash, ctx)
 
         sweeps_v, sweeps_q = (None, ITEM_Q_UNREADABLE)
         try:
@@ -994,7 +1007,7 @@ def extract_roof_types(doc, ctx=None):
             continue
 
         cs_data = _read_compound_structure(cs, doc, ctx, "roof")
-        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(rt, doc, fp_uid_to_sig_hash)
+        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(rt, doc, fp_uid_to_sig_hash, ctx)
 
         if cs_data.get("has_unreadable_thickness", False):
             total_thickness_v, total_thickness_q = (None, ITEM_Q_UNREADABLE)
@@ -1149,7 +1162,7 @@ def extract_ceiling_types(doc, ctx=None):
             continue
 
         cs_data = _read_compound_structure(cs, doc, ctx, "ceiling")
-        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(ct, doc, fp_uid_to_sig_hash)
+        cfpsh_v, cfpsh_q, cfc_v, cfc_q = _coarse_fill_reads(ct, doc, fp_uid_to_sig_hash, ctx)
 
         if cs_data.get("has_unreadable_thickness", False):
             total_thickness_v, total_thickness_q = (None, ITEM_Q_UNREADABLE)

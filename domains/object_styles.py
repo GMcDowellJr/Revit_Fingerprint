@@ -178,6 +178,18 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
             lp_uid_to_sig_hash_v2 = None
     except Exception:
         lp_uid_to_sig_hash_v2 = None
+    try:
+        lp_id_to_value = (ctx or {}).get("line_pattern_id_to_value", {}) if ctx is not None else {}
+        if not isinstance(lp_id_to_value, dict):
+            lp_id_to_value = {}
+    except Exception:
+        lp_id_to_value = {}
+    try:
+        lp_special_values = (ctx or {}).get("line_pattern_special_values", {}) if ctx is not None else {}
+        if not isinstance(lp_special_values, dict):
+            lp_special_values = {}
+    except Exception:
+        lp_special_values = {}
 
     try:
         cats = _collect_categories(doc, ctx, kind=kind)
@@ -278,15 +290,20 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
 
             lp_sig_hash_v = None
             lp_sig_hash_q = ITEM_Q_MISSING
+            lp_id_read_failed = False
             try:
                 lp_id_v2 = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
             except Exception:
                 lp_id_v2 = None
+                lp_id_read_failed = True
                 status_v2 = STATUS_DEGRADED
                 status_reasons.append("get_line_pattern_id_failed")
 
             if lp_id_v2 and getattr(lp_id_v2, "IntegerValue", 0) > 0:
-                if lp_uid_to_sig_hash_v2 is None:
+                pid_key = safe_str(getattr(lp_id_v2, "IntegerValue", ""))
+                if pid_key in lp_id_to_value:
+                    lp_sig_hash_v, lp_sig_hash_q = canonicalize_str(lp_id_to_value.get(pid_key))
+                elif lp_uid_to_sig_hash_v2 is None:
                     status_v2 = STATUS_DEGRADED
                     status_reasons.append("dependency_missing_line_patterns_v2_sig_hash")
                 else:
@@ -304,6 +321,8 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
                         else:
                             status_v2 = STATUS_DEGRADED
                             status_reasons.append("dependency_unmapped_line_pattern_v2_sig_hash")
+            elif (not lp_id_read_failed) and lp_id_v2 is not None and getattr(lp_id_v2, "IntegerValue", 0) <= 0:
+                lp_sig_hash_v, lp_sig_hash_q = canonicalize_str(lp_special_values.get("solid", None))
             identity_items.append(make_identity_item("obj_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
 
             if any(q != ITEM_Q_OK for q in required_qs):
