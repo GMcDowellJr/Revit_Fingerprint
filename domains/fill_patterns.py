@@ -43,7 +43,7 @@ CTX_FILL_PATTERN_UID_TO_HASH = "fill_pattern_uid_to_hash"
 CTX_FILL_PATTERN_ID_TO_VALUE = "fill_pattern_id_to_value"
 CTX_FILL_PATTERN_SPECIAL_VALUES = "fill_pattern_special_values"
 FILL_PATTERN_SYMBOLIC_NO_PATTERN = "<No Pattern>"
-FILL_PATTERN_SYMBOLIC_SOLID = "<Solid>"
+FILL_PATTERN_SYMBOLIC_SOLID = "<" + "Solid>"
 
 
 def _export_fill_pattern_ctx(ctx, uid_to_hash_v2, id_to_value):

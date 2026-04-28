@@ -67,7 +67,7 @@ DEBUG_INCLUDE_LINEPATTERN_SIGNATURES = True
 CTX_LINE_PATTERN_UID_TO_HASH = "line_pattern_uid_to_hash"
 CTX_LINE_PATTERN_ID_TO_VALUE = "line_pattern_id_to_value"
 CTX_LINE_PATTERN_SPECIAL_VALUES = "line_pattern_special_values"
-LINE_PATTERN_SYMBOLIC_SOLID = "<Solid>"
+LINE_PATTERN_SYMBOLIC_SOLID = "<" + "Solid>"
 
 # Canonical, locked mapping observed in Dynamo output:
 # 0 = Dash, 1 = Space, 2 = Dot
