@@ -96,6 +96,47 @@ except Exception:
     # Default OFF on any thinrunner failure here
     os.environ["REVIT_FINGERPRINT_FILENAME_STAMP"] = "0"
 
+# Optional: IN[4] controls dev/production output mode
+#  - "dev"                => full output, human-readable indent, layer_rows preserved
+#  - "production" / "prod" => compact serialization, detail surfaces suppressed
+#  - Missing/None/empty   => default to "production" (safer for corpus runs)
+#  - Unparseable          => env var not set + warning (run_dynamo defaults to production)
+#
+# NOTE: IN[3] is reserved for .dyn graph-path probing (see _iter_dyn_path_candidates).
+#       The output mode flag occupies IN[4] to avoid conflicting with that usage.
+try:
+    raw_in4 = None
+    have_in4 = (IN is not None and len(IN) > 4)
+    if have_in4:
+        raw_in4 = IN[4]
+
+    if raw_in4 is None or (isinstance(raw_in4, str) and not raw_in4.strip()):
+        # Missing / None / empty string => production default
+        os.environ["REVIT_FINGERPRINT_OUTPUT_MODE"] = "production"
+    else:
+        try:
+            _mode_raw = str(raw_in4).strip().lower()
+            if _mode_raw == "dev":
+                os.environ["REVIT_FINGERPRINT_OUTPUT_MODE"] = "dev"
+            elif _mode_raw in ("production", "prod"):
+                os.environ["REVIT_FINGERPRINT_OUTPUT_MODE"] = "production"
+            else:
+                # Unparseable: leave env var absent so run_dynamo applies its own default
+                os.environ.pop("REVIT_FINGERPRINT_OUTPUT_MODE", None)
+                _thinrunner_warnings.append(
+                    "IN[4] unparseable for output mode ('{}'): "
+                    "REVIT_FINGERPRINT_OUTPUT_MODE not set; run_dynamo will default to production".format(raw_in4)
+                )
+        except Exception:
+            os.environ.pop("REVIT_FINGERPRINT_OUTPUT_MODE", None)
+            _thinrunner_warnings.append(
+                "IN[4] error parsing output mode; "
+                "REVIT_FINGERPRINT_OUTPUT_MODE not set; run_dynamo will default to production"
+            )
+except Exception:
+    # Safe default: production on any thinrunner failure
+    os.environ["REVIT_FINGERPRINT_OUTPUT_MODE"] = "production"
+
 # MUST be the repo root that contains: core/, domains/, runner/
 # Dynamo-node safe behavior:
 #  - No __file__ reliance (this code is pasted into a Dynamo Python node)
