@@ -104,12 +104,26 @@ def extract(doc, ctx=None):
 
     # Dependency map: LinePatternElement.UniqueId -> line_patterns record.v2 sig_hash
     lp_uid_to_sig_hash_v2 = None
+    lp_id_to_value = {}
+    lp_special_values = {}
     try:
         lp_uid_to_sig_hash_v2 = (ctx or {}).get("line_pattern_uid_to_hash", None) if ctx is not None else None
         if not isinstance(lp_uid_to_sig_hash_v2, dict) or not lp_uid_to_sig_hash_v2:
             lp_uid_to_sig_hash_v2 = None
     except Exception:
         lp_uid_to_sig_hash_v2 = None
+    try:
+        lp_id_to_value = (ctx or {}).get("line_pattern_id_to_value", {}) if ctx is not None else {}
+        if not isinstance(lp_id_to_value, dict):
+            lp_id_to_value = {}
+    except Exception:
+        lp_id_to_value = {}
+    try:
+        lp_special_values = (ctx or {}).get("line_pattern_special_values", {}) if ctx is not None else {}
+        if not isinstance(lp_special_values, dict):
+            lp_special_values = {}
+    except Exception:
+        lp_special_values = {}
 
     # Collect line style subcategories under OST_Lines
     try:
@@ -238,13 +252,13 @@ def extract(doc, ctx=None):
 
             if is_solid:
                 lp_kind_v = "solid"
-                # Deterministic, non-referential sentinel so SOLID can join cleanly.
-                # This is NOT a UID/name/id and is stable across files.
-                lp_sig_hash_v = "SOLID"
-                lp_sig_hash_q = ITEM_Q_OK
+                lp_sig_hash_v, lp_sig_hash_q = canonicalize_str(lp_special_values.get("solid", None))
             else:
                 lp_kind_v = "ref"
-                if lp_uid_to_sig_hash_v2 is None:
+                pid_key = safe_str(getattr(lp_id, "IntegerValue", ""))
+                if pid_key in lp_id_to_value:
+                    lp_sig_hash_v, lp_sig_hash_q = canonicalize_str(lp_id_to_value.get(pid_key))
+                elif lp_uid_to_sig_hash_v2 is None:
                     status_v2 = STATUS_DEGRADED
                     status_reasons.append("dependency_missing_line_patterns_v2_sig_hash")
                 else:

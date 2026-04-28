@@ -39,6 +39,30 @@ DEBUG_INCLUDE_FILLPATTERN_SIGNATURES = False
 _CTX_FILL_PATTERNS_CACHE_KEY = "_fill_patterns_cache"
 _TARGET_DRAFTING_INT = 0
 _TARGET_MODEL_INT = 1
+CTX_FILL_PATTERN_UID_TO_HASH = "fill_pattern_uid_to_hash"
+CTX_FILL_PATTERN_ID_TO_VALUE = "fill_pattern_id_to_value"
+CTX_FILL_PATTERN_SPECIAL_VALUES = "fill_pattern_special_values"
+FILL_PATTERN_SYMBOLIC_NO_PATTERN = "<No Pattern>"
+FILL_PATTERN_SYMBOLIC_SOLID = "<Solid>"
+
+
+def _export_fill_pattern_ctx(ctx, uid_to_hash_v2, id_to_value):
+    if ctx is None:
+        return
+    existing_uid = ctx.get(CTX_FILL_PATTERN_UID_TO_HASH) or {}
+    existing_uid.update(uid_to_hash_v2 or {})
+    ctx[CTX_FILL_PATTERN_UID_TO_HASH] = existing_uid
+
+    existing_id = ctx.get(CTX_FILL_PATTERN_ID_TO_VALUE) or {}
+    existing_id.update(id_to_value or {})
+    ctx[CTX_FILL_PATTERN_ID_TO_VALUE] = existing_id
+
+    existing_specials = ctx.get(CTX_FILL_PATTERN_SPECIAL_VALUES) or {}
+    existing_specials.update({
+        "no_pattern": FILL_PATTERN_SYMBOLIC_NO_PATTERN,
+        "solid": FILL_PATTERN_SYMBOLIC_SOLID,
+    })
+    ctx[CTX_FILL_PATTERN_SPECIAL_VALUES] = existing_specials
 
 
 def _collect_fill_patterns(doc, ctx):
@@ -533,6 +557,7 @@ def extract_drafting(doc, ctx=None):
     v2_sig_hashes = []
     names = []
     uid_to_hash_v2 = {}
+    id_to_value = {}
     uid_to_hash = {}
 
     for e in col:
@@ -566,6 +591,7 @@ def extract_drafting(doc, ctx=None):
         if fp is not None:
             try:
                 if fp.IsSolidFill:
+                    id_to_value[safe_str(e.Id.IntegerValue)] = FILL_PATTERN_SYMBOLIC_SOLID
                     continue
             except Exception:
                 pass  # if unreadable, proceed and let field-level q handle it
@@ -905,6 +931,7 @@ def extract_drafting(doc, ctx=None):
             v2_sig_hashes.append(sig_hash_v2)
             if uid:
                 uid_to_hash_v2[uid] = sig_hash_v2
+            id_to_value[safe_str(e.Id.IntegerValue)] = sig_hash_v2
 
         info["debug_kept"] += 1
 
@@ -919,12 +946,10 @@ def extract_drafting(doc, ctx=None):
     else:
         info["hash_v2"] = make_hash(info["signature_hashes_v2"])
 
-    # Context mapping (UID is allowed only as lookup key; values are semantic hashes)
-    # Both drafting and model domains contribute to the same fill_pattern_uid_to_hash map
-    if ctx is not None:
-        existing = ctx.get("fill_pattern_uid_to_hash") or {}
-        existing.update(uid_to_hash_v2)
-        ctx["fill_pattern_uid_to_hash"] = existing
+    # Context mapping:
+    # - UID lookup preserves existing dependency contract for readers.
+    # - ElementId lookup and special values provide producer-side symbolic resolution.
+    _export_fill_pattern_ctx(ctx, uid_to_hash_v2, id_to_value)
 
     info["record_rows"] = [{
         "record_key": safe_str(r.get("record_id", "")),
@@ -1410,6 +1435,7 @@ def extract_model(doc, ctx=None):
     v2_sig_hashes = []
     names = []
     uid_to_hash_v2 = {}
+    id_to_value = {}
     uid_to_hash = {}
 
     for e in col:
@@ -1443,6 +1469,7 @@ def extract_model(doc, ctx=None):
         if fp is not None:
             try:
                 if fp.IsSolidFill:
+                    id_to_value[safe_str(e.Id.IntegerValue)] = FILL_PATTERN_SYMBOLIC_SOLID
                     continue
             except Exception:
                 pass  # if unreadable, proceed and let field-level q handle it
@@ -1782,6 +1809,7 @@ def extract_model(doc, ctx=None):
             v2_sig_hashes.append(sig_hash_v2)
             if uid:
                 uid_to_hash_v2[uid] = sig_hash_v2
+            id_to_value[safe_str(e.Id.IntegerValue)] = sig_hash_v2
 
         info["debug_kept"] += 1
 
@@ -1796,12 +1824,10 @@ def extract_model(doc, ctx=None):
     else:
         info["hash_v2"] = make_hash(info["signature_hashes_v2"])
 
-    # Context mapping (UID is allowed only as lookup key; values are semantic hashes)
-    # Both drafting and model domains contribute to the same fill_pattern_uid_to_hash map
-    if ctx is not None:
-        existing = ctx.get("fill_pattern_uid_to_hash") or {}
-        existing.update(uid_to_hash_v2)
-        ctx["fill_pattern_uid_to_hash"] = existing
+    # Context mapping:
+    # - UID lookup preserves existing dependency contract for readers.
+    # - ElementId lookup and special values provide producer-side symbolic resolution.
+    _export_fill_pattern_ctx(ctx, uid_to_hash_v2, id_to_value)
 
     info["record_rows"] = [{
         "record_key": safe_str(r.get("record_id", "")),

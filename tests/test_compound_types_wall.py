@@ -13,6 +13,20 @@ class _MatElem(object):
         self.UniqueId = uid
 
 
+class _FillPatternDef(object):
+    def __init__(self, is_solid=False):
+        self.IsSolidFill = bool(is_solid)
+
+
+class _FillPatternElem(object):
+    def __init__(self, uid, is_solid=False):
+        self.UniqueId = uid
+        self._fp = _FillPatternDef(is_solid=is_solid)
+
+    def GetFillPattern(self):
+        return self._fp
+
+
 class _Param(object):
     def __init__(self, elem_id=None, intval=None):
         self._eid = elem_id
@@ -107,7 +121,7 @@ class _CSWrapError(_CS):
 
 
 class _WallType(object):
-    def __init__(self, name, kind, cs, fn="Interior"):
+    def __init__(self, name, kind, cs, fn="Interior", coarse_fill_id=-1):
         self.Name = name
         self.Kind = kind
         _fn_map = {
@@ -120,6 +134,7 @@ class _WallType(object):
         }
         self._fn = _fn_map.get(fn, fn)
         self._cs = cs
+        self._coarse_fill_id = coarse_fill_id
 
     @property
     def Function(self):
@@ -132,7 +147,7 @@ class _WallType(object):
 
     def get_Parameter(self, bip):
         if bip == "BIP_FILL_PATTERN":
-            return _Param(elem_id=_Id(-1))
+            return _Param(elem_id=_Id(self._coarse_fill_id))
         if bip == "BIP_FILL_COLOR":
             # BGR int encoding expected by extractor
             return _Param(intval=(3 << 16) + (2 << 8) + 1)
@@ -150,11 +165,14 @@ class _ParamString(object):
 
 
 class _Doc(object):
-    def __init__(self, id_to_uid=None):
+    def __init__(self, id_to_uid=None, id_to_elem=None):
         self._id_to_uid = id_to_uid or {}
+        self._id_to_elem = id_to_elem or {}
 
     def GetElement(self, eid):
         i = getattr(eid, "IntegerValue", None)
+        if i in self._id_to_elem:
+            return self._id_to_elem[i]
         if i in self._id_to_uid:
             return _MatElem(self._id_to_uid[i])
         return None
@@ -178,6 +196,8 @@ def _default_ctx(m):
         m.CTX_MATERIAL_UID_TO_NAME: {"m1": "Concrete A", "m2": "Gypsum", "m3": "Brick"},
         m.CTX_MATERIAL_UID_TO_CLASS: {"m1": "Structure", "m2": "Finish", "m3": "Masonry"},
         "fill_pattern_uid_to_sig_hash_v2": {},
+        "fill_pattern_special_values": {"no_pattern": "<No Pattern>", "solid": "<Solid>"},
+        "fill_pattern_id_to_value": {},
     }
 
 
@@ -306,6 +326,43 @@ def test_material_ctx_miss_emits_missing_sentinel(monkeypatch):
 
     assert all(r["wl.material_name"] == "<MISSING>" for r in real_rows)
     assert all(r["wl.material_class"] == "<MISSING>" for r in real_rows)
+
+
+def test_coarse_fill_invalid_id_uses_producer_no_pattern_symbol(monkeypatch):
+    m = _setup_module(monkeypatch)
+    wall = _basic_wall("No Pattern")
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
+
+    rec = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))["records"][0]
+    val = [it for it in rec["identity_basis"]["items"] if it["k"] == "wt.coarse_fill_pattern_sig_hash"][0]["v"]
+    assert val == "<No Pattern>"
+
+
+def test_coarse_fill_uses_producer_mapping_for_solid_and_uid_hash(monkeypatch):
+    m = _setup_module(monkeypatch)
+    wall_solid = _basic_wall("Solid Case")
+    wall_solid._coarse_fill_id = 501
+    wall_ref = _basic_wall("Ref Case")
+    wall_ref._coarse_fill_id = 502
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall_solid, wall_ref])
+
+    doc = _Doc(
+        {101: "m1", 102: "m2", 103: "m3"},
+        id_to_elem={
+            501: _FillPatternElem("solid-uid", is_solid=True),
+            502: _FillPatternElem("ref-uid", is_solid=False),
+        },
+    )
+    ctx = _default_ctx(m)
+    ctx["fill_pattern_id_to_value"] = {"501": "<Solid>"}
+    ctx["fill_pattern_uid_to_sig_hash_v2"] = {"ref-uid": "h-ref"}
+    out = m.extract_wall_types(doc, ctx)
+    values = {
+        rec["label"]["display"]: [it for it in rec["identity_basis"]["items"] if it["k"] == "wt.coarse_fill_pattern_sig_hash"][0]["v"]
+        for rec in out["records"]
+    }
+    assert values["Solid Case"] == "<Solid>"
+    assert values["Ref Case"] == "h-ref"
 
 
 def test_type_name_not_in_sig_hash(monkeypatch):
@@ -453,4 +510,3 @@ def test_mixed_ok_and_blocked_records_keep_domain_hash_blocked(monkeypatch):
     out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
     assert out["debug_v2_blocked"] is True
     assert out["hash_v2"] is None
-

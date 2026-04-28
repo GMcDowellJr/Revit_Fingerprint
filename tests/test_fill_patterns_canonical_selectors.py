@@ -69,3 +69,26 @@ def test_fill_patterns_model_join_key_uses_policy_required_keys_only():
         "fill_pattern.grid_count",
         "fill_pattern.grids_def_hash",
     }
+
+
+def test_fill_pattern_ctx_contract_exports_specials_and_preserves_uid_map():
+    from domains.fill_patterns import _export_fill_pattern_ctx
+
+    ctx = {
+        "fill_pattern_uid_to_hash": {"u-existing": "h-existing"},
+        "fill_pattern_id_to_value": {"10": "h-10"},
+        "fill_pattern_special_values": {"legacy": "kept"},
+    }
+    _export_fill_pattern_ctx(
+        ctx,
+        uid_to_hash_v2={"u-new": "h-new"},
+        id_to_value={"20": "h-20", "99": "<Solid>"},
+    )
+
+    assert ctx["fill_pattern_uid_to_hash"]["u-existing"] == "h-existing"
+    assert ctx["fill_pattern_uid_to_hash"]["u-new"] == "h-new"
+    assert ctx["fill_pattern_id_to_value"]["10"] == "h-10"
+    assert ctx["fill_pattern_id_to_value"]["20"] == "h-20"
+    assert ctx["fill_pattern_special_values"]["no_pattern"] == "<No Pattern>"
+    assert ctx["fill_pattern_special_values"]["solid"] == "<Solid>"
+    assert ctx["fill_pattern_special_values"]["legacy"] == "kept"
