@@ -739,6 +739,119 @@
       "minima": {
         "block_if_any_required_not_ok": true
       }
+    },
+
+    "floor_types": {
+      "domain_family": "compound_types",
+      "allowed_keys": [
+        "ft.function",
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose",
+        "ft.total_layer_rows",
+        "ft.stack_hash_strict",
+        "ft.stack_hash_function_only",
+        "ft.coarse_fill_pattern_sig_hash",
+        "ft.has_embedded_sweeps",
+        "ft.type_name",
+        "ft.coarse_fill_color_rgb"
+      ],
+      "required_keys": [
+        "ft.function",
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose"
+      ],
+      "required": [
+        "ft.function",
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose"
+      ],
+      "optional": [
+        "ft.total_layer_rows",
+        "ft.stack_hash_strict",
+        "ft.stack_hash_function_only",
+        "ft.coarse_fill_pattern_sig_hash",
+        "ft.has_embedded_sweeps",
+        "ft.type_name",
+        "ft.coarse_fill_color_rgb"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "roof_types": {
+      "domain_family": "compound_types",
+      "allowed_keys": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose",
+        "rt.total_layer_rows",
+        "rt.stack_hash_strict",
+        "rt.stack_hash_function_only",
+        "rt.coarse_fill_pattern_sig_hash",
+        "rt.type_name",
+        "rt.coarse_fill_color_rgb"
+      ],
+      "required_keys": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose"
+      ],
+      "required": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose"
+      ],
+      "optional": [
+        "rt.total_layer_rows",
+        "rt.stack_hash_strict",
+        "rt.stack_hash_function_only",
+        "rt.coarse_fill_pattern_sig_hash",
+        "rt.type_name",
+        "rt.coarse_fill_color_rgb"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+
+    "ceiling_types": {
+      "domain_family": "compound_types",
+      "allowed_keys": [
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose",
+        "ct.total_layer_rows",
+        "ct.stack_hash_strict",
+        "ct.stack_hash_function_only",
+        "ct.coarse_fill_pattern_sig_hash",
+        "ct.type_name",
+        "ct.coarse_fill_color_rgb"
+      ],
+      "required_keys": [
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose"
+      ],
+      "required": [
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose"
+      ],
+      "optional": [
+        "ct.total_layer_rows",
+        "ct.stack_hash_strict",
+        "ct.stack_hash_function_only",
+        "ct.coarse_fill_pattern_sig_hash",
+        "ct.type_name",
+        "ct.coarse_fill_color_rgb"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
     }
   }
 }

@@ -776,6 +776,61 @@
         "Wrapping params are optional — degrade gracefully if unreadable.",
         "wt.type_name excluded per D-001 — names are labels only."
       ]
+    },
+    "floor_types": {
+      "join_key_schema": "floor_types.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "ft.function",
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "ft.type_name",
+        "ft.coarse_fill_color_rgb"
+      ],
+      "notes": [
+        "Domain family: compound_types.",
+        "stack_hash_loose includes deck_usage for structural deck layers."
+      ]
+    },
+    "roof_types": {
+      "join_key_schema": "roof_types.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "rt.type_name",
+        "rt.coarse_fill_color_rgb"
+      ],
+      "notes": [
+        "Domain family: compound_types.",
+        "Basic Roof only — non-basic types blocked."
+      ]
+    },
+    "ceiling_types": {
+      "join_key_schema": "ceiling_types.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "ct.type_name",
+        "ct.coarse_fill_color_rgb"
+      ],
+      "notes": [
+        "Domain family: compound_types.",
+        "Compound Ceiling only — non-compound types blocked."
+      ]
     }
   }
 }
