@@ -453,3 +453,4 @@ def test_mixed_ok_and_blocked_records_keep_domain_hash_blocked(monkeypatch):
     out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
     assert out["debug_v2_blocked"] is True
     assert out["hash_v2"] is None
+
