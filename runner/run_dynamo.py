@@ -148,6 +148,7 @@ from domains import view_category_overrides_annotation
 from domains import object_styles
 from domains import fill_patterns
 from domains import materials
+from domains import compound_types
 from domains import dimension_types
 from domains import view_templates
 from core.manifest import build_manifest
@@ -607,6 +608,37 @@ def run_fingerprint(doc, timing=None):
         )
         if legacy is not None:
             fingerprint["materials"] = legacy
+
+    # compound_types: wall_types partition
+    # Hard dependencies: materials (layer material resolution) and
+    # fill_patterns (coarse fill pattern sig_hash resolution).
+    if _enabled("wall_types"):
+        try:
+            require_domain(contract_domains, "materials")
+            require_domain(contract_domains, "fill_patterns_drafting")
+            require_domain(contract_domains, "fill_patterns_model")
+            legacy = _domain_run(
+                "wall_types",
+                compound_types.extract_wall_types,
+                doc, ctx, contract_domains, run_diag, runner_notes,
+            )
+            if legacy is not None:
+                fingerprint["wall_types"] = legacy
+        except Blocked as b:
+            contract_domains["wall_types"] = contracts.new_domain_envelope(
+                domain="wall_types",
+                domain_version=_DOMAIN_VERSION,
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                block_reasons=list(b.reasons),
+                diag={"blocked_code": b.code, "upstream": b.upstream},
+                records=None,
+                hash_value=None,
+            )
+            contracts.add_bounded_error(
+                run_diag, domain="wall_types",
+                status=contracts.DOMAIN_STATUS_BLOCKED,
+                code=b.code, message=";".join(list(b.reasons))
+            )
 
     if _enabled("arrowheads"):
         legacy = _domain_run("arrowheads", arrowheads.extract, doc, ctx, contract_domains, run_diag, runner_notes)

@@ -751,6 +751,31 @@
         "Domain family routing is handled by coordination_items.vt.view_type_family, not by the join key.",
         "Contains: ViewType.Schedule, ViewType.PanelSchedule."
       ]
+    },
+    "wall_types": {
+      "join_key_schema": "wall_types.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "wt.function",
+        "wt.layer_count",
+        "wt.total_thickness_in",
+        "wt.stack_hash_loose"
+      ],
+      "optional_items": [
+        "wt.wraps_at_inserts",
+        "wt.wraps_at_ends"
+      ],
+      "explicitly_excluded_items": [
+        "wt.type_name",
+        "wt.coarse_fill_color_rgb"
+      ],
+      "notes": [
+        "Domain family: compound_types.",
+        "stack_hash_loose is both sig_hash input and primary join discriminator.",
+        "stack_hash_strict and stack_hash_function_only are coordination items for pareto evaluation.",
+        "Wrapping params are optional — degrade gracefully if unreadable.",
+        "wt.type_name excluded per D-001 — names are labels only."
+      ]
     }
   }
 }
