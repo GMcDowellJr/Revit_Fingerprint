@@ -6,7 +6,7 @@ between runs, so edited project modules are re-imported without restarting Revit
 Intended for testing/development only.
 
 Dynamo inputs (optional):
-- IN[0]: prefixes to purge (string "a,b" or list). Default: [] (purge all non-protected)
+- IN[0]: prefixes to purge (string "a,b" or list). Default: ["runner", "core", "domains"]
 - IN[1]: exact module names to purge (string "a,b" or list). Default: []
 - IN[2]: dry run flag (True/False). Default: False
 
@@ -70,7 +70,6 @@ def _is_protected(module_name):
 def purge_modules(prefixes, exact_names, dry_run=False):
     prefixes = tuple(prefixes)
     exact_names = set(exact_names)
-    purge_all = (not prefixes and not exact_names)
 
     to_remove = []
     for name in list(sys.modules.keys()):
@@ -78,8 +77,7 @@ def purge_modules(prefixes, exact_names, dry_run=False):
             continue
 
         matched = (
-            purge_all
-            or name in exact_names
+            name in exact_names
             or any(name == p or name.startswith(p + ".") for p in prefixes)
         )
         if matched:
@@ -100,7 +98,6 @@ def purge_modules(prefixes, exact_names, dry_run=False):
 
     return {
         "status": "dry_run" if dry_run else "ok",
-        "purge_all": purge_all,
         "prefixes": list(prefixes),
         "exact_names": sorted(list(exact_names)),
         "matched_count": len(to_remove),
@@ -113,11 +110,16 @@ def purge_modules(prefixes, exact_names, dry_run=False):
     }
 
 
+_default_prefixes = ["runner", "core", "domains"]
+
 try:
     _in = IN if "IN" in globals() else []
     _prefixes = _to_list(_in[0]) if len(_in) > 0 else []
     _exact = _to_list(_in[1]) if len(_in) > 1 else []
     _dry_run = _to_bool(_in[2], default=False) if len(_in) > 2 else False
+
+    if not _prefixes:
+        _prefixes = _default_prefixes
 
     OUT = purge_modules(_prefixes, _exact, dry_run=_dry_run)
 except Exception as exc:
