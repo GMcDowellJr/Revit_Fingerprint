@@ -2,6 +2,8 @@
 
 import importlib
 
+from core.hashing import make_hash
+from core.record_v2 import serialize_identity_items
 
 class _Id(object):
     def __init__(self, iv):
@@ -237,14 +239,54 @@ def test_optional_identity_fields_do_not_emit_canonical_sentinel_literals(monkey
     assert payload["comments"] is None
 
 
-def test_identity_basis_is_minimal_and_uid_only(monkeypatch):
+def test_identity_basis_contains_uid_and_sig_basis_items(monkeypatch):
     m = importlib.import_module("domains.materials")
     monkeypatch.setattr(m, "Material", object)
     monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [_Mat(uid="uid-x")])
     result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG")}), ctx=_make_ctx_with_fill_patterns(m))
 
     items = (((result["records"][0] or {}).get("identity_basis", {}) or {}).get("items", [])) or []
-    assert [it.get("k") for it in items] == ["material.uid"]
+    ks = [it.get("k") for it in items]
+    assert "material.uid" in ks
+    assert "material.sig.shading_color_rgb" in ks
+
+
+def test_sig_basis_keys_used_reproduces_sig_hash(monkeypatch):
+    m = importlib.import_module("domains.materials")
+    monkeypatch.setattr(m, "Material", object)
+    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [_Mat(uid="uid-sig")])
+    result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG"), 12: _FillPatternElem("fp-12", "BG"), 13: _FillPatternElem("fp-13", "CFG"), 14: _FillPatternElem("fp-14", "CBG")}), ctx=_make_ctx_with_fill_patterns(m))
+
+    rec = result["records"][0]
+    items = (((rec or {}).get("identity_basis", {}) or {}).get("items", [])) or []
+    keys_used = (((rec or {}).get("sig_basis", {}) or {}).get("keys_used", [])) or []
+    preimage = serialize_identity_items([it for it in items if it.get("k") in set(keys_used)])
+    assert make_hash(preimage) == rec["sig_hash"]
+
+
+def test_label_uses_contract_provenance_token(monkeypatch):
+    m = importlib.import_module("domains.materials")
+    monkeypatch.setattr(m, "Material", object)
+    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [_Mat(uid="uid-prov")])
+    result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG")}), ctx=_make_ctx_with_fill_patterns(m))
+    assert result["records"][0]["label"]["provenance"] == "computed.path"
+
+
+def test_fill_pattern_ctx_missing_is_evaluated_per_record(monkeypatch):
+    m = importlib.import_module("domains.materials")
+    monkeypatch.setattr(m, "Material", object)
+    a = _Mat(uid="uid-a")
+    b = _Mat(uid="uid-b")
+    b.SurfaceForegroundPatternId = _Id(-1)
+    b.SurfaceBackgroundPatternId = _Id(-1)
+    b.CutForegroundPatternId = _Id(-1)
+    b.CutBackgroundPatternId = _Id(-1)
+    monkeypatch.setattr(m, "collect_instances", lambda *a_, **k: [a, b])
+
+    result = m.extract(doc=_Doc({}), ctx={})
+    by_id = {r["record_id"]: r for r in result["records"]}
+    assert "fill_pattern_ctx_missing" in by_id["uid:uid-a"]["status_reasons"]
+    assert "fill_pattern_ctx_missing" not in by_id["uid:uid-b"]["status_reasons"]
 
 
 def test_blocked_when_api_unavailable(monkeypatch):

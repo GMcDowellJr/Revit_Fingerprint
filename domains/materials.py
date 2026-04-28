@@ -30,6 +30,7 @@ from core.record_v2 import (
     canonicalize_str,
     canonicalize_int,
     make_identity_item,
+    serialize_identity_items,
     build_record_v2,
 )
 
@@ -144,6 +145,7 @@ def _resolve_pattern_slot(*, doc, ctx, pattern_id_obj, debug):
         "uid": S_MISSING,
         "name": S_MISSING,
         "sig_hash": S_MISSING,
+        "_ctx_missing": False,
     }
 
     if pid_q == ITEM_Q_UNREADABLE:
@@ -163,6 +165,7 @@ def _resolve_pattern_slot(*, doc, ctx, pattern_id_obj, debug):
     id_to_value = (ctx or {}).get(CTX_FILL_PATTERN_ID_TO_VALUE) if ctx is not None else None
     if not isinstance(id_to_value, dict) or not id_to_value:
         debug["debug_pattern_ctx_missing"] += 1
+        out["_ctx_missing"] = True
         out["sig_hash"] = S_UNRESOLVED
     else:
         mapped = id_to_value.get(pid_v)
@@ -226,20 +229,18 @@ def _mk_item(k, v):
     return make_identity_item(k, vv, qq)
 
 
-def _graphics_sig_hash_v2(material_payload):
-    pairs = [
-        ("shading_color_rgb", material_payload.get("shading_color_rgb")),
-        ("shading_transparency", material_payload.get("shading_transparency")),
-        ("surface_foreground_pattern.sig_hash", material_payload.get("surface_foreground_pattern", {}).get("sig_hash")),
-        ("surface_foreground_pattern_color_rgb", material_payload.get("surface_foreground_pattern_color_rgb")),
-        ("surface_background_pattern.sig_hash", material_payload.get("surface_background_pattern", {}).get("sig_hash")),
-        ("surface_background_pattern_color_rgb", material_payload.get("surface_background_pattern_color_rgb")),
-        ("cut_foreground_pattern.sig_hash", material_payload.get("cut_foreground_pattern", {}).get("sig_hash")),
-        ("cut_foreground_pattern_color_rgb", material_payload.get("cut_foreground_pattern_color_rgb")),
-        ("cut_background_pattern.sig_hash", material_payload.get("cut_background_pattern", {}).get("sig_hash")),
-        ("cut_background_pattern_color_rgb", material_payload.get("cut_background_pattern_color_rgb")),
-    ]
-    return make_hash(["{}={}".format(k, safe_str(v)) for k, v in pairs])
+_MATERIAL_SIG_KEYS = [
+    "material.sig.shading_color_rgb",
+    "material.sig.shading_transparency",
+    "material.sig.surface_foreground_pattern.sig_hash",
+    "material.sig.surface_foreground_pattern_color_rgb",
+    "material.sig.surface_background_pattern.sig_hash",
+    "material.sig.surface_background_pattern_color_rgb",
+    "material.sig.cut_foreground_pattern.sig_hash",
+    "material.sig.cut_foreground_pattern_color_rgb",
+    "material.sig.cut_background_pattern.sig_hash",
+    "material.sig.cut_background_pattern_color_rgb",
+]
 
 
 def extract(doc, ctx=None):
@@ -392,7 +393,19 @@ def extract(doc, ctx=None):
         )
         cut_bg_color = _rgb_sig(_read_prop(m, "CutBackgroundPatternColor"))
 
-        identity_items = [_mk_item("material.uid", uid)]
+        sig_basis_items = [
+            _mk_item("material.sig.shading_color_rgb", shading_color_rgb),
+            _mk_item("material.sig.shading_transparency", shading_transparency),
+            _mk_item("material.sig.surface_foreground_pattern.sig_hash", surface_fg["sig_hash"]),
+            _mk_item("material.sig.surface_foreground_pattern_color_rgb", surface_fg_color),
+            _mk_item("material.sig.surface_background_pattern.sig_hash", surface_bg["sig_hash"]),
+            _mk_item("material.sig.surface_background_pattern_color_rgb", surface_bg_color),
+            _mk_item("material.sig.cut_foreground_pattern.sig_hash", cut_fg["sig_hash"]),
+            _mk_item("material.sig.cut_foreground_pattern_color_rgb", cut_fg_color),
+            _mk_item("material.sig.cut_background_pattern.sig_hash", cut_bg["sig_hash"]),
+            _mk_item("material.sig.cut_background_pattern_color_rgb", cut_bg_color),
+        ]
+        identity_items = [_mk_item("material.uid", uid)] + sig_basis_items
 
         material_payload = {
             "uid": uid,
@@ -424,7 +437,8 @@ def extract(doc, ctx=None):
             "thermal_asset_capture_status": "deferred",
         }
         identity_items_sorted = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
-        graphics_sig_hash_v2 = _graphics_sig_hash_v2(material_payload)
+        sig_basis_items_sorted = sorted(sig_basis_items, key=lambda it: safe_str(it.get("k", "")))
+        graphics_sig_hash_v2 = make_hash(serialize_identity_items(sig_basis_items_sorted))
 
         status_v2 = STATUS_OK
         status_reasons = []
@@ -447,7 +461,7 @@ def extract(doc, ctx=None):
         if any(v == S_UNRESOLVED for v in [surface_fg["sig_hash"], surface_bg["sig_hash"], cut_fg["sig_hash"], cut_bg["sig_hash"]]):
             status_v2 = STATUS_DEGRADED
             status_reasons.append("fill_pattern_resolution_unresolved")
-        if info["debug_pattern_ctx_missing"] > 0:
+        if any(bool(slot.get("_ctx_missing", False)) for slot in [surface_fg, surface_bg, cut_fg, cut_bg]):
             status_v2 = STATUS_DEGRADED
             status_reasons.append("fill_pattern_ctx_missing")
 
@@ -462,12 +476,16 @@ def extract(doc, ctx=None):
             label={
                 "display": safe_str(name),
                 "quality": "human" if name not in (S_MISSING, S_UNREADABLE) else "computed",
-                "provenance": "computed.material",
+                "provenance": "computed.path",
                 "components": {"uid": safe_str(uid), "name": safe_str(name)},
             },
         )
         rec["graphics_sig_hash_v2"] = graphics_sig_hash_v2
         rec["material"] = material_payload
+        rec["sig_basis"] = {
+            "schema": "materials.sig_basis.v1",
+            "keys_used": list(_MATERIAL_SIG_KEYS),
+        }
 
         info["records"].append(rec)
         info["count"] += 1
