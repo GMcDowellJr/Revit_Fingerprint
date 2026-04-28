@@ -42,6 +42,7 @@ _CTX_CATEGORIES_CACHE_KEY = "_object_styles_categories_cache"
 _EXCLUDED_TOP_LEVEL_CATEGORIES = frozenset(["Lines"])
 _MODEL_SEMANTIC_KEYS = sorted([
     "obj_style.color.rgb",
+    "obj_style.material_sig_hash",
     "obj_style.pattern_ref.sig_hash",
     "obj_style.weight.cut",
     "obj_style.weight.projection",
@@ -139,6 +140,49 @@ def _rgb_sig(c):
         return "{}-{}-{}".format(int(c.Red), int(c.Green), int(c.Blue))
     except Exception:
         return None
+
+
+def _material_ref_item(doc, cat_obj):
+    try:
+        mid_or_mat = getattr(cat_obj, "Material", None)
+    except Exception:
+        mid_or_mat = None
+
+    mat = None
+    if mid_or_mat is not None and hasattr(mid_or_mat, "MaterialClass"):
+        mat = mid_or_mat
+    else:
+        mid = mid_or_mat
+        if mid is None:
+            try:
+                mid = getattr(cat_obj, "MaterialId", None)
+            except Exception:
+                mid = None
+
+        if mid is None:
+            return make_identity_item("obj_style.material_sig_hash", None, ITEM_Q_MISSING)
+
+        try:
+            if getattr(mid, "IntegerValue", 0) <= 0:
+                return make_identity_item("obj_style.material_sig_hash", None, ITEM_Q_MISSING)
+        except Exception:
+            return make_identity_item("obj_style.material_sig_hash", None, ITEM_Q_UNREADABLE)
+
+        try:
+            mat = doc.GetElement(mid)
+        except Exception:
+            return make_identity_item("obj_style.material_sig_hash", None, ITEM_Q_UNREADABLE)
+
+    if mat is None:
+        return make_identity_item("obj_style.material_sig_hash", None, ITEM_Q_MISSING)
+
+    try:
+        name = canon_str(getattr(mat, "Name", None))
+        mat_class = canon_str(getattr(mat, "MaterialClass", None))
+        material_sig = make_hash([safe_str(name), safe_str(mat_class)])
+        return make_identity_item("obj_style.material_sig_hash", material_sig, ITEM_Q_OK)
+    except Exception:
+        return make_identity_item("obj_style.material_sig_hash", None, ITEM_Q_UNREADABLE)
 
 
 def _build_info():
@@ -324,6 +368,9 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
             elif (not lp_id_read_failed) and lp_id_v2 is not None and getattr(lp_id_v2, "IntegerValue", 0) <= 0:
                 lp_sig_hash_v, lp_sig_hash_q = canonicalize_str(lp_special_values.get("solid", None))
             identity_items.append(make_identity_item("obj_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
+
+            if kind == "model":
+                identity_items.append(_material_ref_item(doc, cat_obj))
 
             if any(q != ITEM_Q_OK for q in required_qs):
                 status_v2 = STATUS_BLOCKED

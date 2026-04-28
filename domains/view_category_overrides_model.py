@@ -23,6 +23,8 @@ from core.record_v2 import (
     build_record_v2,
     canonicalize_str,
     canonicalize_int,
+    canonicalize_bool,
+    ITEM_Q_UNSUPPORTED,
 )
 from core.phase2 import phase2_sorted_items
 from core.deps import require_domain, Blocked
@@ -75,7 +77,7 @@ def _phase2_partition_items(items):
 
     for it in (items or []):
         k = safe_str(it.get("k", ""))
-        if k in ("vco.baseline_category_path", "vco.baseline_sig_hash", "vco.override_properties_hash"):
+        if k in ("vco.baseline_category_path", "vco.baseline_sig_hash", "vco.override_properties_hash", "vco.category_hidden"):
             semantic.append(it)
         elif (k.startswith("vco.projection.") or k.startswith("vco.cut.") or k in ("vco.halftone", "vco.transparency")):
             cosmetic.append(it)
@@ -90,6 +92,16 @@ def _safe_bool(fn, default=False):
         return bool(fn())
     except Exception:
         return default
+
+
+def _category_hidden_item(template, cat):
+    try:
+        if hasattr(template, "GetCategoryHidden"):
+            val, q = canonicalize_bool(bool(template.GetCategoryHidden(cat.Id)))
+            return make_identity_item("vco.category_hidden", val, q)
+        return make_identity_item("vco.category_hidden", None, ITEM_Q_UNSUPPORTED)
+    except Exception:
+        return make_identity_item("vco.category_hidden", None, ITEM_Q_UNREADABLE)
 
 
 def extract(doc, ctx=None):
@@ -211,9 +223,12 @@ def extract(doc, ctx=None):
             halftone_items = extract_halftone(ogs, "vco.halftone")
             trans_items = extract_transparency(ogs, "vco.transparency")
             all_ogs_items = proj_items + cut_items + halftone_items + trans_items
+            hidden_item = _category_hidden_item(template, cat)
+            hidden_is_true = hidden_item.get("q") == ITEM_Q_OK and hidden_item.get("v") == "true"
 
             actual_map = {it.get("k"): it.get("v") for it in all_ogs_items}
-            has_override = any(actual_map.get(k) != dflt_map.get(k) for k in actual_map)
+            has_graphic_override = any(actual_map.get(k) != dflt_map.get(k) for k in actual_map)
+            has_override = has_graphic_override or hidden_is_true
             if not has_override:
                 info["debug_no_change"] += 1
                 continue
@@ -236,6 +251,8 @@ def extract(doc, ctx=None):
             bs_v, bs_q = canonicalize_str(baseline_sig) if baseline_sig else (None, ITEM_Q_MISSING)
 
             non_dflt_items = [it for it in all_ogs_items if actual_map.get(it.get("k")) != dflt_map.get(it.get("k"))]
+            if hidden_is_true:
+                non_dflt_items.append(hidden_item)
             non_dflt_sorted = sorted(non_dflt_items, key=lambda x: x.get("k", ""))
             oph_preimage = serialize_identity_items(non_dflt_sorted) if non_dflt_sorted else "|empty|"
             override_props_hash = make_hash(oph_preimage)
@@ -245,7 +262,7 @@ def extract(doc, ctx=None):
                 make_identity_item("vco.baseline_category_path", rk_v, rk_q),
                 make_identity_item("vco.baseline_sig_hash", bs_v, bs_q),
                 make_identity_item("vco.override_properties_hash", oph_v, oph_q),
-            ] + sorted(all_ogs_items, key=lambda x: x.get("k", ""))
+            ] + sorted(all_ogs_items + [hidden_item], key=lambda x: x.get("k", ""))
             identity_items_sorted = sorted(identity_items, key=lambda it: it.get("k", ""))
 
             preimage = serialize_identity_items(identity_items_sorted)
