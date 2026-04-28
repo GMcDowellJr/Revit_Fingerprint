@@ -125,6 +125,7 @@ def _read_compound_structure(cs, doc, ctx, family):
     fn_only_parts = []
     total_thickness_in = 0.0
     layer_count = 0
+    has_unreadable_thickness = False
 
     exterior_boundary_idx = None
     interior_boundary_idx = None
@@ -193,6 +194,7 @@ def _read_compound_structure(cs, doc, ctx, family):
             width_in = round(float(getattr(layer, "Width", 0.0)) * 12.0, 4)
         except Exception:
             width_in = None
+            has_unreadable_thickness = True
 
         mat_name, mat_class = _material_identity_from_layer(layer, doc, ctx)
 
@@ -276,6 +278,7 @@ def _read_compound_structure(cs, doc, ctx, family):
         "stack_hash_function_only": make_hash(["\n".join(fn_only_parts)]),
         "wraps_at_inserts": wraps_at_inserts,
         "wraps_at_ends": wraps_at_ends,
+        "has_unreadable_thickness": bool(has_unreadable_thickness),
         "layer_rows": rows,
     }
 
@@ -330,7 +333,7 @@ def _label_for_wall_type(type_name):
     return {
         "display": safe_str(type_name),
         "quality": "human",
-        "provenance": "revit.WallType.Name",
+        "provenance": "revit.Name",
         "components": {"type_name": safe_str(type_name)},
     }
 
@@ -449,6 +452,10 @@ def extract_wall_types(doc, ctx=None):
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_kind"] += 1
+            info["debug_v2_blocked"] = True
+            info["debug_v2_block_reasons"]["kind_not_compound"] = (
+                info["debug_v2_block_reasons"].get("kind_not_compound", 0) + 1
+            )
             continue
 
         try:
@@ -476,6 +483,10 @@ def extract_wall_types(doc, ctx=None):
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_no_cs"] += 1
+            info["debug_v2_blocked"] = True
+            info["debug_v2_block_reasons"]["no_compound_structure"] = (
+                info["debug_v2_block_reasons"].get("no_compound_structure", 0) + 1
+            )
             continue
 
         cs_data = _read_compound_structure(cs, doc, ctx, "wall")
@@ -533,12 +544,16 @@ def extract_wall_types(doc, ctx=None):
             sweeps_v, sweeps_q = (None, ITEM_Q_UNREADABLE)
 
         # semantic
+        if cs_data.get("has_unreadable_thickness", False):
+            total_thickness_v, total_thickness_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            total_thickness_v, total_thickness_q = canonicalize_float(cs_data["total_thickness_in"], nd=4)
         semantic = [
             make_identity_item("wt.function", wt_function if wt_function != S_UNREADABLE else None, wt_function_q),
             make_identity_item("wt.wraps_at_inserts", *_canon_non_sentinel_str(cs_data["wraps_at_inserts"])),
             make_identity_item("wt.wraps_at_ends", *_canon_non_sentinel_str(cs_data["wraps_at_ends"])),
             make_identity_item("wt.layer_count", *canonicalize_int(cs_data["layer_count"])),
-            make_identity_item("wt.total_thickness_in", *canonicalize_float(cs_data["total_thickness_in"], nd=4)),
+            make_identity_item("wt.total_thickness_in", total_thickness_v, total_thickness_q),
             make_identity_item("wt.stack_hash_loose", *canonicalize_str(cs_data["stack_hash_loose"])),
         ]
         coordination = [
@@ -609,8 +624,10 @@ def extract_wall_types(doc, ctx=None):
         }
         for r in records
     ]
-    if info["signature_hashes_v2"]:
+    if (not info["debug_v2_blocked"]) and info["signature_hashes_v2"]:
         info["hash_v2"] = make_hash(info["signature_hashes_v2"])
+    else:
+        info["hash_v2"] = None
     return info
 
 

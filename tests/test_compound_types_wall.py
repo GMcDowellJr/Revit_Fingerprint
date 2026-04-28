@@ -194,6 +194,7 @@ def test_non_basic_wall_produces_blocked_record(monkeypatch):
     assert "wt.layer_count" in keys
     assert "wt.total_thickness_in" in keys
     assert "wt.stack_hash_loose" in keys
+    assert out["hash_v2"] is None
 
 
 def test_core_boundary_in_layer_rows(monkeypatch):
@@ -323,7 +324,7 @@ def test_label_has_quality_provenance_and_components(monkeypatch):
     label = rec["label"]
     assert label["display"] == "Named Wall"
     assert label["quality"] == "human"
-    assert label["provenance"] == "revit.WallType.Name"
+    assert label["provenance"] == "revit.Name"
     assert label["components"]["type_name"] == "Named Wall"
 
 
@@ -359,6 +360,23 @@ def test_required_identity_not_ok_blocks_record(monkeypatch):
     assert rec["sig_hash"] is None
     assert "required_identity_not_ok" in rec["status_reasons"]
     assert out["count"] == 0
+
+
+def test_unreadable_layer_width_blocks_required_total_thickness(monkeypatch):
+    m = _setup_module(monkeypatch)
+    layers = [
+        _LayerWidthError("Structure", 0.5, 101),
+        _Layer("Substrate", 0.25, 102),
+    ]
+    wall = _WallType("BadWidth", 0, _CS(layers=layers, ext_idx=0, int_idx=1))
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
+    out = m.extract_wall_types(_Doc({101: "m1", 102: "m2"}), _default_ctx(m))
+    rec = out["records"][0]
+    thickness_item = [it for it in rec["identity_basis"]["items"] if it["k"] == "wt.total_thickness_in"][0]
+
+    assert thickness_item["q"] == "unreadable"
+    assert rec["status"] == "blocked"
+    assert rec["sig_hash"] is None
 
 
 def test_no_compound_structure_blocked_record_includes_required_keys(monkeypatch):
@@ -399,3 +417,11 @@ def test_unreadable_wrap_fields_do_not_block_required_identity(monkeypatch):
 
     assert rec["status"] == "ok"
     assert rec["sig_hash"] is not None
+
+
+def test_mixed_ok_and_blocked_records_keep_domain_hash_blocked(monkeypatch):
+    m = _setup_module(monkeypatch)
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [_basic_wall("OK"), _WallType("Stacked", 1, None)])
+    out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
+    assert out["debug_v2_blocked"] is True
+    assert out["hash_v2"] is None
