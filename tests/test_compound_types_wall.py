@@ -13,6 +13,20 @@ class _MatElem(object):
         self.UniqueId = uid
 
 
+class _FillPatternDef(object):
+    def __init__(self, is_solid):
+        self.IsSolidFill = is_solid
+
+
+class _FillPatternElem(object):
+    def __init__(self, uid, is_solid=False):
+        self.UniqueId = uid
+        self._fp = _FillPatternDef(is_solid)
+
+    def GetFillPattern(self):
+        return self._fp
+
+
 class _Param(object):
     def __init__(self, elem_id=None, intval=None):
         self._eid = elem_id
@@ -156,7 +170,10 @@ class _Doc(object):
     def GetElement(self, eid):
         i = getattr(eid, "IntegerValue", None)
         if i in self._id_to_uid:
-            return _MatElem(self._id_to_uid[i])
+            v = self._id_to_uid[i]
+            if hasattr(v, "UniqueId"):
+                return v
+            return _MatElem(v)
         return None
 
 
@@ -453,3 +470,38 @@ def test_mixed_ok_and_blocked_records_keep_domain_hash_blocked(monkeypatch):
     out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
     assert out["debug_v2_blocked"] is True
     assert out["hash_v2"] is None
+
+
+def test_coarse_fill_no_pattern_emits_symbolic_value(monkeypatch):
+    m = _setup_module(monkeypatch)
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [_basic_wall()])
+
+    rec = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))["records"][0]
+    item = [it for it in rec["identity_basis"]["items"] if it["k"] == "wt.coarse_fill_pattern_sig_hash"][0]
+
+    assert item["q"] == "ok"
+    assert item["v"] == "<No Pattern>"
+
+
+def test_coarse_fill_solid_fill_emits_symbolic_value_when_unmapped(monkeypatch):
+    m = _setup_module(monkeypatch)
+    wall = _basic_wall()
+
+    def _get_param(bip):
+        if bip == "BIP_FILL_PATTERN":
+            return _Param(elem_id=_Id(900))
+        if bip == "BIP_FILL_COLOR":
+            return _Param(intval=(3 << 16) + (2 << 8) + 1)
+        if bip == "BIP_TYPE_NAME":
+            return _ParamString("Fallback Type Name")
+        return None
+
+    wall.get_Parameter = _get_param
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
+
+    doc = _Doc({101: "m1", 102: "m2", 103: "m3", 900: _FillPatternElem("fp-solid", is_solid=True)})
+    rec = m.extract_wall_types(doc, _default_ctx(m))["records"][0]
+    item = [it for it in rec["identity_basis"]["items"] if it["k"] == "wt.coarse_fill_pattern_sig_hash"][0]
+
+    assert item["q"] == "ok"
+    assert item["v"] == "<Solid>"

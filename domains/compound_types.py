@@ -694,14 +694,23 @@ def _coarse_fill_reads(type_elem, doc, fp_uid_to_sig_hash):
         else:
             pid = p.AsElementId()
             if pid is None or getattr(pid, "IntegerValue", -1) < 0:
-                cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
+                cfpsh_v, cfpsh_q = canonicalize_str("<No Pattern>")
             else:
                 pe = doc.GetElement(pid)
                 puid = getattr(pe, "UniqueId", None) if pe is not None else None
                 if puid and puid in fp_uid_to_sig_hash:
                     cfpsh_v, cfpsh_q = canonicalize_str(fp_uid_to_sig_hash.get(puid))
                 else:
-                    cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
+                    is_solid = False
+                    try:
+                        fp = pe.GetFillPattern() if pe is not None else None
+                        is_solid = bool(getattr(fp, "IsSolidFill", False))
+                    except Exception:
+                        is_solid = False
+                    if is_solid:
+                        cfpsh_v, cfpsh_q = canonicalize_str("<Solid>")
+                    else:
+                        cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
     except Exception:
         cfpsh_v, cfpsh_q = (None, ITEM_Q_UNREADABLE)
 
