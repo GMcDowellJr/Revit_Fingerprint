@@ -676,15 +676,19 @@ def _label_for_type(type_name):
 def _coarse_fill_reads(type_elem, doc, fp_uid_to_sig_hash):
     """Read coarse fill pattern sig hash and color from a compound type element.
 
-    All four compound type families (wall, floor, roof, ceiling) expose these
-    under the same UI parameter names. LookupParameter is used because
-    getattr(BuiltInParameter, name) does not resolve in Dynamo CPython3.
+    Prefer locale-independent BuiltInParameter access, with UI-name fallback
+    only when BIP members are unavailable in the current runtime.
     """
     # fill pattern sig hash
     cfpsh_v = None
     cfpsh_q = ITEM_Q_MISSING
     try:
-        p = type_elem.LookupParameter("Coarse Scale Fill Pattern")
+        p = None
+        try:
+            p = type_elem.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_PATTERN_ID_FOR_LEGEND)
+        except Exception:
+            p = type_elem.LookupParameter("Coarse Scale Fill Pattern")
+
         if p is None:
             cfpsh_v, cfpsh_q = (None, ITEM_Q_MISSING)
         else:
@@ -705,7 +709,12 @@ def _coarse_fill_reads(type_elem, doc, fp_uid_to_sig_hash):
     cfc_v = None
     cfc_q = ITEM_Q_MISSING
     try:
-        p = type_elem.LookupParameter("Coarse Scale Fill Color")
+        p = None
+        try:
+            p = type_elem.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_COLOR)
+        except Exception:
+            p = type_elem.LookupParameter("Coarse Scale Fill Color")
+
         if p is None:
             cfc_v, cfc_q = (None, ITEM_Q_MISSING)
         else:
