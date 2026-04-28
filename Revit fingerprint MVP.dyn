@@ -1,0 +1,563 @@
+{
+  "Uuid": "d77ed504-11dd-4a4c-804d-470b1d16ae94",
+  "IsCustomNode": false,
+  "Description": "",
+  "Name": "Revit fingerprint MVP",
+  "ElementResolver": {
+    "ResolutionMap": {}
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "Code": "import sys\r\nimport os\r\nimport traceback\r\nimport json\r\n\r\n# Explicitly request semantic (v2) hashing\r\n\r\nimport importlib\r\n\r\n# Provide output path to imported runner via env var (import boundary safe)\r\ntry:\r\n    if IN is not None and len(IN) > 0 and IN[0] is not None and str(IN[0]).strip():\r\n        os.environ[\"REVIT_FINGERPRINT_OUTPUT_PATH\"] = str(IN[0]).strip()\r\n    else:\r\n        os.environ.pop(\"REVIT_FINGERPRINT_OUTPUT_PATH\", None)\r\nexcept Exception as e:\r\n    os.environ.pop(\"REVIT_FINGERPRINT_OUTPUT_PATH\", None)\r\n\r\n# Optional: control which output surfaces are written\r\n# Values: \"all\", \"minimal\", or comma list e.g. \"payload,manifest\"\r\ntry:\r\n    os.environ[\"REVIT_FINGERPRINT_OUTPUT_SURFACES\"] = \"payload\"\r\nexcept Exception:\r\n    pass\r\n\r\n# Optional: IN[1] == True forces full OUT (debug/back-compat)\r\ntry:\r\n    if IN is not None and len(IN) > 1 and bool(IN[1]) is True:\r\n        os.environ[\"REVIT_FINGERPRINT_FORCE_FULL_OUT\"] = \"1\"\r\n    else:\r\n        os.environ.pop(\"REVIT_FINGERPRINT_FORCE_FULL_OUT\", None)\r\nexcept Exception as e:\r\n    os.environ.pop(\"REVIT_FINGERPRINT_FORCE_FULL_OUT\", None)\r\n\r\n# Optional: IN[2] controls whether a timestamp is appended to output filenames\r\n#  - True / 1 / \"true\"  => stamp ON  (REVIT_FINGERPRINT_FILENAME_STAMP=1)\r\n#  - False / 0 / \"false\" => stamp OFF (REVIT_FINGERPRINT_FILENAME_STAMP=0)\r\n#  - Missing/None => stamp OFF (safer for batch determinism)\r\n#  - Unparseable => stamp OFF + warning\r\n_thinrunner_warnings = []\r\n\r\n# Install path segments (centralized)\r\n# Override REVIT_FINGERPRINT_ORG_DIR to change \"Company\" without editing the graph.\r\ntry:\r\n    ORG_DIR = str(os.environ.get(\"REVIT_FINGERPRINT_ORG_DIR\", \"Company\")).strip() or \"Company\"\r\nexcept Exception:\r\n    ORG_DIR = \"Stantec\"\r\n\r\nAPP_DIR = \"RevitFingerprint\"\r\nCHANNEL_DIR = \"current\"\r\n\r\ndef _parse_boolish(v):\r\n    if v is None:\r\n        return None\r\n    if isinstance(v, bool):\r\n        return v\r\n    try:\r\n        # Dynamo sometimes gives int-like values\r\n        if isinstance(v, (int, float)) and int(v) == v:\r\n            return bool(int(v))\r\n    except Exception:\r\n        pass\r\n    try:\r\n        s = str(v).strip()\r\n    except Exception:\r\n        return None\r\n    if not s:\r\n        return None\r\n    sl = s.lower()\r\n    if sl in (\"1\", \"true\", \"t\", \"yes\", \"y\", \"on\"):\r\n        return True\r\n    if sl in (\"0\", \"false\", \"f\", \"no\", \"n\", \"off\"):\r\n        return False\r\n    return None\r\n\r\ntry:\r\n    raw_in2 = None\r\n    have_in2 = (IN is not None and len(IN) > 2)\r\n    if have_in2:\r\n        raw_in2 = IN[2]\r\n\r\n    stamp_choice = _parse_boolish(raw_in2) if have_in2 else None\r\n\r\n    if stamp_choice is True:\r\n        os.environ[\"REVIT_FINGERPRINT_FILENAME_STAMP\"] = \"1\"\r\n    elif stamp_choice is False:\r\n        os.environ[\"REVIT_FINGERPRINT_FILENAME_STAMP\"] = \"0\"\r\n    else:\r\n        # Missing/None/unparseable => default OFF\r\n        os.environ[\"REVIT_FINGERPRINT_FILENAME_STAMP\"] = \"0\"\r\n        if have_in2 and raw_in2 is not None:\r\n            _thinrunner_warnings.append(\r\n                \"IN[2] unparseable for timestamp flag; defaulting REVIT_FINGERPRINT_FILENAME_STAMP=0\"\r\n            )\r\nexcept Exception:\r\n    # Default OFF on any thinrunner failure here\r\n    os.environ[\"REVIT_FINGERPRINT_FILENAME_STAMP\"] = \"0\"\r\n\r\n# MUST be the repo root that contains: core/, domains/, runner/\r\n# Dynamo-node safe behavior:\r\n#  - No __file__ reliance (this code is pasted into a Dynamo Python node)\r\n#  - Repo root is discovered from env var or conventional local install paths\r\n#  - Hard block if repo appears to be on SharePoint/OneDrive sync or UNC/network path\r\n\r\ndef _looks_like_unc_path(p):\r\n    try:\r\n        s = str(p)\r\n    except Exception:\r\n        return False\r\n    return s.startswith(\"\\\\\\\\\")\r\n\r\ndef _is_probably_sync_path(p):\r\n    \"\"\"\r\n    Heuristic, Windows-centric: previously used to hard-block sync paths.\r\n    Retained for detection only — callers decide whether to block or warn.\r\n    \"\"\"\r\n    try:\r\n        s = os.path.abspath(str(p))\r\n    except Exception:\r\n        return False\r\n\r\n    sl = s.lower()\r\n\r\n    # Common sync markers\r\n    for m in (\"\\\\onedrive\\\\\", \"\\\\sharepoint\\\\\", \"\\\\microsoft teams\\\\\"):\r\n        if m in sl:\r\n            return True\r\n\r\n    # Some orgs sync SharePoint under Documents with tenant/library naming\r\n    if \"\\\\documents\\\\\" in sl and (\"- sharepoint\" in sl or \"sharepoint\" in sl):\r\n        return True\r\n\r\n    return False\r\n\r\ndef _is_repo_root(p):\r\n    expected_local = [\r\n        os.path.join(p, \"runner\", \"run_dynamo.py\"),\r\n        os.path.join(p, \"domains\"),\r\n        os.path.join(p, \"core\"),\r\n    ]\r\n    missing_local = [x for x in expected_local if not os.path.exists(x)]\r\n    return (len(missing_local) == 0), missing_local\r\n\r\ndef _iter_dyn_path_candidates():\r\n    out = []\r\n    seen = set()\r\n    probe_notes = []\r\n\r\n    def _normalize_host_path(raw):\r\n        s = str(raw or \"\").strip()\r\n        if not s:\r\n            return s\r\n\r\n        # Trim wrapping quotes often injected by host shells.\r\n        if (s.startswith('\"') and s.endswith('\"')) or (s.startswith(\"'\") and s.endswith(\"'\")):\r\n            s = s[1:-1].strip()\r\n\r\n        # file:// URI support\r\n        if s.lower().startswith(\"file:///\"):\r\n            s = s[8:].replace(\"/\", os.sep)\r\n\r\n        # Windows device paths:\r\n        #   \\\\?\\C:\\path -> C:\\path\r\n        #   \\\\?\\UNC\\server\\share\\path -> \\\\server\\share\\path (preserve UNC absoluteness)\r\n        sl = s.lower()\r\n        if sl.startswith(\"\\\\\\\\?\\\\unc\\\\\"):\r\n            s = \"\\\\\\\\\" + s[8:]\r\n        elif sl.startswith(\"\\\\\\\\?\\\\\"):\r\n            s = s[4:]\r\n\r\n        return s\r\n\r\n    def _add(src, value):\r\n        # Ignore common non-path control values from Dynamo node inputs.\r\n        if isinstance(value, bool):\r\n            return\r\n        try:\r\n            raw = _normalize_host_path(value)\r\n        except Exception:\r\n            return\r\n        if not raw:\r\n            return\r\n        rlow = raw.strip().lower()\r\n        if rlow in (\"true\", \"false\", \"none\", \"null\"):\r\n            return\r\n\r\n        try:\r\n            v = os.path.abspath(raw)\r\n        except Exception:\r\n            return\r\n        if not v:\r\n            return\r\n\r\n        # This collector is DYN-centric by design:\r\n        # - accept explicit .dyn files\r\n        # - accept directories (caller may provide a containing folder)\r\n        # - reject non-.dyn files (e.g., .rvt) so we do not anchor root discovery\r\n        #   to a Revit model path.\r\n        vl = v.lower()\r\n        if os.path.isfile(v) and (not vl.endswith(\".dyn\")):\r\n            return\r\n        if (not os.path.exists(v)) and (os.path.splitext(vl)[1] not in (\"\", \".dyn\")):\r\n            return\r\n\r\n        k = v.lower()\r\n        if k in seen:\r\n            return\r\n        seen.add(k)\r\n        out.append((src, v))\r\n\r\n    def _probe_dynamo_workspace_path():\r\n        \"\"\"\r\n        Best-effort probe for currently running Dynamo workspace path.\r\n        Returns a list of (source, value) tuples; value may be empty.\r\n        \"\"\"\r\n        found = []\r\n\r\n        # Preferred API path.\r\n        try:\r\n            import clr  # type: ignore\r\n            for _asm in (\"DynamoServices\", \"DynamoCore\"):\r\n                try:\r\n                    clr.AddReference(_asm)\r\n                except Exception:\r\n                    pass\r\n\r\n            try:\r\n                from Dynamo.Events import ExecutionEvents  # type: ignore\r\n\r\n                _sess = getattr(ExecutionEvents, \"ActiveSession\", None)\r\n                _p = getattr(_sess, \"CurrentWorkspacePath\", None) if _sess is not None else None\r\n                found.append((\"auto:dynamo_executionevents_currentworkspace\", _p))\r\n            except Exception as _e:\r\n                probe_notes.append(\"ExecutionEvents import probe failed: {}\".format(_e))\r\n        except Exception as _e:\r\n            probe_notes.append(\"clr/DynamoServices probe unavailable: {}\".format(_e))\r\n\r\n        # Reflection fallback for environments where namespace import differs.\r\n        try:\r\n            import System  # type: ignore\r\n            _ad = System.AppDomain.CurrentDomain\r\n            _assemblies = list(_ad.GetAssemblies())\r\n            _etype = None\r\n            for _a in _assemblies:\r\n                try:\r\n                    _t = _a.GetType(\"Dynamo.Events.ExecutionEvents\")\r\n                except Exception:\r\n                    _t = None\r\n                if _t is not None:\r\n                    _etype = _t\r\n                    break\r\n            if _etype is not None:\r\n                _flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static\r\n                _active_prop = _etype.GetProperty(\"ActiveSession\", _flags)\r\n                _sess = _active_prop.GetValue(None, None) if _active_prop is not None else None\r\n                _p = None\r\n                if _sess is not None:\r\n                    _spath = _sess.GetType().GetProperty(\"CurrentWorkspacePath\")\r\n                    _p = _spath.GetValue(_sess, None) if _spath is not None else None\r\n                found.append((\"auto:dynamo_executionevents_reflection\", _p))\r\n        except Exception as _e:\r\n            probe_notes.append(\"ExecutionEvents reflection probe failed: {}\".format(_e))\r\n\r\n        return found\r\n\r\n    # Auto-discovery (best effort): use current process context as \"current graph\"\r\n    # starting point when explicit graph path is unavailable.\r\n    try:\r\n        cwd = os.getcwd()\r\n    except Exception:\r\n        cwd = \"\"\r\n    if cwd:\r\n        try:\r\n            dyns = [x for x in os.listdir(cwd) if str(x).lower().endswith(\".dyn\")]\r\n            if len(dyns) == 1:\r\n                _add(\"auto:cwd_single_dyn\", os.path.join(cwd, dyns[0]))\r\n        except Exception:\r\n            pass\r\n\r\n    # Some hosts include an opened .dyn path on argv.\r\n    try:\r\n        for a in list(sys.argv):\r\n            s = str(a or \"\").strip()\r\n            if s.lower().endswith(\".dyn\"):\r\n                _add(\"auto:argv_dyn\", s)\r\n    except Exception:\r\n        pass\r\n\r\n    for src, v in _probe_dynamo_workspace_path():\r\n        _add(src, v)\r\n\r\n    # Explicit overrides from host/invoker\r\n    for k in (\r\n        \"REVIT_FINGERPRINT_DYN_PATH\",\r\n        \"DYNAMO_GRAPH_PATH\",\r\n        \"DYNAMO_FILE_PATH\",\r\n    ):\r\n        try:\r\n            v = str(os.environ.get(k, \"\")).strip()\r\n        except Exception:\r\n            v = \"\"\r\n        if v:\r\n            _add(\"env:{}\".format(k), v)\r\n\r\n    # Optional thin-runner input extension: IN[3] = .dyn path or containing folder\r\n    try:\r\n        if IN is not None and len(IN) > 3 and IN[3] is not None:\r\n            v = str(IN[3]).strip()\r\n            if v:\r\n                _add(\"in:IN[3]\", v)\r\n    except Exception:\r\n        pass\r\n\r\n    global _DYN_PROBE_NOTES\r\n    _DYN_PROBE_NOTES = probe_notes\r\n    return out\r\n\r\ndef _nearest_repo_root_from_path(p, max_up=64):\r\n    try:\r\n        cur = os.path.abspath(str(p))\r\n    except Exception:\r\n        return None\r\n\r\n    # Treat explicit *.dyn values as file paths even if the host has not\r\n    # materialized them on disk yet (some Dynamo host surfaces provide\r\n    # unresolved/current-document values).\r\n    if str(cur).lower().endswith(\".dyn\") or os.path.isfile(cur):\r\n        cur = os.path.dirname(cur)\r\n\r\n    steps = 0\r\n    while steps <= int(max_up):\r\n        ok, missing = _is_repo_root(cur)\r\n        if ok:\r\n            return cur\r\n        parent = os.path.dirname(cur)\r\n        if parent == cur:\r\n            break\r\n        cur = parent\r\n        steps += 1\r\n    return None\r\n\r\ndef _candidate_repo_dirs():\r\n    tried = []\r\n    global _DYN_CANDIDATES, _DYN_PROBE_NOTES\r\n    _DYN_CANDIDATES = []\r\n    _DYN_PROBE_NOTES = []\r\n\r\n    # 0) If a Dynamo graph path is known, discover the nearest repo root upward\r\n    # from the .dyn file/folder location.\r\n    for src, p in _iter_dyn_path_candidates():\r\n        _DYN_CANDIDATES.append({\"source\": src, \"path\": p})\r\n        # Keep the original graph-derived candidate visible in diagnostics even\r\n        # when it is not itself a repo root.\r\n        tried.append((src + \":graph_path_candidate\", p))\r\n        rr = _nearest_repo_root_from_path(p)\r\n        if rr:\r\n            tried.append((src + \":nearest_repo_root\", rr))\r\n\r\n    # 1) Optional override: power users can set this once\r\n    try:\r\n        v = os.environ.get(\"REVIT_FINGERPRINT_REPO_DIR\", \"\")\r\n    except Exception:\r\n        v = \"\"\r\n    v = str(v).strip()\r\n    if v:\r\n        tried.append((\"env:REVIT_FINGERPRINT_REPO_DIR\", v))\r\n\r\n    # 2) Preferred per-user install location (Documents)\r\n    # NOTE: Documents is sometimes redirected into OneDrive/SharePoint.\r\n    # We will still *search* here, but runtime will be BLOCKED if it looks synced.\r\n    up = os.environ.get(\"USERPROFILE\", \"\")\r\n    if up:\r\n        tried.append((\"documents:current\", os.path.join(up, \"Documents\", ORG_DIR, APP_DIR, CHANNEL_DIR)))\r\n\r\n    # 3) Fallback: LocalAppData (less visible, usually not synced)\r\n    lad = os.environ.get(\"LOCALAPPDATA\", \"\")\r\n    if lad:\r\n        tried.append((\"localappdata:current\", os.path.join(lad, ORG_DIR, APP_DIR, CHANNEL_DIR)))\r\n\r\n    # 4) Fallback: legacy-ish user profile location\r\n    if up:\r\n        tried.append((\"userprofile:RevitFingerprint_current\", os.path.join(up, \"RevitFingerprint\", \"current\")))\r\n\r\n    # 5) Network-share friendly convention used by current Dynamo deployments\r\n    # (user requested explicit fallback root)\r\n    if up:\r\n        tried.append(\r\n            (\r\n                \"userprofile:stantec_general_code\",\r\n                os.path.join(up, \"Stantec\", \"Revit_Fingerprint - General\", \"Code\"),\r\n            )\r\n        )\r\n\r\n    return tried\r\n\r\n_selected = None\r\n_tried = []\r\nfor src, p in _candidate_repo_dirs():\r\n    if not p:\r\n        continue\r\n    repo_dir = os.path.abspath(str(p))\r\n    _tried.append({\"source\": src, \"path\": repo_dir})\r\n\r\n    unc = _looks_like_unc_path(repo_dir)\r\n    sync = _is_probably_sync_path(repo_dir)\r\n\r\n    ok, missing = _is_repo_root(repo_dir)\r\n    if ok and not unc:\r\n        _selected = {\"repo_dir\": repo_dir, \"source\": src}\r\n        if sync:\r\n            _selected[\"warnings\"] = [\"repo_dir_looks_like_sharepoint_onedrive_sync\"]\r\n        break\r\n\r\nif _selected is None:\r\n    OUT = {\r\n        \"status\": \"blocked\",\r\n        \"error\": \"Local install not found (or only found in unsafe locations).\",\r\n        \"expected_install\": {\r\n            \"recommended_current\": r\"%USERPROFILE%\\Documents\\{ORG}\\{APP}\\{CH}\".format(ORG=ORG_DIR, APP=APP_DIR, CH=CHANNEL_DIR),\r\n            \"zip_extract_example\": r\"%USERPROFILE%\\Documents\\{ORG}\\{APP}\\vX.Y.Z\".format(ORG=ORG_DIR, APP=APP_DIR),\r\n            \"fallback_current_localappdata\": r\"%LOCALAPPDATA%\\{ORG}\\{APP}\\{CH}\".format(ORG=ORG_DIR, APP=APP_DIR, CH=CHANNEL_DIR),\r\n            \"fallback_stantec_general_code\": r\"%USERPROFILE%\\Stantec\\Revit_Fingerprint - General\\Code\",\r\n            \"override_env_var\": \"REVIT_FINGERPRINT_ORG_DIR\",\r\n        },\r\n        \"tried\": _tried,\r\n        \"dyn_candidates\": _DYN_CANDIDATES,\r\n        \"dyn_probe_notes\": _DYN_PROBE_NOTES,\r\n        \"notes\": [\r\n            \"Do not run from UNC/network paths (\\\\\\\\server\\\\share\\\\...).\",\r\n            \"SharePoint/OneDrive-synced paths are permitted but will emit a warning.\",\r\n            \"Install the code locally, then run the Dynamo Player graph from SharePoint.\",\r\n            \"Optional override: set REVIT_FINGERPRINT_REPO_DIR to your local install root.\",\r\n        ],\r\n    }\r\nelse:\r\n    REPO_DIR = _selected[\"repo_dir\"]\r\n    try:\r\n        os.environ[\"REVIT_FINGERPRINT_REPO_ROOT_SELECTED\"] = REPO_DIR\r\n    except Exception:\r\n        pass\r\n\r\n    # Ensure this repo wins import resolution\r\n    if REPO_DIR in sys.path:\r\n        sys.path.remove(REPO_DIR)\r\n    sys.path.insert(0, REPO_DIR)\r\n\r\n    try:\r\n        # Import triggers execution in this repo (run_dynamo computes OUT at import time)\r\n        # Execute exactly once per invocation:\r\n        # - first run: import\r\n        # - subsequent runs: reload existing module\r\n        # If an existing module is bound to a different repo root, drop it and import fresh.\r\n        _existing = sys.modules.get(\"runner.run_dynamo\", None)\r\n\r\n        def _purge_repo_modules():\r\n            prefixes = (\"runner\", \"core\", \"domains\")\r\n            for _name in list(sys.modules.keys()):\r\n                if (\r\n                    _name in prefixes\r\n                    or _name.startswith(\"runner.\")\r\n                    or _name.startswith(\"core.\")\r\n                    or _name.startswith(\"domains.\")\r\n                ):\r\n                    sys.modules.pop(_name, None)\r\n\r\n        if _existing is not None:\r\n            try:\r\n                _f = os.path.abspath(str(getattr(_existing, \"__file__\", \"\") or \"\"))\r\n            except Exception:\r\n                _f = \"\"\r\n            if not _f.startswith(os.path.abspath(REPO_DIR) + os.sep):\r\n                # Repo root switched: purge runner + dependencies so imports come\r\n                # from the selected repo consistently.\r\n                _purge_repo_modules()\r\n                _existing = None\r\n\r\n        if _existing is None:\r\n            exporter = importlib.import_module(\"runner.run_dynamo\")\r\n        else:\r\n            try:\r\n                exporter = importlib.reload(_existing)\r\n            except ModuleNotFoundError:\r\n                # Some embedded hosts lose module spec metadata; fall back to fresh import.\r\n                _purge_repo_modules()\r\n                exporter = importlib.import_module(\"runner.run_dynamo\")\r\n\r\n        # Forward the computed OUT from the runner module\r\n        OUT = exporter.OUT\r\n        if _selected.get(\"warnings\"):\r\n            try:\r\n                _out = OUT if isinstance(OUT, dict) else json.loads(OUT)\r\n                _out.setdefault(\"_runner_warnings\", []).extend(_selected[\"warnings\"])\r\n                OUT = json.dumps(_out, indent=2, sort_keys=True)\r\n            except Exception:\r\n                pass\r\n        try:\r\n            _out = OUT if isinstance(OUT, dict) else json.loads(OUT)\r\n            _out[\"_thinrunner_repo_resolution\"] = {\r\n                \"selected\": {\r\n                    \"source\": _selected.get(\"source\"),\r\n                    \"repo_dir\": REPO_DIR,\r\n                },\r\n                \"dyn_candidates\": _DYN_CANDIDATES,\r\n                \"dyn_probe_notes\": _DYN_PROBE_NOTES,\r\n                \"tried\": _tried,\r\n            }\r\n            OUT = json.dumps(_out, indent=2, sort_keys=True)\r\n        except Exception:\r\n            pass\r\n\r\n    except Exception as e:\r\n        OUT = {\r\n            \"status\": \"failed\",\r\n            \"error\": str(e),\r\n            \"traceback\": traceback.format_exc(),\r\n            \"REPO_DIR\": REPO_DIR,\r\n            \"repo_dir_source\": _selected.get(\"source\", None),\r\n            \"sys_path_head\": sys.path[:8],\r\n            \"exporter_file\": getattr(sys.modules.get(\"runner.run_dynamo\", None), \"__file__\", None),\r\n        }\r\n",
+      "Engine": "CPython3",
+      "VariableInputPorts": true,
+      "Id": "062451acfeaf4fb58eece045c87baede",
+      "NodeType": "PythonScriptNode",
+      "Inputs": [
+        {
+          "Id": "798d5460bf8248b4b215b11687b38371",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "e4448b71a5b64f5b8fa4a5d2cef61257",
+          "Name": "IN[1]",
+          "Description": "Input #1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "c83bc0de134347d082fb6b31224041de",
+          "Name": "IN[2]",
+          "Description": "Input #2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "89b170de086a4fe3a65352005242a656",
+          "Name": "IN[3]",
+          "Description": "Input #3",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "133a5d422c9e4381b9bd60f36faa7f8e",
+          "Name": "OUT",
+          "Description": "Result of the python script",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Runs an embedded Python script."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "Id": "3a22c7cc67dd418697587a1e203f4896",
+      "NodeType": "BooleanInputNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "116765d30ab84621aaf3fdfcd5f616eb",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Enables selection between True and False",
+      "InputValue": false
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Watch, CoreNodeModels",
+      "WatchWidth": 420.0,
+      "WatchHeight": 200.0,
+      "Id": "e6c98cfa3abb4c2fa00082106b427be9",
+      "NodeType": "ExtensionNode",
+      "Inputs": [
+        {
+          "Id": "80596df7ddba4128bde4d7efdf88ec18",
+          "Name": "",
+          "Description": "Node to show output from",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "656613007a084f03b81bda2a77a0f356",
+          "Name": "",
+          "Description": "Node output",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Visualizes a node's output"
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "Id": "1cfb892af5f544daa5b19c870cfb8a4d",
+      "NodeType": "BooleanInputNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "82ef7234dba44fccbf7330840d8f5562",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Enables selection between True and False",
+      "InputValue": true
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.Directory, CoreNodeModels",
+      "Id": "f6a32b228e4f43dab520aa70125d2985",
+      "NodeType": "ExtensionNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "ba77644e90c84e6b8c677874c060fe94",
+          "Name": "",
+          "Description": "Directory path",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows you to select a directory on the system and returns its path",
+      "HintPath": "C:\\Users\\gmcdowell\\Stantec\\Revit_Fingerprint - General\\Exports",
+      "InputValue": "C:\\Users\\gmcdowell\\Stantec\\Revit_Fingerprint - General\\Exports"
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "Id": "18eab04ad7984d008d0f7aec8808f02b",
+      "NodeType": "BooleanInputNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "e37122fcf2ce4955bfa2ef078ba8bfc8",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Enables selection between True and False",
+      "InputValue": false
+    },
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "Code": "# -*- coding: utf-8 -*-\r\n\"\"\"\r\nStandalone Dynamo Python-node helper to purge selected entries from sys.modules\r\nbetween runs, so edited project modules are re-imported without restarting Revit.\r\n\r\nIntended for testing/development only.\r\n\r\nDynamo inputs (optional):\r\n- IN[0]: prefixes to purge (string \"a,b\" or list). Default: [] (purge all non-protected)\r\n- IN[1]: exact module names to purge (string \"a,b\" or list). Default: []\r\n- IN[2]: dry run flag (True/False). Default: False\r\n\r\nDynamo output:\r\n- OUT: dict with removed modules and counts\r\n\"\"\"\r\n\r\nimport sys\r\n\r\n\r\n# Conservative denylist: do not touch these roots.\r\n_PROTECTED_ROOTS = set([\r\n    \"sys\",\r\n    \"os\",\r\n    \"json\",\r\n    \"math\",\r\n    \"clr\",\r\n    \"Autodesk\",\r\n    \"Revit\",\r\n    \"RevitServices\",\r\n    \"RevitNodes\",\r\n    \"ProtoGeometry\",\r\n    \"__main__\",\r\n])\r\n\r\n\r\ndef _to_list(value):\r\n    if value is None:\r\n        return []\r\n    if isinstance(value, (list, tuple, set)):\r\n        return [str(v).strip() for v in value if str(v).strip()]\r\n    s = str(value).strip()\r\n    if not s:\r\n        return []\r\n    return [p.strip() for p in s.split(\",\") if p.strip()]\r\n\r\n\r\ndef _to_bool(value, default=False):\r\n    if value is None:\r\n        return default\r\n    if isinstance(value, bool):\r\n        return value\r\n    try:\r\n        if isinstance(value, (int, float)):\r\n            return bool(int(value))\r\n    except Exception:\r\n        pass\r\n    s = str(value).strip().lower()\r\n    if s in (\"1\", \"true\", \"t\", \"yes\", \"y\", \"on\"):\r\n        return True\r\n    if s in (\"0\", \"false\", \"f\", \"no\", \"n\", \"off\"):\r\n        return False\r\n    return default\r\n\r\n\r\ndef _is_protected(module_name):\r\n    root = module_name.split(\".\", 1)[0]\r\n    return root in _PROTECTED_ROOTS\r\n\r\n\r\ndef purge_modules(prefixes, exact_names, dry_run=False):\r\n    prefixes = tuple(prefixes)\r\n    exact_names = set(exact_names)\r\n    purge_all = (not prefixes and not exact_names)\r\n\r\n    to_remove = []\r\n    for name in list(sys.modules.keys()):\r\n        if not name or _is_protected(name):\r\n            continue\r\n\r\n        matched = (\r\n            purge_all\r\n            or name in exact_names\r\n            or any(name == p or name.startswith(p + \".\") for p in prefixes)\r\n        )\r\n        if matched:\r\n            to_remove.append(name)\r\n\r\n    # Remove deep modules first for cleaner dependency reloads.\r\n    to_remove.sort(key=lambda n: (-n.count(\".\"), n))\r\n\r\n    removed = []\r\n    errors = {}\r\n    if not dry_run:\r\n        for name in to_remove:\r\n            try:\r\n                sys.modules.pop(name, None)\r\n                removed.append(name)\r\n            except Exception as exc:\r\n                errors[name] = str(exc)\r\n\r\n    return {\r\n        \"status\": \"dry_run\" if dry_run else \"ok\",\r\n        \"purge_all\": purge_all,\r\n        \"prefixes\": list(prefixes),\r\n        \"exact_names\": sorted(list(exact_names)),\r\n        \"matched_count\": len(to_remove),\r\n        \"removed_count\": 0 if dry_run else len(removed),\r\n        \"error_count\": len(errors),\r\n        \"removed_modules\": [] if dry_run else removed,\r\n        \"matched_modules\": to_remove if dry_run else [],\r\n        \"errors\": errors,\r\n        \"note\": \"Development helper only. Avoid in production graphs.\",\r\n    }\r\n\r\n\r\ntry:\r\n    _in = IN if \"IN\" in globals() else []\r\n    _prefixes = _to_list(_in[0]) if len(_in) > 0 else []\r\n    _exact = _to_list(_in[1]) if len(_in) > 1 else []\r\n    _dry_run = _to_bool(_in[2], default=False) if len(_in) > 2 else False\r\n\r\n    OUT = purge_modules(_prefixes, _exact, dry_run=_dry_run)\r\nexcept Exception as exc:\r\n    OUT = {\r\n        \"status\": \"error\",\r\n        \"error\": str(exc),\r\n        \"note\": \"Check IN values and retry.\",\r\n    }\r\n",
+      "Engine": "CPython3",
+      "VariableInputPorts": true,
+      "Id": "e33ec6eecbe14276bbd10160da1cfc2c",
+      "NodeType": "PythonScriptNode",
+      "Inputs": [
+        {
+          "Id": "93a7fb0d8c4b4788b7869cea3ddf69a1",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "19d88ac80d4143dcb0e36aae90530a62",
+          "Name": "IN[1]",
+          "Description": "Input #1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "a1c4dc9522fc456a8b0e5e97403a0451",
+          "Name": "IN[2]",
+          "Description": "Input #2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "620fc8b9a82d43608204fd2631009007",
+          "Name": "IN[3]",
+          "Description": "Input #3",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "54cd7d967688402eb9fa58a7065f7295",
+          "Name": "OUT",
+          "Description": "Result of the python script",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Runs an embedded Python script."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Watch, CoreNodeModels",
+      "WatchWidth": 660.8,
+      "WatchHeight": 286.4,
+      "Id": "31cd8593d04244cebb05ad95baa1c08b",
+      "NodeType": "ExtensionNode",
+      "Inputs": [
+        {
+          "Id": "0093a69fbb1b498abd753cb642e3fee1",
+          "Name": "",
+          "Description": "Node to show output from",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "468a0ec30c734220abc37344071b97cf",
+          "Name": "",
+          "Description": "Node output",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Visualizes a node's output"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "Id": "985ce6c2c82f46af9ee0a1e1372ae7ae",
+      "NodeType": "CodeBlockNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "4ae42c4d07dc48469a72ec44ef67c969",
+          "Name": "",
+          "Description": "Value of expression at line 1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows for DesignScript code to be authored directly",
+      "Code": "\"runner,domains,core\";"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Function, DynamoCore",
+      "FunctionSignature": "ecce77dc-1290-438e-a056-970b256fd553",
+      "FunctionType": "Graph",
+      "Id": "487440cb578b42ada607f3414c85c6e6",
+      "NodeType": "FunctionNode",
+      "Inputs": [
+        {
+          "Id": "78c24fc9b38240a0841befbfa21d568c",
+          "Name": "passThrough",
+          "Description": "var[]..[]",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "179b8e413ded4dff83dd0b5fa541489a",
+          "Name": "waitFor",
+          "Description": "var[]..[]",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "4fa42dbd79874397b5dfc2e5e44ee9d6",
+          "Name": "passThrough",
+          "Description": "return value",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Auto",
+      "Description": "Forces a sequential order of execution. The node wired into the output of the Passthrough node will be executed *after* the node wired into the waitFor input (e.g. important for some Revit operations). The value of the passThrough input will be passed on to the node wired into the output port of the Passthrough node."
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "133a5d422c9e4381b9bd60f36faa7f8e",
+      "End": "80596df7ddba4128bde4d7efdf88ec18",
+      "Id": "7febe8844f3b43d3ba0180535e837319",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "116765d30ab84621aaf3fdfcd5f616eb",
+      "End": "e4448b71a5b64f5b8fa4a5d2cef61257",
+      "Id": "b849f537ac234b309af098678c3e8953",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "82ef7234dba44fccbf7330840d8f5562",
+      "End": "89b170de086a4fe3a65352005242a656",
+      "Id": "48da4e31fb1a4053bb6cfff8117bd0c0",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "82ef7234dba44fccbf7330840d8f5562",
+      "End": "620fc8b9a82d43608204fd2631009007",
+      "Id": "6577e1cb3b114e08b5a0908bb28da5e6",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "ba77644e90c84e6b8c677874c060fe94",
+      "End": "78c24fc9b38240a0841befbfa21d568c",
+      "Id": "cd7288397d134a3f9d93a110fb4ec95a",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "e37122fcf2ce4955bfa2ef078ba8bfc8",
+      "End": "c83bc0de134347d082fb6b31224041de",
+      "Id": "3eb0d7c8fb8e43a0b8ddac71130db658",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "54cd7d967688402eb9fa58a7065f7295",
+      "End": "0093a69fbb1b498abd753cb642e3fee1",
+      "Id": "0b34e2073d794107b2f49f46c01d3815",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "54cd7d967688402eb9fa58a7065f7295",
+      "End": "179b8e413ded4dff83dd0b5fa541489a",
+      "Id": "59cd858197514679bb4a9223ee8d5ca0",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "4ae42c4d07dc48469a72ec44ef67c969",
+      "End": "93a7fb0d8c4b4788b7869cea3ddf69a1",
+      "Id": "15cd84d4f1f74c178ef97995f928a6c1",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "4fa42dbd79874397b5dfc2e5e44ee9d6",
+      "End": "798d5460bf8248b4b215b11687b38371",
+      "Id": "fe658a7c045e4e97b23ffa3fd4b40eb0",
+      "IsHidden": "False"
+    }
+  ],
+  "Dependencies": [
+    "ecce77dc-1290-438e-a056-970b256fd553"
+  ],
+  "NodeLibraryDependencies": [
+    {
+      "Name": "Clockwork for Dynamo 2.x",
+      "Version": "2.3.0",
+      "ReferenceType": "Package",
+      "Nodes": [
+        "487440cb578b42ada607f3414c85c6e6"
+      ]
+    }
+  ],
+  "EnableLegacyPolyCurveBehavior": true,
+  "Thumbnail": "",
+  "GraphDocumentationURL": null,
+  "ExtensionWorkspaceData": [
+    {
+      "ExtensionGuid": "28992e1d-abb9-417f-8b1b-05e053bee670",
+      "Name": "Properties",
+      "Version": "3.3",
+      "Data": {}
+    },
+    {
+      "ExtensionGuid": "DFBD9CC0-DB40-457A-939E-8C8555555A9D",
+      "Name": "Generative Design",
+      "Version": "8.2",
+      "Data": {}
+    }
+  ],
+  "Author": "",
+  "Linting": {
+    "activeLinter": "None",
+    "activeLinterId": "7b75fb44-43fd-4631-a878-29f4d5d8399a",
+    "warningCount": 0,
+    "errorCount": 0
+  },
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": true,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "3.3.0.6316",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "_Background Preview",
+      "EyeX": -17.0,
+      "EyeY": 24.0,
+      "EyeZ": 50.0,
+      "LookX": 12.0,
+      "LookY": -13.0,
+      "LookZ": -58.0,
+      "UpX": 0.0,
+      "UpY": 1.0,
+      "UpZ": 0.0
+    },
+    "ConnectorPins": [],
+    "NodeViews": [
+      {
+        "Id": "062451acfeaf4fb58eece045c87baede",
+        "Name": "Python Script",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 748.125655838325,
+        "Y": -216.05749081499357
+      },
+      {
+        "Id": "3a22c7cc67dd418697587a1e203f4896",
+        "Name": "force full OUT",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 368.125655838325,
+        "Y": -172.05749081499357
+      },
+      {
+        "Id": "e6c98cfa3abb4c2fa00082106b427be9",
+        "Name": "Watch",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 1022.5256558383251,
+        "Y": -216.05749081499357
+      },
+      {
+        "Id": "1cfb892af5f544daa5b19c870cfb8a4d",
+        "Name": "toggle",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": -506.2743441616751,
+        "Y": -272.55749081499357
+      },
+      {
+        "Id": "f6a32b228e4f43dab520aa70125d2985",
+        "Name": "Directory Path",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": -149.4743441616751,
+        "Y": -283.05749081499357
+      },
+      {
+        "Id": "18eab04ad7984d008d0f7aec8808f02b",
+        "Name": "timestamp",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 368.125655838325,
+        "Y": -24.05749081499357
+      },
+      {
+        "Id": "e33ec6eecbe14276bbd10160da1cfc2c",
+        "Name": "Python Script",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": -149.4743441616751,
+        "Y": -533.0574908149936
+      },
+      {
+        "Id": "31cd8593d04244cebb05ad95baa1c08b",
+        "Name": "Watch",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 1022.5256558383251,
+        "Y": -616.0574908149936
+      },
+      {
+        "Id": "985ce6c2c82f46af9ee0a1e1372ae7ae",
+        "Name": "Code Block",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": -506.2743441616751,
+        "Y": -533.2299908149936
+      },
+      {
+        "Id": "487440cb578b42ada607f3414c85c6e6",
+        "Name": "Passthrough",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 368.125655838325,
+        "Y": -350.05749081499357
+      }
+    ],
+    "Annotations": [],
+    "X": -325.0356982044952,
+    "Y": 255.06790805940489,
+    "Zoom": 0.6997567619788531
+  }
+}
