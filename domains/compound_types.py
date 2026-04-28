@@ -309,22 +309,17 @@ def _read_type_name(wall_type):
 
 
 def _read_wall_kind(wt):
-    kind_raw = getattr(wt, "Kind", -1)
+    kind_raw = getattr(wt, "Kind", None)
+    if kind_raw is None:
+        return -1, S_UNREADABLE
     try:
-        kind_int = int(kind_raw)
-        return kind_int, _WALL_KIND_NAMES.get(kind_int, safe_str(kind_raw))
+        # str() round-trip is required in Dynamo CPython3 — .NET Int32
+        # does not satisfy == against Python int without explicit conversion
+        kind_int = int(str(kind_raw))
+        return kind_int, _WALL_KIND_NAMES.get(kind_int, str(kind_raw))
     except Exception:
         pass
-    try:
-        kind_int = int(getattr(kind_raw, "value__", -1))
-        return kind_int, _WALL_KIND_NAMES.get(kind_int, safe_str(kind_raw))
-    except Exception:
-        pass
-    kind_str = safe_str(kind_raw)
-    for ki, ks in _WALL_KIND_NAMES.items():
-        if safe_str(ks).lower() == safe_str(kind_str).lower():
-            return ki, ks
-    return -1, kind_str if kind_str else S_UNREADABLE
+    return -1, safe_str(kind_raw)
 
 
 def _blocked_stub_result():
@@ -422,6 +417,19 @@ def extract_wall_types(doc, ctx=None):
                 print("[DEBUG] outer error: {}".format(e))
 
         type_name = _read_type_name(wt)
+        # Temporary: surface first type-name attempts in debug dict for JSON visibility.
+        if len(records) == 0:
+            try:
+                info["debug_v2_block_reasons"]["first_type_name_attempt"] = repr(getattr(wt, "Name", "NO_ATTR"))
+            except Exception:
+                info["debug_v2_block_reasons"]["first_type_name_attempt"] = "ERROR"
+            try:
+                p_dbg = wt.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM)
+                info["debug_v2_block_reasons"]["first_bip_attempt"] = repr(
+                    p_dbg.AsString() if p_dbg else "None"
+                )
+            except Exception:
+                info["debug_v2_block_reasons"]["first_bip_attempt"] = "ERROR"
 
         kind_int, kind_str = _read_wall_kind(wt)
         is_basic = (kind_int == _WALL_KIND_BASIC)

@@ -140,6 +140,7 @@ def _setup_module(monkeypatch):
         "COARSE_SCALE_FILL_PATTERN_ID_FOR_LEGEND": "BIP_FILL_PATTERN",
         "COARSE_SCALE_FILL_COLOR": "BIP_FILL_COLOR",
         "ALL_MODEL_TYPE_NAME": "BIP_TYPE_NAME",
+        "SYMBOL_NAME_PARAM": "BIP_TYPE_NAME",
     }))
     return m
 
