@@ -83,6 +83,10 @@ def _identity_map(rec):
     return {it["k"]: it["v"] for it in items}
 
 
+def _material_payload(rec):
+    return (rec or {}).get("material", {}) or {}
+
+
 def _make_ctx_with_fill_patterns(m):
     return {
         m.CTX_FILL_PATTERN_ID_TO_VALUE: {
@@ -126,9 +130,9 @@ def test_identity_fields_captured_but_excluded_from_graphics_hash(monkeypatch):
     r2 = m.extract(doc=doc, ctx=_make_ctx_with_fill_patterns(m))
 
     rec = r1["records"][0]
-    im = _identity_map(rec)
-    assert im["material.name"] == "Concrete"
-    assert im["material.class"] == "A"
+    payload = _material_payload(rec)
+    assert payload["name"] == "Concrete"
+    assert payload["class"] == "A"
     assert rec["graphics_sig_hash_v2"] == r2["records"][0]["graphics_sig_hash_v2"]
 
 
@@ -146,8 +150,8 @@ def test_use_render_appearance_captured_but_not_hashed(monkeypatch):
     monkeypatch.setattr(m, "collect_instances", lambda *a_, **k: [b])
     r2 = m.extract(doc=doc, ctx=_make_ctx_with_fill_patterns(m))
 
-    assert _identity_map(r1["records"][0])["material.use_render_appearance"] == "True"
-    assert _identity_map(r2["records"][0])["material.use_render_appearance"] == "False"
+    assert _material_payload(r1["records"][0])["use_render_appearance"] == "True"
+    assert _material_payload(r2["records"][0])["use_render_appearance"] == "False"
     assert r1["records"][0]["graphics_sig_hash_v2"] == r2["records"][0]["graphics_sig_hash_v2"]
 
 
@@ -159,9 +163,9 @@ def test_color_and_transparency_are_displayed_values(monkeypatch):
     doc = _Doc({11: _FillPatternElem("fp-11", "FG"), 12: _FillPatternElem("fp-12", "BG"), 13: _FillPatternElem("fp-13", "CFG"), 14: _FillPatternElem("fp-14", "CBG")})
 
     result = m.extract(doc=doc, ctx=_make_ctx_with_fill_patterns(m))
-    im = _identity_map(result["records"][0])
-    assert im["material.shading_color_rgb"] == "12,34,56"
-    assert im["material.shading_transparency"] == "15"
+    payload = _material_payload(result["records"][0])
+    assert payload["shading_color_rgb"] == "12,34,56"
+    assert payload["shading_transparency"] == "15"
 
 
 def test_no_pattern_element_id_minus_one_maps_to_none(monkeypatch):
@@ -172,10 +176,10 @@ def test_no_pattern_element_id_minus_one_maps_to_none(monkeypatch):
     monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [mat])
 
     result = m.extract(doc=_Doc({}), ctx=_make_ctx_with_fill_patterns(m))
-    im = _identity_map(result["records"][0])
-    assert im["material.surface_foreground_pattern.uid"] == "<NONE>"
-    assert im["material.surface_foreground_pattern.name"] == "<NONE>"
-    assert im["material.surface_foreground_pattern.sig_hash"] == "<NONE>"
+    payload = _material_payload(result["records"][0])
+    assert payload["surface_foreground_pattern"]["uid"] == "<NONE>"
+    assert payload["surface_foreground_pattern"]["name"] == "<NONE>"
+    assert payload["surface_foreground_pattern"]["sig_hash"] == "<NONE>"
 
 
 def test_missing_fill_pattern_ctx_degrades_not_blocks(monkeypatch):
@@ -187,8 +191,8 @@ def test_missing_fill_pattern_ctx_degrades_not_blocks(monkeypatch):
 
     assert result["status"] == "degraded"
     assert result["records"]
-    im = _identity_map(result["records"][0])
-    assert im["material.surface_foreground_pattern.sig_hash"] == "<UNRESOLVED>"
+    payload = _material_payload(result["records"][0])
+    assert payload["surface_foreground_pattern"]["sig_hash"] == "<UNRESOLVED>"
 
 
 def test_fill_pattern_ctx_resolution_populates_sig_hash(monkeypatch):
@@ -197,9 +201,8 @@ def test_fill_pattern_ctx_resolution_populates_sig_hash(monkeypatch):
     monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [_Mat()])
 
     result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG")}), ctx=_make_ctx_with_fill_patterns(m))
-    im = _identity_map(result["records"][0])
-
-    assert im["material.surface_foreground_pattern.sig_hash"] == "hash-fg-s"
+    payload = _material_payload(result["records"][0])
+    assert payload["surface_foreground_pattern"]["sig_hash"] == "hash-fg-s"
 
 
 def test_material_ctx_maps_populated(monkeypatch):
@@ -229,11 +232,19 @@ def test_optional_identity_fields_do_not_emit_canonical_sentinel_literals(monkey
     monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [mat])
 
     result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG")}), ctx=_make_ctx_with_fill_patterns(m))
-    im_items = (((result["records"][0] or {}).get("identity_basis", {}) or {}).get("items", [])) or []
-    im = {it["k"]: it for it in im_items}
+    payload = _material_payload(result["records"][0])
+    assert payload["description"] is None
+    assert payload["comments"] is None
 
-    assert im["material.description"]["v"] is None
-    assert im["material.comments"]["v"] is None
+
+def test_identity_basis_is_minimal_and_uid_only(monkeypatch):
+    m = importlib.import_module("domains.materials")
+    monkeypatch.setattr(m, "Material", object)
+    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [_Mat(uid="uid-x")])
+    result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG")}), ctx=_make_ctx_with_fill_patterns(m))
+
+    items = (((result["records"][0] or {}).get("identity_basis", {}) or {}).get("items", [])) or []
+    assert [it.get("k") for it in items] == ["material.uid"]
 
 
 def test_blocked_when_api_unavailable(monkeypatch):

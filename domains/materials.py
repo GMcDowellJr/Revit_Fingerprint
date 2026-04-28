@@ -30,7 +30,6 @@ from core.record_v2 import (
     canonicalize_str,
     canonicalize_int,
     make_identity_item,
-    serialize_identity_items,
     build_record_v2,
 )
 
@@ -227,6 +226,22 @@ def _mk_item(k, v):
     return make_identity_item(k, vv, qq)
 
 
+def _graphics_sig_hash_v2(material_payload):
+    pairs = [
+        ("shading_color_rgb", material_payload.get("shading_color_rgb")),
+        ("shading_transparency", material_payload.get("shading_transparency")),
+        ("surface_foreground_pattern.sig_hash", material_payload.get("surface_foreground_pattern", {}).get("sig_hash")),
+        ("surface_foreground_pattern_color_rgb", material_payload.get("surface_foreground_pattern_color_rgb")),
+        ("surface_background_pattern.sig_hash", material_payload.get("surface_background_pattern", {}).get("sig_hash")),
+        ("surface_background_pattern_color_rgb", material_payload.get("surface_background_pattern_color_rgb")),
+        ("cut_foreground_pattern.sig_hash", material_payload.get("cut_foreground_pattern", {}).get("sig_hash")),
+        ("cut_foreground_pattern_color_rgb", material_payload.get("cut_foreground_pattern_color_rgb")),
+        ("cut_background_pattern.sig_hash", material_payload.get("cut_background_pattern", {}).get("sig_hash")),
+        ("cut_background_pattern_color_rgb", material_payload.get("cut_background_pattern_color_rgb")),
+    ]
+    return make_hash(["{}={}".format(k, safe_str(v)) for k, v in pairs])
+
+
 def extract(doc, ctx=None):
     info = {
         "count": 0,
@@ -377,63 +392,39 @@ def extract(doc, ctx=None):
         )
         cut_bg_color = _rgb_sig(_read_prop(m, "CutBackgroundPatternColor"))
 
-        identity_items = [
-            _mk_item("material.uid", uid),
-            _mk_item("material.id_local", id_local),
-            _mk_item("material.name", name),
-            _mk_item("material.class", mat_class),
-            _mk_item("material.description", description),
-            _mk_item("material.comments", comments),
-            _mk_item("material.keywords", keywords),
-            _mk_item("material.manufacturer", manufacturer),
-            _mk_item("material.model", model),
-            _mk_item("material.cost", cost),
-            _mk_item("material.url", url),
-            _mk_item("material.keynote", keynote),
-            _mk_item("material.mark", mark),
-            _mk_item("material.use_render_appearance", use_render_appearance),
-            _mk_item("material.shading_color_rgb", shading_color_rgb),
-            _mk_item("material.shading_transparency", shading_transparency),
-            _mk_item("material.surface_foreground_pattern.id_local", surface_fg["id_local"]),
-            _mk_item("material.surface_foreground_pattern.uid", surface_fg["uid"]),
-            _mk_item("material.surface_foreground_pattern.name", surface_fg["name"]),
-            _mk_item("material.surface_foreground_pattern.sig_hash", surface_fg["sig_hash"]),
-            _mk_item("material.surface_foreground_pattern_color_rgb", surface_fg_color),
-            _mk_item("material.surface_background_pattern.id_local", surface_bg["id_local"]),
-            _mk_item("material.surface_background_pattern.uid", surface_bg["uid"]),
-            _mk_item("material.surface_background_pattern.name", surface_bg["name"]),
-            _mk_item("material.surface_background_pattern.sig_hash", surface_bg["sig_hash"]),
-            _mk_item("material.surface_background_pattern_color_rgb", surface_bg_color),
-            _mk_item("material.cut_foreground_pattern.id_local", cut_fg["id_local"]),
-            _mk_item("material.cut_foreground_pattern.uid", cut_fg["uid"]),
-            _mk_item("material.cut_foreground_pattern.name", cut_fg["name"]),
-            _mk_item("material.cut_foreground_pattern.sig_hash", cut_fg["sig_hash"]),
-            _mk_item("material.cut_foreground_pattern_color_rgb", cut_fg_color),
-            _mk_item("material.cut_background_pattern.id_local", cut_bg["id_local"]),
-            _mk_item("material.cut_background_pattern.uid", cut_bg["uid"]),
-            _mk_item("material.cut_background_pattern.name", cut_bg["name"]),
-            _mk_item("material.cut_background_pattern.sig_hash", cut_bg["sig_hash"]),
-            _mk_item("material.cut_background_pattern_color_rgb", cut_bg_color),
-            _mk_item("material.appearance_asset_capture_status", "deferred"),
-            _mk_item("material.physical_asset_capture_status", "deferred"),
-            _mk_item("material.thermal_asset_capture_status", "deferred"),
-        ]
+        identity_items = [_mk_item("material.uid", uid)]
 
-        sem_keys = {
-            "material.shading_color_rgb",
-            "material.shading_transparency",
-            "material.surface_foreground_pattern.sig_hash",
-            "material.surface_foreground_pattern_color_rgb",
-            "material.surface_background_pattern.sig_hash",
-            "material.surface_background_pattern_color_rgb",
-            "material.cut_foreground_pattern.sig_hash",
-            "material.cut_foreground_pattern_color_rgb",
-            "material.cut_background_pattern.sig_hash",
-            "material.cut_background_pattern_color_rgb",
+        material_payload = {
+            "uid": uid,
+            "id_local": id_local,
+            "name": name,
+            "class": mat_class,
+            "description": description[0],
+            "comments": comments[0],
+            "keywords": keywords[0],
+            "manufacturer": manufacturer[0],
+            "model": model[0],
+            "cost": cost[0],
+            "url": url[0],
+            "keynote": keynote[0],
+            "mark": mark[0],
+            "use_render_appearance": use_render_appearance,
+            "shading_color_rgb": shading_color_rgb,
+            "shading_transparency": shading_transparency,
+            "surface_foreground_pattern": dict(surface_fg),
+            "surface_foreground_pattern_color_rgb": surface_fg_color,
+            "surface_background_pattern": dict(surface_bg),
+            "surface_background_pattern_color_rgb": surface_bg_color,
+            "cut_foreground_pattern": dict(cut_fg),
+            "cut_foreground_pattern_color_rgb": cut_fg_color,
+            "cut_background_pattern": dict(cut_bg),
+            "cut_background_pattern_color_rgb": cut_bg_color,
+            "appearance_asset_capture_status": "deferred",
+            "physical_asset_capture_status": "deferred",
+            "thermal_asset_capture_status": "deferred",
         }
         identity_items_sorted = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
-        semantic_items = [it for it in identity_items_sorted if it.get("k") in sem_keys]
-        graphics_sig_hash_v2 = make_hash(serialize_identity_items(semantic_items))
+        graphics_sig_hash_v2 = _graphics_sig_hash_v2(material_payload)
 
         status_v2 = STATUS_OK
         status_reasons = []
@@ -467,7 +458,7 @@ def extract(doc, ctx=None):
             status_reasons=sorted(set(status_reasons)),
             sig_hash=graphics_sig_hash_v2,
             identity_items=identity_items_sorted,
-            required_qs=[ITEM_Q_OK],
+            required_qs=[identity_items_sorted[0].get("q", ITEM_Q_OK)],
             label={
                 "display": safe_str(name),
                 "quality": "human" if name not in (S_MISSING, S_UNREADABLE) else "computed",
@@ -476,6 +467,7 @@ def extract(doc, ctx=None):
             },
         )
         rec["graphics_sig_hash_v2"] = graphics_sig_hash_v2
+        rec["material"] = material_payload
 
         info["records"].append(rec)
         info["count"] += 1
