@@ -1095,6 +1095,86 @@ def run_fingerprint(doc, timing=None):
     return fingerprint
 
 
+# Detail surface keys suppressed in production-mode writes.
+# This is the single declaration point — no per-domain logic inside _strip_detail_surfaces.
+_DETAIL_SURFACE_KEYS = frozenset([
+    "layer_rows",
+    # Future detail surfaces declared here as domains add them
+])
+
+
+def _resolve_output_mode():
+    """Read REVIT_FINGERPRINT_OUTPUT_MODE from env; absent/unrecognized values resolve to 'production'."""
+    try:
+        mode = str(os.environ.get("REVIT_FINGERPRINT_OUTPUT_MODE", "")).strip().lower()
+    except Exception:
+        mode = ""
+    return "dev" if mode == "dev" else "production"
+
+
+def _strip_detail_surfaces(payload):
+    """
+    Return a copy of the fingerprint payload with _DETAIL_SURFACE_KEYS removed from all records.
+    Does not mutate the input. Safe on any payload shape including partially-formed error payloads.
+    """
+    if not isinstance(payload, dict):
+        return payload
+
+    payload = dict(payload)  # shallow copy at top level
+
+    # Guard for a potential future "domains" wrapper key
+    domains_val = payload.get("domains")
+    if isinstance(domains_val, dict):
+        new_domains = {}
+        for domain_name, domain_payload in domains_val.items():
+            if not isinstance(domain_payload, dict):
+                new_domains[domain_name] = domain_payload
+                continue
+            records = domain_payload.get("records")
+            if not isinstance(records, list):
+                new_domains[domain_name] = domain_payload
+                continue
+            new_records = []
+            changed = False
+            for rec in records:
+                if not isinstance(rec, dict) or _DETAIL_SURFACE_KEYS.isdisjoint(rec.keys()):
+                    new_records.append(rec)
+                else:
+                    new_records.append({k: v for k, v in rec.items() if k not in _DETAIL_SURFACE_KEYS})
+                    changed = True
+            if changed:
+                domain_payload = dict(domain_payload)
+                domain_payload["records"] = new_records
+            new_domains[domain_name] = domain_payload
+        payload["domains"] = new_domains
+        return payload
+
+    # Current flat structure: domain payloads sit at non-underscore top-level keys
+    for key in list(payload.keys()):
+        if not isinstance(key, str) or key.startswith("_"):
+            continue
+        domain_payload = payload.get(key)
+        if not isinstance(domain_payload, dict):
+            continue
+        records = domain_payload.get("records")
+        if not isinstance(records, list):
+            continue
+        new_records = []
+        changed = False
+        for rec in records:
+            if not isinstance(rec, dict) or _DETAIL_SURFACE_KEYS.isdisjoint(rec.keys()):
+                new_records.append(rec)
+            else:
+                new_records.append({k: v for k, v in rec.items() if k not in _DETAIL_SURFACE_KEYS})
+                changed = True
+        if changed:
+            new_domain_payload = dict(domain_payload)
+            new_domain_payload["records"] = new_records
+            payload[key] = new_domain_payload
+
+    return payload
+
+
 # Execute extraction (OUT protection)
 try:
     _timing = TimingCollector()
@@ -1188,12 +1268,24 @@ try:
         """
         Writes JSON directly to disk to avoid returning multi-MB payloads through Dynamo.
         Returns (bytes_written, write_elapsed_seconds).
+        Serialization format and detail surface suppression are controlled by
+        REVIT_FINGERPRINT_OUTPUT_MODE (dev=indent+full, production=compact+stripped).
         """
         t0 = time.perf_counter()
         _ensure_parent_dir(path)
-        # Keep formatting identical to legacy OUT behavior (indent=2, sort_keys=True)
+
+        _mode = _resolve_output_mode()
+        _is_dev = (_mode == "dev")
+        _suppress_detail_surfaces = not _is_dev
+
+        _write_payload = _strip_detail_surfaces(payload) if _suppress_detail_surfaces else payload
+
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, sort_keys=True)
+            if _is_dev:
+                json.dump(_write_payload, f, indent=2, sort_keys=True)
+            else:
+                json.dump(_write_payload, f, separators=(',', ':'))
+
         bytes_written = None
         try:
             bytes_written = os.path.getsize(path)
@@ -1320,6 +1412,7 @@ try:
 
         summary = {
             "status": status,
+            "output_mode": _resolve_output_mode(),
             "output_paths": paths,
             "output_surfaces": ["payload"],
             "filename_stamp_enabled": _use_filename_stamp(),
