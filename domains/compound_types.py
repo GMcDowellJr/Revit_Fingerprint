@@ -46,7 +46,6 @@ try:
         MaterialFunctionAssignment,
         BuiltInParameter,
         ShellLayerType,
-        Element,
     )
 except ImportError:
     WallType = None
@@ -57,7 +56,6 @@ except ImportError:
     MaterialFunctionAssignment = None
     BuiltInParameter = None
     ShellLayerType = None
-    Element = None
 
 _DOMAIN_WALL = "wall_types"
 _WALL_KIND_BASIC = 0
@@ -284,25 +282,17 @@ def _read_compound_structure(cs, doc, ctx, family):
 
 def _read_type_name(wall_type):
     try:
-        n = Element.Name.GetValue(wall_type) if Element is not None else None
-        if n:
-            return safe_str(n)
-    except Exception:
-        pass
-    # Try .Name property next
-    try:
         n = wall_type.Name
-        if n:
-            return safe_str(n)
+        if n is not None and str(n).strip():
+            return str(n).strip()
     except Exception:
         pass
-    # Fall back to type-name parameter for Dynamo/Revit cross-version reliability
     try:
-        p = wall_type.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME)
+        p = wall_type.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM)
         if p is not None:
             n = p.AsString()
-            if n:
-                return safe_str(n)
+            if n is not None and str(n).strip():
+                return str(n).strip()
     except Exception:
         pass
     return ""
