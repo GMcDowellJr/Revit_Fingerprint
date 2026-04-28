@@ -139,8 +139,7 @@ def main() -> None:
     label_comp_rows: List[Dict[str, str]] = []
     stack_rows: List[Dict[str, str]] = []
     layer_detail_rows: List[Dict[str, str]] = []
-    stacks_seen: set[Tuple[str, str, str]] = set()
-    stack_type_counts: Dict[Tuple[str, str, str], int] = {}
+    stack_groups: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
     seen_file_ids: set[str] = set()
 
     for path in _iter_json_paths(root_dir):
@@ -273,54 +272,26 @@ def main() -> None:
 
                         if stack_hash_loose:
                             stack_key = (file_id, domain, stack_hash_loose)
-                            # Track type_count per stack
-                            stack_type_counts[stack_key] = stack_type_counts.get(stack_key, 0) + 1
-                            # Only write stack rows once per unique stack per file
-                            if stack_key not in stacks_seen:
-                                stacks_seen.add(stack_key)
-                                real_layers = [row for row in layer_rows_payload if isinstance(row, dict) and not row.get("is_core_boundary")]
-                                layer_count = len(real_layers)
+                            group = stack_groups.setdefault(
+                                stack_key,
+                                {
+                                    "type_count": 0,
+                                    "strict_hashes": set(),
+                                    "function_only_hashes": set(),
+                                    "rows_by_strict": {},
+                                },
+                            )
+                            group["type_count"] += 1
+                            if stack_hash_strict:
+                                group["strict_hashes"].add(stack_hash_strict)
+                            if stack_hash_function_only:
+                                group["function_only_hashes"].add(stack_hash_function_only)
 
-                                total_thickness = 0.0
-                                for row in real_layers:
-                                    thickness = row.get("wl.thickness_in")
-                                    if thickness in (None, "", "null"):
-                                        continue
-                                    try:
-                                        total_thickness += float(thickness)
-                                    except (TypeError, ValueError):
-                                        continue
-
-                                stack_rows.append({
-                                    "file_id": file_id,
-                                    "domain": domain,
-                                    "stack_hash_loose": stack_hash_loose,
-                                    "stack_hash_strict": stack_hash_strict,
-                                    "stack_hash_function_only": stack_hash_function_only,
-                                    "layer_count": str(layer_count),
-                                    "total_thickness_in": "{:.4f}".format(total_thickness),
-                                    "type_count": "",  # backfilled after loop
-                                })
-                                for lr in layer_rows_payload:
-                                    if not isinstance(lr, dict):
-                                        continue
-                                    layer_detail_rows.append({
-                                        "file_id": file_id,
-                                        "domain": domain,
-                                        "stack_hash_loose": stack_hash_loose,
-                                        "layer_index": _safe_str(lr.get("layer_index")),
-                                        "is_core_boundary": _safe_str(lr.get("is_core_boundary")),
-                                        "wl.function": _safe_str(lr.get("wl.function")),
-                                        "wl.thickness_in": _safe_str(lr.get("wl.thickness_in")),
-                                        "wl.material_name": _safe_str(lr.get("wl.material_name")),
-                                        "wl.material_class": _safe_str(lr.get("wl.material_class")),
-                                        "wl.participates_in_wrapping": _safe_str(lr.get("wl.participates_in_wrapping")),
-                                        "wl.structural_material": _safe_str(lr.get("wl.structural_material")),
-                                        "wl.is_variable": _safe_str(lr.get("wl.is_variable")),
-                                        "wl.is_structural_deck": _safe_str(lr.get("wl.is_structural_deck")),
-                                        "wl.deck_usage": _safe_str(lr.get("wl.deck_usage")),
-                                        "wl.deck_profile_name": _safe_str(lr.get("wl.deck_profile_name")),
-                                    })
+                            strict_key = stack_hash_strict or "<EMPTY_STRICT_HASH>"
+                            if strict_key not in group["rows_by_strict"]:
+                                group["rows_by_strict"][strict_key] = [
+                                    lr for lr in layer_rows_payload if isinstance(lr, dict)
+                                ]
                         
                 label = r.get("label")
 
@@ -343,9 +314,64 @@ def main() -> None:
                             "component_value": _safe_str(cv),
                         })
 
-    for row in stack_rows:
-        key = (row["file_id"], row["domain"], row["stack_hash_loose"])
-        row["type_count"] = str(stack_type_counts.get(key, 1))
+    for stack_key in sorted(stack_groups.keys()):
+        file_id, domain, stack_hash_loose = stack_key
+        group = stack_groups[stack_key]
+
+        strict_hashes = sorted(group.get("strict_hashes", set()))
+        function_only_hashes = sorted(group.get("function_only_hashes", set()))
+        rows_by_strict = group.get("rows_by_strict", {})
+
+        # Use a deterministic strict-variant when materializing layer rows and rollups.
+        if strict_hashes and strict_hashes[0] in rows_by_strict:
+            canonical_rows = rows_by_strict[strict_hashes[0]]
+        else:
+            first_variant_key = sorted(rows_by_strict.keys())[0] if rows_by_strict else None
+            canonical_rows = rows_by_strict.get(first_variant_key, []) if first_variant_key else []
+
+        real_layers = [row for row in canonical_rows if not row.get("is_core_boundary")]
+        layer_count = len(real_layers)
+        total_thickness = 0.0
+        for row in real_layers:
+            thickness = row.get("wl.thickness_in")
+            if thickness in (None, "", "null"):
+                continue
+            try:
+                total_thickness += float(thickness)
+            except (TypeError, ValueError):
+                continue
+
+        stack_rows.append({
+            "file_id": file_id,
+            "domain": domain,
+            "stack_hash_loose": stack_hash_loose,
+            # If multiple strict/function-only hashes exist for one loose hash,
+            # emit a deterministic, deduplicated list to avoid order-dependence.
+            "stack_hash_strict": "|".join(strict_hashes),
+            "stack_hash_function_only": "|".join(function_only_hashes),
+            "layer_count": str(layer_count),
+            "total_thickness_in": "{:.4f}".format(total_thickness),
+            "type_count": str(group.get("type_count", 1)),
+        })
+
+        for lr in canonical_rows:
+            layer_detail_rows.append({
+                "file_id": file_id,
+                "domain": domain,
+                "stack_hash_loose": stack_hash_loose,
+                "layer_index": _safe_str(lr.get("layer_index")),
+                "is_core_boundary": _safe_str(lr.get("is_core_boundary")),
+                "wl.function": _safe_str(lr.get("wl.function")),
+                "wl.thickness_in": _safe_str(lr.get("wl.thickness_in")),
+                "wl.material_name": _safe_str(lr.get("wl.material_name")),
+                "wl.material_class": _safe_str(lr.get("wl.material_class")),
+                "wl.participates_in_wrapping": _safe_str(lr.get("wl.participates_in_wrapping")),
+                "wl.structural_material": _safe_str(lr.get("wl.structural_material")),
+                "wl.is_variable": _safe_str(lr.get("wl.is_variable")),
+                "wl.is_structural_deck": _safe_str(lr.get("wl.is_structural_deck")),
+                "wl.deck_usage": _safe_str(lr.get("wl.deck_usage")),
+                "wl.deck_profile_name": _safe_str(lr.get("wl.deck_profile_name")),
+            })
 
     def _write_csv(name: str, rows: List[Dict[str, str]], fieldnames: List[str]) -> str:
         p = out_dir / name
