@@ -810,13 +810,8 @@ def extract_floor_types(doc, ctx=None):
             cs = None
 
         if cs is None:
-            try:
-                ft_function_v, ft_function_q = canonicalize_str(getattr(ft, "Function", None))
-            except Exception:
-                ft_function_v, ft_function_q = (None, ITEM_Q_UNREADABLE)
             blocked_items = sorted([
                 make_identity_item("ft.type_name", type_name, ITEM_Q_OK),
-                make_identity_item("ft.function", ft_function_v, ft_function_q),
                 make_identity_item("ft.layer_count", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
                 make_identity_item("ft.total_thickness_in", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
                 make_identity_item("ft.stack_hash_loose", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
@@ -865,12 +860,12 @@ def extract_floor_types(doc, ctx=None):
             total_thickness_v, total_thickness_q = canonicalize_float(cs_data["total_thickness_in"], nd=4)
 
         semantic = [
-            make_identity_item("ft.function", ft_function if ft_function != S_UNREADABLE else None, ft_function_q),
             make_identity_item("ft.layer_count", *canonicalize_int(cs_data["layer_count"])),
             make_identity_item("ft.total_thickness_in", total_thickness_v, total_thickness_q),
             make_identity_item("ft.stack_hash_loose", *canonicalize_str(cs_data["stack_hash_loose"])),
         ]
         coordination = [
+            make_identity_item("ft.function", ft_function if ft_function != S_UNREADABLE else None, ft_function_q),
             make_identity_item("ft.total_layer_rows", *canonicalize_int(cs_data["total_layer_rows"])),
             make_identity_item("ft.stack_hash_strict", *canonicalize_str(cs_data["stack_hash_strict"])),
             make_identity_item("ft.stack_hash_function_only", *canonicalize_str(cs_data["stack_hash_function_only"])),
@@ -883,7 +878,7 @@ def extract_floor_types(doc, ctx=None):
         ]
 
         identity_items = sorted((semantic + coordination + cosmetic), key=lambda it: safe_str(it.get("k", "")))
-        required_keys = {"ft.function", "ft.layer_count", "ft.total_thickness_in", "ft.stack_hash_loose"}
+        required_keys = {"ft.layer_count", "ft.total_thickness_in", "ft.stack_hash_loose"}
         required_qs = [it.get("q") for it in semantic if safe_str(it.get("k", "")) in required_keys]
         required_not_ok = any(q != ITEM_Q_OK for q in required_qs)
         status = STATUS_BLOCKED if required_not_ok else STATUS_OK
@@ -902,7 +897,7 @@ def extract_floor_types(doc, ctx=None):
         )
         rec["sig_basis"] = {
             "schema": "floor_types.sig_basis.v1",
-            "keys_used": ["ft.function", "ft.layer_count", "ft.total_thickness_in", "ft.stack_hash_loose"],
+            "keys_used": ["ft.layer_count", "ft.total_thickness_in", "ft.stack_hash_loose"],
         }
         rec["layer_rows"] = cs_data["layer_rows"]
         records.append(rec)
@@ -941,7 +936,6 @@ def extract_roof_types(doc, ctx=None):
         "record_rows": [],
         "signature_hashes_v2": [],
         "status": "ok",
-        "debug_blocked_kind": 0,
         "debug_blocked_no_cs": 0,
         "debug_v2_blocked": False,
         "debug_v2_block_reasons": {},
@@ -979,33 +973,6 @@ def extract_roof_types(doc, ctx=None):
 
     for rt in roof_types:
         type_name = _read_type_name(rt)
-        is_basic_roof = (_family_name_of(rt) == "Basic Roof")
-
-        if not is_basic_roof:
-            blocked_items = sorted([
-                make_identity_item("rt.type_name", type_name, ITEM_Q_OK),
-                make_identity_item("rt.layer_count", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
-                make_identity_item("rt.total_thickness_in", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
-                make_identity_item("rt.stack_hash_loose", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
-            ], key=lambda it: safe_str(it.get("k", "")))
-            rec = build_record_v2(
-                domain=_DOMAIN_ROOF,
-                record_id="roof_type|{}".format(type_name),
-                status=STATUS_BLOCKED,
-                status_reasons=["kind_not_basic_roof"],
-                sig_hash=None,
-                identity_items=blocked_items,
-                required_qs=[ITEM_Q_OK],
-                label=_label_for_type(type_name),
-            )
-            rec["layer_rows"] = []
-            records.append(rec)
-            info["debug_blocked_kind"] += 1
-            info["debug_v2_blocked"] = True
-            info["debug_v2_block_reasons"]["kind_not_basic_roof"] = (
-                info["debug_v2_block_reasons"].get("kind_not_basic_roof", 0) + 1
-            )
-            continue
 
         try:
             cs = rt.GetCompoundStructure()
@@ -1121,7 +1088,6 @@ def extract_ceiling_types(doc, ctx=None):
         "record_rows": [],
         "signature_hashes_v2": [],
         "status": "ok",
-        "debug_blocked_kind": 0,
         "debug_blocked_no_cs": 0,
         "debug_v2_blocked": False,
         "debug_v2_block_reasons": {},
@@ -1159,33 +1125,6 @@ def extract_ceiling_types(doc, ctx=None):
 
     for ct in ceiling_types:
         type_name = _read_type_name(ct)
-        is_compound = (_family_name_of(ct) == "Compound Ceiling")
-
-        if not is_compound:
-            blocked_items = sorted([
-                make_identity_item("ct.type_name", type_name, ITEM_Q_OK),
-                make_identity_item("ct.layer_count", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
-                make_identity_item("ct.total_thickness_in", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
-                make_identity_item("ct.stack_hash_loose", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
-            ], key=lambda it: safe_str(it.get("k", "")))
-            rec = build_record_v2(
-                domain=_DOMAIN_CEILING,
-                record_id="ceiling_type|{}".format(type_name),
-                status=STATUS_BLOCKED,
-                status_reasons=["kind_not_compound_ceiling"],
-                sig_hash=None,
-                identity_items=blocked_items,
-                required_qs=[ITEM_Q_OK],
-                label=_label_for_type(type_name),
-            )
-            rec["layer_rows"] = []
-            records.append(rec)
-            info["debug_blocked_kind"] += 1
-            info["debug_v2_blocked"] = True
-            info["debug_v2_block_reasons"]["kind_not_compound_ceiling"] = (
-                info["debug_v2_block_reasons"].get("kind_not_compound_ceiling", 0) + 1
-            )
-            continue
 
         try:
             cs = ct.GetCompoundStructure()
