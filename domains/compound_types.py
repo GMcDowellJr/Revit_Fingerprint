@@ -405,6 +405,22 @@ def extract_wall_types(doc, ctx=None):
     debug_kind_printed = 0
 
     for wt in wall_types:
+        # Temporary debug at top of for loop, first iteration only
+        if debug_kind_printed == 0:
+            try:
+                kind_raw = getattr(wt, "Kind", "MISSING_ATTR")
+                print("[DEBUG] Kind raw: {} type: {}".format(kind_raw, type(kind_raw)))
+                print("[DEBUG] Kind dir: {}".format([x for x in dir(kind_raw) if not x.startswith('__')]))
+                print("[DEBUG] wt.Name direct: {}".format(getattr(wt, "Name", "NO_NAME_ATTR")))
+                for bip in ["SYMBOL_NAME_PARAM", "ALL_MODEL_TYPE_NAME", "DATUM_TEXT"]:
+                    try:
+                        p = wt.get_Parameter(getattr(BuiltInParameter, bip))
+                        print("[DEBUG] BIP {}: {}".format(bip, p.AsString() if p else "None"))
+                    except Exception as e:
+                        print("[DEBUG] BIP {} error: {}".format(bip, e))
+            except Exception as e:
+                print("[DEBUG] outer error: {}".format(e))
+
         type_name = _read_type_name(wt)
 
         kind_int, kind_str = _read_wall_kind(wt)
