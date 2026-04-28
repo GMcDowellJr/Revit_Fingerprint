@@ -494,8 +494,9 @@ def main() -> None:
     )
     ap.add_argument(
         "--flat-tables-emit",
-        default="runs,records,status_reasons,identity_items,label_components,layer_stacks",
-        help="Comma-separated emit types for the flat_tables stage (passed to export_to_flat_tables.py).",
+        default="layer_stacks",
+        help="Comma-separated emit types for the flat_tables stage (passed to export_to_flat_tables.py). "
+             "Default is layer_stacks only; runs/records/identity_items etc. are already written by the flatten stage.",
     )
     args = ap.parse_args()
 
