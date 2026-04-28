@@ -66,6 +66,25 @@ _WALL_KIND_NAMES = {
     _WALL_KIND_STACKED: "Stacked",
     _WALL_KIND_CURTAIN: "Curtain",
 }
+def _enum_name(enum_class, int_val, fallback_map):
+    try:
+        return enum_class(int_val).name
+    except Exception:
+        pass
+    return fallback_map.get(int_val, str(int_val))
+
+
+_WALL_FUNCTION_NAMES = {
+    0: "Interior", 1: "Exterior", 2: "Foundation",
+    3: "Retaining", 4: "Soffit", 5: "Coreshaft",
+}
+_LAYER_FUNCTION_NAMES = {
+    0: "None", 1: "Structure", 2: "Substrate", 3: "Insulation",
+    4: "Finish1", 5: "Finish2", 6: "Membrane", 7: "StructuralDeck",
+}
+_WALL_WRAPPING_NAMES = {
+    0: "DoNotWrap", 1: "Exterior", 2: "Interior", 3: "Both",
+}
 _CORE_BOUNDARY_SENTINEL = "CORE_BOUNDARY"
 _LAYER_RECORD_ID_PREFIX = "wall_type_layer"
 
@@ -107,8 +126,9 @@ def _material_identity_from_layer(layer, doc, ctx):
 
 
 def _layer_function_str(layer):
+    raw = getattr(layer, "Function", None)
     try:
-        return safe_str(getattr(layer, "Function", None))
+        return _enum_name(MaterialFunctionAssignment, int(raw), _LAYER_FUNCTION_NAMES)
     except Exception:
         return S_UNREADABLE
 
@@ -261,11 +281,11 @@ def _read_compound_structure(cs, doc, ctx, family):
     wraps_at_ends = S_NOT_APPLICABLE
     if family == "wall":
         try:
-            wraps_at_inserts = safe_str(cs.WrapAtInserts)
+            wraps_at_inserts = _enum_name(None, int(cs.WrapAtInserts), _WALL_WRAPPING_NAMES)
         except Exception:
             wraps_at_inserts = S_UNREADABLE
         try:
-            wraps_at_ends = safe_str(cs.WrapAtEnds)
+            wraps_at_ends = _enum_name(None, int(cs.WrapAtEnds), _WALL_WRAPPING_NAMES)
         except Exception:
             wraps_at_ends = S_UNREADABLE
 
@@ -493,7 +513,8 @@ def extract_wall_types(doc, ctx=None):
 
         # type-level reads
         try:
-            wt_function = safe_str(getattr(wt, "Function", None))
+            raw = getattr(wt, "Function", None)
+            wt_function = _enum_name(WallFunction, int(raw), _WALL_FUNCTION_NAMES)
             wt_function_q = ITEM_Q_OK
         except Exception:
             wt_function = S_UNREADABLE

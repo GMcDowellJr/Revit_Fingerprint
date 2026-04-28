@@ -27,7 +27,17 @@ class _Param(object):
 
 class _Layer(object):
     def __init__(self, fn, width_ft, mat_id, structural=True, variable=False):
-        self.Function = fn
+        _fn_map = {
+            "None": 0,
+            "Structure": 1,
+            "Substrate": 2,
+            "Insulation": 3,
+            "Finish1": 4,
+            "Finish2": 5,
+            "Membrane": 6,
+            "StructuralDeck": 7,
+        }
+        self.Function = _fn_map.get(fn, fn)
         self.Width = width_ft
         self.MaterialId = _Id(mat_id) if isinstance(mat_id, int) else mat_id
         self.IsStructuralMaterial = structural
@@ -36,7 +46,17 @@ class _Layer(object):
 
 class _LayerWidthError(_Layer):
     def __init__(self, fn, width_ft, mat_id, structural=True, variable=False):
-        self.Function = fn
+        _fn_map = {
+            "None": 0,
+            "Structure": 1,
+            "Substrate": 2,
+            "Insulation": 3,
+            "Finish1": 4,
+            "Finish2": 5,
+            "Membrane": 6,
+            "StructuralDeck": 7,
+        }
+        self.Function = _fn_map.get(fn, fn)
         self.MaterialId = _Id(mat_id) if isinstance(mat_id, int) else mat_id
         self.IsStructuralMaterial = structural
         self.IsVariableWidth = variable
@@ -90,7 +110,15 @@ class _WallType(object):
     def __init__(self, name, kind, cs, fn="Interior"):
         self.Name = name
         self.Kind = kind
-        self._fn = fn
+        _fn_map = {
+            "Interior": 0,
+            "Exterior": 1,
+            "Foundation": 2,
+            "Retaining": 3,
+            "Soffit": 4,
+            "Coreshaft": 5,
+        }
+        self._fn = _fn_map.get(fn, fn)
         self._cs = cs
 
     @property
