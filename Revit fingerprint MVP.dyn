@@ -1,5 +1,5 @@
 {
-  "Uuid": "d77ed504-11dd-4a4c-804d-470b1d16ae94",
+  "Uuid": "b3764b1a-62f4-4ccc-9ac0-0b9a2e5c3705",
   "IsCustomNode": false,
   "Description": "",
   "Name": "Revit fingerprint MVP",
@@ -442,12 +442,12 @@
     },
     "Camera": {
       "Name": "_Background Preview",
-      "EyeX": -17.0,
-      "EyeY": 24.0,
-      "EyeZ": 50.0,
-      "LookX": 12.0,
-      "LookY": -13.0,
-      "LookZ": -58.0,
+      "EyeX": -18.394733428955078,
+      "EyeY": 25.51095962524414,
+      "EyeZ": 56.7412109375,
+      "LookX": 13.394733428955078,
+      "LookY": -14.51095962524414,
+      "LookZ": -64.7412109375,
       "UpX": 0.0,
       "UpY": 1.0,
       "UpZ": 0.0
@@ -461,7 +461,7 @@
         "IsSetAsOutput": false,
         "Excluded": false,
         "ShowGeometry": true,
-        "X": 748.125655838325,
+        "X": 665.0573321208985,
         "Y": -216.05749081499357
       },
       {
@@ -471,7 +471,7 @@
         "IsSetAsOutput": false,
         "Excluded": false,
         "ShowGeometry": true,
-        "X": 368.125655838325,
+        "X": 285.05733212089854,
         "Y": -172.05749081499357
       },
       {
@@ -481,7 +481,7 @@
         "IsSetAsOutput": false,
         "Excluded": false,
         "ShowGeometry": true,
-        "X": 1022.5256558383251,
+        "X": 939.4573321208986,
         "Y": -216.05749081499357
       },
       {
@@ -491,7 +491,7 @@
         "IsSetAsOutput": false,
         "Excluded": false,
         "ShowGeometry": true,
-        "X": -506.2743441616751,
+        "X": -589.3426678791016,
         "Y": -272.55749081499357
       },
       {
@@ -501,7 +501,7 @@
         "IsSetAsOutput": false,
         "Excluded": false,
         "ShowGeometry": true,
-        "X": -149.4743441616751,
+        "X": -232.54266787910154,
         "Y": -283.05749081499357
       },
       {
@@ -511,7 +511,7 @@
         "IsSetAsOutput": false,
         "Excluded": false,
         "ShowGeometry": true,
-        "X": 368.125655838325,
+        "X": 285.05733212089854,
         "Y": -24.05749081499357
       },
       {
@@ -521,7 +521,7 @@
         "IsSetAsOutput": false,
         "Excluded": false,
         "ShowGeometry": true,
-        "X": -149.4743441616751,
+        "X": -232.54266787910154,
         "Y": -533.0574908149936
       },
       {
@@ -531,7 +531,7 @@
         "IsSetAsOutput": false,
         "Excluded": false,
         "ShowGeometry": true,
-        "X": 1022.5256558383251,
+        "X": 939.4573321208986,
         "Y": -616.0574908149936
       },
       {
@@ -541,7 +541,7 @@
         "IsSetAsOutput": false,
         "Excluded": false,
         "ShowGeometry": true,
-        "X": -506.2743441616751,
+        "X": -589.3426678791016,
         "Y": -533.2299908149936
       },
       {
@@ -551,13 +551,13 @@
         "IsSetAsOutput": false,
         "Excluded": false,
         "ShowGeometry": true,
-        "X": 368.125655838325,
+        "X": 285.05733212089854,
         "Y": -350.05749081499357
       }
     ],
     "Annotations": [],
-    "X": -325.0356982044952,
-    "Y": 255.06790805940489,
-    "Zoom": 0.6997567619788531
+    "X": -202.77309102990688,
+    "Y": 512.7800146546992,
+    "Zoom": 0.5961838623979467
   }
 }
