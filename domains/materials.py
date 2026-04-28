@@ -84,6 +84,7 @@ def _rgb_sig(col):
 
 
 def _read_param_as_string(mat, *, bip_names, lookup_names):
+    """Return (v, q) for optional identity metadata fields."""
     # BuiltInParameter candidates (if available in this API/runtime)
     if BuiltInParameter is not None:
         for bip_name in list(bip_names or []):
@@ -101,16 +102,16 @@ def _read_param_as_string(mat, *, bip_names, lookup_names):
                 continue
             try:
                 if hasattr(p, "HasValue") and p.HasValue is False:
-                    return S_MISSING
+                    return None, ITEM_Q_MISSING
             except Exception:
                 pass
             for accessor in ("AsString", "AsValueString"):
                 try:
                     v = getattr(p, accessor)()
-                    return canon_str(v)
+                    return canonicalize_str(v)
                 except Exception:
                     continue
-            return S_UNREADABLE
+            return None, ITEM_Q_UNREADABLE
 
     # Parameter name fallbacks
     for pname in list(lookup_names or []):
@@ -122,18 +123,18 @@ def _read_param_as_string(mat, *, bip_names, lookup_names):
             continue
         try:
             if hasattr(p, "HasValue") and p.HasValue is False:
-                return S_MISSING
+                return None, ITEM_Q_MISSING
         except Exception:
             pass
         for accessor in ("AsString", "AsValueString"):
             try:
                 v = getattr(p, accessor)()
-                return canon_str(v)
+                return canonicalize_str(v)
             except Exception:
                 continue
-        return S_UNREADABLE
+        return None, ITEM_Q_UNREADABLE
 
-    return S_MISSING
+    return None, ITEM_Q_MISSING
 
 
 def _resolve_pattern_slot(*, doc, ctx, pattern_id_obj, debug):
@@ -217,6 +218,11 @@ def _safe_item_value(v):
 
 
 def _mk_item(k, v):
+    if isinstance(v, tuple) and len(v) == 2:
+        vv, qq = v
+        if isinstance(vv, str) and vv in (S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE):
+            vv = None
+        return make_identity_item(k, vv, qq)
     vv, qq = _safe_item_value(v)
     return make_identity_item(k, vv, qq)
 
