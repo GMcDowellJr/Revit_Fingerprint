@@ -220,6 +220,22 @@ def test_material_ctx_maps_populated(monkeypatch):
     assert ctx[m.CTX_MATERIAL_UID_TO_GRAPHICS_SIG_HASH]["uid-1"]
 
 
+def test_optional_identity_fields_do_not_emit_canonical_sentinel_literals(monkeypatch):
+    m = importlib.import_module("domains.materials")
+    monkeypatch.setattr(m, "Material", object)
+    mat = _Mat()
+    mat._params["Description"] = _Param(None)
+    mat._params["Comments"] = _Param(None)
+    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [mat])
+
+    result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG")}), ctx=_make_ctx_with_fill_patterns(m))
+    im_items = (((result["records"][0] or {}).get("identity_basis", {}) or {}).get("items", [])) or []
+    im = {it["k"]: it for it in im_items}
+
+    assert im["material.description"]["v"] is None
+    assert im["material.comments"]["v"] is None
+
+
 def test_blocked_when_api_unavailable(monkeypatch):
     m = importlib.import_module("domains.materials")
     monkeypatch.setattr(m, "Material", None)

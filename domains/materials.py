@@ -20,7 +20,7 @@ if repo_root not in sys.path:
 
 from core.collect import collect_instances
 from core.hashing import make_hash, safe_str
-from core.canon import S_MISSING, S_UNREADABLE, S_NONE, S_UNRESOLVED, canon_str
+from core.canon import S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE, S_NONE, S_UNRESOLVED, canon_str
 from core.record_v2 import (
     STATUS_OK,
     STATUS_DEGRADED,
@@ -205,6 +205,22 @@ def _export_ctx(ctx, maps):
         ctx[key] = existing
 
 
+def _safe_item_value(v):
+    """Return (value, q) safe for make_identity_item without sentinel literals."""
+    if v == S_MISSING:
+        return None, ITEM_Q_MISSING
+    if v == S_UNREADABLE:
+        return None, ITEM_Q_UNREADABLE
+    if v == S_NOT_APPLICABLE:
+        return None, ITEM_Q_MISSING
+    return canonicalize_str(v)
+
+
+def _mk_item(k, v):
+    vv, qq = _safe_item_value(v)
+    return make_identity_item(k, vv, qq)
+
+
 def extract(doc, ctx=None):
     info = {
         "count": 0,
@@ -356,45 +372,45 @@ def extract(doc, ctx=None):
         cut_bg_color = _rgb_sig(_read_prop(m, "CutBackgroundPatternColor"))
 
         identity_items = [
-            make_identity_item("material.uid", *canonicalize_str(uid)),
-            make_identity_item("material.id_local", *canonicalize_str(id_local)),
-            make_identity_item("material.name", *canonicalize_str(name)),
-            make_identity_item("material.class", *canonicalize_str(mat_class)),
-            make_identity_item("material.description", *canonicalize_str(description)),
-            make_identity_item("material.comments", *canonicalize_str(comments)),
-            make_identity_item("material.keywords", *canonicalize_str(keywords)),
-            make_identity_item("material.manufacturer", *canonicalize_str(manufacturer)),
-            make_identity_item("material.model", *canonicalize_str(model)),
-            make_identity_item("material.cost", *canonicalize_str(cost)),
-            make_identity_item("material.url", *canonicalize_str(url)),
-            make_identity_item("material.keynote", *canonicalize_str(keynote)),
-            make_identity_item("material.mark", *canonicalize_str(mark)),
-            make_identity_item("material.use_render_appearance", *canonicalize_str(use_render_appearance)),
-            make_identity_item("material.shading_color_rgb", *canonicalize_str(shading_color_rgb)),
-            make_identity_item("material.shading_transparency", *canonicalize_str(shading_transparency)),
-            make_identity_item("material.surface_foreground_pattern.id_local", *canonicalize_str(surface_fg["id_local"])),
-            make_identity_item("material.surface_foreground_pattern.uid", *canonicalize_str(surface_fg["uid"])),
-            make_identity_item("material.surface_foreground_pattern.name", *canonicalize_str(surface_fg["name"])),
-            make_identity_item("material.surface_foreground_pattern.sig_hash", *canonicalize_str(surface_fg["sig_hash"])),
-            make_identity_item("material.surface_foreground_pattern_color_rgb", *canonicalize_str(surface_fg_color)),
-            make_identity_item("material.surface_background_pattern.id_local", *canonicalize_str(surface_bg["id_local"])),
-            make_identity_item("material.surface_background_pattern.uid", *canonicalize_str(surface_bg["uid"])),
-            make_identity_item("material.surface_background_pattern.name", *canonicalize_str(surface_bg["name"])),
-            make_identity_item("material.surface_background_pattern.sig_hash", *canonicalize_str(surface_bg["sig_hash"])),
-            make_identity_item("material.surface_background_pattern_color_rgb", *canonicalize_str(surface_bg_color)),
-            make_identity_item("material.cut_foreground_pattern.id_local", *canonicalize_str(cut_fg["id_local"])),
-            make_identity_item("material.cut_foreground_pattern.uid", *canonicalize_str(cut_fg["uid"])),
-            make_identity_item("material.cut_foreground_pattern.name", *canonicalize_str(cut_fg["name"])),
-            make_identity_item("material.cut_foreground_pattern.sig_hash", *canonicalize_str(cut_fg["sig_hash"])),
-            make_identity_item("material.cut_foreground_pattern_color_rgb", *canonicalize_str(cut_fg_color)),
-            make_identity_item("material.cut_background_pattern.id_local", *canonicalize_str(cut_bg["id_local"])),
-            make_identity_item("material.cut_background_pattern.uid", *canonicalize_str(cut_bg["uid"])),
-            make_identity_item("material.cut_background_pattern.name", *canonicalize_str(cut_bg["name"])),
-            make_identity_item("material.cut_background_pattern.sig_hash", *canonicalize_str(cut_bg["sig_hash"])),
-            make_identity_item("material.cut_background_pattern_color_rgb", *canonicalize_str(cut_bg_color)),
-            make_identity_item("material.appearance_asset_capture_status", *canonicalize_str("deferred")),
-            make_identity_item("material.physical_asset_capture_status", *canonicalize_str("deferred")),
-            make_identity_item("material.thermal_asset_capture_status", *canonicalize_str("deferred")),
+            _mk_item("material.uid", uid),
+            _mk_item("material.id_local", id_local),
+            _mk_item("material.name", name),
+            _mk_item("material.class", mat_class),
+            _mk_item("material.description", description),
+            _mk_item("material.comments", comments),
+            _mk_item("material.keywords", keywords),
+            _mk_item("material.manufacturer", manufacturer),
+            _mk_item("material.model", model),
+            _mk_item("material.cost", cost),
+            _mk_item("material.url", url),
+            _mk_item("material.keynote", keynote),
+            _mk_item("material.mark", mark),
+            _mk_item("material.use_render_appearance", use_render_appearance),
+            _mk_item("material.shading_color_rgb", shading_color_rgb),
+            _mk_item("material.shading_transparency", shading_transparency),
+            _mk_item("material.surface_foreground_pattern.id_local", surface_fg["id_local"]),
+            _mk_item("material.surface_foreground_pattern.uid", surface_fg["uid"]),
+            _mk_item("material.surface_foreground_pattern.name", surface_fg["name"]),
+            _mk_item("material.surface_foreground_pattern.sig_hash", surface_fg["sig_hash"]),
+            _mk_item("material.surface_foreground_pattern_color_rgb", surface_fg_color),
+            _mk_item("material.surface_background_pattern.id_local", surface_bg["id_local"]),
+            _mk_item("material.surface_background_pattern.uid", surface_bg["uid"]),
+            _mk_item("material.surface_background_pattern.name", surface_bg["name"]),
+            _mk_item("material.surface_background_pattern.sig_hash", surface_bg["sig_hash"]),
+            _mk_item("material.surface_background_pattern_color_rgb", surface_bg_color),
+            _mk_item("material.cut_foreground_pattern.id_local", cut_fg["id_local"]),
+            _mk_item("material.cut_foreground_pattern.uid", cut_fg["uid"]),
+            _mk_item("material.cut_foreground_pattern.name", cut_fg["name"]),
+            _mk_item("material.cut_foreground_pattern.sig_hash", cut_fg["sig_hash"]),
+            _mk_item("material.cut_foreground_pattern_color_rgb", cut_fg_color),
+            _mk_item("material.cut_background_pattern.id_local", cut_bg["id_local"]),
+            _mk_item("material.cut_background_pattern.uid", cut_bg["uid"]),
+            _mk_item("material.cut_background_pattern.name", cut_bg["name"]),
+            _mk_item("material.cut_background_pattern.sig_hash", cut_bg["sig_hash"]),
+            _mk_item("material.cut_background_pattern_color_rgb", cut_bg_color),
+            _mk_item("material.appearance_asset_capture_status", "deferred"),
+            _mk_item("material.physical_asset_capture_status", "deferred"),
+            _mk_item("material.thermal_asset_capture_status", "deferred"),
         ]
 
         sem_keys = {
