@@ -684,6 +684,8 @@ def _coarse_fill_reads(type_elem, doc, fp_uid_to_sig_hash, ctx=None):
     cfpsh_q = ITEM_Q_MISSING
     fp_id_to_value = (ctx or {}).get("fill_pattern_id_to_value", {}) or {}
     fp_special_values = (ctx or {}).get("fill_pattern_special_values", {}) or {}
+    if not isinstance(fp_special_values, dict):
+        fp_special_values = {}
     no_pattern_symbol = fp_special_values.get("no_pattern", None)
     try:
         p = None

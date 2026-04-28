@@ -290,10 +290,12 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
 
             lp_sig_hash_v = None
             lp_sig_hash_q = ITEM_Q_MISSING
+            lp_id_read_failed = False
             try:
                 lp_id_v2 = cat_obj.GetLinePatternId(GraphicsStyleType.Projection)
             except Exception:
                 lp_id_v2 = None
+                lp_id_read_failed = True
                 status_v2 = STATUS_DEGRADED
                 status_reasons.append("get_line_pattern_id_failed")
 
@@ -319,7 +321,7 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
                         else:
                             status_v2 = STATUS_DEGRADED
                             status_reasons.append("dependency_unmapped_line_pattern_v2_sig_hash")
-            else:
+            elif (not lp_id_read_failed) and lp_id_v2 is not None and getattr(lp_id_v2, "IntegerValue", 0) <= 0:
                 lp_sig_hash_v, lp_sig_hash_q = canonicalize_str(lp_special_values.get("solid", None))
             identity_items.append(make_identity_item("obj_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
 
