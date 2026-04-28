@@ -35,6 +35,7 @@ from core.record_v2 import (
     build_record_v2,
 )
 from domains.materials import CTX_MATERIAL_UID_TO_NAME, CTX_MATERIAL_UID_TO_CLASS
+from core.deps import require_domain, Blocked
 
 try:
     from Autodesk.Revit.DB import (
@@ -427,6 +428,23 @@ def _blocked_required_items(wt_function_v=None, wt_function_q=ITEM_Q_UNREADABLE)
         make_identity_item("wt.stack_hash_loose", None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE),
     ]
 
+def _require_compound_dependencies(ctx, info):
+    domains_map = (ctx or {}).get("_domains", None)
+    if not isinstance(domains_map, dict) or not domains_map:
+        return True
+    try:
+        require_domain(domains_map, "materials")
+        require_domain(domains_map, "fill_patterns_drafting")
+        require_domain(domains_map, "fill_patterns_model")
+    except Blocked as b:
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {
+            "dependency_blocked": "{}".format(";".join(list(getattr(b, "reasons", []) or [])))
+        }
+        info["status"] = "blocked"
+        return False
+    return True
+
 
 def extract_wall_types(doc, ctx=None):
     info = {
@@ -445,6 +463,9 @@ def extract_wall_types(doc, ctx=None):
 
     if ctx is None:
         ctx = {}
+
+    if not _require_compound_dependencies(ctx, info):
+        return info
 
     if WallType is None:
         info["status"] = "blocked"
@@ -726,6 +747,9 @@ def extract_floor_types(doc, ctx=None):
     if ctx is None:
         ctx = {}
 
+    if not _require_compound_dependencies(ctx, info):
+        return info
+
     if FloorType is None:
         info["status"] = "blocked"
         info["debug_v2_blocked"] = True
@@ -896,6 +920,9 @@ def extract_roof_types(doc, ctx=None):
     if ctx is None:
         ctx = {}
 
+    if not _require_compound_dependencies(ctx, info):
+        return info
+
     if RoofType is None:
         info["status"] = "blocked"
         info["debug_v2_blocked"] = True
@@ -1047,6 +1074,9 @@ def extract_ceiling_types(doc, ctx=None):
 
     if ctx is None:
         ctx = {}
+
+    if not _require_compound_dependencies(ctx, info):
+        return info
 
     if CeilingType is None:
         info["status"] = "blocked"
