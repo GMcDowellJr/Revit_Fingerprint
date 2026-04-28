@@ -554,6 +554,30 @@ def run_fingerprint(doc, timing=None):
         if legacy is not None:
             fingerprint["line_patterns"] = legacy
 
+    # fill_patterns split domains
+    if _enabled("fill_patterns_drafting"):
+        legacy = _domain_run("fill_patterns_drafting", fill_patterns.extract_drafting, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["fill_patterns_drafting"] = legacy
+
+    if _enabled("fill_patterns_model"):
+        legacy = _domain_run("fill_patterns_model", fill_patterns.extract_model, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["fill_patterns_model"] = legacy
+
+    if _enabled("materials"):
+        legacy = _domain_run(
+            "materials",
+            materials.extract,
+            doc,
+            ctx,
+            contract_domains,
+            run_diag,
+            runner_notes,
+        )
+        if legacy is not None:
+            fingerprint["materials"] = legacy
+
     # object_styles split domains (model must run first to export baseline map to ctx)
     if _enabled("object_styles_model"):
         legacy = _domain_run("object_styles_model", object_styles.extract_model, doc, ctx, contract_domains, run_diag, runner_notes)
@@ -580,34 +604,6 @@ def run_fingerprint(doc, timing=None):
         if legacy is not None:
             fingerprint["line_styles"] = legacy
 
-    # fill_patterns split domains
-    if _enabled("fill_patterns_drafting"):
-        legacy = _domain_run("fill_patterns_drafting", fill_patterns.extract_drafting, doc, ctx, contract_domains, run_diag, runner_notes)
-        if legacy is not None:
-            fingerprint["fill_patterns_drafting"] = legacy
-
-    if _enabled("fill_patterns_model"):
-        legacy = _domain_run("fill_patterns_model", fill_patterns.extract_model, doc, ctx, contract_domains, run_diag, runner_notes)
-        if legacy is not None:
-            fingerprint["fill_patterns_model"] = legacy
-
-    # materials: ctx-only domain — populates material_uid_to_name and
-    # material_uid_to_class lookup maps. Runs after fill_patterns so that
-    # when materials is promoted to a governance domain it can consume
-    # fill_pattern_uid_to_sig_hash_v2 from ctx without runner reordering.
-    if _enabled("materials"):
-        legacy = _domain_run(
-            "materials",
-            materials.extract,
-            doc,
-            ctx,
-            contract_domains,
-            run_diag,
-            runner_notes,
-            require_v2_hash=False,
-        )
-        if legacy is not None:
-            fingerprint["materials"] = legacy
 
     # compound_types: wall_types partition
     # Hard dependencies: materials (layer material resolution) and

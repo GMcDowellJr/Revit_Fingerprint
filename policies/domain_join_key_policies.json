@@ -652,6 +652,47 @@
         "Solid fills excluded — system defaults, ungoverned."
       ]
     },
+    "materials": {
+      "join_key_schema": "materials.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "material.shading_color_rgb",
+        "material.shading_transparency",
+        "material.surface_foreground_pattern.sig_hash",
+        "material.surface_foreground_pattern_color_rgb",
+        "material.surface_background_pattern.sig_hash",
+        "material.surface_background_pattern_color_rgb",
+        "material.cut_foreground_pattern.sig_hash",
+        "material.cut_foreground_pattern_color_rgb",
+        "material.cut_background_pattern.sig_hash",
+        "material.cut_background_pattern_color_rgb"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "material.name",
+        "material.class",
+        "material.description",
+        "material.comments",
+        "material.keywords",
+        "material.manufacturer",
+        "material.model",
+        "material.cost",
+        "material.url",
+        "material.keynote",
+        "material.mark",
+        "material.use_render_appearance",
+        "material.appearance_asset_capture_status",
+        "material.physical_asset_capture_status",
+        "material.thermal_asset_capture_status"
+      ],
+      "notes": [
+        "Domain family: materials.",
+        "v1 signatures are graphics-only.",
+        "Identity tab fields are captured as record content only (not signature inputs).",
+        "use_render_appearance is recorded for diagnostics/context but excluded from default signature.",
+        "Appearance/Physical/Thermal assets are explicitly deferred in v1."
+      ]
+    },
     "view_templates_floor_structural_area_plans": {
       "join_key_schema": "view_templates.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",

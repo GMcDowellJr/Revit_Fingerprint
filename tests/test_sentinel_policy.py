@@ -4,7 +4,7 @@ import os
 import re
 
 
-ALLOWED = {"<MISSING>", "<UNREADABLE>", "<NOT_APPLICABLE>"}
+ALLOWED = {"<MISSING>", "<UNREADABLE>", "<NOT_APPLICABLE>", "<NONE>", "<UNRESOLVED>"}
 
 
 def _repo_root() -> str:
