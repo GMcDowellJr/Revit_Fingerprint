@@ -380,7 +380,8 @@ def extract(doc, ctx=None):
                 "label": label,
                 "phase2_payload": {
                     "p2_unknown": p2_unknown,
-                                        "join_key_policy": pol,
+                    "join_key_policy": pol,
+                    "semantic_keys": semantic_keys,
                 },
             }
         )
@@ -419,7 +420,7 @@ def extract(doc, ctx=None):
             "schema": "phase2.view_filter_applications_view_templates.v1",
             "grouping_basis": "phase2.hypothesis",
             # Selector-only: semantic basis is declared by keys, evidence remains canonical in identity_basis.items.
-                        "cosmetic_items": phase2_sorted_items([]),
+            "cosmetic_items": phase2_sorted_items([]),
             "coordination_items": phase2_sorted_items([]),
             "unknown_items": p2_unknown,
         }

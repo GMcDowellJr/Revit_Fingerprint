@@ -41,6 +41,12 @@ except Exception as e:
     ViewSchedule = None
     BuiltInParameter = None
 
+try:
+    from Autodesk.Revit.DB import FilteredWorksetCollector, WorksetKind
+except Exception:
+    FilteredWorksetCollector = None
+    WorksetKind = None
+
 _CTX_TEMPLATES_CACHE_KEY = "_view_templates_cache"
 
 # Canonical cache key for all-View-instances collection.
@@ -164,6 +170,137 @@ def _append_phase_filter_value(
     if include_pf and sentinel in (S_UNREADABLE, S_MISSING) and v2_ok:
         v2_block_fn("phase_filter_unresolved")
         v2_ok = False
+    return v2_ok
+
+
+def _append_filter_stack_signature(v, doc, view_filter_map, sig, sig_v2, v2_ok, v2_block_fn):
+    try:
+        filter_ids = list(v.GetFilters() or []) if hasattr(v, "GetFilters") else []
+        sig.append("filter_stack_count={}".format(len(filter_ids)))
+        if v2_ok:
+            sig_v2.append("vts.filter_stack_count={}".format(canon_str(len(filter_ids))))
+    except Exception:
+        filter_ids = None
+        sig.append("filter_stack_count=<UNREADABLE>")
+        if v2_ok:
+            v2_block_fn("filter_stack_unreadable")
+            v2_ok = False
+
+    if filter_ids is None:
+        return v2_ok
+
+    for i, fid in enumerate(filter_ids):
+        idx3 = "{:03d}".format(i)
+
+        f_uid = None
+        try:
+            fe = doc.GetElement(fid)
+            f_uid = canon_str(getattr(fe, "UniqueId", None)) if fe is not None else None
+        except Exception:
+            f_uid = None
+
+        def_sig = view_filter_map.get(f_uid) if f_uid else None
+
+        if def_sig:
+            sig.append("filter[{}].def_sig={}".format(idx3, canon_str(def_sig)))
+            if v2_ok:
+                sig_v2.append("vts.filter[{}].def_sig_hash={}".format(idx3, canon_str(def_sig)))
+        else:
+            sig.append("filter[{}].def_sig=<UNREADABLE>".format(idx3))
+            if v2_ok:
+                v2_block_fn("view_filter_unresolved")
+                v2_ok = False
+
+        try:
+            enabled = bool(v.GetIsFilterEnabled(fid)) if hasattr(v, "GetIsFilterEnabled") else None
+        except Exception:
+            enabled = None
+
+        if enabled is None:
+            sig.append("filter[{}].enabled=<UNREADABLE>".format(idx3))
+            if v2_ok:
+                v2_block_fn("filter_enabled_unreadable")
+                v2_ok = False
+        else:
+            sig.append("filter[{}].enabled={}".format(idx3, int(enabled)))
+            if v2_ok:
+                sig_v2.append("vts.filter[{}].enabled={}".format(idx3, int(enabled)))
+
+        try:
+            vis = bool(v.GetFilterVisibility(fid)) if hasattr(v, "GetFilterVisibility") else None
+        except Exception:
+            vis = None
+
+        if vis is None:
+            sig.append("filter[{}].vis=<UNREADABLE>".format(idx3))
+            if v2_ok:
+                v2_block_fn("filter_visibility_unreadable")
+                v2_ok = False
+        else:
+            sig.append("filter[{}].vis={}".format(idx3, int(vis)))
+            if v2_ok:
+                sig_v2.append("vts.filter[{}].visibility={}".format(idx3, int(vis)))
+
+        try:
+            ogs = v.GetFilterOverrides(fid) if hasattr(v, "GetFilterOverrides") else None
+        except Exception:
+            ogs = None
+
+        try:
+            has_ovr = False
+            if ogs is not None:
+                if getattr(ogs, "Halftone", False):
+                    has_ovr = True
+                for attr in ("ProjectionLineWeight", "CutLineWeight", "SurfaceTransparency"):
+                    vattr = getattr(ogs, attr, None)
+                    if vattr is not None and int(vattr) > 0:
+                        has_ovr = True
+                for attr in ("ProjectionLinePatternId", "CutLinePatternId"):
+                    eid = getattr(ogs, attr, None)
+                    if eid is not None and int(getattr(eid, "IntegerValue", 0)) not in (0, -1):
+                        has_ovr = True
+            sig.append("filter[{}].ovr={}".format(idx3, int(has_ovr)))
+            if v2_ok:
+                sig_v2.append("vts.filter[{}].overrides={}".format(idx3, int(has_ovr)))
+        except Exception:
+            sig.append("filter[{}].ovr=<UNREADABLE>".format(idx3))
+            if v2_ok:
+                v2_block_fn("filter_overrides_unreadable")
+                v2_ok = False
+
+    return v2_ok
+
+
+def _append_workset_visibility(v, doc, sig, sig_v2, v2_ok, v2_block_fn):
+    if FilteredWorksetCollector is None or WorksetKind is None:
+        return v2_ok
+    if not hasattr(v, "GetWorksetVisibility"):
+        return v2_ok
+
+    try:
+        worksets = list(FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset).ToWorksets())
+    except Exception:
+        return v2_ok
+
+    decorated = []
+    for ws in (worksets or []):
+        name = canon_str(getattr(ws, "Name", None))
+        try:
+            vis = v.GetWorksetVisibility(getattr(ws, "Id", None))
+            decorated.append((safe_str(name), safe_str(vis), False))
+        except Exception:
+            decorated.append((safe_str(name), "<UNREADABLE>", True))
+            if v2_ok:
+                v2_block_fn("workset_visibility_unreadable")
+                v2_ok = False
+
+    for idx, (name, vis, is_unreadable) in enumerate(sorted(decorated, key=lambda x: (x[0], x[1]))):
+        sig.append("workset[{}].name={}".format(idx, name))
+        sig.append("workset[{}].visibility={}".format(idx, vis))
+        if v2_ok and (not is_unreadable):
+            sig_v2.append("vts.workset[{}].name={}".format(idx, name))
+            sig_v2.append("vts.workset[{}].visibility={}".format(idx, vis))
+
     return v2_ok
 
 
@@ -501,82 +638,8 @@ def extract_floor_structural_area_plans(doc, ctx=None):
         )
 
         # Filter stack (order-sensitive)
-        try:
-            filter_ids = list(v.GetFilters() or []) if hasattr(v, "GetFilters") else []
-            sig.append("filter_stack_count={}".format(len(filter_ids)))
-            if v2_ok:
-                sig_v2.append("vts.filter_stack_count={}".format(canon_str(len(filter_ids))))
-        except Exception:
-            filter_ids = None
-            sig.append("filter_stack_count=<UNREADABLE>")
-            if v2_ok:
-                _v2_block("filter_stack_unreadable")
-                v2_ok = False
-
-        if filter_ids is not None:
-            for i, fid in enumerate(filter_ids):
-                idx3 = "{:03d}".format(i)
-
-                f_uid = None
-                try:
-                    fe = doc.GetElement(fid)
-                    f_uid = canon_str(getattr(fe, "UniqueId", None)) if fe is not None else None
-                except Exception:
-                    f_uid = None
-
-                def_sig = view_filter_map.get(f_uid) if f_uid else None
-
-                if def_sig:
-                    sig.append("filter[{}].def_sig={}".format(idx3, canon_str(def_sig)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].def_sig_hash={}".format(idx3, canon_str(def_sig)))
-                else:
-                    sig.append("filter[{}].def_sig=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("view_filter_unresolved")
-                        v2_ok = False
-
-                try:
-                    vis = bool(v.GetFilterVisibility(fid)) if hasattr(v, "GetFilterVisibility") else None
-                except Exception:
-                    vis = None
-
-                if vis is None:
-                    sig.append("filter[{}].vis=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("filter_visibility_unreadable")
-                        v2_ok = False
-                else:
-                    sig.append("filter[{}].vis={}".format(idx3, int(vis)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].visibility={}".format(idx3, int(vis)))
-
-                try:
-                    ogs = v.GetFilterOverrides(fid) if hasattr(v, "GetFilterOverrides") else None
-                except Exception:
-                    ogs = None
-
-                try:
-                    has_ovr = False
-                    if ogs is not None:
-                        if getattr(ogs, "Halftone", False):
-                            has_ovr = True
-                        for attr in ("ProjectionLineWeight", "CutLineWeight", "SurfaceTransparency"):
-                            vattr = getattr(ogs, attr, None)
-                            if vattr is not None and int(vattr) > 0:
-                                has_ovr = True
-                        for attr in ("ProjectionLinePatternId", "CutLinePatternId"):
-                            eid = getattr(ogs, attr, None)
-                            if eid is not None and int(getattr(eid, "IntegerValue", 0)) not in (0, -1):
-                                has_ovr = True
-                    sig.append("filter[{}].ovr={}".format(idx3, int(has_ovr)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].overrides={}".format(idx3, int(has_ovr)))
-                except Exception:
-                    sig.append("filter[{}].ovr=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("filter_overrides_unreadable")
-                        v2_ok = False
+        v2_ok = _append_filter_stack_signature(v, doc, view_filter_map, sig, sig_v2, v2_ok, _v2_block)
+        v2_ok = _append_workset_visibility(v, doc, sig, sig_v2, v2_ok, _v2_block)
 
         # Built-in visual/behavioural parameters
         emit_builtin_params(v, DOMAIN_NAME, tpl_bips, non_ctrl_bips, sig, sig_v2,
@@ -966,82 +1029,8 @@ def extract_ceiling_plans(doc, ctx=None):
         )
 
         # Filter stack (order-sensitive)
-        try:
-            filter_ids = list(v.GetFilters() or []) if hasattr(v, "GetFilters") else []
-            sig.append("filter_stack_count={}".format(len(filter_ids)))
-            if v2_ok:
-                sig_v2.append("vts.filter_stack_count={}".format(canon_str(len(filter_ids))))
-        except Exception:
-            filter_ids = None
-            sig.append("filter_stack_count=<UNREADABLE>")
-            if v2_ok:
-                _v2_block("filter_stack_unreadable")
-                v2_ok = False
-
-        if filter_ids is not None:
-            for i, fid in enumerate(filter_ids):
-                idx3 = "{:03d}".format(i)
-
-                f_uid = None
-                try:
-                    fe = doc.GetElement(fid)
-                    f_uid = canon_str(getattr(fe, "UniqueId", None)) if fe is not None else None
-                except Exception:
-                    f_uid = None
-
-                def_sig = view_filter_map.get(f_uid) if f_uid else None
-
-                if def_sig:
-                    sig.append("filter[{}].def_sig={}".format(idx3, canon_str(def_sig)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].def_sig_hash={}".format(idx3, canon_str(def_sig)))
-                else:
-                    sig.append("filter[{}].def_sig=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("view_filter_unresolved")
-                        v2_ok = False
-
-                try:
-                    vis = bool(v.GetFilterVisibility(fid)) if hasattr(v, "GetFilterVisibility") else None
-                except Exception:
-                    vis = None
-
-                if vis is None:
-                    sig.append("filter[{}].vis=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("filter_visibility_unreadable")
-                        v2_ok = False
-                else:
-                    sig.append("filter[{}].vis={}".format(idx3, int(vis)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].visibility={}".format(idx3, int(vis)))
-
-                try:
-                    ogs = v.GetFilterOverrides(fid) if hasattr(v, "GetFilterOverrides") else None
-                except Exception:
-                    ogs = None
-
-                try:
-                    has_ovr = False
-                    if ogs is not None:
-                        if getattr(ogs, "Halftone", False):
-                            has_ovr = True
-                        for attr in ("ProjectionLineWeight", "CutLineWeight", "SurfaceTransparency"):
-                            vattr = getattr(ogs, attr, None)
-                            if vattr is not None and int(vattr) > 0:
-                                has_ovr = True
-                        for attr in ("ProjectionLinePatternId", "CutLinePatternId"):
-                            eid = getattr(ogs, attr, None)
-                            if eid is not None and int(getattr(eid, "IntegerValue", 0)) not in (0, -1):
-                                has_ovr = True
-                    sig.append("filter[{}].ovr={}".format(idx3, int(has_ovr)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].overrides={}".format(idx3, int(has_ovr)))
-                except Exception:
-                    sig.append("filter[{}].ovr=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("filter_overrides_unreadable")
-                        v2_ok = False
+        v2_ok = _append_filter_stack_signature(v, doc, view_filter_map, sig, sig_v2, v2_ok, _v2_block)
+        v2_ok = _append_workset_visibility(v, doc, sig, sig_v2, v2_ok, _v2_block)
 
         # Built-in visual/behavioural parameters
         emit_builtin_params(v, DOMAIN_NAME, tpl_bips, non_ctrl_bips, sig, sig_v2,
@@ -1457,82 +1446,8 @@ def extract_elevations_sections_detail(doc, ctx=None):
         )
 
         # Filter stack (order-sensitive)
-        try:
-            filter_ids = list(v.GetFilters() or []) if hasattr(v, "GetFilters") else []
-            sig.append("filter_stack_count={}".format(len(filter_ids)))
-            if v2_ok:
-                sig_v2.append("vts.filter_stack_count={}".format(canon_str(len(filter_ids))))
-        except Exception:
-            filter_ids = None
-            sig.append("filter_stack_count=<UNREADABLE>")
-            if v2_ok:
-                _v2_block("filter_stack_unreadable")
-                v2_ok = False
-
-        if filter_ids is not None:
-            for i, fid in enumerate(filter_ids):
-                idx3 = "{:03d}".format(i)
-
-                f_uid = None
-                try:
-                    fe = doc.GetElement(fid)
-                    f_uid = canon_str(getattr(fe, "UniqueId", None)) if fe is not None else None
-                except Exception:
-                    f_uid = None
-
-                def_sig = view_filter_map.get(f_uid) if f_uid else None
-
-                if def_sig:
-                    sig.append("filter[{}].def_sig={}".format(idx3, canon_str(def_sig)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].def_sig_hash={}".format(idx3, canon_str(def_sig)))
-                else:
-                    sig.append("filter[{}].def_sig=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("view_filter_unresolved")
-                        v2_ok = False
-
-                try:
-                    vis = bool(v.GetFilterVisibility(fid)) if hasattr(v, "GetFilterVisibility") else None
-                except Exception:
-                    vis = None
-
-                if vis is None:
-                    sig.append("filter[{}].vis=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("filter_visibility_unreadable")
-                        v2_ok = False
-                else:
-                    sig.append("filter[{}].vis={}".format(idx3, int(vis)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].visibility={}".format(idx3, int(vis)))
-
-                try:
-                    ogs = v.GetFilterOverrides(fid) if hasattr(v, "GetFilterOverrides") else None
-                except Exception:
-                    ogs = None
-
-                try:
-                    has_ovr = False
-                    if ogs is not None:
-                        if getattr(ogs, "Halftone", False):
-                            has_ovr = True
-                        for attr in ("ProjectionLineWeight", "CutLineWeight", "SurfaceTransparency"):
-                            vattr = getattr(ogs, attr, None)
-                            if vattr is not None and int(vattr) > 0:
-                                has_ovr = True
-                        for attr in ("ProjectionLinePatternId", "CutLinePatternId"):
-                            eid = getattr(ogs, attr, None)
-                            if eid is not None and int(getattr(eid, "IntegerValue", 0)) not in (0, -1):
-                                has_ovr = True
-                    sig.append("filter[{}].ovr={}".format(idx3, int(has_ovr)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].overrides={}".format(idx3, int(has_ovr)))
-                except Exception:
-                    sig.append("filter[{}].ovr=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("filter_overrides_unreadable")
-                        v2_ok = False
+        v2_ok = _append_filter_stack_signature(v, doc, view_filter_map, sig, sig_v2, v2_ok, _v2_block)
+        v2_ok = _append_workset_visibility(v, doc, sig, sig_v2, v2_ok, _v2_block)
 
         # Built-in visual/behavioural parameters
         emit_builtin_params(v, DOMAIN_NAME, tpl_bips, non_ctrl_bips, sig, sig_v2,
@@ -1925,82 +1840,8 @@ def extract_renderings_drafting(doc, ctx=None):
         )
 
         # Filter stack (order-sensitive)
-        try:
-            filter_ids = list(v.GetFilters() or []) if hasattr(v, "GetFilters") else []
-            sig.append("filter_stack_count={}".format(len(filter_ids)))
-            if v2_ok:
-                sig_v2.append("vts.filter_stack_count={}".format(canon_str(len(filter_ids))))
-        except Exception:
-            filter_ids = None
-            sig.append("filter_stack_count=<UNREADABLE>")
-            if v2_ok:
-                _v2_block("filter_stack_unreadable")
-                v2_ok = False
-
-        if filter_ids is not None:
-            for i, fid in enumerate(filter_ids):
-                idx3 = "{:03d}".format(i)
-
-                f_uid = None
-                try:
-                    fe = doc.GetElement(fid)
-                    f_uid = canon_str(getattr(fe, "UniqueId", None)) if fe is not None else None
-                except Exception:
-                    f_uid = None
-
-                def_sig = view_filter_map.get(f_uid) if f_uid else None
-
-                if def_sig:
-                    sig.append("filter[{}].def_sig={}".format(idx3, canon_str(def_sig)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].def_sig_hash={}".format(idx3, canon_str(def_sig)))
-                else:
-                    sig.append("filter[{}].def_sig=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("view_filter_unresolved")
-                        v2_ok = False
-
-                try:
-                    vis = bool(v.GetFilterVisibility(fid)) if hasattr(v, "GetFilterVisibility") else None
-                except Exception:
-                    vis = None
-
-                if vis is None:
-                    sig.append("filter[{}].vis=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("filter_visibility_unreadable")
-                        v2_ok = False
-                else:
-                    sig.append("filter[{}].vis={}".format(idx3, int(vis)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].visibility={}".format(idx3, int(vis)))
-
-                try:
-                    ogs = v.GetFilterOverrides(fid) if hasattr(v, "GetFilterOverrides") else None
-                except Exception:
-                    ogs = None
-
-                try:
-                    has_ovr = False
-                    if ogs is not None:
-                        if getattr(ogs, "Halftone", False):
-                            has_ovr = True
-                        for attr in ("ProjectionLineWeight", "CutLineWeight", "SurfaceTransparency"):
-                            vattr = getattr(ogs, attr, None)
-                            if vattr is not None and int(vattr) > 0:
-                                has_ovr = True
-                        for attr in ("ProjectionLinePatternId", "CutLinePatternId"):
-                            eid = getattr(ogs, attr, None)
-                            if eid is not None and int(getattr(eid, "IntegerValue", 0)) not in (0, -1):
-                                has_ovr = True
-                    sig.append("filter[{}].ovr={}".format(idx3, int(has_ovr)))
-                    if v2_ok:
-                        sig_v2.append("vts.filter[{}].overrides={}".format(idx3, int(has_ovr)))
-                except Exception:
-                    sig.append("filter[{}].ovr=<UNREADABLE>".format(idx3))
-                    if v2_ok:
-                        _v2_block("filter_overrides_unreadable")
-                        v2_ok = False
+        v2_ok = _append_filter_stack_signature(v, doc, view_filter_map, sig, sig_v2, v2_ok, _v2_block)
+        v2_ok = _append_workset_visibility(v, doc, sig, sig_v2, v2_ok, _v2_block)
 
         # Built-in visual/behavioural parameters
         emit_builtin_params(v, DOMAIN_NAME, tpl_bips, non_ctrl_bips, sig, sig_v2,
@@ -2407,7 +2248,7 @@ def extract_schedules(doc, ctx=None):
             v2_block_fn=_v2_block,
             debug_counters=info,
         )
-
+        v2_ok = _append_workset_visibility(v, doc, sig, sig_v2, v2_ok, _v2_block)
         # Built-in visual/behavioural parameters
         emit_builtin_params(v, DOMAIN_NAME, tpl_bips, non_ctrl_bips, sig, sig_v2,
                             debug_counters=info)
