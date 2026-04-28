@@ -114,7 +114,7 @@ def main() -> None:
     ap.add_argument(
         "--emit",
         default="runs,records,status_reasons,identity_items,label_components",
-        help="Comma-separated outputs to write: runs,records,status_reasons,identity_items,label_components",
+        help="Comma-separated outputs to write: runs,records,status_reasons,identity_items,label_components,layer_stacks",
     )
     ap.add_argument(
         "--split_by_domain",
@@ -129,6 +129,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     explicit_domains = [x.strip() for x in args.domains.split(",") if x.strip()] or None
+    emit_set = {x.strip() for x in str(args.emit).split(",") if x.strip()}
 
     # Accumulators
     runs_rows: List[Dict[str, str]] = []
@@ -136,6 +137,10 @@ def main() -> None:
     reasons_rows: List[Dict[str, str]] = []
     items_rows: List[Dict[str, str]] = []
     label_comp_rows: List[Dict[str, str]] = []
+    stack_rows: List[Dict[str, str]] = []
+    layer_detail_rows: List[Dict[str, str]] = []
+    stacks_seen: set[Tuple[str, str, str]] = set()
+    stack_type_counts: Dict[Tuple[str, str, str], int] = {}
     seen_file_ids: set[str] = set()
 
     for path in _iter_json_paths(root_dir):
@@ -245,6 +250,77 @@ def main() -> None:
                             "q": _safe_str(it.get("q")),
                             "v": _safe_str(it.get("v")),
                         })
+
+                # layer_rows — compound_types families only
+                if "layer_stacks" in emit_set:
+                    layer_rows_payload = r.get("layer_rows")
+                    if isinstance(layer_rows_payload, list) and layer_rows_payload:
+                        # Extract stack hashes from identity_basis items
+                        stack_hash_loose = ""
+                        stack_hash_strict = ""
+                        stack_hash_function_only = ""
+                        if isinstance(items, list):
+                            for item in items:
+                                if not isinstance(item, dict):
+                                    continue
+                                k = _safe_str(item.get("k"))
+                                if k.endswith(".stack_hash_loose"):
+                                    stack_hash_loose = _safe_str(item.get("v"))
+                                elif k.endswith(".stack_hash_strict"):
+                                    stack_hash_strict = _safe_str(item.get("v"))
+                                elif k.endswith(".stack_hash_function_only"):
+                                    stack_hash_function_only = _safe_str(item.get("v"))
+
+                        if stack_hash_loose:
+                            stack_key = (file_id, domain, stack_hash_loose)
+                            # Track type_count per stack
+                            stack_type_counts[stack_key] = stack_type_counts.get(stack_key, 0) + 1
+                            # Only write stack rows once per unique stack per file
+                            if stack_key not in stacks_seen:
+                                stacks_seen.add(stack_key)
+                                real_layers = [row for row in layer_rows_payload if isinstance(row, dict) and not row.get("is_core_boundary")]
+                                layer_count = len(real_layers)
+
+                                total_thickness = 0.0
+                                for row in real_layers:
+                                    thickness = row.get("wl.thickness_in")
+                                    if thickness in (None, "", "null"):
+                                        continue
+                                    try:
+                                        total_thickness += float(thickness)
+                                    except (TypeError, ValueError):
+                                        continue
+
+                                stack_rows.append({
+                                    "file_id": file_id,
+                                    "domain": domain,
+                                    "stack_hash_loose": stack_hash_loose,
+                                    "stack_hash_strict": stack_hash_strict,
+                                    "stack_hash_function_only": stack_hash_function_only,
+                                    "layer_count": str(layer_count),
+                                    "total_thickness_in": "{:.4f}".format(total_thickness),
+                                    "type_count": "",  # backfilled after loop
+                                })
+                                for lr in layer_rows_payload:
+                                    if not isinstance(lr, dict):
+                                        continue
+                                    layer_detail_rows.append({
+                                        "file_id": file_id,
+                                        "domain": domain,
+                                        "stack_hash_loose": stack_hash_loose,
+                                        "layer_index": _safe_str(lr.get("layer_index")),
+                                        "is_core_boundary": _safe_str(lr.get("is_core_boundary")),
+                                        "wl.function": _safe_str(lr.get("wl.function")),
+                                        "wl.thickness_in": _safe_str(lr.get("wl.thickness_in")),
+                                        "wl.material_name": _safe_str(lr.get("wl.material_name")),
+                                        "wl.material_class": _safe_str(lr.get("wl.material_class")),
+                                        "wl.participates_in_wrapping": _safe_str(lr.get("wl.participates_in_wrapping")),
+                                        "wl.structural_material": _safe_str(lr.get("wl.structural_material")),
+                                        "wl.is_variable": _safe_str(lr.get("wl.is_variable")),
+                                        "wl.is_structural_deck": _safe_str(lr.get("wl.is_structural_deck")),
+                                        "wl.deck_usage": _safe_str(lr.get("wl.deck_usage")),
+                                        "wl.deck_profile_name": _safe_str(lr.get("wl.deck_profile_name")),
+                                    })
                         
                 label = r.get("label")
 
@@ -267,6 +343,9 @@ def main() -> None:
                             "component_value": _safe_str(cv),
                         })
 
+    for row in stack_rows:
+        key = (row["file_id"], row["domain"], row["stack_hash_loose"])
+        row["type_count"] = str(stack_type_counts.get(key, 1))
 
     def _write_csv(name: str, rows: List[Dict[str, str]], fieldnames: List[str]) -> str:
         p = out_dir / name
@@ -288,8 +367,6 @@ def main() -> None:
              .replace("\\", "_")
              .replace(":", "_")
         )
-
-    emit_set = {x.strip() for x in str(args.emit).split(",") if x.strip()}
 
     wrote_paths: List[str] = []
 
@@ -330,6 +407,22 @@ def main() -> None:
                 "label_components.csv",
                 label_comp_rows,
                 ["file_id", "domain", "record_id", "record_ordinal", "record_pk", "component_key", "component_value"],
+            ))
+
+        if "layer_stacks" in emit_set:
+            wrote_paths.append(_write_csv(
+                "layer_stacks.csv",
+                stack_rows,
+                ["file_id", "domain", "stack_hash_loose", "stack_hash_strict",
+                 "stack_hash_function_only", "layer_count", "total_thickness_in", "type_count"],
+            ))
+            wrote_paths.append(_write_csv(
+                "layer_stack_rows.csv",
+                layer_detail_rows,
+                ["file_id", "domain", "stack_hash_loose", "layer_index", "is_core_boundary",
+                 "wl.function", "wl.thickness_in", "wl.material_name", "wl.material_class",
+                 "wl.participates_in_wrapping", "wl.structural_material", "wl.is_variable",
+                 "wl.is_structural_deck", "wl.deck_usage", "wl.deck_profile_name"],
             ))
 
     else:
@@ -383,6 +476,24 @@ def main() -> None:
                     f"label_components__{dom_safe}.csv",
                     dom_comps,
                     ["file_id", "domain", "record_id", "record_ordinal", "record_pk", "component_key", "component_value"],
+                ))
+
+            if "layer_stacks" in emit_set:
+                dom_stacks = [r for r in stack_rows if r.get("domain") == dom]
+                wrote_paths.append(_write_csv(
+                    f"layer_stacks__{dom_safe}.csv",
+                    dom_stacks,
+                    ["file_id", "domain", "stack_hash_loose", "stack_hash_strict",
+                     "stack_hash_function_only", "layer_count", "total_thickness_in", "type_count"],
+                ))
+                dom_stack_rows = [r for r in layer_detail_rows if r.get("domain") == dom]
+                wrote_paths.append(_write_csv(
+                    f"layer_stack_rows__{dom_safe}.csv",
+                    dom_stack_rows,
+                    ["file_id", "domain", "stack_hash_loose", "layer_index", "is_core_boundary",
+                     "wl.function", "wl.thickness_in", "wl.material_name", "wl.material_class",
+                     "wl.participates_in_wrapping", "wl.structural_material", "wl.is_variable",
+                     "wl.is_structural_deck", "wl.deck_usage", "wl.deck_profile_name"],
                 ))
 
 
