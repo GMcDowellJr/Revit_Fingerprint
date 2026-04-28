@@ -322,12 +322,24 @@ def main() -> None:
         function_only_hashes = sorted(group.get("function_only_hashes", set()))
         rows_by_strict = group.get("rows_by_strict", {})
 
-        # Use a deterministic strict-variant when materializing layer rows and rollups.
+        # Use a deterministic strict-variant for stack rollups.
         if strict_hashes and strict_hashes[0] in rows_by_strict:
             canonical_rows = rows_by_strict[strict_hashes[0]]
         else:
             first_variant_key = sorted(rows_by_strict.keys())[0] if rows_by_strict else None
             canonical_rows = rows_by_strict.get(first_variant_key, []) if first_variant_key else []
+
+        # Emit layer rows from all strict variants (deduped by exact row payload)
+        # to avoid dropping variant-specific material fields.
+        materialized_rows: List[Dict[str, Any]] = []
+        seen_layer_payloads: set[str] = set()
+        for strict_key in sorted(rows_by_strict.keys()):
+            for lr in rows_by_strict.get(strict_key, []):
+                payload_sig = json.dumps(lr, ensure_ascii=False, sort_keys=True)
+                if payload_sig in seen_layer_payloads:
+                    continue
+                seen_layer_payloads.add(payload_sig)
+                materialized_rows.append(lr)
 
         real_layers = [row for row in canonical_rows if not row.get("is_core_boundary")]
         layer_count = len(real_layers)
@@ -354,7 +366,7 @@ def main() -> None:
             "type_count": str(group.get("type_count", 1)),
         })
 
-        for lr in canonical_rows:
+        for lr in materialized_rows:
             layer_detail_rows.append({
                 "file_id": file_id,
                 "domain": domain,
