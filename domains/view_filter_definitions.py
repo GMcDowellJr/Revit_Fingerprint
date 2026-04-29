@@ -22,14 +22,7 @@ import json
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from Autodesk.Revit.DB import (
-    ElementId,
-    ElementParameterFilter,
-    LogicalAndFilter,
-    LogicalOrFilter,
-    ParameterFilterElement,
-    SharedParameterElement,
-)
+from Autodesk.Revit import DB as RDB
 
 from core.collect import collect_instances
 from core.hashing import make_hash, safe_str
@@ -179,7 +172,7 @@ def _op_token_from_rule(rule) -> Tuple[Optional[str], str]:
         return None, ITEM_Q_UNREADABLE
 
 
-def _walk_rules(elem_filter, out_rules: List[Dict[str, Any]], doc) -> Tuple[bool, Optional[str]]:
+def _walk_rules(elem_filter, out_rules: List[Dict[str, Any]], doc, rule_prefix: str = "") -> Tuple[bool, Optional[str]]:
     """Depth-first traversal accumulating parameter rules.
 
     Returns:
@@ -193,19 +186,30 @@ def _walk_rules(elem_filter, out_rules: List[Dict[str, Any]], doc) -> Tuple[bool
         if isinstance(elem_filter, LogicalAndFilter) or isinstance(elem_filter, LogicalOrFilter):
             kids = list(elem_filter.GetFilters() or []) if hasattr(elem_filter, "GetFilters") else []
             for k in kids:
-                ok, reason = _walk_rules(k, out_rules, doc)
+                ok, reason = _walk_rules(k, out_rules, doc, rule_prefix=rule_prefix)
                 if not ok:
                     return False, reason
             return True, None
     except Exception:
         return False, "filter_tree.logical_unreadable"
 
+    # Inverse wrapper: NOT(inner_rule)
+    try:
+        if FilterInverseRule is not None and isinstance(elem_filter, FilterInverseRule):
+            inner_rule = elem_filter.GetInnerRule() if hasattr(elem_filter, "GetInnerRule") else None
+            if inner_rule is None:
+                return False, "filter_tree.rules_unreadable"
+            out_rules.append({"rule": inner_rule, "prefix": f"{rule_prefix}NOT."})
+            return True, None
+    except Exception:
+        return False, "filter_tree.rules_unreadable"
+
     # Leaf: ElementParameterFilter rules
     try:
         if isinstance(elem_filter, ElementParameterFilter):
             rules = list(elem_filter.GetRules() or []) if hasattr(elem_filter, "GetRules") else []
             for r in rules:
-                out_rules.append({"rule": r})
+                out_rules.append({"rule": r, "prefix": rule_prefix})
             return True, None
     except Exception:
         return False, "filter_tree.rules_unreadable"
@@ -328,6 +332,7 @@ def extract(doc, ctx=None):
         # Indexed rule keys
         for idx, rr in enumerate(rules):
             r = rr.get("rule")
+            rule_prefix = safe_str(rr.get("prefix") or "")
             idx3 = "{:03d}".format(idx)
 
             val_v, val_q, kind_v = _value_token_from_rule(doc, r)
@@ -337,6 +342,7 @@ def extract(doc, ctx=None):
 
             op_v, op_q = _op_token_from_rule(r)
             identity_items.append(make_identity_item(f"vf.rule[{idx3}].op", op_v, op_q))
+            identity_items.append(make_identity_item(f"vf.rule[{idx3}].prefix", rule_prefix or None, ITEM_Q_OK))
 
             pid = None
             # Revit rule classes differ by version; prefer method if available.
@@ -361,6 +367,7 @@ def extract(doc, ctx=None):
                     "param_kind": safe_str(pk_v or ""),
                     "param_id": safe_str(pi_v or ""),
                     "param_id_q": safe_str(pi_q),
+                    "prefix": rule_prefix,
                 }
             )
 
@@ -378,6 +385,8 @@ def extract(doc, ctx=None):
                 try:
                     sig_obj = {"kind": kind_cv, "op": op_v, "param_ref.id": pi_v, "value": val_v}
                     sig_v = json.dumps(sig_obj, separators=(",", ":"), ensure_ascii=True, sort_keys=True)
+                    if rule_prefix:
+                        sig_v = "{}{}".format(rule_prefix, sig_v)
                     sig_q = ITEM_Q_OK
                 except Exception:
                     sig_v, sig_q = (None, ITEM_Q_UNREADABLE)
@@ -581,3 +590,10 @@ def extract(doc, ctx=None):
         ctx["view_filter_uid_to_sig_hash_v2"] = uid_to_sig_hash if result.get("hash_v2") is not None else {}
 
     return result
+ElementId = RDB.ElementId
+ElementParameterFilter = RDB.ElementParameterFilter
+LogicalAndFilter = RDB.LogicalAndFilter
+LogicalOrFilter = RDB.LogicalOrFilter
+ParameterFilterElement = RDB.ParameterFilterElement
+SharedParameterElement = RDB.SharedParameterElement
+FilterInverseRule = getattr(RDB, "FilterInverseRule", None)

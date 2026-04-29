@@ -1,9 +1,36 @@
 # -*- coding: utf-8 -*-
 
+import importlib
+import sys
+import types
+
 from core.hashing import make_hash
 from core.join_key_builder import build_join_key_from_policy
 from core.join_key_policy import get_domain_join_key_policy, load_join_key_policies
 from core.record_v2 import serialize_identity_items
+
+
+def _install_fake_revit_db():
+    autodesk = types.ModuleType("Autodesk")
+    revit = types.ModuleType("Autodesk.Revit")
+    db = types.ModuleType("Autodesk.Revit.DB")
+
+    class _T(object):
+        pass
+
+    db.ElementId = _T
+    db.ElementParameterFilter = _T
+    db.LogicalAndFilter = _T
+    db.LogicalOrFilter = _T
+    db.ParameterFilterElement = _T
+    db.SharedParameterElement = _T
+
+    autodesk.Revit = revit
+    revit.DB = db
+
+    sys.modules["Autodesk"] = autodesk
+    sys.modules["Autodesk.Revit"] = revit
+    sys.modules["Autodesk.Revit.DB"] = db
 
 
 def test_view_filter_definitions_join_hash_uses_policy_required_keys_only():
@@ -41,3 +68,65 @@ def test_view_filter_definitions_join_hash_uses_policy_required_keys_only():
     join_items = [it for it in canonical_items if it["k"] in set(join_key["keys_used"])]
     join_preimage = serialize_identity_items(join_items)
     assert join_key["join_hash"] == make_hash(join_preimage)
+
+
+def test_view_filter_definitions_inverse_rule_not_prefix_and_sig_diverges(monkeypatch):
+    _install_fake_revit_db()
+    vfd = importlib.import_module("domains.view_filter_definitions")
+
+    class FakeLeafRule(object):
+        def __init__(self, token):
+            self.token = token
+
+    class FakeElementParameterFilter(object):
+        def __init__(self, rules):
+            self._rules = rules
+
+        def GetRules(self):
+            return self._rules
+
+    class FakeFilterInverseRule(object):
+        def __init__(self, inner):
+            self._inner = inner
+
+        def GetInnerRule(self):
+            return self._inner
+
+    monkeypatch.setattr(vfd, "ElementParameterFilter", FakeElementParameterFilter)
+    monkeypatch.setattr(vfd, "FilterInverseRule", FakeFilterInverseRule)
+
+    positive_rule = FakeLeafRule("rule_string_category_equals_walls")
+    positive_filter = FakeElementParameterFilter([positive_rule])
+    negated_filter = FakeFilterInverseRule(positive_rule)
+
+    out_positive = []
+    out_negated = []
+    ok_pos, reason_pos = vfd._walk_rules(positive_filter, out_positive, doc=None)
+    ok_neg, reason_neg = vfd._walk_rules(negated_filter, out_negated, doc=None)
+
+    assert ok_pos is True and reason_pos is None
+    assert ok_neg is True and reason_neg is None
+    assert out_positive == [{"rule": positive_rule, "prefix": ""}]
+    assert out_negated == [{"rule": positive_rule, "prefix": "NOT."}]
+
+    pos_string = "{}{}".format(out_positive[0]["prefix"], positive_rule.token)
+    neg_string = "{}{}".format(out_negated[0]["prefix"], positive_rule.token)
+    assert neg_string == "NOT.rule_string_category_equals_walls"
+
+    pos_sig_hash = make_hash(
+        serialize_identity_items(
+            [
+                {"k": "vf.rule_count", "q": "ok", "v": 1},
+                {"k": "vf.rule[000].sig", "q": "ok", "v": pos_string},
+            ]
+        )
+    )
+    neg_sig_hash = make_hash(
+        serialize_identity_items(
+            [
+                {"k": "vf.rule_count", "q": "ok", "v": 1},
+                {"k": "vf.rule[000].sig", "q": "ok", "v": neg_string},
+            ]
+        )
+    )
+    assert pos_sig_hash != neg_sig_hash
