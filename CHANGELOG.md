@@ -12,6 +12,16 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Changed
+- `units` domain expanded from 3 specs (length/area/volume) to 38 specs covering
+  all Revit disciplines. Common additions: angle, slope, speed, time, mass_density,
+  currency, rotation_angle, distance. Electrical: 7 specs. HVAC: 8 specs. Piping:
+  5 specs. Structural: 7 specs. All specs are extracted for every document regardless
+  of discipline — GetFormatOptions returns a valid FormatOptions object for all
+  SpecTypeId specs on any live document. ITEM_Q_UNREADABLE paths are defensive
+  fallbacks only and are not expected to fire in normal execution. SpecTypeId nested
+  attribute paths are resolved once at function entry and filtered before the loop —
+  unresolvable paths are skipped cleanly without blocking the domain. Attribute names
+  verified against probe_units_2026-02-04.json.
 - file_metadata.csv: `project_label` now extracted from Autodesk Docs:// central path
   (ACC projects only); blank for non-ACC paths
 - line_patterns join key policy upgraded from `line_patterns.join_key.v2`
