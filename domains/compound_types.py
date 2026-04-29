@@ -17,7 +17,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types
+from core.collect import collect_types, purge_lookup
 from core.canon import S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE
 from core.record_v2 import (
     STATUS_OK,
@@ -514,6 +514,9 @@ def extract_wall_types(doc, ctx=None):
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_wall_type(type_name),
             )
+            _ip, _ip_q = purge_lookup(getattr(getattr(wt, "Id", None), "IntegerValue", None), ctx)
+            rec["is_purgeable"] = _ip
+            rec["is_purgeable_q"] = _ip_q
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_kind"] += 1
@@ -545,6 +548,9 @@ def extract_wall_types(doc, ctx=None):
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_wall_type(type_name),
             )
+            _ip, _ip_q = purge_lookup(getattr(getattr(wt, "Id", None), "IntegerValue", None), ctx)
+            rec["is_purgeable"] = _ip
+            rec["is_purgeable_q"] = _ip_q
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_no_cs"] += 1
@@ -625,6 +631,9 @@ def extract_wall_types(doc, ctx=None):
             required_qs=required_qs,
             label=_label_for_wall_type(type_name),
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(wt, "Id", None), "IntegerValue", None), ctx)
+        rec["is_purgeable"] = _ip
+        rec["is_purgeable_q"] = _ip_q
         rec["sig_basis"] = {
             "schema": "wall_types.sig_basis.v1",
             "keys_used": [
@@ -824,6 +833,9 @@ def extract_floor_types(doc, ctx=None):
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_type(type_name),
             )
+            _ip, _ip_q = purge_lookup(getattr(getattr(ft, "Id", None), "IntegerValue", None), ctx)
+            rec["is_purgeable"] = _ip
+            rec["is_purgeable_q"] = _ip_q
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_no_cs"] += 1
@@ -893,6 +905,9 @@ def extract_floor_types(doc, ctx=None):
             required_qs=required_qs,
             label=_label_for_type(type_name),
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(ft, "Id", None), "IntegerValue", None), ctx)
+        rec["is_purgeable"] = _ip
+        rec["is_purgeable_q"] = _ip_q
         rec["sig_basis"] = {
             "schema": "floor_types.sig_basis.v1",
             "keys_used": ["ft.layer_count", "ft.total_thickness_in", "ft.stack_hash_loose"],
@@ -997,6 +1012,9 @@ def extract_roof_types(doc, ctx=None):
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_type(type_name),
             )
+            _ip, _ip_q = purge_lookup(getattr(getattr(rt, "Id", None), "IntegerValue", None), ctx)
+            rec["is_purgeable"] = _ip
+            rec["is_purgeable_q"] = _ip_q
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_no_cs"] += 1
@@ -1048,6 +1066,9 @@ def extract_roof_types(doc, ctx=None):
             required_qs=required_qs,
             label=_label_for_type(type_name),
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(rt, "Id", None), "IntegerValue", None), ctx)
+        rec["is_purgeable"] = _ip
+        rec["is_purgeable_q"] = _ip_q
         rec["sig_basis"] = {
             "schema": "roof_types.sig_basis.v1",
             "keys_used": ["rt.layer_count", "rt.total_thickness_in", "rt.stack_hash_loose"],
@@ -1152,6 +1173,9 @@ def extract_ceiling_types(doc, ctx=None):
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_type(type_name),
             )
+            _ip, _ip_q = purge_lookup(getattr(getattr(ct, "Id", None), "IntegerValue", None), ctx)
+            rec["is_purgeable"] = _ip
+            rec["is_purgeable_q"] = _ip_q
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_no_cs"] += 1
@@ -1203,6 +1227,9 @@ def extract_ceiling_types(doc, ctx=None):
             required_qs=required_qs,
             label=_label_for_type(type_name),
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(ct, "Id", None), "IntegerValue", None), ctx)
+        rec["is_purgeable"] = _ip
+        rec["is_purgeable_q"] = _ip_q
         rec["sig_basis"] = {
             "schema": "ceiling_types.sig_basis.v1",
             "keys_used": ["ct.layer_count", "ct.total_thickness_in", "ct.stack_hash_loose"],

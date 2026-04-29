@@ -708,6 +708,9 @@ def extract_floor_structural_area_plans(doc, ctx=None):
                 },
             },
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(v, "Id", None), "IntegerValue", None), ctx)
+        rec["is_purgeable"] = _ip
+        rec["is_purgeable_q"] = _ip_q
 
         rec["phase2"] = {
             "schema": "phase2.{}.v2".format(DOMAIN_NAME),
@@ -1099,6 +1102,9 @@ def extract_ceiling_plans(doc, ctx=None):
                 },
             },
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(v, "Id", None), "IntegerValue", None), ctx)
+        rec["is_purgeable"] = _ip
+        rec["is_purgeable_q"] = _ip_q
 
         rec["phase2"] = {
             "schema": "phase2.{}.v2".format(DOMAIN_NAME),
@@ -1516,6 +1522,9 @@ def extract_elevations_sections_detail(doc, ctx=None):
                 },
             },
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(v, "Id", None), "IntegerValue", None), ctx)
+        rec["is_purgeable"] = _ip
+        rec["is_purgeable_q"] = _ip_q
 
         rec["phase2"] = {
             "schema": "phase2.{}.v2".format(DOMAIN_NAME),
@@ -1910,6 +1919,9 @@ def extract_renderings_drafting(doc, ctx=None):
                 },
             },
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(v, "Id", None), "IntegerValue", None), ctx)
+        rec["is_purgeable"] = _ip
+        rec["is_purgeable_q"] = _ip_q
 
         rec["phase2"] = {
             "schema": "phase2.{}.v2".format(DOMAIN_NAME),
@@ -2319,6 +2331,9 @@ def extract_schedules(doc, ctx=None):
                 },
             },
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(v, "Id", None), "IntegerValue", None), ctx)
+        rec["is_purgeable"] = _ip
+        rec["is_purgeable_q"] = _ip_q
 
         rec["phase2"] = {
             "schema": "phase2.{}.v2".format(DOMAIN_NAME),

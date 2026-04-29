@@ -534,6 +534,7 @@ def extract(doc, ctx=None):
                 "identity_items": items_sorted,
                 "required_qs": required_qs,
                 "label": label,
+                "pf": pf,
                 "phase2_payload": {
                     "semantic_keys": semantic_keys,
                     "p2_unknown": p2_unknown,
@@ -557,6 +558,12 @@ def extract(doc, ctx=None):
             required_qs=spec["required_qs"],
             label=spec["label"],
         )
+        _ip, _ip_q = purge_lookup(
+            getattr(getattr(spec.get("pf"), "Id", None), "IntegerValue", None),
+            ctx,
+        )
+        rec["is_purgeable"] = _ip
+        rec["is_purgeable_q"] = _ip_q
         if rec["status"] == STATUS_BLOCKED:
             v2_block_reasons[f"record_blocked:{rec['record_id']}"] = True
         pol = spec["phase2_payload"]["join_key_policy"]
