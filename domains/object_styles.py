@@ -30,14 +30,22 @@ from core.record_v2 import (
 from core.phase2 import phase2_sorted_items
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
-from core.collect import purge_lookup
 from core.deps import require_domain, Blocked
 
 try:
-    from Autodesk.Revit.DB import GraphicsStyleType, CategoryType
+    from Autodesk.Revit.DB import (
+        GraphicsStyleType,
+        CategoryType,
+        FilteredElementCollector,
+        BuiltInCategory,
+        BuiltInParameter,
+    )
 except ImportError:
     GraphicsStyleType = None
     CategoryType = None
+    FilteredElementCollector = None
+    BuiltInCategory = None
+    BuiltInParameter = None
 
 _CTX_CATEGORIES_CACHE_KEY = "_object_styles_categories_cache"
 _EXCLUDED_TOP_LEVEL_CATEGORIES = frozenset(["Lines"])
@@ -134,6 +142,82 @@ def _matches_category_type(cat, kind):
     if kind == "imported":
         return ct == getattr(CategoryType, "ImportInstance", getattr(CategoryType, "Imported", None))
     return False
+
+
+def _build_subcategory_used_id_set(doc, parent_cat_obj, ctx):
+    """Build/cache used subcategory ids for a given parent category."""
+    try:
+        parent_id_int = int(getattr(getattr(parent_cat_obj, "Id", None), "IntegerValue", None))
+    except Exception:
+        return None
+
+    cache_key = "_obj_style_used_subcats:{}".format(parent_id_int)
+    if ctx is not None and cache_key in ctx:
+        return ctx[cache_key]
+
+    try:
+        try:
+            parent_bic = BuiltInCategory(parent_id_int)
+        except Exception:
+            if ctx is not None:
+                ctx[cache_key] = None
+            return None
+
+        try:
+            pre_check = (
+                FilteredElementCollector(doc)
+                .OfCategory(parent_bic)
+                .WhereElementIsNotElementType()
+                .GetElementCount()
+            )
+            if pre_check == 0:
+                if ctx is not None:
+                    ctx[cache_key] = frozenset()
+                return frozenset()
+        except Exception:
+            pass
+
+        used = set()
+        try:
+            instances = (
+                FilteredElementCollector(doc)
+                .OfCategory(parent_bic)
+                .WhereElementIsNotElementType()
+                .ToElements()
+            )
+            for inst in instances:
+                try:
+                    p = inst.get_Parameter(BuiltInParameter.ELEM_SUBCATEGORY_PARAM)
+                    if p is not None and p.HasValue:
+                        val = p.AsElementId()
+                        if val is not None:
+                            iv = int(val.IntegerValue)
+                            if iv > 0:
+                                used.add(iv)
+                except Exception:
+                    continue
+        except Exception:
+            if ctx is not None:
+                ctx[cache_key] = None
+            return None
+
+        result = frozenset(used)
+        if ctx is not None:
+            ctx[cache_key] = result
+        return result
+    except Exception:
+        if ctx is not None:
+            ctx[cache_key] = None
+        return None
+
+
+def _subcategory_purge_lookup(doc, element_id_int, parent_cat_obj, ctx):
+    if element_id_int is None or element_id_int <= 0:
+        return None, "unreadable"
+    used_set = _build_subcategory_used_id_set(doc, parent_cat_obj, ctx)
+    if used_set is None:
+        return None, "unreadable"
+    return (element_id_int not in used_set), "ok"
 
 
 def _rgb_sig(c):
@@ -398,7 +482,15 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
                 },
             )
             if row_name != "self":
-                _ip, _ip_q = purge_lookup(getattr(getattr(cat_obj, "Id", None), "IntegerValue", None), ctx)
+                element_id_int = getattr(getattr(cat_obj, "Id", None), "IntegerValue", None)
+                try:
+                    parent_cat_obj = cat_obj.Parent
+                except Exception:
+                    parent_cat_obj = None
+                if parent_cat_obj is not None and element_id_int is not None and element_id_int > 0:
+                    _ip, _ip_q = _subcategory_purge_lookup(doc, element_id_int, parent_cat_obj, ctx)
+                else:
+                    _ip, _ip_q = None, "unreadable"
             else:
                 _ip, _ip_q = None, "unsupported_not_applicable"
             rec_v2["is_purgeable"] = _ip
