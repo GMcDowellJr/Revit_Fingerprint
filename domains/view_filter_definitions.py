@@ -534,7 +534,7 @@ def extract(doc, ctx=None):
                 "identity_items": items_sorted,
                 "required_qs": required_qs,
                 "label": label,
-                "pf": pf,
+                "pf": f,
                 "phase2_payload": {
                     "semantic_keys": semantic_keys,
                     "p2_unknown": p2_unknown,
