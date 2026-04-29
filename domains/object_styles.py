@@ -30,20 +30,19 @@ from core.record_v2 import (
 from core.phase2 import phase2_sorted_items
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
-from core.collect import collect_instances
 from core.deps import require_domain, Blocked
 
 try:
     from Autodesk.Revit.DB import (
         GraphicsStyleType,
         CategoryType,
-        BuiltInCategory,
+        FilteredElementCollector,
         BuiltInParameter,
     )
 except ImportError:
     GraphicsStyleType = None
     CategoryType = None
-    BuiltInCategory = None
+    FilteredElementCollector = None
     BuiltInParameter = None
 
 _CTX_CATEGORIES_CACHE_KEY = "_object_styles_categories_cache"
@@ -156,20 +155,24 @@ def _build_subcategory_used_id_set(doc, parent_cat_obj, ctx):
 
     try:
         try:
-            parent_bic = BuiltInCategory(parent_id_int)
+            parent_cat_eid = parent_cat_obj.Id
+            if parent_cat_eid is None:
+                if ctx is not None:
+                    ctx[cache_key] = None
+                return None
         except Exception:
             if ctx is not None:
                 ctx[cache_key] = None
             return None
 
         try:
-            pre_instances = collect_instances(
-                doc,
-                of_category=parent_bic,
-                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="object_styles:instances:precheck:{}".format(parent_id_int),
+            pre_check = (
+                FilteredElementCollector(doc)
+                .OfCategoryId(parent_cat_eid)
+                .WhereElementIsNotElementType()
+                .GetElementCount()
             )
-            if len(pre_instances or []) == 0:
+            if pre_check == 0:
                 if ctx is not None:
                     ctx[cache_key] = frozenset()
                 return frozenset()
@@ -178,15 +181,19 @@ def _build_subcategory_used_id_set(doc, parent_cat_obj, ctx):
 
         used = set()
         try:
-            instances = collect_instances(
-                doc,
-                of_category=parent_bic,
-                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-                cache_key="object_styles:instances:scan:{}".format(parent_id_int),
+            _subcat_param = BuiltInParameter.ELEM_SUBCATEGORY_PARAM
+        except Exception:
+            _subcat_param = None
+        try:
+            instances = (
+                FilteredElementCollector(doc)
+                .OfCategoryId(parent_cat_eid)
+                .WhereElementIsNotElementType()
+                .ToElements()
             )
             for inst in instances:
                 try:
-                    p = inst.get_Parameter(BuiltInParameter.ELEM_SUBCATEGORY_PARAM)
+                    p = inst.get_Parameter(_subcat_param) if _subcat_param is not None else None
                     if p is not None and p.HasValue:
                         val = p.AsElementId()
                         if val is not None:
