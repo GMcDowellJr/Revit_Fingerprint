@@ -3,11 +3,17 @@
 Units domain extractor.
 
 Captures project units settings including:
-- Length, area, volume format options
+- Format options for 38 specs across all Revit disciplines
+  (Common, Electrical, HVAC, Piping, Structural)
 - Unit types and symbols
-- Accuracy settings
+- Accuracy and rounding settings
 
-Identity is emitted as record.v2 per-spec records (length/area/volume),
+All specs are extracted for every document regardless of discipline.
+GetFormatOptions returns a valid FormatOptions object for all specs
+on any live document. ITEM_Q_UNREADABLE is a defensive fallback only
+and is not expected to fire in normal execution.
+
+Identity is emitted as record.v2 per-spec records,
 with per-record sig_hash derived from identity_items.
 """
 
@@ -125,11 +131,65 @@ def extract(doc, ctx=None):
         result["debug_v2_block_reasons"] = {"SpecTypeId_unavailable": True}
         return result
 
-    specs = [
-        ("length", SpecTypeId.Length),
-        ("area",   SpecTypeId.Area),
-        ("volume", SpecTypeId.Volume),
+    def _resolve_spec(path_fn):
+        """Resolve a SpecTypeId attribute path once. Returns None if unavailable."""
+        try:
+            return path_fn()
+        except Exception:
+            return None
+
+    specs_raw = [
+        # ── Common (discipline: autodesk.spec:discipline-1.0.0) ─────────────────
+        ("length",              _resolve_spec(lambda: SpecTypeId.Length)),
+        ("area",                _resolve_spec(lambda: SpecTypeId.Area)),
+        ("volume",              _resolve_spec(lambda: SpecTypeId.Volume)),
+        ("angle",               _resolve_spec(lambda: SpecTypeId.Angle)),
+        ("slope",               _resolve_spec(lambda: SpecTypeId.Slope)),
+        ("speed",               _resolve_spec(lambda: SpecTypeId.Speed)),
+        ("time",                _resolve_spec(lambda: SpecTypeId.Time)),
+        ("mass_density",        _resolve_spec(lambda: SpecTypeId.MassDensity)),
+        ("currency",            _resolve_spec(lambda: SpecTypeId.Currency)),
+        ("rotation_angle",      _resolve_spec(lambda: SpecTypeId.RotationAngle)),
+        ("distance",            _resolve_spec(lambda: SpecTypeId.Distance)),
+
+        # ── Electrical (discipline: autodesk.spec.discipline:electrical-1.0.0) ──
+        ("electrical_apparent_power",    _resolve_spec(lambda: SpecTypeId.ApparentPower)),
+        ("electrical_current",           _resolve_spec(lambda: SpecTypeId.Current)),
+        ("electrical_potential",         _resolve_spec(lambda: SpecTypeId.ElectricalPotential)),
+        ("electrical_frequency",         _resolve_spec(lambda: SpecTypeId.ElectricalFrequency)),
+        ("electrical_power",             _resolve_spec(lambda: SpecTypeId.ElectricalPower)),
+        ("electrical_temperature",       _resolve_spec(lambda: SpecTypeId.ElectricalTemperature)),
+        ("electrical_wattage",           _resolve_spec(lambda: SpecTypeId.Wattage)),
+
+        # ── HVAC (discipline: autodesk.spec.discipline:hvac-1.0.0) ──────────────
+        ("hvac_air_flow",                _resolve_spec(lambda: SpecTypeId.AirFlow)),
+        ("hvac_cooling_load",            _resolve_spec(lambda: SpecTypeId.CoolingLoad)),
+        ("hvac_heating_load",            _resolve_spec(lambda: SpecTypeId.HeatingLoad)),
+        ("hvac_pressure",                _resolve_spec(lambda: SpecTypeId.HvacPressure)),
+        ("hvac_temperature",             _resolve_spec(lambda: SpecTypeId.HvacTemperature)),
+        ("hvac_velocity",                _resolve_spec(lambda: SpecTypeId.HvacVelocity)),
+        ("hvac_duct_size",               _resolve_spec(lambda: SpecTypeId.DuctSize)),
+        ("hvac_power",                   _resolve_spec(lambda: SpecTypeId.HvacPower)),
+
+        # ── Piping (discipline: autodesk.spec.discipline:piping-1.0.0) ──────────
+        ("piping_flow",                  _resolve_spec(lambda: SpecTypeId.Flow)),
+        ("piping_pressure",              _resolve_spec(lambda: SpecTypeId.PipingPressure)),
+        ("piping_temperature",           _resolve_spec(lambda: SpecTypeId.PipingTemperature)),
+        ("piping_velocity",              _resolve_spec(lambda: SpecTypeId.PipingVelocity)),
+        ("piping_pipe_size",             _resolve_spec(lambda: SpecTypeId.PipeSize)),
+
+        # ── Structural (discipline: autodesk.spec.discipline:structural-1.0.0) ──
+        ("structural_force",               _resolve_spec(lambda: SpecTypeId.Force)),
+        ("structural_moment",              _resolve_spec(lambda: SpecTypeId.Moment)),
+        ("structural_stress",              _resolve_spec(lambda: SpecTypeId.Stress)),
+        ("structural_bar_diameter",        _resolve_spec(lambda: SpecTypeId.BarDiameter)),
+        ("structural_reinforcement_cover", _resolve_spec(lambda: SpecTypeId.ReinforcementCover)),
+        ("structural_section_dimension",   _resolve_spec(lambda: SpecTypeId.SectionDimension)),
+        ("structural_displacement",        _resolve_spec(lambda: SpecTypeId.Displacement)),
     ]
+
+    # Filter to specs that resolved successfully in this Revit version
+    specs = [(label, sid) for label, sid in specs_raw if sid is not None]
 
     for label, spec_id in specs:
         record_id = "units:{}".format(label)
