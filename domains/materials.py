@@ -18,7 +18,7 @@ repo_root = os.path.dirname(current_dir)
 if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
-from core.collect import collect_instances
+from core.collect import collect_instances, purge_lookup
 from core.hashing import make_hash, safe_str
 from core.canon import S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE, S_NONE, S_UNRESOLVED, canon_str
 from core.record_v2 import (
@@ -480,6 +480,14 @@ def extract(doc, ctx=None):
                 "components": {"uid": safe_str(uid), "name": safe_str(name)},
             },
         )
+        element_id_int = None
+        try:
+            element_id_int = int(rec["material"]["id_local"])
+        except Exception:
+            pass
+        _ip, _ip_q = purge_lookup(element_id_int, ctx)
+        rec["is_purgeable"] = _ip
+        rec["is_purgeable_q"] = _ip_q
         rec["graphics_sig_hash_v2"] = graphics_sig_hash_v2
         rec["material"] = material_payload
         rec["sig_basis"] = {

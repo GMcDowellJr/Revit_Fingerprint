@@ -915,6 +915,9 @@ def extract_drafting(doc, ctx=None):
                 "uid_excluded_from_sig": True,
             },
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(e, "Id", None), "IntegerValue", None), ctx)
+        rec_v2["is_purgeable"] = _ip
+        rec_v2["is_purgeable_q"] = _ip_q
         rec_v2["join_key"] = join_key
         rec_v2["phase2"] = phase2_payload
         rec_v2["sig_basis"] = {
@@ -1793,6 +1796,9 @@ def extract_model(doc, ctx=None):
                 "uid_excluded_from_sig": True,
             },
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(e, "Id", None), "IntegerValue", None), ctx)
+        rec_v2["is_purgeable"] = _ip
+        rec_v2["is_purgeable_q"] = _ip_q
         rec_v2["join_key"] = join_key
         rec_v2["phase2"] = phase2_payload
         rec_v2["sig_basis"] = {

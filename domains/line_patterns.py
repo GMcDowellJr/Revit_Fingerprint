@@ -374,6 +374,9 @@ def extract(doc, ctx=None):
                 },
             },
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(e, "Id", None), "IntegerValue", None), ctx)
+        rec_v2["is_purgeable"] = _ip
+        rec_v2["is_purgeable_q"] = _ip_q
         
         # -------------------------
         # Phase-2 additions (additive, explanatory, reversible)

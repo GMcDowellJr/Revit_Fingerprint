@@ -30,6 +30,7 @@ from core.record_v2 import (
 from core.phase2 import phase2_sorted_items
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
+from core.collect import purge_lookup
 from core.deps import require_domain, Blocked
 
 try:
@@ -396,6 +397,12 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
                     "components": {"row_key": safe_str(row_key)},
                 },
             )
+            if row_name != "self":
+                _ip, _ip_q = purge_lookup(getattr(getattr(cat_obj, "Id", None), "IntegerValue", None), ctx)
+            else:
+                _ip, _ip_q = None, "unsupported_not_applicable"
+            rec_v2["is_purgeable"] = _ip
+            rec_v2["is_purgeable_q"] = _ip_q
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), domain_name)
             rec_v2["join_key"], _missing = build_join_key_from_policy(

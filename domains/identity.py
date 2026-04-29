@@ -234,6 +234,8 @@ def extract(doc, ctx=None):
             "provenance": "revit.Document.Title",
         },
     )
+    rec_v2["is_purgeable"] = None
+    rec_v2["is_purgeable_q"] = "unsupported_not_applicable"
     rec_v2["join_key"] = join_key
     rec_v2["phase2"] = info["phase2"]
     rec_v2["sig_basis"] = {

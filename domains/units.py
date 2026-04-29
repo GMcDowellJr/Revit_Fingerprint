@@ -231,6 +231,8 @@ def extract(doc, ctx=None):
                 required_qs=(),
                 label=rec_label,
             )
+            rec["is_purgeable"] = None
+            rec["is_purgeable_q"] = "unsupported_not_applicable"
             # Domain-level signal: v2 cannot be complete if any required key unreadable/missing.
             v2_block_reasons["record_blocked:{}".format(label)] = True
         else:
@@ -247,6 +249,8 @@ def extract(doc, ctx=None):
                 required_qs=required_qs,
                 label=rec_label,
             )
+            rec["is_purgeable"] = None
+            rec["is_purgeable_q"] = "unsupported_not_applicable"
             v2_sig_hashes.append(sig_hash)
 
         # ----------------------------

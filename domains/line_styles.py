@@ -53,6 +53,7 @@ from core.phase2 import (
 
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
+from core.collect import purge_lookup
 
 try:
     from Autodesk.Revit.DB import Category, BuiltInCategory, GraphicsStyleType, ElementId
@@ -326,6 +327,9 @@ def extract(doc, ctx=None):
                     "components": {"path": safe_str(path_v_raw)},
                 },
             )
+            _ip, _ip_q = purge_lookup(getattr(getattr(sc, "Id", None), "IntegerValue", None), ctx)
+            rec_v2["is_purgeable"] = _ip
+            rec_v2["is_purgeable_q"] = _ip_q
 
             # -------------------------
             # Phase-2 additive surfaces (join_key + phase2)

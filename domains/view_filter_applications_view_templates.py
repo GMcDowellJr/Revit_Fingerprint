@@ -401,6 +401,8 @@ def extract(doc, ctx=None):
             required_qs=spec["required_qs"],
             label=spec["label"],
         )
+        rec["is_purgeable"] = None
+        rec["is_purgeable_q"] = "unsupported_not_applicable"
 
         pol = spec["phase2_payload"]["join_key_policy"]
         rec["join_key"], _missing = build_join_key_from_policy(

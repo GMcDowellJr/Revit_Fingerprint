@@ -256,6 +256,8 @@ def extract(doc, ctx=None):
                     required_qs=(),
                     label=label,
                 )
+                rec["is_purgeable"] = None
+                rec["is_purgeable_q"] = "unsupported_not_applicable"
             else:
                 status = STATUS_DEGRADED if any_incomplete else STATUS_OK
                 rec = build_record_v2(
@@ -268,6 +270,8 @@ def extract(doc, ctx=None):
                     required_qs=required_qs,
                     label=label,
                 )
+                rec["is_purgeable"] = None
+                rec["is_purgeable_q"] = "unsupported_not_applicable"
                 signature_hashes_v2.append(sig_hash)
 
             p2_semantic, p2_cosmetic, p2_unknown = _phase2_partition_items(identity_items_sorted)
