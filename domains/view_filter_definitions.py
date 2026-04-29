@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from Autodesk.Revit import DB as RDB
 
-from core.collect import collect_instances
+from core.collect import purge_lookup, collect_instances
 from core.hashing import make_hash, safe_str
 from core.record_v2 import (
     ITEM_Q_MISSING,

@@ -137,3 +137,22 @@ Recommended prefixes:
 - Similarity algorithm changes
 - CSV/comparison logic changes
 - UI-dependent naming retrieval assumptions
+
+
+## Purgeability fields
+
+Every record MUST carry both fields:
+
+- `is_purgeable: boolean | null`
+- `is_purgeable_q: "ok" | "unsupported_not_applicable" | "unreadable"`
+
+Semantics:
+
+| is_purgeable | is_purgeable_q          | Meaning |
+|---|---|---|
+| true         | ok                      | Element ID confirmed in GetUnusedElements — currently purgeable |
+| false        | ok                      | Element ID not in GetUnusedElements — currently in use |
+| null         | unsupported_not_applicable | Domain does not participate in Purge Unused (phases, units, etc.) |
+| null         | unreadable              | GetUnusedElements call failed; signal unavailable for this run |
+
+Quality vocabulary reuses the existing record.v2 q-value set.

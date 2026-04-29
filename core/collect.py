@@ -406,6 +406,73 @@ def collect_instances(
     )
 
 
+
+
+def build_purgeable_id_set(doc: Any, ctx: Optional[dict] = None):
+    """
+    Builds a frozenset of ElementId.IntegerValue (int) for all elements
+    currently listed as purgeable by Document.GetUnusedElements().
+
+    Requires Revit 2024+ (API Since: 2024).
+    For pre-2024, the equivalent approach is:
+      - Get PerformanceAdviser.GetPerformanceAdviser()
+      - Find the rule with GUID 'e8c63650-70b7-435a-9010-ec97660c1bda'
+      - Call ExecuteRules(doc, [ruleId])
+      - Call failureMessages[0].GetFailingElements() to get purgeable IDs
+
+    Caches results to ctx:
+      ctx["_purgeable_id_set"]   -> frozenset[int] | None
+      ctx["_purgeable_id_set_q"] -> "ok" | "unreadable"
+
+    Returns (frozenset_or_none, q_string).
+    """
+    _CACHE_KEY = "_purgeable_id_set"
+    _CACHE_Q_KEY = "_purgeable_id_set_q"
+
+    if ctx is not None and _CACHE_KEY in ctx:
+        return ctx[_CACHE_KEY], ctx.get(_CACHE_Q_KEY, "unreadable")
+
+    try:
+        if doc is None:
+            raise ValueError("doc is None")
+
+        try:
+            import System.Collections.Generic as _scg
+            category_set = _scg.HashSet[ElementId]()
+        except Exception:
+            category_set = set()
+        unused = doc.GetUnusedElements(category_set)
+
+        id_set = frozenset(
+            int(eid.IntegerValue)
+            for eid in unused
+            if eid is not None and not _is_invalid_element_id(eid)
+        )
+
+        if ctx is not None:
+            ctx[_CACHE_KEY] = id_set
+            ctx[_CACHE_Q_KEY] = "ok"
+        return id_set, "ok"
+
+    except Exception:
+        if ctx is not None:
+            ctx[_CACHE_KEY] = None
+            ctx[_CACHE_Q_KEY] = "unreadable"
+        return None, "unreadable"
+
+
+def purge_lookup(element_id_int: Any, ctx: Optional[dict]):
+    purgeable_set = (ctx or {}).get("_purgeable_id_set")
+    purgeable_q = (ctx or {}).get("_purgeable_id_set_q", "unreadable")
+    if purgeable_q == "unreadable" or purgeable_set is None:
+        return None, "unreadable"
+    if element_id_int is None:
+        return None, "unreadable"
+    try:
+        return (int(element_id_int) in purgeable_set), "ok"
+    except Exception:
+        return None, "unreadable"
+
 def is_type_purgeable(
     doc: Any,
     type_id: Any,
@@ -415,12 +482,15 @@ def is_type_purgeable(
     cache_key: Optional[CacheKey] = None,
 ) -> Optional[bool]:
     """
-    Returns True if no instances reference this type (safe to purge).
-    Returns False if at least one instance references it.
-    Returns None if the API check fails.
+    DEPRECATED. Use build_purgeable_id_set() + a set lookup instead.
 
-    Only valid for types exposed in Revit's Purge Unused UI.
-    Other domains intentionally emit None for this field by design.
+    is_type_purgeable() performs a per-record FilteredElementCollector scan,
+    which is O(instances) per call. build_purgeable_id_set() amortizes the
+    cost to a single Document.GetUnusedElements() call per run, with O(1)
+    per-record lookups thereafter.
+
+    This function is retained for reference only. It will be removed once all
+    call sites have been migrated to the new pattern.
     """
     try:
         _require_revit_api()

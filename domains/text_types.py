@@ -22,7 +22,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types, is_type_purgeable
+from core.collect import collect_types, purge_lookup
 from core.canon import (
     canon_str,
     canon_num,
@@ -459,14 +459,6 @@ def extract(doc, ctx=None):
         sig_preimage_v2 = serialize_identity_items(semantic_items_v2)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
 
-        is_purgeable = is_type_purgeable(
-            doc,
-            getattr(t, "Id", None),
-            BuiltInCategory.OST_TextNotes,
-            cctx=(ctx or {}).get("_collect") if ctx is not None else None,
-            cache_key=("text_types:is_purgeable", safe_str(getattr(getattr(t, "Id", None), "IntegerValue", ""))),
-        )
-
         rec_v2 = build_record_v2(
             domain="text_types",
             record_id=safe_str(type_name) if safe_str(type_name) else safe_str(t.Id.IntegerValue),
@@ -486,7 +478,9 @@ def extract(doc, ctx=None):
                 "leader_arrowhead_uid_excluded_from_sig": True,
             },
         )
-        rec_v2["is_purgeable"] = is_purgeable
+        _ip, _ip_q = purge_lookup(getattr(getattr(t, "Id", None), "IntegerValue", None), ctx)
+        rec_v2["is_purgeable"] = _ip
+        rec_v2["is_purgeable_q"] = _ip_q
         rec_v2["join_key"], _missing = build_join_key_from_policy(
             domain_policy=pol,
             identity_items=identity_items_v2_sorted,

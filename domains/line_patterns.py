@@ -24,7 +24,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_instances
+from core.collect import purge_lookup, collect_instances
 from core.canon import (
     canon_str,
     canon_num,
