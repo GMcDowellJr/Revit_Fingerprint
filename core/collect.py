@@ -20,10 +20,11 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 try:
-    from Autodesk.Revit.DB import FilteredElementCollector, ElementId
+    from Autodesk.Revit.DB import FilteredElementCollector, ElementId, BuiltInParameter
 except Exception:
     FilteredElementCollector = None
     ElementId = None
+    BuiltInParameter = None
 
 
 CacheKey = Union[str, Tuple[Any, ...]]
@@ -472,6 +473,81 @@ def purge_lookup(element_id_int: Any, ctx: Optional[dict]):
         return (int(element_id_int) in purgeable_set), "ok"
     except Exception:
         return None, "unreadable"
+
+
+def build_subcategory_used_id_set(doc: Any, parent_cat_obj: Any, ctx: Optional[dict] = None):
+    """Build/cache used subcategory ids for a given parent category."""
+    try:
+        parent_id_int = int(getattr(getattr(parent_cat_obj, "Id", None), "IntegerValue", None))
+    except Exception:
+        return None
+
+    cache_key = "_obj_style_used_subcats:{}".format(parent_id_int)
+    if ctx is not None and cache_key in ctx:
+        return ctx[cache_key]
+
+    try:
+        try:
+            parent_cat_eid = parent_cat_obj.Id
+            if parent_cat_eid is None:
+                if ctx is not None:
+                    ctx[cache_key] = None
+                return None
+        except Exception:
+            if ctx is not None:
+                ctx[cache_key] = None
+            return None
+
+        try:
+            pre_check = (
+                FilteredElementCollector(doc)
+                .OfCategoryId(parent_cat_eid)
+                .WhereElementIsNotElementType()
+                .GetElementCount()
+            )
+            if pre_check == 0:
+                if ctx is not None:
+                    ctx[cache_key] = frozenset()
+                return frozenset()
+        except Exception:
+            pass
+
+        used = set()
+        try:
+            _subcat_param = BuiltInParameter.ELEM_SUBCATEGORY_PARAM
+        except Exception:
+            _subcat_param = None
+        try:
+            instances = (
+                FilteredElementCollector(doc)
+                .OfCategoryId(parent_cat_eid)
+                .WhereElementIsNotElementType()
+                .ToElements()
+            )
+            for inst in instances:
+                try:
+                    p = inst.get_Parameter(_subcat_param) if _subcat_param is not None else None
+                    if p is not None and p.HasValue:
+                        val = p.AsElementId()
+                        if val is not None:
+                            iv = int(val.IntegerValue)
+                            if iv > 0:
+                                used.add(iv)
+                except Exception:
+                    continue
+        except Exception:
+            if ctx is not None:
+                ctx[cache_key] = None
+            return None
+
+        result = frozenset(used)
+        if ctx is not None:
+            ctx[cache_key] = result
+        return result
+    except Exception:
+        if ctx is not None:
+            ctx[cache_key] = None
+        return None
 
 def is_type_purgeable(
     doc: Any,

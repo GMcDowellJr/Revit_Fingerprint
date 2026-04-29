@@ -31,19 +31,16 @@ from core.phase2 import phase2_sorted_items
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 from core.deps import require_domain, Blocked
+from core.collect import build_subcategory_used_id_set
 
 try:
     from Autodesk.Revit.DB import (
         GraphicsStyleType,
         CategoryType,
-        FilteredElementCollector,
-        BuiltInParameter,
     )
 except ImportError:
     GraphicsStyleType = None
     CategoryType = None
-    FilteredElementCollector = None
-    BuiltInParameter = None
 
 _CTX_CATEGORIES_CACHE_KEY = "_object_styles_categories_cache"
 _EXCLUDED_TOP_LEVEL_CATEGORIES = frozenset(["Lines"])
@@ -142,85 +139,10 @@ def _matches_category_type(cat, kind):
     return False
 
 
-def _build_subcategory_used_id_set(doc, parent_cat_obj, ctx):
-    """Build/cache used subcategory ids for a given parent category."""
-    try:
-        parent_id_int = int(getattr(getattr(parent_cat_obj, "Id", None), "IntegerValue", None))
-    except Exception:
-        return None
-
-    cache_key = "_obj_style_used_subcats:{}".format(parent_id_int)
-    if ctx is not None and cache_key in ctx:
-        return ctx[cache_key]
-
-    try:
-        try:
-            parent_cat_eid = parent_cat_obj.Id
-            if parent_cat_eid is None:
-                if ctx is not None:
-                    ctx[cache_key] = None
-                return None
-        except Exception:
-            if ctx is not None:
-                ctx[cache_key] = None
-            return None
-
-        try:
-            pre_check = (
-                FilteredElementCollector(doc)
-                .OfCategoryId(parent_cat_eid)
-                .WhereElementIsNotElementType()
-                .GetElementCount()
-            )
-            if pre_check == 0:
-                if ctx is not None:
-                    ctx[cache_key] = frozenset()
-                return frozenset()
-        except Exception:
-            pass
-
-        used = set()
-        try:
-            _subcat_param = BuiltInParameter.ELEM_SUBCATEGORY_PARAM
-        except Exception:
-            _subcat_param = None
-        try:
-            instances = (
-                FilteredElementCollector(doc)
-                .OfCategoryId(parent_cat_eid)
-                .WhereElementIsNotElementType()
-                .ToElements()
-            )
-            for inst in instances:
-                try:
-                    p = inst.get_Parameter(_subcat_param) if _subcat_param is not None else None
-                    if p is not None and p.HasValue:
-                        val = p.AsElementId()
-                        if val is not None:
-                            iv = int(val.IntegerValue)
-                            if iv > 0:
-                                used.add(iv)
-                except Exception:
-                    continue
-        except Exception:
-            if ctx is not None:
-                ctx[cache_key] = None
-            return None
-
-        result = frozenset(used)
-        if ctx is not None:
-            ctx[cache_key] = result
-        return result
-    except Exception:
-        if ctx is not None:
-            ctx[cache_key] = None
-        return None
-
-
 def _subcategory_purge_lookup(doc, element_id_int, parent_cat_obj, ctx):
     if element_id_int is None or element_id_int <= 0:
         return None, "unreadable"
-    used_set = _build_subcategory_used_id_set(doc, parent_cat_obj, ctx)
+    used_set = build_subcategory_used_id_set(doc, parent_cat_obj, ctx)
     if used_set is None:
         return None, "unreadable"
     return (element_id_int not in used_set), "ok"
