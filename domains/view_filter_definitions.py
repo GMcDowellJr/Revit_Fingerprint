@@ -181,6 +181,19 @@ def _walk_rules(elem_filter, out_rules: List[Dict[str, Any]], doc, rule_prefix: 
     if elem_filter is None:
         return True, None
 
+    def _append_rule(rule_obj, prefix: str) -> Tuple[bool, Optional[str]]:
+        """Append a rule, unwrapping FilterInverseRule wrappers into NOT.-prefixed inner rule."""
+        try:
+            if FilterInverseRule is not None and isinstance(rule_obj, FilterInverseRule):
+                inner_rule = rule_obj.GetInnerRule() if hasattr(rule_obj, "GetInnerRule") else None
+                if inner_rule is None:
+                    return False, "filter_tree.rules_unreadable"
+                return _append_rule(inner_rule, "{}NOT.".format(prefix))
+            out_rules.append({"rule": rule_obj, "prefix": prefix})
+            return True, None
+        except Exception:
+            return False, "filter_tree.rules_unreadable"
+
     # Logical nodes
     try:
         if isinstance(elem_filter, LogicalAndFilter) or isinstance(elem_filter, LogicalOrFilter):
@@ -199,8 +212,7 @@ def _walk_rules(elem_filter, out_rules: List[Dict[str, Any]], doc, rule_prefix: 
             inner_rule = elem_filter.GetInnerRule() if hasattr(elem_filter, "GetInnerRule") else None
             if inner_rule is None:
                 return False, "filter_tree.rules_unreadable"
-            out_rules.append({"rule": inner_rule, "prefix": f"{rule_prefix}NOT."})
-            return True, None
+            return _append_rule(inner_rule, "{}NOT.".format(rule_prefix))
     except Exception:
         return False, "filter_tree.rules_unreadable"
 
@@ -209,7 +221,9 @@ def _walk_rules(elem_filter, out_rules: List[Dict[str, Any]], doc, rule_prefix: 
         if isinstance(elem_filter, ElementParameterFilter):
             rules = list(elem_filter.GetRules() or []) if hasattr(elem_filter, "GetRules") else []
             for r in rules:
-                out_rules.append({"rule": r, "prefix": rule_prefix})
+                ok, reason = _append_rule(r, rule_prefix)
+                if not ok:
+                    return False, reason
             return True, None
     except Exception:
         return False, "filter_tree.rules_unreadable"

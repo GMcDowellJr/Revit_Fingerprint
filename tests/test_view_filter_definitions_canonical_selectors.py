@@ -130,3 +130,38 @@ def test_view_filter_definitions_inverse_rule_not_prefix_and_sig_diverges(monkey
         )
     )
     assert pos_sig_hash != neg_sig_hash
+
+
+def test_view_filter_definitions_inverse_rule_unwrapped_from_leaf_rule_list(monkeypatch):
+    _install_fake_revit_db()
+    vfd = importlib.import_module("domains.view_filter_definitions")
+
+    class FakeLeafRule(object):
+        pass
+
+    class FakeElementParameterFilter(object):
+        def __init__(self, rules):
+            self._rules = rules
+
+        def GetRules(self):
+            return self._rules
+
+    class FakeFilterInverseRule(object):
+        def __init__(self, inner):
+            self._inner = inner
+
+        def GetInnerRule(self):
+            return self._inner
+
+    monkeypatch.setattr(vfd, "ElementParameterFilter", FakeElementParameterFilter)
+    monkeypatch.setattr(vfd, "FilterInverseRule", FakeFilterInverseRule)
+
+    base_rule = FakeLeafRule()
+    filter_with_inverse_leaf = FakeElementParameterFilter([FakeFilterInverseRule(base_rule)])
+
+    out_rules = []
+    ok, reason = vfd._walk_rules(filter_with_inverse_leaf, out_rules, doc=None)
+
+    assert ok is True
+    assert reason is None
+    assert out_rules == [{"rule": base_rule, "prefix": "NOT."}]
