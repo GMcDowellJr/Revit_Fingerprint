@@ -30,20 +30,19 @@ from core.record_v2 import (
 from core.phase2 import phase2_sorted_items
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
+from core.collect import collect_instances
 from core.deps import require_domain, Blocked
 
 try:
     from Autodesk.Revit.DB import (
         GraphicsStyleType,
         CategoryType,
-        FilteredElementCollector,
         BuiltInCategory,
         BuiltInParameter,
     )
 except ImportError:
     GraphicsStyleType = None
     CategoryType = None
-    FilteredElementCollector = None
     BuiltInCategory = None
     BuiltInParameter = None
 
@@ -164,13 +163,13 @@ def _build_subcategory_used_id_set(doc, parent_cat_obj, ctx):
             return None
 
         try:
-            pre_check = (
-                FilteredElementCollector(doc)
-                .OfCategory(parent_bic)
-                .WhereElementIsNotElementType()
-                .GetElementCount()
+            pre_instances = collect_instances(
+                doc,
+                of_category=parent_bic,
+                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+                cache_key="object_styles:instances:precheck:{}".format(parent_id_int),
             )
-            if pre_check == 0:
+            if len(pre_instances or []) == 0:
                 if ctx is not None:
                     ctx[cache_key] = frozenset()
                 return frozenset()
@@ -179,11 +178,11 @@ def _build_subcategory_used_id_set(doc, parent_cat_obj, ctx):
 
         used = set()
         try:
-            instances = (
-                FilteredElementCollector(doc)
-                .OfCategory(parent_bic)
-                .WhereElementIsNotElementType()
-                .ToElements()
+            instances = collect_instances(
+                doc,
+                of_category=parent_bic,
+                cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+                cache_key="object_styles:instances:scan:{}".format(parent_id_int),
             )
             for inst in instances:
                 try:
