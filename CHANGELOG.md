@@ -22,6 +22,7 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   attribute paths are resolved once at function entry and filtered before the loop —
   unresolvable paths are skipped cleanly without blocking the domain. Attribute names
   verified against probe_units_2026-02-04.json.
+- units domain SpecTypeId access corrected to Python flat top-level members for Electrical/HVAC/Piping/Structural entries (instead of nested C#-style paths), enabling those discipline records to resolve and emit.
 - file_metadata.csv: `project_label` now extracted from Autodesk Docs:// central path
   (ACC projects only); blank for non-ACC paths
 - line_patterns join key policy upgraded from `line_patterns.join_key.v2`
