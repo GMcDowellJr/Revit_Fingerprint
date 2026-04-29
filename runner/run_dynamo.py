@@ -127,7 +127,7 @@ if _REPO_ROOT not in sys.path:
 
 # Contract + dependency utilities (must be imported after sys.path adjustment)
 from core import contracts
-from core.collect import CollectCtx
+from core.collect import CollectCtx, build_purgeable_id_set
 from core.context import DocViewContext
 from core.deps import Blocked, require_domain
 from core import naming as fp_naming
@@ -511,6 +511,8 @@ def run_fingerprint(doc, timing=None):
     _timing = timing if timing is not None else TimingCollector()
     ctx["_timing"] = _timing
     ctx["_collect"].timing = _timing
+
+    build_purgeable_id_set(doc, ctx)
 
     # Wire timing into hashing module (module-level ref, never affects hash output)
     try:

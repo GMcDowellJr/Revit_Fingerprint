@@ -11,7 +11,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_instances
+from core.collect import purge_lookup, collect_instances
 from core.canon import canon_str, fnum, canon_num, canon_bool, canon_id, S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE
 from core.phase2 import phase2_sorted_items, phase2_qv_from_legacy_sentinel_str
 from core.record_v2 import (
@@ -915,6 +915,9 @@ def extract_drafting(doc, ctx=None):
                 "uid_excluded_from_sig": True,
             },
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(e, "Id", None), "IntegerValue", None), ctx)
+        rec_v2["is_purgeable"] = _ip
+        rec_v2["is_purgeable_q"] = _ip_q
         rec_v2["join_key"] = join_key
         rec_v2["phase2"] = phase2_payload
         rec_v2["sig_basis"] = {
@@ -1793,6 +1796,9 @@ def extract_model(doc, ctx=None):
                 "uid_excluded_from_sig": True,
             },
         )
+        _ip, _ip_q = purge_lookup(getattr(getattr(e, "Id", None), "IntegerValue", None), ctx)
+        rec_v2["is_purgeable"] = _ip
+        rec_v2["is_purgeable_q"] = _ip_q
         rec_v2["join_key"] = join_key
         rec_v2["phase2"] = phase2_payload
         rec_v2["sig_basis"] = {

@@ -13,19 +13,30 @@
     "sig_hash",
     "identity_basis",
     "identity_quality",
-    "label"
+    "label",
+    "is_purgeable",
+    "is_purgeable_q"
   ],
   "properties": {
-    "schema_version": { "const": "record.v2" },
+    "schema_version": {
+      "const": "record.v2"
+    },
     "domain": {
       "type": "string",
       "minLength": 1,
       "pattern": "^[a-z0-9_]+$"
     },
-    "record_id": { "type": "string", "minLength": 1 },
-
-    "status": { "enum": ["ok", "degraded", "blocked"] },
-
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "degraded",
+        "blocked"
+      ]
+    },
     "status_reasons": {
       "type": "array",
       "items": {
@@ -34,36 +45,64 @@
         "pattern": "^[a-z0-9_.:-]+$"
       }
     },
-
     "sig_hash": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^[0-9a-f]{32}$"
     },
-
     "identity_basis": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["hash_alg", "item_schema", "items"],
+      "required": [
+        "hash_alg",
+        "item_schema",
+        "items"
+      ],
       "properties": {
-        "hash_alg": { "type": "string", "minLength": 1 },
-        "item_schema": { "const": "identity_items.v1" },
+        "hash_alg": {
+          "type": "string",
+          "minLength": 1
+        },
+        "item_schema": {
+          "const": "identity_items.v1"
+        },
         "items": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["k", "v", "q"],
+            "required": [
+              "k",
+              "v",
+              "q"
+            ],
             "properties": {
-              "k": { "type": "string", "minLength": 1 },
-              "v": { "type": ["string", "null"] },
-              "q": { "enum": ["ok", "missing", "unreadable", "unsupported"] }
+              "k": {
+                "type": "string",
+                "minLength": 1
+              },
+              "v": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "q": {
+                "enum": [
+                  "ok",
+                  "missing",
+                  "unreadable",
+                  "unsupported"
+                ]
+              }
             }
           }
         }
       }
     },
-
     "identity_quality": {
       "enum": [
         "complete",
@@ -73,13 +112,19 @@
         "none_blocked"
       ]
     },
-
     "label": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["display", "quality", "provenance", "components"],
+      "required": [
+        "display",
+        "quality",
+        "provenance",
+        "components"
+      ],
       "properties": {
-        "display": { "type": "string" },
+        "display": {
+          "type": "string"
+        },
         "quality": {
           "enum": [
             "human",
@@ -100,34 +145,72 @@
             "none"
           ]
         },
-        "components": { "type": "object" }
+        "components": {
+          "type": "object"
+        }
       }
     },
-
-    "debug": { "type": "object" }
+    "debug": {
+      "type": "object"
+    },
+    "is_purgeable": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "is_purgeable_q": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "unsupported_not_applicable",
+        "unreadable"
+      ]
+    }
   },
-
   "allOf": [
     {
       "if": {
-        "properties": { "status": { "const": "blocked" } },
-        "required": ["status"]
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        },
+        "required": [
+          "status"
+        ]
       },
       "then": {
         "properties": {
-          "sig_hash": { "type": "null" },
-          "identity_quality": { "const": "none_blocked" }
+          "sig_hash": {
+            "type": "null"
+          },
+          "identity_quality": {
+            "const": "none_blocked"
+          }
         }
       }
     },
     {
       "if": {
-        "properties": { "status": { "enum": ["ok", "degraded"] } },
-        "required": ["status"]
+        "properties": {
+          "status": {
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
       },
       "then": {
         "properties": {
-          "sig_hash": { "type": "string", "pattern": "^[0-9a-f]{32}$" }
+          "sig_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$"
+          }
         }
       }
     }

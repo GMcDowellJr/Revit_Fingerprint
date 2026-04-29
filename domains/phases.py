@@ -276,6 +276,8 @@ def extract(doc, ctx=None):
             "keys_used": ["phase.name", "phase.seq"],
         }
 
+        rec_v2["is_purgeable"] = None
+        rec_v2["is_purgeable_q"] = "unsupported_not_applicable"
         v2_records.append(rec_v2)
         if sig_hash_v2 is not None:
             v2_sig_hashes.append(sig_hash_v2)

@@ -20,10 +20,11 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 try:
-    from Autodesk.Revit.DB import FilteredElementCollector, ElementId
+    from Autodesk.Revit.DB import FilteredElementCollector, ElementId, BuiltInParameter
 except Exception:
     FilteredElementCollector = None
     ElementId = None
+    BuiltInParameter = None
 
 
 CacheKey = Union[str, Tuple[Any, ...]]
@@ -406,6 +407,148 @@ def collect_instances(
     )
 
 
+
+
+def build_purgeable_id_set(doc: Any, ctx: Optional[dict] = None):
+    """
+    Builds a frozenset of ElementId.IntegerValue (int) for all elements
+    currently listed as purgeable by Document.GetUnusedElements().
+
+    Requires Revit 2024+ (API Since: 2024).
+    For pre-2024, the equivalent approach is:
+      - Get PerformanceAdviser.GetPerformanceAdviser()
+      - Find the rule with GUID 'e8c63650-70b7-435a-9010-ec97660c1bda'
+      - Call ExecuteRules(doc, [ruleId])
+      - Call failureMessages[0].GetFailingElements() to get purgeable IDs
+
+    Caches results to ctx:
+      ctx["_purgeable_id_set"]   -> frozenset[int] | None
+      ctx["_purgeable_id_set_q"] -> "ok" | "unreadable"
+
+    Returns (frozenset_or_none, q_string).
+    """
+    _CACHE_KEY = "_purgeable_id_set"
+    _CACHE_Q_KEY = "_purgeable_id_set_q"
+
+    if ctx is not None and _CACHE_KEY in ctx:
+        return ctx[_CACHE_KEY], ctx.get(_CACHE_Q_KEY, "unreadable")
+
+    try:
+        if doc is None:
+            raise ValueError("doc is None")
+
+        try:
+            import System.Collections.Generic as _scg
+            category_set = _scg.HashSet[ElementId]()
+        except Exception:
+            category_set = set()
+        unused = doc.GetUnusedElements(category_set)
+
+        id_set = frozenset(
+            int(eid.IntegerValue)
+            for eid in unused
+            if eid is not None and not _is_invalid_element_id(eid)
+        )
+
+        if ctx is not None:
+            ctx[_CACHE_KEY] = id_set
+            ctx[_CACHE_Q_KEY] = "ok"
+        return id_set, "ok"
+
+    except Exception:
+        if ctx is not None:
+            ctx[_CACHE_KEY] = None
+            ctx[_CACHE_Q_KEY] = "unreadable"
+        return None, "unreadable"
+
+
+def purge_lookup(element_id_int: Any, ctx: Optional[dict]):
+    purgeable_set = (ctx or {}).get("_purgeable_id_set")
+    purgeable_q = (ctx or {}).get("_purgeable_id_set_q", "unreadable")
+    if purgeable_q == "unreadable" or purgeable_set is None:
+        return None, "unreadable"
+    if element_id_int is None:
+        return None, "unreadable"
+    try:
+        return (int(element_id_int) in purgeable_set), "ok"
+    except Exception:
+        return None, "unreadable"
+
+
+def build_subcategory_used_id_set(doc: Any, parent_cat_obj: Any, ctx: Optional[dict] = None):
+    """Build/cache used subcategory ids for a given parent category."""
+    try:
+        parent_id_int = int(getattr(getattr(parent_cat_obj, "Id", None), "IntegerValue", None))
+    except Exception:
+        return None
+
+    cache_key = "_obj_style_used_subcats:{}".format(parent_id_int)
+    if ctx is not None and cache_key in ctx:
+        return ctx[cache_key]
+
+    try:
+        try:
+            parent_cat_eid = parent_cat_obj.Id
+            if parent_cat_eid is None:
+                if ctx is not None:
+                    ctx[cache_key] = None
+                return None
+        except Exception:
+            if ctx is not None:
+                ctx[cache_key] = None
+            return None
+
+        try:
+            pre_check = (
+                FilteredElementCollector(doc)
+                .OfCategoryId(parent_cat_eid)
+                .WhereElementIsNotElementType()
+                .GetElementCount()
+            )
+            if pre_check == 0:
+                if ctx is not None:
+                    ctx[cache_key] = frozenset()
+                return frozenset()
+        except Exception:
+            pass
+
+        used = set()
+        try:
+            _subcat_param = BuiltInParameter.ELEM_SUBCATEGORY_PARAM
+        except Exception:
+            _subcat_param = None
+        try:
+            instances = (
+                FilteredElementCollector(doc)
+                .OfCategoryId(parent_cat_eid)
+                .WhereElementIsNotElementType()
+                .ToElements()
+            )
+            for inst in instances:
+                try:
+                    p = inst.get_Parameter(_subcat_param) if _subcat_param is not None else None
+                    if p is not None and p.HasValue:
+                        val = p.AsElementId()
+                        if val is not None:
+                            iv = int(val.IntegerValue)
+                            if iv > 0:
+                                used.add(iv)
+                except Exception:
+                    continue
+        except Exception:
+            if ctx is not None:
+                ctx[cache_key] = None
+            return None
+
+        result = frozenset(used)
+        if ctx is not None:
+            ctx[cache_key] = result
+        return result
+    except Exception:
+        if ctx is not None:
+            ctx[cache_key] = None
+        return None
+
 def is_type_purgeable(
     doc: Any,
     type_id: Any,
@@ -415,12 +558,15 @@ def is_type_purgeable(
     cache_key: Optional[CacheKey] = None,
 ) -> Optional[bool]:
     """
-    Returns True if no instances reference this type (safe to purge).
-    Returns False if at least one instance references it.
-    Returns None if the API check fails.
+    DEPRECATED. Use build_purgeable_id_set() + a set lookup instead.
 
-    Only valid for types exposed in Revit's Purge Unused UI.
-    Other domains intentionally emit None for this field by design.
+    is_type_purgeable() performs a per-record FilteredElementCollector scan,
+    which is O(instances) per call. build_purgeable_id_set() amortizes the
+    cost to a single Document.GetUnusedElements() call per run, with O(1)
+    per-record lookups thereafter.
+
+    This function is retained for reference only. It will be removed once all
+    call sites have been migrated to the new pattern.
     """
     try:
         _require_revit_api()

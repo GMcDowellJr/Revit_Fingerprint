@@ -31,9 +31,13 @@ from core.phase2 import phase2_sorted_items
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 from core.deps import require_domain, Blocked
+from core.collect import build_subcategory_used_id_set
 
 try:
-    from Autodesk.Revit.DB import GraphicsStyleType, CategoryType
+    from Autodesk.Revit.DB import (
+        GraphicsStyleType,
+        CategoryType,
+    )
 except ImportError:
     GraphicsStyleType = None
     CategoryType = None
@@ -133,6 +137,15 @@ def _matches_category_type(cat, kind):
     if kind == "imported":
         return ct == getattr(CategoryType, "ImportInstance", getattr(CategoryType, "Imported", None))
     return False
+
+
+def _subcategory_purge_lookup(doc, element_id_int, parent_cat_obj, ctx):
+    if element_id_int is None or element_id_int <= 0:
+        return None, "unreadable"
+    used_set = build_subcategory_used_id_set(doc, parent_cat_obj, ctx)
+    if used_set is None:
+        return None, "unreadable"
+    return (element_id_int not in used_set), "ok"
 
 
 def _rgb_sig(c):
@@ -396,6 +409,20 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
                     "components": {"row_key": safe_str(row_key)},
                 },
             )
+            if row_name != "self":
+                element_id_int = getattr(getattr(cat_obj, "Id", None), "IntegerValue", None)
+                try:
+                    parent_cat_obj = cat_obj.Parent
+                except Exception:
+                    parent_cat_obj = None
+                if parent_cat_obj is not None and element_id_int is not None and element_id_int > 0:
+                    _ip, _ip_q = _subcategory_purge_lookup(doc, element_id_int, parent_cat_obj, ctx)
+                else:
+                    _ip, _ip_q = None, "unreadable"
+            else:
+                _ip, _ip_q = None, "unsupported_not_applicable"
+            rec_v2["is_purgeable"] = _ip
+            rec_v2["is_purgeable_q"] = _ip_q
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), domain_name)
             rec_v2["join_key"], _missing = build_join_key_from_policy(

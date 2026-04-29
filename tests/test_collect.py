@@ -207,3 +207,54 @@ class TestCollectIdIntsNoRevit:
                 cctx=ctx,
             )
         assert ctx.counters.get("collect.cache_bypass.unkeyed_predicate", 0) == 1
+
+def test_build_purgeable_id_set_ok():
+    import importlib
+    m = importlib.import_module("core.collect")
+
+    class FakeId:
+        def __init__(self, v): self.IntegerValue = v
+
+    class FakeDoc:
+        def GetUnusedElements(self, categories):
+            return [FakeId(100), FakeId(200), FakeId(300)]
+
+    ctx = {}
+    result, q = m.build_purgeable_id_set(FakeDoc(), ctx)
+    assert q == "ok"
+    assert result == frozenset({100, 200, 300})
+    assert ctx["_purgeable_id_set"] == frozenset({100, 200, 300})
+    assert ctx["_purgeable_id_set_q"] == "ok"
+
+
+def test_build_purgeable_id_set_failure():
+    import importlib
+    m = importlib.import_module("core.collect")
+
+    class BadDoc:
+        def GetUnusedElements(self, categories):
+            raise RuntimeError("API unavailable")
+
+    ctx = {}
+    result, q = m.build_purgeable_id_set(BadDoc(), ctx)
+    assert result is None
+    assert q == "unreadable"
+    assert ctx["_purgeable_id_set"] is None
+    assert ctx["_purgeable_id_set_q"] == "unreadable"
+
+
+def test_build_purgeable_id_set_uses_cache():
+    import importlib
+    m = importlib.import_module("core.collect")
+
+    calls = []
+    class TrackingDoc:
+        def GetUnusedElements(self, categories):
+            calls.append(1)
+            return []
+
+    ctx = {"_purgeable_id_set": frozenset({42}), "_purgeable_id_set_q": "ok"}
+    result, q = m.build_purgeable_id_set(TrackingDoc(), ctx)
+    assert result == frozenset({42})
+    assert q == "ok"
+    assert calls == []
