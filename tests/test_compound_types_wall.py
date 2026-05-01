@@ -504,9 +504,10 @@ def test_unreadable_wrap_fields_do_not_block_required_identity(monkeypatch):
     assert rec["sig_hash"] is not None
 
 
-def test_mixed_ok_and_blocked_records_keep_domain_hash_blocked(monkeypatch):
+def test_mixed_ok_and_blocked_records_keep_domain_hash_from_ok_records(monkeypatch):
     m = _setup_module(monkeypatch)
     monkeypatch.setattr(m, "collect_types", lambda *a, **k: [_basic_wall("OK"), _WallType("Stacked", 1, None)])
     out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
     assert out["debug_v2_blocked"] is True
-    assert out["hash_v2"] is None
+    assert len(out["signature_hashes_v2"]) == 1
+    assert out["hash_v2"] is not None
