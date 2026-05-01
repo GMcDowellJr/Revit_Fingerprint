@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+import csv
 import shutil
 import sys
 import time
@@ -24,6 +25,7 @@ if __package__ in (None, ""):
     from step7_overlap_report import emit_stub as emit_step7
     from reference_bundle import load_and_validate
     from step_compare import run_compare_for_domain
+    from placeholder_exclusions import compute_placeholder_exclusions
 else:
     from .common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id
     from .step0_discover_populations import discover_populations
@@ -37,6 +39,7 @@ else:
     from .step7_overlap_report import emit_stub as emit_step7
     from .reference_bundle import load_and_validate
     from .step_compare import run_compare_for_domain
+    from .placeholder_exclusions import compute_placeholder_exclusions
 
 TIMING_FIELDNAMES = ["schema_version", "analysis_run_id", "domain", "population_id", "step", "seconds"]
 TIMING_STEPS = ("step1", "step2", "step2b", "step3", "step4", "step5", "step6", "step7")
@@ -363,6 +366,20 @@ def run_bundle_analysis(
             "files_with_no_bundle_match": total_files_no_bundle,
         }
 
+    records_csv_candidates = [analysis_dir / "phase0_records.csv", analysis_dir / "records.csv"]
+    records_csv_path = next((p for p in records_csv_candidates if p.exists()), None)
+    placeholder_exclusions_path: Optional[Path] = None
+    if records_csv_path is not None:
+        with records_csv_path.open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            has_purgeable = "is_purgeable" in (reader.fieldnames or [])
+        if has_purgeable:
+            placeholder_exclusions_path = out_dir / "domain_placeholder_exclusions.csv"
+            compute_placeholder_exclusions(records_csv_path, placeholder_exclusions_path)
+            print(f"[run_bundle_analysis] placeholder exclusions computed: {placeholder_exclusions_path}")
+        else:
+            print("[run_bundle_analysis] WARNING: is_purgeable column not found in records CSV — placeholder exclusion skipped")
+
     step0_times: Dict[str, float] = {}
     domain_primary_counts: Dict[str, int] = {}
     outliers_by_domain: Dict[str, int] = {}
@@ -388,6 +405,7 @@ def run_bundle_analysis(
                 max_population_overlap=max_population_overlap,
                 min_population_jaccard=min_population_jaccard,
                 discovery_support_pct=discovery_support_pct,
+                placeholder_exclusions_path=placeholder_exclusions_path,
             )
             step0_elapsed = time.time() - t0
             step0_times[dom] = step0_elapsed

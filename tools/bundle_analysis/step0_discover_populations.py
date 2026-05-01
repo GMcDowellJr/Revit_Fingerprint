@@ -127,6 +127,7 @@ def discover_populations(
     max_population_overlap: float = 0.20,
     min_population_jaccard: float = 0.30,
     discovery_support_pct: float = 0.50,
+    placeholder_exclusions_path: Optional[Path] = None,
 ) -> Dict[str, int]:
     if discovery_support_pct < 0.05:
         raise ValueError(
@@ -147,6 +148,16 @@ def discover_populations(
 
     discovery_dir = out_dir / "_population_discovery"
 
+    excluded_pairs: Set[tuple[str, str]] = set()
+    if placeholder_exclusions_path and placeholder_exclusions_path.exists():
+        for row in read_csv_rows(placeholder_exclusions_path):
+            dom = (row.get("domain", "") or "").strip()
+            fid = (row.get("file_id", "") or "").strip()
+            excluded = (row.get("excluded", "") or "").strip().lower()
+            if dom and fid and excluded == "true":
+                excluded_pairs.add((dom, fid))
+
+
     for dom in domains:
         pattern_meta: Dict[str, Dict[str, str]] = {}
         cad_patterns: Set[str] = set()
@@ -161,6 +172,7 @@ def discover_populations(
                 cad_patterns.add(pid)
 
         file_patterns_by_scope: Dict[str, Dict[str, Set[str]]] = {}
+        excluded_for_domain: Set[str] = set()
         for row in pattern_presence_rows:
             if row.get("analysis_run_id", "") != run_id or row.get("domain", "") != dom:
                 continue
@@ -168,11 +180,17 @@ def discover_populations(
             pid = (row.get("pattern_id", "") or "").strip()
             if not fid or not pid or pid in cad_patterns:
                 continue
+            if (dom, fid) in excluded_pairs:
+                excluded_for_domain.add(fid)
+                continue
             meta = pattern_meta.get(pid)
             if meta is None:
                 continue
             scope_key = derive_scope_key(dom, meta)
             file_patterns_by_scope.setdefault(scope_key, {}).setdefault(fid, set()).add(pid)
+
+        if excluded_for_domain:
+            print(f"[step0] domain={dom} excluded {len(excluded_for_domain)} placeholder files via purgeable_pct threshold")
 
         domain_populations = 0
         domain_outliers = 0
@@ -446,6 +464,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--max-population-overlap", type=float, default=0.20)
     parser.add_argument("--min-population-jaccard", type=float, default=0.30)
     parser.add_argument("--discovery-support-pct", type=float, default=0.50)
+    parser.add_argument("--placeholder-exclusions", type=Path, default=None)
     return parser.parse_args(argv)
 
 
@@ -460,6 +479,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         max_population_overlap=args.max_population_overlap,
         min_population_jaccard=args.min_population_jaccard,
         discovery_support_pct=args.discovery_support_pct,
+        placeholder_exclusions_path=args.placeholder_exclusions,
     )
     return 0
 
