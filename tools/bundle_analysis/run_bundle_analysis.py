@@ -366,7 +366,11 @@ def run_bundle_analysis(
             "files_with_no_bundle_match": total_files_no_bundle,
         }
 
-    records_csv_candidates = [analysis_dir / "phase0_records.csv", analysis_dir / "records.csv"]
+    records_csv_candidates = [
+        analysis_dir / "phase0_v21" / "phase0_records.csv",
+        analysis_dir / "phase0_records.csv",
+        analysis_dir / "records.csv",
+    ]
     records_csv_path = next((p for p in records_csv_candidates if p.exists()), None)
     placeholder_exclusions_path: Optional[Path] = None
     if records_csv_path is not None:
