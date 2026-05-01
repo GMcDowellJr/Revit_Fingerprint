@@ -175,7 +175,7 @@
       ],
       "Replication": "Disabled",
       "Description": "Allows you to select a directory on the system and returns its path",
-      "HintPath": "C:\\Users\\gmcdowell\\Stantec\\Revit_Fingerprint - General\\test",
+      "HintPath": "C:\\Users\\gmcdowell\\Stantec\\Revit_Fingerprint - General\\Exports",
       "InputValue": "C:\\Users\\gmcdowell\\Stantec\\Revit_Fingerprint - General\\Exports"
     },
     {
@@ -619,8 +619,8 @@
       }
     ],
     "Annotations": [],
-    "X": 257.63223640404425,
-    "Y": 296.7139271727039,
-    "Zoom": 0.5505744992671647
+    "X": 302.4307294531541,
+    "Y": 294.6991094983039,
+    "Zoom": 0.4376830938115397
   }
 }
