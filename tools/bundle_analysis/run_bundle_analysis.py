@@ -368,12 +368,18 @@ def run_bundle_analysis(
 
     records_csv_candidates = [
         analysis_dir / "phase0_v21" / "phase0_records.csv",
+        analysis_dir.parent / "phase0_v21" / "phase0_records.csv",
         analysis_dir / "phase0_records.csv",
+        analysis_dir.parent / "phase0_records.csv",
         analysis_dir / "records.csv",
+        analysis_dir.parent / "records.csv",
     ]
     records_csv_path = next((p for p in records_csv_candidates if p.exists()), None)
     placeholder_exclusions_path: Optional[Path] = None
-    if records_csv_path is not None:
+    if records_csv_path is None:
+        searched = ", ".join(str(p) for p in records_csv_candidates)
+        print(f"[run_bundle_analysis] WARNING: records CSV not found for placeholder exclusion; searched: {searched}")
+    else:
         with records_csv_path.open("r", encoding="utf-8-sig", newline="") as f:
             reader = csv.DictReader(f)
             has_purgeable = "is_purgeable" in (reader.fieldnames or [])
