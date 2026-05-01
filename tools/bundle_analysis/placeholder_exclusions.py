@@ -50,7 +50,9 @@ def compute_placeholder_exclusions(records_csv_path: Path, out_csv_path: Path) -
         dom = (row.get("domain", "") or "").strip()
         if dom not in TARGET_DOMAINS:
             continue
-        fid = (row.get("file_id", "") or "").strip()
+        # Use canonical export_run_id when available. Keep `file_id` as fallback
+        # for backward compatibility with legacy flat-record exports.
+        fid = (row.get("export_run_id", "") or "").strip() or (row.get("file_id", "") or "").strip()
         if not fid:
             continue
         key = (dom, fid)
