@@ -666,7 +666,7 @@ def extract_wall_types(doc, ctx=None):
         }
         for r in records
     ]
-    if (not info["debug_v2_blocked"]) and info["signature_hashes_v2"]:
+    if info["signature_hashes_v2"]:
         info["hash_v2"] = make_hash(info["signature_hashes_v2"])
     else:
         info["hash_v2"] = None
@@ -933,7 +933,7 @@ def extract_floor_types(doc, ctx=None):
         }
         for r in records
     ]
-    if (not info["debug_v2_blocked"]) and info["signature_hashes_v2"]:
+    if info["signature_hashes_v2"]:
         info["hash_v2"] = make_hash(info["signature_hashes_v2"])
     else:
         info["hash_v2"] = None
@@ -1094,7 +1094,7 @@ def extract_roof_types(doc, ctx=None):
         }
         for r in records
     ]
-    if (not info["debug_v2_blocked"]) and info["signature_hashes_v2"]:
+    if info["signature_hashes_v2"]:
         info["hash_v2"] = make_hash(info["signature_hashes_v2"])
     else:
         info["hash_v2"] = None
@@ -1255,7 +1255,7 @@ def extract_ceiling_types(doc, ctx=None):
         }
         for r in records
     ]
-    if (not info["debug_v2_blocked"]) and info["signature_hashes_v2"]:
+    if info["signature_hashes_v2"]:
         info["hash_v2"] = make_hash(info["signature_hashes_v2"])
     else:
         info["hash_v2"] = None
