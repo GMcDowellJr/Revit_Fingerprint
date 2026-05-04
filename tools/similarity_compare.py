@@ -1679,6 +1679,21 @@ File format notes:
     domain_similarity_rows: List[DomainSimilarityRow] = []
     domain_similarity_keys: set = set()
     details: List[SimilarityDetail] = []
+    baseline_export_run_id: Optional[str] = None
+    baseline_allowed_for_role_filter = True
+
+    if args.baseline and allowed_export_run_ids is not None:
+        try:
+            base_raw = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+            baseline_export_run_id = _get_export_run_id_from_fingerprint(base_raw)
+            if baseline_export_run_id and baseline_export_run_id not in allowed_export_run_ids:
+                baseline_allowed_for_role_filter = False
+                print(
+                    f"[warn] baseline_export_run_id_not_in_allowed_set baseline={args.baseline} "
+                    f"export_run_id={baseline_export_run_id}"
+                )
+        except Exception as e:
+            print(f"[warn] could_not_read_baseline_export_run_id baseline={args.baseline} reason={e}")
 
     def _extend_unique_domain_rows(rows: List[DomainSimilarityRow]) -> None:
         for row in rows:
@@ -1693,14 +1708,6 @@ File format notes:
         if not args.baseline:
             raise SystemExit("--baseline is required for mode=baseline or both")
         base_fp = load_fingerprint(args.baseline)
-        if allowed_export_run_ids is not None:
-            try:
-                base_raw = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
-                baseline_eid = _get_export_run_id_from_fingerprint(base_raw)
-                if baseline_eid and baseline_eid not in allowed_export_run_ids:
-                    print(f"[warn] baseline_export_run_id_not_in_allowed_set baseline={args.baseline} export_run_id={baseline_eid}")
-            except Exception as e:
-                print(f"[warn] could_not_read_baseline_export_run_id baseline={args.baseline} reason={e}")
 
         for fpath in json_files:
             if os.path.abspath(fpath) == os.path.abspath(args.baseline):
@@ -1715,7 +1722,12 @@ File format notes:
         files_for_pairwise = list(json_files)
 
         if args.include_baseline_in_pairwise and args.baseline:
-            if args.baseline not in files_for_pairwise:
+            if not baseline_allowed_for_role_filter:
+                print(
+                    f"[warn] skipping_baseline_in_pairwise_due_to_role_filter baseline={args.baseline} "
+                    f"export_run_id={baseline_export_run_id or 'unknown'}"
+                )
+            elif args.baseline not in files_for_pairwise:
                 files_for_pairwise.append(args.baseline)
                 fps[args.baseline] = load_fingerprint(args.baseline)
             files_for_pairwise.sort()
