@@ -128,6 +128,7 @@ def discover_populations(
     min_population_jaccard: float = 0.30,
     discovery_support_pct: float = 0.50,
     placeholder_exclusions_path: Optional[Path] = None,
+    allowed_export_run_ids: Optional[Set[str]] = None,
 ) -> Dict[str, int]:
     if discovery_support_pct < 0.05:
         raise ValueError(
@@ -179,6 +180,8 @@ def discover_populations(
             fid = (row.get("export_run_id", "") or "").strip()
             pid = (row.get("pattern_id", "") or "").strip()
             if not fid or not pid or pid in cad_patterns:
+                continue
+            if allowed_export_run_ids is not None and fid not in allowed_export_run_ids:
                 continue
             if (dom, fid) in excluded_pairs:
                 excluded_for_domain.add(fid)

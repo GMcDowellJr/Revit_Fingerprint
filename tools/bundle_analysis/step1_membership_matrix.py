@@ -53,6 +53,7 @@ def build_membership_matrix(
     population_id: Optional[str] = None,
     population_registry_dir: Optional[Path] = None,
     scope_key_filter: Optional[str] = None,
+    allowed_export_run_ids: Optional[Set[str]] = None,
 ) -> Dict[str, int]:
     pattern_presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     domain_pattern_rows = read_csv_rows(analysis_dir / "domain_patterns.csv")
@@ -100,6 +101,8 @@ def build_membership_matrix(
         if not export_run_id or not pattern_id:
             continue
         if population_file_ids is not None and export_run_id not in population_file_ids:
+            continue
+        if allowed_export_run_ids is not None and export_run_id and export_run_id not in allowed_export_run_ids:
             continue
         if pattern_id in cad_patterns:
             continue
@@ -162,6 +165,9 @@ def build_membership_matrix(
     print(
         f"[step1] domain={domain} files_in_scope={total_files} patterns_in_scope={total_patterns} scopes_count={len(scope_rows)}"
     )
+    print(
+        f"[step1] domain={domain} role_filter_applied={allowed_export_run_ids is not None} files_after_role_filter={total_files}"
+    )
     return {
         "analysis_run_id": run_id,
         "membership_rows": len(membership_rows),
@@ -189,6 +195,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         args.analysis_run_id,
         args.population_id,
         args.population_registry_dir,
+        None,
     )
     return 0
 
