@@ -1,12 +1,27 @@
-# CLAUDE.md - AI Assistant Guide
+# CLAUDE.md
 
-This document provides essential context for AI assistants working with the Revit Fingerprint codebase.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
 **Revit Fingerprint** extracts deterministic, behavior-based fingerprints from Revit models. It identifies **what a model does**, not how it is named or presented in the UI. The system enables standards governance, drift detection, and cross-project comparison.
 
 **Primary runtime**: Dynamo CPython3 (via `runner/run_dynamo.py`)
+
+## Commands
+
+```bash
+# Run all unit tests
+pytest tests/ -v
+
+# Run a single test file
+pytest tests/test_hashing_incremental.py
+
+# Validate exported JSON against the record.v2 contract
+FINGERPRINT_JSON_PATH=/path/to/export.json pytest tests/test_record_contract_v2.py
+```
+
+No `requirements.txt` or `pyproject.toml` exists. The only external dependency for development is `pytest` (`pip install pytest`). CI runs Python 3.9–3.12 via `.github/workflows/ci.yml`.
 
 ## Architecture
 
@@ -46,29 +61,28 @@ core/                   Pure Python utilities (no Revit API calls)
   timing_collector.py   Extraction profiling instrumentation
   vg_sig.py             VG signature helpers for view_templates
 
-domains/                One extract(doc, ctx) function per domain (16 active)
+domains/                One extract(doc, ctx) function per domain (active)
   identity.py           Project metadata (NO HASH - metadata only)
   units.py              Length/area/volume format options
-  object_styles.py      Object style definitions — internal routing by CategoryType:
-                          model, annotation, analytical, imported partitions
+  object_styles.py      Object style definitions (model/annotation/analytical/imported partitions)
   line_patterns.py      Line pattern definitions
   line_styles.py        Line style definitions
-  fill_patterns.py      Fill pattern definitions — internal routing by FillPatternTarget:
-                          drafting and model partitions
+  fill_patterns.py      Fill pattern definitions (drafting/model partitions)
   text_types.py         Text type definitions
-  arrowheads.py         Arrowhead (tick mark) definitions with shape-gating
-  dimension_types.py    Dimension type definitions — internal routing by DimensionShape:
-                          linear, angular, radial, diameter, spot_elevation,
-                          spot_coordinate, spot_slope partitions
-  phases.py             Phase inventory & sequence (names IN hash per D-010)
+  arrowheads.py         Arrowhead definitions with shape-gating
+  dimension_types.py    Dimension type definitions (7 partitions: linear/angular/radial/diameter/
+                          spot_elevation/spot_coordinate/spot_slope)
+  phases.py             Phase inventory & sequence
   phase_filters.py      Phase filter definitions
-  phase_graphics.py     Phase graphic overrides (DISABLED - API limitation per D-013)
+  phase_graphics.py     Phase graphic overrides (DISABLED - API limitation, D-013)
   view_filter_definitions.py        Detailed filter rule extraction
   view_filter_applications_view_templates.py  Filter application stacks
-  view_templates.py     Template definitions — internal routing by ViewType family:
-                          floor_structural_area_plans, ceiling_plans,
-                          elevations_sections_detail, renderings_drafting, schedules
-  view_category_overrides.py  Category override deltas vs object_styles
+  view_templates.py     Template definitions (5 partitions by ViewType family)
+  view_category_overrides.py        VCO coordinator
+  view_category_overrides_model.py      Model category override partition
+  view_category_overrides_annotation.py Annotation category override partition
+  materials.py          Materials domain (identity + graphics state; v1)
+  compound_types.py     Compound type family (wall_types active; floor/roof/ceiling stubs)
 
 runner/                 Host-specific entry points
   run_dynamo.py         Primary Dynamo CPython3 runner (M5 implementation)
@@ -102,12 +116,9 @@ tools/                  Analysis & comparison utilities
     run_*.py                         (8 analysis runners for specific domains)
 
   governance/                        Governance reporting
-    standards_governance_report.py   Standards governance report generator
+    standards_governance_report.py
 
   probes/                            API probes (15 domain-specific probes)
-    probe_arrowheads.py              Arrowhead API verification
-    probe_dimension_types.py         Dimension type exploration
-    probe_phase_graphics.py          Phase graphics API confirmation
 
 tests/                  pytest test suite (38+ test files + fixtures)
   test_sentinel_policy.py            Enforce only 3 allowed sentinels
@@ -161,12 +172,13 @@ legacy/                 MVP implementation (preserved reference)
 - Hash inputs represent **behavior**, not presentation or naming
 - Names are **metadata only** - never included in behavior hashes unless explicitly stated
 - **Exception (D-010)**: Phase names ARE included in behavioral hashes for cross-project comparability
+- Hashing is semantic-only (`hash_v2`); legacy pipe-delimited mode has been removed (D-014)
 
 ### Sentinel Policy (PR3)
 Only THREE angle-bracket sentinels are allowed:
-- `<MISSING>` - value None/empty/unset
-- `<UNREADABLE>` - value unreadable/exception
-- `<NOT_APPLICABLE>` - value not applicable to element type
+- `<MISSING>` — value None/empty/unset
+- `<UNREADABLE>` — value unreadable/exception
+- `<NOT_APPLICABLE>` — value not applicable to element type
 
 ### Fail-Soft Policy
 - NEVER silently collapse distinct states
@@ -181,10 +193,10 @@ Every record MUST have:
 - `identity_basis` with `items: [{k, q, v}]` format
 - `identity_quality`, `label`
 
-Identity values (`v`) MUST NOT contain sentinel literals - use `v: null` + `q: "missing"` instead.
+Identity values (`v`) MUST NOT contain sentinel literals — use `v: null` + `q: "missing"` instead.
 
 **Identity Quality Dominance** (in order):
-- `none_blocked` > `incomplete_unreadable` > `incomplete_unsupported` > `incomplete_missing` > `complete`
+`none_blocked` > `incomplete_unreadable` > `incomplete_unsupported` > `incomplete_missing` > `complete`
 
 ### UniqueId Usage
 Use `UniqueId` ONLY for element-backed entities where identity persistence matters (filters, phases, templates, views). Styles, patterns, and definitions use name-based or composite keys.
@@ -196,8 +208,7 @@ Use `UniqueId` ONLY for element-backed entities where identity persistence matte
 
 ## Domain Family Architecture (D-015)
 
-Consolidated extractors route records internally by record class (Revit system family boundary).
-Each partition emits its own `sig_hash` and `domain` label within a shared extractor file.
+Consolidated extractors route records internally by record class (Revit system family boundary). Each partition emits its own `sig_hash` and `domain` label within a shared extractor file.
 
 **Domain family mappings**:
 
@@ -205,12 +216,11 @@ Each partition emits its own `sig_hash` and `domain` label within a shared extra
 |-------------|------------------------------------------------|
 | `object_styles.py` | `object_styles_model`, `object_styles_annotation`, `object_styles_analytical`, `object_styles_imported` |
 | `fill_patterns.py` | `fill_patterns_drafting`, `fill_patterns_model` |
-| `dimension_types.py` | `dimension_types_linear`, `dimension_types_angular`, `dimension_types_radial`, `dimension_types_diameter`, `dimension_types_spot_elevation`, `dimension_types_spot_coordinate`, `dimension_types_spot_slope` |
-| `view_templates.py` | `view_templates_floor_structural_area_plans`, `view_templates_ceiling_plans`, `view_templates_elevations_sections_detail`, `view_templates_renderings_drafting`, `view_templates_schedules` |
+| `dimension_types.py` | `dimension_types_linear`, `_angular`, `_radial`, `_diameter`, `_spot_elevation`, `_spot_coordinate`, `_spot_slope` |
+| `view_templates.py` | `view_templates_floor_structural_area_plans`, `_ceiling_plans`, `_elevations_sections_detail`, `_renderings_drafting`, `_schedules` |
+| `view_category_overrides*.py` | Routed via `view_category_overrides.py`; model and annotation in separate files |
 
-**Shared helpers**:
-- `core/dimension_type_helpers.py` - Shape constants, detection, reading for dimension types
-- `core/vg_sig.py` - VG signature helpers for view template partitions
+For consolidated extractors, `extract()` returns a list of per-partition result dicts, each with its own `domain` key.
 
 **Key vocabulary**:
 - **Domain family**: Named grouping (e.g., `object_styles`). Policy and BI concept; no code hierarchy.
@@ -234,33 +244,21 @@ Records partition their items into four buckets:
 
 ## Shape-Gating System
 
-Shape-gating enables conditional join-key composition based on discriminator values. Used for domains where different entity shapes require different identity properties.
+Shape-gating enables conditional join-key composition based on discriminator values. Supported domains: `arrowheads` (by ArrowheadStyle) and `dimension_types_*` partitions. Policy lives in `policies/domain_join_key_policies.json`. See `docs/join_key_shape_gating.md` for schema details.
 
-**Supported domains** (via `policies/domain_join_key_policies.json`):
-- `arrowheads`: Shape discriminator by ArrowheadStyle (Arrow/Tick/Dot/Slash)
-- `dimension_types_*`: Shape discrimination now done at domain-level (per-partition files handle one shape each)
+## Context Dictionary Schema
 
-**Actual policy structure**:
+The runner populates `ctx` for domain cross-references:
 
-    {
-      "domain_name": {
-        "join_key_schema": "domain.join_key.v1",
-        "hash_alg": "md5_utf8_join_pipe",
-        "required_items": ["key1", "key2"],
-        "optional_items": ["opt_key"],
-        "explicitly_excluded_items": ["uid", "name"],
-        "shape_gating": {
-          "discriminator_key": "shape_key",
-          "shape_requirements": {
-            "ShapeValue": {
-              "additional_required": ["shape_specific_key"],
-              "additional_optional": []
-            }
-          },
-          "default_shape_behavior": "common_only"
-        }
-      }
-    }
+**Runner-provided**: `_collect`, `_doc_view`, `debug_vg_details`
+
+**Domain-populated** (for downstream domain use):
+- `phase_uid_to_hash` — phases → view_templates
+- `phase_filter_uid_to_hash` — phase_filters → view_templates
+- `view_filter_uid_to_hash` / `view_filter_uid_to_sig_hash_v2` — view_filter_definitions → view_templates
+- `line_pattern_uid_to_hash` — line_patterns → object_styles, line_styles
+- `object_style_model_row_key_to_sig_hash` — object_styles_model → view_category_overrides
+- `object_style_annotation_row_key_to_sig_hash` — object_styles_annotation → view_category_overrides
 
 ## Development Workflow
 
@@ -276,13 +274,6 @@ Every commit message MUST state "no semantic change" OR describe the semantic ch
 
 ### CHANGELOG Discipline
 Log ONLY semantic changes (signature composition, ordering rules, identity rules, fail-soft behavior). Do NOT log pure refactors.
-
-### Hash Mode
-The system uses semantic hashing (record.v2 identity-basis) exclusively (D-014 completed 2026-02-10).
-Legacy pipe-delimited signature mode has been removed. All domains emit only `hash_v2` as the
-canonical domain hash.
-
-**Migration note:** Legacy exports contained a `hash` field; current exports contain only `hash_v2`.
 
 ### Domain Development Pattern
 
@@ -300,7 +291,6 @@ except ImportError:
 
 def extract(doc, ctx=None):
     """Extract domain data from Revit document."""
-    # ... implementation
     return {
         "hash": "<32-hex MD5 or None>",
         "count": int,
@@ -310,78 +300,7 @@ def extract(doc, ctx=None):
     }
 ```
 
-For consolidated extractors that emit multiple partitions, `extract()` returns a list of
-per-partition result dicts, each with its own `domain` key identifying the partition.
-
-## Testing
-
-### Run Tests
-```bash
-pytest tests/                              # All unit tests
-pytest tests/test_hashing_incremental.py   # Specific test
-```
-
-### Key Test Files
-| Test | Purpose |
-|------|---------|
-| `test_sentinel_policy.py` | Enforce only 3 allowed sentinels |
-| `test_hashing_incremental.py` | Hash determinism |
-| `test_contracts_run_status.py` | Status rollup (failed > degraded > ok) |
-| `test_record_contract_v2.py` | record.v2 schema validation |
-| `test_no_direct_filtered_element_collector_in_domains.py` | Architecture enforcement |
-| `test_deps_require_domain.py` | Dependency blocking |
-| `test_arrowheads_shape_gating.py` | Arrowhead shape-specific properties |
-| `test_dimension_types_shape_gating.py` | Dimension shape-specific properties |
-| `test_join_key_policy_validation.py` | Join-key policy rule enforcement |
-| `test_join_key_builder_shape_gating_dedupe.py` | Deduplication across shape requirements |
-| `test_record_id_determinism.py` | record_id generation stability |
-| `test_*_canonical_selectors.py` | Domain-specific canonical selector validation (14 domains) |
-
-### Validate Exported JSON
-```bash
-FINGERPRINT_JSON_PATH=/path/to/export.json pytest tests/test_record_contract_v2.py
-```
-
-## Context Dictionary Schema
-
-The runner populates context (`ctx`) for domain cross-references:
-
-**Runner-provided**:
-- `_collect` - FilteredElementCollector wrapper (from `core/collect.py`)
-- `_doc_view` - Document/view context (from `core/context.py`)
-- `debug_vg_details` - Verbose VG debugging
-
-**Domain-populated** (for downstream domain use):
-- `phase_uid_to_hash` - phases → view_templates
-- `phase_filter_uid_to_hash` - phase_filters → view_templates
-- `view_filter_uid_to_hash` - view_filter_definitions → view_templates
-- `view_filter_uid_to_sig_hash_v2` - view_filter_definitions → view_templates
-- `line_pattern_uid_to_hash` - line_patterns → object_styles, line_styles
-- `object_style_model_row_key_to_sig_hash` - object_styles_model → view_category_overrides
-- `object_style_annotation_row_key_to_sig_hash` - object_styles_annotation → view_category_overrides
-
-## Key Decisions Reference
-
-| Decision | Summary |
-|----------|---------|
-| D-001 | Behavior-first fingerprinting (not UI presentation) |
-| D-002 | Deterministic, auditable hashes with explicit preimages |
-| D-003 | `record_rows` is canonical explainability |
-| D-004 | `UniqueId` restricted to element-backed identities |
-| D-005 | Fail-soft is mandatory |
-| D-006 | Ordering rules explicit per domain |
-| D-007 | Global vs contextual domain split |
-| D-008 | View templates are behavioral, not nominal |
-| D-009 | Views compose templates + deltas |
-| D-010 | **REVISED**: Phase names ARE included in behavioral hashes (cross-project comparability) |
-| D-011 | Domain-driven architecture |
-| D-012 | Markdown portability rule (no nested fenced blocks) |
-| D-013 | `phase_graphics` disabled (API limitation) |
-| D-014 | **COMPLETED (2026-02-10)**: Semantic (record.v2) hashing is now the only mode; legacy removed |
-| D-015 | Domain family architecture — Revit system family boundary is partition criterion; consolidated extractors with internal routing |
-| D-016 | VCO scope — categories 1 (template-controlled) and 2 (latent) implemented; category 3 (view-local) deferred |
-
-See `DECISIONS.md` for full rationale.
+For consolidated extractors that emit multiple partitions, `extract()` returns a list of per-partition result dicts, each with its own `domain` key.
 
 ## Common Tasks
 
@@ -430,6 +349,29 @@ When working on this codebase, start with:
 3. `ARCHITECTURE.md` - Layered design
 4. `contracts/record_contract_v2.md` - Record schema
 5. `docs/join_key_shape_gating.md` - Shape-gating system
+
+## Key Decisions Reference
+
+| Decision | Summary |
+|----------|---------|
+| D-001 | Behavior-first fingerprinting (not UI presentation) |
+| D-002 | Deterministic, auditable hashes with explicit preimages |
+| D-003 | `record_rows` is canonical explainability |
+| D-004 | `UniqueId` restricted to element-backed identities |
+| D-005 | Fail-soft is mandatory |
+| D-006 | Ordering rules explicit per domain |
+| D-007 | Global vs contextual domain split |
+| D-008 | View templates are behavioral, not nominal |
+| D-009 | Views compose templates + deltas |
+| D-010 | **REVISED**: Phase names ARE included in behavioral hashes (cross-project comparability) |
+| D-011 | Domain-driven architecture |
+| D-012 | Markdown portability rule (no nested fenced blocks) |
+| D-013 | `phase_graphics` disabled (API limitation) |
+| D-014 | **COMPLETED (2026-02-10)**: Semantic (record.v2) hashing is now the only mode; legacy removed |
+| D-015 | Domain family architecture — Revit system family boundary is partition criterion; consolidated extractors with internal routing |
+| D-016 | VCO scope — categories 1 (template-controlled) and 2 (latent) implemented; category 3 (view-local) deferred |
+
+See `DECISIONS.md` for full rationale.
 
 ## Warnings
 
