@@ -147,32 +147,40 @@ TEXT_TYPE_SEMANTIC_KEYS = sorted([
 
 
 
-def _read_instance_and_sole_flags(doc, ctx, type_obj, total_type_count):
+def _build_textnote_instance_count_map(doc, ctx):
+    inst_count_map = {}
+    q = "ok"
+    try:
+        for inst in collect_instances(
+            doc,
+            of_class=TextNote,
+            cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+        ):
+            try:
+                tid = getattr(getattr(inst, "GetTypeId", lambda: None)(), "IntegerValue", None)
+                if tid is not None:
+                    inst_count_map[int(tid)] = inst_count_map.get(int(tid), 0) + 1
+            except Exception:
+                continue
+    except Exception:
+        inst_count_map = {}
+        q = "unreadable"
+    return inst_count_map, q
+
+
+def _read_instance_and_sole_flags(type_obj, total_type_count, inst_count_map, inst_count_map_q):
     try:
         type_id_int = getattr(getattr(type_obj, "Id", None), "IntegerValue", None)
     except Exception:
         type_id_int = None
 
-    try:
-        cache_key = "_instance_count_cache:{}".format(type_id_int)
-        if ctx is not None and cache_key in ctx:
-            inst_ids = ctx.get(cache_key) or set()
-        else:
-            inst_ids = set()
-            if type_obj is not None:
-                for inst in collect_instances(doc, of_class=TextNote, cctx=(ctx or {}).get("_collect") if ctx is not None else None):
-                    try:
-                        tid = getattr(getattr(inst, "GetTypeId", lambda: None)(), "IntegerValue", None)
-                        if tid == type_id_int:
-                            iid = getattr(getattr(inst, "Id", None), "IntegerValue", None)
-                            if iid is not None:
-                                inst_ids.add(iid)
-                    except Exception:
-                        continue
-            if ctx is not None:
-                ctx[cache_key] = inst_ids
-        instance_count, instance_count_q = len(inst_ids), "ok"
-    except Exception:
+    if inst_count_map_q == "ok" and type_id_int is not None:
+        try:
+            instance_count = inst_count_map.get(int(type_id_int), 0)
+            instance_count_q = "ok"
+        except Exception:
+            instance_count, instance_count_q = None, "unreadable"
+    else:
         instance_count, instance_count_q = None, "unreadable"
 
     try:
@@ -218,6 +226,7 @@ def extract(doc, ctx=None):
         types = []
 
     info["raw_count"] = len(types)
+    _instance_count_map, _instance_count_map_q = _build_textnote_instance_count_map(doc, ctx)
 
     names = []
     missing = 0
@@ -519,7 +528,9 @@ def extract(doc, ctx=None):
         _ip, _ip_q = purge_lookup(getattr(getattr(t, "Id", None), "IntegerValue", None), ctx)
         rec_v2["is_purgeable"] = _ip
         rec_v2["is_purgeable_q"] = _ip_q
-        _ic, _icq, _sole, _soleq = _read_instance_and_sole_flags(doc, ctx, t, _text_type_count)
+        _ic, _icq, _sole, _soleq = _read_instance_and_sole_flags(
+            t, _text_type_count, _instance_count_map, _instance_count_map_q
+        )
         rec_v2["instance_count"] = _ic
         rec_v2["instance_count_q"] = _icq
         rec_v2["is_sole_type_in_category"] = _sole
