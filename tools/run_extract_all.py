@@ -438,7 +438,7 @@ def _enforce_policy_gate(rows: List[Dict[str, str]], diagnostics_dir: Path, doma
 
 
 def main() -> None:
-    stage_names = ["flatten", "discover", "apply", "split", "analyze1", "analyze2", "flat_tables"]
+    stage_names = ["flatten", "discover", "apply", "placeholders", "split", "analyze1", "analyze2", "flat_tables"]
     ap = argparse.ArgumentParser(
         description=(
             "Pipeline orchestrator with explicit stages: flatten (T0), discover (T1), apply (T2), split, analyze1, analyze2. "
@@ -448,7 +448,8 @@ def main() -> None:
             "Examples:\n"
             "  default (draft prep): --stages flatten,discover\n"
             "  operational commit:  --stages flatten,discover,apply\n"
-            "  analysis after apply: --stages flatten,discover,apply,split,analyze1,analyze2\n"
+            "  placeholder prep:    --stages flatten,discover,apply,placeholders\n"
+            "  analysis after apply: --stages flatten,discover,apply,placeholders,split,analyze1,analyze2\n"
             "  degraded exploratory analysis (not governance-grade): add --allow-sig-hash-join-key\n"
             "  matrix reference: docs/extract_stage_matrix.md"
         ),
@@ -633,6 +634,15 @@ def main() -> None:
         cmd_apply = [sys.executable, "tools/v21_apply_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--join-policy", str(policy_path)]
         report["commands"].append({"stage": "apply", "cmd": cmd_apply})
         _run(cmd_apply, env=env)
+
+    if "placeholders" in selected_stages:
+        print("[extract_all] Stage placeholders (T2b): generating placeholder exclusion CSVs...", flush=True)
+        cmd_ph = [sys.executable, "tools/bundle_analysis/placeholder_exclusions.py", "--phase0-dir", str(v21_phase0_dir), "--policies-dir", "policies", "--out-dir", str(v21_root / "placeholder_exclusions")]
+        report["commands"].append({"stage": "placeholders", "cmd": cmd_ph})
+        try:
+            _run(cmd_ph, env=env)
+        except Exception as e:
+            sys.stderr.write("[WARN extract_all] placeholders stage failed; continuing: {}\n".format(e))
 
     if any(s in selected_stages for s in ("split", "analyze1", "analyze2")) and require_join_policy:
         phase0_records_csv = v21_phase0_dir / "phase0_records.csv"

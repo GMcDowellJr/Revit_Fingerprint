@@ -22,7 +22,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types, purge_lookup
+from core.collect import collect_types, collect_instances, purge_lookup
 from core.canon import (
     canon_str,
     canon_num,
@@ -144,6 +144,41 @@ TEXT_TYPE_SEMANTIC_KEYS = sorted([
     "text_type.underline",
 ])
 
+
+
+def _read_instance_and_sole_flags(doc, ctx, type_obj, total_type_count):
+    try:
+        type_id_int = getattr(getattr(type_obj, "Id", None), "IntegerValue", None)
+    except Exception:
+        type_id_int = None
+
+    try:
+        cache_key = "_instance_count_cache:{}".format(type_id_int)
+        if ctx is not None and cache_key in ctx:
+            inst_ids = ctx.get(cache_key) or set()
+        else:
+            inst_ids = set()
+            if type_obj is not None:
+                for inst in collect_instances(doc, of_class=type(type_obj), cctx=(ctx or {}).get("_collect") if ctx is not None else None):
+                    try:
+                        tid = getattr(getattr(inst, "GetTypeId", lambda: None)(), "IntegerValue", None)
+                        if tid == type_id_int:
+                            iid = getattr(getattr(inst, "Id", None), "IntegerValue", None)
+                            if iid is not None:
+                                inst_ids.add(iid)
+                    except Exception:
+                        continue
+            if ctx is not None:
+                ctx[cache_key] = inst_ids
+        instance_count, instance_count_q = len(inst_ids), "ok"
+    except Exception:
+        instance_count, instance_count_q = None, "unreadable"
+
+    try:
+        is_sole, is_sole_q = (int(total_type_count) == 1), "ok"
+    except Exception:
+        is_sole, is_sole_q = None, "unreadable"
+    return instance_count, instance_count_q, is_sole, is_sole_q
 def extract(doc, ctx=None):
     """
     Extract Text Types fingerprint from document.
@@ -201,6 +236,8 @@ def extract(doc, ctx=None):
         if not v2_blocked:
             v2_blocked = True
         v2_reasons[reason_key] = True
+
+    _text_type_count = len(types)
 
     for t in types:
         type_name = get_type_display_name(t)
@@ -481,6 +518,11 @@ def extract(doc, ctx=None):
         _ip, _ip_q = purge_lookup(getattr(getattr(t, "Id", None), "IntegerValue", None), ctx)
         rec_v2["is_purgeable"] = _ip
         rec_v2["is_purgeable_q"] = _ip_q
+        _ic, _icq, _sole, _soleq = _read_instance_and_sole_flags(doc, ctx, t, _text_type_count)
+        rec_v2["instance_count"] = _ic
+        rec_v2["instance_count_q"] = _icq
+        rec_v2["is_sole_type_in_category"] = _sole
+        rec_v2["is_sole_type_in_category_q"] = _soleq
         rec_v2["join_key"], _missing = build_join_key_from_policy(
             domain_policy=pol,
             identity_items=identity_items_v2_sorted,
