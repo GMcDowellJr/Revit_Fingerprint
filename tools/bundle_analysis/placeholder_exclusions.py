@@ -70,13 +70,24 @@ def main():
         for fid,rs in sorted(per.items()):
             tc=len(rs); pc=sum(1 for x in rs if t(x.get('is_purgeable')))
             for r in rs:
-                nm=(r.get('type_name') or '').strip(); nml=nm.lower(); reasons=[]; mrn='';mrc=''
+                nm=(r.get('label_display') or '').strip(); nml=nm.lower(); reasons=[]; mrn='';mrc=''
                 is_builtin=nml in kb
                 if is_builtin: reasons.append('known_builtin'); mrn=nm; mrc='known_builtins'
                 if t(r.get('is_purgeable')): reasons.append('is_purgeable')
-                sole=t(r.get('is_sole_type_in_category') or r.get('is_sole_type'))
-                ic=(r.get('instance_count') or '').strip()
-                if sole and ic=='0': reasons.append('sole_type_zero_instances')
+                instance_count_raw = (r.get("instance_count", "") or "").strip()
+                try:
+                    instance_count = int(instance_count_raw) if instance_count_raw not in ("", "None", "none") else None
+                except (ValueError, TypeError):
+                    instance_count = None
+                is_sole_raw = ((r.get("is_sole_type_in_category") or r.get("is_sole_type") or "")).strip().lower()
+                if is_sole_raw == "true":
+                    is_sole_type = True
+                elif is_sole_raw == "false":
+                    is_sole_type = False
+                else:
+                    is_sole_type = None
+                if is_sole_type is True and instance_count == 0:
+                    reasons.append('sole_type_zero_instances')
                 if nml in kd:
                     reasons.append('known_default_name')
                     if not mrn: mrn=nm; mrc='known_defaults'
@@ -86,7 +97,7 @@ def main():
                 if thr is not None and file_pct.get(fid,0)>thr: reasons.append('above_purgeable_threshold')
                 sug=('false' if is_builtin else ('true' if any(x in reasons for x in ['is_purgeable','sole_type_zero_instances','known_default_name','placeholder_pattern']) else 'false'))
                 rec={"schema_version":pol.get('schema_version','1.0'),"domain":d,"file_id":fid,"type_name":nm,
-                "type_count":str(tc),"purgeable_count":str(pc),"instance_count":ic,"is_sole_type":str(r.get('is_sole_type_in_category') or r.get('is_sole_type') or ''),
+                "type_count":str(tc),"purgeable_count":str(pc),"instance_count":("" if instance_count is None else str(instance_count)),"is_sole_type":("" if is_sole_type is None else ("true" if is_sole_type else "false")),
                 "is_purgeable":str(r.get('is_purgeable') or ''),"matched_reference_name":mrn,"matched_reference_category":mrc,
                 "suggested_exclude":sug,"suggestion_reasons":"|".join(reasons),"excluded":"false","reviewed_by":"","override_reason":""}
                 out.append(rec); all_rows.append(rec)

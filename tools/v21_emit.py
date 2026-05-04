@@ -560,6 +560,8 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
                     "label_quality": _safe_str((rec.get("label") or {}).get("quality")),
                     "label_provenance": _safe_str((rec.get("label") or {}).get("provenance")),
                     "is_purgeable": _safe_str(rec.get("is_purgeable")),
+                    "instance_count": _safe_str(rec.get("instance_count")),
+                    "is_sole_type_in_category": _safe_str(rec.get("is_sole_type_in_category")),
                 }
                 record_rows.append(row)
 
@@ -639,6 +641,7 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
         "status", "identity_quality", "sig_hash", "join_hash", "join_key_schema",
         "join_key_status", "join_key_policy_id", "join_key_policy_version",
         "label_display", "label_quality", "label_provenance", "is_purgeable",
+        "instance_count", "is_sole_type_in_category",
     ], _sort_rows(record_rows, ["export_run_id", "domain", "record_pk"]))
 
     _write_csv(out_dir / "phase0_identity_items.csv", [

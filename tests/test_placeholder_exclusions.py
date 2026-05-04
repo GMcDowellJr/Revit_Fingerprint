@@ -9,9 +9,9 @@ def _wcsv(p,rows):
 def test_placeholder_exclusions_smoke(tmp_path):
     phase0=tmp_path/'phase0'; out=tmp_path/'out'; pol=tmp_path/'policies'
     rows=[
-      {'domain':'wall_types','file_id':'f1','type_name':'Wall 1','is_purgeable':'true','instance_count':'0','is_sole_type_in_category':'true'},
-      {'domain':'line_styles','file_id':'f1','type_name':'<Lines>','is_purgeable':'false','instance_count':'','is_sole_type_in_category':''},
-      {'domain':'text_types','file_id':'f2','type_name':'Text 1','is_purgeable':'false','instance_count':'0','is_sole_type_in_category':'true'},
+      {'domain':'wall_types','file_id':'f1','label_display':'Wall 1','is_purgeable':'true','instance_count':'0','is_sole_type_in_category':'true'},
+      {'domain':'line_styles','file_id':'f1','label_display':'<Lines>','is_purgeable':'false','instance_count':'','is_sole_type_in_category':''},
+      {'domain':'text_types','file_id':'f2','label_display':'Text 1','is_purgeable':'false','instance_count':'0','is_sole_type_in_category':'true'},
     ]
     _wcsv(phase0/'phase0_records.csv',rows)
     pol.mkdir(parents=True, exist_ok=True)
