@@ -16,7 +16,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types, purge_lookup
+from core.collect import collect_types, collect_instances, purge_lookup
 from core.rows import first_param, _as_string, _as_value_string, _as_double, _as_int, format_len_inches
 from core.canon import canon_str, S_MISSING, S_UNREADABLE
 from core.record_v2 import (
@@ -113,6 +113,40 @@ def _collect_dim_types(doc, ctx):
         ctx[_CTX_DIM_TYPES_CACHE_KEY] = types
     return types
 
+
+def _build_dimension_instance_count_map(doc, ctx):
+    out = {}
+    try:
+        instances = collect_instances(
+            doc,
+            of_category=getattr(BuiltInCategory, "OST_Dimensions", None),
+            cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+            where_key="dimension_types.instances",
+        )
+        for inst in instances:
+            try:
+                tid = int(getattr(getattr(inst, "GetTypeId", lambda: None)(), "IntegerValue", -1))
+                if tid > 0:
+                    out[tid] = out.get(tid, 0) + 1
+            except Exception:
+                continue
+        return out, "ok"
+    except Exception:
+        return {}, "unreadable"
+
+
+def _attach_placeholder_metadata(rec_v2, type_id_int, instance_count_map, instance_count_map_q):
+    if instance_count_map_q == "ok" and type_id_int is not None:
+        try:
+            rec_v2["instance_count"] = instance_count_map.get(int(type_id_int), 0)
+            rec_v2["instance_count_q"] = "ok"
+        except Exception:
+            rec_v2["instance_count"] = None
+            rec_v2["instance_count_q"] = "unreadable"
+    else:
+        rec_v2["instance_count"] = None
+        rec_v2["instance_count_q"] = "unreadable"
+
 def _apply_family_name_override(d, shape_v, shape_family, shape_q, type_name):
     """
     Heuristic override: if the FamilyName prefix indicates a Spot family,
@@ -173,6 +207,7 @@ def extract_linear(doc, ctx=None):
         all_types = []
 
     info["raw_count"] = len(all_types)
+    _instance_count_map, _instance_count_map_q = _build_dimension_instance_count_map(doc, ctx)
 
     v2_records = []
     v2_sig_hashes = []
@@ -328,6 +363,7 @@ def extract_linear(doc, ctx=None):
             _ip, _ip_q = purge_lookup(type_id_int, ctx)
             rec_v2["is_purgeable"] = _ip
             rec_v2["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec_v2, type_id_int, _instance_count_map, _instance_count_map_q)
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -447,6 +483,7 @@ def extract_angular(doc, ctx=None):
         all_types = []
 
     info["raw_count"] = len(all_types)
+    _instance_count_map, _instance_count_map_q = _build_dimension_instance_count_map(doc, ctx)
 
     v2_records = []
     v2_sig_hashes = []
@@ -593,6 +630,7 @@ def extract_angular(doc, ctx=None):
             _ip, _ip_q = purge_lookup(type_id_int, ctx)
             rec_v2["is_purgeable"] = _ip
             rec_v2["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec_v2, type_id_int, _instance_count_map, _instance_count_map_q)
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -710,6 +748,7 @@ def extract_radial(doc, ctx=None):
         all_types = []
 
     info["raw_count"] = len(all_types)
+    _instance_count_map, _instance_count_map_q = _build_dimension_instance_count_map(doc, ctx)
 
     v2_records = []
     v2_sig_hashes = []
@@ -878,6 +917,7 @@ def extract_radial(doc, ctx=None):
             _ip, _ip_q = purge_lookup(type_id_int, ctx)
             rec_v2["is_purgeable"] = _ip
             rec_v2["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec_v2, type_id_int, _instance_count_map, _instance_count_map_q)
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -995,6 +1035,7 @@ def extract_diameter(doc, ctx=None):
         all_types = []
 
     info["raw_count"] = len(all_types)
+    _instance_count_map, _instance_count_map_q = _build_dimension_instance_count_map(doc, ctx)
 
     v2_records = []
     v2_sig_hashes = []
@@ -1163,6 +1204,7 @@ def extract_diameter(doc, ctx=None):
             _ip, _ip_q = purge_lookup(type_id_int, ctx)
             rec_v2["is_purgeable"] = _ip
             rec_v2["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec_v2, type_id_int, _instance_count_map, _instance_count_map_q)
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -1325,6 +1367,7 @@ def extract_spot_elevation(doc, ctx=None):
         all_types = []
 
     info["raw_count"] = len(all_types)
+    _instance_count_map, _instance_count_map_q = _build_dimension_instance_count_map(doc, ctx)
 
     v2_records = []
     v2_sig_hashes = []
@@ -1523,6 +1566,7 @@ def extract_spot_elevation(doc, ctx=None):
             _ip, _ip_q = purge_lookup(type_id_int, ctx)
             rec_v2["is_purgeable"] = _ip
             rec_v2["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec_v2, type_id_int, _instance_count_map, _instance_count_map_q)
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -1689,6 +1733,7 @@ def extract_spot_coordinate(doc, ctx=None):
         all_types = []
 
     info["raw_count"] = len(all_types)
+    _instance_count_map, _instance_count_map_q = _build_dimension_instance_count_map(doc, ctx)
 
     v2_records = []
     v2_sig_hashes = []
@@ -1901,6 +1946,7 @@ def extract_spot_coordinate(doc, ctx=None):
             _ip, _ip_q = purge_lookup(type_id_int, ctx)
             rec_v2["is_purgeable"] = _ip
             rec_v2["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec_v2, type_id_int, _instance_count_map, _instance_count_map_q)
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
@@ -2017,6 +2063,7 @@ def extract_spot_slope(doc, ctx=None):
         all_types = []
 
     info["raw_count"] = len(all_types)
+    _instance_count_map, _instance_count_map_q = _build_dimension_instance_count_map(doc, ctx)
 
     v2_records = []
     v2_sig_hashes = []
@@ -2154,6 +2201,7 @@ def extract_spot_slope(doc, ctx=None):
             _ip, _ip_q = purge_lookup(type_id_int, ctx)
             rec_v2["is_purgeable"] = _ip
             rec_v2["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec_v2, type_id_int, _instance_count_map, _instance_count_map_q)
 
             pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), DOMAIN_NAME)
             rec_v2["join_key"], _missing = build_join_key_from_policy(
