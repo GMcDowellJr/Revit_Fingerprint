@@ -21,5 +21,6 @@ def test_placeholder_exclusions_smoke(tmp_path):
     all_rows=list(csv.DictReader((out/'placeholder_exclusions_all.csv').open()))
     w1=[r for r in all_rows if r['domain']=='wall_types'][0]
     assert w1['suggested_exclude']=='true'
+    assert w1['excluded']=='false'
     ls=[r for r in all_rows if r['domain']=='line_styles'][0]
     assert ls['suggested_exclude']=='false'

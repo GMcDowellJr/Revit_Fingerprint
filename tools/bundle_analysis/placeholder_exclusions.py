@@ -26,6 +26,19 @@ def lg(vals):
         if g>bg: bg=g;thr=(a+b)/2.0
     return thr if bg>=0.30 else None
 
+
+def compute_placeholder_exclusions(records_csv_path: Path, out_csv_path: Path) -> None:
+    """Compatibility API for run_bundle_analysis legacy callsites.
+
+    Produces a file-level exclusions CSV (domain,file_id) using the legacy
+    implementation contract.
+    """
+    if __package__ in (None, ""):
+        from placeholder_exclusions_legacy import compute_placeholder_exclusions as _legacy_compute
+    else:
+        from .placeholder_exclusions_legacy import compute_placeholder_exclusions as _legacy_compute
+    _legacy_compute(Path(records_csv_path), Path(out_csv_path))
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument('--phase0-dir',type=Path,required=True)
@@ -73,7 +86,7 @@ def main():
                 rec={"schema_version":pol.get('schema_version','1.0'),"domain":d,"file_id":fid,"type_name":nm,
                 "type_count":str(tc),"purgeable_count":str(pc),"instance_count":ic,"is_sole_type":str(r.get('is_sole_type_in_category') or r.get('is_sole_type') or ''),
                 "is_purgeable":str(r.get('is_purgeable') or ''),"matched_reference_name":mrn,"matched_reference_category":mrc,
-                "suggested_exclude":sug,"suggestion_reasons":"|".join(reasons),"excluded":sug,"reviewed_by":"","override_reason":""}
+                "suggested_exclude":sug,"suggestion_reasons":"|".join(reasons),"excluded":"false","reviewed_by":"","override_reason":""}
                 out.append(rec); all_rows.append(rec)
         atomic_write_csv(a.out_dir/f'placeholder_exclusions_{d}.csv',COLS,out)
     atomic_write_csv(a.out_dir/'placeholder_exclusions_all.csv',COLS,all_rows)

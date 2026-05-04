@@ -64,9 +64,10 @@ from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 
 try:
-    from Autodesk.Revit.DB import BuiltInCategory, TextNoteType
+    from Autodesk.Revit.DB import BuiltInCategory, TextNoteType, TextNote
 except ImportError:
     TextNoteType = None
+    TextNote = None
 
 def _phase2_item(k, raw_v, *, allow_empty=False):
     v, q = phase2_qv_from_legacy_sentinel_str(raw_v, allow_empty=allow_empty)
@@ -159,7 +160,7 @@ def _read_instance_and_sole_flags(doc, ctx, type_obj, total_type_count):
         else:
             inst_ids = set()
             if type_obj is not None:
-                for inst in collect_instances(doc, of_class=type(type_obj), cctx=(ctx or {}).get("_collect") if ctx is not None else None):
+                for inst in collect_instances(doc, of_class=TextNote, cctx=(ctx or {}).get("_collect") if ctx is not None else None):
                     try:
                         tid = getattr(getattr(inst, "GetTypeId", lambda: None)(), "IntegerValue", None)
                         if tid == type_id_int:
