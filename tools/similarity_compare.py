@@ -1254,6 +1254,16 @@ def find_json_files(dir_path: str) -> List[str]:
     return files
 
 
+def _get_export_run_id_from_fingerprint(raw: dict) -> Optional[str]:
+    """Read export_run_id from _contract block in fingerprint JSON."""
+    contract = raw.get("_contract")
+    if isinstance(contract, dict):
+        eid = contract.get("export_run_id")
+        if isinstance(eid, str) and eid.strip():
+            return eid.strip()
+    return None
+
+
 def load_fingerprints_from_dir(dir_path: str) -> Dict[str, FingerprintData]:
     """Load all monolithic fingerprints from a directory."""
     p = Path(dir_path)
@@ -1568,14 +1578,80 @@ File format notes:
     ap.add_argument("--details_domain_filter", default=None, help="Comma-separated domain list to include in details (optional)")
 
     ap.add_argument("--include_baseline_in_pairwise", action="store_true")
+    ap.add_argument("--metadata-file", default=None, help="Path to file_metadata.csv. Required when --roles is provided.")
+    ap.add_argument(
+        "--roles",
+        nargs="+",
+        default=None,
+        help="Governance roles to include: Project Template Generic Generic-Host Container, or alias template-group",
+    )
 
     args = ap.parse_args()
 
+    ROLE_GROUP_ALIASES = {
+        "template-group": ["Generic", "Generic-Host", "Template"],
+    }
+    VALID_ROLES = {"Project", "Template", "Generic", "Generic-Host", "Container"}
+
+    resolved_roles: Optional[List[str]] = None
+    allowed_export_run_ids: Optional[set[str]] = None
+    if args.roles:
+        if not args.metadata_file:
+            raise SystemExit("--metadata-file is required when --roles is provided")
+
+        expanded_roles: List[str] = []
+        for role in args.roles:
+            if role in ROLE_GROUP_ALIASES:
+                expanded_roles.extend(ROLE_GROUP_ALIASES[role])
+            else:
+                expanded_roles.append(role)
+
+        invalid_roles = sorted({r for r in expanded_roles if r not in VALID_ROLES})
+        if invalid_roles:
+            raise SystemExit(f"invalid --roles values: {', '.join(invalid_roles)}")
+
+        resolved_roles = sorted(set(expanded_roles))
+        role_set = set(resolved_roles)
+        allowed_export_run_ids = set()
+        with open(args.metadata_file, "r", encoding="utf-8-sig", newline="") as mf:
+            reader = csv.DictReader(mf)
+            for row in reader:
+                role = (row.get("governance_role") or "").strip()
+                export_run_id = (row.get("export_run_id") or "").strip()
+                if role in role_set and export_run_id:
+                    allowed_export_run_ids.add(export_run_id)
+        print(f"[filter] roles={resolved_roles} allowed_files={len(allowed_export_run_ids)}")
+
     # Discover and load all monolithic fingerprints
     fps = load_fingerprints_from_dir(args.dir)
+    if allowed_export_run_ids is not None:
+        total_loaded = len(fps)
+        filtered_fps: Dict[str, FingerprintData] = {}
+        excluded = 0
+        for fpath, fp in fps.items():
+            try:
+                raw = json.loads(Path(fpath).read_text(encoding="utf-8"))
+            except Exception as e:
+                print(f"[warn] could_not_read_export_run_id include_file={fpath} reason={e}")
+                filtered_fps[fpath] = fp
+                continue
+
+            eid = _get_export_run_id_from_fingerprint(raw)
+            if eid is None:
+                print(f"[warn] missing_export_run_id include_file={fpath}")
+                filtered_fps[fpath] = fp
+            elif eid in allowed_export_run_ids:
+                filtered_fps[fpath] = fp
+            else:
+                excluded += 1
+
+        fps = filtered_fps
+        print(f"[filter] loaded={total_loaded} after_role_filter={len(fps)} excluded={excluded}")
     json_files = sorted(fps.keys())
 
     out_base = Path(args.dir) / "similarity"
+    if resolved_roles:
+        out_base = out_base / f"role_{'_'.join(sorted(resolved_roles))}"
     out_base.mkdir(parents=True, exist_ok=True)
 
     def _resolve_out(p: Optional[str]) -> Optional[str]:
@@ -1617,6 +1693,14 @@ File format notes:
         if not args.baseline:
             raise SystemExit("--baseline is required for mode=baseline or both")
         base_fp = load_fingerprint(args.baseline)
+        if allowed_export_run_ids is not None:
+            try:
+                base_raw = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+                baseline_eid = _get_export_run_id_from_fingerprint(base_raw)
+                if baseline_eid and baseline_eid not in allowed_export_run_ids:
+                    print(f"[warn] baseline_export_run_id_not_in_allowed_set baseline={args.baseline} export_run_id={baseline_eid}")
+            except Exception as e:
+                print(f"[warn] could_not_read_baseline_export_run_id baseline={args.baseline} reason={e}")
 
         for fpath in json_files:
             if os.path.abspath(fpath) == os.path.abspath(args.baseline):
