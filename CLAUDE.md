@@ -96,29 +96,56 @@ policies/               Join-key policies and alignment keys
   cross_domain_alignment_keys.json  Domain family registry and alignment key definitions
 
 tools/                  Analysis & comparison utilities
-  compare_manifest.py   Diff analysis
-  pairwise_drift.py     Cross-project drift scoring
-  pareto_joinkey_search.py   Join-key optimization analysis
-  pareto_make_shape_inputs.py  Shape-based input prep
-  merge_split_exports.py     Merge split export artifacts
-  export_to_flat_tables.py   CSV export
-  details_to_csv.py     Details extraction to CSV
+  run_extract_all.py    Primary orchestrator (stage-machine: flatten→discover→apply→analyze)
+  run_config.json       Phase-1 configuration (domains_in_scope, thresholds, seed_baseline_id)
 
-  phase1_domain_authority.py         Phase-1: Authority analysis
-  phase1_pairwise_analysis.py        Phase-1: Pairwise comparison
-  phase1_population_framing.py       Phase-1: Population analysis
+  v21_emit.py           v2.1 export emitter
+  v21_discover_join_policy.py   Discover join-key policy candidates
+  v21_apply_join_policy.py      Apply policy to flatten outputs
+  validate_v21_contract.py      Validate v2.1 contract compliance
 
-  join_key_discovery/                Phase-1.5: Join-key discovery package
-    eval.py, greedy.py
+  export_to_flat_tables.py      Phase-0: Flatten record.v2 details → CSV tables
+  merge_split_exports.py        Merge split export artifacts
+  details_to_csv.py             Details extraction to CSV
 
-  phase2_analysis/                   Phase-2 analysis package
-    attributes.py, compare.py, index.py, io.py, report.py, stability.py
-    run_*.py                         (8 analysis runners for specific domains)
+  phase1_domain_authority.py    Phase-1: Domain authority clustering
+  phase1_population_framing.py  Phase-1: Coverage/adoption framing
+  phase1_pairwise_analysis.py   Phase-1: Project-vs-project summaries
 
-  governance/                        Governance reporting
-    standards_governance_report.py
+  phase2_analysis/              Phase-2 analysis package
+    io.py                       IO contract (must prefer *.details.json)
+    run_joinhash_label_population.py
+    run_joinhash_parameter_population.py
+    run_candidate_joinkey_simulation.py
+    run_population_stability.py
+    run_identity_collision_diagnostics.py
+    run_collision_differencing.py
+    run_change_type.py          ⚠ Requires Phase-2 baseline
+    run_attribute_stress.py     ⚠ Requires Phase-2 baseline
+    run_dimension_types_by_family.py  (probe or baseline-anchored)
+    run_view_templates_joinkey_analysis.py
+    run_view_category_overrides_joinkey_analysis.py
+    run_text_types_candidate_joinkey_simulation.py
+    split_detection.py, split_detection_element_level.py, split_detection_file_level.py
+    pareto_join_keys_by_ids.py, pareto_with_splits.py
+    annotate_cluster_labels.py, build_reference_standards.py
+    domain_identity_contract.py, intradomain_summary.py
 
-  probes/                            API probes (15 domain-specific probes)
+  join_key_discovery/           Phase-1.5: Join-key discovery (eval.py, greedy.py)
+  label_synthesis/              Label synthesis and fragmentation repair
+  bundle_analysis/              Placeholder/exclusion analysis
+  governance/                   Standards governance reporting
+  probes/                       API probes (15 domain-specific probes)
+
+  compare_manifest.py           Diff two manifests
+  pairwise_drift.py             Cross-project drift scoring
+  score_drift.py                Drift score vs baseline using stable surfaces
+  similarity_compare.py         Similarity comparison
+  pareto_joinkey_search.py      Join-key optimization (Pareto front)
+  pareto_make_shape_inputs.py   Shape-based input prep
+  compute_governance_thresholds.py
+  compute_synthetic_keys.py
+  run_split_detection_all.py    Split detection over all domains
 
 tests/                  pytest test suite (38+ test files + fixtures)
   test_sentinel_policy.py            Enforce only 3 allowed sentinels
@@ -341,14 +368,75 @@ For consolidated extractors that emit multiple partitions, `extract()` returns a
 4. Check shape-gating discriminator values if applicable
 5. Use `tools/compare_manifest.py` for diff analysis
 
+## Analysis Pipeline
+
+The analysis side of the codebase is separate from extraction. Exports flow through a staged pipeline:
+
+```
+Extraction (Dynamo)
+  → *.details.json / *.index.json
+    → Phase 0: Flatten to CSV (export_to_flat_tables.py)
+      → Phase 1: Authority/probe clustering (phase1_*.py)
+      → Phase 2: Join-key & stability analysis (phase2_analysis/)
+```
+
+The primary orchestrator is `tools/run_extract_all.py`, which implements a stage machine:
+
+| Stage | Purpose | Default |
+|-------|---------|---------|
+| `flatten` (T0) | Emit v2.1 flatten outputs to `Results_v21/phase0_v21/` | ✅ |
+| `discover` (T1) | Explore join-key policy candidates per domain | ✅ |
+| `apply` (T2) | Apply policy and overwrite join fields | ❌ opt-in |
+| `placeholders` (T2b) | Generate placeholder exclusion CSVs (human review required) | ❌ opt-in |
+| `split` | Split detection analysis | ❌ opt-in |
+| `analyze1` / `analyze2` | Phase-1/2 analysis packets | ❌ opt-in |
+
+### Input format priority
+
+Tools that consume export JSON MUST follow this preference order:
+1. `*.details.json` — record-level, identity_items available
+2. `*.index.json` — summary only; degraded semantics
+3. fallback: `*.json` excluding `*.legacy.json`
+
+Never implicitly load `*.legacy.json`. Tools that glob `*.json` without filtering are unsafe under split exports.
+
+### Two distinct baseline concepts
+
+**Seed-baseline** (Phase-1 only) — a labeling bias for authority framing. Set via `seed_baseline_id` in `run_config.json`. Does NOT define correctness or affect Phase-2 identity. **Do not use yet — authority has not been established.**
+
+**Phase-2 baseline** — a comparison anchor for change analysis (`run_change_type`, `run_attribute_stress`). Requires stable join keys and accepted authority. **Do not use yet — pairwise + population mode is correct.**
+
+### Current operating mode
+
+This project is in **pre-authority probe mode**:
+- Use Phase-0 flattening and Phase-2 population/pairwise analysis freely
+- Use Phase-1 with `domains_in_scope` populated but no `seed_baseline_id`
+- Do NOT use seed-baseline, Phase-2 baselines, or change-type narratives
+- Phase-2 runners that require a baseline (`run_change_type`, `run_attribute_stress`) should not be run
+
+### Phase-1 configuration
+
+Phase-1 behavior is entirely governed by `tools/run_config.json`. If `domains_in_scope` is empty (`[]`), Phase-1 is disabled (headers-only output — this is intentional, not an error).
+
+### Key docs for analysis work
+- `docs/tools_PHASE0_1_2_MAP.md` — authoritative per-tool reference with inputs, outputs, and commands
+- `docs/analysis-phases-question-map.md` — which questions each phase can answer
+- `docs/extract_stage_matrix.md` — full orchestrator stage-machine semantics
+- `docs/V21_ANALYSIS_SCHEMA.md` — v2.1 output schema (`Results_v21/analysis_v21/`)
+
 ## Files to Read First
 
-When working on this codebase, start with:
+When working on **extraction**:
 1. `INVARIANTS.md` - Non-negotiable rules
 2. `DECISIONS.md` - Architectural decisions
 3. `ARCHITECTURE.md` - Layered design
 4. `contracts/record_contract_v2.md` - Record schema
 5. `docs/join_key_shape_gating.md` - Shape-gating system
+
+When working on **analysis**:
+1. `docs/tools_PHASE0_1_2_MAP.md` - Per-tool reference with commands
+2. `docs/analysis-phases-question-map.md` - Phase question map
+3. `docs/extract_stage_matrix.md` - Orchestrator stage semantics
 
 ## Key Decisions Reference
 
