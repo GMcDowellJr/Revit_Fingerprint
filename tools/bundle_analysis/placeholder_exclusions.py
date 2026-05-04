@@ -57,7 +57,9 @@ def main():
     for d in DOMAINS:
         drows=by[d]
         per=defaultdict(list)
-        for r in drows: per[(r.get('file_id') or '').strip()].append(r)
+        for r in drows:
+            fid = (r.get("export_run_id") or "").strip() or (r.get("file_id") or "").strip()
+            per[fid].append(r)
         file_pct={fid:(sum(1 for x in rs if t(x.get('is_purgeable')))/float(len(rs)) if rs else 0.0) for fid,rs in per.items()}
         thr=lg(list(file_pct.values()))
         out=[]
