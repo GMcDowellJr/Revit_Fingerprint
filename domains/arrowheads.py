@@ -320,6 +320,7 @@ def extract(doc, ctx=None):
     for t in all_types:
         if _is_arrowhead_type(doc, t):
             arrow_types.append(t)
+    _total_type_count = len(arrow_types)
 
     v2_records = []
     v2_sig_hashes = []
@@ -560,6 +561,17 @@ def extract(doc, ctx=None):
         _ip, _ip_q = purge_lookup(type_id_for_purge, ctx)
         rec_v2["is_purgeable"] = _ip
         rec_v2["is_purgeable_q"] = _ip_q
+        # instance_count: arrowhead instance counting requires
+        # reverse-lookup through dimension/text type tick mark references.
+        # Deferred — emit not_applicable for now.
+        rec_v2["instance_count"] = None
+        rec_v2["instance_count_q"] = "not_applicable"
+        try:
+            rec_v2["is_sole_type_in_category"] = (_total_type_count == 1)
+            rec_v2["is_sole_type_in_category_q"] = "ok"
+        except Exception:
+            rec_v2["is_sole_type_in_category"] = None
+            rec_v2["is_sole_type_in_category_q"] = "unreadable"
 
         # Phase-2 (join-key candidates live ONLY here; identity remains authoritative)
         cosmetic_items = []
