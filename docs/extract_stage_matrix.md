@@ -9,6 +9,7 @@ This matrix defines the explicit state-machine semantics used by `tools/run_extr
 | `flatten` | T0 | Emit flatten outputs (`Results_v21/phase0_v21`) with identity-mode join fields (`join_key_schema=sig_hash_as_join_key.v1`). | ✅ Yes | No | v2.1 flatten is the default path. |
 | `discover` | T1 | Explore per-domain join policy candidates from flatten identity items. | ✅ Yes | No | Writes PowerBI-ready diagnostics CSVs for `discover`/`validate`/`harsh`; optional JSON emit via `--discover-emit-policy-json`. |
 | `apply` | T2 | Apply policy and overwrite flatten `phase0_records.csv` join fields. | ❌ No | N/A | Explicit opt-in for operational commit path. |
+| `placeholders` | T2b | Generate per-domain placeholder exclusion CSVs from purgeable heuristics, instance count, sole-type flags, and known-defaults reference JSON. Human reviews output before analyze stages. | ❌ No | ✅ Yes | Writes to `Results_v21/placeholder_exclusions/`. Requires `apply` stage. Does not block downstream stages on failure. |
 | `split` | — | Split detection analysis over selected domains. | ❌ No | ✅ Yes | Fails if join identity mode is detected, unless explicit override is used. |
 | `analyze1` | Legacy Phase1 | Analysis stage (authority-related legacy path and/or v2.1 analysis output). | ❌ No | ✅ Yes | Gate can be overridden only by explicit degraded-mode flag. |
 | `analyze2` | Legacy Phase2 | Per-domain analysis packet stage and/or v2.1 analysis output. | ❌ No | ✅ Yes | Gate can be overridden only by explicit degraded-mode flag. |
@@ -31,7 +32,7 @@ This matrix defines the explicit state-machine semantics used by `tools/run_extr
 | Draft prep (default) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root>` |
 | Explicit default | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages flatten,discover` |
 | Operational commit (policy applied) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages flatten,discover,apply` |
-| Join-dependent analysis (safe default) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages flatten,discover,apply,split,analyze1,analyze2` |
+| Join-dependent analysis (safe default) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages flatten,discover,apply,placeholders,[human review],split,analyze1,analyze2` |
 | Degraded exploratory analysis (explicitly unsafe for governance) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages flatten,discover,split --allow-sig-hash-join-key` |
 | Noisy discover domains (e.g., fill_patterns_drafting, fill_patterns_model — now domain families; see `policies/cross_domain_alignment_keys.json` for member domain list) | `python tools/run_extract_all.py <exports_dir> --out-root <out_root> --stages discover --discover-sample-size 100 --discover-max-candidate-fields 20 --discover-policy-modes validate --discover-search-modes pareto` |
 

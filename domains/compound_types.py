@@ -17,7 +17,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types, purge_lookup
+from core.collect import collect_types, collect_instances, purge_lookup
 from core.canon import S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE
 from core.record_v2 import (
     STATUS_OK,
@@ -46,6 +46,7 @@ try:
         CompoundStructureLayer,
         MaterialFunctionAssignment,
         BuiltInParameter,
+        BuiltInCategory,
         ShellLayerType,
     )
 except ImportError:
@@ -56,6 +57,7 @@ except ImportError:
     CompoundStructureLayer = None
     MaterialFunctionAssignment = None
     BuiltInParameter = None
+    BuiltInCategory = None
     ShellLayerType = None
 
 try:
@@ -125,6 +127,48 @@ _DECK_EMBEDDING_NAMES = {
 }
 _CORE_BOUNDARY_SENTINEL = "CORE_BOUNDARY"
 _LAYER_RECORD_ID_PREFIX = "wall_type_layer"
+
+
+def _build_instance_count_map(doc, ctx, bic, where_key):
+    _instance_count_map = {}
+    try:
+        instances = collect_instances(
+            doc,
+            of_category=bic,
+            cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+            where_key=where_key,
+        )
+        for inst in instances:
+            try:
+                tid = int(getattr(getattr(inst, "GetTypeId", lambda: None)(), "IntegerValue", -1))
+                if tid > 0:
+                    _instance_count_map[tid] = _instance_count_map.get(tid, 0) + 1
+            except Exception:
+                continue
+        return _instance_count_map, "ok"
+    except Exception:
+        return {}, "unreadable"
+
+
+def _attach_placeholder_metadata(rec, type_elem, instance_count_map, instance_count_map_q, total_type_count):
+    type_id_int = getattr(getattr(type_elem, "Id", None), "IntegerValue", None)
+    if instance_count_map_q == "ok" and type_id_int is not None:
+        try:
+            rec["instance_count"] = instance_count_map.get(int(type_id_int), 0)
+            rec["instance_count_q"] = "ok"
+        except Exception:
+            rec["instance_count"] = None
+            rec["instance_count_q"] = "unreadable"
+    else:
+        rec["instance_count"] = None
+        rec["instance_count_q"] = "unreadable"
+
+    try:
+        rec["is_sole_type_in_category"] = (total_type_count == 1)
+        rec["is_sole_type_in_category_q"] = "ok"
+    except Exception:
+        rec["is_sole_type_in_category"] = None
+        rec["is_sole_type_in_category_q"] = "unreadable"
 
 
 def _na_or(value, family, allowed_family):
@@ -486,6 +530,10 @@ def extract_wall_types(doc, ctx=None):
         wall_types = []
 
     info["raw_count"] = len(wall_types)
+    _total_type_count = len(wall_types)
+    _instance_count_map, _instance_count_map_q = _build_instance_count_map(
+        doc, ctx, getattr(BuiltInCategory, "OST_Walls", None), "compound_types.wall.instances"
+    )
 
     fp_uid_to_sig_hash = (ctx or {}).get("fill_pattern_uid_to_sig_hash_v2", None)
     if not isinstance(fp_uid_to_sig_hash, dict):
@@ -517,6 +565,7 @@ def extract_wall_types(doc, ctx=None):
             _ip, _ip_q = purge_lookup(getattr(getattr(wt, "Id", None), "IntegerValue", None), ctx)
             rec["is_purgeable"] = _ip
             rec["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec, wt, _instance_count_map, _instance_count_map_q, _total_type_count)
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_kind"] += 1
@@ -551,6 +600,7 @@ def extract_wall_types(doc, ctx=None):
             _ip, _ip_q = purge_lookup(getattr(getattr(wt, "Id", None), "IntegerValue", None), ctx)
             rec["is_purgeable"] = _ip
             rec["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec, wt, _instance_count_map, _instance_count_map_q, _total_type_count)
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_no_cs"] += 1
@@ -634,6 +684,7 @@ def extract_wall_types(doc, ctx=None):
         _ip, _ip_q = purge_lookup(getattr(getattr(wt, "Id", None), "IntegerValue", None), ctx)
         rec["is_purgeable"] = _ip
         rec["is_purgeable_q"] = _ip_q
+        _attach_placeholder_metadata(rec, wt, _instance_count_map, _instance_count_map_q, _total_type_count)
         rec["sig_basis"] = {
             "schema": "wall_types.sig_basis.v1",
             "keys_used": [
@@ -800,6 +851,10 @@ def extract_floor_types(doc, ctx=None):
         floor_types = []
 
     info["raw_count"] = len(floor_types)
+    _total_type_count = len(floor_types)
+    _instance_count_map, _instance_count_map_q = _build_instance_count_map(
+        doc, ctx, getattr(BuiltInCategory, "OST_Floors", None), "compound_types.floor.instances"
+    )
 
     fp_uid_to_sig_hash = (ctx or {}).get("fill_pattern_uid_to_sig_hash_v2", None)
     if not isinstance(fp_uid_to_sig_hash, dict):
@@ -836,6 +891,7 @@ def extract_floor_types(doc, ctx=None):
             _ip, _ip_q = purge_lookup(getattr(getattr(ft, "Id", None), "IntegerValue", None), ctx)
             rec["is_purgeable"] = _ip
             rec["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec, ft, _instance_count_map, _instance_count_map_q, _total_type_count)
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_no_cs"] += 1
@@ -908,6 +964,7 @@ def extract_floor_types(doc, ctx=None):
         _ip, _ip_q = purge_lookup(getattr(getattr(ft, "Id", None), "IntegerValue", None), ctx)
         rec["is_purgeable"] = _ip
         rec["is_purgeable_q"] = _ip_q
+        _attach_placeholder_metadata(rec, ft, _instance_count_map, _instance_count_map_q, _total_type_count)
         rec["sig_basis"] = {
             "schema": "floor_types.sig_basis.v1",
             "keys_used": ["ft.layer_count", "ft.total_thickness_in", "ft.stack_hash_loose"],
@@ -979,6 +1036,10 @@ def extract_roof_types(doc, ctx=None):
         roof_types = []
 
     info["raw_count"] = len(roof_types)
+    _total_type_count = len(roof_types)
+    _instance_count_map, _instance_count_map_q = _build_instance_count_map(
+        doc, ctx, getattr(BuiltInCategory, "OST_Roofs", None), "compound_types.roof.instances"
+    )
 
     fp_uid_to_sig_hash = (ctx or {}).get("fill_pattern_uid_to_sig_hash_v2", None)
     if not isinstance(fp_uid_to_sig_hash, dict):
@@ -1015,6 +1076,7 @@ def extract_roof_types(doc, ctx=None):
             _ip, _ip_q = purge_lookup(getattr(getattr(rt, "Id", None), "IntegerValue", None), ctx)
             rec["is_purgeable"] = _ip
             rec["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec, rt, _instance_count_map, _instance_count_map_q, _total_type_count)
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_no_cs"] += 1
@@ -1069,6 +1131,7 @@ def extract_roof_types(doc, ctx=None):
         _ip, _ip_q = purge_lookup(getattr(getattr(rt, "Id", None), "IntegerValue", None), ctx)
         rec["is_purgeable"] = _ip
         rec["is_purgeable_q"] = _ip_q
+        _attach_placeholder_metadata(rec, rt, _instance_count_map, _instance_count_map_q, _total_type_count)
         rec["sig_basis"] = {
             "schema": "roof_types.sig_basis.v1",
             "keys_used": ["rt.layer_count", "rt.total_thickness_in", "rt.stack_hash_loose"],
@@ -1140,6 +1203,10 @@ def extract_ceiling_types(doc, ctx=None):
         ceiling_types = []
 
     info["raw_count"] = len(ceiling_types)
+    _total_type_count = len(ceiling_types)
+    _instance_count_map, _instance_count_map_q = _build_instance_count_map(
+        doc, ctx, getattr(BuiltInCategory, "OST_Ceilings", None), "compound_types.ceiling.instances"
+    )
 
     fp_uid_to_sig_hash = (ctx or {}).get("fill_pattern_uid_to_sig_hash_v2", None)
     if not isinstance(fp_uid_to_sig_hash, dict):
@@ -1176,6 +1243,7 @@ def extract_ceiling_types(doc, ctx=None):
             _ip, _ip_q = purge_lookup(getattr(getattr(ct, "Id", None), "IntegerValue", None), ctx)
             rec["is_purgeable"] = _ip
             rec["is_purgeable_q"] = _ip_q
+            _attach_placeholder_metadata(rec, ct, _instance_count_map, _instance_count_map_q, _total_type_count)
             rec["layer_rows"] = []
             records.append(rec)
             info["debug_blocked_no_cs"] += 1
@@ -1230,6 +1298,7 @@ def extract_ceiling_types(doc, ctx=None):
         _ip, _ip_q = purge_lookup(getattr(getattr(ct, "Id", None), "IntegerValue", None), ctx)
         rec["is_purgeable"] = _ip
         rec["is_purgeable_q"] = _ip_q
+        _attach_placeholder_metadata(rec, ct, _instance_count_map, _instance_count_map_q, _total_type_count)
         rec["sig_basis"] = {
             "schema": "ceiling_types.sig_basis.v1",
             "keys_used": ["ct.layer_count", "ct.total_thickness_in", "ct.stack_hash_loose"],

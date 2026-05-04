@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "min_confirmation_count": 1,
+  "domains": {
+    "ceiling_types": {
+      "known_defaults": ["Compound Ceiling", "Ceiling 1", "Ceiling 2"],
+      "placeholder_patterns": ["Ceiling [0-9]+"],
+      "known_builtins": []
+    },
+    "wall_types": {
+      "known_defaults": ["Wall 1", "Generic - 6\"", "Generic - 8\"", "Generic - 12\""],
+      "placeholder_patterns": ["Wall [0-9]+", "Generic - [0-9]+"],
+      "known_builtins": []
+    },
+    "floor_types": {
+      "known_defaults": ["Floor 1", "Generic - 12\"", "Generic - 6\""],
+      "placeholder_patterns": ["Floor [0-9]+", "Generic - [0-9]+"],
+      "known_builtins": []
+    },
+    "roof_types": {
+      "known_defaults": ["Roof 1", "Generic - 9\""],
+      "placeholder_patterns": ["Roof [0-9]+", "Generic - [0-9]+"],
+      "known_builtins": []
+    },
+    "text_types": {
+      "known_defaults": ["Text 1", "3/32\" Arial"],
+      "placeholder_patterns": [],
+      "known_builtins": []
+    },
+    "dimension_types_linear": {
+      "known_defaults": ["Linear - 3/32\" Arial"],
+      "placeholder_patterns": [],
+      "known_builtins": []
+    },
+    "arrowheads": {
+      "known_defaults": [],
+      "placeholder_patterns": [],
+      "known_builtins": []
+    },
+    "line_styles": {
+      "known_defaults": [],
+      "placeholder_patterns": [],
+      "known_builtins": [
+        "<Beyond>", "<Demolished>", "<Hidden>", "<Overhead>",
+        "<Room Separation>", "<Space Separation>", "<Stair Path>",
+        "<Centerline>", "<Insulation Batting Lines>", "<Lines>"
+      ]
+    }
+  }
+}

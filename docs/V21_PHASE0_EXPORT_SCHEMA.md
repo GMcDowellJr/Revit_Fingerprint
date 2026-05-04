@@ -25,3 +25,7 @@ Outputs are additive and written under `Results_v21/phase0_v21/`.
   - `phase0_identity_items.csv`: `(export_run_id, domain, record_pk, item_key, item_value)`
   - `phase0_label_components.csv`: `(export_run_id, domain, record_pk, component_order, component_key)`
   - `phase0_status_reasons.csv`: `(export_run_id, domain, record_pk, reason_code)`
+
+## `phase0_records.csv` columns
+
+`schema_version, export_run_id, file_id, domain, record_pk, record_id, record_ordinal, status, identity_quality, sig_hash, join_hash, join_key_schema, join_key_status, join_key_policy_id, join_key_policy_version, label_display, label_quality, label_provenance, is_purgeable, instance_count, is_sole_type_in_category`

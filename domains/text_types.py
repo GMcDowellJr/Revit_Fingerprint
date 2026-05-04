@@ -22,7 +22,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
-from core.collect import collect_types, purge_lookup
+from core.collect import collect_types, collect_instances, purge_lookup
 from core.canon import (
     canon_str,
     canon_num,
@@ -64,9 +64,10 @@ from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy
 
 try:
-    from Autodesk.Revit.DB import BuiltInCategory, TextNoteType
+    from Autodesk.Revit.DB import BuiltInCategory, TextNoteType, TextNote
 except ImportError:
     TextNoteType = None
+    TextNote = None
 
 def _phase2_item(k, raw_v, *, allow_empty=False):
     v, q = phase2_qv_from_legacy_sentinel_str(raw_v, allow_empty=allow_empty)
@@ -144,6 +145,49 @@ TEXT_TYPE_SEMANTIC_KEYS = sorted([
     "text_type.underline",
 ])
 
+
+
+def _build_textnote_instance_count_map(doc, ctx):
+    inst_count_map = {}
+    q = "ok"
+    try:
+        for inst in collect_instances(
+            doc,
+            of_class=TextNote,
+            cctx=(ctx or {}).get("_collect") if ctx is not None else None,
+        ):
+            try:
+                tid = getattr(getattr(inst, "GetTypeId", lambda: None)(), "IntegerValue", None)
+                if tid is not None:
+                    inst_count_map[int(tid)] = inst_count_map.get(int(tid), 0) + 1
+            except Exception:
+                continue
+    except Exception:
+        inst_count_map = {}
+        q = "unreadable"
+    return inst_count_map, q
+
+
+def _read_instance_and_sole_flags(type_obj, total_type_count, inst_count_map, inst_count_map_q):
+    try:
+        type_id_int = getattr(getattr(type_obj, "Id", None), "IntegerValue", None)
+    except Exception:
+        type_id_int = None
+
+    if inst_count_map_q == "ok" and type_id_int is not None:
+        try:
+            instance_count = inst_count_map.get(int(type_id_int), 0)
+            instance_count_q = "ok"
+        except Exception:
+            instance_count, instance_count_q = None, "unreadable"
+    else:
+        instance_count, instance_count_q = None, "unreadable"
+
+    try:
+        is_sole, is_sole_q = (int(total_type_count) == 1), "ok"
+    except Exception:
+        is_sole, is_sole_q = None, "unreadable"
+    return instance_count, instance_count_q, is_sole, is_sole_q
 def extract(doc, ctx=None):
     """
     Extract Text Types fingerprint from document.
@@ -182,6 +226,7 @@ def extract(doc, ctx=None):
         types = []
 
     info["raw_count"] = len(types)
+    _instance_count_map, _instance_count_map_q = _build_textnote_instance_count_map(doc, ctx)
 
     names = []
     missing = 0
@@ -201,6 +246,8 @@ def extract(doc, ctx=None):
         if not v2_blocked:
             v2_blocked = True
         v2_reasons[reason_key] = True
+
+    _text_type_count = len(types)
 
     for t in types:
         type_name = get_type_display_name(t)
@@ -481,6 +528,13 @@ def extract(doc, ctx=None):
         _ip, _ip_q = purge_lookup(getattr(getattr(t, "Id", None), "IntegerValue", None), ctx)
         rec_v2["is_purgeable"] = _ip
         rec_v2["is_purgeable_q"] = _ip_q
+        _ic, _icq, _sole, _soleq = _read_instance_and_sole_flags(
+            t, _text_type_count, _instance_count_map, _instance_count_map_q
+        )
+        rec_v2["instance_count"] = _ic
+        rec_v2["instance_count_q"] = _icq
+        rec_v2["is_sole_type_in_category"] = _sole
+        rec_v2["is_sole_type_in_category_q"] = _soleq
         rec_v2["join_key"], _missing = build_join_key_from_policy(
             domain_policy=pol,
             identity_items=identity_items_v2_sorted,
