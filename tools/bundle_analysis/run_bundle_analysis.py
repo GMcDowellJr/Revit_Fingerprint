@@ -43,6 +43,10 @@ else:
 
 TIMING_FIELDNAMES = ["schema_version", "analysis_run_id", "domain", "population_id", "step", "seconds"]
 TIMING_STEPS = ("step1", "step2", "step2b", "step3", "step4", "step5", "step6", "step7")
+ROLE_GROUP_ALIASES = {
+    "template-group": ["Generic", "Generic-Host", "Template"],
+}
+VALID_ROLES = {"Project", "Template", "Generic", "Generic-Host", "Container"}
 
 
 def _run_pipeline_once(
@@ -57,6 +61,7 @@ def _run_pipeline_once(
     analysis_run_id: str = "",
     population_registry_dir: Optional[Path] = None,
     scope_key_filter: Optional[str] = None,
+    allowed_export_run_ids: Optional[Set[str]] = None,
 ) -> Dict[str, object]:
     total_bundles = 0
     total_edges = 0
@@ -71,6 +76,7 @@ def _run_pipeline_once(
         population_id,
         population_registry_dir,
         scope_key_filter,
+        allowed_export_run_ids,
     )
     t1 = time.time() - t0
     print(f"[run] domain={domain} step1_seconds={t1:.3f}")
@@ -225,11 +231,38 @@ def run_bundle_analysis(
     discovery_support_pct: float = 0.10,
     compare: bool = False,
     compute_share_profile: bool = False,
+    roles: Optional[List[str]] = None,
+    metadata_file: Optional[Path] = None,
 ) -> Dict[str, int]:
     presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     run_id = resolve_analysis_run_id(presence_rows, analysis_run_id)
 
     domains = [domain] if domain else sorted({r.get("domain", "") for r in presence_rows if r.get("analysis_run_id", "") == run_id})
+    resolved_roles: Optional[List[str]] = None
+    allowed_export_run_ids: Optional[Set[str]] = None
+    if roles:
+        if metadata_file is None:
+            raise ValueError("--metadata-file is required when --roles is provided")
+        expanded_roles: List[str] = []
+        for role in roles:
+            if role in ROLE_GROUP_ALIASES:
+                expanded_roles.extend(ROLE_GROUP_ALIASES[role])
+            else:
+                expanded_roles.append(role)
+        invalid_roles = sorted({r for r in expanded_roles if r not in VALID_ROLES})
+        if invalid_roles:
+            raise ValueError(f"invalid --roles values: {', '.join(invalid_roles)}")
+        resolved_roles = sorted(set(expanded_roles))
+        role_set = set(resolved_roles)
+        allowed_export_run_ids = set()
+        with metadata_file.open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                role = (row.get("governance_role", "") or "").strip()
+                eid = (row.get("export_run_id", "") or "").strip()
+                if role in role_set and eid:
+                    allowed_export_run_ids.add(eid)
+        print(f"[role_filter] roles={resolved_roles} allowed_files={len(allowed_export_run_ids)}")
 
     total_bundles = 0
     total_edges = 0
@@ -247,6 +280,10 @@ def run_bundle_analysis(
         compare_dir.mkdir(parents=True, exist_ok=True)
 
     if not discover_populations_flag:
+        role_dir_name = f"role_{'_'.join(resolved_roles)}" if resolved_roles else ""
+        role_stage_root = out_dir / "_role_stage"
+        if resolved_roles and role_stage_root.exists():
+            shutil.rmtree(role_stage_root)
         for dom in domains:
             if not dom:
                 continue
@@ -254,26 +291,30 @@ def run_bundle_analysis(
             print(f"[run] domain={dom} start")
             try:
                 if not compare:
+                    work_out_base = role_stage_root if resolved_roles else out_dir
                     stats = _run_pipeline_once(
                         analysis_dir=analysis_dir,
-                        work_out_dir=out_dir,
+                        work_out_dir=work_out_base,
                         domain=dom,
                         run_id=run_id,
                         min_support_count=min_support_count,
                         min_support_pct=min_support_pct,
                         compute_share_profile=compute_share_profile,
                         analysis_run_id=run_id,
+                        allowed_export_run_ids=allowed_export_run_ids,
                     )
                 else:
+                    work_out_base = role_stage_root if resolved_roles else out_dir
                     t0 = time.time()
                     build_membership_matrix(
                         analysis_dir,
-                        out_dir,
+                        work_out_base,
                         dom,
                         run_id,
                         None,
                         None,
                         None,
+                        allowed_export_run_ids,
                     )
                     t1 = time.time() - t0
                     print(f"[run] domain={dom} step1_seconds={t1:.3f}")
@@ -294,7 +335,7 @@ def run_bundle_analysis(
                         compare_future = executor.submit(
                             run_compare_for_domain,
                             analysis_dir,
-                            out_dir,
+                            work_out_base,
                             reference or {},
                             dom,
                         )
@@ -313,6 +354,13 @@ def run_bundle_analysis(
                         "files_with_no_bundle_match": tail.get("files_with_no_bundle_match", 0),
                         "step_times": step_times,
                     }
+                if resolved_roles:
+                    produced = work_out_base / dom
+                    final_out = out_dir / dom / role_dir_name
+                    if final_out.exists():
+                        shutil.rmtree(final_out)
+                    final_out.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(produced), str(final_out))
                 total_bundles += stats["total_bundles_found"]
                 total_edges += stats["total_dag_edges"]
                 total_files_no_bundle += stats["files_with_no_bundle_match"]
@@ -416,6 +464,7 @@ def run_bundle_analysis(
                 min_population_jaccard=min_population_jaccard,
                 discovery_support_pct=discovery_support_pct,
                 placeholder_exclusions_path=placeholder_exclusions_path,
+                allowed_export_run_ids=allowed_export_run_ids,
             )
             step0_elapsed = time.time() - t0
             step0_times[dom] = step0_elapsed
@@ -472,7 +521,10 @@ def run_bundle_analysis(
             domain_population_counts[dom] = domain_population_counts.get(dom, 0) + 1
             stage_out = staging_root / f"{dom}__{pid}"
             # `pid` already includes the "pop_" prefix from step0.
-            final_out = out_dir / dom / pid
+            final_out_base = out_dir / dom
+            if resolved_roles:
+                final_out_base = final_out_base / f"role_{'_'.join(resolved_roles)}"
+            final_out = final_out_base / pid
             if stage_out.exists():
                 shutil.rmtree(stage_out)
             if final_out.exists():
@@ -491,6 +543,7 @@ def run_bundle_analysis(
                     analysis_run_id=run_id,
                     population_registry_dir=out_dir,
                     scope_key_filter=population_scope_key,
+                    allowed_export_run_ids=allowed_export_run_ids,
                 )
                 domain_elapsed_seconds[dom] = domain_elapsed_seconds.get(dom, 0.0) + (time.time() - t0)
                 total_bundles += stats["total_bundles_found"]
@@ -618,6 +671,8 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--discovery-support-pct", type=float, default=0.10)
     p.add_argument("--compare", action="store_true")
     p.add_argument("--compute-share-profile", action="store_true")
+    p.add_argument("--metadata-file", type=Path, default=None, help="Path to file_metadata.csv. Required when --roles is used.")
+    p.add_argument("--roles", nargs="+", default=None, help="Governance roles: Project Template Generic Generic-Host Container, or alias template-group")
     return p.parse_args(argv)
 
 
@@ -637,6 +692,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         discovery_support_pct=args.discovery_support_pct,
         compare=args.compare,
         compute_share_profile=args.compute_share_profile,
+        roles=args.roles,
+        metadata_file=args.metadata_file,
     )
     return 0
 
