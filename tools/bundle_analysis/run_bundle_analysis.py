@@ -324,7 +324,7 @@ def run_bundle_analysis(
                         discovery_future = executor.submit(
                             _run_step2_to_step7,
                             analysis_dir,
-                            out_dir,
+                            work_out_base,
                             dom,
                             min_support_count,
                             min_support_pct,
