@@ -409,6 +409,15 @@ def extract_linear(doc, ctx=None):
         except Exception:
             continue  # fail-soft per record
 
+    _total_type_count = len(v2_records)
+    for rec in v2_records:
+        try:
+            rec["is_sole_type_in_category"] = (_total_type_count == 1)
+            rec["is_sole_type_in_category_q"] = "ok"
+        except Exception:
+            rec["is_sole_type_in_category"] = None
+            rec["is_sole_type_in_category_q"] = "unreadable"
+
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
     info["count"] = len(v2_records)
     info["signature_hashes_v2"] = sorted(v2_sig_hashes)
@@ -673,6 +682,15 @@ def extract_angular(doc, ctx=None):
 
         except Exception:
             continue  # fail-soft per record
+
+    _total_type_count = len(v2_records)
+    for rec in v2_records:
+        try:
+            rec["is_sole_type_in_category"] = (_total_type_count == 1)
+            rec["is_sole_type_in_category_q"] = "ok"
+        except Exception:
+            rec["is_sole_type_in_category"] = None
+            rec["is_sole_type_in_category_q"] = "unreadable"
 
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
     info["count"] = len(v2_records)
@@ -961,6 +979,15 @@ def extract_radial(doc, ctx=None):
         except Exception:
             continue  # fail-soft per record
 
+    _total_type_count = len(v2_records)
+    for rec in v2_records:
+        try:
+            rec["is_sole_type_in_category"] = (_total_type_count == 1)
+            rec["is_sole_type_in_category_q"] = "ok"
+        except Exception:
+            rec["is_sole_type_in_category"] = None
+            rec["is_sole_type_in_category_q"] = "unreadable"
+
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
     info["count"] = len(v2_records)
     info["signature_hashes_v2"] = sorted(v2_sig_hashes)
@@ -1247,6 +1274,15 @@ def extract_diameter(doc, ctx=None):
 
         except Exception:
             continue  # fail-soft per record
+
+    _total_type_count = len(v2_records)
+    for rec in v2_records:
+        try:
+            rec["is_sole_type_in_category"] = (_total_type_count == 1)
+            rec["is_sole_type_in_category_q"] = "ok"
+        except Exception:
+            rec["is_sole_type_in_category"] = None
+            rec["is_sole_type_in_category_q"] = "unreadable"
 
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
     info["count"] = len(v2_records)
@@ -1609,6 +1645,15 @@ def extract_spot_elevation(doc, ctx=None):
 
         except Exception:
             continue  # fail-soft per record
+
+    _total_type_count = len(v2_records)
+    for rec in v2_records:
+        try:
+            rec["is_sole_type_in_category"] = (_total_type_count == 1)
+            rec["is_sole_type_in_category_q"] = "ok"
+        except Exception:
+            rec["is_sole_type_in_category"] = None
+            rec["is_sole_type_in_category_q"] = "unreadable"
 
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
     info["count"] = len(v2_records)
@@ -1990,6 +2035,15 @@ def extract_spot_coordinate(doc, ctx=None):
         except Exception:
             continue  # fail-soft per record
 
+    _total_type_count = len(v2_records)
+    for rec in v2_records:
+        try:
+            rec["is_sole_type_in_category"] = (_total_type_count == 1)
+            rec["is_sole_type_in_category_q"] = "ok"
+        except Exception:
+            rec["is_sole_type_in_category"] = None
+            rec["is_sole_type_in_category_q"] = "unreadable"
+
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
     info["count"] = len(v2_records)
     info["signature_hashes_v2"] = sorted(v2_sig_hashes)
@@ -2244,6 +2298,15 @@ def extract_spot_slope(doc, ctx=None):
 
         except Exception:
             continue  # fail-soft per record
+
+    _total_type_count = len(v2_records)
+    for rec in v2_records:
+        try:
+            rec["is_sole_type_in_category"] = (_total_type_count == 1)
+            rec["is_sole_type_in_category_q"] = "ok"
+        except Exception:
+            rec["is_sole_type_in_category"] = None
+            rec["is_sole_type_in_category_q"] = "unreadable"
 
     info["records"] = sorted(v2_records, key=lambda r: str(r.get("record_id", "")))
     info["count"] = len(v2_records)
