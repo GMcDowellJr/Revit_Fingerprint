@@ -211,6 +211,7 @@ def extract_linear(doc, ctx=None):
 
     v2_records = []
     v2_sig_hashes = []
+    _eligible_type_count = 0
 
     for d in all_types:
         try:
@@ -247,6 +248,8 @@ def extract_linear(doc, ctx=None):
             if family_name and family_name != EXPECTED_FAMILY:
                 info["debug_wrong_family_excluded"] = info.get("debug_wrong_family_excluded", 0) + 1
                 continue
+
+            _eligible_type_count += 1
 
             # --- Read core identity fields ---
 
@@ -409,7 +412,7 @@ def extract_linear(doc, ctx=None):
         except Exception:
             continue  # fail-soft per record
 
-    _total_type_count = len(v2_records)
+    _total_type_count = _eligible_type_count
     for rec in v2_records:
         try:
             rec["is_sole_type_in_category"] = (_total_type_count == 1)
@@ -496,6 +499,7 @@ def extract_angular(doc, ctx=None):
 
     v2_records = []
     v2_sig_hashes = []
+    _eligible_type_count = 0
 
     for d in all_types:
         try:
@@ -530,6 +534,8 @@ def extract_angular(doc, ctx=None):
             if family_name and family_name != EXPECTED_FAMILY:
                 info["debug_wrong_family_excluded"] = info.get("debug_wrong_family_excluded", 0) + 1
                 continue
+
+            _eligible_type_count += 1
 
             # --- Read core identity fields ---
 
@@ -683,7 +689,7 @@ def extract_angular(doc, ctx=None):
         except Exception:
             continue  # fail-soft per record
 
-    _total_type_count = len(v2_records)
+    _total_type_count = _eligible_type_count
     for rec in v2_records:
         try:
             rec["is_sole_type_in_category"] = (_total_type_count == 1)
@@ -770,6 +776,7 @@ def extract_radial(doc, ctx=None):
 
     v2_records = []
     v2_sig_hashes = []
+    _eligible_type_count = 0
 
     for d in all_types:
         try:
@@ -804,6 +811,8 @@ def extract_radial(doc, ctx=None):
             if family_name and family_name != EXPECTED_FAMILY:
                 info["debug_wrong_family_excluded"] = info.get("debug_wrong_family_excluded", 0) + 1
                 continue
+
+            _eligible_type_count += 1
 
             # --- Read core identity fields ---
 
@@ -979,7 +988,7 @@ def extract_radial(doc, ctx=None):
         except Exception:
             continue  # fail-soft per record
 
-    _total_type_count = len(v2_records)
+    _total_type_count = _eligible_type_count
     for rec in v2_records:
         try:
             rec["is_sole_type_in_category"] = (_total_type_count == 1)
@@ -1066,6 +1075,7 @@ def extract_diameter(doc, ctx=None):
 
     v2_records = []
     v2_sig_hashes = []
+    _eligible_type_count = 0
 
     for d in all_types:
         try:
@@ -1100,6 +1110,8 @@ def extract_diameter(doc, ctx=None):
             if family_name and family_name != EXPECTED_FAMILY:
                 info["debug_wrong_family_excluded"] = info.get("debug_wrong_family_excluded", 0) + 1
                 continue
+
+            _eligible_type_count += 1
 
             # --- Read core identity fields ---
 
@@ -1275,7 +1287,7 @@ def extract_diameter(doc, ctx=None):
         except Exception:
             continue  # fail-soft per record
 
-    _total_type_count = len(v2_records)
+    _total_type_count = _eligible_type_count
     for rec in v2_records:
         try:
             rec["is_sole_type_in_category"] = (_total_type_count == 1)
@@ -1407,6 +1419,7 @@ def extract_spot_elevation(doc, ctx=None):
 
     v2_records = []
     v2_sig_hashes = []
+    _eligible_type_count = 0
 
     for d in all_types:
         try:
@@ -1441,6 +1454,8 @@ def extract_spot_elevation(doc, ctx=None):
             if family_name and family_name != EXPECTED_FAMILY:
                 info["debug_wrong_family_excluded"] = info.get("debug_wrong_family_excluded", 0) + 1
                 continue
+
+            _eligible_type_count += 1
 
             # --- Read core identity fields ---
 
@@ -1646,7 +1661,7 @@ def extract_spot_elevation(doc, ctx=None):
         except Exception:
             continue  # fail-soft per record
 
-    _total_type_count = len(v2_records)
+    _total_type_count = _eligible_type_count
     for rec in v2_records:
         try:
             rec["is_sole_type_in_category"] = (_total_type_count == 1)
@@ -1782,6 +1797,7 @@ def extract_spot_coordinate(doc, ctx=None):
 
     v2_records = []
     v2_sig_hashes = []
+    _eligible_type_count = 0
 
     for d in all_types:
         try:
@@ -1816,6 +1832,8 @@ def extract_spot_coordinate(doc, ctx=None):
             if family_name and family_name not in ACCEPTED_FAMILIES:
                 info["debug_wrong_family_excluded"] = info.get("debug_wrong_family_excluded", 0) + 1
                 continue
+
+            _eligible_type_count += 1
 
             # --- Read core identity fields ---
 
@@ -2035,7 +2053,7 @@ def extract_spot_coordinate(doc, ctx=None):
         except Exception:
             continue  # fail-soft per record
 
-    _total_type_count = len(v2_records)
+    _total_type_count = _eligible_type_count
     for rec in v2_records:
         try:
             rec["is_sole_type_in_category"] = (_total_type_count == 1)
@@ -2121,6 +2139,7 @@ def extract_spot_slope(doc, ctx=None):
 
     v2_records = []
     v2_sig_hashes = []
+    _eligible_type_count = 0
 
     for d in all_types:
         try:
@@ -2155,6 +2174,8 @@ def extract_spot_slope(doc, ctx=None):
             if family_name and family_name != EXPECTED_FAMILY:
                 info["debug_wrong_family_excluded"] = info.get("debug_wrong_family_excluded", 0) + 1
                 continue
+
+            _eligible_type_count += 1
 
             # --- Read core identity fields ---
 
@@ -2299,7 +2320,7 @@ def extract_spot_slope(doc, ctx=None):
         except Exception:
             continue  # fail-soft per record
 
-    _total_type_count = len(v2_records)
+    _total_type_count = _eligible_type_count
     for rec in v2_records:
         try:
             rec["is_sole_type_in_category"] = (_total_type_count == 1)
