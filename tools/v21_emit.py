@@ -47,6 +47,7 @@ _VOLATILE_SEGMENTS = {
     "revit",
     "cache",
 }
+_GOVERNANCE_ROLE_RULES_PATH = Path(__file__).resolve().parent.parent / "policies" / "governance_role_path_patterns.json"
 
 
 def _safe_str(v: Any) -> str:
@@ -229,6 +230,58 @@ def _b32_sha1_16(text: str) -> str:
     digest = hashlib.sha1(text.encode("utf-8")).digest()
     token = base64.b32encode(digest).decode("ascii").lower().rstrip("=")
     return token[:16]
+
+
+def _load_governance_role_rules() -> List[Dict[str, str]]:
+    try:
+        with _GOVERNANCE_ROLE_RULES_PATH.open("r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except Exception as exc:
+        sys.stderr.write(
+            f"[WARN v21_emit] governance_role inference disabled: could not load "
+            f"{_GOVERNANCE_ROLE_RULES_PATH}: {exc}\n"
+        )
+        return []
+
+    if not isinstance(payload, dict) or not isinstance(payload.get("rules"), list):
+        sys.stderr.write(
+            f"[WARN v21_emit] governance_role inference disabled: malformed rules file "
+            f"{_GOVERNANCE_ROLE_RULES_PATH}\n"
+        )
+        return []
+
+    cleaned: List[Dict[str, str]] = []
+    for idx, rule in enumerate(payload.get("rules", [])):
+        if not isinstance(rule, dict):
+            continue
+        role = _safe_str(rule.get("role")).strip()
+        path_contains = _safe_str(rule.get("path_contains")).strip().lower()
+        filename_contains = _safe_str(rule.get("filename_contains")).strip().lower()
+        if not role or not path_contains:
+            sys.stderr.write(f"[WARN v21_emit] skipping invalid governance rule at index {idx}\n")
+            continue
+        row: Dict[str, str] = {"role": role, "path_contains": path_contains}
+        if filename_contains:
+            row["filename_contains"] = filename_contains
+        cleaned.append(row)
+    return cleaned
+
+
+def _infer_governance_role(central_path_norm: str, rules: List[Dict[str, str]]) -> str:
+    normalized_path = (central_path_norm or "").lower()
+    if not normalized_path or not rules:
+        return ""
+
+    filename = normalized_path.replace("\\", "/").rsplit("/", 1)[-1]
+    for rule in rules:
+        path_contains = rule.get("path_contains", "")
+        if path_contains not in normalized_path:
+            continue
+        filename_contains = rule.get("filename_contains", "")
+        if filename_contains and filename_contains not in filename:
+            continue
+        return rule.get("role", "")
+    return ""
 
 
 def _stable_pattern_id(
@@ -486,6 +539,7 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
     item_rows: List[Dict[str, str]] = []
     label_rows: List[Dict[str, str]] = []
     reason_rows: List[Dict[str, str]] = []
+    governance_rules = _load_governance_role_rules()
 
     for _, primary, secondary in _iter_export_files(exports_dir):
         data = _read_json(primary)
@@ -621,13 +675,24 @@ def emit_phase0_v21(exports_dir: Path, out_dir: Path, file_id_mode: str = "basen
                 if any(v for v in preserved.values()):
                     existing_annotations[eid] = preserved
 
+    governance_counts: Dict[str, int] = defaultdict(int)
     for row in meta_rows:
         eid = row.get("export_run_id", "").strip()
+        preserved_governance_role = ""
         if eid in existing_annotations:
             for col in annotation_columns:
                 if not row.get(col, "").strip():
                     row[col] = existing_annotations[eid].get(col, "")
+            preserved_governance_role = row.get("governance_role", "").strip()
+        if not preserved_governance_role:
+            row["governance_role"] = _infer_governance_role(row.get("central_path_norm", ""), governance_rules)
+        governance_counts[row.get("governance_role", "").strip()] += 1
 
+    sys.stderr.write(
+        "[INFO v21_emit] governance_role inference summary: "
+        + ", ".join(f"{(role or '<empty>')}={count}" for role, count in sorted(governance_counts.items()))
+        + "\n"
+    )
     _write_csv(out_dir / "file_metadata.csv", [
         "schema_version", "export_run_id", "file_id", "project_id", "model_id",
         "project_label", "model_label", "central_path", "central_path_norm",
