@@ -40,7 +40,8 @@ def resolve_analysis_run_id(rows: Sequence[Dict[str, str]], explicit: str = "") 
 
 def derive_scope_key(domain: str, pattern_meta: Dict[str, str]) -> str:
     if domain in ROW_KEY_DOMAINS:
-        return (pattern_meta.get("pattern_label_human", "") or "").strip()
+        label = (pattern_meta.get("pattern_label_human", "") or "").strip()
+        return label.split("|")[0].strip() if "|" in label else label
     if domain in SHAPE_GATED_DOMAINS:
         return (pattern_meta.get("join_key_schema", "") or "").strip()
     return ""

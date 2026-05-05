@@ -637,7 +637,7 @@ def main() -> None:
 
     if "placeholders" in selected_stages:
         print("[extract_all] Stage placeholders (T2b): generating placeholder exclusion CSVs...", flush=True)
-        cmd_ph = [sys.executable, "tools/bundle_analysis/placeholder_exclusions.py", "--phase0-dir", str(v21_phase0_dir), "--policies-dir", "policies", "--out-dir", str(v21_root / "placeholder_exclusions")]
+        cmd_ph = [sys.executable, "tools/bundle_analysis/placeholder_exclusions.py", "--phase0-dir", str(v21_phase0_dir), "--policies-dir", "policies", "--out-dir", str(v21_root / "placeholder_exclusions"), "--file-metadata-path", str(v21_phase0_dir / "file_metadata.csv")]
         report["commands"].append({"stage": "placeholders", "cmd": cmd_ph})
         try:
             _run(cmd_ph, env=env)
