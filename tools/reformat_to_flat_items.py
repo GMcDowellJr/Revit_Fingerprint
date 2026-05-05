@@ -110,15 +110,16 @@ def process_payload(
     allowed_domains: set[str] | None,
     role_policy: dict[str, dict[str, str]] | None,
     source_path: Path,
-) -> tuple[Any, int, int, Counter[str], int]:
+) -> tuple[Any, int, int, Counter[str], int, dict[str, dict[str, int]]]:
     if not isinstance(payload, dict):
-        return payload, 0, 0, Counter(), 0
+        return payload, 0, 0, Counter(), 0, {}
 
     out_payload = dict(payload)
     records_total = 0
     items_total = 0
     role_counts: Counter[str] = Counter()
     policy_overrides_total = 0
+    domain_stats: dict[str, dict[str, int]] = {}
 
     for domain_name, domain_payload in payload.items():
         if not isinstance(domain_payload, dict):
@@ -130,6 +131,9 @@ def process_payload(
             continue
 
         transformed_records: list[Any] = []
+        domain_role_counts: Counter[str] = Counter()
+        domain_records = 0
+        domain_items = 0
         for idx, record in enumerate(records):
             if not isinstance(record, dict):
                 sys.stderr.write(
@@ -139,15 +143,45 @@ def process_payload(
             transformed, item_count, per_record_roles, overrides = transform_record(record, domain_name, role_policy)
             transformed_records.append(transformed)
             records_total += 1
+            domain_records += 1
             items_total += item_count
+            domain_items += item_count
             role_counts.update(per_record_roles)
+            domain_role_counts.update(per_record_roles)
             policy_overrides_total += overrides
 
         new_domain = dict(domain_payload)
         new_domain["records"] = transformed_records
         out_payload[domain_name] = new_domain
+        domain_stats[domain_name] = {
+            "records": domain_records,
+            "items": domain_items,
+            "identity": domain_role_counts["identity"],
+            "cosmetic": domain_role_counts["cosmetic"],
+            "coordination": domain_role_counts["coordination"],
+            "unknown": domain_role_counts["unknown"],
+        }
 
-    return out_payload, records_total, items_total, role_counts, policy_overrides_total
+    return out_payload, records_total, items_total, role_counts, policy_overrides_total, domain_stats
+
+
+def print_domain_breakdown(domain_stats: dict[str, dict[str, int]]) -> None:
+    print("  {domain:>38} {records:>10} {identity:>10} {cosmetic:>10} {coordination:>13} {unknown:>8}".format(
+        domain="domain", records="records", identity="identity", cosmetic="cosmetic", coordination="coordination", unknown="unknown"
+    ))
+    print("  " + "-" * 92)
+    rows = sorted(domain_stats.items(), key=lambda kv: kv[1].get("items", 0), reverse=True)
+    for domain, stats in rows:
+        print(
+            "  {domain:>38} {records:>10} {identity:>10} {cosmetic:>10} {coordination:>13} {unknown:>8}".format(
+                domain=domain,
+                records=stats.get("records", 0),
+                identity=stats.get("identity", 0),
+                cosmetic=stats.get("cosmetic", 0),
+                coordination=stats.get("coordination", 0),
+                unknown=stats.get("unknown", 0),
+            )
+        )
 
 
 def iter_input_files(input_dir: Path) -> list[Path]:
@@ -166,6 +200,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--role_policy")
     ap.add_argument("--domains", help="Comma-separated domains to transform; others are left unchanged")
     ap.add_argument("--dry_run", action="store_true")
+    ap.add_argument("--breakdown_by_domain", action="store_true")
     args = ap.parse_args(argv)
 
     input_dir = Path(args.input_dir)
@@ -183,6 +218,9 @@ def main(argv: list[str]) -> int:
 
     allowed_domains = parse_domains(args.domains)
 
+    if args.breakdown_by_domain and not args.dry_run:
+        sys.stderr.write("WARN: --breakdown_by_domain is only supported with --dry_run; ignoring\n")
+
     files = iter_input_files(input_dir)
 
     if not args.dry_run:
@@ -191,6 +229,7 @@ def main(argv: list[str]) -> int:
     total_files = 0
     total_records = 0
     total_items = 0
+    corpus_domain_stats: dict[str, dict[str, int]] = {}
 
     for path in files:
         try:
@@ -200,7 +239,7 @@ def main(argv: list[str]) -> int:
             sys.stderr.write("WARN: failed to parse JSON {}: {}\n".format(path, exc))
             continue
 
-        transformed, record_count, item_count, role_counts, policy_overrides = process_payload(
+        transformed, record_count, item_count, role_counts, policy_overrides, domain_stats = process_payload(
             payload,
             allowed_domains,
             role_policy,
@@ -213,18 +252,20 @@ def main(argv: list[str]) -> int:
 
         output_name = "{}.flat.json".format(path.stem)
         if args.dry_run:
-            role_summary = ",".join(
-                "{}={}".format(role, role_counts[role]) for role in ("identity", "cosmetic", "coordination", "unknown") if role_counts[role]
-            )
-            print(
-                "{} records={} items={} roles=[{}]{}".format(
-                    path.name,
-                    record_count,
-                    item_count,
-                    role_summary,
-                    " policy_overrides={}".format(policy_overrides) if role_policy else "",
-                )
-            )
+            print("{}  domains={}  records={}  items={}{}".format(
+                output_name,
+                len(domain_stats),
+                record_count,
+                item_count,
+                "  policy_overrides={}".format(policy_overrides) if role_policy else "",
+            ))
+            if args.breakdown_by_domain:
+                print_domain_breakdown(domain_stats)
+                for domain_name, stats in domain_stats.items():
+                    if domain_name not in corpus_domain_stats:
+                        corpus_domain_stats[domain_name] = {"records": 0, "items": 0, "identity": 0, "cosmetic": 0, "coordination": 0, "unknown": 0}
+                    for k, v in stats.items():
+                        corpus_domain_stats[domain_name][k] += v
             continue
 
         out_path = output_dir / output_name
@@ -238,6 +279,14 @@ def main(argv: list[str]) -> int:
         print(line)
 
     print("total files={} total records={} total items={}".format(total_files, total_records, total_items))
+    if args.dry_run and args.breakdown_by_domain:
+        print("CORPUS TOTALS  files={}  domains={}  records={}  items={}".format(
+            total_files,
+            len(corpus_domain_stats),
+            total_records,
+            total_items,
+        ))
+        print_domain_breakdown(corpus_domain_stats)
     return 0
 
 
