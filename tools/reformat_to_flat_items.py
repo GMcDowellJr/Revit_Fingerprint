@@ -46,11 +46,12 @@ def load_role_policy(path: str | None) -> dict[str, dict[str, str]] | None:
     return policy
 
 
-def transform_record(record: dict[str, Any], domain: str, role_policy: dict[str, dict[str, str]] | None) -> tuple[dict[str, Any], int, Counter[str], int]:
+def transform_record(record: dict[str, Any], domain: str, role_policy: dict[str, dict[str, str]] | None) -> tuple[dict[str, Any], int, Counter[str], int, Counter[str]]:
     out = dict(record)
     flat_items: list[dict[str, Any]] = []
     seen_keys: set[Any] = set()
     role_counts: Counter[str] = Counter()
+    unknown_key_counts: Counter[str] = Counter()
     policy_overrides = 0
 
     identity_basis = record.get("identity_basis")
@@ -96,13 +97,17 @@ def transform_record(record: dict[str, Any], domain: str, role_policy: dict[str,
                 role_counts[override_role] += 1
                 policy_overrides += 1
 
+    for item in flat_items:
+        if item["role"] == "unknown":
+            unknown_key_counts[item["k"]] += 1
+
     out["items"] = flat_items
     out.pop("identity_basis", None)
     out.pop("phase2", None)
     if missing_identity_basis:
         out["flat_items_warning"] = "missing_identity_basis"
 
-    return out, len(flat_items), role_counts, policy_overrides
+    return out, len(flat_items), role_counts, policy_overrides, unknown_key_counts
 
 
 def process_payload(
@@ -110,9 +115,9 @@ def process_payload(
     allowed_domains: set[str] | None,
     role_policy: dict[str, dict[str, str]] | None,
     source_path: Path,
-) -> tuple[Any, int, int, Counter[str], int, dict[str, dict[str, int]]]:
+) -> tuple[Any, int, int, Counter[str], int, dict[str, dict[str, int]], dict[str, Counter[str]]]:
     if not isinstance(payload, dict):
-        return payload, 0, 0, Counter(), 0, {}
+        return payload, 0, 0, Counter(), 0, {}, {}
 
     out_payload = dict(payload)
     records_total = 0
@@ -120,6 +125,7 @@ def process_payload(
     role_counts: Counter[str] = Counter()
     policy_overrides_total = 0
     domain_stats: dict[str, dict[str, int]] = {}
+    domain_unknown_keys: dict[str, Counter[str]] = {}
 
     for domain_name, domain_payload in payload.items():
         if not isinstance(domain_payload, dict):
@@ -140,7 +146,7 @@ def process_payload(
                     "WARN: {} domain={} record_index={} is not an object; skipping\n".format(source_path, domain_name, idx)
                 )
                 continue
-            transformed, item_count, per_record_roles, overrides = transform_record(record, domain_name, role_policy)
+            transformed, item_count, per_record_roles, overrides, record_unknown_keys = transform_record(record, domain_name, role_policy)
             transformed_records.append(transformed)
             records_total += 1
             domain_records += 1
@@ -148,6 +154,7 @@ def process_payload(
             domain_items += item_count
             role_counts.update(per_record_roles)
             domain_role_counts.update(per_record_roles)
+            domain_unknown_keys.setdefault(domain_name, Counter()).update(record_unknown_keys)
             policy_overrides_total += overrides
 
         new_domain = dict(domain_payload)
@@ -162,7 +169,7 @@ def process_payload(
             "unknown": domain_role_counts["unknown"],
         }
 
-    return out_payload, records_total, items_total, role_counts, policy_overrides_total, domain_stats
+    return out_payload, records_total, items_total, role_counts, policy_overrides_total, domain_stats, domain_unknown_keys
 
 
 def print_domain_breakdown(domain_stats: dict[str, dict[str, int]]) -> None:
@@ -184,6 +191,19 @@ def print_domain_breakdown(domain_stats: dict[str, dict[str, int]]) -> None:
         )
 
 
+def print_unknown_keys_by_domain(domain_unknown_keys: dict[str, Counter[str]]) -> None:
+    print("  UNKNOWN KEYS BY DOMAIN:")
+    rows = sorted(
+        ((domain, counts) for domain, counts in domain_unknown_keys.items() if sum(counts.values()) > 0),
+        key=lambda kv: sum(kv[1].values()),
+        reverse=True,
+    )
+    for domain, counts in rows:
+        print("  {}".format(domain))
+        for key, count in sorted(counts.items(), key=lambda kv: kv[1], reverse=True):
+            print("    {key:<38} {count:>10}".format(key=key, count=count))
+
+
 def iter_input_files(input_dir: Path) -> list[Path]:
     files: list[Path] = []
     for path in sorted(input_dir.glob("*.json")):
@@ -201,6 +221,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--domains", help="Comma-separated domains to transform; others are left unchanged")
     ap.add_argument("--dry_run", action="store_true")
     ap.add_argument("--breakdown_by_domain", action="store_true")
+    ap.add_argument("--list_unknown_keys", action="store_true")
     args = ap.parse_args(argv)
 
     input_dir = Path(args.input_dir)
@@ -220,6 +241,10 @@ def main(argv: list[str]) -> int:
 
     if args.breakdown_by_domain and not args.dry_run:
         sys.stderr.write("WARN: --breakdown_by_domain is only supported with --dry_run; ignoring\n")
+    if args.list_unknown_keys and not args.dry_run:
+        sys.stderr.write("WARN: --list_unknown_keys is only supported with --dry_run; ignoring\n")
+    if args.list_unknown_keys and args.dry_run:
+        args.breakdown_by_domain = True
 
     files = iter_input_files(input_dir)
 
@@ -230,6 +255,7 @@ def main(argv: list[str]) -> int:
     total_records = 0
     total_items = 0
     corpus_domain_stats: dict[str, dict[str, int]] = {}
+    corpus_unknown_keys: dict[str, Counter[str]] = {}
 
     for path in files:
         try:
@@ -239,7 +265,7 @@ def main(argv: list[str]) -> int:
             sys.stderr.write("WARN: failed to parse JSON {}: {}\n".format(path, exc))
             continue
 
-        transformed, record_count, item_count, role_counts, policy_overrides, domain_stats = process_payload(
+        transformed, record_count, item_count, role_counts, policy_overrides, domain_stats, domain_unknown_keys = process_payload(
             payload,
             allowed_domains,
             role_policy,
@@ -266,6 +292,10 @@ def main(argv: list[str]) -> int:
                         corpus_domain_stats[domain_name] = {"records": 0, "items": 0, "identity": 0, "cosmetic": 0, "coordination": 0, "unknown": 0}
                     for k, v in stats.items():
                         corpus_domain_stats[domain_name][k] += v
+                if args.list_unknown_keys:
+                    print_unknown_keys_by_domain(domain_unknown_keys)
+                    for domain_name, counts in domain_unknown_keys.items():
+                        corpus_unknown_keys.setdefault(domain_name, Counter()).update(counts)
             continue
 
         out_path = output_dir / output_name
@@ -287,6 +317,9 @@ def main(argv: list[str]) -> int:
             total_items,
         ))
         print_domain_breakdown(corpus_domain_stats)
+        if args.list_unknown_keys:
+            print("CORPUS UNKNOWN KEYS BY DOMAIN:")
+            print_unknown_keys_by_domain(corpus_unknown_keys)
     return 0
 
 
