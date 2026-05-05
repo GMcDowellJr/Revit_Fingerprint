@@ -66,6 +66,12 @@ def transform_record(record: dict[str, Any], domain: str, role_policy: dict[str,
             if not isinstance(item, dict):
                 continue
             key = item.get("k")
+            if not isinstance(key, str):
+                continue
+            try:
+                hash(key)
+            except TypeError:
+                continue
             if key in seen_keys:
                 continue
             seen_keys.add(key)
