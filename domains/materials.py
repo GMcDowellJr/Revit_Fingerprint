@@ -480,12 +480,9 @@ def extract(doc, ctx=None):
                 "components": {"uid": safe_str(uid), "name": safe_str(name)},
             },
         )
-        element_id_int = None
-        try:
-            element_id_int = int(rec["material"]["id_local"])
-        except Exception:
-            pass
-        _ip, _ip_q = purge_lookup(element_id_int, ctx)
+        _ip, _ip_q = purge_lookup(
+            getattr(getattr(m, "Id", None), "IntegerValue", None), ctx
+        )
         rec["is_purgeable"] = _ip
         rec["is_purgeable_q"] = _ip_q
         rec["graphics_sig_hash_v2"] = graphics_sig_hash_v2
