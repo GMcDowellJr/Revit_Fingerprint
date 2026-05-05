@@ -62,6 +62,26 @@ def transform_record(record: dict[str, Any], domain: str, role_policy: dict[str,
     else:
         missing_identity_basis = True
 
+    existing_items = record.get("items")
+    preserved_existing_items = False
+    if missing_identity_basis and isinstance(existing_items, list):
+        for item in existing_items:
+            if not isinstance(item, dict):
+                continue
+            key = item.get("k")
+            if not isinstance(key, str):
+                continue
+            if key in seen_keys:
+                continue
+            role = item.get("role")
+            if role not in VALID_ROLES:
+                role = "unknown"
+            seen_keys.add(key)
+            flat_items.append({"k": key, "v": item.get("v"), "q": item.get("q"), "role": role})
+            role_counts[role] += 1
+        if flat_items:
+            preserved_existing_items = True
+
     def emit(items: list[Any], role: str) -> None:
         for item in items:
             if not isinstance(item, dict):
@@ -79,7 +99,8 @@ def transform_record(record: dict[str, Any], domain: str, role_policy: dict[str,
             flat_items.append({"k": key, "v": item.get("v"), "q": item.get("q"), "role": role})
             role_counts[role] += 1
 
-    emit(identity_items, "identity")
+    if not preserved_existing_items:
+        emit(identity_items, "identity")
 
     phase2 = record.get("phase2")
     phase2_dict = phase2 if isinstance(phase2, dict) else {}
@@ -104,7 +125,7 @@ def transform_record(record: dict[str, Any], domain: str, role_policy: dict[str,
     out["items"] = flat_items
     out.pop("identity_basis", None)
     out.pop("phase2", None)
-    if missing_identity_basis:
+    if missing_identity_basis and not preserved_existing_items:
         out["flat_items_warning"] = "missing_identity_basis"
 
     return out, len(flat_items), role_counts, policy_overrides, unknown_key_counts
