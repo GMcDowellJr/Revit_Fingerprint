@@ -324,7 +324,12 @@ def main(argv: list[str]) -> int:
             json.dump(transformed, f, separators=(",", ":"), ensure_ascii=False)
             f.write("\n")
 
-        line = "{}  domains={}  records={}  items={}".format(output_name, len([k for k, v in transformed.items() if isinstance(v, dict)]), record_count, item_count)
+        if isinstance(transformed, dict):
+            domain_count = len([k for k, v in transformed.items() if isinstance(v, dict)])
+        else:
+            domain_count = 0
+            sys.stderr.write("WARN: {} has non-object top-level payload; wrote unchanged output\n".format(path))
+        line = "{}  domains={}  records={}  items={}".format(output_name, domain_count, record_count, item_count)
         if role_policy:
             line += "  policy_overrides={}".format(policy_overrides)
         print(line)
