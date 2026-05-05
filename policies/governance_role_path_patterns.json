@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "notes": "Path substring patterns for governance_role inference. Matched against central_path_norm (lowercased). Evaluated in declared order — first match wins.",
+  "rules": [
+    { "role": "Container", "path_contains": "containers" },
+    { "role": "Generic", "path_contains": "project_templates", "filename_contains": "generic" },
+    { "role": "Template", "path_contains": "project_templates" },
+    { "role": "Project", "path_contains": "autodesk docs" }
+  ]
+}
