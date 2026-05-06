@@ -43,8 +43,17 @@ def main() -> None:
     if not policy_path.exists():
         raise SystemExit(f"Join policy not found: {policy_path}")
     records_path = phase0_dir / "records.csv"
+    if not records_path.exists():
+        legacy_records_path = phase0_dir / "phase0_records.csv"
+        if legacy_records_path.exists():
+            records_path = legacy_records_path
     records = _read_csv(records_path)
-    items = _read_csv(phase0_dir / "identity_items.csv")
+    items_path = phase0_dir / "identity_items.csv"
+    if not items_path.exists():
+        legacy_items_path = phase0_dir / "phase0_identity_items.csv"
+        if legacy_items_path.exists():
+            items_path = legacy_items_path
+    items = _read_csv(items_path)
     identity_index = build_identity_index(items)
 
     line_pattern_record_pks = {

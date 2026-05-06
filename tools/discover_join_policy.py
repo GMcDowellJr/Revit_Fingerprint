@@ -112,8 +112,18 @@ def main() -> None:
     args = ap.parse_args()
 
     phase0_dir = Path(args.phase0_dir)
-    records = _read_csv(phase0_dir / "records.csv")
-    items = _read_csv(phase0_dir / "identity_items.csv")
+    records_path = phase0_dir / "records.csv"
+    if not records_path.exists():
+        legacy_records_path = phase0_dir / "phase0_records.csv"
+        if legacy_records_path.exists():
+            records_path = legacy_records_path
+    records = _read_csv(records_path)
+    items_path = phase0_dir / "identity_items.csv"
+    if not items_path.exists():
+        legacy_items_path = phase0_dir / "phase0_identity_items.csv"
+        if legacy_items_path.exists():
+            items_path = legacy_items_path
+    items = _read_csv(items_path)
 
     domains = sorted({r.get("domain", "").strip() for r in records if r.get("domain", "").strip()}, key=str.lower)
     if args.domains:
