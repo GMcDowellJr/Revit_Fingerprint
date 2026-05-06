@@ -416,10 +416,10 @@ def run_bundle_analysis(
         }
 
     records_csv_candidates = [
-        analysis_dir / "phase0_v21" / "phase0_records.csv",
-        analysis_dir.parent / "phase0_v21" / "phase0_records.csv",
-        analysis_dir / "phase0_records.csv",
-        analysis_dir.parent / "phase0_records.csv",
+        analysis_dir / "records" / "records.csv",
+        analysis_dir.parent / "records" / "records.csv",
+        analysis_dir / "records.csv",
+        analysis_dir.parent / "records.csv",
         analysis_dir / "records.csv",
         analysis_dir.parent / "records.csv",
     ]

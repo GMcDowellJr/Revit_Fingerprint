@@ -96,7 +96,7 @@ def main():
     ap.add_argument('--out-dir',type=Path,required=True)
     ap.add_argument('--file-metadata-path',type=Path,default=None)
     a=ap.parse_args()
-    rows=read_csv_rows(a.phase0_dir/'phase0_records.csv')
+    rows=read_csv_rows(a.phase0_dir/'records.csv')
     pol=json.loads((a.policies_dir/'placeholder_known_defaults.json').read_text())
     pdom=pol.get('domains',{})
     file_roles = _load_governance_roles(a.file_metadata_path)
