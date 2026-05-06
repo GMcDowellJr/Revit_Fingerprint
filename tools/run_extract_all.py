@@ -15,6 +15,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from emit_element_dominance import emit_element_dominance
 from extractor import emit_analysis, emit_records
+
+# Backward-compatible aliases for tests/older callers
+emit_analysis_v21 = emit_analysis
+emit_phase0_v21 = emit_records
 from bundle_analysis.common import atomic_write_csv, read_csv_rows
 from bundle_analysis.reference_bundle import write_sidecar
 
@@ -505,7 +509,7 @@ def main() -> None:
         ("--strict-join-policy", "--require-join-policy", args.strict_join_policy),
         ("--allow-bootstrap", "--allow-sig-hash-join-key", args.allow_bootstrap),
         ("--emit-v21", "--stages flatten,discover", args.emit_v21),
-        ("--emit-phase0-v21", "--stages flatten,discover", args.emit_records),
+        ("--emit-phase0-v21", "--stages flatten,discover", args.emit_phase0_v21),
         ("--phase0-only", "--stages flatten", args.phase0_only),
         ("--phase1-only", "--stages authority", args.phase1_only),
         ("--phase2-only", "--stages patterns", args.phase2_only),
@@ -535,7 +539,9 @@ def main() -> None:
     elif args.split_only:
         selected_stages = ["split"]
 
-    skipped = set(_parse_stage_csv(args.skip_stages))
+    # Backward-compat stage aliases
+    selected_stages = ["authority" if s=="analyze1" else "patterns" if s=="analyze2" else s for s in selected_stages]
+    skipped = set("authority" if s=="analyze1" else "patterns" if s=="analyze2" else s for s in _parse_stage_csv(args.skip_stages))
     for st in selected_stages + list(skipped):
         if st not in stage_names:
             raise SystemExit(f"Unknown stage: {st}. Valid stages: {','.join(stage_names)}")
@@ -798,7 +804,7 @@ def main() -> None:
             dom_out = phase2_root / dom
             _ensure_dir(dom_out)
             for mod in ["run_joinhash_label_population", "run_joinhash_parameter_population", "run_candidate_joinkey_simulation", "run_population_stability"]:
-                _run([sys.executable, "-m", f"tools.patterns_analysis.{mod}", str(exports_dir), "--domain", dom, "--out", str(dom_out)], env=env)
+                _run([sys.executable, "-m", f"tools.phase2_analysis.{mod}", str(exports_dir), "--domain", dom, "--out", str(dom_out)], env=env)
             if dom.startswith("dimension_types_") and dom not in dimtype_domains_seen:
                 dimtype_domains_seen.append(dom)
 
@@ -809,7 +815,7 @@ def main() -> None:
                 "[DEBUG run_extract_all] Invoking run_dimension_types_by_family once "
                 f"for {len(dimtype_domains_seen)} dimension_types_* domain(s) using {canonical_dimtype_domain}.\n"
             )
-            cmd2e = [sys.executable, "-m", "tools.patterns_analysis.run_dimension_types_by_family", str(exports_dir), "--domain", canonical_dimtype_domain, "--out", str(dom_out)]
+            cmd2e = [sys.executable, "-m", "tools.phase2_analysis.run_dimension_types_by_family", str(exports_dir), "--domain", canonical_dimtype_domain, "--out", str(dom_out)]
             cmd2e += ["--baseline", str(args.baseline), "--families_from", "baseline"] if args.baseline else ["--families_from", "all"]
             _run(cmd2e, env=env)
 

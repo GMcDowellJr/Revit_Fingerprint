@@ -350,7 +350,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.patterns_analysis.split_detection_file_level',
+            '-m', 'tools.patterns_analysis._archive.split_detection_file_level',
             exports_dir,
             '--domain', domain,
             '--threshold', str(threshold),
@@ -393,7 +393,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.patterns_analysis.build_reference_standards',
+            '-m', 'tools.patterns_analysis._archive.build_reference_standards',
             str(clusters_csv),
             exports_dir,
             '--domain', domain,
@@ -408,7 +408,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.patterns_analysis.intradomain_summary',
+            '-m', 'tools.patterns_analysis._archive.intradomain_summary',
             str(clusters_csv),
             exports_dir,
             '--domain', domain,
@@ -421,7 +421,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.patterns_analysis.emit_intradomain_definition',
+            '-m', 'tools.patterns_analysis._archive.emit_intradomain_definition',
             str(clusters_csv),
             '--domain', domain,
             '--out', str(intradomain_out)
@@ -435,7 +435,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.patterns_analysis.derive_join_keys_by_ids',
+            '-m', 'tools.patterns_analysis._archive.derive_join_keys_by_ids',
             exports_dir,
             '--domain', domain,
             '--file-to-ids', str(file_to_ids_csv),
@@ -452,7 +452,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.patterns_analysis.apply_join_keys_by_ids',
+            '-m', 'tools.patterns_analysis._archive.apply_join_keys_by_ids',
             exports_dir,
             '--domain', domain,
             '--file-to-ids', str(file_to_ids_csv),
@@ -468,7 +468,7 @@ def run_split_detection_workflow(
         run_command(
             [
                 sys.executable,
-                '-m', 'tools.patterns_analysis.calibrate_join_key_gates',
+                '-m', 'tools.patterns_analysis._archive.calibrate_join_key_gates',
                 str(ids_report_csv),
                 '--domain', domain,
                 '--out', str(join_keys_out)
@@ -481,7 +481,7 @@ def run_split_detection_workflow(
         run_command(
             [
                 sys.executable,
-                '-m', 'tools.patterns_analysis.pareto_join_keys_by_ids',
+                '-m', 'tools.patterns_analysis._archive.pareto_join_keys_by_ids',
                 exports_dir,
                 '--domain', domain,
                 '--file-to-ids', str(file_to_ids_csv),
@@ -499,7 +499,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.patterns_analysis.split_detection_element_level',
+            '-m', 'tools.patterns_analysis._archive.split_detection_element_level',
             str(clusters_csv),
             str(standards_json),
             exports_dir,
