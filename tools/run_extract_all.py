@@ -41,15 +41,21 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
     item_index_col = "item_index" if "item_index" in fieldnames else "item_role"
 
     grouped: Dict[str, List[Dict[str, str]]] = {}
+    already_augmented: set = set()
     for r in rows:
         if str(r.get("domain", "")) != "line_patterns":
             continue
-        grouped.setdefault(str(r.get("record_pk", "")), []).append(r)
+        pk = str(r.get("record_pk", ""))
+        if str(r.get(key_col, "")) == "line_pattern.segments_norm_hash":
+            already_augmented.add(pk)
+        grouped.setdefault(pk, []).append(r)
 
     out_rows: List[Dict[str, str]] = []
     ok = 0
     missing = 0
     for record_pk, group in grouped.items():
+        if record_pk in already_augmented:
+            continue
         seg_rows = [r for r in group if _LP_SEGMENT_KEY_RE.match(str(r.get(key_col, "")))]
         status = "ok"
         hash_v = ""
@@ -557,6 +563,13 @@ def main() -> None:
 
     if "apply" in selected_stages:
         print("[extract_all] Stage apply (T2): applying join policy to flatten outputs...", flush=True)
+        items_csv = v21_phase0_dir / "identity_items.csv"
+        stats = _append_line_pattern_synthetic_norm_hash(items_csv)
+        print(
+            f"[extract_all] line_patterns segments_norm_hash (pre-apply): "
+            f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}",
+            flush=True,
+        )
         policy_path = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json").resolve()
         cmd_apply = [sys.executable, "tools/apply_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--join-policy", str(policy_path)]
         report["commands"].append({"stage": "apply", "cmd": cmd_apply})
