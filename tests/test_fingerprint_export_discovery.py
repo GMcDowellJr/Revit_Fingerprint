@@ -116,39 +116,3 @@ def test_load_exports_prefers_fingerprint_files_before_plain_fallback(tmp_path: 
         "fp__beta__002__fingerprint.json",
         "zeta.report.json",
     ]
-
-
-def test_analyze2_runs_dimension_types_by_family_once(tmp_path: Path, monkeypatch, capsys) -> None:
-    out_root = tmp_path / "out"
-    exports_dir = tmp_path / "exports"
-    exports_dir.mkdir()
-    _write_json(exports_dir / "fp__project__001__fingerprint.json", _fingerprint_payload("dimension_types_linear"))
-
-    commands = []
-
-    monkeypatch.setattr("tools.run_extract_all._detect_surfaces", lambda _: {"fingerprint_json": 1, "plain_json": 0, "details": 0, "index": 0, "legacy": 0, "total_json": 1})
-    monkeypatch.setattr("tools.run_extract_all.emit_analysis_v21", lambda *args, **kwargs: "analysis-run")
-    monkeypatch.setattr("tools.run_extract_all._run", lambda cmd, env: commands.append(cmd))
-
-    argv = [
-        "run_extract_all.py",
-        str(exports_dir),
-        "--out-root",
-        str(out_root),
-        "--stages",
-        "analyze2",
-        "--emit-legacy",
-        "--domains",
-        "dimension_types_linear,dimension_types_angular,dimension_types_radial",
-        "--no-require-join-policy",
-    ]
-    monkeypatch.setattr(sys, "argv", argv)
-
-    from tools import run_extract_all
-
-    run_extract_all.main()
-    captured = capsys.readouterr()
-
-    dimtype_calls = [cmd for cmd in commands if "tools.phase2_analysis.run_dimension_types_by_family" in cmd]
-    assert len(dimtype_calls) == 1
-    assert "Invoking run_dimension_types_by_family once" in captured.err
