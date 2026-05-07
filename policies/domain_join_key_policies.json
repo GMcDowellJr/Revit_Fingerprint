@@ -653,13 +653,14 @@
       ]
     },
     "materials": {
-      "join_key_schema": "materials.join_key.v1",
+      "join_key_schema": "materials.join_key.v2",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "material.uid"
+        "material.sig_hash"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
+		"material.uid",
         "material.id_local",
         "material.name",
         "material.class",

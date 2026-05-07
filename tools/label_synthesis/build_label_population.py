@@ -35,8 +35,8 @@ from typing import Dict, Set, Tuple
 
 
 def build_label_population(out_root: Path) -> None:
-    phase0_dir = out_root / "Results_v21" / "phase0_v21"
-    records_csv = phase0_dir / "phase0_records.csv"
+    phase0_dir = out_root / "results" / "records"
+    records_csv = phase0_dir / "records.csv"
 
     if not records_csv.is_file():
         sys.exit(
@@ -44,7 +44,7 @@ def build_label_population(out_root: Path) -> None:
             f"        Run flatten stage first: --stages flatten (or flatten,apply)"
         )
 
-    label_synth_dir = out_root / "Results_v21" / "label_synthesis"
+    label_synth_dir = out_root / "results" / "label_synthesis"
     label_synth_dir.mkdir(parents=True, exist_ok=True)
 
     # Group by (domain, join_hash, label_v) -> set of file (export_run_id) that have it
