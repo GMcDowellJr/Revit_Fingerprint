@@ -177,6 +177,24 @@ def test_registry_output_folder_sanitized():
     assert kaiser_reg["output_folder"] == "imperial_kaiser"
 
 
+def test_registry_output_folders_globally_unique_with_suffix_collision():
+    # Reproduce the case where a generated suffix collides with another
+    # segment's natural sanitized name:
+    #   imperial|kaiser   → imperial_kaiser (natural)
+    #   imperial|Kaiser   → imperial_kaiser (collision → imperial_kaiser_2)
+    #   imperial|kaiser_2 → imperial_kaiser_2 (natural — collides with the suffix!)
+    # The registry must still produce three distinct output_folder values.
+    rows = (
+        [_meta_row(f"a{i:02d}", "imperial", "kaiser", "Project") for i in range(3)]
+        + [_meta_row(f"b{i:02d}", "imperial", "Kaiser", "Project") for i in range(3)]
+        + [_meta_row(f"c{i:02d}", "imperial", "kaiser_2", "Project") for i in range(3)]
+    )
+    segs = _build_segments(rows, min_files=1)
+    reg = _build_registry(segs)
+    folders = [r["output_folder"] for r in reg]
+    assert len(folders) == len(set(folders)), f"Duplicate output_folder values: {folders}"
+
+
 def test_registry_initial_status_pending():
     segs = _build_segments(ROWS, min_files=3)
     reg = _build_registry(segs)
