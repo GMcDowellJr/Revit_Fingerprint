@@ -209,7 +209,9 @@ def extract(doc, ctx=None):
             unit_v, unit_q = (None, ITEM_Q_UNREADABLE)
         else:
             try:
-                unit_v, unit_q = canonicalize_str(safe_str(fmt.GetUnitTypeId()))
+                forge_id = fmt.GetUnitTypeId()
+                uid_str = forge_id.TypeId  # direct access — getattr fails in IronPython 2.7
+                unit_v, unit_q = canonicalize_str(safe_str(uid_str))
             except Exception:
                 unit_v, unit_q = (None, ITEM_Q_UNREADABLE)
         items.append(make_identity_item("units.unit_type_id", unit_v, unit_q))
@@ -219,7 +221,9 @@ def extract(doc, ctx=None):
             sym_v, sym_q = (None, ITEM_Q_UNREADABLE)
         else:
             try:
-                sym_v, sym_q = canonicalize_str(safe_str(fmt.GetSymbolTypeId()))
+                sym_forge_id = fmt.GetSymbolTypeId()
+                sym_str = sym_forge_id.TypeId  # direct access — getattr fails in IronPython 2.7
+                sym_v, sym_q = canonicalize_str(safe_str(sym_str))
             except Exception:
                 sym_v, sym_q = (None, ITEM_Q_UNREADABLE)
         items.append(make_identity_item("units.symbol_type_id", sym_v, sym_q))

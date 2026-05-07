@@ -535,8 +535,6 @@ def _derive_unit_system(payload: Dict[str, Any], export_run_id: str) -> str:
     units_block = payload.get("units")
     if not isinstance(units_block, dict):
         return ""
-    if _safe_str(units_block.get("status")).strip().lower() != "ok":
-        return ""
     records = units_block.get("records")
     if not isinstance(records, list):
         return ""
@@ -557,6 +555,10 @@ def _derive_unit_system(payload: Dict[str, Any], export_run_id: str) -> str:
             for it in items
         )
         if not is_length:
+            continue
+
+        # Only trust a record with ok status
+        if _safe_str(rec.get("status")).strip().lower() != "ok":
             continue
 
         length_spec_found = True
@@ -583,10 +585,9 @@ def _derive_unit_system(payload: Dict[str, Any], export_run_id: str) -> str:
         )
         return ""
 
-    if length_spec_found is False:
+    if not length_spec_found:
         sys.stderr.write(f"[WARN flatten] unit_system: no length spec found for {export_run_id}\n")
     return ""
-
 
 def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename") -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     exported_utc = _utc_now_iso()
