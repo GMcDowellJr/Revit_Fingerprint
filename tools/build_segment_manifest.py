@@ -45,9 +45,13 @@ REGISTRY_FIELDNAMES = [
 ]
 
 
-def _read_csv(path: Path) -> List[Dict[str, str]]:
+def _read_csv(path: Path) -> tuple:
+    """Return (fieldnames, rows). fieldnames is a list of header strings (may be empty for a totally empty file)."""
     with path.open("r", encoding="utf-8-sig", newline="") as f:
-        return [{str(k): ("" if v is None else str(v)) for k, v in row.items()} for row in csv.DictReader(f)]
+        reader = csv.DictReader(f)
+        rows = [{str(k): ("" if v is None else str(v)) for k, v in row.items()} for row in reader]
+        fieldnames = list(reader.fieldnames or [])
+    return fieldnames, rows
 
 
 def _atomic_write_csv(path: Path, fieldnames: Sequence[str], rows: Iterable[Dict[str, str]]) -> None:
@@ -253,17 +257,19 @@ def main(argv: List[str] | None = None) -> int:
     out_dir = Path(args.out_dir)
     min_files: int = args.min_files
 
-    rows = _read_csv(metadata_path)
-    if not rows:
-        sys.stderr.write(f"[WARN] file_metadata.csv is empty: {metadata_path}\n")
+    fieldnames, rows = _read_csv(metadata_path)
+    # Validate headers unconditionally — even a header-only file must declare the required columns.
+    if not fieldnames:
+        sys.stderr.write(f"[WARN] file_metadata.csv is completely empty (no header): {metadata_path}\n")
     else:
-        actual_columns = set(rows[0].keys())
-        missing_columns = REQUIRED_COLUMNS - actual_columns
+        missing_columns = REQUIRED_COLUMNS - set(fieldnames)
         if missing_columns:
             sys.stderr.write(
                 f"[ERROR] file_metadata.csv is missing required columns: {sorted(missing_columns)}\n"
             )
             return 1
+        if not rows:
+            sys.stderr.write(f"[WARN] file_metadata.csv has a valid header but no data rows: {metadata_path}\n")
 
     skipped_blank = sum(1 for r in rows if not (r.get("unit_system") or "").strip())
     if skipped_blank:

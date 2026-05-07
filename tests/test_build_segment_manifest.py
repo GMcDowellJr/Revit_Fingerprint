@@ -313,3 +313,17 @@ def test_main_fails_when_export_run_id_column_absent(tmp_path):
     out_dir = tmp_path / "out"
     rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
     assert rc == 1
+
+
+def test_main_fails_on_missing_columns_even_with_no_data_rows(tmp_path):
+    # Header-only file missing governance_role must still fail, not silently succeed.
+    meta = tmp_path / "file_metadata.csv"
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["export_run_id", "unit_system", "client_label"])
+        w.writeheader()
+        # No data rows — previously validation was skipped in this branch.
+
+    out_dir = tmp_path / "out"
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+    assert rc == 1
+    assert not (out_dir / "segment_manifest.csv").exists()
