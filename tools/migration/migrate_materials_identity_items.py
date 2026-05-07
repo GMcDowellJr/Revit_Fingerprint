@@ -10,6 +10,10 @@ as rec["graphics_sig_hash_v2"] — this script surfaces it into
 rec["identity_basis"]["items"] so the apply/discover pipeline can use it as a
 join key.
 
+Input format: compact (production) or indented (dev) JSON — both handled.
+Output format: compact production JSON (separators=(',',':'), sort_keys=True),
+               matching runner/run_dynamo.py production output mode.
+
 Changes made per materials record:
   - Adds {"k": "material.graphics_sig_hash_v2", "v": <value>, "q": "ok"} to
     identity_basis.items if not already present.
@@ -42,7 +46,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 # ---------------------------------------------------------------------------
-# JSON helpers
+# JSON helpers — compact production format
 # ---------------------------------------------------------------------------
 
 def _load_json(path: Path) -> Dict[str, Any]:
@@ -51,9 +55,10 @@ def _load_json(path: Path) -> Dict[str, Any]:
 
 
 def _write_json(path: Path, data: Dict[str, Any]) -> None:
+    """Write compact production JSON — matches runner/run_dynamo.py production mode."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        json.dump(data, f, separators=(",", ":"), sort_keys=True)
         f.write("\n")
 
 
@@ -70,7 +75,6 @@ def _iter_materials_records(payload: Dict[str, Any]):
       - Flat structure: payload["materials"]["records"] = [...]
       - Nested structure: payload["domains"]["materials"]["records"] = [...]
     """
-    # Flat structure (current)
     mat = payload.get("materials")
     if isinstance(mat, dict):
         records = mat.get("records")
@@ -80,7 +84,6 @@ def _iter_materials_records(payload: Dict[str, Any]):
                     yield ("materials", records, i, rec)
         return
 
-    # Nested under "domains" key (older format)
     domains = payload.get("domains")
     if isinstance(domains, dict):
         mat = domains.get("materials")
@@ -93,7 +96,6 @@ def _iter_materials_records(payload: Dict[str, Any]):
 
 
 def _get_identity_items(rec: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Return the identity_basis.items list, creating the structure if absent."""
     ib = rec.get("identity_basis")
     if not isinstance(ib, dict):
         rec["identity_basis"] = {"items": []}
@@ -113,24 +115,17 @@ def _migrate_record(rec: Dict[str, Any]) -> bool:
     Inject material.graphics_sig_hash_v2 into identity_basis.items.
     Returns True if a change was made.
     """
-    # Read the sig hash value from the record
     sig_value = rec.get("graphics_sig_hash_v2") or rec.get("sig_hash")
     if not sig_value:
-        return False  # Nothing to inject
+        return False
 
     items = _get_identity_items(rec)
 
-    # Check if already present
     for item in items:
         if isinstance(item, dict) and item.get("k") == _INJECT_KEY:
             return False  # Already migrated
 
-    # Inject — append and then re-sort alphabetically by k (pipeline convention)
-    items.append({
-        "k": _INJECT_KEY,
-        "v": str(sig_value),
-        "q": "ok",
-    })
+    items.append({"k": _INJECT_KEY, "q": "ok", "v": str(sig_value)})
     items.sort(key=lambda it: str(it.get("k", "")))
     return True
 
@@ -161,7 +156,7 @@ def _migrate_file(
     modified = 0
     already = 0
 
-    for _domain_key, _records, idx, rec in _iter_materials_records(payload):
+    for _domain_key, _records, _idx, rec in _iter_materials_records(payload):
         found += 1
         changed = _migrate_record(rec)
         if changed:
@@ -170,7 +165,6 @@ def _migrate_file(
             already += 1
 
     if found == 0:
-        # No materials domain in this file — skip write
         return 0, 0, 0
 
     if dry_run:
@@ -200,11 +194,9 @@ def _migrate_file(
 # ---------------------------------------------------------------------------
 
 def _find_json_files(exports_dir: Path) -> List[Path]:
-    """Find all fingerprint JSON files, preferring __fingerprint.json."""
     fps = sorted(exports_dir.glob("*__fingerprint.json"))
     if fps:
         return fps
-    # Fall back to all .json (excluding .legacy.json and .bak)
     return sorted(
         p for p in exports_dir.glob("*.json")
         if not p.name.lower().endswith(".legacy.json")
@@ -216,34 +208,20 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description=(
             "Migrate fingerprint JSON exports to inject material.graphics_sig_hash_v2 "
-            "as an identity item. No Dynamo re-extraction required."
+            "as an identity item. Reads compact or indented JSON; always writes compact "
+            "production JSON (separators=(',',':'), sort_keys=True)."
         )
     )
-    ap.add_argument(
-        "--exports-dir",
-        required=True,
-        help="Directory containing fingerprint JSON export files.",
-    )
-    ap.add_argument(
-        "--out-dir",
-        default=None,
-        help="Output directory for migrated files (default: required unless --in-place).",
-    )
-    ap.add_argument(
-        "--in-place",
-        action="store_true",
-        help="Overwrite originals in-place (creates .bak backups unless --no-backup).",
-    )
-    ap.add_argument(
-        "--no-backup",
-        action="store_true",
-        help="Skip .bak backup when using --in-place.",
-    )
-    ap.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Report what would change without writing any files.",
-    )
+    ap.add_argument("--exports-dir", required=True,
+                    help="Directory containing fingerprint JSON export files.")
+    ap.add_argument("--out-dir", default=None,
+                    help="Output directory for migrated files (required unless --in-place).")
+    ap.add_argument("--in-place", action="store_true",
+                    help="Overwrite originals in-place (creates .bak backups unless --no-backup).")
+    ap.add_argument("--no-backup", action="store_true",
+                    help="Skip .bak backup when using --in-place.")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="Report what would change without writing any files.")
     args = ap.parse_args()
 
     exports_dir = Path(args.exports_dir).resolve()
@@ -274,6 +252,7 @@ def main() -> None:
         print(f"[migrate] IN-PLACE mode{backup_note}")
     else:
         print(f"[migrate] Output directory: {out_dir}")
+    print(f"[migrate] Output format: compact JSON (production mode)")
     print()
 
     total_files = 0
@@ -312,10 +291,8 @@ def main() -> None:
     print("NEXT STEPS after migration:")
     print("  1. Update domain_join_key_policies.json — set materials required_items")
     print('     to ["material.graphics_sig_hash_v2"], move material.uid to optional_items')
-    print("  2. Re-run the apply stage:")
-    print("     python tools/run_extract_all.py <exports_dir> --out-root <out_root>")
-    print("         --stages apply --domain-policy-json <policy.json>")
-    print("  3. Re-run analyze1/analyze2 to rebuild domain_patterns.csv with new join keys")
+    print("  2. Re-run flatten + apply stages against the migrated exports directory")
+    print("  3. Re-run analyze1/analyze2 to rebuild domain_patterns.csv")
     print()
 
 
