@@ -405,7 +405,11 @@ def extract(doc, ctx=None):
             _mk_item("material.sig.cut_background_pattern.sig_hash", cut_bg["sig_hash"]),
             _mk_item("material.sig.cut_background_pattern_color_rgb", cut_bg_color),
         ]
-        identity_items = [_mk_item("material.uid", uid)] + sig_basis_items
+        name_v, name_q = canonicalize_str(name) if name not in (S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE) else (None, ITEM_Q_MISSING if name == S_MISSING else ITEM_Q_UNREADABLE)
+        identity_items = [
+            _mk_item("material.uid", uid),
+            make_identity_item("material.name", name_v, name_q),
+        ] + sig_basis_items
 
         material_payload = {
             "uid": uid,
@@ -436,9 +440,16 @@ def extract(doc, ctx=None):
             "physical_asset_capture_status": "deferred",
             "thermal_asset_capture_status": "deferred",
         }
-        identity_items_sorted = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
         sig_basis_items_sorted = sorted(sig_basis_items, key=lambda it: safe_str(it.get("k", "")))
         graphics_sig_hash_v2 = make_hash(serialize_identity_items(sig_basis_items_sorted))
+
+        # Inject graphics_sig_hash_v2 as an identity item so the policy apply
+        # stage can select it as the join key basis (v2 policy).
+        # Re-sort identity_items after injection to maintain canonical order.
+        identity_items.append(
+            make_identity_item("material.graphics_sig_hash_v2", graphics_sig_hash_v2, ITEM_Q_OK)
+        )
+        identity_items_sorted = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
 
         status_v2 = STATUS_OK
         status_reasons = []
@@ -472,7 +483,7 @@ def extract(doc, ctx=None):
             status_reasons=sorted(set(status_reasons)),
             sig_hash=graphics_sig_hash_v2,
             identity_items=identity_items_sorted,
-            required_qs=[identity_items_sorted[0].get("q", ITEM_Q_OK)],
+            required_qs=[ITEM_Q_OK],
             label={
                 "display": safe_str(name),
                 "quality": "human" if name not in (S_MISSING, S_UNREADABLE) else "computed",
