@@ -73,12 +73,71 @@ def run_step(cmd: List[str]) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, check=True, capture_output=False, text=True)
 
 
-def run_step_capture(cmd: List[str]) -> tuple[int, str]:
-    """Run a subprocess step, return (returncode, last_20_lines_stderr)."""
+def run_step_capture(cmd: List[str]) -> tuple[int, str, str]:
+    """Run a subprocess step, return (returncode, last_20_lines_stderr, full_stderr)."""
     result = subprocess.run(cmd, capture_output=True, text=True)
     stderr_lines = (result.stderr or "").splitlines()
     tail = "\n".join(stderr_lines[-20:]) if stderr_lines else ""
-    return result.returncode, tail
+    return result.returncode, tail, result.stderr or ""
+
+
+# ── Diagnostic helpers ────────────────────────────────────────────────────────
+
+def _build_patterns_missing_notes(
+    sid: str,
+    out_root: Path,
+    records_dir: Path,
+    patterns_stderr: str,
+) -> str:
+    """Build a diagnostic failure message when patterns exits 0 but writes no output."""
+    parts = [
+        f"step=patterns returncode=0 but pattern_presence_file.csv was not written.",
+        f"segment={sid}",
+        "emit_analysis was skipped — most likely because no records matched the export_run_id filter.",
+        "",
+    ]
+
+    ids_file = out_root / "export_run_ids.txt"
+    if ids_file.is_file():
+        ids = [l.strip() for l in ids_file.read_text(encoding="utf-8").splitlines() if l.strip()]
+        parts.append(f"export_run_ids.txt: {len(ids)} IDs")
+        if ids:
+            parts.append(f"  first 3: {ids[:3]}")
+    else:
+        parts.append(f"export_run_ids.txt NOT FOUND at {ids_file}")
+
+    records_csv = records_dir / "records.csv"
+    if records_csv.is_file():
+        with records_csv.open("r", encoding="utf-8-sig", newline="") as f:
+            rdr = csv.reader(f)
+            header = next(rdr, [])
+            first_row = next(rdr, [])
+        row_dict = dict(zip(header, first_row)) if first_row else {}
+        first_eid = row_dict.get("export_run_id", "<column missing>")
+        parts.append(f"records.csv first export_run_id: {first_eid!r}")
+    else:
+        parts.append(f"records.csv NOT FOUND at {records_csv}")
+
+    meta_csv = records_dir / "file_metadata.csv"
+    if meta_csv.is_file():
+        with meta_csv.open("r", encoding="utf-8-sig", newline="") as f:
+            rdr = csv.reader(f)
+            header = next(rdr, [])
+            first_row = next(rdr, [])
+        row_dict = dict(zip(header, first_row)) if first_row else {}
+        first_eid = row_dict.get("export_run_id", "<column missing>")
+        parts.append(f"file_metadata.csv first export_run_id: {first_eid!r}")
+    else:
+        parts.append(f"file_metadata.csv NOT FOUND at {meta_csv}")
+
+    # Surface WARN lines from patterns stderr (run_extract_all.py warnings)
+    warn_lines = [ln for ln in patterns_stderr.splitlines() if "[WARN extract_all]" in ln]
+    if warn_lines:
+        parts.append("")
+        parts.append("patterns stderr warnings:")
+        parts.extend(f"  {ln}" for ln in warn_lines[-10:])
+
+    return "\n".join(parts)
 
 
 # ── Core orchestration ────────────────────────────────────────────────────────
@@ -259,7 +318,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 "--out-root", str(out_root),
                 "--records-dir", str(records_dir),
             ]
-            rc, tail = run_step_capture(lp_cmd)
+            rc, tail, _stderr = run_step_capture(lp_cmd)
             if rc != 0:
                 raise subprocess.CalledProcessError(rc, lp_cmd, stderr=tail)
         except Exception as exc:
@@ -280,7 +339,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 "--allow-sig-hash-join-key",
                 "--records-dir", str(records_dir),
             ]
-            rc, tail = run_step_capture(extract_cmd)
+            rc, tail, patterns_stderr = run_step_capture(extract_cmd)
             if rc != 0:
                 step_failed = "patterns"
                 failure_notes = f"step=patterns returncode={rc}\n{tail}"
@@ -288,12 +347,8 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 presence_csv = out_root / "results" / "analysis" / "pattern_presence_file.csv"
                 if not presence_csv.is_file():
                     step_failed = "patterns"
-                    failure_notes = (
-                        "step=patterns returncode=0 but pattern_presence_file.csv was not written — "
-                        "emit_analysis was likely skipped because no records matched the "
-                        "export_run_id filter. Check that export_run_ids in "
-                        f"{out_root / 'export_run_ids.txt'} match export_run_id values in "
-                        f"{records_dir / 'records.csv'}."
+                    failure_notes = _build_patterns_missing_notes(
+                        sid, out_root, records_dir, patterns_stderr
                     )
 
         # Step 3 — Bundle stage
@@ -307,7 +362,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 "--metadata-file", str(records_dir / "file_metadata.csv"),
                 "--no-discover-populations",
             ]
-            rc, tail = run_step_capture(bundle_cmd)
+            rc, tail, _stderr = run_step_capture(bundle_cmd)
             if rc != 0:
                 step_failed = "bundle"
                 failure_notes = f"step=bundle returncode={rc}\n{tail}"

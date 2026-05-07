@@ -619,6 +619,16 @@ def main() -> None:
                 f"meta_rows={len(meta_rows)} record_rows={len(record_rows)}",
                 flush=True,
             )
+            if not meta_rows or not record_rows:
+                _sample_allowed = sorted(_allowed)[:5]
+                _meta_ids = sorted({r.get("export_run_id", "").strip() for r in _read_csv_rows(records_source_dir / "file_metadata.csv")})[:5] if (records_source_dir / "file_metadata.csv").is_file() else []
+                sys.stderr.write(
+                    f"[WARN extract_all] filter left meta_rows={len(meta_rows)} record_rows={len(record_rows)} — "
+                    f"emit_analysis will be skipped and pattern_presence_file.csv will NOT be written.\n"
+                    f"[WARN extract_all] records_source_dir={records_source_dir}\n"
+                    f"[WARN extract_all] filter_file={_filter_path} (first 5 IDs: {_sample_allowed})\n"
+                    f"[WARN extract_all] file_metadata.csv first 5 export_run_ids: {_meta_ids}\n"
+                )
 
         if require_join_policy and phase0_records_csv.is_file():
             _enforce_policy_gate(record_rows, v21_root / "diagnostics", active_domains, allow_sig_hash_join_key)
