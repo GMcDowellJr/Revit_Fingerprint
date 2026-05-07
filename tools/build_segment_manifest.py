@@ -16,6 +16,7 @@ from tempfile import NamedTemporaryFile
 from typing import Dict, Iterable, List, Sequence
 
 SEED_ROLES = {"Template", "Container"}
+REQUIRED_COLUMNS = {"export_run_id", "unit_system", "client_label", "governance_role"}
 
 MANIFEST_FIELDNAMES = [
     "segment_id",
@@ -255,6 +256,14 @@ def main(argv: List[str] | None = None) -> int:
     rows = _read_csv(metadata_path)
     if not rows:
         sys.stderr.write(f"[WARN] file_metadata.csv is empty: {metadata_path}\n")
+    else:
+        actual_columns = set(rows[0].keys())
+        missing_columns = REQUIRED_COLUMNS - actual_columns
+        if missing_columns:
+            sys.stderr.write(
+                f"[ERROR] file_metadata.csv is missing required columns: {sorted(missing_columns)}\n"
+            )
+            return 1
 
     skipped_blank = sum(1 for r in rows if not (r.get("unit_system") or "").strip())
     if skipped_blank:

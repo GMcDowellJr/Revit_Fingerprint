@@ -268,3 +268,30 @@ def test_blank_client_label_level2_id_distinct_from_level1():
 def test_main_missing_metadata_file(tmp_path):
     rc = main(["--metadata-file", str(tmp_path / "missing.csv"), "--out-dir", str(tmp_path / "out")])
     assert rc == 1
+
+
+def test_main_fails_on_missing_required_columns(tmp_path):
+    # CSV is present and non-empty but lacks governance_role — tool must exit 1
+    # and write no output files (silently dropping every row would be worse).
+    meta = tmp_path / "file_metadata.csv"
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["export_run_id", "unit_system", "client_label"])
+        w.writeheader()
+        w.writerow({"export_run_id": "r01", "unit_system": "imperial", "client_label": "Acme"})
+
+    out_dir = tmp_path / "out"
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+    assert rc == 1
+    assert not (out_dir / "segment_manifest.csv").exists()
+
+
+def test_main_fails_when_export_run_id_column_absent(tmp_path):
+    meta = tmp_path / "file_metadata.csv"
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["unit_system", "client_label", "governance_role"])
+        w.writeheader()
+        w.writerow({"unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
+
+    out_dir = tmp_path / "out"
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+    assert rc == 1
