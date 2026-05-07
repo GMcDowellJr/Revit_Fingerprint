@@ -540,6 +540,7 @@ def _derive_unit_system(payload: Dict[str, Any], export_run_id: str) -> str:
         return ""
 
     length_spec_found = False
+    saw_length_unit_type_id = False
     for rec in records:
         if not isinstance(rec, dict):
             continue
@@ -557,8 +558,9 @@ def _derive_unit_system(payload: Dict[str, Any], export_run_id: str) -> str:
         if not is_length:
             continue
 
-        # Only trust a record with ok status
-        if _safe_str(rec.get("status")).strip().lower() != "ok":
+        # Accept usable records even when optional fields degrade status
+        rec_status = _safe_str(rec.get("status")).strip().lower()
+        if rec_status not in ("ok", "degraded"):
             continue
 
         length_spec_found = True
@@ -569,24 +571,25 @@ def _derive_unit_system(payload: Dict[str, Any], export_run_id: str) -> str:
                 break
 
         if not unit_type_id:
-            return ""
+            continue
 
+        saw_length_unit_type_id = True
         unit_type_id_l = unit_type_id.lower()
-        if "feet" in unit_type_id_l or "fractional" in unit_type_id_l:
+        if "feet" in unit_type_id_l or "foot" in unit_type_id_l or "fractional" in unit_type_id_l or "inch" in unit_type_id_l:
             return "Imperial"
         if "millimeter" in unit_type_id_l:
             return "Metric"
         tokens = re.split(r"[^a-z0-9]+", unit_type_id_l)
-        if "meter" in tokens:
+        if "meter" in tokens or "meters" in tokens or "metre" in tokens or "metres" in tokens or "centimeter" in tokens or "centimeters" in tokens:
             return "Metric"
-
-        sys.stderr.write(
-            f"[WARN flatten] unit_system: unrecognized unit_type_id '{unit_type_id}' for {export_run_id}\n"
-        )
-        return ""
 
     if not length_spec_found:
         sys.stderr.write(f"[WARN flatten] unit_system: no length spec found for {export_run_id}\n")
+        return ""
+    if saw_length_unit_type_id:
+        sys.stderr.write(
+            f"[WARN flatten] unit_system: no recognized unit_type_id found in length records for {export_run_id}\n"
+        )
     return ""
 
 def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename") -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
