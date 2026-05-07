@@ -362,6 +362,26 @@ def test_main_fails_when_export_run_id_column_absent(tmp_path):
     assert rc == 1
 
 
+def test_main_warns_on_blank_export_run_id(tmp_path, capsys):
+    meta = tmp_path / "file_metadata.csv"
+    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        w.writerow({"export_run_id": "r01", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
+        w.writerow({"export_run_id": "r02", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
+        w.writerow({"export_run_id": "r03", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
+        # Malformed row — blank export_run_id, valid unit_system
+        w.writerow({"export_run_id": "", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
+
+    import io, contextlib
+    stderr_buf = io.StringIO()
+    with contextlib.redirect_stderr(stderr_buf):
+        rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "1"])
+    assert rc == 0
+    assert "blank export_run_id" in stderr_buf.getvalue()
+
+
 def test_main_fails_on_missing_columns_even_with_no_data_rows(tmp_path):
     # Header-only file missing governance_role must still fail, not silently succeed.
     meta = tmp_path / "file_metadata.csv"

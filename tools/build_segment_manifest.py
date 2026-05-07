@@ -282,9 +282,17 @@ def main(argv: List[str] | None = None) -> int:
         if not rows:
             sys.stderr.write(f"[WARN] file_metadata.csv has a valid header but no data rows: {metadata_path}\n")
 
-    skipped_blank = sum(1 for r in rows if not (r.get("unit_system") or "").strip())
-    if skipped_blank:
-        sys.stderr.write(f"[WARN] Excluded {skipped_blank} row(s) with blank unit_system\n")
+    skipped_blank_us = sum(1 for r in rows if not (r.get("unit_system") or "").strip())
+    if skipped_blank_us:
+        sys.stderr.write(f"[WARN] Excluded {skipped_blank_us} row(s) with blank unit_system\n")
+
+    skipped_blank_eid = sum(
+        1 for r in rows
+        if (r.get("unit_system") or "").strip()      # unit_system present (not already counted above)
+        and not (r.get("export_run_id") or "").strip()
+    )
+    if skipped_blank_eid:
+        sys.stderr.write(f"[WARN] Excluded {skipped_blank_eid} row(s) with blank export_run_id\n")
 
     manifest_rows = _build_segments(rows, min_files)
     registry_rows = _build_registry(manifest_rows)
