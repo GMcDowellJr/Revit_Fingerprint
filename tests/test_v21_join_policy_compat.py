@@ -115,7 +115,7 @@ def test_apply_diagnostics_include_discriminator_context(tmp_path: Path):
     policy_path.write_text(json.dumps(policy), encoding="utf-8")
 
     subprocess.run(
-        [sys.executable, "tools/v21_apply_join_policy.py", "--phase0-dir", str(phase0_dir), "--join-policy", str(policy_path)],
+        [sys.executable, "tools/apply_join_policy.py", "--phase0-dir", str(phase0_dir), "--join-policy", str(policy_path)],
         check=True,
         cwd=Path(__file__).resolve().parents[1],
     )
@@ -186,7 +186,7 @@ def test_discover_emits_legacy_compat_shape_and_lists(tmp_path: Path):
     subprocess.run(
         [
             sys.executable,
-            "tools/v21_discover_join_policy.py",
+            "tools/discover_join_policy.py",
             "--phase0-dir",
             str(phase0_dir),
             "--out-policy",
@@ -263,7 +263,7 @@ def test_validate_pareto_auto_bumps_max_k_for_required_items(tmp_path: Path):
     subprocess.run(
         [
             sys.executable,
-            "tools/v21_discover_join_policy.py",
+            "tools/discover_join_policy.py",
             "--phase0-dir",
             str(phase0_dir),
             "--domains",
