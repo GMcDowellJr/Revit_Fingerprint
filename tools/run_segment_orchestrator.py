@@ -191,6 +191,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 "--filter-export-run-ids", str(out_root / "export_run_ids.txt"),
                 "--join-policy", str(join_policy),
                 "--allow-sig-hash-join-key",
+                "--records-dir", str(records_dir),
             ]
             bundle_cmd = [
                 sys.executable,
@@ -277,6 +278,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 "--filter-export-run-ids", str(out_root / "export_run_ids.txt"),
                 "--join-policy", str(join_policy),
                 "--allow-sig-hash-join-key",
+                "--records-dir", str(records_dir),
             ]
             rc, tail = run_step_capture(extract_cmd)
             if rc != 0:
