@@ -218,6 +218,29 @@ def test_main_writes_files(tmp_path):
     assert not any(r["segment_id"] == "metric|Global" for r in reg_rows)
 
 
+def test_seed_only_note_not_set_for_generic_only_segment():
+    # A segment whose files are all Generic (no Project AND no Template/Container)
+    # must NOT be flagged seed_only — it has no actual seed files.
+    rows = [_meta_row(f"r{i:02d}", "imperial", "GenericClient", "Generic") for i in range(3)]
+    segs = _build_segments(rows, min_files=1)
+    l2 = next(r for r in segs if r["segment_level"] == "2")
+    assert "seed_only" not in (l2.get("notes") or "")
+    assert l2["has_seed_file"] == "false"
+
+
+def test_seed_only_note_set_when_segment_has_seeds_no_project():
+    # Template/Container files with no Project files → seed_only is correct.
+    rows = [
+        _meta_row("s01", "imperial", "SeedOrg", "Template"),
+        _meta_row("s02", "imperial", "SeedOrg", "Container"),
+        _meta_row("s03", "imperial", "SeedOrg", "Template"),
+    ]
+    segs = _build_segments(rows, min_files=1)
+    l2 = next(r for r in segs if r["segment_level"] == "2")
+    assert "seed_only" in (l2.get("notes") or "")
+    assert l2["has_seed_file"] == "true"
+
+
 def test_registry_output_folders_unique_across_case_variants():
     # "imperial|Kaiser" and "imperial|kaiser" both sanitize to "imperial_kaiser";
     # the registry must still assign each a distinct output_folder.

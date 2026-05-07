@@ -107,13 +107,12 @@ def _build_segments(
                 r = (row.get("governance_role") or "").strip()
                 if r:
                     all_roles.add(r)
-        only_seeds = all_roles and all_roles.issubset(SEED_ROLES | {"Generic", "Generic-Host", "Container", "Template"})
         no_project = not any(
             (row.get("governance_role") or "").strip() == "Project"
             for row in rows
             if (row.get("unit_system") or "").strip() == us
         )
-        notes = "seed_only" if no_project and eids else ""
+        notes = "seed_only" if no_project and seed_eids else ""
         manifest_rows.append({
             "segment_id": us,
             "parent_segment_id": "",
@@ -144,7 +143,7 @@ def _build_segments(
         notes_parts = []
         if file_count < min_files:
             notes_parts.append("below_min_files")
-        if no_project and eids:
+        if no_project and seed_eids:
             notes_parts.append("seed_only")
         run_type = "skip" if file_count < min_files else "bundle"
         manifest_rows.append({
