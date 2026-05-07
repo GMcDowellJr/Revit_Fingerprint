@@ -169,15 +169,23 @@ def _build_segments(
 
 def _build_registry(manifest_rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
     registry = []
+    seen_folders: Dict[str, int] = {}
     for row in manifest_rows:
         if row["run_type"] == "skip":
             continue
+        base = _sanitize_folder(row["segment_id"])
+        if base in seen_folders:
+            seen_folders[base] += 1
+            folder = f"{base}_{seen_folders[base]}"
+        else:
+            seen_folders[base] = 1
+            folder = base
         registry.append({
             "segment_id": row["segment_id"],
             "parent_segment_id": row["parent_segment_id"],
             "run_type": row["run_type"],
             "population_hash": row["population_hash"],
-            "output_folder": _sanitize_folder(row["segment_id"]),
+            "output_folder": folder,
             "status": "pending",
             "last_run_utc": "",
             "notes": row.get("notes", ""),

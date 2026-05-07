@@ -218,6 +218,19 @@ def test_main_writes_files(tmp_path):
     assert not any(r["segment_id"] == "metric|Global" for r in reg_rows)
 
 
+def test_registry_output_folders_unique_across_case_variants():
+    # "imperial|Kaiser" and "imperial|kaiser" both sanitize to "imperial_kaiser";
+    # the registry must still assign each a distinct output_folder.
+    rows = (
+        [_meta_row(f"r{i:02d}", "imperial", "Kaiser", "Project") for i in range(3)]
+        + [_meta_row(f"r{i:02d}", "imperial", "kaiser", "Project") for i in range(10, 13)]
+    )
+    segs = _build_segments(rows, min_files=1)
+    reg = _build_registry(segs)
+    folders = [r["output_folder"] for r in reg]
+    assert len(folders) == len(set(folders)), f"Duplicate output_folder values: {folders}"
+
+
 def test_blank_client_label_level2_id_distinct_from_level1():
     # When client_label is blank the level-2 segment_id must be "imperial|", not "imperial",
     # so it never collides with the level-1 segment_id for the same unit_system.
