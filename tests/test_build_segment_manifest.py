@@ -71,6 +71,23 @@ def test_level1_segments_present():
     assert ids == {"imperial", "metric"}
 
 
+def test_level1_run_type_skip_when_below_min_files():
+    # A unit_system population with fewer files than min_files must be skipped,
+    # not scheduled as a bundle, so the orchestrator does not run low-signal analysis.
+    rows = [_meta_row("x01", "metric", "Tiny", "Project"), _meta_row("x02", "metric", "Tiny", "Project")]
+    segs = _build_segments(rows, min_files=3)
+    metric = next(r for r in segs if r["segment_id"] == "metric" and r["segment_level"] == "1")
+    assert metric["run_type"] == "skip"
+    assert "below_min_files" in metric["notes"]
+
+
+def test_level1_run_type_bundle_at_min_files():
+    rows = [_meta_row(f"r{i:02d}", "imperial", "Acme", "Project") for i in range(3)]
+    segs = _build_segments(rows, min_files=3)
+    imp = next(r for r in segs if r["segment_id"] == "imperial" and r["segment_level"] == "1")
+    assert imp["run_type"] == "bundle"
+
+
 def test_level1_file_counts():
     segs = _build_segments(ROWS, min_files=3)
     l1 = {r["segment_id"]: int(r["file_count"]) for r in segs if r["segment_level"] == "1"}

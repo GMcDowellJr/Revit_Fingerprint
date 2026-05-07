@@ -117,20 +117,24 @@ def _build_segments(
             for row in rows
             if (row.get("unit_system") or "").strip() == us
         )
-        notes = "seed_only" if no_project and seed_eids else ""
+        l1_notes_parts = []
+        if len(eids) < min_files:
+            l1_notes_parts.append("below_min_files")
+        if no_project and seed_eids:
+            l1_notes_parts.append("seed_only")
         manifest_rows.append({
             "segment_id": us,
             "parent_segment_id": "",
             "segment_level": "1",
             "unit_system": us,
             "client_label": "",
-            "run_type": "bundle",
+            "run_type": "skip" if len(eids) < min_files else "bundle",
             "file_count": str(len(eids)),
             "export_run_ids": "|".join(eids),
             "has_seed_file": "true" if seed_eids else "false",
             "seed_export_run_ids": "|".join(seed_eids),
             "population_hash": _population_hash(eids),
-            "notes": notes,
+            "notes": "|".join(l1_notes_parts),
         })
 
     # Level 2 segments
@@ -203,9 +207,9 @@ def _print_summary(
     manifest_rows: List[Dict[str, str]],
     min_files: int,
 ) -> None:
-    level1_rows = [r for r in manifest_rows if r["segment_level"] == "1"]
+    level1_bundle = [r for r in manifest_rows if r["segment_level"] == "1" and r["run_type"] == "bundle"]
     level2_bundle = [r for r in manifest_rows if r["segment_level"] == "2" and r["run_type"] == "bundle"]
-    level2_skip = [r for r in manifest_rows if r["segment_level"] == "2" and r["run_type"] == "skip"]
+    all_skip = [r for r in manifest_rows if r["run_type"] == "skip"]
 
     n_segments = len([r for r in manifest_rows if r["run_type"] != "skip"])
     print(f"Segment manifest written: {manifest_path}")
@@ -214,9 +218,9 @@ def _print_summary(
     print(f"Run plan ({n_segments} segments):")
 
     print("  Level 1:")
-    for r in level1_rows:
+    for r in level1_bundle:
         tags = []
-        if r["notes"] == "seed_only":
+        if "seed_only" in (r.get("notes") or ""):
             tags.append("[template-only]")
         if r["has_seed_file"] == "true":
             tags.append("[has seed]")
@@ -234,9 +238,9 @@ def _print_summary(
             tag_str = "  " + "  ".join(tags) if tags else ""
             print(f"    {r['segment_id']}  ({r['file_count']} files){tag_str}")
 
-    if level2_skip:
+    if all_skip:
         print(f"  Skipped (below min_files={min_files}):")
-        for r in level2_skip:
+        for r in all_skip:
             print(f"    {r['segment_id']}  ({r['file_count']} file{'s' if int(r['file_count']) != 1 else ''})")
 
 
