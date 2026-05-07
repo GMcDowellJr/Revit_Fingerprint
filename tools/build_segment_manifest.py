@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -45,9 +46,13 @@ REGISTRY_FIELDNAMES = [
 ]
 
 
-def _read_csv(path: Path) -> List[Dict[str, str]]:
+def _read_csv(path: Path) -> tuple:
+    """Return (fieldnames, rows). fieldnames is a list of header strings (may be empty for a totally empty file)."""
     with path.open("r", encoding="utf-8-sig", newline="") as f:
-        return [{str(k): ("" if v is None else str(v)) for k, v in row.items()} for row in csv.DictReader(f)]
+        reader = csv.DictReader(f)
+        rows = [{str(k): ("" if v is None else str(v)) for k, v in row.items()} for row in reader]
+        fieldnames = list(reader.fieldnames or [])
+    return fieldnames, rows
 
 
 def _atomic_write_csv(path: Path, fieldnames: Sequence[str], rows: Iterable[Dict[str, str]]) -> None:
@@ -66,8 +71,12 @@ def _population_hash(export_run_ids: List[str]) -> str:
     return hashlib.sha1(token.encode("utf-8")).hexdigest()
 
 
+_UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>\s]+')
+
+
 def _sanitize_folder(segment_id: str) -> str:
-    return segment_id.replace("|", "_").lower()
+    """Replace filesystem-unsafe characters with underscores and lowercase."""
+    return _UNSAFE_FOLDER_CHARS.sub("_", segment_id).lower().strip("_")
 
 
 def _build_segments(
@@ -112,21 +121,26 @@ def _build_segments(
             (row.get("governance_role") or "").strip() == "Project"
             for row in rows
             if (row.get("unit_system") or "").strip() == us
+            and (row.get("export_run_id") or "").strip()
         )
-        notes = "seed_only" if no_project and seed_eids else ""
+        l1_notes_parts = []
+        if len(eids) < min_files:
+            l1_notes_parts.append("below_min_files")
+        if no_project and seed_eids:
+            l1_notes_parts.append("seed_only")
         manifest_rows.append({
             "segment_id": us,
             "parent_segment_id": "",
             "segment_level": "1",
             "unit_system": us,
             "client_label": "",
-            "run_type": "bundle",
+            "run_type": "skip" if len(eids) < min_files else "bundle",
             "file_count": str(len(eids)),
             "export_run_ids": "|".join(eids),
             "has_seed_file": "true" if seed_eids else "false",
             "seed_export_run_ids": "|".join(seed_eids),
             "population_hash": _population_hash(eids),
-            "notes": notes,
+            "notes": "|".join(l1_notes_parts),
         })
 
     # Level 2 segments
@@ -140,6 +154,7 @@ def _build_segments(
             for row in rows
             if (row.get("unit_system") or "").strip() == us
             and (row.get("client_label") or "").strip() == cl
+            and (row.get("export_run_id") or "").strip()
         )
         notes_parts = []
         if file_count < min_files:
@@ -169,17 +184,17 @@ def _build_segments(
 
 def _build_registry(manifest_rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
     registry = []
-    seen_folders: Dict[str, int] = {}
+    assigned_folders: set = set()
     for row in manifest_rows:
         if row["run_type"] == "skip":
             continue
         base = _sanitize_folder(row["segment_id"])
-        if base in seen_folders:
-            seen_folders[base] += 1
-            folder = f"{base}_{seen_folders[base]}"
-        else:
-            seen_folders[base] = 1
-            folder = base
+        folder = base
+        n = 2
+        while folder in assigned_folders:
+            folder = f"{base}_{n}"
+            n += 1
+        assigned_folders.add(folder)
         registry.append({
             "segment_id": row["segment_id"],
             "parent_segment_id": row["parent_segment_id"],
@@ -199,9 +214,9 @@ def _print_summary(
     manifest_rows: List[Dict[str, str]],
     min_files: int,
 ) -> None:
-    level1_rows = [r for r in manifest_rows if r["segment_level"] == "1"]
+    level1_bundle = [r for r in manifest_rows if r["segment_level"] == "1" and r["run_type"] == "bundle"]
     level2_bundle = [r for r in manifest_rows if r["segment_level"] == "2" and r["run_type"] == "bundle"]
-    level2_skip = [r for r in manifest_rows if r["segment_level"] == "2" and r["run_type"] == "skip"]
+    all_skip = [r for r in manifest_rows if r["run_type"] == "skip"]
 
     n_segments = len([r for r in manifest_rows if r["run_type"] != "skip"])
     print(f"Segment manifest written: {manifest_path}")
@@ -210,9 +225,9 @@ def _print_summary(
     print(f"Run plan ({n_segments} segments):")
 
     print("  Level 1:")
-    for r in level1_rows:
+    for r in level1_bundle:
         tags = []
-        if r["notes"] == "seed_only":
+        if "seed_only" in (r.get("notes") or ""):
             tags.append("[template-only]")
         if r["has_seed_file"] == "true":
             tags.append("[has seed]")
@@ -230,9 +245,9 @@ def _print_summary(
             tag_str = "  " + "  ".join(tags) if tags else ""
             print(f"    {r['segment_id']}  ({r['file_count']} files){tag_str}")
 
-    if level2_skip:
+    if all_skip:
         print(f"  Skipped (below min_files={min_files}):")
-        for r in level2_skip:
+        for r in all_skip:
             print(f"    {r['segment_id']}  ({r['file_count']} file{'s' if int(r['file_count']) != 1 else ''})")
 
 
@@ -253,21 +268,31 @@ def main(argv: List[str] | None = None) -> int:
     out_dir = Path(args.out_dir)
     min_files: int = args.min_files
 
-    rows = _read_csv(metadata_path)
-    if not rows:
-        sys.stderr.write(f"[WARN] file_metadata.csv is empty: {metadata_path}\n")
+    fieldnames, rows = _read_csv(metadata_path)
+    # Validate headers unconditionally — even a header-only file must declare the required columns.
+    if not fieldnames:
+        sys.stderr.write(f"[WARN] file_metadata.csv is completely empty (no header): {metadata_path}\n")
     else:
-        actual_columns = set(rows[0].keys())
-        missing_columns = REQUIRED_COLUMNS - actual_columns
+        missing_columns = REQUIRED_COLUMNS - set(fieldnames)
         if missing_columns:
             sys.stderr.write(
                 f"[ERROR] file_metadata.csv is missing required columns: {sorted(missing_columns)}\n"
             )
             return 1
+        if not rows:
+            sys.stderr.write(f"[WARN] file_metadata.csv has a valid header but no data rows: {metadata_path}\n")
 
-    skipped_blank = sum(1 for r in rows if not (r.get("unit_system") or "").strip())
-    if skipped_blank:
-        sys.stderr.write(f"[WARN] Excluded {skipped_blank} row(s) with blank unit_system\n")
+    skipped_blank_us = sum(1 for r in rows if not (r.get("unit_system") or "").strip())
+    if skipped_blank_us:
+        sys.stderr.write(f"[WARN] Excluded {skipped_blank_us} row(s) with blank unit_system\n")
+
+    skipped_blank_eid = sum(
+        1 for r in rows
+        if (r.get("unit_system") or "").strip()      # unit_system present (not already counted above)
+        and not (r.get("export_run_id") or "").strip()
+    )
+    if skipped_blank_eid:
+        sys.stderr.write(f"[WARN] Excluded {skipped_blank_eid} row(s) with blank export_run_id\n")
 
     manifest_rows = _build_segments(rows, min_files)
     registry_rows = _build_registry(manifest_rows)

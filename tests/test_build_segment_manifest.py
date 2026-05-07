@@ -71,6 +71,23 @@ def test_level1_segments_present():
     assert ids == {"imperial", "metric"}
 
 
+def test_level1_run_type_skip_when_below_min_files():
+    # A unit_system population with fewer files than min_files must be skipped,
+    # not scheduled as a bundle, so the orchestrator does not run low-signal analysis.
+    rows = [_meta_row("x01", "metric", "Tiny", "Project"), _meta_row("x02", "metric", "Tiny", "Project")]
+    segs = _build_segments(rows, min_files=3)
+    metric = next(r for r in segs if r["segment_id"] == "metric" and r["segment_level"] == "1")
+    assert metric["run_type"] == "skip"
+    assert "below_min_files" in metric["notes"]
+
+
+def test_level1_run_type_bundle_at_min_files():
+    rows = [_meta_row(f"r{i:02d}", "imperial", "Acme", "Project") for i in range(3)]
+    segs = _build_segments(rows, min_files=3)
+    imp = next(r for r in segs if r["segment_id"] == "imperial" and r["segment_level"] == "1")
+    assert imp["run_type"] == "bundle"
+
+
 def test_level1_file_counts():
     segs = _build_segments(ROWS, min_files=3)
     l1 = {r["segment_id"]: int(r["file_count"]) for r in segs if r["segment_level"] == "1"}
@@ -177,6 +194,34 @@ def test_registry_output_folder_sanitized():
     assert kaiser_reg["output_folder"] == "imperial_kaiser"
 
 
+def test_sanitize_folder_strips_path_separators():
+    from build_segment_manifest import _sanitize_folder
+    assert "/" not in _sanitize_folder("imperial/west|Client")
+    assert "\\" not in _sanitize_folder("imperial\\east|Client")
+    # Result should be a flat name, not a path
+    result = _sanitize_folder("us/west|Acme Corp")
+    assert "/" not in result and "\\" not in result
+    assert result == result.lower()
+
+
+def test_registry_output_folders_globally_unique_with_suffix_collision():
+    # Reproduce the case where a generated suffix collides with another
+    # segment's natural sanitized name:
+    #   imperial|kaiser   → imperial_kaiser (natural)
+    #   imperial|Kaiser   → imperial_kaiser (collision → imperial_kaiser_2)
+    #   imperial|kaiser_2 → imperial_kaiser_2 (natural — collides with the suffix!)
+    # The registry must still produce three distinct output_folder values.
+    rows = (
+        [_meta_row(f"a{i:02d}", "imperial", "kaiser", "Project") for i in range(3)]
+        + [_meta_row(f"b{i:02d}", "imperial", "Kaiser", "Project") for i in range(3)]
+        + [_meta_row(f"c{i:02d}", "imperial", "kaiser_2", "Project") for i in range(3)]
+    )
+    segs = _build_segments(rows, min_files=1)
+    reg = _build_registry(segs)
+    folders = [r["output_folder"] for r in reg]
+    assert len(folders) == len(set(folders)), f"Duplicate output_folder values: {folders}"
+
+
 def test_registry_initial_status_pending():
     segs = _build_segments(ROWS, min_files=3)
     reg = _build_registry(segs)
@@ -226,6 +271,26 @@ def test_seed_only_note_not_set_for_generic_only_segment():
     l2 = next(r for r in segs if r["segment_level"] == "2")
     assert "seed_only" not in (l2.get("notes") or "")
     assert l2["has_seed_file"] == "false"
+
+
+def test_seed_only_note_not_suppressed_by_blank_eid_project_row():
+    # A malformed row with blank export_run_id and governance_role=Project must NOT
+    # suppress seed_only — it is excluded from membership so it should not influence
+    # the no_project predicate either.
+    rows = [
+        _meta_row("s01", "imperial", "SeedOrg", "Template"),
+        _meta_row("s02", "imperial", "SeedOrg", "Template"),
+        _meta_row("s03", "imperial", "SeedOrg", "Template"),
+        _meta_row("",    "imperial", "SeedOrg", "Project"),   # blank eid — excluded member
+    ]
+    segs = _build_segments(rows, min_files=1)
+    l2 = next(r for r in segs if r["segment_level"] == "2" and r["unit_system"] == "imperial")
+    assert "seed_only" in (l2.get("notes") or ""), (
+        "Blank-eid Project row should not suppress seed_only"
+    )
+    assert l2["has_seed_file"] == "true"
+    # The blank-eid row must not appear in export_run_ids
+    assert "" not in l2["export_run_ids"].split("|")
 
 
 def test_seed_only_note_set_when_segment_has_seeds_no_project():
@@ -295,3 +360,37 @@ def test_main_fails_when_export_run_id_column_absent(tmp_path):
     out_dir = tmp_path / "out"
     rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
     assert rc == 1
+
+
+def test_main_warns_on_blank_export_run_id(tmp_path, capsys):
+    meta = tmp_path / "file_metadata.csv"
+    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        w.writerow({"export_run_id": "r01", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
+        w.writerow({"export_run_id": "r02", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
+        w.writerow({"export_run_id": "r03", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
+        # Malformed row — blank export_run_id, valid unit_system
+        w.writerow({"export_run_id": "", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
+
+    import io, contextlib
+    stderr_buf = io.StringIO()
+    with contextlib.redirect_stderr(stderr_buf):
+        rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "1"])
+    assert rc == 0
+    assert "blank export_run_id" in stderr_buf.getvalue()
+
+
+def test_main_fails_on_missing_columns_even_with_no_data_rows(tmp_path):
+    # Header-only file missing governance_role must still fail, not silently succeed.
+    meta = tmp_path / "file_metadata.csv"
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["export_run_id", "unit_system", "client_label"])
+        w.writeheader()
+        # No data rows — previously validation was skipped in this branch.
+
+    out_dir = tmp_path / "out"
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+    assert rc == 1
+    assert not (out_dir / "segment_manifest.csv").exists()
