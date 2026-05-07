@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -70,8 +71,12 @@ def _population_hash(export_run_ids: List[str]) -> str:
     return hashlib.sha1(token.encode("utf-8")).hexdigest()
 
 
+_UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>\s]+')
+
+
 def _sanitize_folder(segment_id: str) -> str:
-    return segment_id.replace("|", "_").lower()
+    """Replace filesystem-unsafe characters with underscores and lowercase."""
+    return _UNSAFE_FOLDER_CHARS.sub("_", segment_id).lower().strip("_")
 
 
 def _build_segments(

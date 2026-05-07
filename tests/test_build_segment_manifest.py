@@ -194,6 +194,16 @@ def test_registry_output_folder_sanitized():
     assert kaiser_reg["output_folder"] == "imperial_kaiser"
 
 
+def test_sanitize_folder_strips_path_separators():
+    from build_segment_manifest import _sanitize_folder
+    assert "/" not in _sanitize_folder("imperial/west|Client")
+    assert "\\" not in _sanitize_folder("imperial\\east|Client")
+    # Result should be a flat name, not a path
+    result = _sanitize_folder("us/west|Acme Corp")
+    assert "/" not in result and "\\" not in result
+    assert result == result.lower()
+
+
 def test_registry_output_folders_globally_unique_with_suffix_collision():
     # Reproduce the case where a generated suffix collides with another
     # segment's natural sanitized name:
