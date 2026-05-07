@@ -531,6 +531,63 @@ def _load_semantic_groups(results_v21_dir: Optional[Path]) -> Dict[str, Dict[str
     return out
 
 
+def _derive_unit_system(payload: Dict[str, Any], export_run_id: str) -> str:
+    units_block = payload.get("units")
+    if not isinstance(units_block, dict):
+        return ""
+    if _safe_str(units_block.get("status")).strip().lower() != "ok":
+        return ""
+    records = units_block.get("records")
+    if not isinstance(records, list):
+        return ""
+
+    length_spec_found = False
+    for rec in records:
+        if not isinstance(rec, dict):
+            continue
+        identity_basis = rec.get("identity_basis")
+        items = identity_basis.get("items") if isinstance(identity_basis, dict) else None
+        if not isinstance(items, list):
+            continue
+
+        is_length = any(
+            isinstance(it, dict)
+            and _safe_str(it.get("k")).strip() == "units.spec"
+            and _safe_str(it.get("v")).strip().lower() == "length"
+            for it in items
+        )
+        if not is_length:
+            continue
+
+        length_spec_found = True
+        unit_type_id = ""
+        for it in items:
+            if isinstance(it, dict) and _safe_str(it.get("k")).strip() == "units.unit_type_id":
+                unit_type_id = _safe_str(it.get("v")).strip()
+                break
+
+        if not unit_type_id:
+            return ""
+
+        unit_type_id_l = unit_type_id.lower()
+        if "feet" in unit_type_id_l or "fractional" in unit_type_id_l:
+            return "Imperial"
+        if "millimeter" in unit_type_id_l:
+            return "Metric"
+        tokens = re.split(r"[^a-z0-9]+", unit_type_id_l)
+        if "meter" in tokens:
+            return "Metric"
+
+        sys.stderr.write(
+            f"[WARN flatten] unit_system: unrecognized unit_type_id '{unit_type_id}' for {export_run_id}\n"
+        )
+        return ""
+
+    if length_spec_found is False:
+        sys.stderr.write(f"[WARN flatten] unit_system: no length spec found for {export_run_id}\n")
+    return ""
+
+
 def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename") -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     exported_utc = _utc_now_iso()
     tool_version = _get_tool_version()
@@ -570,6 +627,7 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
             "exported_utc": exported_utc,
             "client_label": "",
             "governance_role": "",
+            "unit_system": _derive_unit_system(data, export_run_id),
         })
 
         for source_domain in _iter_domains(data):
@@ -672,6 +730,7 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
             eid = row.get("export_run_id", "").strip()
             if eid:
                 preserved = {col: row.get(col, "").strip() for col in annotation_columns}
+                preserved["unit_system"] = row.get("unit_system", "").strip()
                 if any(v for v in preserved.values()):
                     existing_annotations[eid] = preserved
 
@@ -679,13 +738,17 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
     for row in meta_rows:
         eid = row.get("export_run_id", "").strip()
         preserved_governance_role = ""
+        preserved_unit_system = ""
         if eid in existing_annotations:
             for col in annotation_columns:
                 if not row.get(col, "").strip():
                     row[col] = existing_annotations[eid].get(col, "")
             preserved_governance_role = row.get("governance_role", "").strip()
+            preserved_unit_system = _safe_str(existing_annotations[eid].get("unit_system", "")).strip()
         if not preserved_governance_role:
             row["governance_role"] = _infer_governance_role(row.get("central_path_norm", ""), governance_rules)
+        if preserved_unit_system:
+            row["unit_system"] = preserved_unit_system
         governance_counts[row.get("governance_role", "").strip()] += 1
 
     sys.stderr.write(
@@ -698,7 +761,7 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
         "project_label", "model_label", "central_path", "central_path_norm",
         "lineage_hash", "revit_version_number", "revit_version_name", "revit_build",
         "is_workshared", "tool_version", "exported_utc",
-        "client_label", "governance_role",
+        "client_label", "governance_role", "unit_system",
     ], _sort_rows(meta_rows, ["export_run_id"]))
 
     _write_csv(out_dir / "records.csv", [
