@@ -10,14 +10,14 @@ for candidate in (str(_REPO_ROOT), str(_TOOLS_DIR)):
     if candidate not in sys.path:
         sys.path.insert(0, candidate)
 
-from tools.phase2_analysis.io import load_exports
+from tools.patterns_analysis._archive.io import load_exports
 from tools.run_extract_all import (
     _detect_surfaces,
     _discover_domains_from_exports,
     _infer_domains,
     _pick_sample_file,
 )
-from tools.v21_emit import _iter_export_files
+from tools.extractor import _iter_export_files
 
 
 def _write_json(path: Path, payload: dict) -> None:
