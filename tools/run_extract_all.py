@@ -571,11 +571,6 @@ def main() -> None:
         except Exception as e:
             sys.stderr.write("[WARN extract_all] placeholders stage failed; continuing: {}\n".format(e))
 
-    if any(s in selected_stages for s in ("split", "authority", "patterns")) and require_join_policy:
-        phase0_records_csv = v21_phase0_dir / "records.csv"
-        if phase0_records_csv.is_file():
-            _enforce_policy_gate(_read_csv_rows(phase0_records_csv), v21_root / "diagnostics", active_domains, allow_sig_hash_join_key)
-
     if "authority" in selected_stages or "patterns" in selected_stages:
         phase0_records_csv = v21_phase0_dir / "records.csv"
         if phase0_records_csv.is_file():
@@ -584,13 +579,16 @@ def main() -> None:
             record_rows = _read_csv_rows(phase0_records_csv)
         if (v21_phase0_dir / "file_metadata.csv").is_file():
             meta_rows = _read_csv_rows(v21_phase0_dir / "file_metadata.csv")
+        # Snapshot pre-filter rows so split domain auto-discovery (which runs after
+        # this block) uses the full post-reload population regardless of filter.
+        _pre_filter_record_rows = record_rows
 
         if args.filter_export_run_ids:
             _filter_path = Path(args.filter_export_run_ids)
             if not _filter_path.is_file():
                 raise SystemExit(f"--filter-export-run-ids file not found: {_filter_path}")
             _allowed = {
-                line.strip() for line in _filter_path.read_text(encoding="utf-8").splitlines()
+                line.strip() for line in _filter_path.read_text(encoding="utf-8-sig").splitlines()
                 if line.strip()
             }
             meta_rows = [r for r in meta_rows if r.get("export_run_id", "").strip() in _allowed]
@@ -600,6 +598,9 @@ def main() -> None:
                 f"meta_rows={len(meta_rows)} record_rows={len(record_rows)}",
                 flush=True,
             )
+
+        if require_join_policy and (v21_phase0_dir / "records.csv").is_file():
+            _enforce_policy_gate(record_rows, v21_root / "diagnostics", active_domains, allow_sig_hash_join_key)
 
         if meta_rows and record_rows:
             shard_dir = _ensure_domain_scoped_identity_items(v21_phase0_dir)
@@ -720,6 +721,7 @@ def main() -> None:
             report["notes"].append(f"analysis_run_id={analysis_run_id}")
             emit_element_dominance(v21_analysis_dir)
             report["notes"].append("element_dominance: emitted")
+        record_rows = _pre_filter_record_rows
 
     split_domains: List[str] = []
     if "split" in selected_stages:
