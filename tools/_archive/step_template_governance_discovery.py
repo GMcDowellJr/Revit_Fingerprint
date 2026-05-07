@@ -1,7 +1,7 @@
 """
 step_template_governance_discovery.py
 
-Reads phase0_records.csv and computes per-domain alignment of a corpus to a
+Reads records.csv and computes per-domain alignment of a corpus to a
 designated template file. Emits:
   - template_governance_readiness.csv  (one row per domain, sorted by alignment_rate desc)
   - template_comparison_profile.json   (stable-domain comparison profile)
@@ -73,9 +73,9 @@ def run(
     threshold: float,
     out_dir: str,
 ) -> None:
-    phase0_path = Path(phase0_dir) / "phase0_records.csv"
+    phase0_path = Path(phase0_dir) / "records.csv"
     if not phase0_path.exists():
-        print(f"[ERROR] phase0_records.csv not found at: {phase0_path}", file=sys.stderr)
+        print(f"[ERROR] records.csv not found at: {phase0_path}", file=sys.stderr)
         sys.exit(1)
 
     # ------------------------------------------------------------------
@@ -115,7 +115,7 @@ def run(
                     all_file_keys.append(file_key)
                 corpus_sigs[file_key].setdefault(domain, Counter())[sig_hash] += 1
 
-    print(f"[INFO] Loaded phase0_records.csv: {total_rows:,} rows")
+    print(f"[INFO] Loaded records.csv: {total_rows:,} rows")
 
     if not template_found:
         # Collect sample of available keys for the error message
@@ -123,7 +123,7 @@ def run(
             {k for k in all_file_keys[:50]}
         )[:10]
         print(
-            f"[ERROR] Template file_id/export_run_id '{template_id}' not found in phase0_records.csv.\n"
+            f"[ERROR] Template file_id/export_run_id '{template_id}' not found in records.csv.\n"
             f"        Available file keys (first 10): {sample_keys}",
             file=sys.stderr,
         )
@@ -344,19 +344,19 @@ def run(
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Compute per-domain template governance readiness from phase0_records.csv."
+        description="Compute per-domain template governance readiness from records.csv."
     )
     p.add_argument(
         "--phase0-dir",
         required=True,
         dest="phase0_dir",
-        help="Directory containing phase0_records.csv",
+        help="Directory containing records.csv",
     )
     p.add_argument(
         "--template-id",
         required=True,
         dest="template_id",
-        help="file_id or export_run_id of the template file in phase0_records.csv",
+        help="file_id or export_run_id of the template file in records.csv",
     )
     p.add_argument(
         "--threshold",

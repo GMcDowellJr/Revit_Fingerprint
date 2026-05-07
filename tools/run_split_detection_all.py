@@ -71,7 +71,7 @@ def _write_no_data_stub_reports(out_root: Path, domain: str) -> None:
 def _validate_join_policy_ready(phase0_dir: str | None, domain: str, allow_sig_hash_join_key: bool) -> None:
     if not phase0_dir:
         return
-    rec_csv = Path(phase0_dir) / "phase0_records.csv"
+    rec_csv = Path(phase0_dir) / "records.csv"
     if not rec_csv.exists():
         return
     rows = [r for r in _read_csv(rec_csv) if (r.get("domain", "").strip() == domain)]
@@ -128,7 +128,7 @@ def _load_export_mapping(phase0_dir: str | None) -> Dict[str, str]:
 def _load_analysis_run_id(analysis_dir: str | None) -> str:
     if not analysis_dir:
         return ""
-    manifest_csv = Path(analysis_dir) / "analysis_manifest.csv"
+    manifest_csv = Path(analysis_dir) / "corpus_manifest.csv"
     if not manifest_csv.exists():
         return ""
     rows = _read_csv(manifest_csv)
@@ -332,7 +332,7 @@ def run_split_detection_workflow(
     join_keys_out.mkdir(exist_ok=True)
 
     is_empty_domain = False
-    phase0_records_csv = Path(phase0_dir) / "phase0_records.csv" if phase0_dir else None
+    phase0_records_csv = Path(phase0_dir) / "records.csv" if phase0_dir else None
     if phase0_records_csv and phase0_records_csv.exists():
         is_empty_domain = not _domain_has_records(phase0_records_csv, domain)
         if is_empty_domain:
@@ -350,7 +350,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.phase2_analysis.split_detection_file_level',
+            '-m', 'tools.patterns_analysis._archive.split_detection_file_level',
             exports_dir,
             '--domain', domain,
             '--threshold', str(threshold),
@@ -393,7 +393,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.phase2_analysis.build_reference_standards',
+            '-m', 'tools.patterns_analysis._archive.build_reference_standards',
             str(clusters_csv),
             exports_dir,
             '--domain', domain,
@@ -408,7 +408,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.phase2_analysis.intradomain_summary',
+            '-m', 'tools.patterns_analysis._archive.intradomain_summary',
             str(clusters_csv),
             exports_dir,
             '--domain', domain,
@@ -421,7 +421,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.phase2_analysis.emit_intradomain_definition',
+            '-m', 'tools.patterns_analysis._archive.emit_intradomain_definition',
             str(clusters_csv),
             '--domain', domain,
             '--out', str(intradomain_out)
@@ -435,7 +435,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.phase2_analysis.derive_join_keys_by_ids',
+            '-m', 'tools.patterns_analysis._archive.derive_join_keys_by_ids',
             exports_dir,
             '--domain', domain,
             '--file-to-ids', str(file_to_ids_csv),
@@ -452,7 +452,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.phase2_analysis.apply_join_keys_by_ids',
+            '-m', 'tools.patterns_analysis._archive.apply_join_keys_by_ids',
             exports_dir,
             '--domain', domain,
             '--file-to-ids', str(file_to_ids_csv),
@@ -468,7 +468,7 @@ def run_split_detection_workflow(
         run_command(
             [
                 sys.executable,
-                '-m', 'tools.phase2_analysis.calibrate_join_key_gates',
+                '-m', 'tools.patterns_analysis._archive.calibrate_join_key_gates',
                 str(ids_report_csv),
                 '--domain', domain,
                 '--out', str(join_keys_out)
@@ -481,7 +481,7 @@ def run_split_detection_workflow(
         run_command(
             [
                 sys.executable,
-                '-m', 'tools.phase2_analysis.pareto_join_keys_by_ids',
+                '-m', 'tools.patterns_analysis._archive.pareto_join_keys_by_ids',
                 exports_dir,
                 '--domain', domain,
                 '--file-to-ids', str(file_to_ids_csv),
@@ -499,7 +499,7 @@ def run_split_detection_workflow(
     run_command(
         [
             sys.executable,
-            '-m', 'tools.phase2_analysis.split_detection_element_level',
+            '-m', 'tools.patterns_analysis._archive.split_detection_element_level',
             str(clusters_csv),
             str(standards_json),
             exports_dir,
@@ -539,7 +539,7 @@ def main() -> None:
         '--phase0-dir',
         dest='phase0_dir',
         default=None,
-        help="If provided, use v2.1 Phase0 tables from this directory (Results_v21/phase0_v21) for all split-analysis steps that support CSV mode.",
+        help="If provided, use v2.1 Phase0 tables from this directory (results/records) for all split-analysis steps that support CSV mode.",
     )
     parser.add_argument(
         '--domain',
@@ -561,7 +561,7 @@ def main() -> None:
         '--analysis-dir',
         dest='analysis_dir',
         default=None,
-        help="Optional path to analysis_v21 output directory (for analysis_run_id and pattern mapping joins).",
+        help="Optional path to analysis output directory (for analysis_run_id and pattern mapping joins).",
     )
     parser.add_argument(
         '--mode',

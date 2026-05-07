@@ -3,7 +3,7 @@
 Diagnostic script to identify why Phase 1 CSVs are empty.
 
 Usage:
-    python diagnose_phase1_empty.py --exports <exports_dir> --config <config_json> [--phase1-out <phase1_dir>]
+    python diagnose_authority_empty.py --exports <exports_dir> --config <config_json> [--phase1-out <phase1_dir>]
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ def load_json(path: Path) -> Dict[str, Any]:
 
 
 def extract_domains_from_fp(fp: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    """Extract domain summary from fingerprint (mimics phase1_domain_authority logic)."""
+    """Extract domain summary from fingerprint (mimics domain_authority logic)."""
     out: Dict[str, Dict[str, Any]] = {}
     
     # Try _manifest.domains first
@@ -132,7 +132,7 @@ def diagnose_exports(exports_dir: Path) -> Dict[str, Any]:
         else:
             findings["files"]["other_json"].append(p.name)
     
-    # Determine which files will be loaded by phase1_domain_authority
+    # Determine which files will be loaded by domain_authority
     if findings["files"]["details"]:
         json_paths = [exports_dir / f for f in sorted(findings["files"]["details"])]
         findings["surface_used"] = "details"

@@ -36,14 +36,14 @@ def main() -> None:
             errors.append("file_metadata.csv has non-semver schema_version")
             break
 
-    manifest = read_csv(analysis_dir / "analysis_manifest.csv")
+    manifest = read_csv(analysis_dir / "corpus_manifest.csv")
     if manifest:
         row = manifest[0]
         for k in ("join_key_policy_version", "pattern_promotion_policy_version", "authority_metric_version"):
             if not SEMVER_RE.match(row.get(k, "")):
-                errors.append(f"analysis_manifest.csv invalid or missing semver field: {k}")
+                errors.append(f"corpus_manifest.csv invalid or missing semver field: {k}")
         if row.get("is_incremental_update", "") not in {"0", "1"}:
-            errors.append("analysis_manifest.csv is_incremental_update must be 0/1")
+            errors.append("corpus_manifest.csv is_incremental_update must be 0/1")
 
     required = {"schema_version", "analysis_run_id", "domain"}
     for csv_path in sorted(split_dir.rglob("*.csv")):

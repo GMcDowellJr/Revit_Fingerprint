@@ -1,8 +1,8 @@
-# join_key_derivation_phase05.py
+# join_key_derivation.py
 # Phase 0.5: derive join_hash AFTER export (from record.v2 identity_basis.items) using join-key policy.
 #
 # Usage (example):
-#   python join_key_derivation_phase05.py \
+#   python join_key_derivation.py \
 #     --details "C:\path\to\details\**\details_*.json" \
 #     --policy  "C:\path\to\policies\domain_join_key_policies.json" \
 #     --run-id  "2026-02-05T1200Z" \
