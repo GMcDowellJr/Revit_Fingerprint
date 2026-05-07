@@ -3,10 +3,8 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import os
-import re
 import subprocess
 import sys
 import time
@@ -15,141 +13,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from emit_element_dominance import emit_element_dominance
 from extractor import emit_analysis, emit_records
-
-# Backward-compatible aliases for tests/older callers
-emit_analysis_v21 = emit_analysis
-emit_phase0_v21 = emit_records
 from bundle_analysis.common import atomic_write_csv, read_csv_rows
 from bundle_analysis.reference_bundle import write_sidecar
 
 SUPPRESSED_DOWNSTREAM_DOMAINS = {"object_styles_imported"}
-
-
-_LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.(?:seg|segment)\[(\d{3})\]\.(kind|length)$")
-_LP_SEGMENT_COUNT_KEY = "line_pattern.segment_count"
-
-
-def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
-    """Append synthetic line_pattern.segments_norm_hash rows to identity_items.csv."""
-    if not items_csv.is_file():
-        return {"total": 0, "ok": 0, "missing": 0}
-
-    with items_csv.open("r", encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.DictReader(f))
-        fieldnames = list((rows[0].keys() if rows else [
-            "schema_version", "export_run_id", "file_id", "domain", "record_id", "record_ordinal", "record_pk", "item_index", "k", "q", "v",
-        ]))
-    key_col = "k" if "k" in fieldnames else "item_key"
-    quality_col = "q" if "q" in fieldnames else "item_value_type"
-    value_col = "v" if "v" in fieldnames else "item_value"
-    item_index_col = "item_index" if "item_index" in fieldnames else "item_role"
-
-    grouped: Dict[str, List[Dict[str, str]]] = {}
-    for r in rows:
-        if str(r.get("domain", "")) != "line_patterns":
-            continue
-        grouped.setdefault(str(r.get("record_pk", "")), []).append(r)
-
-    out_rows: List[Dict[str, str]] = []
-    ok = 0
-    missing = 0
-    for record_pk, group in grouped.items():
-        seg_rows = [r for r in group if _LP_SEGMENT_KEY_RE.match(str(r.get(key_col, "")))]
-        status = "ok"
-        hash_v = ""
-
-        if not seg_rows:
-            seg_count_rows = [r for r in group if str(r.get(key_col, "")) == _LP_SEGMENT_COUNT_KEY]
-            seg_count_v = str(seg_count_rows[0].get(value_col, "")).strip() if seg_count_rows else ""
-            seg_count_q = str(seg_count_rows[0].get(quality_col, "")).strip() if seg_count_rows else ""
-            try:
-                seg_count_is_zero = int(seg_count_v) == 0
-            except Exception:
-                seg_count_is_zero = False
-
-            if seg_count_q == "ok" and seg_count_is_zero:
-                hash_v = hashlib.md5("segment_count=0".encode("utf-8")).hexdigest()
-                ok += 1
-            else:
-                status = "missing"
-                missing += 1
-        elif any(str(r.get(quality_col, "")) != "ok" for r in seg_rows):
-            status = "missing"
-            missing += 1
-        else:
-            segments: Dict[int, Dict[str, float]] = {}
-            parse_error = False
-            for r in seg_rows:
-                m = _LP_SEGMENT_KEY_RE.match(str(r.get(key_col, "")))
-                if not m:
-                    continue
-                idx = int(m.group(1))
-                key = m.group(2)
-                segments.setdefault(idx, {})
-                try:
-                    if key == "kind":
-                        segments[idx]["kind"] = int(str(r.get(value_col, "")))
-                    else:
-                        segments[idx]["length"] = float(str(r.get(value_col, "")))
-                except Exception:
-                    parse_error = True
-                    break
-
-            if parse_error or any("kind" not in d or "length" not in d for d in segments.values()):
-                status = "missing"
-                missing += 1
-            else:
-                ordered = [(idx, int(v["kind"]), float(v["length"])) for idx, v in sorted(segments.items())]
-                non_dot_total = sum(length for _, kind, length in ordered if kind != 2)
-                has_non_dot = any(kind != 2 for _, kind, _ in ordered)
-                dot_count = sum(1 for _, kind, _ in ordered if kind == 2)
-                eff_total = non_dot_total if has_non_dot else float(dot_count)
-                tokens: List[str] = []
-                for idx, kind, length in ordered:
-                    if kind == 2:
-                        eff_length = 0.0 if has_non_dot else 1.0
-                    else:
-                        eff_length = length
-                    norm = (eff_length / eff_total) if eff_total > 0 else 0.0
-                    tokens.append(f"seg[{idx:03d}].kind={kind}")
-                    tokens.append(f"seg[{idx:03d}].norm_length={norm:.6f}")
-                hash_v = hashlib.md5("|".join(tokens).encode("utf-8")).hexdigest()
-                ok += 1
-
-        base = group[0]
-        out_rows.append({
-            "schema_version": str(base.get("schema_version", "")),
-            "export_run_id": str(base.get("export_run_id", "")),
-            "file_id": str(base.get("file_id", "")),
-            "domain": "line_patterns",
-            "record_id": str(base.get("record_id", "")),
-            "record_ordinal": str(base.get("record_ordinal", "")),
-            "record_pk": record_pk,
-            item_index_col: "synthetic",
-            key_col: "line_pattern.segments_norm_hash",
-            quality_col: status,
-            value_col: hash_v,
-        })
-
-    if out_rows:
-        rows.extend(out_rows)
-        rows = sorted(
-            rows,
-            key=lambda r: (
-                str(r.get("export_run_id", "")),
-                str(r.get("domain", "")),
-                str(r.get("record_pk", "")),
-                str(r.get(key_col, "")),
-                str(r.get(value_col, "")),
-            ),
-        )
-        with items_csv.open("w", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=fieldnames)
-            w.writeheader()
-            for r in rows:
-                w.writerow({k: r.get(k, "") for k in fieldnames})
-
-    return {"total": len(out_rows), "ok": ok, "missing": missing}
 
 
 def _discover_domains_from_exports(exports_dir: Path) -> List[str]:
@@ -442,7 +309,7 @@ def _enforce_policy_gate(rows: List[Dict[str, str]], diagnostics_dir: Path, doma
 
 
 def main() -> None:
-    stage_names = ["flatten", "discover", "apply", "placeholders", "split", "authority", "patterns", "flat_tables"]
+    stage_names = ["flatten", "discover", "apply", "placeholders", "authority", "patterns", "split", "flat_tables"]
     ap = argparse.ArgumentParser(
         description=(
             "Pipeline orchestrator with explicit stages: flatten (T0), discover (T1), apply (T2), split, authority, patterns. "
@@ -461,87 +328,34 @@ def main() -> None:
     )
     ap.add_argument("exports_dir", help="Folder containing fingerprint exports (*__fingerprint.json, or legacy *.details.json / *.index.json).")
     ap.add_argument("--out-root", required=True, help="Output root folder.")
-    ap.add_argument("--config", default=None, help="Phase1 config path (required when stage authority is included).")
-    ap.add_argument("--seed-baseline", default=None, help="Optional seed baseline fingerprint JSON path for authority.")
-    ap.add_argument("--seed", default=None, help="Optional path to a single fingerprint JSON to treat as the seed file.")
+    ap.add_argument("--seed", default=None, help="Path to a seed fingerprint JSON. When provided, emits a seed-comparison sidecar for the seed-baseline BI dashboard (project drift vs template). Not part of standard segment runs.")
     ap.add_argument("--domains", default=None, help="Comma list of domains; if omitted, infer from exports.")
-    ap.add_argument("--baseline", default=None, help="Baseline export filename for patterns dimension_types by-family packet.")
-    ap.add_argument("--emit-legacy", action="store_true", help="Also emit legacy phase0/phase1/phase2 artifacts when authority/patterns run.")
-    ap.add_argument("--no-dimtypes-by-family", action="store_true", help="Disable dimension_types by-family packet (default: enabled).")
     ap.add_argument("--stages", default="flatten,discover", help="Comma-separated stages to run. Default: flatten,discover.")
     ap.add_argument("--skip-stages", default="", help="Comma-separated stages to skip from --stages.")
-    ap.add_argument("--discover-join-policy", action="store_true", help="Alias for including stage discover.")
-    ap.add_argument("--apply-join-policy", action="store_true", help="Alias for including stage apply (operational commit path).")
     ap.add_argument("--join-policy", default=None, help="Policy JSON path used by apply stage.")
-    ap.add_argument("--domain-policy-json", default=None, help="Official domain policy JSON for discover validate/harsh exploration and apply fallback.")
-    ap.add_argument("--require-join-policy", action=argparse.BooleanOptionalAction, default=True, help="Require policy-mode join keys for split/analyze stages (default: true).")
-    ap.add_argument("--strict-join-policy", action="store_true", help="Deprecated alias for --require-join-policy.")
     ap.add_argument("--allow-sig-hash-join-key", action="store_true", help="Allow degraded identity-mode join keys (sig_hash_as_join_key.v1) for exploratory analysis.")
-    ap.add_argument("--allow-bootstrap", action="store_true", help="Deprecated alias for --allow-sig-hash-join-key.")
-    ap.add_argument("--emit-v21", action="store_true", help="Deprecated alias; v2.1 flatten is default and always emitted.")
-    ap.add_argument("--emit-phase0-v21", action="store_true", help="Deprecated alias; v2.1 flatten is default and always emitted.")
-    ap.add_argument("--phase0-only", action="store_true", help="Deprecated alias for --stages flatten.")
-    ap.add_argument("--phase1-only", action="store_true", help="Deprecated alias for --stages authority.")
-    ap.add_argument("--phase2-only", action="store_true", help="Deprecated alias for --stages patterns.")
-    ap.add_argument("--split-only", action="store_true", help="Deprecated alias for --stages split.")
     ap.add_argument("--split-domains", nargs="?", const="__ALL__", default=None, help="Domains for split stage; optional CSV. If no value, run all discovered domains.")
-    ap.add_argument("--mode", choices=("allpairs", "candidates"), default="allpairs", help="File-level split detection mode.")
-    ap.add_argument("--discover-sample-size", type=int, default=None, help="Optional max records per domain for discover stage. If omitted, downstream discover tool default is used.")
-    ap.add_argument("--discover-sample-seed", type=int, default=None, help="Optional deterministic sampling seed for discover stage. If omitted, downstream discover tool default is used.")
-    ap.add_argument("--discover-max-candidate-fields", type=int, default=None, help="Optional max candidate fields per domain for discover stage. If omitted, downstream discover tool default is used.")
-    ap.add_argument("--discover-search-modes", default="greedy,pareto", help="Comma-separated discover engines (default: greedy,pareto).")
-    ap.add_argument("--discover-policy-modes", default="discover,validate,harsh", help="Comma-separated policy strictness modes for exploration CSVs (default: discover,validate,harsh).")
-    ap.add_argument("--discover-emit-policy-json", action="store_true", help="Also emit discovered compatibility policy JSON (off by default; CSV exploration is primary).")
-    ap.add_argument(
-        "--synthetic-domains",
-        default="",
-        help="Optional comma-separated domains for synthetic key augmentation after flatten (currently supports: line_patterns).",
-    )
     ap.add_argument(
         "--flat-tables-emit",
         default="layer_stacks",
-        help="Comma-separated emit types for the flat_tables stage (passed to export_to_flat_tables.py). "
-             "Default is layer_stacks only; runs/records/identity_items etc. are already written by the flatten stage.",
+        help="Comma-separated emit types for the flat_tables stage. Used primarily for compound type layer stack export (layer_stacks, layer_stack_rows). Default is layer_stacks.",
+    )
+    ap.add_argument(
+        "--filter-export-run-ids",
+        default=None,
+        help="Path to a text file with one export_run_id per line. "
+             "Filters meta_rows and record_rows to the specified population "
+             "before running authority/patterns stages. "
+             "flatten/apply/placeholders/split stages are unaffected."
     )
     args = ap.parse_args()
 
-    for alias, repl, used in [
-        ("--strict-join-policy", "--require-join-policy", args.strict_join_policy),
-        ("--allow-bootstrap", "--allow-sig-hash-join-key", args.allow_bootstrap),
-        ("--emit-v21", "--stages flatten,discover", args.emit_v21),
-        ("--emit-phase0-v21", "--stages flatten,discover", args.emit_phase0_v21),
-        ("--phase0-only", "--stages flatten", args.phase0_only),
-        ("--phase1-only", "--stages authority", args.phase1_only),
-        ("--phase2-only", "--stages patterns", args.phase2_only),
-        ("--split-only", "--stages split", args.split_only),
-    ]:
-        if used:
-            _warn_deprecated_alias(alias, repl)
-
-    allow_sig_hash_join_key = args.allow_sig_hash_join_key or args.allow_bootstrap
-    require_join_policy = args.require_join_policy or args.strict_join_policy
+    allow_sig_hash_join_key = args.allow_sig_hash_join_key
+    require_join_policy = True
 
     selected_stages = _parse_stage_csv(args.stages) or ["flatten", "discover"]
-    if args.discover_join_policy and "discover" not in selected_stages:
-        selected_stages.append("discover")
-    if args.apply_join_policy and "apply" not in selected_stages:
-        selected_stages.append("apply")
 
-    only_aliases = [args.phase0_only, args.phase1_only, args.phase2_only, args.split_only]
-    if sum(1 for f in only_aliases if f) > 1:
-        raise SystemExit("Only one of --phase0-only/--phase1-only/--phase2-only/--split-only may be used.")
-    if args.phase0_only:
-        selected_stages = ["flatten"]
-    elif args.phase1_only:
-        selected_stages = ["authority"]
-    elif args.phase2_only:
-        selected_stages = ["patterns"]
-    elif args.split_only:
-        selected_stages = ["split"]
-
-    # Backward-compat stage aliases
-    selected_stages = ["authority" if s=="analyze1" else "patterns" if s=="analyze2" else s for s in selected_stages]
-    skipped = set("authority" if s=="analyze1" else "patterns" if s=="analyze2" else s for s in _parse_stage_csv(args.skip_stages))
+    skipped = set(_parse_stage_csv(args.skip_stages))
     for st in selected_stages + list(skipped):
         if st not in stage_names:
             raise SystemExit(f"Unknown stage: {st}. Valid stages: {','.join(stage_names)}")
@@ -554,9 +368,6 @@ def main() -> None:
 
     exports_dir = Path(args.exports_dir).resolve()
     out_root = Path(args.out_root).resolve()
-    phase0_dir = out_root / "phase0_flat"
-    phase1_dir = out_root / "phase1_authority"
-    phase2_root = out_root / "phase2_domain"
     v21_root = out_root / "results"
     v21_phase0_dir = v21_root / "records"
     v21_analysis_dir = v21_root / "analysis"
@@ -591,52 +402,28 @@ def main() -> None:
         meta_rows, record_rows = emit_records(exports_dir, v21_phase0_dir, file_id_mode="basename")
         print(f"[extract_all] Stage flatten complete: rows={len(record_rows)} files={len(meta_rows)} out={v21_phase0_dir}", flush=True)
 
-        synthetic_domains = {d.strip() for d in str(args.synthetic_domains).split(",") if d.strip()}
-        unsupported = sorted([d for d in synthetic_domains if d != "line_patterns"])
-        for d in unsupported:
-            sys.stderr.write(f"[WARN extract_all] synthetic domain not supported yet: {d}\n")
-
-        items_csv = v21_phase0_dir / "identity_items.csv"
-        stats = _append_line_pattern_synthetic_norm_hash(items_csv)
-        note = (
-            "line_patterns segments_norm_hash: "
-            f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}"
-        )
-        report["notes"].append(note)
-        print(f"[extract_all] {note}", flush=True)
-
     if "discover" in selected_stages:
         print("[extract_all] Stage discover (T1): exploring join policy candidates (discover/validate/harsh CSVs)...", flush=True)
-        discover_out = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json")
         cmd_discover = [
             sys.executable,
             "tools/discover_join_policy.py",
             "--phase0-dir",
             str(v21_phase0_dir),
             "--search-modes",
-            str(args.discover_search_modes),
+            "greedy,pareto",
             "--policy-modes",
-            str(args.discover_policy_modes),
+            "discover,validate,harsh",
         ]
-        if args.discover_sample_size is not None:
-            cmd_discover += ["--sample-size", str(args.discover_sample_size)]
-        if args.discover_sample_seed is not None:
-            cmd_discover += ["--sample-seed", str(args.discover_sample_seed)]
-        if args.discover_max_candidate_fields is not None:
-            cmd_discover += ["--max-candidate-fields", str(args.discover_max_candidate_fields)]
         if args.domains and str(args.domains).strip():
             cmd_discover += ["--domains", str(args.domains)]
-        if args.domain_policy_json:
-            cmd_discover += ["--policy-json", str(Path(args.domain_policy_json).resolve()), "--base-policy", str(Path(args.domain_policy_json).resolve())]
-        if args.discover_emit_policy_json:
-            cmd_discover += ["--out-policy", str(discover_out)]
-            args.join_policy = str(discover_out)
         report["commands"].append({"stage": "discover", "cmd": cmd_discover})
         _run(cmd_discover, env=env)
 
     if "apply" in selected_stages:
         print("[extract_all] Stage apply (T2): applying join policy to flatten outputs...", flush=True)
-        policy_path = Path(args.join_policy).resolve() if args.join_policy else (Path(args.domain_policy_json).resolve() if args.domain_policy_json else (v21_root / "policies" / "domain_join_key_policies.v21.json").resolve())
+        policy_path = Path(args.join_policy).resolve() if args.join_policy else None
+        if policy_path is None:
+            raise SystemExit("--join-policy is required when running the apply stage")
         cmd_apply = [sys.executable, "tools/apply_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--join-policy", str(policy_path)]
         report["commands"].append({"stage": "apply", "cmd": cmd_apply})
         _run(cmd_apply, env=env)
@@ -663,6 +450,23 @@ def main() -> None:
             record_rows = _read_csv_rows(phase0_records_csv)
         if (v21_phase0_dir / "file_metadata.csv").is_file():
             meta_rows = _read_csv_rows(v21_phase0_dir / "file_metadata.csv")
+
+        if args.filter_export_run_ids:
+            _filter_path = Path(args.filter_export_run_ids)
+            if not _filter_path.is_file():
+                raise SystemExit(f"--filter-export-run-ids file not found: {_filter_path}")
+            _allowed = {
+                line.strip() for line in _filter_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            }
+            meta_rows = [r for r in meta_rows if r.get("export_run_id", "").strip() in _allowed]
+            record_rows = [r for r in record_rows if r.get("export_run_id", "").strip() in _allowed]
+            print(
+                f"[extract_all] export_run_id filter applied: "
+                f"meta_rows={len(meta_rows)} record_rows={len(record_rows)}",
+                flush=True,
+            )
+
         if meta_rows and record_rows:
             shard_dir = _ensure_domain_scoped_identity_items(v21_phase0_dir)
             if shard_dir is not None:
@@ -783,42 +587,6 @@ def main() -> None:
             emit_element_dominance(v21_analysis_dir)
             report["notes"].append("element_dominance: emitted")
 
-    if "authority" in selected_stages and args.emit_legacy:
-        if not args.config:
-            sys.stderr.write("[WARN extract_all] --config not provided; skipping authority legacy outputs.\n")
-        else:
-            _ensure_dir(phase1_dir)
-            cmd1a = [sys.executable, "tools/domain_authority.py", "--input-dir", str(exports_dir), "--config", str(Path(args.config).resolve()), "--out-dir", str(phase1_dir)]
-            if args.seed_baseline:
-                sb = Path(args.seed_baseline)
-                seed_path = (exports_dir / sb) if not sb.is_absolute() else sb
-                cmd1a += ["--seed-baseline", str(seed_path.resolve())]
-            _run(cmd1a, env=env)
-            _run([sys.executable, "tools/population_framing.py", "--domain-clusters", str(phase1_dir / "domain_cluster_summary.csv"), "--domain-authority", str(phase1_dir / "domain_authority_summary.csv"), "--run-config", str(Path(args.config).resolve()), "--out", str(phase1_dir / "population_baseline_summary.csv")], env=env)
-            _run([sys.executable, "tools/pairwise_analysis.py", "--baseline-coverage", str(phase1_dir / "baseline_coverage_by_project.csv"), "--out-dir", str(phase1_dir)], env=env)
-
-    if "patterns" in selected_stages and args.emit_legacy:
-        _ensure_dir(phase2_root)
-        dimtype_domains_seen: List[str] = []
-        for dom in active_domains:
-            dom_out = phase2_root / dom
-            _ensure_dir(dom_out)
-            for mod in ["run_joinhash_label_population", "run_joinhash_parameter_population", "run_candidate_joinkey_simulation", "run_population_stability"]:
-                _run([sys.executable, "-m", f"tools.phase2_analysis.{mod}", str(exports_dir), "--domain", dom, "--out", str(dom_out)], env=env)
-            if dom.startswith("dimension_types_") and dom not in dimtype_domains_seen:
-                dimtype_domains_seen.append(dom)
-
-        if dimtype_domains_seen and not args.no_dimtypes_by_family:
-            canonical_dimtype_domain = dimtype_domains_seen[0]
-            dom_out = phase2_root / canonical_dimtype_domain
-            sys.stderr.write(
-                "[DEBUG run_extract_all] Invoking run_dimension_types_by_family once "
-                f"for {len(dimtype_domains_seen)} dimension_types_* domain(s) using {canonical_dimtype_domain}.\n"
-            )
-            cmd2e = [sys.executable, "-m", "tools.phase2_analysis.run_dimension_types_by_family", str(exports_dir), "--domain", canonical_dimtype_domain, "--out", str(dom_out)]
-            cmd2e += ["--baseline", str(args.baseline), "--families_from", "baseline"] if args.baseline else ["--families_from", "all"]
-            _run(cmd2e, env=env)
-
     split_domains: List[str] = []
     if "split" in selected_stages:
         if args.split_domains is None or str(args.split_domains) == "__ALL__":
@@ -836,7 +604,7 @@ def main() -> None:
         if use_phase0_dir and require_join_policy:
             _enforce_policy_gate(_read_csv_rows(phase0_records_csv), v21_root / "diagnostics", split_domains, allow_sig_hash_join_key)
         for split_domain in split_domains:
-            cmd_split = [sys.executable, "tools/run_split_detection_all.py", str(exports_dir), "--domain", split_domain, "--out-root", str(v21_split_root / split_domain), "--mode", str(args.mode), *(["--phase0-dir", str(v21_phase0_dir)] if use_phase0_dir else []), *(["--allow-sig-hash-join-key"] if allow_sig_hash_join_key else [])]
+            cmd_split = [sys.executable, "tools/run_split_detection_all.py", str(exports_dir), "--domain", split_domain, "--out-root", str(v21_split_root / split_domain), "--mode", "allpairs", *(["--phase0-dir", str(v21_phase0_dir)] if use_phase0_dir else []), *(["--allow-sig-hash-join-key"] if allow_sig_hash_join_key else [])]
             report["commands"].append({"stage": "split", "domain": split_domain, "cmd": cmd_split})
             _run(cmd_split, env=env)
 
