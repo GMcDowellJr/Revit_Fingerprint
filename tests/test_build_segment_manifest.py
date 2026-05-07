@@ -263,6 +263,26 @@ def test_seed_only_note_not_set_for_generic_only_segment():
     assert l2["has_seed_file"] == "false"
 
 
+def test_seed_only_note_not_suppressed_by_blank_eid_project_row():
+    # A malformed row with blank export_run_id and governance_role=Project must NOT
+    # suppress seed_only — it is excluded from membership so it should not influence
+    # the no_project predicate either.
+    rows = [
+        _meta_row("s01", "imperial", "SeedOrg", "Template"),
+        _meta_row("s02", "imperial", "SeedOrg", "Template"),
+        _meta_row("s03", "imperial", "SeedOrg", "Template"),
+        _meta_row("",    "imperial", "SeedOrg", "Project"),   # blank eid — excluded member
+    ]
+    segs = _build_segments(rows, min_files=1)
+    l2 = next(r for r in segs if r["segment_level"] == "2" and r["unit_system"] == "imperial")
+    assert "seed_only" in (l2.get("notes") or ""), (
+        "Blank-eid Project row should not suppress seed_only"
+    )
+    assert l2["has_seed_file"] == "true"
+    # The blank-eid row must not appear in export_run_ids
+    assert "" not in l2["export_run_ids"].split("|")
+
+
 def test_seed_only_note_set_when_segment_has_seeds_no_project():
     # Template/Container files with no Project files → seed_only is correct.
     rows = [

@@ -116,6 +116,7 @@ def _build_segments(
             (row.get("governance_role") or "").strip() == "Project"
             for row in rows
             if (row.get("unit_system") or "").strip() == us
+            and (row.get("export_run_id") or "").strip()
         )
         l1_notes_parts = []
         if len(eids) < min_files:
@@ -148,6 +149,7 @@ def _build_segments(
             for row in rows
             if (row.get("unit_system") or "").strip() == us
             and (row.get("client_label") or "").strip() == cl
+            and (row.get("export_run_id") or "").strip()
         )
         notes_parts = []
         if file_count < min_files:
