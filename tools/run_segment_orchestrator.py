@@ -284,6 +284,17 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             if rc != 0:
                 step_failed = "patterns"
                 failure_notes = f"step=patterns returncode={rc}\n{tail}"
+            else:
+                presence_csv = out_root / "results" / "analysis" / "pattern_presence_file.csv"
+                if not presence_csv.is_file():
+                    step_failed = "patterns"
+                    failure_notes = (
+                        "step=patterns returncode=0 but pattern_presence_file.csv was not written — "
+                        "emit_analysis was likely skipped because no records matched the "
+                        "export_run_id filter. Check that export_run_ids in "
+                        f"{out_root / 'export_run_ids.txt'} match export_run_id values in "
+                        f"{records_dir / 'records.csv'}."
+                    )
 
         # Step 3 — Bundle stage
         if step_failed is None:
