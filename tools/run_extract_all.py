@@ -557,9 +557,7 @@ def main() -> None:
 
     if "apply" in selected_stages:
         print("[extract_all] Stage apply (T2): applying join policy to flatten outputs...", flush=True)
-        policy_path = Path(args.join_policy).resolve() if args.join_policy else None
-        if policy_path is None:
-            raise SystemExit("--join-policy is required when running the apply stage")
+        policy_path = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json").resolve()
         cmd_apply = [sys.executable, "tools/apply_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--join-policy", str(policy_path)]
         report["commands"].append({"stage": "apply", "cmd": cmd_apply})
         _run(cmd_apply, env=env)
