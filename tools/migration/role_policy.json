@@ -1,0 +1,268 @@
+{
+  "_notes": [
+    "Role assignments derived from domain_join_key_policies.json.",
+    "required_items and optional_items -> identity (already assigned from identity_basis bucket; listed here for override completeness).",
+    "explicitly_excluded_items -> coordination (excluded from joins but retained for forensics, tracing, and label resolution).",
+    "Items not listed in any policy entry retain their source-bucket role (unknown stays unknown).",
+    "Generated from corpus unknown-key audit against v21 corpus, May 2026."
+  ],
+  "identity": {
+    "identity.central_path": "coordination",
+    "identity.central_path_norm": "coordination",
+    "identity.filename": "coordination",
+    "identity.project_title": "coordination"
+  },
+  "phase_filters": {
+    "phase_filter.name": "coordination",
+    "phase_filter.id.int": "coordination",
+    "phase_filter.source_element_id": "coordination",
+    "phase_filter.source_unique_id": "coordination",
+    "phase_filter.uid": "coordination"
+  },
+  "phases": {
+    "phase.source_element_id": "coordination",
+    "phase.source_unique_id": "coordination",
+    "phase.uid": "coordination"
+  },
+  "line_patterns": {
+    "line_pattern.uid": "coordination",
+    "line_pattern.name": "coordination",
+    "line_pattern.element_id": "coordination",
+    "line_pattern.uid_or_namekey": "coordination",
+    "line_pattern.segments_def_hash": "coordination",
+    "line_pattern.source_element_id": "coordination",
+    "line_pattern.source_unique_id": "coordination"
+  },
+  "line_styles": {
+    "line_style.path": "coordination",
+    "line_style.pattern_ref.kind": "coordination",
+    "line_style.source_element_id": "coordination",
+    "line_style.source_unique_id": "coordination"
+  },
+  "arrowheads": {
+    "arrowhead.name": "coordination",
+    "arrowhead.type_id": "coordination",
+    "arrowhead.source_element_id": "coordination",
+    "arrowhead.source_unique_id": "coordination"
+  },
+  "text_types": {
+    "text_type.leader_arrowhead_sig_hash": "identity",
+    "text_type.name": "coordination",
+    "text_type.type_id": "coordination",
+    "text_type.type_uid": "coordination",
+    "text_type.leader_arrowhead_uid": "coordination",
+    "text_type.leader_arrowhead_name": "coordination",
+    "text_type.color_int": "coordination",
+    "text_type.source_element_id": "coordination",
+    "text_type.source_unique_id": "coordination"
+  },
+  "view_filter_definitions": {
+    "vf.uid_or_namekey": "coordination",
+    "vf.elem_id": "coordination",
+    "vf.categories": "coordination",
+    "vf.logic_root": "coordination",
+    "vf.rule_count": "coordination",
+    "vf.source_element_id": "coordination",
+    "vf.source_unique_id": "coordination"
+  },
+  "view_filter_applications_view_templates": {
+    "vfa.template_uid_or_namekey": "coordination",
+    "vfa.template_elem_id": "coordination",
+    "vfa.filter_stack_count": "coordination",
+    "vfa.source_element_id": "coordination",
+    "vfa.source_unique_id": "coordination"
+  },
+  "view_category_overrides": {
+    "vco.category_path": "coordination",
+    "vco.projection.line_weight": "coordination",
+    "vco.projection.line_pattern_ref.sig_hash": "coordination",
+    "vco.projection.line_color.rgb": "coordination",
+    "vco.cut.line_weight": "coordination",
+    "vco.cut.line_pattern_ref.sig_hash": "coordination",
+    "vco.cut.line_color.rgb": "coordination",
+    "vco.halftone": "coordination",
+    "vco.transparency": "coordination",
+    "vco.template_element_id": "coordination",
+    "vco.template_unique_id": "coordination"
+  },
+  "view_category_overrides_model": {
+    "vco.category_path": "coordination",
+    "vco.projection.line_weight": "coordination",
+    "vco.projection.line_pattern_ref.sig_hash": "coordination",
+    "vco.projection.line_color.rgb": "coordination",
+    "vco.cut.line_weight": "coordination",
+    "vco.cut.line_pattern_ref.sig_hash": "coordination",
+    "vco.cut.line_color.rgb": "coordination",
+    "vco.halftone": "coordination",
+    "vco.transparency": "coordination",
+    "vco.template_element_id": "coordination",
+    "vco.template_unique_id": "coordination"
+  },
+  "view_category_overrides_annotation": {
+    "vco.category_path": "coordination",
+    "vco.projection.line_weight": "coordination",
+    "vco.projection.line_pattern_ref.sig_hash": "coordination",
+    "vco.projection.line_color.rgb": "coordination",
+    "vco.halftone": "coordination",
+    "vco.transparency": "coordination",
+    "vco.template_element_id": "coordination",
+    "vco.template_unique_id": "coordination"
+  },
+  "dimension_types_linear": {
+    "dim_type.name": "coordination",
+    "dim_type.tick_mark_uid": "coordination",
+    "dim_attr.tick_mark_uid": "coordination",
+    "dim_type.source_element_id": "coordination",
+    "dim_type.source_unique_id": "coordination"
+  },
+  "dimension_types_angular": {
+    "dim_type.name": "coordination",
+    "dim_type.tick_mark_uid": "coordination",
+    "dim_attr.tick_mark_uid": "coordination",
+    "dim_type.source_element_id": "coordination",
+    "dim_type.source_unique_id": "coordination"
+  },
+  "dimension_types_radial": {
+    "dim_type.name": "coordination",
+    "dim_type.tick_mark_uid": "coordination",
+    "dim_attr.tick_mark_uid": "coordination",
+    "dim_type.source_element_id": "coordination",
+    "dim_type.source_unique_id": "coordination"
+  },
+  "dimension_types_diameter": {
+    "dim_type.name": "coordination",
+    "dim_type.tick_mark_uid": "coordination",
+    "dim_attr.tick_mark_uid": "coordination",
+    "dim_type.source_element_id": "coordination",
+    "dim_type.source_unique_id": "coordination"
+  },
+  "dimension_types_spot_elevation": {
+    "dim_type.name": "coordination",
+    "dim_type.tick_mark_uid": "coordination",
+    "dim_attr.tick_mark_uid": "coordination",
+    "dim_type.source_element_id": "coordination",
+    "dim_type.source_unique_id": "coordination"
+  },
+  "dimension_types_spot_coordinate": {
+    "dim_type.name": "coordination",
+    "dim_type.tick_mark_uid": "coordination",
+    "dim_attr.tick_mark_uid": "coordination",
+    "dim_type.source_element_id": "coordination",
+    "dim_type.source_unique_id": "coordination"
+  },
+  "dimension_types_spot_slope": {
+    "dim_type.name": "coordination",
+    "dim_type.tick_mark_uid": "coordination",
+    "dim_attr.tick_mark_uid": "coordination",
+    "dim_type.source_element_id": "coordination",
+    "dim_type.source_unique_id": "coordination"
+  },
+  "object_styles_model": {
+    "obj_style.source_element_id": "coordination",
+    "obj_style.source_unique_id": "coordination"
+  },
+  "object_styles_annotation": {
+    "obj_style.weight.cut": "coordination",
+    "obj_style.material_sig_hash": "coordination",
+    "obj_style.source_element_id": "coordination",
+    "obj_style.source_unique_id": "coordination"
+  },
+  "object_styles_analytical": {
+    "obj_style.weight.cut": "coordination",
+    "obj_style.material_sig_hash": "coordination",
+    "obj_style.source_element_id": "coordination",
+    "obj_style.source_unique_id": "coordination"
+  },
+  "object_styles_imported": {
+    "obj_style.weight.cut": "coordination",
+    "obj_style.material_sig_hash": "coordination",
+    "obj_style.source_element_id": "coordination",
+    "obj_style.source_unique_id": "coordination"
+  },
+  "fill_patterns_drafting": {
+    "fill_pattern.name": "coordination",
+    "fill_pattern.is_solid": "coordination",
+    "fill_pattern.elem_id": "coordination",
+    "fill_pattern.source_element_id": "coordination",
+    "fill_pattern.source_unique_id": "coordination",
+    "fill_pattern.uid": "coordination"
+  },
+  "fill_patterns_model": {
+    "fill_pattern.name": "coordination",
+    "fill_pattern.is_solid": "coordination",
+    "fill_pattern.elem_id": "coordination",
+    "fill_pattern.source_element_id": "coordination",
+    "fill_pattern.source_unique_id": "coordination",
+    "fill_pattern.uid": "coordination"
+  },
+  "materials": {
+    "material.id_local": "coordination",
+    "material.name": "coordination",
+    "material.class": "coordination",
+    "material.description": "coordination",
+    "material.comments": "coordination",
+    "material.keywords": "coordination",
+    "material.manufacturer": "coordination",
+    "material.model": "coordination",
+    "material.cost": "coordination",
+    "material.url": "coordination",
+    "material.keynote": "coordination",
+    "material.mark": "coordination"
+  },
+  "view_templates_floor_structural_area_plans": {
+    "view_template.name": "coordination",
+    "view_template.uid": "coordination",
+    "view_template.element_id": "coordination",
+    "view_template.category_overrides_def_hash": "coordination",
+    "vt.source_element_id": "coordination",
+    "vt.source_unique_id": "coordination"
+  },
+  "view_templates_ceiling_plans": {
+    "view_template.name": "coordination",
+    "view_template.uid": "coordination",
+    "view_template.element_id": "coordination",
+    "view_template.category_overrides_def_hash": "coordination",
+    "vt.source_element_id": "coordination",
+    "vt.source_unique_id": "coordination"
+  },
+  "view_templates_elevations_sections_detail": {
+    "view_template.name": "coordination",
+    "view_template.uid": "coordination",
+    "view_template.element_id": "coordination",
+    "view_template.category_overrides_def_hash": "coordination",
+    "vt.source_element_id": "coordination",
+    "vt.source_unique_id": "coordination"
+  },
+  "view_templates_renderings_drafting": {
+    "view_template.name": "coordination",
+    "view_template.uid": "coordination",
+    "view_template.element_id": "coordination",
+    "view_template.category_overrides_def_hash": "coordination",
+    "vt.source_element_id": "coordination",
+    "vt.source_unique_id": "coordination"
+  },
+  "view_templates_schedules": {
+    "view_template.name": "coordination",
+    "view_template.uid": "coordination",
+    "view_template.element_id": "coordination",
+    "view_template.category_overrides_def_hash": "coordination",
+    "vt.source_element_id": "coordination",
+    "vt.source_unique_id": "coordination"
+  },
+  "wall_types": {
+    "wt.type_name": "coordination",
+    "wt.coarse_fill_color_rgb": "coordination"
+  },
+  "floor_types": {
+    "ft.type_name": "coordination",
+    "ft.coarse_fill_color_rgb": "coordination"
+  },
+  "roof_types": {
+    "rt.type_name": "coordination",
+    "rt.coarse_fill_color_rgb": "coordination"
+  },
+  "ceiling_types": {
+    "ct.type_name": "coordination",
+    "ct.coarse_fill_color_rgb": "coordination"
+  }
+}

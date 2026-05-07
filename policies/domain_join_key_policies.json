@@ -656,7 +656,7 @@
       "join_key_schema": "materials.join_key.v2",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "material.sig_hash"
+        "material.graphics_sig_hash_v2"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
