@@ -218,6 +218,17 @@ def test_main_writes_files(tmp_path):
     assert not any(r["segment_id"] == "metric|Global" for r in reg_rows)
 
 
+def test_blank_client_label_level2_id_distinct_from_level1():
+    # When client_label is blank the level-2 segment_id must be "imperial|", not "imperial",
+    # so it never collides with the level-1 segment_id for the same unit_system.
+    rows = [_meta_row(f"r{i:02d}", "imperial", "", "Project") for i in range(3)]
+    segs = _build_segments(rows, min_files=1)
+    l1_ids = {r["segment_id"] for r in segs if r["segment_level"] == "1"}
+    l2_ids = {r["segment_id"] for r in segs if r["segment_level"] == "2"}
+    assert l1_ids.isdisjoint(l2_ids), f"Level-1 and level-2 IDs overlap: {l1_ids & l2_ids}"
+    assert "imperial|" in l2_ids
+
+
 def test_main_missing_metadata_file(tmp_path):
     rc = main(["--metadata-file", str(tmp_path / "missing.csv"), "--out-dir", str(tmp_path / "out")])
     assert rc == 1

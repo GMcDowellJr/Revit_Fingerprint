@@ -133,7 +133,7 @@ def _build_segments(
     for (us, cl) in sorted(level2):
         eids = sorted(set(level2[(us, cl)]))
         seed_eids = sorted(set(level2_seeds[(us, cl)]))
-        seg_id = f"{us}|{cl}" if cl else us
+        seg_id = f"{us}|{cl}"  # always pipe-delimited; keeps level-2 distinct from level-1 when cl is blank
         file_count = len(eids)
         no_project = not any(
             (row.get("governance_role") or "").strip() == "Project"
