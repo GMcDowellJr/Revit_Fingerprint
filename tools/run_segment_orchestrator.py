@@ -73,12 +73,40 @@ def run_step(cmd: List[str]) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, check=True, capture_output=False, text=True)
 
 
-def run_step_capture(cmd: List[str]) -> tuple[int, str, str]:
+def run_step_capture(cmd: List[str], cwd: Optional[str] = None) -> tuple[int, str, str]:
     """Run a subprocess step, return (returncode, last_20_lines_stderr, full_stderr)."""
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
     stderr_lines = (result.stderr or "").splitlines()
     tail = "\n".join(stderr_lines[-20:]) if stderr_lines else ""
     return result.returncode, tail, result.stderr or ""
+
+
+# ── Record helpers ────────────────────────────────────────────────────────────
+
+def _write_segment_records(
+    records_dir: Path,
+    segment_records_dir: Path,
+    allowed_ids: set,
+) -> None:
+    """
+    Copy records.csv and file_metadata.csv from corpus records_dir into the
+    segment records dir, filtered to the segment's export_run_ids.
+    Missing source files are skipped silently — patterns stage will simply see
+    an empty (or absent) input and the guard will surface the failure cleanly.
+    """
+    for fname in ("records.csv", "file_metadata.csv"):
+        src = records_dir / fname
+        if not src.is_file():
+            continue
+        with src.open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            fieldnames = list(reader.fieldnames or [])
+            rows = [r for r in reader if r.get("export_run_id", "").strip() in allowed_ids]
+        dst = segment_records_dir / fname
+        with dst.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
 
 
 # ── Diagnostic helpers ────────────────────────────────────────────────────────
@@ -239,7 +267,6 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 sys.executable,
                 str(repo_root / "tools" / "label_synthesis" / "build_label_population.py"),
                 "--out-root", str(out_root),
-                "--records-dir", str(records_dir),
             ]
             extract_cmd = [
                 sys.executable,
@@ -250,11 +277,10 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 "--filter-export-run-ids", str(out_root / "export_run_ids.txt"),
                 "--join-policy", str(join_policy),
                 "--allow-sig-hash-join-key",
-                "--records-dir", str(records_dir),
             ]
             bundle_cmd = [
                 sys.executable,
-                str(repo_root / "tools" / "run_bundle_analysis.py"),
+                str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
                 "--analysis-dir", str(out_root / "results" / "analysis"),
                 "--out-dir", str(out_root / "results" / "bundle_analysis"),
                 "--metadata-file", str(records_dir / "file_metadata.csv"),
@@ -302,9 +328,11 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         failure_notes: str = ""
         t_start = time.monotonic()
 
-        # Step 1 — Prepare directories and export_run_ids.txt
+        # Step 1 — Prepare: directories, export_run_ids.txt, segment-level records
         print(f"[orchestrator]   step 1/3 label_population...", flush=True)
         try:
+            segment_records_dir = out_root / "results" / "records"
+            segment_records_dir.mkdir(parents=True, exist_ok=True)
             (out_root / "results" / "analysis").mkdir(parents=True, exist_ok=True)
             (out_root / "results" / "bundle_analysis").mkdir(parents=True, exist_ok=True)
             (out_root / "results" / "label_synthesis").mkdir(parents=True, exist_ok=True)
@@ -312,13 +340,14 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             ids_file = out_root / "export_run_ids.txt"
             ids_file.write_text("\n".join(export_run_ids) + "\n", encoding="utf-8")
 
+            _write_segment_records(records_dir, segment_records_dir, set(export_run_ids))
+
             lp_cmd = [
                 sys.executable,
                 str(repo_root / "tools" / "label_synthesis" / "build_label_population.py"),
                 "--out-root", str(out_root),
-                "--records-dir", str(records_dir),
             ]
-            rc, tail, _stderr = run_step_capture(lp_cmd)
+            rc, tail, _stderr = run_step_capture(lp_cmd, cwd=str(repo_root))
             if rc != 0:
                 raise subprocess.CalledProcessError(rc, lp_cmd, stderr=tail)
         except Exception as exc:
@@ -337,9 +366,8 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 "--filter-export-run-ids", str(out_root / "export_run_ids.txt"),
                 "--join-policy", str(join_policy),
                 "--allow-sig-hash-join-key",
-                "--records-dir", str(records_dir),
             ]
-            rc, tail, patterns_stderr = run_step_capture(extract_cmd)
+            rc, tail, patterns_stderr = run_step_capture(extract_cmd, cwd=str(repo_root))
             if rc != 0:
                 step_failed = "patterns"
                 failure_notes = f"step=patterns returncode={rc}\n{tail}"
@@ -356,13 +384,13 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             print(f"[orchestrator]   step 3/3 bundle...", flush=True)
             bundle_cmd = [
                 sys.executable,
-                str(repo_root / "tools" / "run_bundle_analysis.py"),
+                str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
                 "--analysis-dir", str(out_root / "results" / "analysis"),
                 "--out-dir", str(out_root / "results" / "bundle_analysis"),
                 "--metadata-file", str(records_dir / "file_metadata.csv"),
                 "--no-discover-populations",
             ]
-            rc, tail, _stderr = run_step_capture(bundle_cmd)
+            rc, tail, _stderr = run_step_capture(bundle_cmd, cwd=str(repo_root))
             if rc != 0:
                 step_failed = "bundle"
                 failure_notes = f"step=bundle returncode={rc}\n{tail}"
