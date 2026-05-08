@@ -483,6 +483,13 @@ def main() -> None:
              "before running authority/patterns stages. "
              "flatten/apply/placeholders/split stages are unaffected."
     )
+    ap.add_argument(
+        "--records-dir",
+        default=None,
+        help="Path to directory containing records.csv and file_metadata.csv. "
+             "Overrides the default {out-root}/results/records/ for authority/patterns stages. "
+             "Use when running per-segment analysis where records live at corpus level."
+    )
     args = ap.parse_args()
 
     allow_sig_hash_join_key = args.allow_sig_hash_join_key
@@ -585,13 +592,14 @@ def main() -> None:
             sys.stderr.write("[WARN extract_all] placeholders stage failed; continuing: {}\n".format(e))
 
     if "authority" in selected_stages or "patterns" in selected_stages:
-        phase0_records_csv = v21_phase0_dir / "records.csv"
+        records_source_dir = Path(args.records_dir).resolve() if args.records_dir else v21_phase0_dir
+        phase0_records_csv = records_source_dir / "records.csv"
         if phase0_records_csv.is_file():
             # Always reload from disk here so analyze uses post-apply join_hash values,
             # not in-memory rows captured before join policy application.
             record_rows = _read_csv_rows(phase0_records_csv)
-        if (v21_phase0_dir / "file_metadata.csv").is_file():
-            meta_rows = _read_csv_rows(v21_phase0_dir / "file_metadata.csv")
+        if (records_source_dir / "file_metadata.csv").is_file():
+            meta_rows = _read_csv_rows(records_source_dir / "file_metadata.csv")
         # Snapshot pre-filter rows so split domain auto-discovery (which runs after
         # this block) uses the full post-reload population regardless of filter.
         _pre_filter_record_rows = record_rows
@@ -611,8 +619,18 @@ def main() -> None:
                 f"meta_rows={len(meta_rows)} record_rows={len(record_rows)}",
                 flush=True,
             )
+            if not meta_rows or not record_rows:
+                _sample_allowed = sorted(_allowed)[:5]
+                _meta_ids = sorted({r.get("export_run_id", "").strip() for r in _read_csv_rows(records_source_dir / "file_metadata.csv")})[:5] if (records_source_dir / "file_metadata.csv").is_file() else []
+                sys.stderr.write(
+                    f"[WARN extract_all] filter left meta_rows={len(meta_rows)} record_rows={len(record_rows)} — "
+                    f"emit_analysis will be skipped and pattern_presence_file.csv will NOT be written.\n"
+                    f"[WARN extract_all] records_source_dir={records_source_dir}\n"
+                    f"[WARN extract_all] filter_file={_filter_path} (first 5 IDs: {_sample_allowed})\n"
+                    f"[WARN extract_all] file_metadata.csv first 5 export_run_ids: {_meta_ids}\n"
+                )
 
-        if require_join_policy and (v21_phase0_dir / "records.csv").is_file():
+        if require_join_policy and phase0_records_csv.is_file():
             _enforce_policy_gate(record_rows, v21_root / "diagnostics", active_domains, allow_sig_hash_join_key)
 
         if meta_rows and record_rows:
@@ -627,6 +645,8 @@ def main() -> None:
                 "--out-root",
                 str(out_root),
             ]
+            if args.records_dir:
+                cmd_label_pop += ["--records-dir", str(records_source_dir)]
             report["commands"].append({"stage": "analyze", "cmd": cmd_label_pop})
             _run(cmd_label_pop, env=env)
 

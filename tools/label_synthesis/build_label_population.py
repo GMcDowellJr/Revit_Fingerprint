@@ -2,14 +2,14 @@
 """
 tools/label_synthesis/build_label_population.py
 
-Derives per-domain label population CSVs from phase0_records.csv.
+Derives per-domain label population CSVs from records.csv.
 These feed the modal label layer (Layer 3) of the label resolver.
 
 Reads:
-    Results_v21/phase0_v21/phase0_records.csv
+    results/records/records.csv
 
 Writes (one per domain):
-    Results_v21/label_synthesis/{domain}.joinhash_label_population.csv
+    results/label_synthesis/{domain}.joinhash_label_population.csv
 
 Columns in output:
     domain, join_hash, label_v, label_q, files_count
@@ -34,9 +34,11 @@ from pathlib import Path
 from typing import Dict, Set, Tuple
 
 
-def build_label_population(out_root: Path) -> None:
-    phase0_dir = out_root / "results" / "records"
-    records_csv = phase0_dir / "records.csv"
+def build_label_population(out_root: Path, records_dir: Path | None = None) -> None:
+    if records_dir is not None:
+        records_csv = records_dir / "records.csv"
+    else:
+        records_csv = out_root / "results" / "records" / "records.csv"
 
     if not records_csv.is_file():
         sys.exit(
@@ -128,7 +130,7 @@ def build_label_population(out_root: Path) -> None:
         flush=True,
     )
     print(
-        "[build_label_population] Label population artifacts are ready for emit_analysis_v21.",
+        "[build_label_population] Label population artifacts are ready for emit_analysis.",
         flush=True,
     )
 
@@ -136,7 +138,7 @@ def build_label_population(out_root: Path) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=(
-            "Build per-domain joinhash label population CSVs from phase0_records.csv. "
+            "Build per-domain joinhash label population CSVs from records.csv. "
             "Output feeds Layer 3 (modal label) of the label resolver."
         )
     )
@@ -145,8 +147,16 @@ def main() -> None:
         required=True,
         help="Same --out-root passed to run_extract_all.py (e.g. results_allpairs)",
     )
+    ap.add_argument(
+        "--records-dir",
+        default=None,
+        help="Path to records directory containing records.csv. "
+             "Overrides the default {out-root}/results/records/ derivation. "
+             "Use when running per-segment analysis where records live at corpus level.",
+    )
     args = ap.parse_args()
-    build_label_population(Path(args.out_root).resolve())
+    records_dir = Path(args.records_dir).resolve() if args.records_dir else None
+    build_label_population(Path(args.out_root).resolve(), records_dir=records_dir)
 
 
 if __name__ == "__main__":
