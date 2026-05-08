@@ -326,6 +326,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
 
         step_failed: Optional[str] = None
         failure_notes: str = ""
+        notes_parts: List[str] = []
         t_start = time.monotonic()
 
         # Step 1 — Prepare: directories, export_run_ids.txt, segment-level records
@@ -397,6 +398,17 @@ def run_orchestrator(args: argparse.Namespace) -> int:
 
         elapsed = int(time.monotonic() - t_start)
 
+        # Post-bundle validation (warn only, runs before registry write so warnings land in notes)
+        if step_failed is None:
+            dag_nodes = out_root / "results" / "bundle_analysis" / "line_patterns" / "bundle_dag_nodes.csv"
+            if not dag_nodes.is_file() or dag_nodes.stat().st_size == 0:
+                warn = (
+                    f"[WARN orchestrator] segment={sid} line_patterns/bundle_dag_nodes.csv "
+                    f"missing or empty — bundle analysis may not have run correctly"
+                )
+                print(warn, flush=True)
+                notes_parts.append(warn)
+
         # Update registry row
         ri = reg_index.get(sid)
         if ri is not None:
@@ -404,7 +416,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 registry[ri]["status"] = "complete"
                 registry[ri]["last_run_utc"] = utc_now_iso()
                 if "notes" in registry[ri]:
-                    registry[ri]["notes"] = ""
+                    registry[ri]["notes"] = "; ".join(notes_parts)
             else:
                 registry[ri]["status"] = "failed"
                 registry[ri]["last_run_utc"] = utc_now_iso()
@@ -415,28 +427,6 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         if step_failed is None:
             print(f"[orchestrator]   ✓ complete (elapsed: {elapsed}s)", flush=True)
             n_complete += 1
-
-            # Post-bundle validation (warn only)
-            dag_nodes = out_root / "results" / "bundle_analysis" / "bundle_dag_nodes.csv"
-            if not dag_nodes.is_file():
-                print(
-                    f"[WARN orchestrator] segment={sid} bundle_dag_nodes.csv missing or empty"
-                    f" — some domains may have been silently skipped"
-                    f" (check for stale _population_runs staging directories)",
-                    flush=True,
-                )
-            else:
-                with dag_nodes.open("r", encoding="utf-8-sig", newline="") as f:
-                    rdr = csv.reader(f)
-                    next(rdr, None)  # skip header
-                    has_data = next(rdr, None) is not None
-                if not has_data:
-                    print(
-                        f"[WARN orchestrator] segment={sid} bundle_dag_nodes.csv missing or empty"
-                        f" — some domains may have been silently skipped"
-                        f" (check for stale _population_runs staging directories)",
-                        flush=True,
-                    )
         else:
             print(
                 f"[orchestrator]   ✗ failed at step={step_failed} (elapsed: {elapsed}s)",
