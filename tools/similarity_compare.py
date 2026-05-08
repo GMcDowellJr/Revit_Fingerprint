@@ -1578,6 +1578,13 @@ File format notes:
     ap.add_argument("--details_domain_filter", default=None, help="Comma-separated domain list to include in details (optional)")
 
     ap.add_argument("--include_baseline_in_pairwise", action="store_true")
+    ap.add_argument(
+        "--out-dir",
+        default=None,
+        help="Base output directory for all similarity outputs. "
+             "When provided, overrides the default {--dir}/similarity/ resolution "
+             "for all relative output paths (out_pairwise, out_baseline, domain_similarity, etc.)."
+    )
     ap.add_argument("--metadata-file", default=None, help="Path to file_metadata.csv. Required when --roles is provided.")
     ap.add_argument(
         "--roles",
@@ -1649,7 +1656,10 @@ File format notes:
         print(f"[filter] loaded={total_loaded} after_role_filter={len(fps)} excluded={excluded}")
     json_files = sorted(fps.keys())
 
-    out_base = Path(args.dir) / "similarity"
+    if args.out_dir:
+        out_base = Path(args.out_dir).resolve()
+    else:
+        out_base = Path(args.dir).resolve() / "similarity"
     if resolved_roles:
         out_base = out_base / f"role_{'_'.join(sorted(resolved_roles))}"
     out_base.mkdir(parents=True, exist_ok=True)
