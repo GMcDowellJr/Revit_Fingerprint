@@ -29,6 +29,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
+# Allow import of bundle_analysis package from the same tools/ directory
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bundle_analysis.common import atomic_write_csv, read_csv_rows
+
+BI_MERGE_FILES = [
+    "membership_matrix.csv",
+    "bundles.csv",
+    "bundle_dag_nodes.csv",
+    "bundle_dag_edges.csv",
+    "bundle_dag_differences.csv",
+    "pattern_bundle_classification.csv",
+    "bundle_membership.csv",
+    "file_bundle_classification.csv",
+    "bundle_file_membership.csv",
+    "scope_registry.csv",
+]
+
 
 # ── CSV helpers ──────────────────────────────────────────────────────────────
 
@@ -166,6 +183,54 @@ def _build_patterns_missing_notes(
         parts.extend(f"  {ln}" for ln in warn_lines[-10:])
 
     return "\n".join(parts)
+
+
+# ── BI merge ─────────────────────────────────────────────────────────────────
+
+def merge_bi_outputs(bundle_analysis_dir: Path) -> dict:
+    """Pre-merge per-domain bundle analysis CSVs into single combined files for Power BI."""
+    if not bundle_analysis_dir.is_dir():
+        return {}
+
+    result: Dict[str, dict] = {}
+    for filename in BI_MERGE_FILES:
+        candidates = [
+            p for p in bundle_analysis_dir.glob(f"*/{filename}")
+            if "_population_discovery" not in str(p) and "_population_runs" not in str(p)
+        ]
+        if not candidates:
+            continue
+
+        header: Optional[List[str]] = None
+        all_rows: List[Dict[str, str]] = []
+        files_merged = 0
+        for csv_path in sorted(candidates):
+            rows = read_csv_rows(csv_path)
+            if not rows:
+                files_merged += 1
+                continue
+            file_header = list(rows[0].keys())
+            if header is None:
+                header = file_header
+            elif file_header != header:
+                print(
+                    f"[WARN orchestrator] bi_merge header mismatch in {csv_path} "
+                    f"(expected {header}, got {file_header}) — skipping",
+                    flush=True,
+                )
+                continue
+            all_rows.extend(rows)
+            files_merged += 1
+
+        if header is None:
+            continue
+
+        stem = Path(filename).stem
+        out_path = bundle_analysis_dir / f"{stem}_combined.csv"
+        atomic_write_csv(out_path, header, all_rows)
+        result[filename] = {"files_merged": files_merged, "rows_written": len(all_rows)}
+
+    return result
 
 
 # ── Core orchestration ────────────────────────────────────────────────────────
@@ -409,6 +474,23 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 print(warn, flush=True)
                 notes_parts.append(warn)
 
+        # BI merge (non-fatal; only runs when bundle succeeded)
+        if step_failed is None and not args.skip_bi_merge:
+            try:
+                bundle_analysis_dir = out_root / "results" / "bundle_analysis"
+                merge_result = merge_bi_outputs(bundle_analysis_dir)
+                total_files = sum(v["files_merged"] for v in merge_result.values())
+                total_rows = sum(v["rows_written"] for v in merge_result.values())
+                print(
+                    f"[orchestrator] bi_merge segment={sid} files_merged={total_files} rows_written={total_rows}",
+                    flush=True,
+                )
+            except Exception as merge_exc:
+                print(
+                    f"[WARN orchestrator] bi_merge failed for segment={sid}: {merge_exc}",
+                    flush=True,
+                )
+
         # Update registry row
         ri = reg_index.get(sid)
         if ri is not None:
@@ -491,6 +573,10 @@ def main() -> None:
     ap.add_argument(
         "--dry-run", action="store_true",
         help="Print full run plan without executing anything",
+    )
+    ap.add_argument(
+        "--skip-bi-merge", action="store_true",
+        help="Skip the BI merge post-processing step (useful for dry runs and debugging)",
     )
     args = ap.parse_args()
     sys.exit(run_orchestrator(args))
