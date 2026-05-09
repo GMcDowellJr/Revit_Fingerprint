@@ -31,7 +31,7 @@ from typing import Dict, List, Optional
 
 # Allow import of bundle_analysis package from the same tools/ directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bundle_analysis.common import atomic_write_csv, read_csv_rows
+from bundle_analysis.common import atomic_write_csv
 
 BI_MERGE_FILES = [
     "membership_matrix.csv",
@@ -205,11 +205,16 @@ def merge_bi_outputs(bundle_analysis_dir: Path) -> dict:
         all_rows: List[Dict[str, str]] = []
         files_merged = 0
         for csv_path in sorted(candidates):
-            rows = read_csv_rows(csv_path)
-            if not rows:
-                files_merged += 1
+            with csv_path.open("r", encoding="utf-8-sig", newline="") as fh:
+                reader = csv.DictReader(fh)
+                file_header = list(reader.fieldnames or [])
+                rows = [
+                    {str(k): "" if v is None else str(v) for k, v in row.items()}
+                    for row in reader
+                ]
+            if not file_header:
+                # Truly empty file — no header at all; skip without counting
                 continue
-            file_header = list(rows[0].keys())
             if header is None:
                 header = file_header
             elif file_header != header:
