@@ -187,8 +187,33 @@ def _build_patterns_missing_notes(
 
 # ── BI merge ─────────────────────────────────────────────────────────────────
 
-def merge_bi_outputs(bundle_analysis_dir: Path) -> dict:
-    """Pre-merge per-domain bundle analysis CSVs into single combined files for Power BI."""
+def _active_domains_from_presence_csv(analysis_dir: Path) -> Optional[frozenset]:
+    """Return the set of domain names present in pattern_presence_file.csv, or None on failure.
+
+    Mirrors the domain-discovery logic in run_bundle_analysis.py so the merge
+    uses exactly the same domain set that the bundle step processed.
+    Returns None (not an empty frozenset) when the file is absent or contains no
+    domains, so callers fall back to unfiltered behaviour rather than writing
+    empty combined files.
+    """
+    presence_csv = analysis_dir / "pattern_presence_file.csv"
+    if not presence_csv.is_file():
+        return None
+    with presence_csv.open("r", encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        domains = frozenset(
+            r.get("domain", "").strip() for r in reader if r.get("domain", "").strip()
+        )
+    return domains if domains else None
+
+
+def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozenset] = None) -> dict:
+    """Pre-merge per-domain bundle analysis CSVs into single combined files for Power BI.
+
+    active_domains: when provided, only subfolders whose name is in this set are
+    merged.  Pass the set derived from pattern_presence_file.csv so that stale
+    domain folders left over from earlier runs are excluded.
+    """
     if not bundle_analysis_dir.is_dir():
         return {}
 
@@ -196,7 +221,9 @@ def merge_bi_outputs(bundle_analysis_dir: Path) -> dict:
     for filename in BI_MERGE_FILES:
         candidates = [
             p for p in bundle_analysis_dir.glob(f"*/{filename}")
-            if "_population_discovery" not in str(p) and "_population_runs" not in str(p)
+            if "_population_discovery" not in str(p)
+            and "_population_runs" not in str(p)
+            and (active_domains is None or p.parent.name in active_domains)
         ]
         if not candidates:
             continue
@@ -482,8 +509,9 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         # BI merge (non-fatal; only runs when bundle succeeded)
         if step_failed is None and not args.skip_bi_merge:
             try:
+                active_domains = _active_domains_from_presence_csv(out_root / "results" / "analysis")
                 bundle_analysis_dir = out_root / "results" / "bundle_analysis"
-                merge_result = merge_bi_outputs(bundle_analysis_dir)
+                merge_result = merge_bi_outputs(bundle_analysis_dir, active_domains=active_domains)
                 total_files = sum(v["files_merged"] for v in merge_result.values())
                 total_rows = sum(v["rows_written"] for v in merge_result.values())
                 print(
