@@ -97,10 +97,10 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         lev = r["segment_level"]
         cl = r["client_label"]
         role = r["governance_role"]
-        if lev == "2" and not role and cl:
-            # unit|client segments: level-3 children parent to unit|role, not unit|client,
-            # so they never appear in kids. Use l3_by_uc instead.
-            has = bool(l3_by_uc.get((r["unit_system"], cl)))
+        if lev == "1":
+            has = False
+        elif lev == "2" and not role:
+            has = False
         else:
             has = bool(kids.get(seg))
         if has:
@@ -112,7 +112,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         elif role in {"Template","Container","Generic"}: r["run_type"]="reference"
         elif role=="Project": r["run_type"]="skip"
         elif role == "":
-            r["run_type"] = "registration"
+            r["run_type"] = "skip"
         else: r["run_type"]="registration"
     # purpose/label
     def child_span(r):
