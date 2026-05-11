@@ -42,16 +42,27 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     l2b=defaultdict(list); l2bs=defaultdict(list)
     l3=defaultdict(list); l3s=defaultdict(list)
     client_roles=defaultdict(set)
+    role_presence_by_l2: Dict[str, set] = defaultdict(set)
+    project_presence_by_l2: Dict[str, bool] = defaultdict(bool)
     for row in rows:
         u=(row.get("unit_system") or "").strip(); c=(row.get("client_label") or "").strip(); r=(row.get("governance_role") or "").strip(); e=(row.get("export_run_id") or "").strip()
         if not u or not e: continue
         l1[u].append(e); l2a[(u,r)].append(e)
+        l2b[(u,c)].append(e)
         if c:
-            l2b[(u,c)].append(e); l3[(u,r,c)].append(e); client_roles[(u,c)].add(r)
+            l3[(u,r,c)].append(e)
+        client_roles[(u,c)].add(r)
+        l2_seg_id = f"{u}|{c}"
+        if r:
+            role_presence_by_l2[l2_seg_id].add(r)
+        if r == "Project":
+            project_presence_by_l2[l2_seg_id] = True
         if r in SEED_ROLES:
             l1s[u].append(e); l2as[(u,r)].append(e)
             if c:
                 l2bs[(u,c)].append(e); l3s[(u,r,c)].append(e)
+            else:
+                l2bs[(u, c)].append(e)
     m=[]
     def mk(seg,parent,lev,u,r,c,eids,seeds):
         eids=sorted(set(eids)); seeds=sorted(set(seeds))
@@ -59,7 +70,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     for u in sorted(l1): mk(u,"",1,u,"","",l1[u],l1s[u])
     for (u,r) in sorted(l2a): mk(f"{u}|{r}",u,2,u,r,"",l2a[(u,r)],l2as[(u,r)])
     for (u,c) in sorted(l2b):
-        if len(client_roles[(u,c)])>1: mk(f"{u}|{c}",u,2,u,"",c,l2b[(u,c)],l2bs[(u,c)])
+        mk(f"{u}|{c}",u,2,u,"",c,l2b[(u,c)],l2bs[(u,c)])
     for (u,r,c) in sorted(l3): mk(f"{u}|{r}|{c}",f"{u}|{r}",3,u,r,c,l3[(u,r,c)],l3s[(u,r,c)])
     byid={r["segment_id"]:r for r in m}; kids=defaultdict(list)
     for r in m:
@@ -71,8 +82,21 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             l3_by_uc[(r["unit_system"], r["client_label"])].append(r)
     # pass3 run type
     for r in m:
-        if r["segment_level"] == "2" and r["client_label"] and not r["governance_role"]:
-            has = bool(l3_by_uc.get((r["unit_system"], r["client_label"])))
+        fc=int(r["file_count"]); role=r["governance_role"]
+        notes = []
+        if fc < min_files:
+            notes.append("below_min_files")
+        if r["segment_level"] == "2" and r["has_seed_file"] == "true":
+            if not role and not project_presence_by_l2.get(r["segment_id"], False):
+                notes.append("seed_only")
+            elif role and role != "Project":
+                notes.append("seed_only")
+        if notes:
+            r["notes"] = "|".join(notes)
+        if r["segment_level"] == "1":
+            has = False
+        elif r["segment_level"] == "2" and not r["governance_role"]:
+            has = False
         else:
             has=bool(kids.get(r["segment_id"]))
         if has:
@@ -80,10 +104,11 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
                 pass
             else:
                 r["run_type"]="registration";continue
-        fc=int(r["file_count"]); role=r["governance_role"]
         if fc>=min_files: r["run_type"]="bundle"
         elif role in {"Template","Container","Generic"}: r["run_type"]="reference"
         elif role=="Project": r["run_type"]="skip"
+        elif role == "":
+            r["run_type"] = "skip"
         else: r["run_type"]="registration"
     # purpose/label
     def child_span(r):
