@@ -96,7 +96,7 @@ is always active and can only raise the threshold above the CLI floor.
 - `natural_breaks_floor`:
   - build actual pairwise co-occurrence counts (for pairs with support ≥ 2)
   - run pure-Python Fisher-Jenks (`jenks_natural_breaks`, `n_classes=3`)
-  - take the noise→transition break (`breaks[1]`), ceil, clamp to at least `2`
+  - take the noise→transition break (`breaks[0]`), ceil, clamp to at least `2`
   - if co-occurrence values are too sparse (<4 distinct values), fall back to
     `expected_floor`
 
