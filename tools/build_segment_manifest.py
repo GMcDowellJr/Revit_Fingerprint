@@ -106,6 +106,8 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         if has:
             if enable_cross_org_template_bundles and r["segment_level"]=="2" and r["governance_role"]=="Template" and not r["client_label"]:
                 pass
+            elif fc >= min_files:
+                r["run_type"]="reference";continue
             else:
                 r["run_type"]="registration";continue
         if fc>=min_files: r["run_type"]="bundle"
@@ -121,12 +123,12 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     for r in m:
         pur="insufficient_population" if r["run_type"]=="skip" else ""
         lev,role,rt=int(r["segment_level"]),r["governance_role"],r["run_type"]
-        if lev==1 and rt=="registration": pur="population_denominator"
+        if lev==1: pur="population_denominator"
         elif lev == 2 and r["client_label"] and not role:
             pur = "client_population"
         elif lev==2 and role=="Template":
             if rt=="bundle": pur="cross_template_agreement"
-            elif rt=="registration": pur="cross_org_template_pool" if child_span(r)=="multi_client" else "redundant_single_child"
+            elif rt in {"registration","reference"}: pur="cross_org_template_pool" if child_span(r)=="multi_client" else "redundant_single_child"
         elif lev==2 and role=="Project": pur="cross_project_practice" if rt=="bundle" else "practiced_standards_corpus"
         elif lev==2 and role=="Container": pur="coordination_corpus"
         elif lev==2 and role=="Generic" and rt=="reference": pur="generic_reference_corpus"
@@ -140,7 +142,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         r["segment_label"]=templates.get(r["segment_purpose"],sid)
     # pass5 redundant hash
     for r in m:
-        if r["run_type"]!="registration": continue
+        if r["run_type"] not in {"registration", "reference"}: continue
         _seg = r["segment_id"]
         _lev = r["segment_level"]
         _cl = r["client_label"]
@@ -152,7 +154,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         matches = [c for c in direct_children if c["population_hash"] == r["population_hash"]]
         if len(direct_children) == 1 and len(matches) == 1:
             ch=matches[0]["segment_id"]; _append_note(r,"redundant_single_child",ch)
-            r["segment_purpose"]="redundant_single_child"; r["segment_label"]=f"{r['segment_id']} — same population as {ch}"
+            r["run_type"]="registration"; r["segment_purpose"]="redundant_single_child"; r["segment_label"]=f"{r['segment_id']} — same population as {ch}"
     m.sort(key=lambda r:(int(r["segment_level"]),r["segment_id"]))
     return m
 
