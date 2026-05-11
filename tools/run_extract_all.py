@@ -503,9 +503,9 @@ def main() -> None:
             raise SystemExit(f"Unknown stage: {st}. Valid stages: {','.join(stage_names)}")
     selected_stages = [s for s in stage_names if s in selected_stages and s not in skipped]
 
-    plan_msg = " → ".join([s if s in selected_stages else f"({s} skipped)" for s in stage_names])
+    plan_msg = " -> ".join([s if s in selected_stages else f"({s} skipped)" for s in stage_names])
     if require_join_policy and any(s in selected_stages for s in ("split", "authority", "patterns")) and "apply" not in selected_stages:
-        plan_msg += " → (analysis gated: requires policy join keys; include apply stage)"
+        plan_msg += " -> (analysis gated: requires policy join keys; include apply stage)"
     print(f"Plan: {plan_msg}")
 
     exports_dir = Path(args.exports_dir).resolve()
