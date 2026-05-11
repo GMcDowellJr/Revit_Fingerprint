@@ -137,8 +137,9 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     # pass5 redundant hash
     for r in m:
         if r["run_type"]!="registration": continue
-        matches=[c for c in kids.get(r["segment_id"],[]) if c["population_hash"]==r["population_hash"]]
-        if len(matches)==1:
+        direct_children = kids.get(r["segment_id"], [])
+        matches=[c for c in direct_children if c["population_hash"]==r["population_hash"]]
+        if len(direct_children) == 1 and len(matches)==1:
             ch=matches[0]["segment_id"]; _append_note(r,"redundant_single_child",ch)
             r["segment_purpose"]="redundant_single_child"; r["segment_label"]=f"{r['segment_id']} — same population as {ch}"
     m.sort(key=lambda r:(int(r["segment_level"]),r["segment_id"]))
