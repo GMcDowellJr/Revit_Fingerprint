@@ -92,12 +92,12 @@ def compute_auto_threshold(
         )
     else:
         breaks = sorted(jenks_natural_breaks([float(v) for v in presence_values], 3))
-        natural_breaks_floor = max(2, int(math.ceil(breaks[1])))
+        natural_breaks_floor = max(2, int(math.ceil(breaks[0])))
         cooccurrence_p90 = None
         expected_floor = None
         expected_method_detail = "not_computed_presence_breaks_succeeded"
         natural_breaks_method_detail = (
-            f"presence_count_floor=ceil(jenks_break_1_of_presence_counts); "
+            f"presence_count_floor=ceil(jenks_break_0_of_presence_counts); "
             f"breaks={','.join(f'{b:.6f}' for b in breaks)}"
         )
 
