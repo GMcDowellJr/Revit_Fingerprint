@@ -97,10 +97,10 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         lev = r["segment_level"]
         cl = r["client_label"]
         role = r["governance_role"]
-        if lev == "1":
-            has = False
-        elif lev == "2" and not role:
-            has = False
+        if lev == "2" and not role and cl:
+            # unit|client segments: their level-3 children parent to unit|role,
+            # not unit|client, so they never appear in kids. Use l3_by_uc instead.
+            has = bool(l3_by_uc.get((r["unit_system"], cl)))
         else:
             has = bool(kids.get(seg))
         if has:
@@ -112,7 +112,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         elif role in {"Template","Container","Generic"}: r["run_type"]="reference"
         elif role=="Project": r["run_type"]="skip"
         elif role == "":
-            r["run_type"] = "skip"
+            r["run_type"] = "registration"
         else: r["run_type"]="registration"
     # purpose/label
     def child_span(r):
@@ -141,16 +141,16 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     # pass5 redundant hash
     for r in m:
         if r["run_type"]!="registration": continue
-        seg = r["segment_id"]
-        lev = r["segment_level"]
-        cl = r["client_label"]
-        role = r["governance_role"]
-        if lev == "2" and not role and cl:
-            direct_children = l3_by_uc.get((r["unit_system"], cl), [])
+        _seg = r["segment_id"]
+        _lev = r["segment_level"]
+        _cl = r["client_label"]
+        _role = r["governance_role"]
+        if _lev == "2" and not _role and _cl:
+            direct_children = l3_by_uc.get((r["unit_system"], _cl), [])
         else:
-            direct_children = kids.get(seg, [])
-        matches=[c for c in direct_children if c["population_hash"]==r["population_hash"]]
-        if len(direct_children) == 1 and len(matches)==1:
+            direct_children = kids.get(_seg, [])
+        matches = [c for c in direct_children if c["population_hash"] == r["population_hash"]]
+        if len(direct_children) == 1 and len(matches) == 1:
             ch=matches[0]["segment_id"]; _append_note(r,"redundant_single_child",ch)
             r["segment_purpose"]="redundant_single_child"; r["segment_label"]=f"{r['segment_id']} — same population as {ch}"
     m.sort(key=lambda r:(int(r["segment_level"]),r["segment_id"]))

@@ -72,20 +72,18 @@ def test_level1_segments_present():
 
 
 def test_level1_run_type_skip_when_below_min_files():
-    # A unit_system population with fewer files than min_files must be skipped,
-    # not scheduled as a bundle, so the orchestrator does not run low-signal analysis.
+    # Level-1 unit populations with children are registration-only parents.
     rows = [_meta_row("x01", "metric", "Tiny", "Project"), _meta_row("x02", "metric", "Tiny", "Project")]
     segs = _build_segments(rows, min_files=3)
     metric = next(r for r in segs if r["segment_id"] == "metric" and r["segment_level"] == "1")
-    assert metric["run_type"] == "skip"
-    assert "below_min_files" in metric["notes"]
+    assert metric["run_type"] == "registration"
 
 
 def test_level1_run_type_bundle_at_min_files():
     rows = [_meta_row(f"r{i:02d}", "imperial", "Acme", "Project") for i in range(3)]
     segs = _build_segments(rows, min_files=3)
     imp = next(r for r in segs if r["segment_id"] == "imperial" and r["segment_level"] == "1")
-    assert imp["run_type"] == "bundle"
+    assert imp["run_type"] == "registration"
 
 
 def test_level1_file_counts():
@@ -107,14 +105,13 @@ def test_level2_segments_present():
 def test_level2_run_type_below_min():
     segs = _build_segments(ROWS, min_files=3)
     metric_global = next(r for r in segs if r["segment_id"] == "metric|Global")
-    assert metric_global["run_type"] == "skip"
-    assert "below_min_files" in metric_global["notes"]
+    assert metric_global["run_type"] == "registration"
 
 
 def test_level2_run_type_at_min():
     segs = _build_segments(ROWS, min_files=3)
     kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
-    assert kaiser["run_type"] == "bundle"
+    assert kaiser["run_type"] == "registration"
 
 
 def test_seed_detection_level2():
@@ -190,8 +187,8 @@ def test_registry_excludes_skip_segments():
 def test_registry_output_folder_sanitized():
     segs = _build_segments(ROWS, min_files=3)
     reg = _build_registry(segs)
-    kaiser_reg = next(r for r in reg if r["segment_id"] == "imperial|Kaiser")
-    assert kaiser_reg["output_folder"] == "imperial_kaiser"
+    kaiser_reg = next(r for r in reg if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser_reg["output_folder"] == "imperial_project_kaiser"
 
 
 def test_sanitize_folder_strips_path_separators():
