@@ -278,7 +278,7 @@ def build_run_plan(
     sorted by segment_level asc then segment_id asc.
     Segments to skip are excluded; dry-run callers handle skip annotation separately.
     """
-    bundle_rows = [r for r in registry if r.get("run_type", "").strip() == "bundle"]
+    run_rows = [r for r in registry if r.get("run_type", "").strip() in {"bundle", "reference"}]
 
     def sort_key(row: dict) -> tuple:
         sid = row.get("segment_id", "")
@@ -289,10 +289,10 @@ def build_run_plan(
             level = 0
         return (level, sid)
 
-    bundle_rows.sort(key=sort_key)
+    run_rows.sort(key=sort_key)
 
     plan: List[tuple[dict, dict]] = []
-    for reg_row in bundle_rows:
+    for reg_row in run_rows:
         sid = reg_row.get("segment_id", "").strip()
         mrow = manifest.get(sid, {})
         plan.append((reg_row, mrow))
@@ -334,6 +334,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             sid = reg_row.get("segment_id", "")
             output_folder = reg_row.get("output_folder", "").strip()
             status = reg_row.get("status", "").strip()
+            run_type = reg_row.get("run_type", "bundle").strip()
             out_root = segments_root / output_folder
 
             # --segment filter
@@ -375,17 +376,18 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 "--join-policy", str(join_policy),
                 "--allow-sig-hash-join-key",
             ]
-            bundle_cmd = [
-                sys.executable,
-                str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
-                "--analysis-dir", str(out_root / "results" / "analysis"),
-                "--out-dir", str(out_root / "results" / "bundle_analysis"),
-                "--metadata-file", str(records_dir / "file_metadata.csv"),
-                "--no-discover-populations",
-            ]
             print(f"  step 1: {' '.join(lp_cmd[1:])}")
             print(f"  step 2: {' '.join(extract_cmd[1:])}")
-            print(f"  step 3: {' '.join(bundle_cmd[1:])}")
+            if run_type == "bundle":
+                bundle_cmd = [
+                    sys.executable,
+                    str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
+                    "--analysis-dir", str(out_root / "results" / "analysis"),
+                    "--out-dir", str(out_root / "results" / "bundle_analysis"),
+                    "--metadata-file", str(records_dir / "file_metadata.csv"),
+                    "--no-discover-populations",
+                ]
+                print(f"  step 3: {' '.join(bundle_cmd[1:])}")
             print()
         return 0
 
@@ -415,6 +417,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         export_run_ids_raw = mrow.get("export_run_ids", "")
         export_run_ids = sorted(x.strip() for x in export_run_ids_raw.split("|") if x.strip())
         file_count = len(export_run_ids)
+        run_type = reg_row.get("run_type", "bundle").strip()
 
         print(
             f"\n[orchestrator] ── segment={sid} ({idx}/{total}) level={level} files={file_count} ──",
@@ -478,7 +481,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                     )
 
         # Step 3 — Bundle stage
-        if step_failed is None:
+        if step_failed is None and run_type == "bundle":
             print(f"[orchestrator]   step 3/3 bundle...", flush=True)
             bundle_cmd = [
                 sys.executable,
@@ -496,7 +499,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         elapsed = int(time.monotonic() - t_start)
 
         # Post-bundle validation (warn only, runs before registry write so warnings land in notes)
-        if step_failed is None:
+        if step_failed is None and run_type == "bundle":
             dag_nodes = out_root / "results" / "bundle_analysis" / "line_patterns" / "bundle_dag_nodes.csv"
             if not dag_nodes.is_file() or dag_nodes.stat().st_size == 0:
                 warn = (
@@ -507,7 +510,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 notes_parts.append(warn)
 
         # BI merge (non-fatal; only runs when bundle succeeded)
-        if step_failed is None and not args.skip_bi_merge:
+        if step_failed is None and run_type == "bundle" and not args.skip_bi_merge:
             try:
                 active_domains = _active_domains_from_presence_csv(out_root / "results" / "analysis")
                 bundle_analysis_dir = out_root / "results" / "bundle_analysis"
@@ -553,7 +556,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
 
     # ── Final summary ─────────────────────────────────────────────────────────
     # Count non-bundle rows as additional skips
-    non_bundle = [r for r in registry if r.get("run_type", "").strip() != "bundle"]
+    non_bundle = [r for r in registry if r.get("run_type", "").strip() not in {"bundle", "reference"}]
     non_bundle_skipped = len(non_bundle)
 
     print(f"\n[orchestrator] ── run complete ──")
