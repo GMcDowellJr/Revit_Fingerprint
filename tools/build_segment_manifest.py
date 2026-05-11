@@ -37,6 +37,15 @@ def _append_note(row,k,v=""):
     else: row["notes"]=note
 
 def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_template_bundles:bool=False)->List[Dict[str,str]]:
+    def _role_segment_id(unit: str, role: str) -> str:
+        return f"{unit}|role|{role}"
+
+    def _client_segment_id(unit: str, client: str) -> str:
+        return f"{unit}|client|{client}"
+
+    def _leaf_segment_id(unit: str, role: str, client: str) -> str:
+        return f"{unit}|role|{role}|client|{client}"
+
     l1=defaultdict(list); l1s=defaultdict(list)
     l2a=defaultdict(list); l2as=defaultdict(list)
     l2b=defaultdict(list); l2bs=defaultdict(list)
@@ -52,7 +61,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         if c:
             l3[(u,r,c)].append(e)
         client_roles[(u,c)].add(r)
-        l2_seg_id = f"{u}|{c}"
+        l2_seg_id = _client_segment_id(u, c)
         if r:
             role_presence_by_l2[l2_seg_id].add(r)
         if r == "Project":
@@ -68,10 +77,10 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         eids=sorted(set(eids)); seeds=sorted(set(seeds))
         m.append({"segment_id":seg,"parent_segment_id":parent,"segment_level":str(lev),"unit_system":u,"governance_role":r,"client_label":c,"run_type":"","file_count":str(len(eids)),"export_run_ids":"|".join(eids),"has_seed_file":"true" if seeds else "false","seed_export_run_ids":"|".join(seeds),"population_hash":_population_hash(eids),"notes":"","segment_purpose":"","segment_label":""})
     for u in sorted(l1): mk(u,"",1,u,"","",l1[u],l1s[u])
-    for (u,r) in sorted(l2a): mk(f"{u}|{r}",u,2,u,r,"",l2a[(u,r)],l2as[(u,r)])
+    for (u,r) in sorted(l2a): mk(_role_segment_id(u, r),u,2,u,r,"",l2a[(u,r)],l2as[(u,r)])
     for (u,c) in sorted(l2b):
-        mk(f"{u}|{c}",u,2,u,"",c,l2b[(u,c)],l2bs[(u,c)])
-    for (u,r,c) in sorted(l3): mk(f"{u}|{r}|{c}",f"{u}|{r}",3,u,r,c,l3[(u,r,c)],l3s[(u,r,c)])
+        mk(_client_segment_id(u, c),u,2,u,"",c,l2b[(u,c)],l2bs[(u,c)])
+    for (u,r,c) in sorted(l3): mk(_leaf_segment_id(u, r, c),_role_segment_id(u, r),3,u,r,c,l3[(u,r,c)],l3s[(u,r,c)])
     byid={r["segment_id"]:r for r in m}; kids=defaultdict(list)
     for r in m:
         if r["parent_segment_id"]: kids[r["parent_segment_id"]].append(r)
