@@ -64,9 +64,17 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     byid={r["segment_id"]:r for r in m}; kids=defaultdict(list)
     for r in m:
         if r["parent_segment_id"]: kids[r["parent_segment_id"]].append(r)
+    # level-3 members per (unit, client) — used to detect children of unit|client segments
+    l3_by_uc: Dict[tuple, List[dict]] = defaultdict(list)
+    for r in m:
+        if r["segment_level"] == "3" and r["unit_system"] and r["client_label"]:
+            l3_by_uc[(r["unit_system"], r["client_label"])].append(r)
     # pass3 run type
     for r in m:
-        has=bool(kids.get(r["segment_id"]))
+        if r["segment_level"] == "2" and r["client_label"] and not r["governance_role"]:
+            has = bool(l3_by_uc.get((r["unit_system"], r["client_label"])))
+        else:
+            has=bool(kids.get(r["segment_id"]))
         if has:
             if enable_cross_org_template_bundles and r["segment_level"]=="2" and r["governance_role"]=="Template" and not r["client_label"]:
                 pass
@@ -85,7 +93,8 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         pur="insufficient_population" if r["run_type"]=="skip" else ""
         lev,role,rt=int(r["segment_level"]),r["governance_role"],r["run_type"]
         if lev==1 and rt=="registration": pur="population_denominator"
-        elif lev==2 and r["client_label"] and rt=="registration": pur="client_population"
+        elif lev == 2 and r["client_label"] and not role:
+            pur = "client_population"
         elif lev==2 and role=="Template":
             if rt=="bundle": pur="cross_template_agreement"
             elif rt=="registration": pur="cross_org_template_pool" if child_span(r)=="multi_client" else "redundant_single_child"
@@ -218,6 +227,15 @@ def main(argv: List[str] | None = None) -> int:
     )
     if skipped_blank_eid:
         sys.stderr.write(f"[WARN] Excluded {skipped_blank_eid} row(s) with blank export_run_id\n")
+
+    KNOWN_ROLES = {"Project", "Template", "Container", "Generic", ""}
+    unknown_roles = {
+        (r.get("governance_role") or "").strip()
+        for r in rows
+        if (r.get("governance_role") or "").strip() not in KNOWN_ROLES
+    }
+    for role in sorted(unknown_roles):
+        sys.stderr.write(f"[WARN] Unrecognised governance_role value in metadata: '{role}' — rows with this role will create unexpected segments\n")
 
     manifest_rows = _build_segments(rows, min_files, args.enable_cross_org_template_bundles)
 
