@@ -93,12 +93,16 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
                 notes.append("seed_only")
         if notes:
             r["notes"] = "|".join(notes)
-        if r["segment_level"] == "1":
-            has = False
-        elif r["segment_level"] == "2" and not r["governance_role"]:
-            has = False
+        seg = r["segment_id"]
+        lev = r["segment_level"]
+        cl = r["client_label"]
+        role = r["governance_role"]
+        if lev == "2" and not role and cl:
+            # unit|client segments: level-3 children parent to unit|role, not unit|client,
+            # so they never appear in kids. Use l3_by_uc instead.
+            has = bool(l3_by_uc.get((r["unit_system"], cl)))
         else:
-            has=bool(kids.get(r["segment_id"]))
+            has = bool(kids.get(seg))
         if has:
             if enable_cross_org_template_bundles and r["segment_level"]=="2" and r["governance_role"]=="Template" and not r["client_label"]:
                 pass
@@ -108,7 +112,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         elif role in {"Template","Container","Generic"}: r["run_type"]="reference"
         elif role=="Project": r["run_type"]="skip"
         elif role == "":
-            r["run_type"] = "skip"
+            r["run_type"] = "registration"
         else: r["run_type"]="registration"
     # purpose/label
     def child_span(r):
@@ -137,7 +141,14 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     # pass5 redundant hash
     for r in m:
         if r["run_type"]!="registration": continue
-        direct_children = kids.get(r["segment_id"], [])
+        seg = r["segment_id"]
+        lev = r["segment_level"]
+        cl = r["client_label"]
+        role = r["governance_role"]
+        if lev == "2" and not role and cl:
+            direct_children = l3_by_uc.get((r["unit_system"], cl), [])
+        else:
+            direct_children = kids.get(seg, [])
         matches=[c for c in direct_children if c["population_hash"]==r["population_hash"]]
         if len(direct_children) == 1 and len(matches)==1:
             ch=matches[0]["segment_id"]; _append_note(r,"redundant_single_child",ch)
