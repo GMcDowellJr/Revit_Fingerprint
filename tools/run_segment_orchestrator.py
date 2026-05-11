@@ -510,7 +510,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 notes_parts.append(warn)
 
         # BI merge (non-fatal; only runs when bundle succeeded)
-        if step_failed is None and not args.skip_bi_merge:
+        if step_failed is None and run_type == "bundle" and not args.skip_bi_merge:
             try:
                 active_domains = _active_domains_from_presence_csv(out_root / "results" / "analysis")
                 bundle_analysis_dir = out_root / "results" / "bundle_analysis"
