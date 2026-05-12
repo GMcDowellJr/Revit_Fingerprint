@@ -46,7 +46,7 @@ from core.phase2 import (
     phase2_qv_from_legacy_sentinel_str,
 )
 from core.canonical_items import (
-    merge_legacy_buckets,
+    build_flat_items,
     compile_role_policy,
     resolve_item_roles,
 )
@@ -512,10 +512,8 @@ def extract(doc, ctx=None):
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
 
         phase2_payload = rec.get("phase2") if isinstance(rec.get("phase2"), dict) else {}
-        canonical_payload = merge_legacy_buckets(phase2_payload)
         # Runtime role resolution from policy-compiled key map (facts stay role-free).
         role_lookup = compile_role_policy((ctx or {}).get("role_policy", {}), domain="text_types")
-        _resolved_roles = resolve_item_roles(canonical_payload.get("items", []), role_lookup)
         rec_v2 = {
             "domain": "text_types",
             "record_id": safe_str(type_name) if safe_str(type_name) else safe_str(t.Id.IntegerValue),
@@ -526,14 +524,28 @@ def extract(doc, ctx=None):
                 "quality": "human",
                 "provenance": "revit.TextNoteType.Name",
             },
-            "items": canonical_payload.get("items", []),
+            "identity_basis": {
+                "items": identity_items_v2_sorted,
+            },
+            "phase2": phase2_payload,
             "debug": {
                 "sig_preimage_sample": sig_preimage_v2[:6],
                 "uid_excluded_from_sig": True,
                 "leader_arrowhead_uid_excluded_from_sig": True,
-                "resolved_role_counts": {k: len(v) for k, v in _resolved_roles.items()},
             },
         }
+        identity_items = (((rec_v2.get("identity_basis") or {}).get("items")) or [])
+        rec_v2["items"] = build_flat_items(
+            identity_items,
+            phase2_payload.get("semantic_items", []),
+            phase2_payload.get("cosmetic_items", []),
+            phase2_payload.get("coordination_items", []),
+            phase2_payload.get("unknown_items", []),
+        )
+        _resolved_roles = resolve_item_roles(rec_v2.get("items", []), role_lookup)
+        rec_v2["debug"]["resolved_role_counts"] = {k: len(v) for k, v in _resolved_roles.items()}
+        for key in ("identity_basis", "phase2", "sig_hash", "sig_basis", "join_key"):
+            rec_v2.pop(key, None)
         _ip, _ip_q = purge_lookup(getattr(getattr(t, "Id", None), "IntegerValue", None), ctx)
         rec_v2["is_purgeable"] = _ip
         rec_v2["is_purgeable_q"] = _ip_q

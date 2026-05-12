@@ -19,7 +19,7 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      "sig_hash is computed post-extraction from canonical records[].items filtered by sig-hash policy."
       ],
       "required_items": [
         "arrowhead.style",
