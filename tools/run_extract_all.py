@@ -240,10 +240,14 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for r in items_rows:
         pk = str(r.get("record_pk", ""))
-        k = str(r.get("k", ""))
+        k = str(r.get("k", "") or r.get("item_key", ""))
         if not pk or not k:
             continue
-        grouped.setdefault(pk, []).append({"k": k, "v": r.get("v"), "q": r.get("q")})
+        grouped.setdefault(pk, []).append({
+            "k": k,
+            "v": r.get("v", r.get("item_value")),
+            "q": r.get("q", r.get("item_value_type")),
+        })
     for row in records:
         dom = str(row.get("domain", "")).strip()
         if dom_filter and dom not in dom_filter:

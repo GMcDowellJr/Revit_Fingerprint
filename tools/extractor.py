@@ -655,7 +655,7 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                 # - keep sig_hash as-is
                 # - set join_hash = sig_hash
                 # - set join_key_schema = sig_hash_as_join_key.v1
-                sig_hash_v = _safe_str(rec.get("sig_hash") or (rec.get("identity_basis", {}) or {}).get("sig_hash"))
+                sig_hash_v = _safe_str(rec.get("sig_hash"))
                 row = {
                     "schema_version": SCHEMA_VERSION,
                     "export_run_id": export_run_id,
@@ -692,7 +692,9 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                             "reason_detail": "",
                         })
 
-                items = (rec.get("identity_basis") or {}).get("items") if isinstance(rec.get("identity_basis"), dict) else None
+                items = rec.get("items") if isinstance(rec.get("items"), list) else None
+                if not isinstance(items, list):
+                    items = (rec.get("identity_basis") or {}).get("items") if isinstance(rec.get("identity_basis"), dict) else None
                 if isinstance(items, list):
                     for it in items:
                         if not isinstance(it, dict):
@@ -705,7 +707,7 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                             "item_key": _safe_str(it.get("k")),
                             "item_value": _safe_str(it.get("v")),
                             "item_value_type": _safe_str(it.get("q")),
-                            "item_role": "identity_basis",
+                            "item_role": "",
                         })
 
                 comps = (rec.get("label") or {}).get("components") if isinstance(rec.get("label"), dict) else None
