@@ -37,12 +37,13 @@ def transform_record(record: dict[str, Any], domain: str) -> tuple[dict[str, Any
     existing_items = record.get("items") if isinstance(record.get("items"), list) else []
 
     flat_items = build_flat_items(
+        existing_items,
         identity_items if isinstance(identity_items, list) else [],
         phase2_dict.get("semantic_items", []) if isinstance(phase2_dict.get("semantic_items"), list) else [],
+        phase2_dict.get("lineage_items", []) if isinstance(phase2_dict.get("lineage_items"), list) else [],
         phase2_dict.get("cosmetic_items", []) if isinstance(phase2_dict.get("cosmetic_items"), list) else [],
         phase2_dict.get("coordination_items", []) if isinstance(phase2_dict.get("coordination_items"), list) else [],
         phase2_dict.get("unknown_items", []) if isinstance(phase2_dict.get("unknown_items"), list) else [],
-        existing_items,
     )
     for item in flat_items:
         if isinstance(item, dict):
