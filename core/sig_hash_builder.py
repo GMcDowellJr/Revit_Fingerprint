@@ -11,7 +11,6 @@ from core.record_v2 import (
     STATUS_BLOCKED,
     STATUS_DEGRADED,
     STATUS_OK,
-    compute_identity_quality,
     serialize_identity_items,
 )
 
@@ -39,7 +38,8 @@ def _key_allowed(k: str, allowed: Sequence[str], prefixes: Sequence[str]) -> boo
 def build_sig_hash_from_policy(
     *,
     domain_policy: Dict[str, Any],
-    identity_items: Sequence[Dict[str, Any]],
+    items: Optional[Sequence[Dict[str, Any]]] = None,
+    identity_items: Optional[Sequence[Dict[str, Any]]] = None,
     status_reasons: Optional[Sequence[str]] = None,
 ) -> Tuple[Optional[str], str, List[str], List[Dict[str, Any]]]:
     """Return (sig_hash, status, status_reasons, hash_items).
@@ -54,11 +54,12 @@ def build_sig_hash_from_policy(
     minima = pol.get("minima") if isinstance(pol.get("minima"), dict) else {}
     block_if_any_required_not_ok = bool(minima.get("block_if_any_required_not_ok", True))
 
+    src_items = items if items is not None else (identity_items or [])
     reasons = sorted({str(x) for x in (status_reasons or []) if str(x)})
-    kmap = _items_to_map(identity_items or [])
+    kmap = _items_to_map(src_items or [])
 
     hash_items: List[Dict[str, Any]] = []
-    for it in identity_items or []:
+    for it in src_items or []:
         if not isinstance(it, dict):
             continue
         k = it.get("k")
@@ -88,21 +89,21 @@ def build_sig_hash_from_policy(
 
 
 def apply_sig_hash_policy_to_record(record: Dict[str, Any], domain_policy: Dict[str, Any]) -> Dict[str, Any]:
-    """Mutate and return a record.v2 dict with policy-generated sig_hash/status."""
+    """Mutate and return a canonical record dict with policy-generated sig_hash/status."""
     if not isinstance(record, dict):
         return record
-    ib = record.get("identity_basis") if isinstance(record.get("identity_basis"), dict) else {}
-    items = ib.get("items") if isinstance(ib.get("items"), list) else []
+    items = record.get("items") if isinstance(record.get("items"), list) else []
     sig_hash, status, reasons, hash_items = build_sig_hash_from_policy(
         domain_policy=domain_policy,
-        identity_items=items,
+        items=items,
         status_reasons=record.get("status_reasons") if isinstance(record.get("status_reasons"), list) else [],
     )
     record["status"] = status
     record["status_reasons"] = reasons
     record["sig_hash"] = sig_hash
-    record["identity_quality"] = compute_identity_quality(status, [it.get("q") for it in hash_items if it.get("k") in set(domain_policy.get("required_items") or [])])
-    ib["hash_alg"] = str(domain_policy.get("hash_alg") or ib.get("hash_alg") or "md5_utf8_join_pipe")
-    ib["sig_hash_schema"] = str(domain_policy.get("sig_hash_schema") or "")
-    record["identity_basis"] = ib
+    record["sig_basis"] = {
+        "schema": str(domain_policy.get("sig_hash_schema") or ""),
+        "keys_used": sorted([it.get("k") for it in hash_items if isinstance(it.get("k"), str)]),
+        "hash_alg": str(domain_policy.get("hash_alg") or "md5_utf8_join_pipe"),
+    }
     return record
