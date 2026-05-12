@@ -593,6 +593,11 @@ def main() -> None:
         if st not in stage_names:
             raise SystemExit(f"Unknown stage: {st}. Valid stages: {','.join(stage_names)}")
     selected_stages = [s for s in stage_names if s in selected_stages and s not in skipped]
+    if "apply" in selected_stages and "flatten" not in selected_stages:
+        selected_stages = ["flatten"] + selected_stages
+        report_note = "auto_inserted_flatten_for_apply"
+    else:
+        report_note = None
 
     plan_msg = " -> ".join([s if s in selected_stages else f"({s} skipped)" for s in stage_names])
     if require_join_policy and any(s in selected_stages for s in ("split", "authority", "patterns")) and "apply" not in selected_stages:
@@ -625,6 +630,8 @@ def main() -> None:
 
     env = os.environ.copy()
     report: Dict[str, Any] = {"tool": "tools/run_extract_all.py", "exports_dir": str(exports_dir), "out_root": str(out_root), "surfaces": surfaces, "domains": domains, "active_domains": active_domains, "selected_stages": selected_stages, "commands": [], "notes": []}
+    if report_note:
+        report["notes"].append(report_note)
     meta_rows: List[Dict[str, str]] = []
     record_rows: List[Dict[str, str]] = []
 
