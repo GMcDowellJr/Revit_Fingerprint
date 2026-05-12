@@ -31,6 +31,7 @@ def test_text_types_extract_emits_flat_items_only(monkeypatch):
     rec = out["records"][0]
 
     assert "items" in rec and isinstance(rec["items"], list)
+    assert rec.get("schema_version") == "record.v2"
     assert "identity_basis" not in rec
     assert "phase2" not in rec
     assert "join_key" not in rec
@@ -38,6 +39,7 @@ def test_text_types_extract_emits_flat_items_only(monkeypatch):
     assert all("role" not in it for it in rec["items"])
     assert [it["k"] for it in rec["items"]] == sorted([it["k"] for it in rec["items"]])
     policy = json.load(open("policies/domain_sig_hash_policies.json", "r"))
-    required = set((policy.get("text_types") or {}).get("required_items") or [])
+    domain_policy = (policy.get("domains") or {}).get("text_types") or {}
+    required = set(domain_policy.get("required_items") or [])
     keys = {it["k"] for it in rec["items"]}
     assert required.issubset(keys)
