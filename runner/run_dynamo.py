@@ -154,6 +154,7 @@ from domains import view_templates
 from core.manifest import build_manifest
 from core.features import build_features
 from core.join_key_policy import load_join_key_policies
+from core.canonical_items import canonicalize_record
 
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
@@ -1086,6 +1087,9 @@ def run_fingerprint(doc, timing=None):
             domains=contract_domains,
         )
 
+    # Canonicalize all domain record payloads to flat items shape.
+    fingerprint = _canonicalize_all_domain_records(fingerprint)
+
     # Preserve the collector for post-extraction serialization timing at module scope.
     # This hidden key is removed before the final payload is emitted.
     fingerprint["_timing_collector"] = _timing
@@ -1175,6 +1179,22 @@ def _strip_detail_surfaces(payload):
             payload[key] = new_domain_payload
 
     return payload
+
+
+def _canonicalize_all_domain_records(payload):
+    if not isinstance(payload, dict):
+        return payload
+    out = dict(payload)
+    for key, domain_payload in list(out.items()):
+        if not isinstance(key, str) or key.startswith("_") or not isinstance(domain_payload, dict):
+            continue
+        records = domain_payload.get("records")
+        if not isinstance(records, list):
+            continue
+        new_domain = dict(domain_payload)
+        new_domain["records"] = [canonicalize_record(r) for r in records]
+        out[key] = new_domain
+    return out
 
 
 # Execute extraction (OUT protection)

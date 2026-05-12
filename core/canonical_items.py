@@ -117,3 +117,27 @@ def resolve_item_roles(items: Sequence[Mapping[str, Any]], role_lookup: Mapping[
             role = "unknown"
         grouped[role].append({"k": k, "v": it.get("v"), "q": it.get("q")})
     return grouped
+
+
+def canonicalize_record(record: Mapping[str, Any]) -> Dict[str, Any]:
+    """Canonicalize a record to flat `items` shape and remove legacy/derived keys."""
+    out = dict(record) if isinstance(record, Mapping) else {}
+    existing_items = out.get("items") if isinstance(out.get("items"), list) else []
+    ib = out.get("identity_basis") if isinstance(out.get("identity_basis"), Mapping) else {}
+    identity_items = ib.get("items") if isinstance(ib.get("items"), list) else []
+    phase2 = out.get("phase2") if isinstance(out.get("phase2"), Mapping) else {}
+    out["items"] = build_flat_items(
+        existing_items,
+        identity_items,
+        phase2.get("semantic_items", []) if isinstance(phase2.get("semantic_items"), list) else [],
+        phase2.get("lineage_items", []) if isinstance(phase2.get("lineage_items"), list) else [],
+        phase2.get("cosmetic_items", []) if isinstance(phase2.get("cosmetic_items"), list) else [],
+        phase2.get("coordination_items", []) if isinstance(phase2.get("coordination_items"), list) else [],
+        phase2.get("unknown_items", []) if isinstance(phase2.get("unknown_items"), list) else [],
+    )
+    for it in out.get("items", []):
+        if isinstance(it, dict):
+            it.pop("role", None)
+    for k in ("identity_basis", "phase2", "join_key", "sig_hash", "sig_basis", "identity_quality", "record_id_alg", "record_id_scope", "schema_version"):
+        out.pop(k, None)
+    return out
