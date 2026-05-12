@@ -265,6 +265,8 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
             status_reasons=[],
         )
         row["sig_hash"] = "" if sig_hash is None else str(sig_hash)
+        if str(row.get("join_key_schema", "")) == "sig_hash_as_join_key.v1":
+            row["join_hash"] = row["sig_hash"]
         row["status"] = str(status)
         row["status_reasons"] = "|".join(reasons)
         row["sig_basis_schema"] = str(pol.get("sig_hash_schema") or "")
@@ -567,7 +569,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description=(
             "Pipeline orchestrator with explicit stages: flatten (T0), sig_hash (T0.5), discover (T1), apply (T2), split, authority, patterns. "
-            "Default stages are flatten,discover. Governance-grade runs should include sig_hash before discover/apply."
+            "Default stages are flatten,sig_hash,discover."
         ),
         epilog=(
             "Examples:\n"
@@ -585,7 +587,7 @@ def main() -> None:
     ap.add_argument("--out-root", required=True, help="Output root folder.")
     ap.add_argument("--seed", default=None, help="Path to a seed fingerprint JSON. When provided, emits a seed-comparison sidecar for the seed-baseline BI dashboard (project drift vs template). Not part of standard segment runs.")
     ap.add_argument("--domains", default=None, help="Comma list of domains; if omitted, infer from exports.")
-    ap.add_argument("--stages", default="flatten,discover", help="Comma-separated stages to run. Default: flatten,discover.")
+    ap.add_argument("--stages", default="flatten,sig_hash,discover", help="Comma-separated stages to run. Default: flatten,sig_hash,discover.")
     ap.add_argument("--skip-stages", default="", help="Comma-separated stages to skip from --stages.")
     ap.add_argument("--join-policy", default=None, help="Policy JSON path used by apply stage.")
     ap.add_argument("--sig-hash-policy", default=None, help="Policy JSON path used by sig_hash stage.")
@@ -617,7 +619,7 @@ def main() -> None:
     allow_sig_hash_join_key = args.allow_sig_hash_join_key
     require_join_policy = True
 
-    selected_stages = _parse_stage_csv(args.stages) or ["flatten", "discover"]
+    selected_stages = _parse_stage_csv(args.stages) or ["flatten", "sig_hash", "discover"]
 
     skipped = set(_parse_stage_csv(args.skip_stages))
     for st in selected_stages + list(skipped):
@@ -629,6 +631,10 @@ def main() -> None:
         report_note = "auto_inserted_flatten_for_apply"
     else:
         report_note = None
+    if "apply" in selected_stages and "sig_hash" not in selected_stages:
+        insert_at = selected_stages.index("apply")
+        selected_stages.insert(insert_at, "sig_hash")
+        report_note = (report_note + "|auto_inserted_sig_hash_for_apply") if report_note else "auto_inserted_sig_hash_for_apply"
 
     plan_msg = " -> ".join([s if s in selected_stages else f"({s} skipped)" for s in stage_names])
     if require_join_policy and any(s in selected_stages for s in ("split", "authority", "patterns")) and "apply" not in selected_stages:
