@@ -16,6 +16,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 LEGACY_BUCKET_KEYS: Tuple[str, ...] = (
     "semantic_items",
+    "lineage_items",
     "cosmetic_items",
     "coordination_items",
     "unknown_items",
@@ -82,17 +83,24 @@ def compile_role_policy(policy: Mapping[str, Any], *, domain: Optional[str] = No
         elif isinstance(src.get("domains"), Mapping) and isinstance(src.get("domains", {}).get(domain), Mapping):
             src = src.get("domains", {}).get(domain)  # type: ignore[assignment]
 
-    # Precompiled shape: {"item.k": "identity"}
-    if all(isinstance(k, str) and isinstance(v, str) for k, v in src.items()):
-        return {str(k): str(v) for k, v in src.items()}
+    # If any value is a non-string sequence the dict is role->keys shape.
+    # Otherwise treat as precompiled k->role and keep valid str->str pairs only.
+    has_seq_values = any(not isinstance(v, str) and isinstance(v, Sequence) for v in src.values())
 
     out: Dict[str, str] = {}
-    for role, keys in src.items():
-        if not isinstance(role, str) or isinstance(keys, str) or not isinstance(keys, Sequence):
-            continue
-        for k in keys:
-            if isinstance(k, str) and k and k not in out:
-                out[k] = role
+    if not has_seq_values:
+        # Precompiled shape: {"item.k": "role"} — keep valid str->str pairs
+        for k, v in src.items():
+            if isinstance(k, str) and k and isinstance(v, str):
+                out[k] = v
+    else:
+        # Role->keys shape: {"role": ["item.k", ...]} — skip malformed scalar values
+        for role, keys in src.items():
+            if not isinstance(role, str) or isinstance(keys, str) or not isinstance(keys, Sequence):
+                continue
+            for k in keys:
+                if isinstance(k, str) and k and k not in out:
+                    out[k] = role
     return out
 
 
@@ -138,6 +146,6 @@ def canonicalize_record(record: Mapping[str, Any]) -> Dict[str, Any]:
     for it in out.get("items", []):
         if isinstance(it, dict):
             it.pop("role", None)
-    for k in ("identity_basis", "phase2", "join_key", "sig_hash", "sig_basis", "identity_quality", "record_id_alg", "record_id_scope", "schema_version"):
+    for k in ("identity_basis", "phase2", "join_key", "sig_hash", "sig_basis"):
         out.pop(k, None)
     return out

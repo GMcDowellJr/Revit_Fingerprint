@@ -217,9 +217,14 @@ def _resolve_sig_hash_policy_path(explicit: Optional[str], out_root: Path) -> Op
     candidate1 = (out_root / "results" / "policies" / "domain_sig_hash_policies.json").resolve()
     if candidate1.is_file():
         return candidate1
+    # CWD-relative (works when invoked from repo root)
     candidate2 = Path("policies/domain_sig_hash_policies.json").resolve()
     if candidate2.is_file():
         return candidate2
+    # Repo-root-relative (works regardless of CWD)
+    candidate3 = (REPO_ROOT / "policies" / "domain_sig_hash_policies.json").resolve()
+    if candidate3.is_file():
+        return candidate3
     return None
 
 
@@ -256,12 +261,13 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
             if str(r.get("domain", "")).strip() != domain:
                 continue
             pk = str(r.get("record_pk", ""))
-            k = str(r.get("k", "") or r.get("item_key", ""))
+            k = str(r.get("item_key", "") or r.get("k", ""))
             if not pk or not k:
                 continue
             out.setdefault(pk, []).append({"k": k, "v": r.get("v", r.get("item_value")), "q": r.get("q", r.get("item_value_type"))})
         grouped_cache[domain] = out
         return out
+    basis_item_rows: List[Dict[str, str]] = []
     for row in records:
         dom = str(row.get("domain", "")).strip()
         if dom_filter and dom not in dom_filter:
@@ -281,10 +287,18 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
         row["sig_hash"] = "" if sig_hash is None else str(sig_hash)
         if str(row.get("join_key_schema", "")) == "sig_hash_as_join_key.v1":
             row["join_hash"] = row["sig_hash"]
-        row["status"] = str(status)
-        row["status_reasons"] = "|".join(reasons)
+        prior_status = str(row.get("status", "")).strip()
+        if prior_status == "blocked":
+            # Extractor-blocked status is sticky; sig_hash stage cannot upgrade it.
+            pass
+        else:
+            row["status"] = str(status)
+            row["status_reasons"] = "|".join(reasons)
         row["sig_basis_schema"] = str(pol.get("sig_hash_schema") or "")
-        row["sig_basis_keys_used"] = "|".join(sorted([str(it.get("k")) for it in hash_items if isinstance(it.get("k"), str)]))
+        for ordinal, it in enumerate(hash_items):
+            k = it.get("k")
+            if isinstance(k, str) and k:
+                basis_item_rows.append({"record_pk": pk, "domain": dom, "item_key": k, "ordinal": str(ordinal)})
         if sig_hash is not None:
             diag["records_hashed"] += 1
         if status == "blocked":
@@ -293,16 +307,35 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
             diag["records_degraded"] += 1
     if records:
         fieldnames = list(records[0].keys())
-        for extra in ("sig_hash", "sig_basis_schema", "sig_basis_keys_used", "status", "status_reasons"):
+        for extra in ("sig_hash", "sig_basis_schema", "status", "status_reasons"):
             if extra not in fieldnames:
                 fieldnames.append(extra)
+        # Drop sig_basis_keys_used if it was written by a prior run; key traceability
+        # is now in sig_basis_items.csv which is more query-friendly at scale.
+        fieldnames = [f for f in fieldnames if f != "sig_basis_keys_used"]
         with records_csv.open("w", encoding="utf-8", newline="") as f:
             w = csv.DictWriter(f, fieldnames=fieldnames)
             w.writeheader()
             for r in records:
                 w.writerow({k: r.get(k, "") for k in fieldnames})
+    if basis_item_rows:
+        basis_csv = phase0_dir / "sig_basis_items.csv"
+        basis_fields = ["record_pk", "domain", "item_key", "ordinal"]
+        with basis_csv.open("w", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=basis_fields)
+            w.writeheader()
+            for r in basis_item_rows:
+                w.writerow(r)
+        diag["sig_basis_items_written"] = len(basis_item_rows)
     diag["files_processed"] = 1
     diag["domains_without_policy"] = sorted(domains_without)
+    if domains_without:
+        sys.stderr.write(
+            "[WARN extract_all] sig_hash stage: {} domain(s) have no policy entry — "
+            "sig_hash will be empty for their records: {}\n".format(
+                len(domains_without), ", ".join(sorted(domains_without))
+            )
+        )
     return diag
 
 
@@ -334,8 +367,10 @@ def _ensure_domain_scoped_identity_items(phase0_dir: Path) -> Optional[Path]:
     sentinel = shard_dir / ".complete"
 
     try:
-        if sentinel.is_file() and sentinel.stat().st_mtime >= src.stat().st_mtime:
-            return shard_dir
+        if sentinel.is_file():
+            stored = sentinel.read_text(encoding="utf-8").strip()
+            if stored == str(src.stat().st_mtime):
+                return shard_dir
     except OSError:
         pass
 
@@ -705,20 +740,38 @@ def main() -> None:
             flush=True,
         )
     if "sig_hash" in selected_stages:
-        if "flatten" not in selected_stages:
-            raise SystemExit("sig_hash stage requires flatten stage (records.csv + identity_items.csv).")
+        _records_csv = effective_phase0_dir / "records.csv"
+        _items_csv = effective_phase0_dir / "identity_items.csv"
+        if not _records_csv.is_file() or not _items_csv.is_file():
+            raise SystemExit(
+                "sig_hash stage requires records.csv and identity_items.csv to exist. "
+                "Run the flatten stage first, or include flatten in --stages."
+            )
         sig_pol = _resolve_sig_hash_policy_path(args.sig_hash_policy, out_root)
         if sig_pol is None:
             if args.skip_sig_hash_missing_policy:
+                sys.stderr.write(
+                    "[WARN extract_all] sig_hash stage skipped: no policy file found. "
+                    "sig_hash and join_hash will be empty for all records.\n"
+                )
                 report["notes"].append("sig_hash stage skipped: no policy found")
             else:
                 raise SystemExit("sig_hash stage requested but no policy file found. Use --sig-hash-policy or --skip-sig-hash-missing-policy.")
         else:
+            print(f"[extract_all] Stage sig_hash (T0.5): applying policy {sig_pol.name} ...", flush=True)
             diag = _apply_sig_hash_to_phase0(effective_phase0_dir, sig_pol, active_domains or domains)
             diag_dir = v21_root / "diagnostics"
             _ensure_dir(diag_dir)
             diag_path = diag_dir / "sig_hash_policy_diagnostics.json"
             diag_path.write_text(json.dumps(diag, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            print(
+                f"[extract_all] Stage sig_hash complete: "
+                f"processed={diag['records_processed']} hashed={diag['records_hashed']} "
+                f"blocked={diag['records_blocked']} degraded={diag['records_degraded']} "
+                f"basis_items={diag.get('sig_basis_items_written', 0)} "
+                f"domains_without_policy={len(diag['domains_without_policy'])}",
+                flush=True,
+            )
             report["commands"].append({"stage": "sig_hash", "policy": str(sig_pol), "out": str(effective_phase0_dir), "diagnostics": str(diag_path)})
 
     if "discover" in selected_stages:

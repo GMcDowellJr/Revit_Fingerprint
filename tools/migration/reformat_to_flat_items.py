@@ -50,17 +50,7 @@ def transform_record(record: dict[str, Any], domain: str) -> tuple[dict[str, Any
             item.pop("role", None)
 
     out["items"] = flat_items
-    for key in (
-        "identity_basis",
-        "phase2",
-        "join_key",
-        "sig_hash",
-        "sig_basis",
-        "identity_quality",
-        "record_id_alg",
-        "record_id_scope",
-        "schema_version",
-    ):
+    for key in ("identity_basis", "phase2", "join_key", "sig_hash", "sig_basis"):
         out.pop(key, None)
 
     return out, len(flat_items), role_counts, 0, unknown_key_counts
@@ -143,11 +133,20 @@ def main(argv: list[str]) -> int:
         output_dir.mkdir(parents=True, exist_ok=True)
 
     for src in files:
-        with src.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
+        try:
+            with src.open("r", encoding="utf-8") as f:
+                payload = json.load(f)
+        except Exception as exc:
+            sys.stderr.write(f"[WARN reformat] skipping {src.name}: {exc}\n")
+            continue
         transformed, *_ = process_payload(payload, allowed_domains, src)
         if not args.dry_run:
-            out_path = output_dir / src.name
+            # Use a distinct stem to avoid overwriting sources when output_dir == input_dir.
+            if output_dir.resolve() == src.parent.resolve():
+                out_name = src.stem + ".canonical" + src.suffix
+            else:
+                out_name = src.name
+            out_path = output_dir / out_name
             with out_path.open("w", encoding="utf-8") as f:
                 json.dump(transformed, f, indent=2, sort_keys=True)
                 f.write("\n")

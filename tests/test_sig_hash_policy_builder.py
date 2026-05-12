@@ -38,11 +38,13 @@ def test_sig_hash_builder_blocks_when_required_not_ok():
         "required_items": ["a"],
         "minima": {"block_if_any_required_not_ok": True},
     }
-    sig_hash, status, reasons, _ = build_sig_hash_from_policy(
+    item = make_identity_item("a", None, ITEM_Q_MISSING)
+    sig_hash, status, reasons, hash_items = build_sig_hash_from_policy(
         domain_policy=policy,
-        items=[make_identity_item("a", None, ITEM_Q_MISSING)],
+        items=[item],
     )
-    assert sig_hash is None
+    # Blocked records still produce a hash for traceability (based on available items).
+    assert sig_hash == make_hash(serialize_identity_items(hash_items))
     assert status == "blocked"
     assert "identity.incomplete:required_not_ok:a" in reasons
 

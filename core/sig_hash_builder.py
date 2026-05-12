@@ -77,7 +77,9 @@ def build_sig_hash_from_policy(
             reasons.append("identity.incomplete:required_not_ok:%s" % k)
 
     if required_not_ok and block_if_any_required_not_ok:
-        return None, STATUS_BLOCKED, sorted(set(reasons)), hash_items
+        preimage = serialize_identity_items(hash_items)
+        blocked_hash = make_hash(preimage) if hash_items else None
+        return blocked_hash, STATUS_BLOCKED, sorted(set(reasons)), hash_items
 
     if required_not_ok:
         status = STATUS_DEGRADED

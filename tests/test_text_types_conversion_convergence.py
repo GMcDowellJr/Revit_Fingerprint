@@ -42,9 +42,12 @@ def test_converted_old_and_new_records_converge(monkeypatch):
     }
     converted, *_ = transform_record(legacy, "text_types")
 
-    for k in ("identity_basis", "phase2", "join_key", "sig_hash", "sig_basis", "identity_quality", "record_id_alg", "record_id_scope", "schema_version"):
+    # Post-extraction artifacts are stripped; schema descriptor fields are preserved.
+    for k in ("identity_basis", "phase2", "join_key", "sig_hash", "sig_basis"):
         assert k not in converted
         assert k not in rec
+    assert rec.get("schema_version") == "record.v2"
+    assert converted.get("schema_version") == "record.v2"
 
     assert all("role" not in it for it in converted["items"])
     assert all("role" not in it for it in rec["items"])

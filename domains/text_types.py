@@ -54,6 +54,7 @@ from core.record_v2 import (
     STATUS_BLOCKED,
     ITEM_Q_OK,
     ITEM_Q_UNREADABLE,
+    SCHEMA_VERSION_RECORD_V2,
     canonicalize_str,
     canonicalize_int,
     canonicalize_float,
@@ -511,6 +512,7 @@ def extract(doc, ctx=None):
 
         phase2_payload = rec.get("phase2") if isinstance(rec.get("phase2"), dict) else {}
         rec_v2 = {
+            "schema_version": SCHEMA_VERSION_RECORD_V2,
             "domain": "text_types",
             "record_id": safe_str(type_name) if safe_str(type_name) else safe_str(t.Id.IntegerValue),
             "status": status_v2,
@@ -539,17 +541,7 @@ def extract(doc, ctx=None):
             phase2_payload.get("coordination_items", []),
             phase2_payload.get("unknown_items", []),
         )
-        for key in (
-            "identity_basis",
-            "phase2",
-            "join_key",
-            "sig_hash",
-            "sig_basis",
-            "identity_quality",
-            "record_id_alg",
-            "record_id_scope",
-            "schema_version",
-        ):
+        for key in ("identity_basis", "phase2", "join_key", "sig_hash", "sig_basis"):
             rec_v2.pop(key, None)
         for it in rec_v2.get("items", []):
             if isinstance(it, dict):
