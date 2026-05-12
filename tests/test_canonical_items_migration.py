@@ -26,6 +26,14 @@ def test_build_flat_items_preserves_counts_for_unique_keys():
     assert len(out) == len(a) + len(b)
 
 
+def test_merge_legacy_buckets_preserves_existing_canonical_items():
+    payload = {
+        "items": [{"k": "already.flat", "v": "1", "q": "ok"}],
+    }
+    out = merge_legacy_buckets(payload)
+    assert out["items"] == [{"k": "already.flat", "v": "1", "q": "ok"}]
+
+
 def test_compile_and_resolve_roles_runtime_from_key_only():
     policy = {
         "text_types": {
@@ -47,3 +55,16 @@ def test_compile_and_resolve_roles_runtime_from_key_only():
     assert len(grouped["identity"]) == 1
     assert len(grouped["unknown"]) == 1
     assert all("role" not in it for role in grouped.values() for it in role)
+
+
+def test_compile_role_policy_skips_scalar_string_for_role_keys():
+    malformed = {
+        "text_types": {
+            "identity": "text_type.leader_arrowhead_sig_hash",
+            "coordination": ["text_type.name"],
+        }
+    }
+    lookup = compile_role_policy(malformed, domain="text_types")
+    assert "text_type.name" in lookup
+    assert "text_type.leader_arrowhead_sig_hash" not in lookup
+    assert "t" not in lookup

@@ -57,7 +57,10 @@ def build_flat_items(*item_groups: Iterable[Dict[str, Any]]) -> List[Dict[str, A
 def merge_legacy_buckets(phase2_payload: Mapping[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
     """Convert legacy phase2 bucket payload into canonical flat items envelope."""
     payload = phase2_payload if isinstance(phase2_payload, Mapping) else {}
+    existing_items = payload.get("items")
     groups: List[Iterable[Dict[str, Any]]] = []
+    if isinstance(existing_items, list):
+        groups.append(existing_items)
     for key in LEGACY_BUCKET_KEYS:
         val = payload.get(key)
         if isinstance(val, list):
@@ -82,7 +85,7 @@ def compile_role_policy(policy: Mapping[str, Any], *, domain: Optional[str] = No
 
     out: Dict[str, str] = {}
     for role, keys in src.items():
-        if not isinstance(role, str) or not isinstance(keys, Sequence):
+        if not isinstance(role, str) or isinstance(keys, str) or not isinstance(keys, Sequence):
             continue
         for k in keys:
             if isinstance(k, str) and k and k not in out:
