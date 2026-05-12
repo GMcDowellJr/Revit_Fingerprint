@@ -349,6 +349,33 @@ def _ensure_domain_scoped_identity_items(phase0_dir: Path) -> Optional[Path]:
     return shard_dir
 
 
+def _validate_line_pattern_synthetic_norm_hash(phase0_dir: Path) -> None:
+    records_csv = phase0_dir / "records.csv"
+    items_csv = phase0_dir / "identity_items.csv"
+    if not records_csv.is_file() or not items_csv.is_file():
+        raise SystemExit("flatten/enrichment stage did not produce records.csv and identity_items.csv before apply")
+    rec_rows = _read_csv_rows(records_csv)
+    line_pattern_pks = [r.get("record_pk", "") for r in rec_rows if str(r.get("domain", "")) == "line_patterns"]
+    if not line_pattern_pks:
+        return
+    item_rows = _read_csv_rows(items_csv)
+    key_name = "item_key" if item_rows and "item_key" in item_rows[0] else "k"
+    pks_with_norm = {
+        str(r.get("record_pk", ""))
+        for r in item_rows
+        if str(r.get("domain", "")) == "line_patterns" and str(r.get(key_name, "")) == "line_pattern.segments_norm_hash"
+    }
+    missing = [pk for pk in line_pattern_pks if pk not in pks_with_norm]
+    if missing:
+        sample = ",".join(missing[:10])
+        more = "" if len(missing) <= 10 else f" (+{len(missing)-10} more)"
+        raise SystemExit(
+            "flatten/enrichment stage did not produce synthetic norm hashes before apply: "
+            f"missing line_pattern.segments_norm_hash for {len(missing)} line_patterns records. "
+            f"sample_record_pks={sample}{more}"
+        )
+
+
 def _emit_join_policy_diagnostics(rows: List[Dict[str, str]], diagnostics_dir: Path, domains: Optional[List[str]] = None) -> List[Dict[str, str]]:
     import csv
 
@@ -612,6 +639,7 @@ def main() -> None:
     out_root = Path(args.out_root).resolve()
     v21_root = out_root / "results"
     v21_phase0_dir = v21_root / "records"
+    effective_phase0_dir = v21_phase0_dir
     v21_analysis_dir = v21_root / "analysis"
     v21_split_root = v21_root / "split_analysis"
     flat_tables_dir = v21_root / "flat_tables"
@@ -662,12 +690,12 @@ def main() -> None:
             else:
                 raise SystemExit("sig_hash stage requested but no policy file found. Use --sig-hash-policy or --skip-sig-hash-missing-policy.")
         else:
-            diag = _apply_sig_hash_to_phase0(v21_phase0_dir, sig_pol, active_domains or domains)
+            diag = _apply_sig_hash_to_phase0(effective_phase0_dir, sig_pol, active_domains or domains)
             diag_dir = v21_root / "diagnostics"
             _ensure_dir(diag_dir)
             diag_path = diag_dir / "sig_hash_policy_diagnostics.json"
             diag_path.write_text(json.dumps(diag, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            report["commands"].append({"stage": "sig_hash", "policy": str(sig_pol), "out": str(v21_phase0_dir), "diagnostics": str(diag_path)})
+            report["commands"].append({"stage": "sig_hash", "policy": str(sig_pol), "out": str(effective_phase0_dir), "diagnostics": str(diag_path)})
 
     if "discover" in selected_stages:
         print("[extract_all] Stage discover (T1): exploring join policy candidates (discover/validate/harsh CSVs)...", flush=True)
@@ -675,7 +703,7 @@ def main() -> None:
             sys.executable,
             "tools/discover_join_policy.py",
             "--phase0-dir",
-            str(v21_phase0_dir),
+            str(effective_phase0_dir),
             "--search-modes",
             "greedy,pareto",
             "--policy-modes",
@@ -688,15 +716,17 @@ def main() -> None:
 
     if "apply" in selected_stages:
         print("[extract_all] Stage apply (T2): applying join policy to flatten outputs...", flush=True)
-        items_csv = v21_phase0_dir / "identity_items.csv"
+        items_csv = effective_phase0_dir / "identity_items.csv"
         stats = _append_line_pattern_synthetic_norm_hash(items_csv)
         print(
             f"[extract_all] line_patterns segments_norm_hash (pre-apply): "
             f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}",
             flush=True,
         )
+        _validate_line_pattern_synthetic_norm_hash(effective_phase0_dir)
+        print(f"[apply] using enriched records dir: {effective_phase0_dir}", flush=True)
         policy_path = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json").resolve()
-        cmd_apply = [sys.executable, "tools/apply_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--join-policy", str(policy_path)]
+        cmd_apply = [sys.executable, "tools/apply_join_policy.py", "--phase0-dir", str(effective_phase0_dir), "--join-policy", str(policy_path)]
         report["commands"].append({"stage": "apply", "cmd": cmd_apply})
         _run(cmd_apply, env=env)
 
