@@ -217,9 +217,14 @@ def _resolve_sig_hash_policy_path(explicit: Optional[str], out_root: Path) -> Op
     candidate1 = (out_root / "results" / "policies" / "domain_sig_hash_policies.json").resolve()
     if candidate1.is_file():
         return candidate1
+    # CWD-relative (works when invoked from repo root)
     candidate2 = Path("policies/domain_sig_hash_policies.json").resolve()
     if candidate2.is_file():
         return candidate2
+    # Repo-root-relative (works regardless of CWD)
+    candidate3 = (REPO_ROOT / "policies" / "domain_sig_hash_policies.json").resolve()
+    if candidate3.is_file():
+        return candidate3
     return None
 
 
@@ -753,11 +758,20 @@ def main() -> None:
             else:
                 raise SystemExit("sig_hash stage requested but no policy file found. Use --sig-hash-policy or --skip-sig-hash-missing-policy.")
         else:
+            print(f"[extract_all] Stage sig_hash (T0.5): applying policy {sig_pol.name} ...", flush=True)
             diag = _apply_sig_hash_to_phase0(effective_phase0_dir, sig_pol, active_domains or domains)
             diag_dir = v21_root / "diagnostics"
             _ensure_dir(diag_dir)
             diag_path = diag_dir / "sig_hash_policy_diagnostics.json"
             diag_path.write_text(json.dumps(diag, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            print(
+                f"[extract_all] Stage sig_hash complete: "
+                f"processed={diag['records_processed']} hashed={diag['records_hashed']} "
+                f"blocked={diag['records_blocked']} degraded={diag['records_degraded']} "
+                f"basis_items={diag.get('sig_basis_items_written', 0)} "
+                f"domains_without_policy={len(diag['domains_without_policy'])}",
+                flush=True,
+            )
             report["commands"].append({"stage": "sig_hash", "policy": str(sig_pol), "out": str(effective_phase0_dir), "diagnostics": str(diag_path)})
 
     if "discover" in selected_stages:
