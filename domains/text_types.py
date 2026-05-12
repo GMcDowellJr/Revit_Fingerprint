@@ -45,6 +45,9 @@ from core.phase2 import (
     phase2_sorted_items,
     phase2_qv_from_legacy_sentinel_str,
 )
+from core.canonical_items import (
+    build_flat_items,
+)
 
 from core.record_v2 import (
     STATUS_OK,
@@ -506,25 +509,51 @@ def extract(doc, ctx=None):
         sig_preimage_v2 = serialize_identity_items(semantic_items_v2)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
 
-        rec_v2 = build_record_v2(
-            domain="text_types",
-            record_id=safe_str(type_name) if safe_str(type_name) else safe_str(t.Id.IntegerValue),
-            status=status_v2,
-            status_reasons=sorted(set(status_reasons_v2)),
-            sig_hash=sig_hash_v2,
-            identity_items=identity_items_v2_sorted,
-            required_qs=required_qs,
-            label={
+        phase2_payload = rec.get("phase2") if isinstance(rec.get("phase2"), dict) else {}
+        rec_v2 = {
+            "domain": "text_types",
+            "record_id": safe_str(type_name) if safe_str(type_name) else safe_str(t.Id.IntegerValue),
+            "status": status_v2,
+            "status_reasons": sorted(set(status_reasons_v2)),
+            "sig_hash": sig_hash_v2,
+            "label": {
                 "display": safe_str(type_name),
                 "quality": "human",
                 "provenance": "revit.TextNoteType.Name",
             },
-            debug={
+            "identity_basis": {
+                "items": identity_items_v2_sorted,
+            },
+            "phase2": phase2_payload,
+            "debug": {
                 "sig_preimage_sample": sig_preimage_v2[:6],
                 "uid_excluded_from_sig": True,
                 "leader_arrowhead_uid_excluded_from_sig": True,
             },
+        }
+        identity_items = (((rec_v2.get("identity_basis") or {}).get("items")) or [])
+        rec_v2["items"] = build_flat_items(
+            identity_items,
+            phase2_payload.get("semantic_items", []),
+            phase2_payload.get("cosmetic_items", []),
+            phase2_payload.get("coordination_items", []),
+            phase2_payload.get("unknown_items", []),
         )
+        for key in (
+            "identity_basis",
+            "phase2",
+            "join_key",
+            "sig_hash",
+            "sig_basis",
+            "identity_quality",
+            "record_id_alg",
+            "record_id_scope",
+            "schema_version",
+        ):
+            rec_v2.pop(key, None)
+        for it in rec_v2.get("items", []):
+            if isinstance(it, dict):
+                it.pop("role", None)
         _ip, _ip_q = purge_lookup(getattr(getattr(t, "Id", None), "IntegerValue", None), ctx)
         rec_v2["is_purgeable"] = _ip
         rec_v2["is_purgeable_q"] = _ip_q
@@ -535,21 +564,8 @@ def extract(doc, ctx=None):
         rec_v2["instance_count_q"] = _icq
         rec_v2["is_sole_type_in_category"] = _sole
         rec_v2["is_sole_type_in_category_q"] = _soleq
-        rec_v2["join_key"], _missing = build_join_key_from_policy(
-            domain_policy=pol,
-            identity_items=identity_items_v2_sorted,
-            include_optional_items=False,
-            emit_keys_used=True,
-            hash_optional_items=False,
-            emit_items=False,
-            emit_selectors=True,
-        )
-
-        rec_v2["phase2"] = rec["phase2"]
-        rec_v2["sig_basis"] = {
-            "schema": "text_types.sig_basis.v1",
-            "keys_used": TEXT_TYPE_SEMANTIC_KEYS,
-        }
+        # join_key/sig_hash are intentionally omitted from extractor output in canonical mode;
+        # they are post-extraction artifacts.
 
         v2_records.append(rec_v2)
         if sig_hash_v2 is not None:

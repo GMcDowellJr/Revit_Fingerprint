@@ -13,10 +13,22 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from emit_element_dominance import emit_element_dominance
 from extractor import emit_analysis, emit_records
 from bundle_analysis.common import atomic_write_csv, read_csv_rows
 from bundle_analysis.reference_bundle import write_sidecar
+from core.sig_hash_policy import load_sig_hash_policies, get_domain_sig_hash_policy
+from core.sig_hash_builder import build_sig_hash_from_policy
+
+try:
+    csv.field_size_limit(sys.maxsize)
+except Exception:
+    pass
 
 SUPPRESSED_DOWNSTREAM_DOMAINS = {"object_styles_imported"}
 
@@ -198,6 +210,102 @@ def _ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
 
+def _resolve_sig_hash_policy_path(explicit: Optional[str], out_root: Path) -> Optional[Path]:
+    if explicit:
+        p = Path(explicit).resolve()
+        return p if p.is_file() else None
+    candidate1 = (out_root / "results" / "policies" / "domain_sig_hash_policies.json").resolve()
+    if candidate1.is_file():
+        return candidate1
+    candidate2 = Path("policies/domain_sig_hash_policies.json").resolve()
+    if candidate2.is_file():
+        return candidate2
+    return None
+
+
+def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Optional[List[str]] = None):
+    policies = load_sig_hash_policies(str(policy_path))
+    dom_filter = set(domains or [])
+    diag = {
+        "policy_path": str(policy_path),
+        "files_processed": 0,
+        "records_processed": 0,
+        "records_hashed": 0,
+        "domains_without_policy": [],
+        "records_blocked": 0,
+        "records_degraded": 0,
+    }
+    domains_without = set()
+    records_csv = phase0_dir / "records.csv"
+    items_csv = phase0_dir / "identity_items.csv"
+    if not records_csv.is_file() or not items_csv.is_file():
+        return diag
+    records = _read_csv_rows(records_csv)
+    shard_dir = _ensure_domain_scoped_identity_items(phase0_dir)
+    grouped_cache: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+
+    def _load_items_for_domain(domain: str) -> Dict[str, List[Dict[str, Any]]]:
+        if domain in grouped_cache:
+            return grouped_cache[domain]
+        out: Dict[str, List[Dict[str, Any]]] = {}
+        src = (shard_dir / f"{domain}.csv") if shard_dir is not None else items_csv
+        if not src.is_file():
+            grouped_cache[domain] = out
+            return out
+        for r in _iter_csv_rows(src):
+            if str(r.get("domain", "")).strip() != domain:
+                continue
+            pk = str(r.get("record_pk", ""))
+            k = str(r.get("k", "") or r.get("item_key", ""))
+            if not pk or not k:
+                continue
+            out.setdefault(pk, []).append({"k": k, "v": r.get("v", r.get("item_value")), "q": r.get("q", r.get("item_value_type"))})
+        grouped_cache[domain] = out
+        return out
+    for row in records:
+        dom = str(row.get("domain", "")).strip()
+        if dom_filter and dom not in dom_filter:
+            continue
+        pol = get_domain_sig_hash_policy(policies, dom)
+        if not isinstance(pol, dict):
+            domains_without.add(dom)
+            continue
+        pk = str(row.get("record_pk", ""))
+        rec_items = _load_items_for_domain(dom).get(pk, [])
+        diag["records_processed"] += 1
+        sig_hash, status, reasons, hash_items = build_sig_hash_from_policy(
+            domain_policy=pol,
+            items=rec_items,
+            status_reasons=[],
+        )
+        row["sig_hash"] = "" if sig_hash is None else str(sig_hash)
+        if str(row.get("join_key_schema", "")) == "sig_hash_as_join_key.v1":
+            row["join_hash"] = row["sig_hash"]
+        row["status"] = str(status)
+        row["status_reasons"] = "|".join(reasons)
+        row["sig_basis_schema"] = str(pol.get("sig_hash_schema") or "")
+        row["sig_basis_keys_used"] = "|".join(sorted([str(it.get("k")) for it in hash_items if isinstance(it.get("k"), str)]))
+        if sig_hash is not None:
+            diag["records_hashed"] += 1
+        if status == "blocked":
+            diag["records_blocked"] += 1
+        elif status == "degraded":
+            diag["records_degraded"] += 1
+    if records:
+        fieldnames = list(records[0].keys())
+        for extra in ("sig_hash", "sig_basis_schema", "sig_basis_keys_used", "status", "status_reasons"):
+            if extra not in fieldnames:
+                fieldnames.append(extra)
+        with records_csv.open("w", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fieldnames)
+            w.writeheader()
+            for r in records:
+                w.writerow({k: r.get(k, "") for k in fieldnames})
+    diag["files_processed"] = 1
+    diag["domains_without_policy"] = sorted(domains_without)
+    return diag
+
+
 def _run(cmd: List[str], *, env: Dict[str, str]) -> None:
     start = time.time()
     print(f"[extract_all] RUN: {' '.join(cmd)}", flush=True)
@@ -206,10 +314,14 @@ def _run(cmd: List[str], *, env: Dict[str, str]) -> None:
 
 
 def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
-    import csv
-
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         return [{str(k): "" if v is None else str(v) for k, v in row.items()} for row in csv.DictReader(f)]
+
+
+def _iter_csv_rows(path: Path):
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            yield {str(k): "" if v is None else str(v) for k, v in row.items()}
 
 
 def _ensure_domain_scoped_identity_items(phase0_dir: Path) -> Optional[Path]:
@@ -255,6 +367,33 @@ def _ensure_domain_scoped_identity_items(phase0_dir: Path) -> Optional[Path]:
 
     sentinel.write_text(str(src.stat().st_mtime), encoding="utf-8")
     return shard_dir
+
+
+def _validate_line_pattern_synthetic_norm_hash(phase0_dir: Path) -> None:
+    records_csv = phase0_dir / "records.csv"
+    items_csv = phase0_dir / "identity_items.csv"
+    if not records_csv.is_file() or not items_csv.is_file():
+        raise SystemExit("flatten/enrichment stage did not produce records.csv and identity_items.csv before apply")
+    line_pattern_pks: List[str] = []
+    for r in _iter_csv_rows(records_csv):
+        if str(r.get("domain", "")) == "line_patterns":
+            line_pattern_pks.append(r.get("record_pk", ""))
+    if not line_pattern_pks:
+        return
+    pks_with_norm: set = set()
+    for r in _iter_csv_rows(items_csv):
+        key = str(r.get("item_key", "") or r.get("k", ""))
+        if str(r.get("domain", "")) == "line_patterns" and key == "line_pattern.segments_norm_hash":
+            pks_with_norm.add(str(r.get("record_pk", "")))
+    missing = [pk for pk in line_pattern_pks if pk not in pks_with_norm]
+    if missing:
+        sample = ",".join(missing[:10])
+        more = "" if len(missing) <= 10 else f" (+{len(missing)-10} more)"
+        raise SystemExit(
+            "flatten/enrichment stage did not produce synthetic norm hashes before apply: "
+            f"missing line_pattern.segments_norm_hash for {len(missing)} line_patterns records. "
+            f"sample_record_pks={sample}{more}"
+        )
 
 
 def _emit_join_policy_diagnostics(rows: List[Dict[str, str]], diagnostics_dir: Path, domains: Optional[List[str]] = None) -> List[Dict[str, str]]:
@@ -444,15 +583,16 @@ def _enforce_policy_gate(rows: List[Dict[str, str]], diagnostics_dir: Path, doma
 
 
 def main() -> None:
-    stage_names = ["flatten", "discover", "apply", "placeholders", "authority", "patterns", "split", "flat_tables"]
+    stage_names = ["flatten", "sig_hash", "discover", "apply", "placeholders", "authority", "patterns", "split", "flat_tables"]
     ap = argparse.ArgumentParser(
         description=(
-            "Pipeline orchestrator with explicit stages: flatten (T0), discover (T1), apply (T2), split, authority, patterns. "
-            "Default stages are flatten,discover. Apply is opt-in. Identity-mode join schema sig_hash_as_join_key.v1 is degraded and gated by default."
+            "Pipeline orchestrator with explicit stages: flatten (T0), sig_hash (T0.5), discover (T1), apply (T2), split, authority, patterns. "
+            "Default stages are flatten,sig_hash,discover."
         ),
         epilog=(
             "Examples:\n"
             "  default (draft prep): --stages flatten,discover\n"
+            "  governance prep:      --stages sig_hash,flatten,discover\n"
             "  operational commit:  --stages flatten,discover,apply\n"
             "  placeholder prep:    --stages flatten,discover,apply,placeholders\n"
             "  analysis after apply: --stages flatten,discover,apply,placeholders,split,authority,patterns\n"
@@ -465,9 +605,11 @@ def main() -> None:
     ap.add_argument("--out-root", required=True, help="Output root folder.")
     ap.add_argument("--seed", default=None, help="Path to a seed fingerprint JSON. When provided, emits a seed-comparison sidecar for the seed-baseline BI dashboard (project drift vs template). Not part of standard segment runs.")
     ap.add_argument("--domains", default=None, help="Comma list of domains; if omitted, infer from exports.")
-    ap.add_argument("--stages", default="flatten,discover", help="Comma-separated stages to run. Default: flatten,discover.")
+    ap.add_argument("--stages", default="flatten,sig_hash,discover", help="Comma-separated stages to run. Default: flatten,sig_hash,discover.")
     ap.add_argument("--skip-stages", default="", help="Comma-separated stages to skip from --stages.")
     ap.add_argument("--join-policy", default=None, help="Policy JSON path used by apply stage.")
+    ap.add_argument("--sig-hash-policy", default=None, help="Policy JSON path used by sig_hash stage.")
+    ap.add_argument("--skip-sig-hash-missing-policy", action="store_true", help="Skip sig_hash stage if no policy file is found.")
     ap.add_argument("--allow-sig-hash-join-key", action="store_true", help="Allow degraded identity-mode join keys (sig_hash_as_join_key.v1) for exploratory analysis.")
     ap.add_argument("--split-domains", nargs="?", const="__ALL__", default=None, help="Domains for split stage; optional CSV. If no value, run all discovered domains.")
     ap.add_argument(
@@ -495,13 +637,22 @@ def main() -> None:
     allow_sig_hash_join_key = args.allow_sig_hash_join_key
     require_join_policy = True
 
-    selected_stages = _parse_stage_csv(args.stages) or ["flatten", "discover"]
+    selected_stages = _parse_stage_csv(args.stages) or ["flatten", "sig_hash", "discover"]
 
     skipped = set(_parse_stage_csv(args.skip_stages))
     for st in selected_stages + list(skipped):
         if st not in stage_names:
             raise SystemExit(f"Unknown stage: {st}. Valid stages: {','.join(stage_names)}")
     selected_stages = [s for s in stage_names if s in selected_stages and s not in skipped]
+    if "apply" in selected_stages and "flatten" not in selected_stages:
+        selected_stages = ["flatten"] + selected_stages
+        report_note = "auto_inserted_flatten_for_apply"
+    else:
+        report_note = None
+    if "apply" in selected_stages and "sig_hash" not in selected_stages:
+        insert_at = selected_stages.index("apply")
+        selected_stages.insert(insert_at, "sig_hash")
+        report_note = (report_note + "|auto_inserted_sig_hash_for_apply") if report_note else "auto_inserted_sig_hash_for_apply"
 
     plan_msg = " -> ".join([s if s in selected_stages else f"({s} skipped)" for s in stage_names])
     if require_join_policy and any(s in selected_stages for s in ("split", "authority", "patterns")) and "apply" not in selected_stages:
@@ -512,6 +663,7 @@ def main() -> None:
     out_root = Path(args.out_root).resolve()
     v21_root = out_root / "results"
     v21_phase0_dir = v21_root / "records"
+    effective_phase0_dir = v21_phase0_dir
     v21_analysis_dir = v21_root / "analysis"
     v21_split_root = v21_root / "split_analysis"
     flat_tables_dir = v21_root / "flat_tables"
@@ -534,6 +686,8 @@ def main() -> None:
 
     env = os.environ.copy()
     report: Dict[str, Any] = {"tool": "tools/run_extract_all.py", "exports_dir": str(exports_dir), "out_root": str(out_root), "surfaces": surfaces, "domains": domains, "active_domains": active_domains, "selected_stages": selected_stages, "commands": [], "notes": []}
+    if report_note:
+        report["notes"].append(report_note)
     meta_rows: List[Dict[str, str]] = []
     record_rows: List[Dict[str, str]] = []
 
@@ -550,6 +704,22 @@ def main() -> None:
             f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}",
             flush=True,
         )
+    if "sig_hash" in selected_stages:
+        if "flatten" not in selected_stages:
+            raise SystemExit("sig_hash stage requires flatten stage (records.csv + identity_items.csv).")
+        sig_pol = _resolve_sig_hash_policy_path(args.sig_hash_policy, out_root)
+        if sig_pol is None:
+            if args.skip_sig_hash_missing_policy:
+                report["notes"].append("sig_hash stage skipped: no policy found")
+            else:
+                raise SystemExit("sig_hash stage requested but no policy file found. Use --sig-hash-policy or --skip-sig-hash-missing-policy.")
+        else:
+            diag = _apply_sig_hash_to_phase0(effective_phase0_dir, sig_pol, active_domains or domains)
+            diag_dir = v21_root / "diagnostics"
+            _ensure_dir(diag_dir)
+            diag_path = diag_dir / "sig_hash_policy_diagnostics.json"
+            diag_path.write_text(json.dumps(diag, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            report["commands"].append({"stage": "sig_hash", "policy": str(sig_pol), "out": str(effective_phase0_dir), "diagnostics": str(diag_path)})
 
     if "discover" in selected_stages:
         print("[extract_all] Stage discover (T1): exploring join policy candidates (discover/validate/harsh CSVs)...", flush=True)
@@ -557,7 +727,7 @@ def main() -> None:
             sys.executable,
             "tools/discover_join_policy.py",
             "--phase0-dir",
-            str(v21_phase0_dir),
+            str(effective_phase0_dir),
             "--search-modes",
             "greedy,pareto",
             "--policy-modes",
@@ -570,15 +740,17 @@ def main() -> None:
 
     if "apply" in selected_stages:
         print("[extract_all] Stage apply (T2): applying join policy to flatten outputs...", flush=True)
-        items_csv = v21_phase0_dir / "identity_items.csv"
+        items_csv = effective_phase0_dir / "identity_items.csv"
         stats = _append_line_pattern_synthetic_norm_hash(items_csv)
         print(
             f"[extract_all] line_patterns segments_norm_hash (pre-apply): "
             f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}",
             flush=True,
         )
+        _validate_line_pattern_synthetic_norm_hash(effective_phase0_dir)
+        print(f"[apply] using enriched records dir: {effective_phase0_dir}", flush=True)
         policy_path = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json").resolve()
-        cmd_apply = [sys.executable, "tools/apply_join_policy.py", "--phase0-dir", str(v21_phase0_dir), "--join-policy", str(policy_path)]
+        cmd_apply = [sys.executable, "tools/apply_join_policy.py", "--phase0-dir", str(effective_phase0_dir), "--join-policy", str(policy_path)]
         report["commands"].append({"stage": "apply", "cmd": cmd_apply})
         _run(cmd_apply, env=env)
 
