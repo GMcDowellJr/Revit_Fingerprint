@@ -68,3 +68,17 @@ def test_compile_role_policy_skips_scalar_string_for_role_keys():
     assert "text_type.name" in lookup
     assert "text_type.leader_arrowhead_sig_hash" not in lookup
     assert "t" not in lookup
+
+
+def test_compile_role_policy_accepts_top_level_domains_wrapper():
+    wrapped = {
+        "domains": {
+            "text_types": {
+                "identity": ["text_type.leader_arrowhead_sig_hash"],
+                "coordination": ["text_type.name"],
+            }
+        }
+    }
+    lookup = compile_role_policy(wrapped, domain="text_types")
+    assert lookup["text_type.leader_arrowhead_sig_hash"] == "identity"
+    assert lookup["text_type.name"] == "coordination"

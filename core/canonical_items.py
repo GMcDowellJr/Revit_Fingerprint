@@ -76,8 +76,11 @@ def compile_role_policy(policy: Mapping[str, Any], *, domain: Optional[str] = No
     - direct k->role mapping (already compiled).
     """
     src = policy if isinstance(policy, Mapping) else {}
-    if domain and isinstance(src.get(domain), Mapping):
-        src = src.get(domain)  # type: ignore[assignment]
+    if domain:
+        if isinstance(src.get(domain), Mapping):
+            src = src.get(domain)  # type: ignore[assignment]
+        elif isinstance(src.get("domains"), Mapping) and isinstance(src.get("domains", {}).get(domain), Mapping):
+            src = src.get("domains", {}).get(domain)  # type: ignore[assignment]
 
     # Precompiled shape: {"item.k": "identity"}
     if all(isinstance(k, str) and isinstance(v, str) for k, v in src.items()):
