@@ -17,6 +17,8 @@ from emit_element_dominance import emit_element_dominance
 from extractor import emit_analysis, emit_records
 from bundle_analysis.common import atomic_write_csv, read_csv_rows
 from bundle_analysis.reference_bundle import write_sidecar
+from core.sig_hash_policy import load_sig_hash_policies, get_domain_sig_hash_policy
+from core.sig_hash_builder import apply_sig_hash_policy_to_record
 
 SUPPRESSED_DOWNSTREAM_DOMAINS = {"object_styles_imported"}
 
@@ -196,6 +198,70 @@ def _discover_domains_from_exports(exports_dir: Path) -> List[str]:
 
 def _ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
+
+
+def _resolve_sig_hash_policy_path(explicit: Optional[str], out_root: Path) -> Optional[Path]:
+    if explicit:
+        p = Path(explicit).resolve()
+        return p if p.is_file() else None
+    candidate1 = (out_root / "results" / "policies" / "domain_sig_hash_policies.json").resolve()
+    if candidate1.is_file():
+        return candidate1
+    candidate2 = Path("policies/domain_sig_hash_policies.json").resolve()
+    if candidate2.is_file():
+        return candidate2
+    return None
+
+
+def _apply_sig_hash_to_exports(exports_dir: Path, out_dir: Path, policy_path: Path, domains: Optional[List[str]] = None):
+    _ensure_dir(out_dir)
+    policies = load_sig_hash_policies(str(policy_path))
+    dom_filter = set(domains or [])
+    diag = {
+        "policy_path": str(policy_path),
+        "files_processed": 0,
+        "records_processed": 0,
+        "records_hashed": 0,
+        "domains_without_policy": [],
+        "records_blocked": 0,
+        "records_degraded": 0,
+    }
+    domains_without = set()
+    for src in sorted(exports_dir.glob("*.json")):
+        data = _read_json(src)
+        changed = False
+        for dname, dp in data.items():
+            if not isinstance(dname, str) or dname.startswith("_") or not isinstance(dp, dict):
+                continue
+            if dom_filter and dname not in dom_filter:
+                continue
+            recs = dp.get("records")
+            if not isinstance(recs, list):
+                continue
+            pol = get_domain_sig_hash_policy(policies, dname)
+            if not isinstance(pol, dict):
+                domains_without.add(dname)
+                continue
+            for i, rec in enumerate(recs):
+                if not isinstance(rec, dict):
+                    continue
+                diag["records_processed"] += 1
+                rec2 = apply_sig_hash_policy_to_record(dict(rec), pol)
+                recs[i] = rec2
+                changed = True
+                if rec2.get("sig_hash") is not None:
+                    diag["records_hashed"] += 1
+                if rec2.get("status") == "blocked":
+                    diag["records_blocked"] += 1
+                elif rec2.get("status") == "degraded":
+                    diag["records_degraded"] += 1
+        out_path = out_dir / src.name
+        with out_path.open("w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, sort_keys=True)
+            f.write("\n")
+        diag["files_processed"] += 1
+    diag["domains_without_policy"] = sorted(domains_without)
+    return out_dir, diag
 
 
 def _run(cmd: List[str], *, env: Dict[str, str]) -> None:
@@ -444,15 +510,16 @@ def _enforce_policy_gate(rows: List[Dict[str, str]], diagnostics_dir: Path, doma
 
 
 def main() -> None:
-    stage_names = ["flatten", "discover", "apply", "placeholders", "authority", "patterns", "split", "flat_tables"]
+    stage_names = ["flatten", "sig_hash", "discover", "apply", "placeholders", "authority", "patterns", "split", "flat_tables"]
     ap = argparse.ArgumentParser(
         description=(
-            "Pipeline orchestrator with explicit stages: flatten (T0), discover (T1), apply (T2), split, authority, patterns. "
-            "Default stages are flatten,discover. Apply is opt-in. Identity-mode join schema sig_hash_as_join_key.v1 is degraded and gated by default."
+            "Pipeline orchestrator with explicit stages: flatten (T0), sig_hash (T0.5), discover (T1), apply (T2), split, authority, patterns. "
+            "Default stages are flatten,discover. Governance-grade runs should include sig_hash before discover/apply."
         ),
         epilog=(
             "Examples:\n"
             "  default (draft prep): --stages flatten,discover\n"
+            "  governance prep:      --stages sig_hash,flatten,discover\n"
             "  operational commit:  --stages flatten,discover,apply\n"
             "  placeholder prep:    --stages flatten,discover,apply,placeholders\n"
             "  analysis after apply: --stages flatten,discover,apply,placeholders,split,authority,patterns\n"
@@ -468,6 +535,8 @@ def main() -> None:
     ap.add_argument("--stages", default="flatten,discover", help="Comma-separated stages to run. Default: flatten,discover.")
     ap.add_argument("--skip-stages", default="", help="Comma-separated stages to skip from --stages.")
     ap.add_argument("--join-policy", default=None, help="Policy JSON path used by apply stage.")
+    ap.add_argument("--sig-hash-policy", default=None, help="Policy JSON path used by sig_hash stage.")
+    ap.add_argument("--skip-sig-hash-missing-policy", action="store_true", help="Skip sig_hash stage if no policy file is found.")
     ap.add_argument("--allow-sig-hash-join-key", action="store_true", help="Allow degraded identity-mode join keys (sig_hash_as_join_key.v1) for exploratory analysis.")
     ap.add_argument("--split-domains", nargs="?", const="__ALL__", default=None, help="Domains for split stage; optional CSV. If no value, run all discovered domains.")
     ap.add_argument(
@@ -537,11 +606,28 @@ def main() -> None:
     meta_rows: List[Dict[str, str]] = []
     record_rows: List[Dict[str, str]] = []
 
+    effective_exports_dir = exports_dir
+    if "sig_hash" in selected_stages:
+        sig_pol = _resolve_sig_hash_policy_path(args.sig_hash_policy, out_root)
+        if sig_pol is None:
+            if args.skip_sig_hash_missing_policy:
+                report["notes"].append("sig_hash stage skipped: no policy found")
+            else:
+                raise SystemExit("sig_hash stage requested but no policy file found. Use --sig-hash-policy or --skip-sig-hash-missing-policy.")
+        else:
+            sig_out = v21_root / "post_extract_sig_hash"
+            effective_exports_dir, diag = _apply_sig_hash_to_exports(exports_dir, sig_out, sig_pol, active_domains or domains)
+            diag_dir = v21_root / "diagnostics"
+            _ensure_dir(diag_dir)
+            diag_path = diag_dir / "sig_hash_policy_diagnostics.json"
+            diag_path.write_text(json.dumps(diag, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            report["commands"].append({"stage": "sig_hash", "policy": str(sig_pol), "out": str(sig_out), "diagnostics": str(diag_path)})
+
     if "flatten" in selected_stages:
         print("[extract_all] Stage flatten (T0): emitting flatten outputs...", flush=True)
         _ensure_dir(v21_phase0_dir)
         report["commands"].append({"stage": "flatten", "out": str(v21_phase0_dir)})
-        meta_rows, record_rows = emit_records(exports_dir, v21_phase0_dir, file_id_mode="basename")
+        meta_rows, record_rows = emit_records(effective_exports_dir, v21_phase0_dir, file_id_mode="basename")
         print(f"[extract_all] Stage flatten complete: rows={len(record_rows)} files={len(meta_rows)} out={v21_phase0_dir}", flush=True)
         items_csv = v21_phase0_dir / "identity_items.csv"
         stats = _append_line_pattern_synthetic_norm_hash(items_csv)
