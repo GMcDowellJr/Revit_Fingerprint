@@ -1,0 +1,955 @@
+{
+  "domains": {
+    "arrowheads": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "arrowhead.style",
+        "arrowhead.arrow_style_raw_int",
+        "arrowhead.arrow_style_display",
+        "arrowhead.tick_size_in",
+        "arrowhead.width_angle_deg",
+        "arrowhead.fill_tick",
+        "arrowhead.arrow_closed",
+        "arrowhead.tick_mark_centered",
+        "arrowhead.heavy_end_pen_weight"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "arrowhead.style",
+        "arrowhead.tick_size_in"
+      ],
+      "sig_hash_schema": "arrowheads.sig_hash.v1"
+    },
+    "ceiling_types": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose",
+        "ct.total_layer_rows",
+        "ct.stack_hash_strict",
+        "ct.stack_hash_function_only",
+        "ct.coarse_fill_pattern_sig_hash",
+        "ct.type_name",
+        "ct.coarse_fill_color_rgb"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose"
+      ],
+      "sig_hash_schema": "ceiling_types.sig_hash.v1"
+    },
+    "dimension_types_angular": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
+        "dim_type.unit_format_id",
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
+        "dim_type.unit_format_id",
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix"
+      ],
+      "sig_hash_schema": "dimension_types_angular.sig_hash.v1"
+    },
+    "dimension_types_diameter": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.diameter_symbol_location",
+        "dim_type.diameter_symbol_text",
+        "dim_type.unit_format_id",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.diameter_symbol_location",
+        "dim_type.diameter_symbol_text",
+        "dim_type.unit_format_id"
+      ],
+      "sig_hash_schema": "dimension_types_diameter.sig_hash.v1"
+    },
+    "dimension_types_linear": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
+        "dim_type.unit_format_id",
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
+        "dim_type.unit_format_id",
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix"
+      ],
+      "sig_hash_schema": "dimension_types_linear.sig_hash.v1"
+    },
+    "dimension_types_radial": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.radius_symbol_location",
+        "dim_type.radius_symbol_text",
+        "dim_type.unit_format_id",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.radius_symbol_location",
+        "dim_type.radius_symbol_text",
+        "dim_type.unit_format_id"
+      ],
+      "sig_hash_schema": "dimension_types_radial.sig_hash.v1"
+    },
+    "dimension_types_spot_coordinate": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.top_coordinate",
+        "dim_type.bottom_coordinate",
+        "dim_type.north_south_indicator",
+        "dim_type.east_west_indicator",
+        "dim_type.include_elevation",
+        "dim_type.elevation_indicator",
+        "dim_type.indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_name",
+        "dim_type.leader_arrowhead_sig_hash",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.top_coordinate",
+        "dim_type.bottom_coordinate",
+        "dim_type.north_south_indicator",
+        "dim_type.east_west_indicator",
+        "dim_type.include_elevation",
+        "dim_type.elevation_indicator",
+        "dim_type.indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_name"
+      ],
+      "sig_hash_schema": "dimension_types_spot_coordinate.sig_hash.v1"
+    },
+    "dimension_types_spot_elevation": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.elevation_indicator",
+        "dim_type.elevation_indicator_as_prefix_suffix",
+        "dim_type.top_indicator",
+        "dim_type.bottom_indicator",
+        "dim_type.top_indicator_as_prefix_suffix",
+        "dim_type.bottom_indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_name",
+        "dim_type.leader_arrowhead_sig_hash",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.elevation_indicator",
+        "dim_type.elevation_indicator_as_prefix_suffix",
+        "dim_type.top_indicator",
+        "dim_type.bottom_indicator",
+        "dim_type.top_indicator_as_prefix_suffix",
+        "dim_type.bottom_indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_name"
+      ],
+      "sig_hash_schema": "dimension_types_spot_elevation.sig_hash.v1"
+    },
+    "dimension_types_spot_slope": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.slope_direction",
+        "dim_type.leader_line_length",
+        "dim_type.leader_arrowhead_sig_hash",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.slope_direction",
+        "dim_type.leader_line_length"
+      ],
+      "sig_hash_schema": "dimension_types_spot_slope.sig_hash.v1"
+    },
+    "fill_patterns_drafting": {
+      "allowed_item_prefixes": [
+        "fill_pattern.grid["
+      ],
+      "allowed_items": [
+        "fill_pattern.target",
+        "fill_pattern.grid_count",
+        "fill_pattern.grids_def_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "fill_pattern.target",
+        "fill_pattern.grid_count",
+        "fill_pattern.grids_def_hash"
+      ],
+      "sig_hash_schema": "fill_patterns_drafting.sig_hash.v1"
+    },
+    "fill_patterns_model": {
+      "allowed_item_prefixes": [
+        "fill_pattern.grid["
+      ],
+      "allowed_items": [
+        "fill_pattern.target",
+        "fill_pattern.grid_count",
+        "fill_pattern.grids_def_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "fill_pattern.target",
+        "fill_pattern.grid_count",
+        "fill_pattern.grids_def_hash"
+      ],
+      "sig_hash_schema": "fill_patterns_model.sig_hash.v1"
+    },
+    "floor_types": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "ft.function",
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose",
+        "ft.total_layer_rows",
+        "ft.stack_hash_strict",
+        "ft.stack_hash_function_only",
+        "ft.coarse_fill_pattern_sig_hash",
+        "ft.has_embedded_sweeps",
+        "ft.type_name",
+        "ft.coarse_fill_color_rgb"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "ft.function",
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose"
+      ],
+      "sig_hash_schema": "floor_types.sig_hash.v1"
+    },
+    "identity": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "identity.is_workshared",
+        "identity.revit_version_number",
+        "identity.revit_version_name",
+        "identity.revit_build"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "identity.is_workshared"
+      ],
+      "sig_hash_schema": "identity.sig_hash.v1"
+    },
+    "line_patterns": {
+      "allowed_item_prefixes": [
+        "line_pattern.seg["
+      ],
+      "allowed_items": [
+        "line_pattern.uid_or_namekey",
+        "line_pattern.segment_count",
+        "line_pattern.segments_def_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "line_pattern.uid_or_namekey",
+        "line_pattern.segment_count"
+      ],
+      "sig_hash_schema": "line_patterns.sig_hash.v1"
+    },
+    "line_styles": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "line_style.line_weight_projection",
+        "line_style.color_rgb",
+        "line_style.weight.cut",
+        "line_style.pattern_ref.sig_hash",
+        "line_style.weight.projection",
+        "line_style.color.rgb"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "line_style.line_weight_projection",
+        "line_style.color_rgb",
+        "line_style.pattern_ref.sig_hash"
+      ],
+      "sig_hash_schema": "line_styles.sig_hash.v1"
+    },
+    "object_styles_analytical": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "obj_style.row_key"
+      ],
+      "sig_hash_schema": "object_styles_analytical.sig_hash.v1"
+    },
+    "object_styles_annotation": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "obj_style.row_key"
+      ],
+      "sig_hash_schema": "object_styles_annotation.sig_hash.v1"
+    },
+    "object_styles_imported": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "obj_style.row_key"
+      ],
+      "sig_hash_schema": "object_styles_imported.sig_hash.v1"
+    },
+    "object_styles_model": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.weight.cut",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash",
+        "obj_style.material_sig_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "obj_style.row_key"
+      ],
+      "sig_hash_schema": "object_styles_model.sig_hash.v1"
+    },
+    "phase_filters": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "phase_filter.name",
+        "phase_filter.new.presentation_id",
+        "phase_filter.existing.presentation_id",
+        "phase_filter.demolished.presentation_id",
+        "phase_filter.temporary.presentation_id"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "phase_filter.name",
+        "phase_filter.new.presentation_id",
+        "phase_filter.existing.presentation_id",
+        "phase_filter.demolished.presentation_id",
+        "phase_filter.temporary.presentation_id"
+      ],
+      "sig_hash_schema": "phase_filters.sig_hash.v1"
+    },
+    "phases": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "phase.seq",
+        "phase.name"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "phase.seq",
+        "phase.name"
+      ],
+      "sig_hash_schema": "phases.sig_hash.v1"
+    },
+    "roof_types": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose",
+        "rt.total_layer_rows",
+        "rt.stack_hash_strict",
+        "rt.stack_hash_function_only",
+        "rt.coarse_fill_pattern_sig_hash",
+        "rt.type_name",
+        "rt.coarse_fill_color_rgb"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose"
+      ],
+      "sig_hash_schema": "roof_types.sig_hash.v1"
+    },
+    "text_types": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "text_type.name",
+        "text_type.font",
+        "text_type.size_in",
+        "text_type.width_factor",
+        "text_type.background",
+        "text_type.line_weight",
+        "text_type.color_rgb",
+        "text_type.show_border",
+        "text_type.leader_border_offset_in",
+        "text_type.tab_size_in",
+        "text_type.bold",
+        "text_type.italic",
+        "text_type.underline"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "text_type.name",
+        "text_type.font",
+        "text_type.size_in",
+        "text_type.width_factor",
+        "text_type.background",
+        "text_type.line_weight",
+        "text_type.color_rgb",
+        "text_type.show_border",
+        "text_type.leader_border_offset_in",
+        "text_type.tab_size_in",
+        "text_type.bold",
+        "text_type.italic",
+        "text_type.underline"
+      ],
+      "sig_hash_schema": "text_types.sig_hash.v1"
+    },
+    "units": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "units.spec",
+        "units.unit_type_id",
+        "units.symbol_type_id",
+        "units.accuracy",
+        "units.rounding_method"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "units.spec",
+        "units.unit_type_id"
+      ],
+      "sig_hash_schema": "units.sig_hash.v1"
+    },
+    "view_category_overrides": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash",
+        "vco.projection.line_weight",
+        "vco.projection.color.rgb",
+        "vco.projection.pattern_ref.sig_hash",
+        "vco.projection.fill_pattern_ref.sig_hash",
+        "vco.projection.fill_color.rgb",
+        "vco.cut.line_weight",
+        "vco.cut.color.rgb",
+        "vco.cut.pattern_ref.sig_hash",
+        "vco.cut.fill_pattern_ref.sig_hash",
+        "vco.cut.fill_color.rgb",
+        "vco.halftone",
+        "vco.transparency",
+        "vco.include_controlled",
+        "vco.vg_category_type",
+        "vco.context_type",
+        "vco.template_name",
+        "vco.template_element_id",
+        "vco.template_unique_id"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "sig_hash_schema": "view_category_overrides.sig_hash.v1"
+    },
+    "view_filter_applications_view_templates": {
+      "allowed_item_prefixes": [
+        "vfa.stack["
+      ],
+      "allowed_items": [
+        "vfa.template_uid_or_namekey",
+        "vfa.filter_stack_count",
+        "vfa.stack_def_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "vfa.template_uid_or_namekey",
+        "vfa.filter_stack_count"
+      ],
+      "sig_hash_schema": "view_filter_applications_view_templates.sig_hash.v1"
+    },
+    "view_filter_definitions": {
+      "allowed_item_prefixes": [
+        "vf.rule["
+      ],
+      "allowed_items": [
+        "vf.uid_or_namekey",
+        "vf.logic_root",
+        "vf.rule_count",
+        "vf.categories",
+        "vf.def_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "vf.uid_or_namekey",
+        "vf.logic_root",
+        "vf.rule_count"
+      ],
+      "sig_hash_schema": "view_filter_definitions.sig_hash.v1"
+    },
+    "view_templates_ceiling_plans": {
+      "allowed_item_prefixes": [
+        "view_template.sig."
+      ],
+      "allowed_items": [
+        "view_template.def_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_schema": "view_templates_ceiling_plans.sig_hash.v1"
+    },
+    "view_templates_elevations_sections_detail": {
+      "allowed_item_prefixes": [
+        "view_template.sig."
+      ],
+      "allowed_items": [
+        "view_template.def_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_schema": "view_templates_elevations_sections_detail.sig_hash.v1"
+    },
+    "view_templates_floor_structural_area_plans": {
+      "allowed_item_prefixes": [
+        "view_template.sig."
+      ],
+      "allowed_items": [
+        "view_template.def_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_schema": "view_templates_floor_structural_area_plans.sig_hash.v1"
+    },
+    "view_templates_renderings_drafting": {
+      "allowed_item_prefixes": [
+        "view_template.sig."
+      ],
+      "allowed_items": [
+        "view_template.def_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_schema": "view_templates_renderings_drafting.sig_hash.v1"
+    },
+    "view_templates_schedules": {
+      "allowed_item_prefixes": [
+        "view_template.sig."
+      ],
+      "allowed_items": [
+        "view_template.def_hash"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_schema": "view_templates_schedules.sig_hash.v1"
+    },
+    "wall_types": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "wt.function",
+        "wt.layer_count",
+        "wt.total_thickness_in",
+        "wt.stack_hash_loose",
+        "wt.wraps_at_inserts",
+        "wt.wraps_at_ends",
+        "wt.kind",
+        "wt.total_layer_rows",
+        "wt.stack_hash_strict",
+        "wt.stack_hash_function_only",
+        "wt.coarse_fill_pattern_sig_hash",
+        "wt.has_embedded_sweeps",
+        "wt.type_name",
+        "wt.coarse_fill_color_rgb"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "wt.function",
+        "wt.layer_count",
+        "wt.total_thickness_in",
+        "wt.stack_hash_loose"
+      ],
+      "sig_hash_schema": "wall_types.sig_hash.v1"
+    }
+  },
+  "identity_item_schema": "identity_items.v1",
+  "record_schema_version": "record.v2",
+  "source_registry_version": "domain_identity_keys.v2",
+  "version": "domain_sig_hash_policies.v1"
+}
