@@ -519,6 +519,7 @@ def extract(doc, ctx=None):
             "record_id": safe_str(type_name) if safe_str(type_name) else safe_str(t.Id.IntegerValue),
             "status": status_v2,
             "status_reasons": sorted(set(status_reasons_v2)),
+            "sig_hash": sig_hash_v2,
             "label": {
                 "display": safe_str(type_name),
                 "quality": "human",
@@ -544,7 +545,7 @@ def extract(doc, ctx=None):
         )
         _resolved_roles = resolve_item_roles(rec_v2.get("items", []), role_lookup)
         rec_v2["debug"]["resolved_role_counts"] = {k: len(v) for k, v in _resolved_roles.items()}
-        for key in ("identity_basis", "phase2", "sig_hash", "sig_basis", "join_key"):
+        for key in ("phase2", "sig_basis", "join_key"):
             rec_v2.pop(key, None)
         _ip, _ip_q = purge_lookup(getattr(getattr(t, "Id", None), "IntegerValue", None), ctx)
         rec_v2["is_purgeable"] = _ip

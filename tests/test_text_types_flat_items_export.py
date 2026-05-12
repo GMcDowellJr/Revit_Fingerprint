@@ -31,10 +31,10 @@ def test_text_types_extract_emits_flat_items_only(monkeypatch):
     rec = out["records"][0]
 
     assert "items" in rec and isinstance(rec["items"], list)
-    assert "identity_basis" not in rec
+    assert "identity_basis" in rec and isinstance(rec["identity_basis"].get("items"), list)
     assert "phase2" not in rec
     assert "join_key" not in rec
-    assert "sig_hash" not in rec
+    assert "sig_hash" in rec
     assert all("role" not in it for it in rec["items"])
     assert [it["k"] for it in rec["items"]] == sorted([it["k"] for it in rec["items"]])
     policy = json.load(open("policies/domain_sig_hash_policies.json", "r"))
