@@ -262,6 +262,7 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
             out.setdefault(pk, []).append({"k": k, "v": r.get("v", r.get("item_value")), "q": r.get("q", r.get("item_value_type"))})
         grouped_cache[domain] = out
         return out
+    basis_item_rows: List[Dict[str, str]] = []
     for row in records:
         dom = str(row.get("domain", "")).strip()
         if dom_filter and dom not in dom_filter:
@@ -281,10 +282,18 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
         row["sig_hash"] = "" if sig_hash is None else str(sig_hash)
         if str(row.get("join_key_schema", "")) == "sig_hash_as_join_key.v1":
             row["join_hash"] = row["sig_hash"]
-        row["status"] = str(status)
-        row["status_reasons"] = "|".join(reasons)
+        prior_status = str(row.get("status", "")).strip()
+        if prior_status == "blocked":
+            # Extractor-blocked status is sticky; sig_hash stage cannot upgrade it.
+            pass
+        else:
+            row["status"] = str(status)
+            row["status_reasons"] = "|".join(reasons)
         row["sig_basis_schema"] = str(pol.get("sig_hash_schema") or "")
-        row["sig_basis_keys_used"] = "|".join(sorted([str(it.get("k")) for it in hash_items if isinstance(it.get("k"), str)]))
+        for ordinal, it in enumerate(hash_items):
+            k = it.get("k")
+            if isinstance(k, str) and k:
+                basis_item_rows.append({"record_pk": pk, "domain": dom, "item_key": k, "ordinal": str(ordinal)})
         if sig_hash is not None:
             diag["records_hashed"] += 1
         if status == "blocked":
@@ -293,14 +302,26 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
             diag["records_degraded"] += 1
     if records:
         fieldnames = list(records[0].keys())
-        for extra in ("sig_hash", "sig_basis_schema", "sig_basis_keys_used", "status", "status_reasons"):
+        for extra in ("sig_hash", "sig_basis_schema", "status", "status_reasons"):
             if extra not in fieldnames:
                 fieldnames.append(extra)
+        # Drop sig_basis_keys_used if it was written by a prior run; key traceability
+        # is now in sig_basis_items.csv which is more query-friendly at scale.
+        fieldnames = [f for f in fieldnames if f != "sig_basis_keys_used"]
         with records_csv.open("w", encoding="utf-8", newline="") as f:
             w = csv.DictWriter(f, fieldnames=fieldnames)
             w.writeheader()
             for r in records:
                 w.writerow({k: r.get(k, "") for k in fieldnames})
+    if basis_item_rows:
+        basis_csv = phase0_dir / "sig_basis_items.csv"
+        basis_fields = ["record_pk", "domain", "item_key", "ordinal"]
+        with basis_csv.open("w", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=basis_fields)
+            w.writeheader()
+            for r in basis_item_rows:
+                w.writerow(r)
+        diag["sig_basis_items_written"] = len(basis_item_rows)
     diag["files_processed"] = 1
     diag["domains_without_policy"] = sorted(domains_without)
     if domains_without:
