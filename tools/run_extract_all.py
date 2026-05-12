@@ -256,7 +256,7 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
             if str(r.get("domain", "")).strip() != domain:
                 continue
             pk = str(r.get("record_pk", ""))
-            k = str(r.get("k", "") or r.get("item_key", ""))
+            k = str(r.get("item_key", "") or r.get("k", ""))
             if not pk or not k:
                 continue
             out.setdefault(pk, []).append({"k": k, "v": r.get("v", r.get("item_value")), "q": r.get("q", r.get("item_value_type"))})
@@ -303,6 +303,13 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
                 w.writerow({k: r.get(k, "") for k in fieldnames})
     diag["files_processed"] = 1
     diag["domains_without_policy"] = sorted(domains_without)
+    if domains_without:
+        sys.stderr.write(
+            "[WARN extract_all] sig_hash stage: {} domain(s) have no policy entry — "
+            "sig_hash will be empty for their records: {}\n".format(
+                len(domains_without), ", ".join(sorted(domains_without))
+            )
+        )
     return diag
 
 
@@ -334,8 +341,10 @@ def _ensure_domain_scoped_identity_items(phase0_dir: Path) -> Optional[Path]:
     sentinel = shard_dir / ".complete"
 
     try:
-        if sentinel.is_file() and sentinel.stat().st_mtime >= src.stat().st_mtime:
-            return shard_dir
+        if sentinel.is_file():
+            stored = sentinel.read_text(encoding="utf-8").strip()
+            if stored == str(src.stat().st_mtime):
+                return shard_dir
     except OSError:
         pass
 
@@ -705,11 +714,20 @@ def main() -> None:
             flush=True,
         )
     if "sig_hash" in selected_stages:
-        if "flatten" not in selected_stages:
-            raise SystemExit("sig_hash stage requires flatten stage (records.csv + identity_items.csv).")
+        _records_csv = effective_phase0_dir / "records.csv"
+        _items_csv = effective_phase0_dir / "identity_items.csv"
+        if not _records_csv.is_file() or not _items_csv.is_file():
+            raise SystemExit(
+                "sig_hash stage requires records.csv and identity_items.csv to exist. "
+                "Run the flatten stage first, or include flatten in --stages."
+            )
         sig_pol = _resolve_sig_hash_policy_path(args.sig_hash_policy, out_root)
         if sig_pol is None:
             if args.skip_sig_hash_missing_policy:
+                sys.stderr.write(
+                    "[WARN extract_all] sig_hash stage skipped: no policy file found. "
+                    "sig_hash and join_hash will be empty for all records.\n"
+                )
                 report["notes"].append("sig_hash stage skipped: no policy found")
             else:
                 raise SystemExit("sig_hash stage requested but no policy file found. Use --sig-hash-policy or --skip-sig-hash-missing-policy.")
