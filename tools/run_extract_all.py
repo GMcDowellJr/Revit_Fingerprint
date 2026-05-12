@@ -13,6 +13,11 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from emit_element_dominance import emit_element_dominance
 from extractor import emit_analysis, emit_records
 from bundle_analysis.common import atomic_write_csv, read_csv_rows
