@@ -106,8 +106,6 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         if has:
             if enable_cross_org_template_bundles and r["segment_level"]=="2" and r["governance_role"]=="Template" and not r["client_label"]:
                 pass
-            elif fc >= min_files:
-                r["run_type"]="reference";continue
             else:
                 r["run_type"]="registration";continue
         if fc>=min_files: r["run_type"]="bundle"
