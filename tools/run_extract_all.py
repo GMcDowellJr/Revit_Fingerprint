@@ -25,6 +25,11 @@ from bundle_analysis.reference_bundle import write_sidecar
 from core.sig_hash_policy import load_sig_hash_policies, get_domain_sig_hash_policy
 from core.sig_hash_builder import build_sig_hash_from_policy
 
+try:
+    csv.field_size_limit(sys.maxsize)
+except Exception:
+    pass
+
 SUPPRESSED_DOWNSTREAM_DOMAINS = {"object_styles_imported"}
 
 
@@ -236,18 +241,27 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
     if not records_csv.is_file() or not items_csv.is_file():
         return diag
     records = _read_csv_rows(records_csv)
-    items_rows = _read_csv_rows(items_csv)
-    grouped: Dict[str, List[Dict[str, Any]]] = {}
-    for r in items_rows:
-        pk = str(r.get("record_pk", ""))
-        k = str(r.get("k", "") or r.get("item_key", ""))
-        if not pk or not k:
-            continue
-        grouped.setdefault(pk, []).append({
-            "k": k,
-            "v": r.get("v", r.get("item_value")),
-            "q": r.get("q", r.get("item_value_type")),
-        })
+    shard_dir = _ensure_domain_scoped_identity_items(phase0_dir)
+    grouped_cache: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+
+    def _load_items_for_domain(domain: str) -> Dict[str, List[Dict[str, Any]]]:
+        if domain in grouped_cache:
+            return grouped_cache[domain]
+        out: Dict[str, List[Dict[str, Any]]] = {}
+        src = (shard_dir / f"{domain}.csv") if shard_dir is not None else items_csv
+        if not src.is_file():
+            grouped_cache[domain] = out
+            return out
+        for r in _iter_csv_rows(src):
+            if str(r.get("domain", "")).strip() != domain:
+                continue
+            pk = str(r.get("record_pk", ""))
+            k = str(r.get("k", "") or r.get("item_key", ""))
+            if not pk or not k:
+                continue
+            out.setdefault(pk, []).append({"k": k, "v": r.get("v", r.get("item_value")), "q": r.get("q", r.get("item_value_type"))})
+        grouped_cache[domain] = out
+        return out
     for row in records:
         dom = str(row.get("domain", "")).strip()
         if dom_filter and dom not in dom_filter:
@@ -257,7 +271,7 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
             domains_without.add(dom)
             continue
         pk = str(row.get("record_pk", ""))
-        rec_items = grouped.get(pk, [])
+        rec_items = _load_items_for_domain(dom).get(pk, [])
         diag["records_processed"] += 1
         sig_hash, status, reasons, hash_items = build_sig_hash_from_policy(
             domain_policy=pol,
@@ -300,10 +314,14 @@ def _run(cmd: List[str], *, env: Dict[str, str]) -> None:
 
 
 def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
-    import csv
-
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         return [{str(k): "" if v is None else str(v) for k, v in row.items()} for row in csv.DictReader(f)]
+
+
+def _iter_csv_rows(path: Path):
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            yield {str(k): "" if v is None else str(v) for k, v in row.items()}
 
 
 def _ensure_domain_scoped_identity_items(phase0_dir: Path) -> Optional[Path]:
@@ -356,17 +374,17 @@ def _validate_line_pattern_synthetic_norm_hash(phase0_dir: Path) -> None:
     items_csv = phase0_dir / "identity_items.csv"
     if not records_csv.is_file() or not items_csv.is_file():
         raise SystemExit("flatten/enrichment stage did not produce records.csv and identity_items.csv before apply")
-    rec_rows = _read_csv_rows(records_csv)
-    line_pattern_pks = [r.get("record_pk", "") for r in rec_rows if str(r.get("domain", "")) == "line_patterns"]
+    line_pattern_pks: List[str] = []
+    for r in _iter_csv_rows(records_csv):
+        if str(r.get("domain", "")) == "line_patterns":
+            line_pattern_pks.append(r.get("record_pk", ""))
     if not line_pattern_pks:
         return
-    item_rows = _read_csv_rows(items_csv)
-    key_name = "item_key" if item_rows and "item_key" in item_rows[0] else "k"
-    pks_with_norm = {
-        str(r.get("record_pk", ""))
-        for r in item_rows
-        if str(r.get("domain", "")) == "line_patterns" and str(r.get(key_name, "")) == "line_pattern.segments_norm_hash"
-    }
+    pks_with_norm: set = set()
+    for r in _iter_csv_rows(items_csv):
+        key = str(r.get("item_key", "") or r.get("k", ""))
+        if str(r.get("domain", "")) == "line_patterns" and key == "line_pattern.segments_norm_hash":
+            pks_with_norm.add(str(r.get("record_pk", "")))
     missing = [pk for pk in line_pattern_pks if pk not in pks_with_norm]
     if missing:
         sample = ",".join(missing[:10])
