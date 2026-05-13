@@ -21,8 +21,10 @@ def _stratified_sample(records, items, stratify_key, sample_size, seed):
 
     Looks up stratify_key from items to build a pk->value map, then takes
     ceil(sample_size / n_groups) records from each group using the same
-    deterministic hash-rank as _sample_domain_records.  Falls back to flat
-    sampling when the key has no item coverage.
+    deterministic hash-rank as _sample_domain_records.  After the first pass,
+    tops up to sample_size from groups with surplus records, then from ungrouped
+    records, so the total always reaches sample_size when enough records exist.
+    Falls back to flat sampling when the key has no item coverage.
     """
     import math
     if not stratify_key or sample_size <= 0 or len(records) <= sample_size:
@@ -54,12 +56,22 @@ def _stratified_sample(records, items, stratify_key, sample_size, seed):
         return _sample_domain_records(records, sample_size, seed)
 
     per_group = max(1, math.ceil(sample_size / n_groups))
+    first_pass: Dict[str, List] = {}
     out: List = []
     for val in sorted(groups.keys()):
-        out.extend(_sample_domain_records(groups[val], per_group, seed))
+        sampled = _sample_domain_records(groups[val], per_group, seed)
+        first_pass[val] = sampled
+        out.extend(sampled)
 
-    if len(out) < sample_size and ungrouped:
-        out.extend(_sample_domain_records(ungrouped, sample_size - len(out), seed))
+    # Top up to sample_size: groups with more records than per_group contribute
+    # their surplus first (preserving balanced representation), then ungrouped.
+    if len(out) < sample_size:
+        surplus: List = []
+        for val in sorted(groups.keys()):
+            all_ranked = _sample_domain_records(groups[val], len(groups[val]), seed)
+            surplus.extend(all_ranked[len(first_pass[val]):])
+        surplus.extend(_sample_domain_records(ungrouped, len(ungrouped), seed))
+        out.extend(surplus[:sample_size - len(out)])
 
     return out[:sample_size]
 

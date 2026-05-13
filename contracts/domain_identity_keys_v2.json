@@ -517,14 +517,20 @@
     "materials": {
       "domain_family": "materials",
       "allowed_keys": [
+        "material.graphics_sig_hash_v2",
         "material.uid"
       ],
       "required_keys": [
-        "material.uid"
+        "material.graphics_sig_hash_v2"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
-      }
+      },
+      "notes": [
+        "sig_hash anchors on material.graphics_sig_hash_v2 (visual/material properties).",
+        "material.uid is for record traceability only — not a sig or join anchor.",
+        "Consistent with domain_join_key_policies.json which requires graphics_sig_hash_v2."
+      ]
     },
     "object_styles_analytical": {
       "domain_family": "object_styles",
@@ -748,7 +754,82 @@
       ],
       "minima": {
         "block_if_any_required_not_ok": true
-      }
+      },
+      "notes": [
+        "Deprecated aggregate domain. Extractor emits view_category_overrides_model and",
+        "view_category_overrides_annotation. This entry retained for legacy compatibility."
+      ]
+    },
+    "view_category_overrides_annotation": {
+      "domain_family": "view_category_overrides",
+      "allowed_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash",
+        "vco.projection.line_weight",
+        "vco.projection.color.rgb",
+        "vco.projection.pattern_ref.sig_hash",
+        "vco.projection.fill_pattern_ref.sig_hash",
+        "vco.projection.fill_color.rgb",
+        "vco.halftone",
+        "vco.transparency",
+        "vco.include_controlled",
+        "vco.vg_category_type",
+        "vco.context_type",
+        "vco.template_name",
+        "vco.template_element_id",
+        "vco.template_unique_id"
+      ],
+      "required_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Domain family: view_category_overrides. Annotation category partition.",
+        "Cut properties not applicable to annotation categories — omitted from allowed_keys."
+      ]
+    },
+    "view_category_overrides_model": {
+      "domain_family": "view_category_overrides",
+      "allowed_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash",
+        "vco.projection.line_weight",
+        "vco.projection.color.rgb",
+        "vco.projection.pattern_ref.sig_hash",
+        "vco.projection.fill_pattern_ref.sig_hash",
+        "vco.projection.fill_color.rgb",
+        "vco.cut.line_weight",
+        "vco.cut.color.rgb",
+        "vco.cut.pattern_ref.sig_hash",
+        "vco.cut.fill_pattern_ref.sig_hash",
+        "vco.cut.fill_color.rgb",
+        "vco.halftone",
+        "vco.transparency",
+        "vco.include_controlled",
+        "vco.vg_category_type",
+        "vco.context_type",
+        "vco.template_name",
+        "vco.template_element_id",
+        "vco.template_unique_id"
+      ],
+      "required_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Domain family: view_category_overrides. Model category partition.",
+        "Both projection and cut properties applicable for model categories."
+      ]
     },
     "view_filter_applications_view_templates": {
       "domain_family": "view_filter_applications_view_templates",
