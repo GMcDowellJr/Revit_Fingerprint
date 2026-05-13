@@ -60,14 +60,18 @@ def _domain_rows(records,items,domain,target):
         out.append((gate,[r for r in rec if r.get('record_pk','').strip() in pks],[it for it in items if it.get('domain')==domain and it.get('record_pk','').strip() in pks]))
     return out
 
-def _run_target(target,args,records,domains,base_domains):
+def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
     rows=[]; candidates={}
-    items=_load_items(Path(args.phase0_dir),target)
+    items=_load_items(phase0_dir,target)
     for domain in domains:
         normalized=normalize_policy_block(base_domains.get(domain,{}))
         req=normalized['required_fields']; opt=normalized['optional_items']; excluded=set(normalized['explicitly_excluded_items']); gates=normalized['gates']
         for gate,dom_records_all,dom_items_all in _domain_rows(records,items,domain,target):
+            if not dom_records_all:
+                continue
             dom_records=_sample_domain_records(dom_records_all,args.sample_size,args.sample_seed)
+            if not dom_records:
+                continue
             sampled={r.get('record_pk','').strip() for r in dom_records}
             dom_items=[it for it in dom_items_all if not sampled or it.get('record_pk','').strip() in sampled]
             raw=_pick_candidate_fields(dom_items,args.max_candidate_fields)
@@ -177,12 +181,14 @@ def main():
     diagnostics=phase0.parent/'diagnostics'; diagnostics.mkdir(parents=True,exist_ok=True)
     all_rows=[];cand_out={}
     for t in targets:
-        rows,cands=_run_target(t,args,records,domains,base_domains);all_rows.extend(rows);cand_out[t]=cands
+        rows,cands=_run_target(t,args,records,domains,base_domains,phase0);all_rows.extend(rows);cand_out[t]=cands
         _write_csv(diagnostics/f'hash_{t}_discovery_exploration.csv',list(rows[0].keys()) if rows else ["domain","discovery_target"],rows)
     if args.out_policy:
         payload={"policy_version":"candidate","governance_status":"discovered_candidate_not_governed","domains":{}}
         for d in domains:
             payload['domains'][d]={"sig_hash_candidates":cand_out.get('sig',{}).get(d,{}),"join_hash_candidates":cand_out.get('join',{}).get(d,{}),"shape_gating":{"gate_key":CATEGORY_GATE_KEY if d=='loaded_family_types' else ""},"notes":["candidate discovery only; not governed contract"]}
-        Path(args.out_policy).write_text(json.dumps(payload,indent=2,sort_keys=True),encoding='utf-8')
+        out_policy = Path(args.out_policy)
+        out_policy.parent.mkdir(parents=True, exist_ok=True)
+        out_policy.write_text(json.dumps(payload,indent=2,sort_keys=True),encoding='utf-8')
 
 if __name__=='__main__': main()

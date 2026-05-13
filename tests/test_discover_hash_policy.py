@@ -95,7 +95,12 @@ def test_phase0_dir_can_be_results_root(tmp_path: Path):
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(results_root),
         '--domains','loaded_family_types','--discovery-target','sig'
     ],cwd=Path(__file__).resolve().parents[1],check=True)
-    assert (results_root/'diagnostics'/'hash_sig_discovery_exploration.csv').exists()
+    out = results_root/'diagnostics'/'hash_sig_discovery_exploration.csv'
+    assert out.exists()
+    with out.open('r', encoding='utf-8', newline='') as f:
+        rows = list(csv.DictReader(f))
+    assert rows
+    assert any(r["status"] != "no_candidates" for r in rows)
 
 
 def test_phase0_dir_auto_resolves_results_records(tmp_path: Path):
@@ -128,3 +133,40 @@ def test_phase0_dir_auto_resolves_records_subfolder(tmp_path: Path):
         '--domains','text_types','--discovery-target','sig'
     ],cwd=Path(__file__).resolve().parents[1],check=True)
     assert (results_root/'diagnostics'/'hash_sig_discovery_exploration.csv').exists()
+
+
+def test_out_policy_creates_parent_directories(tmp_path: Path):
+    phase0 = tmp_path / "results" / "records"
+    _write_csv(phase0/'records.csv',["file_id","domain","record_pk","sig_hash"],[
+        {"file_id":"f1","domain":"text_types","record_pk":"1","sig_hash":"s1"},
+    ])
+    _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
+        {"domain":"text_types","record_pk":"1","item_key":"text_type.font","item_value_type":"str","item_value":"Arial"},
+    ])
+    out_policy = tmp_path / "nested" / "policy" / "hash_candidates.json"
+    subprocess.run([
+        sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
+        '--domains','text_types','--discovery-target','sig','--out-policy',str(out_policy)
+    ],cwd=Path(__file__).resolve().parents[1],check=True)
+    assert out_policy.exists()
+
+
+def test_loaded_family_types_skips_orphan_gate_buckets(tmp_path: Path):
+    phase0 = tmp_path / "results" / "records"
+    _write_csv(phase0/'records.csv',["file_id","domain","record_pk","sig_hash"],[
+        {"file_id":"f1","domain":"loaded_family_types","record_pk":"1","sig_hash":"s1"},
+    ])
+    _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"shape_gate.category","item_value_type":"str","item_value":"Doors"},
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"family.name","item_value_type":"str","item_value":"DoorA"},
+        {"domain":"loaded_family_types","record_pk":"orphan","item_key":"shape_gate.category","item_value_type":"str","item_value":"Windows"},
+        {"domain":"loaded_family_types","record_pk":"orphan","item_key":"family.name","item_value_type":"str","item_value":"WindowOrphan"},
+    ])
+    subprocess.run([
+        sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
+        '--domains','loaded_family_types','--discovery-target','sig'
+    ],cwd=Path(__file__).resolve().parents[1],check=True)
+    with (phase0.parent/'diagnostics'/'hash_sig_discovery_exploration.csv').open('r', encoding='utf-8', newline='') as f:
+        rows = list(csv.DictReader(f))
+    assert rows
+    assert all(r["shape_gate"] != "Windows" for r in rows)
