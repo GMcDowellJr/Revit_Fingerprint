@@ -75,17 +75,51 @@ def _run_target(target,args,records,domains,base_domains):
     return rows,candidates
 
 def main():
-    ap=argparse.ArgumentParser()
-    ap.add_argument('--phase0-dir',default='results/records')
-    ap.add_argument('--policy-json',default=None)
-    ap.add_argument('--base-policy',default=None)
-    ap.add_argument('--out-policy',default=None)
-    ap.add_argument('--domains',default=None)
-    ap.add_argument('--discovery-target',default='both',choices=['join','sig','both'])
-    ap.add_argument('--search-modes',default='greedy,pareto')
-    ap.add_argument('--policy-modes',default='discover,validate,harsh')
-    ap.add_argument('--sample-size',type=int,default=5000);ap.add_argument('--sample-seed',type=int,default=17)
-    ap.add_argument('--max-candidate-fields',type=int,default=64);ap.add_argument('--max-k',type=int,default=4)
+    ap=argparse.ArgumentParser(
+        description=(
+            "Discovery-stage hash candidate analysis over flattened CSVs from phase0 output "
+            "(records/items), not over original export JSON."
+        )
+    )
+    ap.add_argument('--phase0-dir',default='results/records', help='Directory containing flattened CSVs (records.csv + item CSVs).')
+    ap.add_argument(
+        '--policy-json',
+        default=None,
+        help=(
+            "Optional governed policy JSON used as discovery constraints/baseline "
+            "(required/optional/excluded/gates). Most relevant for validate/harsh modes."
+        ),
+    )
+    ap.add_argument(
+        '--base-policy',
+        default=None,
+        help='Fallback policy path if --policy-json is not provided; same schema/intent as --policy-json.',
+    )
+    ap.add_argument(
+        '--out-policy',
+        default=None,
+        help=(
+            "Optional output path for candidate-only policy JSON. "
+            "This is advisory discovery output and not a governed contract."
+        ),
+    )
+    ap.add_argument('--domains',default=None, help='Optional comma-separated domain allow-list.')
+    ap.add_argument('--discovery-target',default='both',choices=['join','sig','both'], help='Which candidate family to explore: join, sig, or both.')
+    ap.add_argument('--search-modes',default='greedy,pareto', help='Comma-separated search engines to run.')
+    ap.add_argument(
+        '--policy-modes',
+        default='discover,validate,harsh',
+        help=(
+            "Comma-separated policy strictness modes: "
+            "discover=free candidate pool, "
+            "validate=required+optional only, "
+            "harsh=required+optional plus discovered candidates."
+        ),
+    )
+    ap.add_argument('--sample-size',type=int,default=5000, help='Per-domain sample cap (0 means no cap).')
+    ap.add_argument('--sample-seed',type=int,default=17, help='Deterministic sampling seed.')
+    ap.add_argument('--max-candidate-fields',type=int,default=64, help='Max discovered candidate fields per domain/gate.')
+    ap.add_argument('--max-k',type=int,default=4, help='Max field subset size for greedy/Pareto evaluation.')
     args=ap.parse_args();args.search_modes=[m.strip() for m in args.search_modes.split(',') if m.strip()];args.policy_modes=[m.strip() for m in args.policy_modes.split(',') if m.strip()]
     phase0=Path(args.phase0_dir);records=_read_csv(phase0/'records.csv' if (phase0/'records.csv').exists() else phase0/'phase0_records.csv')
     domains=sorted({r.get('domain','').strip() for r in records if r.get('domain','').strip()},key=str.lower)
