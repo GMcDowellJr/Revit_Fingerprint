@@ -56,19 +56,34 @@ def _run_target(target,args,records,domains,base_domains):
             idx=build_identity_index(dom_items)
             for pm in args.policy_modes:
                 work=scoped if pm=="discover" else _without_excluded(req+opt if pm=="validate" else req+opt+scoped,excluded)
+                max_k = args.max_k
+                if pm == "validate" and req:
+                    max_k = max(max_k, len(req))
                 for sm in args.search_modes:
                     selected=[];metrics={};status="ok";reason="";frontier=0;fallback=False
                     if not work: status="no_candidates"
                     elif sm=="pareto":
-                        p=_pareto_search_adapter(dom_records,idx,work,{"max_k":args.max_k,"gates":{"required_fields":req,**gates}})
+                        p=_pareto_search_adapter(dom_records,idx,work,{"max_k":max_k,"gates":{"required_fields":req,**gates}})
                         fr=p.get('frontier') if isinstance(p.get('frontier'),list) else [];frontier=len(fr)
+                        if pm == "validate" and req:
+                            fr = [row for row in fr if set(req).issubset(set(str(row.get("keys", "")).split("|")))]
+                            frontier = len(fr)
                         if fr:
                             ch=sorted(fr,key=lambda x:(x.get('collision_rate',1.0),x.get('coverage_gap',1.0),x.get('k_count',99),x.get('keys','')))[0]
                             selected=[x for x in str(ch.get('keys','')).split('|') if x];metrics=ch.get('metrics',{}) if isinstance(ch.get('metrics'),dict) else {}
+                        elif pm == "validate" and req:
+                            selected = list(req)
+                            metrics = score_candidate(dom_records,idx,selected,{"gates":{"required_fields":req,**gates}})
+                            fallback = True
+                            reason = "required_set_fallback"
                         else: status="blocked";reason="no_frontier"
                     else:
-                        g=discover_greedy(dom_records,idx,work,{"max_k":args.max_k,"gates":{"required_fields":req,**gates}})
+                        g=discover_greedy(dom_records,idx,work,{"max_k":max_k,"gates":{"required_fields":req,**gates}})
                         selected=[str(x) for x in g.get('selected_fields',[]) if str(x).strip()];metrics=g.get('metrics',{}) if isinstance(g.get('metrics'),dict) else {}
+                    if pm=="validate" and req and not set(req).issubset(set(selected)):
+                        status="blocked_missing_required"
+                        if not reason:
+                            reason="selected_missing_required"
                     if not metrics and work: metrics=score_candidate(dom_records,idx,selected,{"gates":{"required_fields":req,**gates}})
                     rows.append({"domain":domain,"discovery_target":target,"policy_mode":pm,"search_mode":sm,"status":status,"reason":reason,"selected_fields":"|".join(selected),"coverage":f"{float(metrics.get('coverage',0.0)):.6f}","collision_rate":f"{float(metrics.get('collision_rate',1.0)):.6f}","fragmentation_rate":f"{float(metrics.get('fragmentation_rate',1.0)):.6f}","records_total":str(int(metrics.get('records_total',0) or 0)),"records_covered":str(int(metrics.get('records_covered',0) or 0)),"collision_records":str(int(metrics.get('collision_records',0) or 0)),"signature_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="sig" else "","join_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="join" else "","frontier_size":str(frontier),"fallback_used":"true" if fallback else "false","shape_gate":gate})
             candidates.setdefault(domain,{})[gate]=scoped

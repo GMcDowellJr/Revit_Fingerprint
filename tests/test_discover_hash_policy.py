@@ -30,3 +30,53 @@ def test_discover_hash_policy_join_and_sig(tmp_path: Path):
     assert rows
     assert all(r['discovery_target']=='sig' for r in rows)
     assert all(r['shape_gate'] in ('Doors','Windows') for r in rows)
+
+
+def test_validate_marks_blocked_when_required_fields_missing_from_selected(tmp_path: Path):
+    phase0 = tmp_path / 'Results_v21' / 'phase0_v21'
+    _write_csv(phase0/'records.csv',["file_id","domain","record_pk","sig_hash"],[
+        {"file_id":"f1","domain":"text_types","record_pk":"1","sig_hash":"s1"},
+    ])
+    _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
+        {"domain":"text_types","record_pk":"1","item_key":"text_type.font","item_value_type":"str","item_value":"Arial"},
+    ])
+    policy = tmp_path / "policy.json"
+    policy.write_text(
+        '{"domains":{"text_types":{"required_items":["text_type.font","text_type.size_in"],"optional_items":[],"explicitly_excluded_items":[]}}}',
+        encoding="utf-8",
+    )
+    subprocess.run([
+        sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
+        '--domains','text_types','--policy-json',str(policy),'--policy-modes','validate','--search-modes','greedy'
+    ],cwd=Path(__file__).resolve().parents[1],check=True)
+    with (phase0.parent/'diagnostics'/'hash_sig_discovery_exploration.csv').open('r', encoding='utf-8', newline='') as f:
+        rows=list(csv.DictReader(f))
+    assert rows
+    assert rows[0]["status"] == "blocked_missing_required"
+
+
+def test_validate_pareto_auto_bumps_max_k_to_required_count(tmp_path: Path):
+    phase0 = tmp_path / 'Results_v21' / 'phase0_v21'
+    _write_csv(phase0/'records.csv',["file_id","domain","record_pk","sig_hash"],[
+        {"file_id":"f1","domain":"text_types","record_pk":"1","sig_hash":"s1"},
+    ])
+    _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
+        {"domain":"text_types","record_pk":"1","item_key":"text_type.font","item_value_type":"str","item_value":"Arial"},
+        {"domain":"text_types","record_pk":"1","item_key":"text_type.size_in","item_value_type":"num","item_value":"0.1"},
+        {"domain":"text_types","record_pk":"1","item_key":"text_type.bold","item_value_type":"bool","item_value":"FALSE"},
+        {"domain":"text_types","record_pk":"1","item_key":"text_type.italic","item_value_type":"bool","item_value":"FALSE"},
+        {"domain":"text_types","record_pk":"1","item_key":"text_type.underline","item_value_type":"bool","item_value":"FALSE"},
+    ])
+    policy = tmp_path / "policy.json"
+    policy.write_text(
+        '{"domains":{"text_types":{"required_items":["text_type.font","text_type.size_in","text_type.bold","text_type.italic","text_type.underline"],"optional_items":[],"explicitly_excluded_items":[]}}}',
+        encoding="utf-8",
+    )
+    subprocess.run([
+        sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
+        '--domains','text_types','--policy-json',str(policy),'--policy-modes','validate','--search-modes','pareto','--max-k','2'
+    ],cwd=Path(__file__).resolve().parents[1],check=True)
+    with (phase0.parent/'diagnostics'/'hash_sig_discovery_exploration.csv').open('r', encoding='utf-8', newline='') as f:
+        rows=list(csv.DictReader(f))
+    assert rows
+    assert rows[0]["status"] == "ok"
