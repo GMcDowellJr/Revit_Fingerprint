@@ -600,6 +600,7 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
     item_rows: List[Dict[str, str]] = []
     label_rows: List[Dict[str, str]] = []
     reason_rows: List[Dict[str, str]] = []
+    param_evidence_rows: List[Dict[str, str]] = []
     governance_rules = _load_governance_role_rules()
 
     for _, primary, secondary in _iter_export_files(exports_dir):
@@ -710,6 +711,26 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                             "item_role": "",
                         })
 
+                for pr in rec.get("parameter_rows") if isinstance(rec.get("parameter_rows"), list) else []:
+                    if not isinstance(pr, dict):
+                        continue
+                    param_evidence_rows.append({
+                        "schema_version": SCHEMA_VERSION,
+                        "export_run_id": export_run_id,
+                        "domain": domain,
+                        "record_pk": record_pk,
+                        "param_index": _safe_str(pr.get("param_index")),
+                        "lftp.key": _safe_str(pr.get("lftp.key")),
+                        "lftp.name": _safe_str(pr.get("lftp.name")),
+                        "lftp.guid": _safe_str(pr.get("lftp.guid")),
+                        "lftp.id": _safe_str(pr.get("lftp.id")),
+                        "lftp.id_sign": _safe_str(pr.get("lftp.id_sign")),
+                        "lftp.data_type": _safe_str(pr.get("lftp.data_type")),
+                        "lftp.binding_scope": _safe_str(pr.get("lftp.binding_scope")),
+                        "lftp.semantic_role": _safe_str(pr.get("lftp.semantic_role")),
+                        "lftp.source": _safe_str(pr.get("lftp.source")),
+                    })
+
                 comps = (rec.get("label") or {}).get("components") if isinstance(rec.get("label"), dict) else None
                 if isinstance(comps, dict):
                     for order, key in enumerate(sorted(comps.keys(), key=str)):
@@ -790,6 +811,13 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
     _write_csv(out_dir / "status_reasons.csv", [
         "schema_version", "export_run_id", "domain", "record_pk", "reason_code", "reason_detail",
     ], _sort_rows(reason_rows, ["export_run_id", "domain", "record_pk", "reason_code"]))
+
+    if param_evidence_rows:
+        _write_csv(out_dir / "parameter_rows.csv", [
+            "schema_version", "export_run_id", "domain", "record_pk", "param_index",
+            "lftp.key", "lftp.name", "lftp.guid", "lftp.id", "lftp.id_sign",
+            "lftp.data_type", "lftp.binding_scope", "lftp.semantic_role", "lftp.source",
+        ], _sort_rows(param_evidence_rows, ["export_run_id", "domain", "record_pk", "param_index"]))
     return meta_rows, record_rows
 
 

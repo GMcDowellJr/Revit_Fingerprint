@@ -13,7 +13,7 @@ except ModuleNotFoundError:
     from join_key_discovery.greedy import discover_greedy
 
 TARGET_FILES={"sig":["signature_items.csv","identity_items.csv","phase0_identity_items.csv"],"join":["join_items.csv","identity_items.csv","phase0_identity_items.csv"]}
-CATEGORY_GATE_KEY="shape_gate.category"
+CATEGORY_GATE_KEY="lft.shape_gate.category"
 
 
 def _resolve_phase0_dir(path: Path) -> Path:

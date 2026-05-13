@@ -16,10 +16,10 @@ def test_discover_hash_policy_join_and_sig(tmp_path: Path):
         {"file_id":"f1","domain":"loaded_family_types","record_pk":"2","sig_hash":"s2"},
     ])
     _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
-        {"domain":"loaded_family_types","record_pk":"1","item_key":"shape_gate.category","item_value_type":"str","item_value":"Doors"},
-        {"domain":"loaded_family_types","record_pk":"1","item_key":"family.name","item_value_type":"str","item_value":"A"},
-        {"domain":"loaded_family_types","record_pk":"2","item_key":"shape_gate.category","item_value_type":"str","item_value":"Windows"},
-        {"domain":"loaded_family_types","record_pk":"2","item_key":"family.name","item_value_type":"str","item_value":"B"},
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"lft.shape_gate.category","item_value_type":"str","item_value":"Doors"},
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"lft.family_name","item_value_type":"str","item_value":"A"},
+        {"domain":"loaded_family_types","record_pk":"2","item_key":"lft.shape_gate.category","item_value_type":"str","item_value":"Windows"},
+        {"domain":"loaded_family_types","record_pk":"2","item_key":"lft.family_name","item_value_type":"str","item_value":"B"},
     ])
     subprocess.run([sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),'--domains','loaded_family_types','--discovery-target','both'],cwd=Path(__file__).resolve().parents[1],check=True)
     diag = phase0.parent/'diagnostics'
@@ -89,7 +89,7 @@ def test_phase0_dir_can_be_results_root(tmp_path: Path):
         {"file_id":"f1","domain":"loaded_family_types","record_pk":"1","sig_hash":"s1"},
     ])
     _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
-        {"domain":"loaded_family_types","record_pk":"1","item_key":"shape_gate.category","item_value_type":"str","item_value":"Doors"},
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"lft.shape_gate.category","item_value_type":"str","item_value":"Doors"},
     ])
     subprocess.run([
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(results_root),
@@ -110,7 +110,7 @@ def test_phase0_dir_auto_resolves_results_records(tmp_path: Path):
         {"file_id":"f1","domain":"loaded_family_types","record_pk":"1","sig_hash":"s1"},
     ])
     _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
-        {"domain":"loaded_family_types","record_pk":"1","item_key":"shape_gate.category","item_value_type":"str","item_value":"Doors"},
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"lft.shape_gate.category","item_value_type":"str","item_value":"Doors"},
     ])
     subprocess.run([
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(repo_like_root),
@@ -157,10 +157,10 @@ def test_loaded_family_types_skips_orphan_gate_buckets(tmp_path: Path):
         {"file_id":"f1","domain":"loaded_family_types","record_pk":"1","sig_hash":"s1"},
     ])
     _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
-        {"domain":"loaded_family_types","record_pk":"1","item_key":"shape_gate.category","item_value_type":"str","item_value":"Doors"},
-        {"domain":"loaded_family_types","record_pk":"1","item_key":"family.name","item_value_type":"str","item_value":"DoorA"},
-        {"domain":"loaded_family_types","record_pk":"orphan","item_key":"shape_gate.category","item_value_type":"str","item_value":"Windows"},
-        {"domain":"loaded_family_types","record_pk":"orphan","item_key":"family.name","item_value_type":"str","item_value":"WindowOrphan"},
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"lft.shape_gate.category","item_value_type":"str","item_value":"Doors"},
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"lft.family_name","item_value_type":"str","item_value":"DoorA"},
+        {"domain":"loaded_family_types","record_pk":"orphan","item_key":"lft.shape_gate.category","item_value_type":"str","item_value":"Windows"},
+        {"domain":"loaded_family_types","record_pk":"orphan","item_key":"lft.family_name","item_value_type":"str","item_value":"WindowOrphan"},
     ])
     subprocess.run([
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
@@ -179,9 +179,9 @@ def test_loaded_family_types_surfaces_missing_shape_gate_records(tmp_path: Path)
         {"file_id":"f1","domain":"loaded_family_types","record_pk":"2","sig_hash":"s2"},
     ])
     _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
-        {"domain":"loaded_family_types","record_pk":"1","item_key":"shape_gate.category","item_value_type":"str","item_value":"Doors"},
-        {"domain":"loaded_family_types","record_pk":"1","item_key":"family.name","item_value_type":"str","item_value":"DoorA"},
-        {"domain":"loaded_family_types","record_pk":"2","item_key":"family.name","item_value_type":"str","item_value":"UngatedFamily"},
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"lft.shape_gate.category","item_value_type":"str","item_value":"Doors"},
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"lft.family_name","item_value_type":"str","item_value":"DoorA"},
+        {"domain":"loaded_family_types","record_pk":"2","item_key":"lft.family_name","item_value_type":"str","item_value":"UngatedFamily"},
     ])
     subprocess.run([
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),

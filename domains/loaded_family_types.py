@@ -33,6 +33,20 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.collect import collect_types
+from core.record_v2 import (
+    STATUS_OK,
+    STATUS_DEGRADED,
+    ITEM_Q_OK,
+    ITEM_Q_MISSING,
+    ITEM_Q_UNREADABLE,
+    canonicalize_str,
+    canonicalize_int,
+    canonicalize_bool,
+    make_identity_item,
+    serialize_identity_items,
+    build_record_v2,
+)
 
 try:
     from Autodesk.Revit.DB import FamilySymbol, ParameterElement, SharedParameterElement
@@ -103,7 +117,12 @@ def extract(doc, ctx=None):
         return info
 
     try:
-        symbols = list(__import__('core.collect', fromlist=['collect_types']).collect_types(doc, of_class=FamilySymbol, cctx=(ctx or {}).get('_collect') if ctx else None, cache_key='loaded_family_types:FamilySymbol:types'))
+        symbols = list(collect_types(
+            doc,
+            of_class=FamilySymbol,
+            cctx=(ctx or {}).get("_collect") if ctx else None,
+            cache_key="loaded_family_types:FamilySymbol:types",
+        ))
     except Exception:
         symbols = []
     info["raw_count"] = len(symbols)
@@ -117,11 +136,23 @@ def extract(doc, ctx=None):
                 return default
 
         cat = getattr(sym, "Category", None)
-        cat_name = safe_str(_safe_attr(cat, "Name", None)) or "none"
-        cat_id = safe_str(_safe_attr(_safe_attr(cat, "Id", None), "IntegerValue", None)) or ""
+        cat_name_v, cat_name_q = canonicalize_str(_safe_attr(cat, "Name", None))
+        cat_id_v, cat_id_q = canonicalize_int(_safe_attr(_safe_attr(cat, "Id", None), "IntegerValue", None))
+
         fam = _safe_attr(sym, "Family", None)
-        fam_name = safe_str(_safe_attr(fam, "Name", None))
-        type_name = safe_str(_safe_attr(sym, "Name", None))
+        fam_name_v, fam_name_q = canonicalize_str(_safe_attr(fam, "Name", None))
+        type_name_v, type_name_q = canonicalize_str(_safe_attr(sym, "Name", None))
+
+        fam_is_in_place_v, fam_is_in_place_q = canonicalize_bool(_safe_attr(fam, "IsInPlace", None))
+        fam_is_editable_v, fam_is_editable_q = canonicalize_bool(_safe_attr(fam, "IsEditable", None))
+
+        fam_symbol_count_raw = None
+        try:
+            sym_ids = fam.GetFamilySymbolIds() if fam is not None else None
+            fam_symbol_count_raw = len(list(sym_ids)) if sym_ids is not None else None
+        except Exception:
+            pass
+        fam_symbol_count_v, fam_symbol_count_q = canonicalize_int(fam_symbol_count_raw)
 
         prov_rows = []
         for p in list(getattr(sym, "Parameters", []) or []):
@@ -129,61 +160,112 @@ def extract(doc, ctx=None):
             guid = _safe_guid_str(p)
             pid = _param_id_int(p)
             scope = _binding_scope(doc, p, guid, pid)
-            dtype = safe_str(getattr(getattr(p, "Definition", None), "ParameterType", None) or getattr(getattr(p, "Definition", None), "GetDataType", lambda: None)())
-            key = ("guid:%s" % guid.lower()) if guid else (("bip:%s" % pid) if pid < 0 else ("name:%s|dt:%s|scope:%s" % (pname, dtype, scope)))
+            dtype = safe_str(
+                getattr(getattr(p, "Definition", None), "ParameterType", None)
+                or getattr(getattr(p, "Definition", None), "GetDataType", lambda: None)()
+            )
+            key = (
+                ("guid:%s" % guid.lower()) if guid
+                else (("bip:%s" % pid) if pid < 0
+                else ("name:%s|dt:%s|scope:%s" % (pname, dtype, scope)))
+            )
             role = _semantic_role(pname, scope)
             prov_rows.append({
-                "param.name": pname,
-                "param.key": key,
-                "param.guid": guid or None,
-                "param.id": pid,
-                "param.id_sign": "negative" if pid < 0 else ("positive" if pid > 0 else "zero"),
-                "param.data_type": dtype,
-                "param.binding_scope": scope,
-                "param.semantic_role": role,
-                "param.source": "type_parameter",
-                "param.value_preview": safe_str(getattr(p, "AsValueString", lambda: None)() or getattr(p, "AsString", lambda: None)()),
+                "lftp.key": key,
+                "lftp.name": pname,
+                "lftp.guid": guid or None,
+                "lftp.id": pid,
+                "lftp.id_sign": "negative" if pid < 0 else ("positive" if pid > 0 else "zero"),
+                "lftp.data_type": dtype,
+                "lftp.binding_scope": scope,
+                "lftp.semantic_role": role,
+                "lftp.source": "type_parameter",
             })
 
-        prov_rows = sorted(prov_rows, key=lambda r: (r["param.key"], r["param.name"]))
-        schema_basis = ["%s|%s|%s|%s" % (r["param.key"], r["param.binding_scope"], r["param.semantic_role"], r["param.source"]) for r in prov_rows]
+        prov_rows = sorted(prov_rows, key=lambda r: (r["lftp.key"], r["lftp.name"]))
+        schema_basis = [
+            "%s|%s|%s|%s" % (r["lftp.key"], r["lftp.binding_scope"], r["lftp.semantic_role"], r["lftp.source"])
+            for r in prov_rows
+        ]
         type_schema_hash = make_hash(schema_basis)
+        type_schema_hash_v, type_schema_hash_q = canonicalize_str(type_schema_hash)
+        type_param_count_v, type_param_count_q = canonicalize_int(len(prov_rows))
 
-        semantic_basis = [
-            "shape_gate.category=%s|%s" % (cat_name, cat_id),
-            "family.name=%s" % fam_name,
-            "family.is_editable=%s" % safe_str(getattr(fam, "IsEditable", None)).lower(),
-            "family.is_in_place=%s" % safe_str(getattr(fam, "IsInPlace", None)).lower(),
-            "family.symbol_count=%s" % safe_str(getattr(fam, "GetFamilySymbolIds", lambda: [])() and len(list(fam.GetFamilySymbolIds()))),
-            "type.name=%s" % type_name,
-            "type.parameter_schema_hash=%s" % type_schema_hash,
-        ] + ["prov:%s" % s for s in schema_basis if "|operational|" not in s]
-        sig_hash = make_hash(semantic_basis)
+        identity_items = [
+            make_identity_item("lft.shape_gate.category", cat_name_v, cat_name_q),
+            make_identity_item("lft.shape_gate.category_id", cat_id_v, cat_id_q),
+            make_identity_item("lft.family_name", fam_name_v, fam_name_q),
+            make_identity_item("lft.type_name", type_name_v, type_name_q),
+            make_identity_item("lft.type_parameter_schema_hash", type_schema_hash_v, type_schema_hash_q),
+            make_identity_item("lft.type_parameter_count", type_param_count_v, type_param_count_q),
+            make_identity_item("lft.family_is_in_place", fam_is_in_place_v, fam_is_in_place_q),
+            make_identity_item("lft.family_is_editable", fam_is_editable_v, fam_is_editable_q),
+            make_identity_item("lft.family_symbol_count", fam_symbol_count_v, fam_symbol_count_q),
+        ]
 
-        rec = {
-            "record_id": "%s|%s|%s|%s" % (cat_name, fam_name, type_name, type_schema_hash),
-            "category": cat_name,
-            "family_name": fam_name,
-            "type_name": type_name,
-            "type_parameter_schema_hash": type_schema_hash,
-            "signature_hash_v2": sig_hash,
-            "identity_items": [
-                {"k": "shape_gate.category", "v": cat_name},
-                {"k": "shape_gate.category_id", "v": cat_id},
-                {"k": "family.name", "v": fam_name},
-                {"k": "type.name", "v": type_name},
-                {"k": "type.parameter_schema_hash", "v": type_schema_hash},
-            ],
-            "join_items": [{"k": "type.parameter_key", "v": r["param.key"]} for r in prov_rows],
-            "validation_items": [{"k": "param.provenance", "v": r} for r in prov_rows],
-            "debug_items": [{"k": "param.value_preview", "v": r["param.value_preview"], "param_key": r["param.key"]} for r in prov_rows if r.get("param.value_preview")],
+        status_reasons = []
+        any_incomplete = False
+        for it in identity_items:
+            q = it.get("q")
+            if q != ITEM_Q_OK:
+                any_incomplete = True
+                status_reasons.append("identity.incomplete:{}:{}".format(q, it.get("k")))
+        status = STATUS_OK if not any_incomplete else STATUS_DEGRADED
+
+        preimage = serialize_identity_items(identity_items)
+        sig_hash = make_hash(preimage)
+
+        label_parts = []
+        if fam_name_v:
+            label_parts.append(fam_name_v)
+        if type_name_v:
+            label_parts.append(type_name_v)
+        label_display = " : ".join(label_parts) if label_parts else "loaded_family_type"
+        label_quality = "human" if (fam_name_v and type_name_v) else "placeholder_missing"
+
+        label = {
+            "display": label_display,
+            "quality": label_quality,
+            "provenance": "revit.FamilySymbol.Family.Name+Name",
+            "components": {
+                "category": cat_name_v or "",
+                "family_name": fam_name_v or "",
+                "type_name": type_name_v or "",
+            },
         }
+
+        record_id = "%s|%s|%s|%s" % (
+            cat_name_v or "none",
+            fam_name_v or "none",
+            type_name_v or "none",
+            type_schema_hash,
+        )
+        required_qs = [cat_name_q, fam_name_q, type_name_q]
+
+        rec = build_record_v2(
+            domain=DOMAIN_NAME,
+            record_id=record_id,
+            record_id_alg="loaded_family_types_composite_v1",
+            record_id_scope="file_local",
+            status=status,
+            status_reasons=sorted(set(status_reasons)),
+            sig_hash=sig_hash,
+            identity_items=identity_items,
+            required_qs=required_qs,
+            label=label,
+        )
+
+        rec["parameter_rows"] = [
+            dict({"param_index": i}, **r)
+            for i, r in enumerate(prov_rows)
+        ]
+
         info["records"].append(rec)
         info["signature_hashes_v2"].append(sig_hash)
-        category_sigs[cat_name].append(sig_hash)
+        category_sigs[cat_name_v or "none"].append(sig_hash)
 
     info["count"] = len(info["records"])
     info["signature_hashes_v2"].sort()
     info["category_hashes"] = {k: make_hash(sorted(v)) for k, v in sorted(category_sigs.items())}
-    info["hash_v2"] = make_hash(info["signature_hashes_v2"])
+    info["hash_v2"] = make_hash(info["signature_hashes_v2"]) if info["signature_hashes_v2"] else None
     return info
