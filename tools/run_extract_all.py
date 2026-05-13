@@ -775,12 +775,14 @@ def main() -> None:
             report["commands"].append({"stage": "sig_hash", "policy": str(sig_pol), "out": str(effective_phase0_dir), "diagnostics": str(diag_path)})
 
     if "discover" in selected_stages:
-        print("[extract_all] Stage discover (T1): exploring join policy candidates (discover/validate/harsh CSVs)...", flush=True)
+        print("[extract_all] Stage discover (T1): exploring join/sig hash policy candidates...", flush=True)
         cmd_discover = [
             sys.executable,
-            "tools/discover_join_policy.py",
+            "tools/discover_hash_policy.py",
             "--phase0-dir",
             str(effective_phase0_dir),
+            "--discovery-target",
+            "both",
             "--search-modes",
             "greedy,pareto",
             "--policy-modes",
