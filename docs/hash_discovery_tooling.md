@@ -46,5 +46,6 @@ If omitted, discovery runs unconstrained except for built-in behavior (such as `
 For `loaded_family_types`, discovery is partitioned by `shape_gate.category`; candidates are discovered per gate to prevent global cross-category key nomination.
 `--phase0-dir` may point either to:
 - the direct phase0 folder (e.g., `Results_v21/phase0_v21`), or
+- a results root containing `records/records.csv` (e.g., `.../compact/results`),
 - the `Results_v21` root (tool will resolve `phase0_v21/` automatically when present).
 - a repo/workspace root where pipeline outputs are under `results/records/` (tool resolves that automatically).

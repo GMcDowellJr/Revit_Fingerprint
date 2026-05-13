@@ -112,3 +112,19 @@ def test_phase0_dir_auto_resolves_results_records(tmp_path: Path):
         '--domains','loaded_family_types','--discovery-target','sig'
     ],cwd=Path(__file__).resolve().parents[1],check=True)
     assert (repo_like_root/'results'/'diagnostics'/'hash_sig_discovery_exploration.csv').exists()
+
+
+def test_phase0_dir_auto_resolves_records_subfolder(tmp_path: Path):
+    results_root = tmp_path / "compact" / "results"
+    phase0 = results_root / "records"
+    _write_csv(phase0/'records.csv',["file_id","domain","record_pk","sig_hash"],[
+        {"file_id":"f1","domain":"text_types","record_pk":"1","sig_hash":"s1"},
+    ])
+    _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
+        {"domain":"text_types","record_pk":"1","item_key":"text_type.font","item_value_type":"str","item_value":"Arial"},
+    ])
+    subprocess.run([
+        sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(results_root),
+        '--domains','text_types','--discovery-target','sig'
+    ],cwd=Path(__file__).resolve().parents[1],check=True)
+    assert (results_root/'diagnostics'/'hash_sig_discovery_exploration.csv').exists()

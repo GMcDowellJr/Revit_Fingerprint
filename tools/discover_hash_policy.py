@@ -25,6 +25,9 @@ def _resolve_phase0_dir(path: Path) -> Path:
     """
     if (path / "records.csv").exists():
         return path
+    records_dir = path / "records"
+    if (records_dir / "records.csv").exists():
+        return records_dir
     results_records = path / "results" / "records"
     if (results_records / "records.csv").exists():
         return results_records
@@ -114,7 +117,7 @@ def main():
             "(records/items), not over original export JSON."
         )
     )
-    ap.add_argument('--phase0-dir',default='results/records', help='Phase0 directory containing records.csv (also auto-resolves Results_v21/phase0_v21 and results/records).')
+    ap.add_argument('--phase0-dir',default='results/records', help='Phase0 directory containing records.csv (also auto-resolves <root>/records, Results_v21/phase0_v21, and <root>/results/records).')
     ap.add_argument(
         '--policy-json',
         default=None,
