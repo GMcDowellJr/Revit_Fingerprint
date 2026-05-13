@@ -6,7 +6,8 @@
 It does **not** read the original fingerprint/export JSON files directly.
 
 Expected inputs under `--phase0-dir`:
-- `records.csv` (or legacy `phase0_records.csv`)
+- Canonical: `records.csv`
+- Legacy fallback: `phase0_records.csv`
 - item tables used per target:
   - `sig`: `signature_items.csv` -> fallback `identity_items.csv` -> fallback `phase0_identity_items.csv`
   - `join`: `join_items.csv` -> fallback `identity_items.csv` -> fallback `phase0_identity_items.csv`
@@ -43,3 +44,6 @@ If omitted, discovery runs unconstrained except for built-in behavior (such as `
 
 ## Gating behavior (`loaded_family_types`)
 For `loaded_family_types`, discovery is partitioned by `shape_gate.category`; candidates are discovered per gate to prevent global cross-category key nomination.
+`--phase0-dir` may point either to:
+- the direct phase0 folder (e.g., `Results_v21/phase0_v21`), or
+- the `Results_v21` root (tool will resolve `phase0_v21/` automatically when present).

@@ -80,3 +80,19 @@ def test_validate_pareto_auto_bumps_max_k_to_required_count(tmp_path: Path):
         rows=list(csv.DictReader(f))
     assert rows
     assert rows[0]["status"] == "ok"
+
+
+def test_phase0_dir_can_be_results_root(tmp_path: Path):
+    results_root = tmp_path / "Results_v21"
+    phase0 = results_root / "phase0_v21"
+    _write_csv(phase0/'records.csv',["file_id","domain","record_pk","sig_hash"],[
+        {"file_id":"f1","domain":"loaded_family_types","record_pk":"1","sig_hash":"s1"},
+    ])
+    _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"shape_gate.category","item_value_type":"str","item_value":"Doors"},
+    ])
+    subprocess.run([
+        sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(results_root),
+        '--domains','loaded_family_types','--discovery-target','sig'
+    ],cwd=Path(__file__).resolve().parents[1],check=True)
+    assert (results_root/'diagnostics'/'hash_sig_discovery_exploration.csv').exists()

@@ -15,6 +15,20 @@ except ModuleNotFoundError:
 TARGET_FILES={"sig":["signature_items.csv","identity_items.csv","phase0_identity_items.csv"],"join":["join_items.csv","identity_items.csv","phase0_identity_items.csv"]}
 CATEGORY_GATE_KEY="shape_gate.category"
 
+
+def _resolve_phase0_dir(path: Path) -> Path:
+    """
+    Accept either:
+      - direct phase0 folder (contains records.csv), or
+      - Results_v21 root (contains phase0_v21/records.csv).
+    """
+    if (path / "records.csv").exists():
+        return path
+    nested = path / "phase0_v21"
+    if (nested / "records.csv").exists():
+        return nested
+    return path
+
 def _load_items(phase0:Path,target:str)->List[Dict[str,str]]:
     for name in TARGET_FILES[target]:
         p=phase0/name
@@ -96,7 +110,7 @@ def main():
             "(records/items), not over original export JSON."
         )
     )
-    ap.add_argument('--phase0-dir',default='results/records', help='Directory containing flattened CSVs (records.csv + item CSVs).')
+    ap.add_argument('--phase0-dir',default='results/records', help='Phase0 directory containing records.csv (or Results_v21 root containing phase0_v21/records.csv).')
     ap.add_argument(
         '--policy-json',
         default=None,
@@ -136,7 +150,15 @@ def main():
     ap.add_argument('--max-candidate-fields',type=int,default=64, help='Max discovered candidate fields per domain/gate.')
     ap.add_argument('--max-k',type=int,default=4, help='Max field subset size for greedy/Pareto evaluation.')
     args=ap.parse_args();args.search_modes=[m.strip() for m in args.search_modes.split(',') if m.strip()];args.policy_modes=[m.strip() for m in args.policy_modes.split(',') if m.strip()]
-    phase0=Path(args.phase0_dir);records=_read_csv(phase0/'records.csv' if (phase0/'records.csv').exists() else phase0/'phase0_records.csv')
+    phase0=_resolve_phase0_dir(Path(args.phase0_dir))
+    records_path = phase0 / "records.csv"
+    if not records_path.exists():
+        legacy_records_path = phase0 / "phase0_records.csv"
+        if legacy_records_path.exists():
+            records_path = legacy_records_path
+        else:
+            raise SystemExit(f"records.csv not found under phase0 dir: {phase0}")
+    records=_read_csv(records_path)
     domains=sorted({r.get('domain','').strip() for r in records if r.get('domain','').strip()},key=str.lower)
     if args.domains: allow={d.strip() for d in str(args.domains).split(',') if d.strip()};domains=[d for d in domains if d in allow]
     src=Path(args.policy_json) if args.policy_json else (Path(args.base_policy) if args.base_policy else None)
