@@ -725,10 +725,14 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                         "lftp.guid": _safe_str(pr.get("lftp.guid")),
                         "lftp.id": _safe_str(pr.get("lftp.id")),
                         "lftp.id_sign": _safe_str(pr.get("lftp.id_sign")),
+                        "lftp.storage_type": _safe_str(pr.get("lftp.storage_type")),
+                        "lftp.has_value": _safe_str(pr.get("lftp.has_value")),
                         "lftp.data_type": _safe_str(pr.get("lftp.data_type")),
                         "lftp.binding_scope": _safe_str(pr.get("lftp.binding_scope")),
                         "lftp.semantic_role": _safe_str(pr.get("lftp.semantic_role")),
                         "lftp.source": _safe_str(pr.get("lftp.source")),
+                        "lftp.value_display": _safe_str(pr.get("lftp.value_display")),
+                        "lftp.value_raw": _safe_str(pr.get("lftp.value_raw")),
                     })
 
                 comps = (rec.get("label") or {}).get("components") if isinstance(rec.get("label"), dict) else None
@@ -815,7 +819,9 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
     _write_csv(out_dir / "parameter_rows.csv", [
         "schema_version", "export_run_id", "domain", "record_pk", "param_index",
         "lftp.key", "lftp.name", "lftp.guid", "lftp.id", "lftp.id_sign",
-        "lftp.data_type", "lftp.binding_scope", "lftp.semantic_role", "lftp.source",
+        "lftp.storage_type", "lftp.has_value", "lftp.data_type",
+        "lftp.binding_scope", "lftp.semantic_role", "lftp.source",
+        "lftp.value_display", "lftp.value_raw",
     ], _sort_rows(param_evidence_rows, ["export_run_id", "domain", "record_pk", "param_index"]))
     return meta_rows, record_rows
 

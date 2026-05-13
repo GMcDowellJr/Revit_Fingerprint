@@ -70,6 +70,56 @@ def _param_id_int(param):
         return 0
 
 
+def _read_param_value(p):
+    """Return (storage_type, has_value, value_display, value_raw) for a parameter.
+
+    storage_type: lowercase StorageType name ("string","double","integer","elementid","none")
+    has_value:    "true"/"false"/"unreadable"
+    value_display: AsValueString() — works for all storage types; Revit's UI representation
+    value_raw:    typed raw value as string — double kept full precision, elementid as int string
+    """
+    storage_type = "none"
+    has_value = "false"
+    value_display = None
+    value_raw = None
+    try:
+        st = getattr(p, "StorageType", None)
+        if st is not None:
+            storage_type = safe_str(st).split(".")[-1].lower()
+        hv = getattr(p, "HasValue", None)
+        has_value = "true" if hv else ("false" if hv is not None else "unreadable")
+    except Exception:
+        has_value = "unreadable"
+
+    if has_value != "true":
+        return storage_type, has_value, None, None
+
+    try:
+        v = p.AsValueString()
+        value_display = safe_str(v) if v is not None else None
+    except Exception:
+        pass
+
+    try:
+        if storage_type == "string":
+            v = p.AsString()
+            value_raw = safe_str(v) if v is not None else None
+        elif storage_type == "double":
+            v = p.AsDouble()
+            value_raw = repr(v) if v is not None else None
+        elif storage_type == "integer":
+            v = p.AsInteger()
+            value_raw = str(v) if v is not None else None
+        elif storage_type == "elementid":
+            eid = p.AsElementId()
+            iv = getattr(eid, "IntegerValue", None)
+            value_raw = str(iv) if iv is not None else None
+    except Exception:
+        pass
+
+    return storage_type, has_value, value_display, value_raw
+
+
 def _binding_scope(doc, param, guid, pid):
     if pid < 0:
         return "builtin_parameter"
@@ -170,16 +220,21 @@ def extract(doc, ctx=None):
                 else ("name:%s|dt:%s|scope:%s" % (pname, dtype, scope)))
             )
             role = _semantic_role(pname, scope)
+            storage_type, has_value, value_display, value_raw = _read_param_value(p)
             prov_rows.append({
                 "lftp.key": key,
                 "lftp.name": pname,
                 "lftp.guid": guid or None,
                 "lftp.id": pid,
                 "lftp.id_sign": "negative" if pid < 0 else ("positive" if pid > 0 else "zero"),
+                "lftp.storage_type": storage_type,
+                "lftp.has_value": has_value,
                 "lftp.data_type": dtype,
                 "lftp.binding_scope": scope,
                 "lftp.semantic_role": role,
                 "lftp.source": "type_parameter",
+                "lftp.value_display": value_display,
+                "lftp.value_raw": value_raw,
             })
 
         prov_rows = sorted(prov_rows, key=lambda r: (r["lftp.key"], r["lftp.name"]))
