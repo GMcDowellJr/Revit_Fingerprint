@@ -58,6 +58,15 @@ def _domain_rows(records,items,domain,target):
     for gate in gates:
         pks={pk for pk,val in cat_by_pk.items() if val==gate}
         out.append((gate,[r for r in rec if r.get('record_pk','').strip() in pks],[it for it in items if it.get('domain')==domain and it.get('record_pk','').strip() in pks]))
+    # Surface records lacking shape gate so diagnostics don't silently skip them.
+    rec_pks = {r.get('record_pk', '').strip() for r in rec if r.get('record_pk', '').strip()}
+    missing_gate_pks = rec_pks - set(cat_by_pk.keys())
+    if missing_gate_pks:
+        out.append((
+            "__missing_shape_gate__",
+            [r for r in rec if r.get('record_pk', '').strip() in missing_gate_pks],
+            [it for it in items if it.get('domain') == domain and it.get('record_pk', '').strip() in missing_gate_pks],
+        ))
     return out
 
 def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):

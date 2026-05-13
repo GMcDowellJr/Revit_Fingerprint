@@ -170,3 +170,24 @@ def test_loaded_family_types_skips_orphan_gate_buckets(tmp_path: Path):
         rows = list(csv.DictReader(f))
     assert rows
     assert all(r["shape_gate"] != "Windows" for r in rows)
+
+
+def test_loaded_family_types_surfaces_missing_shape_gate_records(tmp_path: Path):
+    phase0 = tmp_path / "results" / "records"
+    _write_csv(phase0/'records.csv',["file_id","domain","record_pk","sig_hash"],[
+        {"file_id":"f1","domain":"loaded_family_types","record_pk":"1","sig_hash":"s1"},
+        {"file_id":"f1","domain":"loaded_family_types","record_pk":"2","sig_hash":"s2"},
+    ])
+    _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"shape_gate.category","item_value_type":"str","item_value":"Doors"},
+        {"domain":"loaded_family_types","record_pk":"1","item_key":"family.name","item_value_type":"str","item_value":"DoorA"},
+        {"domain":"loaded_family_types","record_pk":"2","item_key":"family.name","item_value_type":"str","item_value":"UngatedFamily"},
+    ])
+    subprocess.run([
+        sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
+        '--domains','loaded_family_types','--discovery-target','sig','--policy-modes','discover','--search-modes','greedy'
+    ],cwd=Path(__file__).resolve().parents[1],check=True)
+    with (phase0.parent/'diagnostics'/'hash_sig_discovery_exploration.csv').open('r', encoding='utf-8', newline='') as f:
+        rows = list(csv.DictReader(f))
+    assert rows
+    assert any(r["shape_gate"] == "__missing_shape_gate__" for r in rows)
