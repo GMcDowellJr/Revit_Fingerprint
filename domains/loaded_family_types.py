@@ -88,6 +88,15 @@ def _semantic_role(name, scope):
     return "unknown"
 
 
+def _safe_guid_str(param):
+    """Return GUID string when parameter is shared; empty string otherwise."""
+    try:
+        raw = getattr(param, "GUID", None)
+    except Exception:
+        return ""
+    return safe_str(raw)
+
+
 def extract(doc, ctx=None):
     info = {"count": 0, "records": [], "signature_hashes_v2": [], "hash_v2": None, "raw_count": 0}
     if FamilySymbol is None:
@@ -117,7 +126,7 @@ def extract(doc, ctx=None):
         prov_rows = []
         for p in list(getattr(sym, "Parameters", []) or []):
             pname = safe_str(getattr(getattr(p, "Definition", None), "Name", None))
-            guid = safe_str(getattr(p, "GUID", None))
+            guid = _safe_guid_str(p)
             pid = _param_id_int(p)
             scope = _binding_scope(doc, p, guid, pid)
             dtype = safe_str(getattr(getattr(p, "Definition", None), "ParameterType", None) or getattr(getattr(p, "Definition", None), "GetDataType", lambda: None)())
