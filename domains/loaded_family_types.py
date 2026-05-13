@@ -102,7 +102,7 @@ def extract(doc, ctx=None):
     category_sigs = defaultdict(list)
     for sym in symbols:
         cat = getattr(sym, "Category", None)
-        cat_name = safe_str(getattr(cat, "Name", None)) or "<none>"
+        cat_name = safe_str(getattr(cat, "Name", None)) or "none"
         cat_id = safe_str(getattr(getattr(cat, "Id", None), "IntegerValue", None)) or ""
         fam = getattr(sym, "Family", None)
         fam_name = safe_str(getattr(fam, "Name", None))
