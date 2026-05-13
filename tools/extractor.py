@@ -731,8 +731,10 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                         "lftp.binding_scope": _safe_str(pr.get("lftp.binding_scope")),
                         "lftp.semantic_role": _safe_str(pr.get("lftp.semantic_role")),
                         "lftp.source": _safe_str(pr.get("lftp.source")),
-                        "lftp.value_display": _safe_str(pr.get("lftp.value_display")),
-                        "lftp.value_raw": _safe_str(pr.get("lftp.value_raw")),
+                        "lftp.value_uniform": _safe_str(pr.get("lftp.value_uniform")),
+                        "lftp.value_distinct_count": _safe_str(pr.get("lftp.value_distinct_count")),
+                        "lftp.value_set": _safe_str(pr.get("lftp.value_set")),
+                        "lftp.value_raw_set": _safe_str(pr.get("lftp.value_raw_set")),
                     })
 
                 comps = (rec.get("label") or {}).get("components") if isinstance(rec.get("label"), dict) else None
@@ -821,7 +823,7 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
         "lftp.key", "lftp.name", "lftp.guid", "lftp.id", "lftp.id_sign",
         "lftp.storage_type", "lftp.has_value", "lftp.data_type",
         "lftp.binding_scope", "lftp.semantic_role", "lftp.source",
-        "lftp.value_display", "lftp.value_raw",
+        "lftp.value_uniform", "lftp.value_distinct_count", "lftp.value_set", "lftp.value_raw_set",
     ], _sort_rows(param_evidence_rows, ["export_run_id", "domain", "record_pk", "param_index"]))
     return meta_rows, record_rows
 

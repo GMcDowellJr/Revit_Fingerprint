@@ -479,18 +479,15 @@
       "allowed_keys": [
         "lft.shape_gate.category",
         "lft.shape_gate.category_id",
-        "lft.family_name",
-        "lft.type_name",
         "lft.type_parameter_schema_hash",
         "lft.type_parameter_count",
         "lft.family_is_in_place",
         "lft.family_is_editable",
-        "lft.family_symbol_count"
+        "lft.family_symbol_count",
+        "lft.type_count"
       ],
       "required_keys": [
         "lft.shape_gate.category",
-        "lft.family_name",
-        "lft.type_name",
         "lft.type_parameter_schema_hash"
       ],
       "optional": [
@@ -498,16 +495,23 @@
         "lft.family_symbol_count",
         "lft.family_is_in_place",
         "lft.family_is_editable",
-        "lft.shape_gate.category_id"
+        "lft.shape_gate.category_id",
+        "lft.type_count"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
       },
       "notes": [
+        "Records are emitted at family granularity (one record per Family element, not per FamilySymbol).",
+        "lft.family_name is label-only — excluded from identity_basis so sig_hash is name-independent.",
+        "lft.type_name removed: replaced by lft.type_count (count of collected types per family).",
+        "lft.family_symbol_count: API-reported total types; may differ from lft.type_count if types were filtered.",
         "lft.type_parameter_schema_hash is the primary behavioral anchor for sig_hash.",
         "lft.shape_gate.category_id is allowed but excluded from sig/join: Revit-version-specific int.",
-        "lft.family_is_editable and lft.family_is_in_place are discrimination signals (loaded vs system), not behavioral.",
-        "Records where lft.type_name is missing (system families) will be blocked per minima — consistent with D-018."
+        "lft.family_is_editable and lft.family_is_in_place are discrimination signals (loaded vs system).",
+        "sig_hash = f(category + schema_hash + is_in_place + is_editable + counts).",
+        "join_hash discovery: schema_hash is the behavioral anchor; individual parameter value items",
+        "  (from parameter_rows) are future discovery work (see domain future-steps)."
       ]
     },
     "materials": {

@@ -393,37 +393,41 @@
       ]
     },
     "loaded_family_types": {
-      "join_key_schema": "loaded_family_types.join_key.v1",
+      "join_key_schema": "loaded_family_types.join_key.v2",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
         "lft.shape_gate.category",
-        "lft.family_name",
-        "lft.type_name"
+        "lft.type_parameter_schema_hash"
       ],
       "optional_items": [
-        "lft.type_parameter_count"
+        "lft.family_is_in_place",
+        "lft.family_is_editable"
       ],
       "explicitly_excluded_items": [
-        "lft.type_parameter_schema_hash",
         "lft.shape_gate.category_id",
-        "lft.family_is_editable",
-        "lft.family_is_in_place",
-        "lft.family_symbol_count"
+        "lft.type_parameter_count",
+        "lft.family_symbol_count",
+        "lft.type_count"
       ],
       "notes": [
-        "Join key is name-anchored (category + family + type). lft.type_parameter_count adds a",
-        "stable schema-complexity signal without the cross-project fragility of the schema hash.",
+        "Records are at family granularity (one per Family element, not per type).",
+        "family_name is excluded from join: including it prevents within-project matches for",
+        "functionally identical families with different names. Two families that share category +",
+        "parameter schema are the same behavioral concept.",
         "",
-        "lft.type_parameter_schema_hash is explicitly excluded from the join key: a single",
-        "project-level shared parameter addition (e.g. a Revision param) flips the hash and",
-        "breaks cross-project matching. Use it only for sig_hash (file-local behavioral truth).",
+        "lft.type_parameter_schema_hash IS the behavioral anchor for join: it encodes the full",
+        "parameter definition set for the family, making it a precise identity discriminator.",
+        "Note: schema_hash is opaque to greedy/Pareto discovery tools — those tools cannot",
+        "decompose it into sub-fields. For finer-grained join discovery, individual parameter",
+        "values from parameter_rows would need to be promoted as identity items (future work,",
+        "see domain future-steps item 8).",
         "",
-        "lft.family_name + lft.type_name are the unavoidable name anchors for loaded families.",
-        "lft.type_parameter_count is the behavioral enrichment that prevents pure-name fallback.",
+        "lft.family_is_in_place / lft.family_is_editable optionally narrow matches to",
+        "loaded-only or in-place-only subsets.",
         "",
         "Excluded from any parameter-row (lftp.*) discovery promotion:",
-        "  bip:-1002001 Type Name      -- circular alias of lft.type_name",
-        "  bip:-1002002 Family Name    -- circular alias of lft.family_name",
+        "  bip:-1002001 Type Name      -- circular alias of lft.type_name (removed field)",
+        "  bip:-1002002 Family Name    -- circular alias of family_name (label-only)",
         "  bip:-1140362/3 Category     -- circular alias of lft.shape_gate.category",
         "  bip:-1002053 Workset        -- operational",
         "  bip:-1002067 Edited by      -- operational",

@@ -4,14 +4,20 @@ Loaded family types discovery-stage semantic exporter.
 
 Stable domain name: ``loaded_family_types``.
 
-This domain intentionally uses category as the first shape gate and emits
-parameter schema/provenance evidence for each loaded FamilySymbol.
+Records are emitted at family granularity (one record per Family element), not
+per FamilySymbol.  All types belonging to a family share the same parameter
+schema; value variation across types is captured as value distributions in
+``parameter_rows`` (``lftp.value_set``, ``lftp.value_uniform``,
+``lftp.value_distinct_count``).
 
 Governance posture:
 - Broad extraction is allowed.
 - Broad governance is not.
 - Parameter values are validation/debug evidence only and are excluded from
   governed semantic hash inputs.
+
+sig_hash composition: category + schema_hash + is_in_place + is_editable.
+family_name is label-only — not included in sig or join hashes.
 
 Future steps:
 1. Validate category foundation schemas across multiple projects.
@@ -21,6 +27,8 @@ Future steps:
 5. Add value-level comparison only inside promoted category/type gates.
 6. Add nested family/material/connector relationships as separate join layers.
 7. Add compatibility/versioning rules before governed compliance use.
+8. Surface individual parameter values as identity items for greedy/Pareto
+   join discovery (current schema_hash is opaque to discovery tools).
 """
 
 import os
@@ -61,6 +69,13 @@ _CLASSIFICATION_NAMES = {
     "OmniClass Title", "Code Name", "Keynote", "Manufacturer", "Model", "Description", "URL",
 }
 _OPERATIONAL_TOKENS = ("workset", "edited by", "owner", "ownership", "worksharing")
+
+
+def _safe_attr(obj, attr, default=None):
+    try:
+        return getattr(obj, attr, default)
+    except Exception:
+        return default
 
 
 def _param_id_int(param):
@@ -161,6 +176,41 @@ def _safe_guid_str(param):
     return safe_str(raw)
 
 
+def _build_param_key(pname, guid, pid, dtype, scope):
+    if guid:
+        return "guid:%s" % guid.lower()
+    if pid < 0:
+        return "bip:%s" % pid
+    return "name:%s|dt:%s|scope:%s" % (pname, dtype, scope)
+
+
+def _extract_param_meta(p, doc):
+    """Extract stable metadata for a parameter definition (schema-level, not value-level)."""
+    pname = safe_str(getattr(getattr(p, "Definition", None), "Name", None))
+    guid = _safe_guid_str(p)
+    pid = _param_id_int(p)
+    scope = _binding_scope(doc, p, guid, pid)
+    dtype = safe_str(
+        getattr(getattr(p, "Definition", None), "ParameterType", None)
+        or getattr(getattr(p, "Definition", None), "GetDataType", lambda: None)()
+    )
+    key = _build_param_key(pname, guid, pid, dtype, scope)
+    role = _semantic_role(pname, scope)
+    storage_type, _, _, _ = _read_param_value(p)
+    return key, {
+        "lftp.key": key,
+        "lftp.name": pname,
+        "lftp.guid": guid or None,
+        "lftp.id": pid,
+        "lftp.id_sign": "negative" if pid < 0 else ("positive" if pid > 0 else "zero"),
+        "lftp.storage_type": storage_type,
+        "lftp.data_type": dtype,
+        "lftp.binding_scope": scope,
+        "lftp.semantic_role": role,
+        "lftp.source": "type_parameter",
+    }
+
+
 def extract(doc, ctx=None):
     info = {"count": 0, "records": [], "signature_hashes_v2": [], "hash_v2": None, "raw_count": 0}
     if FamilySymbol is None:
@@ -177,22 +227,27 @@ def extract(doc, ctx=None):
         symbols = []
     info["raw_count"] = len(symbols)
 
-    category_sigs = defaultdict(list)
+    # Group FamilySymbols by Family element ID.
+    # All types of a family share the same parameter schema; collapsing to
+    # family granularity reduces record count and enables value distributions.
+    fam_groups = defaultdict(list)
     for sym in symbols:
-        def _safe_attr(obj, attr, default=None):
-            try:
-                return getattr(obj, attr, default)
-            except Exception:
-                return default
+        fam = _safe_attr(sym, "Family", None)
+        fam_id_int = _safe_attr(_safe_attr(fam, "Id", None), "IntegerValue", None)
+        group_key = str(fam_id_int) if fam_id_int is not None else "__no_family__"
+        fam_groups[group_key].append(sym)
 
-        cat = getattr(sym, "Category", None)
+    category_sigs = defaultdict(list)
+
+    for _group_key, fam_syms in sorted(fam_groups.items()):
+        first = fam_syms[0]
+
+        fam = _safe_attr(first, "Family", None)
+        cat = getattr(first, "Category", None)
         cat_name_v, cat_name_q = canonicalize_str(_safe_attr(cat, "Name", None))
         cat_id_v, cat_id_q = canonicalize_int(_safe_attr(_safe_attr(cat, "Id", None), "IntegerValue", None))
 
-        fam = _safe_attr(sym, "Family", None)
         fam_name_v, fam_name_q = canonicalize_str(_safe_attr(fam, "Name", None))
-        type_name_v, type_name_q = canonicalize_str(_safe_attr(sym, "Name", None))
-
         fam_is_in_place_v, fam_is_in_place_q = canonicalize_bool(_safe_attr(fam, "IsInPlace", None))
         fam_is_editable_v, fam_is_editable_q = canonicalize_bool(_safe_attr(fam, "IsEditable", None))
 
@@ -203,41 +258,53 @@ def extract(doc, ctx=None):
         except Exception:
             pass
         fam_symbol_count_v, fam_symbol_count_q = canonicalize_int(fam_symbol_count_raw)
+        type_count_v, type_count_q = canonicalize_int(len(fam_syms))
 
+        # --- Parameter schema from first type ---
+        # Schema is stable per family; all types share the same parameter definitions.
+        param_meta = {}
+        for p in list(getattr(first, "Parameters", []) or []):
+            key, meta = _extract_param_meta(p, doc)
+            param_meta[key] = meta
+
+        # --- Value distributions across all types ---
+        # Collect (has_value, value_display, value_raw) per parameter key per type.
+        param_values = defaultdict(list)
+        for sym in fam_syms:
+            for p in list(getattr(sym, "Parameters", []) or []):
+                pname = safe_str(getattr(getattr(p, "Definition", None), "Name", None))
+                guid = _safe_guid_str(p)
+                pid = _param_id_int(p)
+                scope = _binding_scope(doc, p, guid, pid)
+                dtype = safe_str(
+                    getattr(getattr(p, "Definition", None), "ParameterType", None)
+                    or getattr(getattr(p, "Definition", None), "GetDataType", lambda: None)()
+                )
+                key = _build_param_key(pname, guid, pid, dtype, scope)
+                _, has_value, value_display, value_raw = _read_param_value(p)
+                param_values[key].append((has_value, value_display, value_raw))
+
+        # --- Build provenance rows with distributions ---
         prov_rows = []
-        for p in list(getattr(sym, "Parameters", []) or []):
-            pname = safe_str(getattr(getattr(p, "Definition", None), "Name", None))
-            guid = _safe_guid_str(p)
-            pid = _param_id_int(p)
-            scope = _binding_scope(doc, p, guid, pid)
-            dtype = safe_str(
-                getattr(getattr(p, "Definition", None), "ParameterType", None)
-                or getattr(getattr(p, "Definition", None), "GetDataType", lambda: None)()
-            )
-            key = (
-                ("guid:%s" % guid.lower()) if guid
-                else (("bip:%s" % pid) if pid < 0
-                else ("name:%s|dt:%s|scope:%s" % (pname, dtype, scope)))
-            )
-            role = _semantic_role(pname, scope)
-            storage_type, has_value, value_display, value_raw = _read_param_value(p)
-            prov_rows.append({
-                "lftp.key": key,
-                "lftp.name": pname,
-                "lftp.guid": guid or None,
-                "lftp.id": pid,
-                "lftp.id_sign": "negative" if pid < 0 else ("positive" if pid > 0 else "zero"),
-                "lftp.storage_type": storage_type,
-                "lftp.has_value": has_value,
-                "lftp.data_type": dtype,
-                "lftp.binding_scope": scope,
-                "lftp.semantic_role": role,
-                "lftp.source": "type_parameter",
-                "lftp.value_display": value_display,
-                "lftp.value_raw": value_raw,
-            })
+        for key in sorted(param_meta.keys()):
+            meta = dict(param_meta[key])
+            vals = param_values.get(key, [])
+            display_vals = [v[1] for v in vals if v[1] is not None]
+            raw_vals = [v[2] for v in vals if v[2] is not None]
+            distinct_display = sorted(set(display_vals))
+            distinct_raw = sorted(set(raw_vals))
 
-        prov_rows = sorted(prov_rows, key=lambda r: (r["lftp.key"], r["lftp.name"]))
+            any_true = any(v[0] == "true" for v in vals)
+            all_true = all(v[0] == "true" for v in vals) if vals else False
+            has_value_agg = "true" if all_true else ("partial" if any_true else "false")
+
+            meta["lftp.has_value"] = has_value_agg
+            meta["lftp.value_uniform"] = "true" if len(distinct_display) <= 1 else "false"
+            meta["lftp.value_distinct_count"] = str(len(distinct_display))
+            meta["lftp.value_set"] = "|".join(distinct_display) if distinct_display else None
+            meta["lftp.value_raw_set"] = "|".join(distinct_raw) if distinct_raw else None
+            prov_rows.append(meta)
+
         schema_basis = [
             "%s|%s|%s|%s" % (r["lftp.key"], r["lftp.binding_scope"], r["lftp.semantic_role"], r["lftp.source"])
             for r in prov_rows
@@ -246,16 +313,18 @@ def extract(doc, ctx=None):
         type_schema_hash_v, type_schema_hash_q = canonicalize_str(type_schema_hash)
         type_param_count_v, type_param_count_q = canonicalize_int(len(prov_rows))
 
+        # Identity items: category + schema structure + family flags.
+        # family_name is label-only — excluded so sig_hash is name-independent
+        # and two families with the same behavioral definition compare equal.
         identity_items = [
             make_identity_item("lft.shape_gate.category", cat_name_v, cat_name_q),
             make_identity_item("lft.shape_gate.category_id", cat_id_v, cat_id_q),
-            make_identity_item("lft.family_name", fam_name_v, fam_name_q),
-            make_identity_item("lft.type_name", type_name_v, type_name_q),
             make_identity_item("lft.type_parameter_schema_hash", type_schema_hash_v, type_schema_hash_q),
             make_identity_item("lft.type_parameter_count", type_param_count_v, type_param_count_q),
             make_identity_item("lft.family_is_in_place", fam_is_in_place_v, fam_is_in_place_q),
             make_identity_item("lft.family_is_editable", fam_is_editable_v, fam_is_editable_q),
             make_identity_item("lft.family_symbol_count", fam_symbol_count_v, fam_symbol_count_q),
+            make_identity_item("lft.type_count", type_count_v, type_count_q),
         ]
 
         status_reasons = []
@@ -270,32 +339,29 @@ def extract(doc, ctx=None):
         preimage = serialize_identity_items(identity_items)
         sig_hash = make_hash(preimage)
 
-        label_parts = []
-        if fam_name_v:
-            label_parts.append(fam_name_v)
-        if type_name_v:
-            label_parts.append(type_name_v)
-        label_display = " : ".join(label_parts) if label_parts else "loaded_family_type"
-        label_quality = "human" if (fam_name_v and type_name_v) else "placeholder_missing"
+        label_display = fam_name_v if fam_name_v else "loaded_family_type"
+        if cat_name_v:
+            label_display = "%s : %s" % (cat_name_v, label_display)
+        label_quality = "human" if fam_name_v else "placeholder_missing"
 
         label = {
             "display": label_display,
             "quality": label_quality,
-            "provenance": "revit.FamilySymbol.Family.Name+Name",
+            "provenance": "revit.FamilySymbol.Family.Name",
             "components": {
                 "category": cat_name_v or "",
                 "family_name": fam_name_v or "",
-                "type_name": type_name_v or "",
             },
         }
 
-        record_id = "%s|%s|%s|%s" % (
+        # record_id includes family_name for file-local uniqueness; it is NOT
+        # a cross-project identifier (record_id_scope = file_local).
+        record_id = "%s|%s|%s" % (
             cat_name_v or "none",
             fam_name_v or "none",
-            type_name_v or "none",
             type_schema_hash,
         )
-        required_qs = [cat_name_q, fam_name_q, type_name_q]
+        required_qs = [cat_name_q, type_schema_hash_q]
 
         rec = build_record_v2(
             domain=DOMAIN_NAME,

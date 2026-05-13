@@ -504,29 +504,29 @@
       "allowed_items": [
         "lft.shape_gate.category",
         "lft.shape_gate.category_id",
-        "lft.family_name",
-        "lft.type_name",
         "lft.type_parameter_schema_hash",
         "lft.type_parameter_count",
         "lft.family_is_in_place",
         "lft.family_is_editable",
-        "lft.family_symbol_count"
+        "lft.family_symbol_count",
+        "lft.type_count"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "Generated from contracts/domain_identity_keys_v2.json.",
+        "Records are at family granularity. family_name is label-only — not in sig_hash.",
+        "sig_hash = f(category + schema_hash + is_in_place + is_editable + counts).",
+        "Two families with identical category + parameter schema hash as equal by sig_hash.",
+        "lft.type_count: collected types in this run. lft.family_symbol_count: API-reported total.",
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
         "lft.shape_gate.category",
-        "lft.family_name",
-        "lft.type_name",
         "lft.type_parameter_schema_hash"
       ],
-      "sig_hash_schema": "loaded_family_types.sig_hash.v1"
+      "sig_hash_schema": "loaded_family_types.sig_hash.v2"
     },
     "materials": {
       "allowed_item_prefixes": [],
