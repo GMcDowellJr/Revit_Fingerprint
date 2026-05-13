@@ -812,12 +812,11 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
         "schema_version", "export_run_id", "domain", "record_pk", "reason_code", "reason_detail",
     ], _sort_rows(reason_rows, ["export_run_id", "domain", "record_pk", "reason_code"]))
 
-    if param_evidence_rows:
-        _write_csv(out_dir / "parameter_rows.csv", [
-            "schema_version", "export_run_id", "domain", "record_pk", "param_index",
-            "lftp.key", "lftp.name", "lftp.guid", "lftp.id", "lftp.id_sign",
-            "lftp.data_type", "lftp.binding_scope", "lftp.semantic_role", "lftp.source",
-        ], _sort_rows(param_evidence_rows, ["export_run_id", "domain", "record_pk", "param_index"]))
+    _write_csv(out_dir / "parameter_rows.csv", [
+        "schema_version", "export_run_id", "domain", "record_pk", "param_index",
+        "lftp.key", "lftp.name", "lftp.guid", "lftp.id", "lftp.id_sign",
+        "lftp.data_type", "lftp.binding_scope", "lftp.semantic_role", "lftp.source",
+    ], _sort_rows(param_evidence_rows, ["export_run_id", "domain", "record_pk", "param_index"]))
     return meta_rows, record_rows
 
 
