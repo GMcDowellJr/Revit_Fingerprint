@@ -21,9 +21,13 @@ def _resolve_phase0_dir(path: Path) -> Path:
     Accept either:
       - direct phase0 folder (contains records.csv), or
       - Results_v21 root (contains phase0_v21/records.csv).
+      - pipeline default records root (results/records/records.csv).
     """
     if (path / "records.csv").exists():
         return path
+    results_records = path / "results" / "records"
+    if (results_records / "records.csv").exists():
+        return results_records
     nested = path / "phase0_v21"
     if (nested / "records.csv").exists():
         return nested
@@ -110,7 +114,7 @@ def main():
             "(records/items), not over original export JSON."
         )
     )
-    ap.add_argument('--phase0-dir',default='results/records', help='Phase0 directory containing records.csv (or Results_v21 root containing phase0_v21/records.csv).')
+    ap.add_argument('--phase0-dir',default='results/records', help='Phase0 directory containing records.csv (also auto-resolves Results_v21/phase0_v21 and results/records).')
     ap.add_argument(
         '--policy-json',
         default=None,

@@ -47,3 +47,4 @@ For `loaded_family_types`, discovery is partitioned by `shape_gate.category`; ca
 `--phase0-dir` may point either to:
 - the direct phase0 folder (e.g., `Results_v21/phase0_v21`), or
 - the `Results_v21` root (tool will resolve `phase0_v21/` automatically when present).
+- a repo/workspace root where pipeline outputs are under `results/records/` (tool resolves that automatically).
