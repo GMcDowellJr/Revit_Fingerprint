@@ -191,3 +191,30 @@ def test_loaded_family_types_surfaces_missing_shape_gate_records(tmp_path: Path)
         rows = list(csv.DictReader(f))
     assert rows
     assert any(r["shape_gate"] == "__missing_shape_gate__" for r in rows)
+
+
+def test_stratify_by_limits_overrepresentation(tmp_path: Path):
+    """Stratified sampling gives each family equal weight regardless of type count."""
+    phase0 = tmp_path / "results" / "records"
+    # FamilyA has 10 types, FamilyB has 1 type — without stratification FamilyA
+    # dominates a sample_size=4 draw; with stratification each gets <=2 slots.
+    records = [{"file_id":"f1","domain":"loaded_family_types","record_pk":str(i),"sig_hash":f"h{i}"} for i in range(11)]
+    items = (
+        [{"domain":"loaded_family_types","record_pk":str(i),"item_key":"lft.shape_gate.category","item_value_type":"str","item_value":"Doors"} for i in range(11)]
+        + [{"domain":"loaded_family_types","record_pk":str(i),"item_key":"lft.family_name","item_value_type":"str","item_value":"FamilyA"} for i in range(10)]
+        + [{"domain":"loaded_family_types","record_pk":"10","item_key":"lft.family_name","item_value_type":"str","item_value":"FamilyB"}]
+    )
+    _write_csv(phase0/'records.csv',["file_id","domain","record_pk","sig_hash"],records)
+    _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],items)
+    subprocess.run([
+        sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
+        '--domains','loaded_family_types','--discovery-target','join',
+        '--search-modes','greedy','--policy-modes','discover',
+        '--sample-size','4','--stratify-by','lft.family_name',
+    ],cwd=Path(__file__).resolve().parents[1],check=True)
+    with (phase0.parent/'diagnostics'/'hash_join_discovery_exploration.csv').open('r', encoding='utf-8', newline='') as f:
+        rows = list(csv.DictReader(f))
+    assert rows
+    assert rows[0].get('stratify_by') == 'lft.family_name'
+    # With stratification, records_total should be <= sample_size=4
+    assert all(int(r['records_total']) <= 4 for r in rows if r['records_total'])

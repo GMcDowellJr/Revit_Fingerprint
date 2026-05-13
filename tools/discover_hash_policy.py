@@ -16,6 +16,54 @@ TARGET_FILES={"sig":["signature_items.csv","identity_items.csv","phase0_identity
 CATEGORY_GATE_KEY="lft.shape_gate.category"
 
 
+def _stratified_sample(records, items, stratify_key, sample_size, seed):
+    """Sample records giving equal representation to each unique value of stratify_key.
+
+    Looks up stratify_key from items to build a pk->value map, then takes
+    ceil(sample_size / n_groups) records from each group using the same
+    deterministic hash-rank as _sample_domain_records.  Falls back to flat
+    sampling when the key has no item coverage.
+    """
+    import math
+    if not stratify_key or sample_size <= 0 or len(records) <= sample_size:
+        return records
+
+    pk_to_val = {}
+    for it in items:
+        if it.get("item_key","").strip() == stratify_key:
+            pk = it.get("record_pk","").strip()
+            val = it.get("item_value","").strip()
+            if pk and val:
+                pk_to_val[pk] = val
+
+    if not pk_to_val:
+        return _sample_domain_records(records, sample_size, seed)
+
+    groups: Dict[str,List] = {}
+    ungrouped = []
+    for r in records:
+        pk = r.get("record_pk","").strip()
+        val = pk_to_val.get(pk)
+        if val:
+            groups.setdefault(val, []).append(r)
+        else:
+            ungrouped.append(r)
+
+    n_groups = len(groups)
+    if n_groups == 0:
+        return _sample_domain_records(records, sample_size, seed)
+
+    per_group = max(1, math.ceil(sample_size / n_groups))
+    out: List = []
+    for val in sorted(groups.keys()):
+        out.extend(_sample_domain_records(groups[val], per_group, seed))
+
+    if len(out) < sample_size and ungrouped:
+        out.extend(_sample_domain_records(ungrouped, sample_size - len(out), seed))
+
+    return out[:sample_size]
+
+
 def _resolve_phase0_dir(path: Path) -> Path:
     """
     Accept either:
@@ -72,13 +120,17 @@ def _domain_rows(records,items,domain,target):
 def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
     rows=[]; candidates={}
     items=_load_items(phase0_dir,target)
+    stratify_key=getattr(args,'stratify_by','') or ''
     for domain in domains:
         normalized=normalize_policy_block(base_domains.get(domain,{}))
         req=normalized['required_fields']; opt=normalized['optional_items']; excluded=set(normalized['explicitly_excluded_items']); gates=normalized['gates']
         for gate,dom_records_all,dom_items_all in _domain_rows(records,items,domain,target):
             if not dom_records_all:
                 continue
-            dom_records=_sample_domain_records(dom_records_all,args.sample_size,args.sample_seed)
+            if stratify_key:
+                dom_records=_stratified_sample(dom_records_all,dom_items_all,stratify_key,args.sample_size,args.sample_seed)
+            else:
+                dom_records=_sample_domain_records(dom_records_all,args.sample_size,args.sample_seed)
             if not dom_records:
                 continue
             sampled={r.get('record_pk','').strip() for r in dom_records}
@@ -119,7 +171,7 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
                         if not reason:
                             reason="selected_missing_required"
                     if not metrics and work: metrics=score_candidate(dom_records,idx,selected,{"gates":{"required_fields":req,**gates}})
-                    rows.append({"domain":domain,"discovery_target":target,"policy_mode":pm,"search_mode":sm,"status":status,"reason":reason,"selected_fields":"|".join(selected),"coverage":f"{float(metrics.get('coverage',0.0)):.6f}","collision_rate":f"{float(metrics.get('collision_rate',1.0)):.6f}","fragmentation_rate":f"{float(metrics.get('fragmentation_rate',1.0)):.6f}","records_total":str(int(metrics.get('records_total',0) or 0)),"records_covered":str(int(metrics.get('records_covered',0) or 0)),"collision_records":str(int(metrics.get('collision_records',0) or 0)),"signature_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="sig" else "","join_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="join" else "","frontier_size":str(frontier),"fallback_used":"true" if fallback else "false","shape_gate":gate})
+                    rows.append({"domain":domain,"discovery_target":target,"policy_mode":pm,"search_mode":sm,"status":status,"reason":reason,"selected_fields":"|".join(selected),"coverage":f"{float(metrics.get('coverage',0.0)):.6f}","collision_rate":f"{float(metrics.get('collision_rate',1.0)):.6f}","fragmentation_rate":f"{float(metrics.get('fragmentation_rate',1.0)):.6f}","records_total":str(int(metrics.get('records_total',0) or 0)),"records_covered":str(int(metrics.get('records_covered',0) or 0)),"collision_records":str(int(metrics.get('collision_records',0) or 0)),"signature_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="sig" else "","join_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="join" else "","frontier_size":str(frontier),"fallback_used":"true" if fallback else "false","shape_gate":gate,"stratify_by":stratify_key})
             candidates.setdefault(domain,{})[gate]=scoped
     return rows,candidates
 
@@ -167,6 +219,7 @@ def main():
     )
     ap.add_argument('--sample-size',type=int,default=5000, help='Per-domain sample cap (0 means no cap).')
     ap.add_argument('--sample-seed',type=int,default=17, help='Deterministic sampling seed.')
+    ap.add_argument('--stratify-by',default='', help='Item key to stratify sampling by so each unique value gets equal representation regardless of group size (e.g. lft.family_name for loaded_family_types join discovery). Falls back to flat sampling when the key has no coverage.')
     ap.add_argument('--max-candidate-fields',type=int,default=64, help='Max discovered candidate fields per domain/gate.')
     ap.add_argument('--max-k',type=int,default=4, help='Max field subset size for greedy/Pareto evaluation.')
     args=ap.parse_args();args.search_modes=[m.strip() for m in args.search_modes.split(',') if m.strip()];args.policy_modes=[m.strip() for m in args.policy_modes.split(',') if m.strip()]
