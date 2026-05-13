@@ -150,6 +150,7 @@ from domains import fill_patterns
 from domains import materials
 from domains import compound_types
 from domains import dimension_types
+from domains import loaded_family_types
 from domains import view_templates
 from core.manifest import build_manifest
 from core.features import build_features
@@ -814,6 +815,11 @@ def run_fingerprint(doc, timing=None):
             records=None,
             hash_value=None,
         )
+
+    if _enabled("loaded_family_types"):
+        legacy = _domain_run("loaded_family_types", loaded_family_types.extract, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["loaded_family_types"] = legacy
 
     # Contextual domains (can reference global domains via ctx)
     # Cache pre-warm: populate shared View instances cache before any view-related domain runs.
