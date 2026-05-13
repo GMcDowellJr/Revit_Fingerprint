@@ -1,136 +1,5 @@
 {
   "domains": {
-    "identity": {
-      "join_key_schema": "identity.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "identity.is_workshared"
-      ],
-      "optional_items": [
-        "identity.revit_version_number",
-        "identity.revit_build",
-        "identity.revit_version_name"
-      ],
-      "explicitly_excluded_items": [
-        "identity.central_path",
-        "identity.central_path_norm",
-        "identity.filename",
-        "identity.project_title"
-      ],
-      "shape_gating": {
-        "discriminator_key": "identity.is_workshared",
-        "shape_requirements": {
-          "true": {
-            "additional_required": [
-              "identity.revit_version_number"
-            ],
-            "additional_optional": [],
-            "notes": "Workshared identity joins include version number as discriminator-gated required context."
-          }
-        },
-        "default_shape_behavior": "common_only"
-      },
-      "notes": [
-        "Pilot for canonical evidence superset + selectors in the identity domain.",
-        "join_hash uses policy-required items only; optional items remain in identity_basis.items for future exploration.",
-        "File-local identifiers remain excluded from canonical identity evidence and join-key hashing."
-      ]
-    },
-	"phase_filters": {
-	  "join_key_schema": "phase_filters.join_key.v2",
-	  "hash_alg": "md5_utf8_join_pipe",
-	  "required_items": [
-		"phase_filter.demolished.presentation_id",
-		"phase_filter.existing.presentation_id",
-		"phase_filter.new.presentation_id",
-		"phase_filter.temporary.presentation_id"
-	  ],
-	  "optional_items": [],
-	  "explicitly_excluded_items": [
-		"phase_filter.name"
-	  ],
-	  "notes": [
-		"Policy aligned to canonical identity evidence emitted by domains/phase_filters.py.",
-		"Join identity is defined by the four per-status presentation ids; phase_filter.name remains a phase2 coordination/label field only.",
-		"This replaces the provisional name-only policy, which no longer matched the exported identity_items surface."
-	  ]
-	},
-    "phases": {
-      "join_key_schema": "phases.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "phase.name"
-      ],
-      "optional_items": [
-        "phase.seq"
-      ],
-      "explicitly_excluded_items": [],
-      "notes": [
-        "Policy is provisional pending broader samples; current Pareto evidence shows zero fragmentation and zero collisions for both phase.name and phase.seq.",
-        "phase.name is treated as the definition-bearing identifier in current evidence; phase.seq may be added only if future datasets exhibit name collisions."
-      ]
-    },
-    "units": {
-      "join_key_schema": "units.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "units.spec",
-        "units.unit_type_id",
-        "units.rounding_method"
-      ],
-      "optional_items": [
-        "units.accuracy"
-      ],
-      "explicitly_excluded_items": [],
-      "notes": [
-        "Accuracy moved to optional - display precision preference, not behavioral identity.",
-        "Spec + type + rounding define the unit system (feet-inches, metric, etc.).",
-        "Accuracy variance (0.01 vs 1.0) is display formatting, not calculation behavior.",
-        "DECISION: Accuracy affects display only, not technical behavior - treat as refinement."
-      ]
-    },
-    "line_patterns": {
-      "join_key_schema": "line_patterns.join_key.v3",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "line_pattern.segments_norm_hash"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "line_pattern.uid",
-        "line_pattern.name",
-        "line_pattern.element_id",
-        "line_pattern.uid_or_namekey",
-        "line_pattern.segments_def_hash"
-      ],
-      "notes": [
-        "Upgraded from v2 (segments_def_hash) to v3 (segments_norm_hash) for scale-invariant identity.",
-        "segments_norm_hash encodes segment kind sequence + length ratios (length / non_dot_total).",
-        "Scale variants of the same structural type collapse to the same pattern.",
-        "Dot segments use relative epsilon (1% of non_dot_total) to preserve scale invariance.",
-        "segments_def_hash moved to explicitly_excluded — retains exact identity in identity_basis for forensics.",
-        "Names are labels only and must not participate in joins.",
-        "lp.is_import added to coordination_items in extractor v2."
-      ]
-    },
-    "line_styles": {
-      "join_key_schema": "line_styles.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "line_style.weight.projection",
-        "line_style.color.rgb",
-        "line_style.pattern_ref.sig_hash"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "line_style.path",
-        "line_style.pattern_ref.kind"
-      ],
-      "notes": [
-        "Identity is definition-based: projection weight + color + referenced line pattern definition via pattern_ref.sig_hash.",
-        "pattern_ref.kind is too coarse and produces high collisions; it must not be used for joins."
-      ]
-    },
     "arrowheads": {
       "join_key_schema": "arrowheads.join_key.v2",
       "hash_alg": "md5_utf8_join_pipe",
@@ -181,190 +50,22 @@
         "Definition-based identity only; no referential identifiers in joins."
       ]
     },
-    "text_types": {
-      "join_key_schema": "text_types.join_key.v2",
+    "ceiling_types": {
+      "join_key_schema": "ceiling_types.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "text_type.font",
-        "text_type.size_in",
-        "text_type.bold",
-        "text_type.italic",
-        "text_type.underline",
-        "text_type.color_rgb",
-        "text_type.width_factor"
-      ],
-      "optional_items": [
-        "text_type.leader_arrowhead_sig_hash",
-        "text_type.background_raw",
-        "text_type.line_weight",
-        "text_type.show_border",
-        "text_type.tab_size_in",
-        "text_type.leader_border_offset_in"
-      ],
-      "explicitly_excluded_items": [
-        "text_type.name",
-        "text_type.type_id",
-        "text_type.type_uid",
-        "text_type.leader_arrowhead_uid",
-        "text_type.leader_arrowhead_name",
-        "text_type.color_int"
-      ],
-      "notes": [
-        "Policy: color_rgb is definition-bearing.",
-        "Policy: arrowhead is definition-bearing only via arrowheads-domain signature hash (text_type.leader_arrowhead_sig_hash), not uid/name/id.",
-        "If text_type.leader_arrowhead_sig_hash is unavailable for some records, treat as lower confidence rather than substituting uid/name."
-      ]
-    },
-    "view_filter_definitions": {
-      "join_key_schema": "view_filter_definitions.join_key.v2",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "vf.def_hash"
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
-        "vf.uid_or_namekey",
-        "vf.elem_id",
-        "vf.categories",
-        "vf.logic_root",
-        "vf.rule_count",
-        "vf.rules[].sig",
-        "label.components.name",
-        "label.display"
+        "ct.type_name",
+        "ct.coarse_fill_color_rgb"
       ],
       "notes": [
-        "Structured domain: join is performed on vf.def_hash only (definition bundle hash).",
-        "vf.def_hash is computed from canonical vf.categories + vf.logic_root + vf.rule_count + ordered vf.rule[###].sig, but those leaf inputs remain identity-only for forensics.",
-        "Names/labels and any UID-like identifiers are prohibited from joins for standards governance."
-      ]
-    },
-    "view_filter_applications_view_templates": {
-      "join_key_schema": "view_filter_applications_view_templates.join_key.v2",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "vfa.stack_def_hash"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "vfa.template_uid_or_namekey",
-        "vfa.template_elem_id",
-        "vfa.filter_stack_count",
-        "vfa.stack[].filter_sig_hash",
-        "vfa.stack[].visible",
-        "vfa.stack[].enabled"
-      ],
-      "notes": [
-        "Structured-sequence domain: join identity is the ordered filter-stack definition collapsed into vfa.stack_def_hash.",
-        "Leaf stack members and counts are authoritative identity (identity_basis) but must not participate in joins.",
-        "Template identifiers are labels/linkage only and are prohibited from joins."
-      ]
-    },
-    "view_category_overrides": {
-      "join_key_schema": "view_category_overrides.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "vco.baseline_category_path",
-        "vco.baseline_sig_hash",
-        "vco.override_properties_hash"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "vco.category_path",
-        "vco.projection.line_weight",
-        "vco.projection.line_pattern_ref.sig_hash",
-        "vco.projection.line_color.rgb",
-        "vco.cut.line_weight",
-        "vco.cut.line_pattern_ref.sig_hash",
-        "vco.cut.line_color.rgb",
-        "vco.halftone",
-        "vco.transparency"
-      ],
-      "notes": [
-        "Join-key identity captures the override pattern, not where it's used.",
-        "vco.baseline_category_path identifies WHICH category is being overridden.",
-        "vco.baseline_sig_hash identifies the object_styles baseline definition being overridden.",
-        "vco.override_properties_hash collapses all delta properties into a single behavioral signature.",
-        "Individual delta properties (line_weight, color, etc.) are forensic detail, excluded from joins.",
-        "Deprecated aggregate domain. Use view_category_overrides_model and view_category_overrides_annotation."
-      ]
-    },
-    "view_category_overrides_model": {
-      "join_key_schema": "view_category_overrides_model.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "vco.baseline_category_path",
-        "vco.baseline_sig_hash",
-        "vco.override_properties_hash"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "vco.category_path",
-        "vco.projection.line_weight",
-        "vco.projection.line_pattern_ref.sig_hash",
-        "vco.projection.line_color.rgb",
-        "vco.cut.line_weight",
-        "vco.cut.line_pattern_ref.sig_hash",
-        "vco.cut.line_color.rgb",
-        "vco.halftone",
-        "vco.transparency"
-      ],
-      "notes": [
-        "Domain family: view_category_overrides.",
-        "Contains: CategoryType.Model categories and subcategories.",
-        "include_controlled removed — include state sourced from view_templates.include_vg_model.",
-        "vco.vg_tab = Model in coordination_items for downstream join."
-      ]
-    },
-    "view_category_overrides_annotation": {
-      "join_key_schema": "view_category_overrides_annotation.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "vco.baseline_category_path",
-        "vco.baseline_sig_hash",
-        "vco.override_properties_hash"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "vco.category_path",
-        "vco.projection.line_weight",
-        "vco.projection.line_pattern_ref.sig_hash",
-        "vco.projection.line_color.rgb",
-        "vco.halftone",
-        "vco.transparency"
-      ],
-      "notes": [
-        "Domain family: view_category_overrides.",
-        "Contains: CategoryType.Annotation categories.",
-        "Cut weight not applicable to annotation categories — excluded.",
-        "include_controlled removed — include state sourced from view_templates.include_vg_annotation.",
-        "vco.vg_tab = Annotation in coordination_items for downstream join.",
-        "Baseline: object_styles_annotation ctx map."
-      ]
-    },
-    "dimension_types_linear": {
-      "join_key_schema": "dimension_types_linear.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "dim_type.shape",
-        "dim_type.accuracy",
-        "dim_type.tick_mark_sig_hash",
-        "dim_type.witness_line_control",
-        "dim_type.unit_format_id",
-        "dim_type.rounding",
-        "dim_type.prefix",
-        "dim_type.suffix"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "dim_type.name",
-        "dim_type.tick_mark_uid",
-        "dim_attr.tick_mark_uid"
-      ],
-      "notes": [
-        "Domain family: dimension_types.",
-        "Contains: Linear, LinearFixed, Angular, ArcLength shapes (all share witness_line_control).",
-        "No record class gating needed — homogeneous property structure across all four shapes.",
-        "witness_line_control is confirmed active for all four shapes in UI."
+        "Domain family: compound_types.",
+        "Compound Ceiling only — non-compound types blocked."
       ]
     },
     "dimension_types_angular": {
@@ -394,32 +95,6 @@
         "No record class gating needed."
       ]
     },
-    "dimension_types_radial": {
-      "join_key_schema": "dimension_types_radial.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "dim_type.shape",
-        "dim_type.accuracy",
-        "dim_type.tick_mark_sig_hash",
-        "dim_type.center_marks",
-        "dim_type.center_mark_size",
-        "dim_type.radius_symbol_location",
-        "dim_type.radius_symbol_text",
-        "dim_type.unit_format_id"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "dim_type.name",
-        "dim_type.tick_mark_uid",
-        "dim_attr.tick_mark_uid"
-      ],
-      "notes": [
-        "Domain family: dimension_types.",
-        "Contains: Radial only.",
-        "Radius Symbol Location and Radius Symbol Text are active fields in UI.",
-        "No record class gating needed."
-      ]
-    },
     "dimension_types_diameter": {
       "join_key_schema": "dimension_types_diameter.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
@@ -446,21 +121,18 @@
         "No record class gating needed."
       ]
     },
-    "dimension_types_spot_elevation": {
-      "join_key_schema": "dimension_types_spot_elevation.join_key.v1",
+    "dimension_types_linear": {
+      "join_key_schema": "dimension_types_linear.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
         "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
         "dim_type.unit_format_id",
-        "dim_type.elevation_indicator",
-        "dim_type.elevation_indicator_as_prefix_suffix",
-        "dim_type.top_indicator",
-        "dim_type.bottom_indicator",
-        "dim_type.top_indicator_as_prefix_suffix",
-        "dim_type.bottom_indicator_as_prefix_suffix",
-        "dim_type.text_orientation",
-        "dim_type.text_location",
-        "dim_type.symbol_name"
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
@@ -470,9 +142,34 @@
       ],
       "notes": [
         "Domain family: dimension_types.",
-        "Contains: SpotElevation, SpotElevationFixed.",
-        "Primary units shows indicator fields, no prefix/suffix, no witness line.",
-        "Leader Arrowhead replaces Tick Mark for spot types.",
+        "Contains: Linear, LinearFixed, Angular, ArcLength shapes (all share witness_line_control).",
+        "No record class gating needed — homogeneous property structure across all four shapes.",
+        "witness_line_control is confirmed active for all four shapes in UI."
+      ]
+    },
+    "dimension_types_radial": {
+      "join_key_schema": "dimension_types_radial.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.radius_symbol_location",
+        "dim_type.radius_symbol_text",
+        "dim_type.unit_format_id"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "dim_type.name",
+        "dim_type.tick_mark_uid",
+        "dim_attr.tick_mark_uid"
+      ],
+      "notes": [
+        "Domain family: dimension_types.",
+        "Contains: Radial only.",
+        "Radius Symbol Location and Radius Symbol Text are active fields in UI.",
         "No record class gating needed."
       ]
     },
@@ -506,6 +203,36 @@
         "No record class gating needed."
       ]
     },
+    "dimension_types_spot_elevation": {
+      "join_key_schema": "dimension_types_spot_elevation.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.elevation_indicator",
+        "dim_type.elevation_indicator_as_prefix_suffix",
+        "dim_type.top_indicator",
+        "dim_type.bottom_indicator",
+        "dim_type.top_indicator_as_prefix_suffix",
+        "dim_type.bottom_indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_name"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "dim_type.name",
+        "dim_type.tick_mark_uid",
+        "dim_attr.tick_mark_uid"
+      ],
+      "notes": [
+        "Domain family: dimension_types.",
+        "Contains: SpotElevation, SpotElevationFixed.",
+        "Primary units shows indicator fields, no prefix/suffix, no witness line.",
+        "Leader Arrowhead replaces Tick Mark for spot types.",
+        "No record class gating needed."
+      ]
+    },
     "dimension_types_spot_slope": {
       "join_key_schema": "dimension_types_spot_slope.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
@@ -527,90 +254,6 @@
         "Minimal — Slope Direction and Leader Line Length active, no symbol field.",
         "Rotate with Component is greyed (not applicable) — not extracted.",
         "No record class gating needed."
-      ]
-    },
-    "object_styles_model": {
-      "join_key_schema": "object_styles_model.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "obj_style.row_key",
-        "obj_style.weight.projection",
-        "obj_style.weight.cut",
-        "obj_style.color.rgb",
-        "obj_style.pattern_ref.sig_hash"
-      ],
-      "optional_items": [
-        "obj_style.material_sig_hash"
-      ],
-      "explicitly_excluded_items": [],
-      "notes": [
-        "Domain family: object_styles.",
-        "Contains: CategoryType.Model categories and subcategories.",
-        "Cut weight and material are applicable to Model categories.",
-        "pattern_ref gate removed — pattern_ref.sig_hash is optional (present for ref patterns, q=missing for solid/none).",
-        "pattern_ref.kind NOT in identity_items — only needed for the old gate which is removed.",
-        "row_key encodes category path and provides primary identity."
-      ]
-    },
-    "object_styles_annotation": {
-      "join_key_schema": "object_styles_annotation.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "obj_style.row_key",
-        "obj_style.weight.projection",
-        "obj_style.color.rgb",
-        "obj_style.pattern_ref.sig_hash"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "obj_style.weight.cut",
-        "obj_style.material_sig_hash"
-      ],
-      "notes": [
-        "Domain family: object_styles.",
-        "Contains: CategoryType.Annotation categories.",
-        "Cut weight and material do not exist for Annotation categories in Revit API.",
-        "These fields must not be emitted in identity_items for this domain."
-      ]
-    },
-    "object_styles_analytical": {
-      "join_key_schema": "object_styles_analytical.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "obj_style.row_key",
-        "obj_style.weight.projection",
-        "obj_style.color.rgb",
-        "obj_style.pattern_ref.sig_hash"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "obj_style.weight.cut",
-        "obj_style.material_sig_hash"
-      ],
-      "notes": [
-        "Domain family: object_styles.",
-        "Contains: CategoryType.AnalyticalModel categories.",
-        "Same structure as annotation: cut weight and material not applicable."
-      ]
-    },
-    "object_styles_imported": {
-      "join_key_schema": "object_styles_imported.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "obj_style.row_key",
-        "obj_style.weight.projection",
-        "obj_style.color.rgb",
-        "obj_style.pattern_ref.sig_hash"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "obj_style.weight.cut",
-        "obj_style.material_sig_hash"
-      ],
-      "notes": [
-        "Domain family: object_styles.",
-        "Contains: CategoryType.Imported categories (CAD import artifacts).",
-        "Material present but is CAD render material, not governed Revit material — excluded from identity."
       ]
     },
     "fill_patterns_drafting": {
@@ -652,6 +295,152 @@
         "Solid fills excluded — system defaults, ungoverned."
       ]
     },
+    "floor_types": {
+      "join_key_schema": "floor_types.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "ft.function",
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "ft.type_name",
+        "ft.coarse_fill_color_rgb"
+      ],
+      "notes": [
+        "Domain family: compound_types.",
+        "stack_hash_loose includes deck_usage for structural deck layers."
+      ]
+    },
+    "identity": {
+      "join_key_schema": "identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "identity.is_workshared"
+      ],
+      "optional_items": [
+        "identity.revit_version_number",
+        "identity.revit_build",
+        "identity.revit_version_name"
+      ],
+      "explicitly_excluded_items": [
+        "identity.central_path",
+        "identity.central_path_norm",
+        "identity.filename",
+        "identity.project_title"
+      ],
+      "shape_gating": {
+        "discriminator_key": "identity.is_workshared",
+        "shape_requirements": {
+          "true": {
+            "additional_required": [
+              "identity.revit_version_number"
+            ],
+            "additional_optional": [],
+            "notes": "Workshared identity joins include version number as discriminator-gated required context."
+          }
+        },
+        "default_shape_behavior": "common_only"
+      },
+      "notes": [
+        "Pilot for canonical evidence superset + selectors in the identity domain.",
+        "join_hash uses policy-required items only; optional items remain in identity_basis.items for future exploration.",
+        "File-local identifiers remain excluded from canonical identity evidence and join-key hashing."
+      ]
+    },
+    "line_patterns": {
+      "join_key_schema": "line_patterns.join_key.v3",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "line_pattern.segments_norm_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "line_pattern.uid",
+        "line_pattern.name",
+        "line_pattern.element_id",
+        "line_pattern.uid_or_namekey",
+        "line_pattern.segments_def_hash"
+      ],
+      "notes": [
+        "Upgraded from v2 (segments_def_hash) to v3 (segments_norm_hash) for scale-invariant identity.",
+        "segments_norm_hash encodes segment kind sequence + length ratios (length / non_dot_total).",
+        "Scale variants of the same structural type collapse to the same pattern.",
+        "Dot segments use relative epsilon (1% of non_dot_total) to preserve scale invariance.",
+        "segments_def_hash moved to explicitly_excluded — retains exact identity in identity_basis for forensics.",
+        "Names are labels only and must not participate in joins.",
+        "lp.is_import added to coordination_items in extractor v2."
+      ]
+    },
+    "line_styles": {
+      "join_key_schema": "line_styles.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "line_style.weight.projection",
+        "line_style.color.rgb",
+        "line_style.pattern_ref.sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "line_style.path",
+        "line_style.pattern_ref.kind"
+      ],
+      "notes": [
+        "Identity is definition-based: projection weight + color + referenced line pattern definition via pattern_ref.sig_hash.",
+        "pattern_ref.kind is too coarse and produces high collisions; it must not be used for joins."
+      ]
+    },
+    "loaded_family_types": {
+      "join_key_schema": "loaded_family_types.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "lft.shape_gate.category",
+        "lft.type_parameter_schema_hash"
+      ],
+      "optional_items": [
+        "lft.family_is_in_place",
+        "lft.family_is_editable"
+      ],
+      "explicitly_excluded_items": [
+        "lft.shape_gate.category_id",
+        "lft.type_parameter_count",
+        "lft.family_symbol_count",
+        "lft.type_count"
+      ],
+      "notes": [
+        "Records are at family granularity (one per Family element, not per type).",
+        "family_name is excluded from join: including it prevents within-project matches for",
+        "functionally identical families with different names. Two families that share category +",
+        "parameter schema are the same behavioral concept.",
+        "",
+        "lft.type_parameter_schema_hash IS the behavioral anchor for join: it encodes the full",
+        "parameter definition set for the family, making it a precise identity discriminator.",
+        "Note: schema_hash is opaque to greedy/Pareto discovery tools — those tools cannot",
+        "decompose it into sub-fields. For finer-grained join discovery, individual parameter",
+        "values from parameter_rows would need to be promoted as identity items (future work,",
+        "see domain future-steps item 8).",
+        "",
+        "lft.family_is_in_place / lft.family_is_editable optionally narrow matches to",
+        "loaded-only or in-place-only subsets.",
+        "",
+        "Excluded from any parameter-row (lftp.*) discovery promotion:",
+        "  bip:-1002001 Type Name      -- circular alias of lft.type_name (removed field)",
+        "  bip:-1002002 Family Name    -- circular alias of family_name (label-only)",
+        "  bip:-1140362/3 Category     -- circular alias of lft.shape_gate.category",
+        "  bip:-1002053 Workset        -- operational",
+        "  bip:-1002067 Edited by      -- operational",
+        "  bip:-1019001/13/15/17 IFC   -- file-local export config",
+        "  bip:-1152384 Type Image     -- presentation only",
+        "  bip:-1001205 Cost           -- project-local financial",
+        "  bip:-1013201 Design Option  -- file-local context",
+        "  guid:* pattern              -- project-specific shared params (e.g. Revision) not portable",
+        "  Classification group        -- Type Mark, Assembly Code/Description, OmniClass Number/Title,",
+        "                                 Code Name, Description, URL, Manufacturer, Model, Keynote;",
+        "                                 taxonomy labels useful for label synthesis only"
+      ]
+    },
     "materials": {
       "join_key_schema": "materials.join_key.v2",
       "hash_alg": "md5_utf8_join_pipe",
@@ -660,7 +449,7 @@
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
-		"material.uid",
+        "material.uid",
         "material.id_local",
         "material.name",
         "material.class",
@@ -697,24 +486,319 @@
         "Appearance/Physical/Thermal assets are explicitly deferred in v1."
       ]
     },
-    "view_templates_floor_structural_area_plans": {
-      "join_key_schema": "view_templates.join_key.v1",
+    "object_styles_analytical": {
+      "join_key_schema": "object_styles_analytical.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "view_template.def_hash"
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
       ],
       "optional_items": [],
       "explicitly_excluded_items": [
-        "view_template.name",
-        "view_template.uid",
-        "view_template.element_id",
-        "view_template.category_overrides_def_hash"
+        "obj_style.weight.cut",
+        "obj_style.material_sig_hash"
       ],
       "notes": [
-        "Split domain: same join key policy as monolithic view_templates.",
-        "view_template.def_hash captures complete behavioral definition.",
-        "Domain family routing is handled by coordination_items.vt.view_type_family, not by the join key.",
-        "Contains: ViewType.FloorPlan, ViewType.EngineeringPlan (Structural), ViewType.AreaPlan."
+        "Domain family: object_styles.",
+        "Contains: CategoryType.AnalyticalModel categories.",
+        "Same structure as annotation: cut weight and material not applicable."
+      ]
+    },
+    "object_styles_annotation": {
+      "join_key_schema": "object_styles_annotation.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "obj_style.weight.cut",
+        "obj_style.material_sig_hash"
+      ],
+      "notes": [
+        "Domain family: object_styles.",
+        "Contains: CategoryType.Annotation categories.",
+        "Cut weight and material do not exist for Annotation categories in Revit API.",
+        "These fields must not be emitted in identity_items for this domain."
+      ]
+    },
+    "object_styles_imported": {
+      "join_key_schema": "object_styles_imported.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "obj_style.weight.cut",
+        "obj_style.material_sig_hash"
+      ],
+      "notes": [
+        "Domain family: object_styles.",
+        "Contains: CategoryType.Imported categories (CAD import artifacts).",
+        "Material present but is CAD render material, not governed Revit material — excluded from identity."
+      ]
+    },
+    "object_styles_model": {
+      "join_key_schema": "object_styles_model.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.weight.cut",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "optional_items": [
+        "obj_style.material_sig_hash"
+      ],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "Domain family: object_styles.",
+        "Contains: CategoryType.Model categories and subcategories.",
+        "Cut weight and material are applicable to Model categories.",
+        "pattern_ref gate removed — pattern_ref.sig_hash is optional (present for ref patterns, q=missing for solid/none).",
+        "pattern_ref.kind NOT in identity_items — only needed for the old gate which is removed.",
+        "row_key encodes category path and provides primary identity."
+      ]
+    },
+    "phase_filters": {
+      "join_key_schema": "phase_filters.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "phase_filter.demolished.presentation_id",
+        "phase_filter.existing.presentation_id",
+        "phase_filter.new.presentation_id",
+        "phase_filter.temporary.presentation_id"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "phase_filter.name"
+      ],
+      "notes": [
+        "Policy aligned to canonical identity evidence emitted by domains/phase_filters.py.",
+        "Join identity is defined by the four per-status presentation ids; phase_filter.name remains a phase2 coordination/label field only.",
+        "This replaces the provisional name-only policy, which no longer matched the exported identity_items surface."
+      ]
+    },
+    "phases": {
+      "join_key_schema": "phases.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "phase.name"
+      ],
+      "optional_items": [
+        "phase.seq"
+      ],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "Policy is provisional pending broader samples; current Pareto evidence shows zero fragmentation and zero collisions for both phase.name and phase.seq.",
+        "phase.name is treated as the definition-bearing identifier in current evidence; phase.seq may be added only if future datasets exhibit name collisions."
+      ]
+    },
+    "roof_types": {
+      "join_key_schema": "roof_types.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "rt.type_name",
+        "rt.coarse_fill_color_rgb"
+      ],
+      "notes": [
+        "Domain family: compound_types.",
+        "Basic Roof only — non-basic types blocked."
+      ]
+    },
+    "text_types": {
+      "join_key_schema": "text_types.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "text_type.font",
+        "text_type.size_in",
+        "text_type.bold",
+        "text_type.italic",
+        "text_type.underline",
+        "text_type.color_rgb",
+        "text_type.width_factor"
+      ],
+      "optional_items": [
+        "text_type.leader_arrowhead_sig_hash",
+        "text_type.background_raw",
+        "text_type.line_weight",
+        "text_type.show_border",
+        "text_type.tab_size_in",
+        "text_type.leader_border_offset_in"
+      ],
+      "explicitly_excluded_items": [
+        "text_type.name",
+        "text_type.type_id",
+        "text_type.type_uid",
+        "text_type.leader_arrowhead_uid",
+        "text_type.leader_arrowhead_name",
+        "text_type.color_int"
+      ],
+      "notes": [
+        "Policy: color_rgb is definition-bearing.",
+        "Policy: arrowhead is definition-bearing only via arrowheads-domain signature hash (text_type.leader_arrowhead_sig_hash), not uid/name/id.",
+        "If text_type.leader_arrowhead_sig_hash is unavailable for some records, treat as lower confidence rather than substituting uid/name."
+      ]
+    },
+    "units": {
+      "join_key_schema": "units.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "units.spec",
+        "units.unit_type_id",
+        "units.rounding_method"
+      ],
+      "optional_items": [
+        "units.accuracy"
+      ],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "Accuracy moved to optional - display precision preference, not behavioral identity.",
+        "Spec + type + rounding define the unit system (feet-inches, metric, etc.).",
+        "Accuracy variance (0.01 vs 1.0) is display formatting, not calculation behavior.",
+        "DECISION: Accuracy affects display only, not technical behavior - treat as refinement."
+      ]
+    },
+    "view_category_overrides": {
+      "join_key_schema": "view_category_overrides.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vco.category_path",
+        "vco.projection.line_weight",
+        "vco.projection.line_pattern_ref.sig_hash",
+        "vco.projection.line_color.rgb",
+        "vco.cut.line_weight",
+        "vco.cut.line_pattern_ref.sig_hash",
+        "vco.cut.line_color.rgb",
+        "vco.halftone",
+        "vco.transparency"
+      ],
+      "notes": [
+        "Join-key identity captures the override pattern, not where it's used.",
+        "vco.baseline_category_path identifies WHICH category is being overridden.",
+        "vco.baseline_sig_hash identifies the object_styles baseline definition being overridden.",
+        "vco.override_properties_hash collapses all delta properties into a single behavioral signature.",
+        "Individual delta properties (line_weight, color, etc.) are forensic detail, excluded from joins.",
+        "Deprecated aggregate domain. Use view_category_overrides_model and view_category_overrides_annotation."
+      ]
+    },
+    "view_category_overrides_annotation": {
+      "join_key_schema": "view_category_overrides_annotation.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vco.category_path",
+        "vco.projection.line_weight",
+        "vco.projection.line_pattern_ref.sig_hash",
+        "vco.projection.line_color.rgb",
+        "vco.halftone",
+        "vco.transparency"
+      ],
+      "notes": [
+        "Domain family: view_category_overrides.",
+        "Contains: CategoryType.Annotation categories.",
+        "Cut weight not applicable to annotation categories — excluded.",
+        "include_controlled removed — include state sourced from view_templates.include_vg_annotation.",
+        "vco.vg_tab = Annotation in coordination_items for downstream join.",
+        "Baseline: object_styles_annotation ctx map."
+      ]
+    },
+    "view_category_overrides_model": {
+      "join_key_schema": "view_category_overrides_model.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vco.category_path",
+        "vco.projection.line_weight",
+        "vco.projection.line_pattern_ref.sig_hash",
+        "vco.projection.line_color.rgb",
+        "vco.cut.line_weight",
+        "vco.cut.line_pattern_ref.sig_hash",
+        "vco.cut.line_color.rgb",
+        "vco.halftone",
+        "vco.transparency"
+      ],
+      "notes": [
+        "Domain family: view_category_overrides.",
+        "Contains: CategoryType.Model categories and subcategories.",
+        "include_controlled removed — include state sourced from view_templates.include_vg_model.",
+        "vco.vg_tab = Model in coordination_items for downstream join."
+      ]
+    },
+    "view_filter_applications_view_templates": {
+      "join_key_schema": "view_filter_applications_view_templates.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vfa.stack_def_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vfa.template_uid_or_namekey",
+        "vfa.template_elem_id",
+        "vfa.filter_stack_count",
+        "vfa.stack[].filter_sig_hash",
+        "vfa.stack[].visible",
+        "vfa.stack[].enabled"
+      ],
+      "notes": [
+        "Structured-sequence domain: join identity is the ordered filter-stack definition collapsed into vfa.stack_def_hash.",
+        "Leaf stack members and counts are authoritative identity (identity_basis) but must not participate in joins.",
+        "Template identifiers are labels/linkage only and are prohibited from joins."
+      ]
+    },
+    "view_filter_definitions": {
+      "join_key_schema": "view_filter_definitions.join_key.v2",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "vf.def_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "vf.uid_or_namekey",
+        "vf.elem_id",
+        "vf.categories",
+        "vf.logic_root",
+        "vf.rule_count",
+        "vf.rules[].sig",
+        "label.components.name",
+        "label.display"
+      ],
+      "notes": [
+        "Structured domain: join is performed on vf.def_hash only (definition bundle hash).",
+        "vf.def_hash is computed from canonical vf.categories + vf.logic_root + vf.rule_count + ordered vf.rule[###].sig, but those leaf inputs remain identity-only for forensics.",
+        "Names/labels and any UID-like identifiers are prohibited from joins for standards governance."
       ]
     },
     "view_templates_ceiling_plans": {
@@ -755,6 +839,26 @@
         "view_template.def_hash captures complete behavioral definition.",
         "Domain family routing is handled by coordination_items.vt.view_type_family, not by the join key.",
         "Contains: ViewType.Elevation, ViewType.Section, ViewType.Detail."
+      ]
+    },
+    "view_templates_floor_structural_area_plans": {
+      "join_key_schema": "view_templates.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "view_template.def_hash"
+      ],
+      "optional_items": [],
+      "explicitly_excluded_items": [
+        "view_template.name",
+        "view_template.uid",
+        "view_template.element_id",
+        "view_template.category_overrides_def_hash"
+      ],
+      "notes": [
+        "Split domain: same join key policy as monolithic view_templates.",
+        "view_template.def_hash captures complete behavioral definition.",
+        "Domain family routing is handled by coordination_items.vt.view_type_family, not by the join key.",
+        "Contains: ViewType.FloorPlan, ViewType.EngineeringPlan (Structural), ViewType.AreaPlan."
       ]
     },
     "view_templates_renderings_drafting": {
@@ -820,61 +924,6 @@
         "stack_hash_strict and stack_hash_function_only are coordination items for pareto evaluation.",
         "Wrapping params are optional — degrade gracefully if unreadable.",
         "wt.type_name excluded per D-001 — names are labels only."
-      ]
-    },
-    "floor_types": {
-      "join_key_schema": "floor_types.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "ft.function",
-        "ft.layer_count",
-        "ft.total_thickness_in",
-        "ft.stack_hash_loose"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "ft.type_name",
-        "ft.coarse_fill_color_rgb"
-      ],
-      "notes": [
-        "Domain family: compound_types.",
-        "stack_hash_loose includes deck_usage for structural deck layers."
-      ]
-    },
-    "roof_types": {
-      "join_key_schema": "roof_types.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "rt.layer_count",
-        "rt.total_thickness_in",
-        "rt.stack_hash_loose"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "rt.type_name",
-        "rt.coarse_fill_color_rgb"
-      ],
-      "notes": [
-        "Domain family: compound_types.",
-        "Basic Roof only — non-basic types blocked."
-      ]
-    },
-    "ceiling_types": {
-      "join_key_schema": "ceiling_types.join_key.v1",
-      "hash_alg": "md5_utf8_join_pipe",
-      "required_items": [
-        "ct.layer_count",
-        "ct.total_thickness_in",
-        "ct.stack_hash_loose"
-      ],
-      "optional_items": [],
-      "explicitly_excluded_items": [
-        "ct.type_name",
-        "ct.coarse_fill_color_rgb"
-      ],
-      "notes": [
-        "Domain family: compound_types.",
-        "Compound Ceiling only — non-compound types blocked."
       ]
     }
   }

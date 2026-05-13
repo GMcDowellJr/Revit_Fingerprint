@@ -2,7 +2,6 @@
   "version": "domain_identity_keys.v2",
   "record_schema_version": "record.v2",
   "identity_item_schema": "identity_items.v1",
-
   "identity_quality_dominance_order": [
     "none_blocked",
     "incomplete_unreadable",
@@ -10,156 +9,13 @@
     "incomplete_missing",
     "complete"
   ],
-
   "banned_identity_value_substrings": [
     "<MISSING>",
     "<UNREADABLE>",
     "<NOT_APPLICABLE>",
     "<LP:UNMAPPED>"
   ],
-
   "domains": {
-    "line_patterns": {
-      "domain_family": "line_patterns",
-      "allowed_keys": [
-        "line_pattern.uid_or_namekey",
-        "line_pattern.segment_count",
-        "line_pattern.segments_def_hash"
-      ],
-      "allowed_key_prefixes": [
-        "line_pattern.seg["
-      ],
-      "required_keys": [
-        "line_pattern.uid_or_namekey",
-        "line_pattern.segment_count"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      },
-      "indexed_key_rules": {
-        "line_pattern.seg[i].kind": true,
-        "line_pattern.seg[i].length": true
-      }
-    },
-
-    "line_styles": {
-      "domain_family": "line_styles",
-      "allowed_keys": [
-        "line_style.line_weight_projection",
-        "line_style.color_rgb",
-        "line_style.weight.cut",
-        "line_style.pattern_ref.sig_hash",
-        "line_style.weight.projection",
-        "line_style.color.rgb"
-      ],
-      "required_keys": [
-        "line_style.line_weight_projection",
-        "line_style.color_rgb",
-        "line_style.pattern_ref.sig_hash"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
-    "units": {
-      "domain_family": "units",
-      "allowed_keys": [
-        "units.spec",
-        "units.unit_type_id",
-        "units.symbol_type_id",
-        "units.accuracy",
-        "units.rounding_method"
-      ],
-      "required_keys": [
-        "units.spec",
-        "units.unit_type_id"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
-    "view_filter_definitions": {
-      "domain_family": "view_filter_definitions",
-      "allowed_keys": [
-        "vf.uid_or_namekey",
-        "vf.logic_root",
-        "vf.rule_count",
-        "vf.categories",
-        "vf.def_hash"
-      ],
-      "allowed_key_prefixes": [
-        "vf.rule["
-      ],
-      "required_keys": [
-        "vf.uid_or_namekey",
-        "vf.logic_root",
-        "vf.rule_count"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      },
-      "indexed_key_rules": {
-        "vf.rule[i].kind": true,
-        "vf.rule[i].op": true,
-        "vf.rule[i].param_ref.kind": true,
-        "vf.rule[i].param_ref.id": true,
-        "vf.rule[i].value": true
-      }
-    },
-
-    "view_filter_applications_view_templates": {
-      "domain_family": "view_filter_applications_view_templates",
-      "allowed_keys": [
-        "vfa.template_uid_or_namekey",
-        "vfa.filter_stack_count",
-        "vfa.stack_def_hash"
-      ],
-      "allowed_key_prefixes": [
-        "vfa.stack["
-      ],
-      "required_keys": [
-        "vfa.template_uid_or_namekey",
-        "vfa.filter_stack_count"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      },
-      "indexed_key_rules": {
-        "vfa.stack[i].filter_sig_hash": true,
-        "vfa.stack[i].visibility": true,
-        "vfa.stack[i].overrides": true
-      }
-    },
-
-    "phases": {
-      "domain_family": "phases",
-      "allowed_keys": ["phase.seq", "phase.name"],
-      "allowed_key_prefixes": [],
-      "required_keys": ["phase.seq", "phase.name"],
-      "minima": {"block_if_any_required_not_ok": true},
-      "indexed_key_rules": {}
-    },
-
-    "phase_filters": {
-      "domain_family": "phase_filters",
-      "allowed_keys": ["phase_filter.name", "phase_filter.new.presentation_id", "phase_filter.existing.presentation_id", "phase_filter.demolished.presentation_id", "phase_filter.temporary.presentation_id"],
-      "allowed_key_prefixes": [],
-      "required_keys": ["phase_filter.name", "phase_filter.new.presentation_id", "phase_filter.existing.presentation_id", "phase_filter.demolished.presentation_id", "phase_filter.temporary.presentation_id"],
-      "minima": {"block_if_any_required_not_ok": true},
-      "indexed_key_rules": {}
-    },
-
-    "text_types": {
-      "domain_family": "text_types",
-      "allowed_keys": ["text_type.name", "text_type.font", "text_type.size_in", "text_type.width_factor", "text_type.background", "text_type.line_weight", "text_type.color_rgb", "text_type.show_border", "text_type.leader_border_offset_in", "text_type.tab_size_in", "text_type.bold", "text_type.italic", "text_type.underline"],
-      "allowed_key_prefixes": [],
-      "required_keys": ["text_type.name", "text_type.font", "text_type.size_in", "text_type.width_factor", "text_type.background", "text_type.line_weight", "text_type.color_rgb", "text_type.show_border", "text_type.leader_border_offset_in", "text_type.tab_size_in", "text_type.bold", "text_type.italic", "text_type.underline"],
-      "minima": {"block_if_any_required_not_ok": true},
-      "indexed_key_rules": {}
-    },
-
     "arrowheads": {
       "domain_family": "arrowheads",
       "allowed_keys": [
@@ -181,94 +37,41 @@
         "block_if_any_required_not_ok": true
       }
     },
-
-    "identity": {
-      "domain_family": "identity",
+    "ceiling_types": {
+      "domain_family": "compound_types",
       "allowed_keys": [
-        "identity.is_workshared",
-        "identity.revit_version_number",
-        "identity.revit_version_name",
-        "identity.revit_build"
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose",
+        "ct.total_layer_rows",
+        "ct.stack_hash_strict",
+        "ct.stack_hash_function_only",
+        "ct.coarse_fill_pattern_sig_hash",
+        "ct.type_name",
+        "ct.coarse_fill_color_rgb"
       ],
       "required_keys": [
-        "identity.is_workshared"
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose"
+      ],
+      "required": [
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose"
+      ],
+      "optional": [
+        "ct.total_layer_rows",
+        "ct.stack_hash_strict",
+        "ct.stack_hash_function_only",
+        "ct.coarse_fill_pattern_sig_hash",
+        "ct.type_name",
+        "ct.coarse_fill_color_rgb"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
       }
     },
-
-    "view_category_overrides": {
-      "domain_family": "view_category_overrides",
-      "allowed_keys": [
-        "vco.baseline_category_path",
-        "vco.baseline_sig_hash",
-        "vco.override_properties_hash",
-        "vco.projection.line_weight",
-        "vco.projection.color.rgb",
-        "vco.projection.pattern_ref.sig_hash",
-        "vco.projection.fill_pattern_ref.sig_hash",
-        "vco.projection.fill_color.rgb",
-        "vco.cut.line_weight",
-        "vco.cut.color.rgb",
-        "vco.cut.pattern_ref.sig_hash",
-        "vco.cut.fill_pattern_ref.sig_hash",
-        "vco.cut.fill_color.rgb",
-        "vco.halftone",
-        "vco.transparency",
-        "vco.include_controlled",
-        "vco.vg_category_type",
-        "vco.context_type",
-        "vco.template_name",
-        "vco.template_element_id",
-        "vco.template_unique_id"
-      ],
-      "required_keys": [
-        "vco.baseline_category_path",
-        "vco.baseline_sig_hash",
-        "vco.override_properties_hash"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
-    "dimension_types_linear": {
-      "domain_family": "dimension_types",
-      "allowed_keys": [
-        "dim_type.shape",
-        "dim_type.accuracy",
-        "dim_type.tick_mark_sig_hash",
-        "dim_type.witness_line_control",
-        "dim_type.unit_format_id",
-        "dim_type.rounding",
-        "dim_type.prefix",
-        "dim_type.suffix",
-        "dim_type.text_font",
-        "dim_type.text_size_in",
-        "dim_type.text_bold",
-        "dim_type.text_italic",
-        "dim_type.text_underline",
-        "dim_type.text_width_factor",
-        "dim_type.text_background",
-        "dim_type.color_rgb",
-        "dim_type.line_weight"
-      ],
-      "required_keys": [
-        "dim_type.shape",
-        "dim_type.accuracy",
-        "dim_type.tick_mark_sig_hash",
-        "dim_type.witness_line_control",
-        "dim_type.unit_format_id",
-        "dim_type.rounding",
-        "dim_type.prefix",
-        "dim_type.suffix"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
     "dimension_types_angular": {
       "domain_family": "dimension_types",
       "allowed_keys": [
@@ -304,43 +107,6 @@
         "block_if_any_required_not_ok": true
       }
     },
-
-    "dimension_types_radial": {
-      "domain_family": "dimension_types",
-      "allowed_keys": [
-        "dim_type.shape",
-        "dim_type.accuracy",
-        "dim_type.tick_mark_sig_hash",
-        "dim_type.center_marks",
-        "dim_type.center_mark_size",
-        "dim_type.radius_symbol_location",
-        "dim_type.radius_symbol_text",
-        "dim_type.unit_format_id",
-        "dim_type.text_font",
-        "dim_type.text_size_in",
-        "dim_type.text_bold",
-        "dim_type.text_italic",
-        "dim_type.text_underline",
-        "dim_type.text_width_factor",
-        "dim_type.text_background",
-        "dim_type.color_rgb",
-        "dim_type.line_weight"
-      ],
-      "required_keys": [
-        "dim_type.shape",
-        "dim_type.accuracy",
-        "dim_type.tick_mark_sig_hash",
-        "dim_type.center_marks",
-        "dim_type.center_mark_size",
-        "dim_type.radius_symbol_location",
-        "dim_type.radius_symbol_text",
-        "dim_type.unit_format_id"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
     "dimension_types_diameter": {
       "domain_family": "dimension_types",
       "allowed_keys": [
@@ -376,22 +142,17 @@
         "block_if_any_required_not_ok": true
       }
     },
-
-    "dimension_types_spot_elevation": {
+    "dimension_types_linear": {
       "domain_family": "dimension_types",
       "allowed_keys": [
         "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
         "dim_type.unit_format_id",
-        "dim_type.elevation_indicator",
-        "dim_type.elevation_indicator_as_prefix_suffix",
-        "dim_type.top_indicator",
-        "dim_type.bottom_indicator",
-        "dim_type.top_indicator_as_prefix_suffix",
-        "dim_type.bottom_indicator_as_prefix_suffix",
-        "dim_type.text_orientation",
-        "dim_type.text_location",
-        "dim_type.symbol_name",
-        "dim_type.leader_arrowhead_sig_hash",
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix",
         "dim_type.text_font",
         "dim_type.text_size_in",
         "dim_type.text_bold",
@@ -404,22 +165,53 @@
       ],
       "required_keys": [
         "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.witness_line_control",
         "dim_type.unit_format_id",
-        "dim_type.elevation_indicator",
-        "dim_type.elevation_indicator_as_prefix_suffix",
-        "dim_type.top_indicator",
-        "dim_type.bottom_indicator",
-        "dim_type.top_indicator_as_prefix_suffix",
-        "dim_type.bottom_indicator_as_prefix_suffix",
-        "dim_type.text_orientation",
-        "dim_type.text_location",
-        "dim_type.symbol_name"
+        "dim_type.rounding",
+        "dim_type.prefix",
+        "dim_type.suffix"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
       }
     },
-
+    "dimension_types_radial": {
+      "domain_family": "dimension_types",
+      "allowed_keys": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.radius_symbol_location",
+        "dim_type.radius_symbol_text",
+        "dim_type.unit_format_id",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "required_keys": [
+        "dim_type.shape",
+        "dim_type.accuracy",
+        "dim_type.tick_mark_sig_hash",
+        "dim_type.center_marks",
+        "dim_type.center_mark_size",
+        "dim_type.radius_symbol_location",
+        "dim_type.radius_symbol_text",
+        "dim_type.unit_format_id"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
     "dimension_types_spot_coordinate": {
       "domain_family": "dimension_types",
       "allowed_keys": [
@@ -464,7 +256,48 @@
         "block_if_any_required_not_ok": true
       }
     },
-
+    "dimension_types_spot_elevation": {
+      "domain_family": "dimension_types",
+      "allowed_keys": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.elevation_indicator",
+        "dim_type.elevation_indicator_as_prefix_suffix",
+        "dim_type.top_indicator",
+        "dim_type.bottom_indicator",
+        "dim_type.top_indicator_as_prefix_suffix",
+        "dim_type.bottom_indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_name",
+        "dim_type.leader_arrowhead_sig_hash",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight"
+      ],
+      "required_keys": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.elevation_indicator",
+        "dim_type.elevation_indicator_as_prefix_suffix",
+        "dim_type.top_indicator",
+        "dim_type.bottom_indicator",
+        "dim_type.top_indicator_as_prefix_suffix",
+        "dim_type.bottom_indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_name"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
     "dimension_types_spot_slope": {
       "domain_family": "dimension_types",
       "allowed_keys": [
@@ -493,73 +326,6 @@
         "block_if_any_required_not_ok": true
       }
     },
-
-    "object_styles_model": {
-      "domain_family": "object_styles",
-      "allowed_keys": [
-        "obj_style.row_key",
-        "obj_style.weight.projection",
-        "obj_style.weight.cut",
-        "obj_style.color.rgb",
-        "obj_style.pattern_ref.sig_hash",
-        "obj_style.material_sig_hash"
-      ],
-      "required_keys": [
-        "obj_style.row_key"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
-    "object_styles_annotation": {
-      "domain_family": "object_styles",
-      "allowed_keys": [
-        "obj_style.row_key",
-        "obj_style.weight.projection",
-        "obj_style.color.rgb",
-        "obj_style.pattern_ref.sig_hash"
-      ],
-      "required_keys": [
-        "obj_style.row_key"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
-    "object_styles_analytical": {
-      "domain_family": "object_styles",
-      "allowed_keys": [
-        "obj_style.row_key",
-        "obj_style.weight.projection",
-        "obj_style.color.rgb",
-        "obj_style.pattern_ref.sig_hash"
-      ],
-      "required_keys": [
-        "obj_style.row_key"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
-    "object_styles_imported": {
-      "domain_family": "object_styles",
-      "allowed_keys": [
-        "obj_style.row_key",
-        "obj_style.weight.projection",
-        "obj_style.color.rgb",
-        "obj_style.pattern_ref.sig_hash"
-      ],
-      "required_keys": [
-        "obj_style.row_key"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
     "fill_patterns_drafting": {
       "domain_family": "fill_patterns",
       "allowed_keys": [
@@ -586,7 +352,6 @@
         "fill_pattern.grid[i].offset": true
       }
     },
-
     "fill_patterns_model": {
       "domain_family": "fill_patterns",
       "allowed_keys": [
@@ -613,36 +378,510 @@
         "fill_pattern.grid[i].offset": true
       }
     },
-
+    "floor_types": {
+      "domain_family": "compound_types",
+      "allowed_keys": [
+        "ft.function",
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose",
+        "ft.total_layer_rows",
+        "ft.stack_hash_strict",
+        "ft.stack_hash_function_only",
+        "ft.coarse_fill_pattern_sig_hash",
+        "ft.has_embedded_sweeps",
+        "ft.type_name",
+        "ft.coarse_fill_color_rgb"
+      ],
+      "required_keys": [
+        "ft.function",
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose"
+      ],
+      "required": [
+        "ft.function",
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose"
+      ],
+      "optional": [
+        "ft.total_layer_rows",
+        "ft.stack_hash_strict",
+        "ft.stack_hash_function_only",
+        "ft.coarse_fill_pattern_sig_hash",
+        "ft.has_embedded_sweeps",
+        "ft.type_name",
+        "ft.coarse_fill_color_rgb"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+    "identity": {
+      "domain_family": "identity",
+      "allowed_keys": [
+        "identity.is_workshared",
+        "identity.revit_version_number",
+        "identity.revit_version_name",
+        "identity.revit_build"
+      ],
+      "required_keys": [
+        "identity.is_workshared"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+    "line_patterns": {
+      "domain_family": "line_patterns",
+      "allowed_keys": [
+        "line_pattern.uid_or_namekey",
+        "line_pattern.segment_count",
+        "line_pattern.segments_def_hash"
+      ],
+      "allowed_key_prefixes": [
+        "line_pattern.seg["
+      ],
+      "required_keys": [
+        "line_pattern.uid_or_namekey",
+        "line_pattern.segment_count"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {
+        "line_pattern.seg[i].kind": true,
+        "line_pattern.seg[i].length": true
+      }
+    },
+    "line_styles": {
+      "domain_family": "line_styles",
+      "allowed_keys": [
+        "line_style.line_weight_projection",
+        "line_style.color_rgb",
+        "line_style.weight.cut",
+        "line_style.pattern_ref.sig_hash",
+        "line_style.weight.projection",
+        "line_style.color.rgb"
+      ],
+      "required_keys": [
+        "line_style.line_weight_projection",
+        "line_style.color_rgb",
+        "line_style.pattern_ref.sig_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+    "loaded_family_types": {
+      "domain_family": "loaded_family_types",
+      "allowed_keys": [
+        "lft.shape_gate.category",
+        "lft.shape_gate.category_id",
+        "lft.type_parameter_schema_hash",
+        "lft.type_parameter_count",
+        "lft.family_is_in_place",
+        "lft.family_is_editable",
+        "lft.family_symbol_count",
+        "lft.type_count"
+      ],
+      "required_keys": [
+        "lft.shape_gate.category",
+        "lft.type_parameter_schema_hash"
+      ],
+      "optional": [
+        "lft.type_parameter_count",
+        "lft.family_symbol_count",
+        "lft.family_is_in_place",
+        "lft.family_is_editable",
+        "lft.shape_gate.category_id",
+        "lft.type_count"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Records are emitted at family granularity (one record per Family element, not per FamilySymbol).",
+        "lft.family_name is label-only — excluded from identity_basis so sig_hash is name-independent.",
+        "lft.type_name removed: replaced by lft.type_count (count of collected types per family).",
+        "lft.family_symbol_count: API-reported total types; may differ from lft.type_count if types were filtered.",
+        "lft.type_parameter_schema_hash is the primary behavioral anchor for sig_hash.",
+        "lft.shape_gate.category_id is allowed but excluded from sig/join: Revit-version-specific int.",
+        "lft.family_is_editable and lft.family_is_in_place are discrimination signals (loaded vs system).",
+        "sig_hash = f(category + schema_hash + is_in_place + is_editable + counts).",
+        "join_hash discovery: schema_hash is the behavioral anchor; individual parameter value items",
+        "  (from parameter_rows) are future discovery work (see domain future-steps)."
+      ]
+    },
     "materials": {
       "domain_family": "materials",
       "allowed_keys": [
+        "material.graphics_sig_hash_v2",
         "material.uid"
       ],
       "required_keys": [
-        "material.uid"
+        "material.graphics_sig_hash_v2"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "sig_hash anchors on material.graphics_sig_hash_v2 (visual/material properties).",
+        "material.uid is for record traceability only — not a sig or join anchor.",
+        "Consistent with domain_join_key_policies.json which requires graphics_sig_hash_v2."
+      ]
+    },
+    "object_styles_analytical": {
+      "domain_family": "object_styles",
+      "allowed_keys": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "required_keys": [
+        "obj_style.row_key"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
       }
     },
-
-    "view_templates_floor_structural_area_plans": {
-      "domain_family": "view_templates",
+    "object_styles_annotation": {
+      "domain_family": "object_styles",
       "allowed_keys": [
-        "view_template.def_hash"
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "required_keys": [
+        "obj_style.row_key"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+    "object_styles_imported": {
+      "domain_family": "object_styles",
+      "allowed_keys": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash"
+      ],
+      "required_keys": [
+        "obj_style.row_key"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+    "object_styles_model": {
+      "domain_family": "object_styles",
+      "allowed_keys": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.weight.cut",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash",
+        "obj_style.material_sig_hash"
+      ],
+      "required_keys": [
+        "obj_style.row_key"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+    "phase_filters": {
+      "domain_family": "phase_filters",
+      "allowed_keys": [
+        "phase_filter.name",
+        "phase_filter.new.presentation_id",
+        "phase_filter.existing.presentation_id",
+        "phase_filter.demolished.presentation_id",
+        "phase_filter.temporary.presentation_id"
+      ],
+      "allowed_key_prefixes": [],
+      "required_keys": [
+        "phase_filter.name",
+        "phase_filter.new.presentation_id",
+        "phase_filter.existing.presentation_id",
+        "phase_filter.demolished.presentation_id",
+        "phase_filter.temporary.presentation_id"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {}
+    },
+    "phases": {
+      "domain_family": "phases",
+      "allowed_keys": [
+        "phase.seq",
+        "phase.name"
+      ],
+      "allowed_key_prefixes": [],
+      "required_keys": [
+        "phase.seq",
+        "phase.name"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {}
+    },
+    "roof_types": {
+      "domain_family": "compound_types",
+      "allowed_keys": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose",
+        "rt.total_layer_rows",
+        "rt.stack_hash_strict",
+        "rt.stack_hash_function_only",
+        "rt.coarse_fill_pattern_sig_hash",
+        "rt.type_name",
+        "rt.coarse_fill_color_rgb"
+      ],
+      "required_keys": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose"
+      ],
+      "required": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose"
+      ],
+      "optional": [
+        "rt.total_layer_rows",
+        "rt.stack_hash_strict",
+        "rt.stack_hash_function_only",
+        "rt.coarse_fill_pattern_sig_hash",
+        "rt.type_name",
+        "rt.coarse_fill_color_rgb"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+    "text_types": {
+      "domain_family": "text_types",
+      "allowed_keys": [
+        "text_type.name",
+        "text_type.font",
+        "text_type.size_in",
+        "text_type.width_factor",
+        "text_type.background",
+        "text_type.line_weight",
+        "text_type.color_rgb",
+        "text_type.show_border",
+        "text_type.leader_border_offset_in",
+        "text_type.tab_size_in",
+        "text_type.bold",
+        "text_type.italic",
+        "text_type.underline"
+      ],
+      "allowed_key_prefixes": [],
+      "required_keys": [
+        "text_type.name",
+        "text_type.font",
+        "text_type.size_in",
+        "text_type.width_factor",
+        "text_type.background",
+        "text_type.line_weight",
+        "text_type.color_rgb",
+        "text_type.show_border",
+        "text_type.leader_border_offset_in",
+        "text_type.tab_size_in",
+        "text_type.bold",
+        "text_type.italic",
+        "text_type.underline"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {}
+    },
+    "units": {
+      "domain_family": "units",
+      "allowed_keys": [
+        "units.spec",
+        "units.unit_type_id",
+        "units.symbol_type_id",
+        "units.accuracy",
+        "units.rounding_method"
+      ],
+      "required_keys": [
+        "units.spec",
+        "units.unit_type_id"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
+    "view_category_overrides": {
+      "domain_family": "view_category_overrides",
+      "allowed_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash",
+        "vco.projection.line_weight",
+        "vco.projection.color.rgb",
+        "vco.projection.pattern_ref.sig_hash",
+        "vco.projection.fill_pattern_ref.sig_hash",
+        "vco.projection.fill_color.rgb",
+        "vco.cut.line_weight",
+        "vco.cut.color.rgb",
+        "vco.cut.pattern_ref.sig_hash",
+        "vco.cut.fill_pattern_ref.sig_hash",
+        "vco.cut.fill_color.rgb",
+        "vco.halftone",
+        "vco.transparency",
+        "vco.include_controlled",
+        "vco.vg_category_type",
+        "vco.context_type",
+        "vco.template_name",
+        "vco.template_element_id",
+        "vco.template_unique_id"
+      ],
+      "required_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Deprecated aggregate domain. Extractor emits view_category_overrides_model and",
+        "view_category_overrides_annotation. This entry retained for legacy compatibility."
+      ]
+    },
+    "view_category_overrides_annotation": {
+      "domain_family": "view_category_overrides",
+      "allowed_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash",
+        "vco.projection.line_weight",
+        "vco.projection.color.rgb",
+        "vco.projection.pattern_ref.sig_hash",
+        "vco.projection.fill_pattern_ref.sig_hash",
+        "vco.projection.fill_color.rgb",
+        "vco.halftone",
+        "vco.transparency",
+        "vco.include_controlled",
+        "vco.vg_category_type",
+        "vco.context_type",
+        "vco.template_name",
+        "vco.template_element_id",
+        "vco.template_unique_id"
+      ],
+      "required_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Domain family: view_category_overrides. Annotation category partition.",
+        "Cut properties not applicable to annotation categories — omitted from allowed_keys."
+      ]
+    },
+    "view_category_overrides_model": {
+      "domain_family": "view_category_overrides",
+      "allowed_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash",
+        "vco.projection.line_weight",
+        "vco.projection.color.rgb",
+        "vco.projection.pattern_ref.sig_hash",
+        "vco.projection.fill_pattern_ref.sig_hash",
+        "vco.projection.fill_color.rgb",
+        "vco.cut.line_weight",
+        "vco.cut.color.rgb",
+        "vco.cut.pattern_ref.sig_hash",
+        "vco.cut.fill_pattern_ref.sig_hash",
+        "vco.cut.fill_color.rgb",
+        "vco.halftone",
+        "vco.transparency",
+        "vco.include_controlled",
+        "vco.vg_category_type",
+        "vco.context_type",
+        "vco.template_name",
+        "vco.template_element_id",
+        "vco.template_unique_id"
+      ],
+      "required_keys": [
+        "vco.baseline_category_path",
+        "vco.baseline_sig_hash",
+        "vco.override_properties_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Domain family: view_category_overrides. Model category partition.",
+        "Both projection and cut properties applicable for model categories."
+      ]
+    },
+    "view_filter_applications_view_templates": {
+      "domain_family": "view_filter_applications_view_templates",
+      "allowed_keys": [
+        "vfa.template_uid_or_namekey",
+        "vfa.filter_stack_count",
+        "vfa.stack_def_hash"
       ],
       "allowed_key_prefixes": [
-        "view_template.sig."
+        "vfa.stack["
       ],
       "required_keys": [
-        "view_template.def_hash"
+        "vfa.template_uid_or_namekey",
+        "vfa.filter_stack_count"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {
+        "vfa.stack[i].filter_sig_hash": true,
+        "vfa.stack[i].visibility": true,
+        "vfa.stack[i].overrides": true
       }
     },
-
+    "view_filter_definitions": {
+      "domain_family": "view_filter_definitions",
+      "allowed_keys": [
+        "vf.uid_or_namekey",
+        "vf.logic_root",
+        "vf.rule_count",
+        "vf.categories",
+        "vf.def_hash"
+      ],
+      "allowed_key_prefixes": [
+        "vf.rule["
+      ],
+      "required_keys": [
+        "vf.uid_or_namekey",
+        "vf.logic_root",
+        "vf.rule_count"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {
+        "vf.rule[i].kind": true,
+        "vf.rule[i].op": true,
+        "vf.rule[i].param_ref.kind": true,
+        "vf.rule[i].param_ref.id": true,
+        "vf.rule[i].value": true
+      }
+    },
     "view_templates_ceiling_plans": {
       "domain_family": "view_templates",
       "allowed_keys": [
@@ -658,7 +897,6 @@
         "block_if_any_required_not_ok": true
       }
     },
-
     "view_templates_elevations_sections_detail": {
       "domain_family": "view_templates",
       "allowed_keys": [
@@ -674,7 +912,21 @@
         "block_if_any_required_not_ok": true
       }
     },
-
+    "view_templates_floor_structural_area_plans": {
+      "domain_family": "view_templates",
+      "allowed_keys": [
+        "view_template.def_hash"
+      ],
+      "allowed_key_prefixes": [
+        "view_template.sig."
+      ],
+      "required_keys": [
+        "view_template.def_hash"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      }
+    },
     "view_templates_renderings_drafting": {
       "domain_family": "view_templates",
       "allowed_keys": [
@@ -690,7 +942,6 @@
         "block_if_any_required_not_ok": true
       }
     },
-
     "view_templates_schedules": {
       "domain_family": "view_templates",
       "allowed_keys": [
@@ -706,7 +957,6 @@
         "block_if_any_required_not_ok": true
       }
     },
-
     "wall_types": {
       "domain_family": "compound_types",
       "allowed_keys": [
@@ -748,119 +998,6 @@
         "wt.has_embedded_sweeps",
         "wt.type_name",
         "wt.coarse_fill_color_rgb"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
-    "floor_types": {
-      "domain_family": "compound_types",
-      "allowed_keys": [
-        "ft.function",
-        "ft.layer_count",
-        "ft.total_thickness_in",
-        "ft.stack_hash_loose",
-        "ft.total_layer_rows",
-        "ft.stack_hash_strict",
-        "ft.stack_hash_function_only",
-        "ft.coarse_fill_pattern_sig_hash",
-        "ft.has_embedded_sweeps",
-        "ft.type_name",
-        "ft.coarse_fill_color_rgb"
-      ],
-      "required_keys": [
-        "ft.function",
-        "ft.layer_count",
-        "ft.total_thickness_in",
-        "ft.stack_hash_loose"
-      ],
-      "required": [
-        "ft.function",
-        "ft.layer_count",
-        "ft.total_thickness_in",
-        "ft.stack_hash_loose"
-      ],
-      "optional": [
-        "ft.total_layer_rows",
-        "ft.stack_hash_strict",
-        "ft.stack_hash_function_only",
-        "ft.coarse_fill_pattern_sig_hash",
-        "ft.has_embedded_sweeps",
-        "ft.type_name",
-        "ft.coarse_fill_color_rgb"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
-    "roof_types": {
-      "domain_family": "compound_types",
-      "allowed_keys": [
-        "rt.layer_count",
-        "rt.total_thickness_in",
-        "rt.stack_hash_loose",
-        "rt.total_layer_rows",
-        "rt.stack_hash_strict",
-        "rt.stack_hash_function_only",
-        "rt.coarse_fill_pattern_sig_hash",
-        "rt.type_name",
-        "rt.coarse_fill_color_rgb"
-      ],
-      "required_keys": [
-        "rt.layer_count",
-        "rt.total_thickness_in",
-        "rt.stack_hash_loose"
-      ],
-      "required": [
-        "rt.layer_count",
-        "rt.total_thickness_in",
-        "rt.stack_hash_loose"
-      ],
-      "optional": [
-        "rt.total_layer_rows",
-        "rt.stack_hash_strict",
-        "rt.stack_hash_function_only",
-        "rt.coarse_fill_pattern_sig_hash",
-        "rt.type_name",
-        "rt.coarse_fill_color_rgb"
-      ],
-      "minima": {
-        "block_if_any_required_not_ok": true
-      }
-    },
-
-    "ceiling_types": {
-      "domain_family": "compound_types",
-      "allowed_keys": [
-        "ct.layer_count",
-        "ct.total_thickness_in",
-        "ct.stack_hash_loose",
-        "ct.total_layer_rows",
-        "ct.stack_hash_strict",
-        "ct.stack_hash_function_only",
-        "ct.coarse_fill_pattern_sig_hash",
-        "ct.type_name",
-        "ct.coarse_fill_color_rgb"
-      ],
-      "required_keys": [
-        "ct.layer_count",
-        "ct.total_thickness_in",
-        "ct.stack_hash_loose"
-      ],
-      "required": [
-        "ct.layer_count",
-        "ct.total_thickness_in",
-        "ct.stack_hash_loose"
-      ],
-      "optional": [
-        "ct.total_layer_rows",
-        "ct.stack_hash_strict",
-        "ct.stack_hash_function_only",
-        "ct.coarse_fill_pattern_sig_hash",
-        "ct.type_name",
-        "ct.coarse_fill_color_rgb"
       ],
       "minima": {
         "block_if_any_required_not_ok": true

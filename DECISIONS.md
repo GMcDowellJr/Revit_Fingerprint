@@ -506,6 +506,42 @@ such as Hidden 1/8 and Hidden 1/4 should resolve to one governance unit.
 
 ---
 
+## D-018 — loaded_family_types scope: loaded families only; system families deferred
+
+### Status
+Accepted (2026-05-13)
+
+### Context
+`loaded_family_types` extracts `FamilySymbol` records using the parameter-schema
+evidence model (`lft.*` / `lftp.*`). In practice, `FamilySymbol` collectors also
+surface system-family types (e.g. curtain panels, stacked walls, curtain walls,
+MEP system types) where `Family.IsEditable == False`. These appear in extraction
+output with `lft.family_is_editable: "false"` and `lft.type_name` often missing,
+causing `status: degraded` and `identity_quality: incomplete_missing`.
+
+`compound_types` already covers some system families (standard wall, floor, ceiling
+types) via their specific `ElementType` subclasses and layer-structure semantics, but
+does not reach stacked walls, curtain walls, curtain systems, or MEP system types.
+
+### Decision
+`loaded_family_types` is scoped to user-loaded families only as its **governed
+primary audience**. System families are not filtered out at extraction time — they
+appear in output with `lft.family_is_editable: "false"` as a discrimination signal —
+but they are not governed under this domain's identity contract.
+
+A dedicated `system_family_types` domain (or expansion of `compound_types`) to cover
+the remaining system families (stacked walls, curtain walls, curtain systems, MEP
+system types) is deferred until Phase-1 analysis establishes which categories are
+worth the extraction investment.
+
+### Consequences
+- No filter change to `loaded_family_types` extractor.
+- Downstream analysis should use `lft.family_is_editable` to segment loaded vs.
+  system records if needed.
+- `compound_types` gap (stacked walls, curtain walls) is a known open item.
+
+---
+
 ## Notes
 
 - This document is **append-only**.
