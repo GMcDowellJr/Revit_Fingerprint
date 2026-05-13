@@ -220,6 +220,17 @@ This enables distinguishing:
 
 ---
 
+## 13. Discovery vs Governed Hash Contracts
+
+- `sig_hash` discovery and `join_hash` discovery outputs are **advisory diagnostics only**.
+- Discovery tools may nominate candidate fields, but must never silently mutate promoted policy contracts.
+- Promoted contracts remain explicit, reviewed, and versioned in policy/config files.
+- `sig_hash` candidates represent semantic record signatures.
+- `join_hash` candidates represent semantic relationship/edge signatures.
+- For `loaded_family_types`, discovery must be shape-gated by `shape_gate.category` and must not perform global cross-category candidate selection.
+
+---
+
 ## Invariant Summary
 
 - Semantic equality must not depend on API reachability
