@@ -1458,6 +1458,35 @@ try:
 
         OUT = json.dumps(summary, indent=2, sort_keys=True)
 
+        # Optional batch-mode auto-close.
+        # Reads IN[5] (Boolean Input node in the .dyn, labelled "batch_close").
+        # When True: closes the document without saving after successful extraction.
+        # Never fires if write_errors is non-empty — keep doc open for investigation.
+        # Wrapped in broad try/except so it can never crash the runner.
+        try:
+            _batch_close = False
+            try:
+                _env_batch_close = str(os.environ.get("REVIT_FINGERPRINT_BATCH_CLOSE", "")).strip().lower()
+            except Exception:
+                _env_batch_close = ""
+
+            if _env_batch_close in ("1", "true", "yes", "on"):
+                _batch_close = True
+            elif _env_batch_close in ("0", "false", "no", "off", ""):
+                _batch_close = False
+            else:
+                try:
+                    _in = IN
+                    if _in is not None and len(_in) > 5 and _in[5] is not None:
+                        _batch_close = bool(_in[5])
+                except Exception:
+                    _batch_close = False
+
+            if _batch_close and not write_errors:
+                doc.Close(False)  # False = do not save
+        except Exception:
+            pass  # Never crash the runner due to close failure
+
     else:
         # Legacy behavior: return full JSON through Dynamo (may hang on large payloads)
         OUT = json.dumps(fingerprint, indent=2, sort_keys=True)

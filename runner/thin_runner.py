@@ -137,6 +137,27 @@ except Exception:
     # Safe default: production on any thinrunner failure
     os.environ["REVIT_FINGERPRINT_OUTPUT_MODE"] = "production"
 
+# Optional: IN[5] controls batch-mode auto-close after extraction.
+#  - True / 1 / "true"  => set REVIT_FINGERPRINT_BATCH_CLOSE=1
+#  - False / 0 / "false" => set REVIT_FINGERPRINT_BATCH_CLOSE=0
+#  - Missing/None/empty  => default to 0 (do not close — safe for interactive use)
+try:
+    raw_in5 = None
+    have_in5 = (IN is not None and len(IN) > 5)
+    if have_in5:
+        raw_in5 = IN[5]
+
+    batch_close_choice = _parse_boolish(raw_in5) if have_in5 else None
+
+    if batch_close_choice is True:
+        os.environ["REVIT_FINGERPRINT_BATCH_CLOSE"] = "1"
+    elif batch_close_choice is False:
+        os.environ["REVIT_FINGERPRINT_BATCH_CLOSE"] = "0"
+    else:
+        os.environ["REVIT_FINGERPRINT_BATCH_CLOSE"] = "0"
+except Exception:
+    os.environ["REVIT_FINGERPRINT_BATCH_CLOSE"] = "0"
+
 # MUST be the repo root that contains: core/, domains/, runner/
 # Dynamo-node safe behavior:
 #  - No __file__ reliance (this code is pasted into a Dynamo Python node)
