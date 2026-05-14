@@ -147,15 +147,17 @@ try:
     if have_in5:
         raw_in5 = IN[5]
 
-    # Preserve caller-provided env control when IN[5] is omitted/None/unparseable.
-    if have_in5:
-        batch_close_choice = _parse_boolish(raw_in5)
-        if batch_close_choice is True:
-            os.environ["REVIT_FINGERPRINT_BATCH_CLOSE"] = "1"
-        elif batch_close_choice is False:
-            os.environ["REVIT_FINGERPRINT_BATCH_CLOSE"] = "0"
+    batch_close_choice = _parse_boolish(raw_in5) if have_in5 else None
+
+    if batch_close_choice is True:
+        os.environ["REVIT_FINGERPRINT_BATCH_CLOSE"] = "1"
+    elif batch_close_choice is False:
+        os.environ["REVIT_FINGERPRINT_BATCH_CLOSE"] = "0"
+    else:
+        # Clear stale state in long-lived Dynamo/Revit processes.
+        os.environ["REVIT_FINGERPRINT_BATCH_CLOSE"] = "0"
 except Exception:
-    pass
+    os.environ["REVIT_FINGERPRINT_BATCH_CLOSE"] = "0"
 
 # MUST be the repo root that contains: core/, domains/, runner/
 # Dynamo-node safe behavior:
