@@ -1458,35 +1458,27 @@ try:
 
         OUT = json.dumps(summary, indent=2, sort_keys=True)
 
-        # Optional batch-mode auto-close.
-        # Reads IN[5] (Boolean Input node in the .dyn, labelled "batch_close").
-        # When True: closes the document without saving after successful extraction.
-        # Never fires if write_errors is non-empty — keep doc open for investigation.
-        # Wrapped in broad try/except so it can never crash the runner.
+        # Batch-mode auto-close + exit.
+        # When REVIT_FINGERPRINT_BATCH_CLOSE=1: close the document and post
+        # an ExitRevit command so Revit exits cleanly after the graph finishes.
+        # The .bat runner's "Revit.exe /journal" call then unblocks and the
+        # next file starts. Never fires if write_errors is non-empty.
         try:
-            _batch_close = False
-            try:
-                _env_batch_close_raw = os.environ.get("REVIT_FINGERPRINT_BATCH_CLOSE", None)
-                _env_batch_close = str(_env_batch_close_raw).strip().lower() if _env_batch_close_raw is not None else None
-            except Exception:
-                _env_batch_close = None
-
-            if _env_batch_close in ("1", "true", "yes", "on"):
-                _batch_close = True
-            elif _env_batch_close in ("0", "false", "no", "off"):
-                _batch_close = False
-            else:
-                try:
-                    _in = IN
-                    if _in is not None and len(_in) > 5 and _in[5] is not None:
-                        _batch_close = bool(_in[5])
-                except Exception:
-                    _batch_close = False
-
+            _batch_close = str(os.getenv("REVIT_FINGERPRINT_BATCH_CLOSE", "0")).strip() in ("1", "true", "yes")
             if _batch_close and not write_errors:
-                doc.Close(False)  # False = do not save
+                try:
+                    doc.Close(False)  # close without saving
+                except Exception:
+                    pass
+                try:
+                    from Autodesk.Revit.UI import PostableCommand, RevitCommandId
+                    __revit__.PostCommand(
+                        RevitCommandId.LookupPostableCommandId(PostableCommand.ExitRevit)
+                    )
+                except Exception:
+                    pass
         except Exception:
-            pass  # Never crash the runner due to close failure
+            pass
 
     else:
         # Legacy behavior: return full JSON through Dynamo (may hang on large payloads)
