@@ -1466,13 +1466,14 @@ try:
         try:
             _batch_close = False
             try:
-                _env_batch_close = str(os.environ.get("REVIT_FINGERPRINT_BATCH_CLOSE", "")).strip().lower()
+                _env_batch_close_raw = os.environ.get("REVIT_FINGERPRINT_BATCH_CLOSE", None)
+                _env_batch_close = str(_env_batch_close_raw).strip().lower() if _env_batch_close_raw is not None else None
             except Exception:
-                _env_batch_close = ""
+                _env_batch_close = None
 
             if _env_batch_close in ("1", "true", "yes", "on"):
                 _batch_close = True
-            elif _env_batch_close in ("0", "false", "no", "off", ""):
+            elif _env_batch_close in ("0", "false", "no", "off"):
                 _batch_close = False
             else:
                 try:
