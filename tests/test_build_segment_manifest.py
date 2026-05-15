@@ -391,3 +391,45 @@ def test_main_fails_on_missing_columns_even_with_no_data_rows(tmp_path):
     rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
     assert rc == 1
     assert not (out_dir / "segment_manifest.csv").exists()
+
+def test_level2_project_bundle_with_parent_bundle_runs_enabled():
+    rows = (
+        [_meta_row(f"k{i:02d}", "imperial", "Kaiser", "Project") for i in range(1, 4)]
+        + [_meta_row(f"r{i:02d}", "imperial", "Renown", "Project") for i in range(1, 4)]
+    )
+    segs = _build_segments(rows, min_files=3, enable_parent_bundle_runs=True)
+    parent = next(r for r in segs if r["segment_id"] == "imperial|Project")
+    assert parent["run_type"] == "bundle"
+
+
+def test_level2_project_registration_without_flag():
+    rows = (
+        [_meta_row(f"k{i:02d}", "imperial", "Kaiser", "Project") for i in range(1, 4)]
+        + [_meta_row(f"r{i:02d}", "imperial", "Renown", "Project") for i in range(1, 4)]
+    )
+    segs = _build_segments(rows, min_files=3)
+    parent = next(r for r in segs if r["segment_id"] == "imperial|Project")
+    assert parent["run_type"] == "registration"
+
+
+def test_mixed_role_client_segment_stays_reference():
+    rows = [
+        _meta_row("s01", "imperial", "Sutter", "Project"),
+        _meta_row("s02", "imperial", "Sutter", "Project"),
+        _meta_row("s03", "imperial", "Sutter", "Project"),
+        _meta_row("s04", "imperial", "Sutter", "Template"),
+        _meta_row("s05", "imperial", "Sutter", "Template"),
+        _meta_row("s06", "imperial", "Sutter", "Template"),
+    ]
+    segs = _build_segments(rows, min_files=3, enable_parent_bundle_runs=True)
+    mixed = next(r for r in segs if r["segment_id"] == "imperial|Sutter")
+    assert mixed["governance_role"] == ""
+    assert mixed["run_type"] == "registration"
+
+
+def test_single_child_suppression_still_fires():
+    rows = [_meta_row(f"k{i:02d}", "imperial", "Kaiser", "Project") for i in range(1, 4)]
+    segs = _build_segments(rows, min_files=3, enable_parent_bundle_runs=True)
+    parent = next(r for r in segs if r["segment_id"] == "imperial|Project")
+    assert parent["run_type"] == "registration"
+    assert "redundant_single_child" in (parent.get("notes") or "")
