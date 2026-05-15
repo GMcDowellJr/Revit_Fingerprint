@@ -16,11 +16,11 @@ if __package__ in (None, ""):
     if str(_TOOLS_DIR) not in sys.path:
         sys.path.insert(0, str(_TOOLS_DIR))
     from common import SCHEMA_VERSION, atomic_write_csv, compute_effective_support, make_bundle_id, read_csv_rows
-    from compute_governance_thresholds import jenks_natural_breaks
+    from jenks_utils import jenks_breaks
     from utils import find_closed_itemsets
 else:
     from .common import SCHEMA_VERSION, atomic_write_csv, compute_effective_support, make_bundle_id, read_csv_rows
-    from ..compute_governance_thresholds import jenks_natural_breaks
+    from ..jenks_utils import jenks_breaks
     from .utils import find_closed_itemsets
 
 
@@ -91,7 +91,7 @@ def compute_auto_threshold(
             f" distinct_values={len(distinct_presence_values)}"
         )
     else:
-        breaks = sorted(jenks_natural_breaks([float(v) for v in presence_values], 3))
+        breaks = sorted(jenks_breaks([float(v) for v in presence_values], 3))
         natural_breaks_floor = max(2, int(math.ceil(breaks[0])))
         cooccurrence_p90 = None
         expected_floor = None

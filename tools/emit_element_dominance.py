@@ -13,7 +13,7 @@ _TOOLS_DIR = str(Path(__file__).resolve().parent)
 if _TOOLS_DIR not in sys.path:
     sys.path.insert(0, _TOOLS_DIR)
 
-from compute_governance_thresholds import jenks_natural_breaks
+from jenks_utils import jenks_breaks
 
 SCHEMA_VERSION = "2.1.0"
 STANDARD_PRESENCE_MIN = 0.75
@@ -130,7 +130,7 @@ def emit_element_dominance(analysis_dir: Path, domain: Optional[str] = None) -> 
 
     def _compute_breaks(values: List[float], n_classes: int = 3) -> Tuple[float, float, str]:
         if len(values) >= n_classes:
-            breaks = sorted(jenks_natural_breaks(values, n_classes))
+            breaks = sorted(jenks_breaks(values, n_classes))
             return breaks[0], breaks[1], "jenks_natural_breaks"
         return STANDARD_PRESENCE_MIN / 2.0, STANDARD_PRESENCE_MIN, "fallback_standard_presence_min"
 

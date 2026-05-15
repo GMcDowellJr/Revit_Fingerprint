@@ -26,6 +26,7 @@ if __package__ in (None, ""):
     from reference_bundle import load_and_validate
     from step_compare import run_compare_for_domain
     from placeholder_exclusions import compute_placeholder_exclusions
+    from jenks_utils import jenks_breaks
 else:
     from .common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id
     from .step0_discover_populations import discover_populations
@@ -40,6 +41,7 @@ else:
     from .reference_bundle import load_and_validate
     from .step_compare import run_compare_for_domain
     from .placeholder_exclusions import compute_placeholder_exclusions
+    from ..jenks_utils import jenks_breaks
 
 TIMING_FIELDNAMES = ["schema_version", "analysis_run_id", "domain", "population_id", "step", "seconds"]
 TIMING_STEPS = ("step1", "step2", "step2b", "step3", "step4", "step5", "step6", "step7")
@@ -47,6 +49,65 @@ ROLE_GROUP_ALIASES = {
     "template-group": ["Generic", "Generic-Host", "Template"],
 }
 VALID_ROLES = {"Project", "Template", "Generic", "Generic-Host", "Container"}
+
+
+def _emit_meta_scatter_thresholds(out_dir: Path, run_id: str, domain_filter: str = "") -> None:
+    if domain_filter:
+        return
+
+    rows: List[Dict[str, str]] = []
+    for dom_dir in sorted([p for p in out_dir.iterdir() if p.is_dir() and not p.name.startswith("_")], key=lambda p: p.name.lower()):
+        bundle_files = sorted(dom_dir.glob("*/bundles.csv"))
+        scope_files = sorted(dom_dir.glob("*/scope_registry.csv"))
+        if not bundle_files or not scope_files:
+            continue
+        bundle_rows = []
+        for p in bundle_files:
+            bundle_rows.extend(read_csv_rows(p))
+        scope_rows = []
+        for p in scope_files:
+            scope_rows.extend(read_csv_rows(p))
+        run_bundles = [r for r in bundle_rows if r.get("analysis_run_id", "") == run_id]
+        run_scopes = [r for r in scope_rows if r.get("analysis_run_id", "") == run_id]
+        if not run_scopes:
+            continue
+        bundle_count = len(run_bundles)
+        population_files = sum(int(r.get("files_in_scope", "0") or "0") for r in run_scopes)
+        top_alignment = 0.0
+        for r in run_bundles:
+            try:
+                files_present = int(r.get("files_present", "0") or "0")
+                files_total = int(r.get("files_total", "0") or "0")
+            except ValueError:
+                continue
+            if files_total > 0:
+                top_alignment = max(top_alignment, files_present / files_total)
+        bundle_density = (bundle_count / population_files) if population_files > 0 else 0.0
+        rows.append({"domain": dom_dir.name, "b_alignment_rate": f"{top_alignment:.6f}", "bundle_density": f"{bundle_density:.6f}"})
+
+    axis_map = {
+        "alignment_rate": [float(r["b_alignment_rate"]) for r in rows if float(r["b_alignment_rate"]) > 0.0 and float(r["bundle_density"]) > 0.0],
+        "bundle_density": [float(r["bundle_density"]) for r in rows if float(r["b_alignment_rate"]) > 0.0 and float(r["bundle_density"]) > 0.0],
+    }
+    out_rows: List[Dict[str, str]] = []
+    for axis, values in axis_map.items():
+        breaks = jenks_breaks(values, n_classes=2) if values else []
+        break_value = breaks[0] if breaks else 0.0
+        out_rows.append(
+            {
+                "analysis_run_id": run_id,
+                "axis": axis,
+                "break_value": f"{break_value:.4f}",
+                "n_domains": str(len(values)),
+                "input_min": f"{(min(values) if values else 0.0):.4f}",
+                "input_max": f"{(max(values) if values else 0.0):.4f}",
+            }
+        )
+    atomic_write_csv(
+        out_dir / "meta_scatter_thresholds.csv",
+        ["analysis_run_id", "axis", "break_value", "n_domains", "input_min", "input_max"],
+        out_rows,
+    )
 
 
 def _run_pipeline_once(
@@ -408,6 +469,7 @@ def run_bundle_analysis(
             f"[run] complete domains_processed={processed} total_bundles_found={total_bundles} "
             f"total_dag_edges={total_edges} files_with_no_bundle_match={total_files_no_bundle}"
         )
+        _emit_meta_scatter_thresholds(out_dir, run_id, domain)
         return {
             "domains_processed": processed,
             "total_bundles_found": total_bundles,
@@ -645,6 +707,8 @@ def run_bundle_analysis(
             ],
             compare_rows,
         )
+
+    _emit_meta_scatter_thresholds(out_dir, run_id, domain)
 
     return {
         "domains_processed": processed,
