@@ -1207,7 +1207,42 @@ def _canonicalize_all_domain_records(payload):
 try:
     _timing = TimingCollector()
     _timing.start_timer("total_run")
-    doc = get_doc()
+    # --- Document resolution ---
+    # Default: get from DocumentManager (Dynamo/journal path, unchanged behavior).
+    # Override: if REVIT_FINGERPRINT_DOC_TITLE is set (pyRevit/external runner),
+    # find the document by filename from Application.Documents instead.
+    # This env var is never set by the thin runner, so Dynamo behavior is unaffected.
+    _doc_title_override = ""
+    try:
+        _doc_title_override = str(os.environ.get("REVIT_FINGERPRINT_DOC_TITLE", "")).strip()
+    except Exception:
+        _doc_title_override = ""
+
+    if _doc_title_override:
+        doc = None
+        try:
+            from RevitServices.Persistence import DocumentManager as _DM_override
+            _ui_app = _DM_override.Instance.CurrentUIApplication
+            for _candidate in _ui_app.Application.Documents:
+                try:
+                    _candidate_name = os.path.basename(str(_candidate.PathName or ""))
+                    if (
+                        _candidate_name == _doc_title_override
+                        or _candidate.Title == _doc_title_override
+                        or str(_candidate.PathName or "") == _doc_title_override
+                    ):
+                        doc = _candidate
+                        break
+                except Exception:
+                    continue
+        except Exception:
+            doc = None
+        if doc is None:
+            # Fallback to default if lookup fails
+            doc = get_doc()
+    else:
+        doc = get_doc()
+
     fingerprint = run_fingerprint(doc, timing=_timing)
     _timing = fingerprint.pop("_timing_collector", _timing)
 
