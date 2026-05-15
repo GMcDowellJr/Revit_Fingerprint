@@ -36,7 +36,7 @@ def _append_note(row,k,v=""):
     if row.get("notes"): row["notes"] += f"|{note}"
     else: row["notes"]=note
 
-def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_template_bundles:bool=False)->List[Dict[str,str]]:
+def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_template_bundles:bool=False,enable_parent_bundle_runs:bool=False)->List[Dict[str,str]]:
     l1=defaultdict(list); l1s=defaultdict(list)
     l2a=defaultdict(list); l2as=defaultdict(list)
     l2b=defaultdict(list); l2bs=defaultdict(list)
@@ -104,10 +104,23 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         else:
             has = bool(kids.get(seg))
         if has:
-            if enable_cross_org_template_bundles and r["segment_level"]=="2" and r["governance_role"]=="Template" and not r["client_label"]:
-                pass
-            else:
-                r["run_type"]="registration";continue
+            # Determine whether this segment qualifies for bundle analysis despite having children
+            is_cross_org_template = (
+                enable_cross_org_template_bundles
+                and r["segment_level"] == "2"
+                and r["governance_role"] == "Template"
+                and not r["client_label"]
+            )
+            is_role_fixed_parent = (
+                enable_parent_bundle_runs
+                and r["segment_level"] == "2"
+                and r["governance_role"] != ""
+                and not r["client_label"]
+                and fc >= min_files
+            )
+            if not is_cross_org_template and not is_role_fixed_parent:
+                r["run_type"] = "registration"; continue
+            # else: fall through to normal bundle/reference assignment below
         if fc>=min_files: r["run_type"]="bundle"
         elif role in {"Template","Container","Generic"}: r["run_type"]="reference"
         elif role=="Project": r["run_type"]="skip"
@@ -140,7 +153,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         r["segment_label"]=templates.get(r["segment_purpose"],sid)
     # pass5 redundant hash
     for r in m:
-        if r["run_type"] not in {"registration", "reference"}: continue
+        if r["run_type"] not in {"bundle", "registration", "reference"}: continue
         _seg = r["segment_id"]
         _lev = r["segment_level"]
         _cl = r["client_label"]
@@ -229,6 +242,11 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--out-dir", required=True, help="Directory to write output files")
     parser.add_argument("--min-files", type=int, default=3, help="Minimum file count for a segment (default: 3)")
     parser.add_argument("--enable-cross-org-template-bundles", action="store_true", help="Allow cross-org level-2 Template segments to run as bundle/reference")
+    parser.add_argument(
+        "--enable-parent-bundle-runs",
+        action="store_true",
+        help="Allow level-2 role-fixed segments (e.g. imperial|Project) to run bundle analysis even when they have child segments."
+    )
     args = parser.parse_args(argv)
 
     metadata_path = Path(args.metadata_file)
@@ -274,7 +292,7 @@ def main(argv: List[str] | None = None) -> int:
     for role in sorted(unknown_roles):
         sys.stderr.write(f"[WARN] Unrecognised governance_role value in metadata: '{role}' — rows with this role will create unexpected segments\n")
 
-    manifest_rows = _build_segments(rows, min_files, args.enable_cross_org_template_bundles)
+    manifest_rows = _build_segments(rows, min_files, args.enable_cross_org_template_bundles, args.enable_parent_bundle_runs)
 
     for r in manifest_rows:
         if r["run_type"] == "bundle" and int(r["file_count"]) < min_files:
