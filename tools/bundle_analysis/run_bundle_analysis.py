@@ -57,8 +57,8 @@ def _emit_meta_scatter_thresholds(out_dir: Path, run_id: str, domain_filter: str
 
     rows: List[Dict[str, str]] = []
     for dom_dir in sorted([p for p in out_dir.iterdir() if p.is_dir() and not p.name.startswith("_")], key=lambda p: p.name.lower()):
-        bundle_files = sorted(dom_dir.glob("*/bundles.csv"))
-        scope_files = sorted(dom_dir.glob("*/scope_registry.csv"))
+        bundle_files = sorted(dom_dir.rglob("bundles.csv"))
+        scope_files = sorted(dom_dir.rglob("scope_registry.csv"))
         if not bundle_files or not scope_files:
             continue
         bundle_rows = []
