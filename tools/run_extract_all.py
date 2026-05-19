@@ -290,11 +290,14 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
         prior_status = str(row.get("status", "")).strip()
         if prior_status == "blocked":
             # Extractor-blocked records are sticky — the sig_hash stage cannot upgrade them.
-            # Exception: records blocked by a *prior apply run* (identified by the
-            # "identity.incomplete:" prefix in status_reasons) must be re-evaluated so that
+            # Exception: records blocked by a *prior apply run* must be re-evaluated so that
             # policy corrections or updated identity_items can take effect.
+            # Distinguisher: the apply stage writes "identity.incomplete:required_not_ok:<k>";
+            # extractors write "identity.incomplete:<q>:<k>" (e.g. "identity.incomplete:missing:…").
+            # Matching on the apply-specific "required_not_ok" middle segment avoids
+            # misclassifying genuine extractor blocks as apply-stage blocks.
             prior_reasons = [r for r in str(row.get("status_reasons", "")).split("|") if r]
-            apply_stage_blocked = any(r.startswith("identity.incomplete:") for r in prior_reasons)
+            apply_stage_blocked = any(r.startswith("identity.incomplete:required_not_ok:") for r in prior_reasons)
             if not apply_stage_blocked:
                 pass  # genuine extractor block — preserve it
             else:
