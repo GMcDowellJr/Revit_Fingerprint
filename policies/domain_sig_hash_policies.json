@@ -456,7 +456,7 @@
         "line_pattern.seg["
       ],
       "allowed_items": [
-        "line_pattern.uid_or_namekey",
+        "line_pattern.segments_norm_hash",
         "line_pattern.segment_count",
         "line_pattern.segments_def_hash"
       ],
@@ -469,16 +469,15 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "line_pattern.uid_or_namekey",
-        "line_pattern.segment_count"
+        "line_pattern.segments_norm_hash"
       ],
       "sig_hash_schema": "line_patterns.sig_hash.v1"
     },
     "line_styles": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "line_style.line_weight_projection",
-        "line_style.color_rgb",
+        "line_style.weight.projection",
+        "line_style.color.rgb",
         "line_style.weight.cut",
         "line_style.pattern_ref.sig_hash",
         "line_style.weight.projection",
@@ -493,8 +492,8 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "line_style.line_weight_projection",
-        "line_style.color_rgb",
+        "line_style.weight.projection",
+        "line_style.color.rgb",
         "line_style.pattern_ref.sig_hash"
       ],
       "sig_hash_schema": "line_styles.sig_hash.v1"
@@ -502,27 +501,28 @@
     "loaded_family_types": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-		  "lft.shape_gate.category",
-		  "lft.shape_gate.category_id",
-		  "lft.type_parameter_schema_hash",
-		  "lft.type_parameter_count",
-		  "lft.family_is_in_place"
+        "lft.shape_gate.category",
+        "lft.shape_gate.category_id",
+        "lft.type_parameter_schema_hash",
+        "lft.type_parameter_count",
+        "lft.family_is_in_place",
+        "lft.family_is_editable",
+        "lft.family_symbol_count",
+        "lft.type_count"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "Records are at family granularity. family_name is label-only — not in sig_hash.",
-        "sig_hash = f(category + schema_hash + is_in_place + is_editable + counts).",
-        "Two families with identical category + parameter schema hash as equal by sig_hash.",
+        "Generated from contracts/domain_identity_keys_v2.json.",
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
         "lft.shape_gate.category",
         "lft.type_parameter_schema_hash"
       ],
-      "sig_hash_schema": "loaded_family_types.sig_hash.v2"
+      "sig_hash_schema": "loaded_family_types.sig_hash.v1"
     },
     "materials": {
       "allowed_item_prefixes": [],
@@ -535,10 +535,8 @@
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "sig_hash is keyed to material.graphics_sig_hash_v2 (visual/material properties), not",
-        "material.uid. Two materials with identical graphics in different files share a sig_hash.",
-        "material.uid is allowed for record traceability but must not be the sig anchor.",
-        "Consistent with join key policy which also anchors on material.graphics_sig_hash_v2."
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
         "material.graphics_sig_hash_v2"
@@ -649,7 +647,6 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "phase_filter.name",
         "phase_filter.new.presentation_id",
         "phase_filter.existing.presentation_id",
         "phase_filter.demolished.presentation_id",
@@ -708,19 +705,18 @@
     "text_types": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "text_type.name",
         "text_type.font",
         "text_type.size_in",
+        "text_type.bold",
+        "text_type.italic",
+        "text_type.underline",
+        "text_type.color_rgb",
         "text_type.width_factor",
         "text_type.background",
         "text_type.line_weight",
-        "text_type.color_rgb",
         "text_type.show_border",
         "text_type.leader_border_offset_in",
-        "text_type.tab_size_in",
-        "text_type.bold",
-        "text_type.italic",
-        "text_type.underline"
+        "text_type.tab_size_in"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -731,19 +727,13 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "text_type.name",
         "text_type.font",
         "text_type.size_in",
-        "text_type.width_factor",
-        "text_type.background",
-        "text_type.line_weight",
-        "text_type.color_rgb",
-        "text_type.show_border",
-        "text_type.leader_border_offset_in",
-        "text_type.tab_size_in",
         "text_type.bold",
         "text_type.italic",
-        "text_type.underline"
+        "text_type.underline",
+        "text_type.color_rgb",
+        "text_type.width_factor"
       ],
       "sig_hash_schema": "text_types.sig_hash.v1"
     },
@@ -800,8 +790,8 @@
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "Deprecated aggregate domain. Extractor emits view_category_overrides_model and",
-        "view_category_overrides_annotation instead. This entry retained for legacy compatibility."
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
         "vco.baseline_category_path",
@@ -835,8 +825,8 @@
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "Domain family: view_category_overrides. Annotation category partition.",
-        "Cut properties not applicable to annotation categories."
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
         "vco.baseline_category_path",
@@ -875,8 +865,8 @@
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "Domain family: view_category_overrides. Model category partition.",
-        "Both projection and cut properties are applicable for model categories."
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
         "vco.baseline_category_path",
@@ -886,12 +876,8 @@
       "sig_hash_schema": "view_category_overrides_model.sig_hash.v1"
     },
     "view_filter_applications_view_templates": {
-      "allowed_item_prefixes": [
-        "vfa.stack["
-      ],
+      "allowed_item_prefixes": [],
       "allowed_items": [
-        "vfa.template_uid_or_namekey",
-        "vfa.filter_stack_count",
         "vfa.stack_def_hash"
       ],
       "hash_alg": "md5_utf8_join_pipe",
@@ -903,8 +889,7 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "vfa.template_uid_or_namekey",
-        "vfa.filter_stack_count"
+        "vfa.stack_def_hash"
       ],
       "sig_hash_schema": "view_filter_applications_view_templates.sig_hash.v1"
     },
@@ -913,10 +898,6 @@
         "vf.rule["
       ],
       "allowed_items": [
-        "vf.uid_or_namekey",
-        "vf.logic_root",
-        "vf.rule_count",
-        "vf.categories",
         "vf.def_hash"
       ],
       "hash_alg": "md5_utf8_join_pipe",
@@ -928,9 +909,7 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "vf.uid_or_namekey",
-        "vf.logic_root",
-        "vf.rule_count"
+        "vf.def_hash"
       ],
       "sig_hash_schema": "view_filter_definitions.sig_hash.v1"
     },

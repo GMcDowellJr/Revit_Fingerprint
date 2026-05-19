@@ -436,7 +436,7 @@
     "line_patterns": {
       "domain_family": "line_patterns",
       "allowed_keys": [
-        "line_pattern.uid_or_namekey",
+        "line_pattern.segments_norm_hash",
         "line_pattern.segment_count",
         "line_pattern.segments_def_hash"
       ],
@@ -444,8 +444,7 @@
         "line_pattern.seg["
       ],
       "required_keys": [
-        "line_pattern.uid_or_namekey",
-        "line_pattern.segment_count"
+        "line_pattern.segments_norm_hash"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -458,16 +457,16 @@
     "line_styles": {
       "domain_family": "line_styles",
       "allowed_keys": [
-        "line_style.line_weight_projection",
-        "line_style.color_rgb",
+        "line_style.weight.projection",
+        "line_style.color.rgb",
         "line_style.weight.cut",
         "line_style.pattern_ref.sig_hash",
         "line_style.weight.projection",
         "line_style.color.rgb"
       ],
       "required_keys": [
-        "line_style.line_weight_projection",
-        "line_style.color_rgb",
+        "line_style.weight.projection",
+        "line_style.color.rgb",
         "line_style.pattern_ref.sig_hash"
       ],
       "minima": {
@@ -503,7 +502,7 @@
       },
       "notes": [
         "Records are emitted at family granularity (one record per Family element, not per FamilySymbol).",
-        "lft.family_name is label-only — excluded from identity_basis so sig_hash is name-independent.",
+        "lft.family_name is label-only \u2014 excluded from identity_basis so sig_hash is name-independent.",
         "lft.type_name removed: replaced by lft.type_count (count of collected types per family).",
         "lft.family_symbol_count: API-reported total types; may differ from lft.type_count if types were filtered.",
         "lft.type_parameter_schema_hash is the primary behavioral anchor for sig_hash.",
@@ -528,7 +527,7 @@
       },
       "notes": [
         "sig_hash anchors on material.graphics_sig_hash_v2 (visual/material properties).",
-        "material.uid is for record traceability only — not a sig or join anchor.",
+        "material.uid is for record traceability only \u2014 not a sig or join anchor.",
         "Consistent with domain_join_key_policies.json which requires graphics_sig_hash_v2."
       ]
     },
@@ -605,7 +604,6 @@
       ],
       "allowed_key_prefixes": [],
       "required_keys": [
-        "phase_filter.name",
         "phase_filter.new.presentation_id",
         "phase_filter.existing.presentation_id",
         "phase_filter.demolished.presentation_id",
@@ -670,35 +668,28 @@
     "text_types": {
       "domain_family": "text_types",
       "allowed_keys": [
-        "text_type.name",
         "text_type.font",
         "text_type.size_in",
+        "text_type.bold",
+        "text_type.italic",
+        "text_type.underline",
+        "text_type.color_rgb",
         "text_type.width_factor",
         "text_type.background",
         "text_type.line_weight",
-        "text_type.color_rgb",
         "text_type.show_border",
         "text_type.leader_border_offset_in",
-        "text_type.tab_size_in",
-        "text_type.bold",
-        "text_type.italic",
-        "text_type.underline"
+        "text_type.tab_size_in"
       ],
       "allowed_key_prefixes": [],
       "required_keys": [
-        "text_type.name",
         "text_type.font",
         "text_type.size_in",
-        "text_type.width_factor",
-        "text_type.background",
-        "text_type.line_weight",
-        "text_type.color_rgb",
-        "text_type.show_border",
-        "text_type.leader_border_offset_in",
-        "text_type.tab_size_in",
         "text_type.bold",
         "text_type.italic",
-        "text_type.underline"
+        "text_type.underline",
+        "text_type.color_rgb",
+        "text_type.width_factor"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -790,7 +781,7 @@
       },
       "notes": [
         "Domain family: view_category_overrides. Annotation category partition.",
-        "Cut properties not applicable to annotation categories — omitted from allowed_keys."
+        "Cut properties not applicable to annotation categories \u2014 omitted from allowed_keys."
       ]
     },
     "view_category_overrides_model": {
@@ -834,16 +825,10 @@
     "view_filter_applications_view_templates": {
       "domain_family": "view_filter_applications_view_templates",
       "allowed_keys": [
-        "vfa.template_uid_or_namekey",
-        "vfa.filter_stack_count",
         "vfa.stack_def_hash"
       ],
-      "allowed_key_prefixes": [
-        "vfa.stack["
-      ],
       "required_keys": [
-        "vfa.template_uid_or_namekey",
-        "vfa.filter_stack_count"
+        "vfa.stack_def_hash"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -857,19 +842,13 @@
     "view_filter_definitions": {
       "domain_family": "view_filter_definitions",
       "allowed_keys": [
-        "vf.uid_or_namekey",
-        "vf.logic_root",
-        "vf.rule_count",
-        "vf.categories",
         "vf.def_hash"
       ],
       "allowed_key_prefixes": [
         "vf.rule["
       ],
       "required_keys": [
-        "vf.uid_or_namekey",
-        "vf.logic_root",
-        "vf.rule_count"
+        "vf.def_hash"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
