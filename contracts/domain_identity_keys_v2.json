@@ -394,13 +394,11 @@
         "ft.coarse_fill_color_rgb"
       ],
       "required_keys": [
-        "ft.function",
         "ft.layer_count",
         "ft.total_thickness_in",
         "ft.stack_hash_loose"
       ],
       "required": [
-        "ft.function",
         "ft.layer_count",
         "ft.total_thickness_in",
         "ft.stack_hash_loose"

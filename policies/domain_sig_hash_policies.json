@@ -423,7 +423,6 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "ft.function",
         "ft.layer_count",
         "ft.total_thickness_in",
         "ft.stack_hash_loose"
