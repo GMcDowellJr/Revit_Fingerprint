@@ -1,108 +1,14 @@
-# similarity_compare.py
-# Compare Revit fingerprint JSONs:
-#   1) baseline file vs every JSON in a directory
-#   2) pairwise comparisons among all JSONs in a directory
-#
-# Implements 3 similarity options:
-#   A) OK-domain hash token Jaccard (domain:hash, ok only)
-#   B) Domain status token Jaccard (domain:status, excluding blocked)
-#   C) Record sig_hash overlap (multiset Jaccard) aggregated across comparable domains
-#
-# Invariants honored:
-#   - blocked domains => undefined (excluded from similarity; tracked)
-#   - unreadable != missing (explicit)
-#   - no silent failure: parse/shape problems recorded per file and per domain
-
 from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import itertools
-import json
-import os
-import re
-import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
-
-# -----------------------------
-# Data model (minimal, tolerant)
-# -----------------------------
-
-STATUS_OK = "ok"
-STATUS_DEGRADED = "degraded"
-STATUS_BLOCKED = "blocked"
-
-# Some fingerprint files may use other labels; map conservatively.
-STATUS_ALIASES = {
-    "OK": STATUS_OK,
-    "Ok": STATUS_OK,
-    "DEGRADED": STATUS_DEGRADED,
-    "Degraded": STATUS_DEGRADED,
-    "BLOCKED": STATUS_BLOCKED,
-    "Blocked": STATUS_BLOCKED,
-}
-
-RECOGNIZED_STATUSES = {STATUS_OK, STATUS_DEGRADED, STATUS_BLOCKED}
-
-# Domains where delete+recreate is considered equivalent (persistence authority)
-SEMANTIC_UID_DOMAINS = {
-    "dimension_types",
-    # future candidates go here explicitly
-}
-
-
-@dataclass(frozen=True)
-class DomainData:
-    name: str
-    status: str
-    domain_hash: Optional[str]
-    sig_hashes: Optional[List[str]]  # None means unavailable/unknown; [] means known empty
-    unreadable: bool                 # explicitly indicates file/domain unreadable, not missing
-    missing: bool                    # explicitly indicates missing domain payload
-    reason: Optional[str]            # why missing/unreadable/unknown
-
-    # Optional mapping from sig_hash -> label metadata from record.v2 (display/quality/provenance).
-    # None means unavailable/unknown; {} should not be emitted.
-    sig_label_meta: Optional[Dict[str, Dict[str, str]]] = None
-
-
-@dataclass(frozen=True)
-class FingerprintData:
-    path: str
-    ok: bool
-    error: Optional[str]
-    domains: Dict[str, DomainData]
-
-
-@dataclass(frozen=True)
-class SimilarityScalar:
-    value: Optional[float]          # None means undefined
-    reason: Optional[str]           # why undefined
-
-
-@dataclass(frozen=True)
-class SimilarityResult:
-    file_a: str
-    file_b: str
-
-    # Semantic metric names (formerly opt_a / opt_b / opt_c)
-    domain_hash_identity_jaccard: SimilarityScalar
-    domain_status_layout_jaccard: SimilarityScalar
-    signature_multiset_similarity: SimilarityScalar
-
-    # Coverage / gating signals
-    domains_total: int
-    domains_compared_signatures: int
-    domains_undefined_blocked: int
-    domains_undefined_unreadable: int
-    domains_missing: int
-
-    note: Optional[str]
+STATUS_ALLOWED = {"ok", "degraded"}
 
 
 @dataclass(frozen=True)
@@ -122,1657 +28,188 @@ class DomainSimilarityRow:
     multiset_jaccard: Optional[float]
 
 
-# -----------------------------
-# Parsing helpers (tolerant, explicit)
-# -----------------------------
-
-def _strip_revit_uid_tail(v: Optional[str]) -> Optional[str]:
-    """
-    Revit UniqueId is typically GUID-ELEMENTID.
-    For persistence-based similarity, keep GUID only.
-    """
-    if not isinstance(v, str):
-        return v
-    if "-" not in v:
-        return v
-    return v.rsplit("-", 1)[0]
-
-def _as_str(x: Any) -> Optional[str]:
-    if x is None:
-        return None
-    if isinstance(x, str):
-        return x
-    return str(x)
-
-
-def _norm_status(s: Any) -> str:
-    if s is None:
-        return STATUS_BLOCKED  # conservative default when absent
-    if isinstance(s, str):
-        s2 = STATUS_ALIASES.get(s, s.lower().strip())
-        if s2 in RECOGNIZED_STATUSES:
-            return s2
-    # Unknown status -> blocked (don’t guess comparable)
-    return STATUS_BLOCKED
-
-
-def _extract_domains_obj(fp: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """
-    Return the domain-metadata object.
-
-    Supported layouts:
-      1) New contract: top-level "_domains" (dict)
-      2) Legacy: top-level "domains" (dict)
-      3) Wrapped legacy: {"fingerprint"|"result"|"results"|"data": {"domains": {...}}}
-    """
-    v = fp.get("_domains")
-    if isinstance(v, dict):
-        return v
-
-    v = fp.get("domains")
-    if isinstance(v, dict):
-        return v
-
-    for wrap in ("fingerprint", "result", "results", "data"):
-        w = fp.get(wrap)
-        if isinstance(w, dict):
-            v2 = w.get("domains")
-            if isinstance(v2, dict):
-                return v2
-
-    return None
-
-
-def _extract_sig_hashes(domain_payload: Dict[str, Any], domain_name: str) -> Optional[List[str]]:
-    """
-    Contract-aligned signature extraction.
-
-    Return:
-      - None: unavailable/unknown/unsupported (not contract-valid for similarity)
-      - []: explicitly known empty (contract-valid)
-      - [..]: list of sig_hash strings (may include duplicates)
-
-    Contract source of truth:
-      - domain_payload["records"] containing record.v2 objects, each with:
-          schema_version == "record.v2"
-          status in {ok,degraded,blocked}
-          sig_hash: 32-hex for ok/degraded; null for blocked
-    """
-    recs = domain_payload.get("records")
-    if not isinstance(recs, list):
-        return None
-
-    out: List[str] = []
-    saw_v2 = False
-
-    for r in recs:
-        if not isinstance(r, dict):
-            continue
-        if r.get("schema_version") != "record.v2":
-            continue
-
-        saw_v2 = True
-
-        st = _norm_status(r.get("status"))
-        sig = r.get("sig_hash")
-
-        if st == STATUS_BLOCKED:
-            # Contract: sig_hash must be null when blocked; do not include.
-            continue
-
-        # ok/degraded must have a 32-hex string; if not, do not guess.
-        if isinstance(sig, str) and sig:
-            if domain_name in SEMANTIC_UID_DOMAINS:
-                out.append(_strip_revit_uid_tail(sig))
-            else:
-                out.append(sig)
-
-    if not saw_v2:
-        return None
-
-    # If records exist, list existence is contract-valid even if empty.
-    return out
-
-def _extract_domain_status(domain_payload: Dict[str, Any]) -> str:
-    for key in ("status", "run_status", "domain_status"):
-        if key in domain_payload:
-            return _norm_status(domain_payload.get(key))
-    # Sometimes status stored under "meta"
-    meta = domain_payload.get("meta")
-    if isinstance(meta, dict) and "status" in meta:
-        return _norm_status(meta.get("status"))
-    return STATUS_BLOCKED  # conservative
-
-
-def _extract_domain_hash(domain_payload: Dict[str, Any]) -> Optional[str]:
-    """
-    Extract the domain-level hash from either:
-      - new contract meta objects (from _domains), or
-      - legacy domain payload objects.
-
-    Returns:
-      - hash string, or None if absent.
-    """
-    for key in ("hash", "domain_hash", "value_hash", "fingerprint_hash", "def_hash"):
-        v = domain_payload.get(key)
-        if isinstance(v, str) and v:
-            return v
-
-    # Sometimes nested under meta
-    meta = domain_payload.get("meta")
-    if isinstance(meta, dict):
-        for key in ("hash", "domain_hash", "value_hash", "fingerprint_hash", "def_hash"):
-            v = meta.get(key)
-            if isinstance(v, str) and v:
-                return v
-
-    return None
-
-
-def load_fingerprint(path: str) -> FingerprintData:
-    p = Path(path)
-    try:
-        raw = json.loads(p.read_text(encoding="utf-8"))
-    except Exception as e:
-        return FingerprintData(path=os.path.basename(str(p)), ok=False, error=f"unreadable_json: {type(e).__name__}: {e}", domains={})
-
-    domains_obj = _extract_domains_obj(raw)
-    if domains_obj is None:
-        return FingerprintData(path=os.path.basename(str(p)), ok=False, error="missing_domains_object", domains={})
-
-    # Detect whether this is the new contract (domains_obj == raw["_domains"])
-    is_new_contract = isinstance(raw.get("_domains"), dict) and domains_obj is raw.get("_domains")
-
-    domains: Dict[str, DomainData] = {}
-
-    if is_new_contract:
-        # domains_obj provides meta (status/hash/reasons); per-domain payload is at top-level key with same name.
-        for dname, meta in domains_obj.items():
-            if not isinstance(dname, str):
-                dname = str(dname)
-
-            if not isinstance(meta, dict):
-                domains[dname] = DomainData(
-                    name=dname,
-                    status=STATUS_BLOCKED,
-                    domain_hash=None,
-                    sig_hashes=None,
-                    unreadable=True,
-                    missing=False,
-                    reason=f"domain_meta_not_object:{type(meta).__name__}",
-                )
-                continue
-
-            status = _extract_domain_status(meta)
-            dhash = _extract_domain_hash(meta)
-
-            payload = raw.get(dname, None)
-            if payload is None:
-                # Domain exists in _domains but has no payload key (distinct from blocked/unreadable)
-                reason = None
-                for rk in ("reason", "block_reason", "degrade_reason", "error"):
-                    rv = meta.get(rk)
-                    if isinstance(rv, str) and rv.strip():
-                        reason = rv.strip()
-                        break
-                if reason is None:
-                    br = meta.get("block_reasons")
-                    if isinstance(br, list) and br:
-                        reason = f"block_reasons:{br[0]}"
-                domains[dname] = DomainData(
-                    name=dname,
-                    status=status,
-                    domain_hash=dhash,
-                    sig_hashes=None,
-                    unreadable=False,
-                    missing=True,
-                    reason=reason or "missing_domain_payload_key",
-                )
-                continue
-
-            if not isinstance(payload, dict):
-                domains[dname] = DomainData(
-                    name=dname,
-                    status=status,
-                    domain_hash=dhash,
-                    sig_hashes=None,
-                    unreadable=True,
-                    missing=False,
-                    reason=f"domain_payload_not_object:{type(payload).__name__}",
-                )
-                continue
-
-            sigs = _extract_sig_hashes(payload, dname)
-            sig_label_meta = _extract_sig_label_meta(payload)
-
-            # Capture a reason string if present (meta first, then payload)
-            reason = None
-            for src in (meta, payload):
-                for rk in ("reason", "block_reason", "degrade_reason", "error"):
-                    rv = src.get(rk)
-                    if isinstance(rv, str) and rv.strip():
-                        reason = rv.strip()
-                        break
-                if reason:
-                    break
-            if reason is None:
-                br = meta.get("block_reasons")
-                if isinstance(br, list) and br:
-                    reason = f"block_reasons:{br[0]}"
-
-            domains[dname] = DomainData(
-                name=dname,
-                status=status,
-                domain_hash=dhash,
-                sig_hashes=sigs,
-                unreadable=False,
-                missing=False,
-                reason=reason,
-                sig_label_meta=sig_label_meta,
-            )
-
-
-        return FingerprintData(path=os.path.basename(str(p)), ok=True, error=None, domains=domains)
-
-    # Legacy path: domains_obj is already per-domain payload
-    for dname, dpayload in domains_obj.items():
-        if not isinstance(dname, str):
-            dname = str(dname)
-
-        if dpayload is None:
-            domains[dname] = DomainData(
-                name=dname,
-                status=STATUS_BLOCKED,
-                domain_hash=None,
-                sig_hashes=None,
-                unreadable=False,
-                missing=True,
-                reason="domain_payload_null",
-            )
-            continue
-
-        if not isinstance(dpayload, dict):
-            domains[dname] = DomainData(
-                name=dname,
-                status=STATUS_BLOCKED,
-                domain_hash=None,
-                sig_hashes=None,
-                unreadable=True,
-                missing=False,
-                reason=f"domain_payload_not_object:{type(dpayload).__name__}",
-            )
-            continue
-
-        status = _extract_domain_status(dpayload)
-        dhash = _extract_domain_hash(dpayload)
-        sigs = _extract_sig_hashes(dpayload, dname)
-        sig_label_meta = _extract_sig_label_meta(dpayload)
-
-        missing = False
-        unreadable = False
-        reason = None
-        for rk in ("reason", "block_reason", "degrade_reason", "error"):
-            rv = dpayload.get(rk)
-            if isinstance(rv, str) and rv.strip():
-                reason = rv.strip()
-                break
-
-        domains[dname] = DomainData(
-            name=dname,
-            status=status,
-            domain_hash=dhash,
-            sig_hashes=sigs,
-            unreadable=unreadable,
-            missing=missing,
-            reason=reason,
-            sig_label_meta=sig_label_meta,
-        )
-
-
-    return FingerprintData(path=str(p), ok=True, error=None, domains=domains)
-
-
-# -----------------------------
-# Similarity metrics
-# -----------------------------
-
-def jaccard_set(a: Iterable[str], b: Iterable[str]) -> SimilarityScalar:
+def _set_jaccard(a: Iterable[str], b: Iterable[str]) -> float:
     sa = set(a)
     sb = set(b)
     if not sa and not sb:
-        return SimilarityScalar(value=1.0, reason=None)
-    if not sa and sb:
-        return SimilarityScalar(value=0.0, reason=None)
-    if sa and not sb:
-        return SimilarityScalar(value=0.0, reason=None)
-    inter = len(sa & sb)
-    union = len(sa | sb)
-    return SimilarityScalar(value=(inter / union) if union else None, reason=None)
+        return 1.0
+    return len(sa & sb) / len(sa | sb)
 
 
-def jaccard_multiset(ca: Counter, cb: Counter) -> SimilarityScalar:
-    # Weighted Jaccard on multisets: sum min / sum max
-    keys = set(ca.keys()) | set(cb.keys())
+def _multiset_jaccard(ca: Counter, cb: Counter) -> Tuple[float, int, int, int, int]:
+    keys = set(ca) | set(cb)
     if not keys:
-        return SimilarityScalar(value=1.0, reason=None)
-    inter = 0
-    union = 0
+        return 1.0, 0, 0, 0, 0
+    matched = 0
+    union_mass = 0
+    added_in_b = 0
+    removed_from_a = 0
     for k in keys:
         a = ca.get(k, 0)
         b = cb.get(k, 0)
-        inter += min(a, b)
-        union += max(a, b)
-    if union == 0:
-        return SimilarityScalar(value=None, reason="undefined_union_zero")
-    return SimilarityScalar(value=inter / union, reason=None)
-
-
-def _domain_union_mass(sig_a: Optional[List[str]], sig_b: Optional[List[str]]) -> Optional[int]:
-    if sig_a is None or sig_b is None:
-        return None
-    ca = Counter(sig_a)
-    cb = Counter(sig_b)
-    keys = set(ca.keys()) | set(cb.keys())
-    mass = 0
-    for k in keys:
-        mass += max(ca.get(k, 0), cb.get(k, 0))
-    return mass
-
-
-def compare_two_full(fp_a: FingerprintData, fp_b: FingerprintData) -> Tuple[SimilarityResult, List[DomainSimilarityRow]]:
-    # If a file is unreadable, all metrics are undefined (explicit)
-    if not fp_a.ok or not fp_b.ok:
-        reason = "file_unreadable"
-        note = f"a_error={fp_a.error!r} b_error={fp_b.error!r}"
-        return (
-            SimilarityResult(
-                file_a=fp_a.path,
-                file_b=fp_b.path,
-
-                domain_hash_identity_jaccard=SimilarityScalar(None, reason),
-                domain_status_layout_jaccard=SimilarityScalar(None, reason),
-                signature_multiset_similarity=SimilarityScalar(None, reason),
-
-                domains_total=0,
-                domains_compared_signatures=0,
-                domains_undefined_blocked=0,
-                domains_undefined_unreadable=0,
-                domains_missing=0,
-                note=note,
-            ),
-            [],
-        )
-
-    domain_names = sorted(set(fp_a.domains.keys()) | set(fp_b.domains.keys()))
-    domains_total = len(domain_names)
-
-    undefined_blocked = 0
-    undefined_unreadable = 0
-    missing = 0
-
-    # ----------------
-    # Metric 1: domain_hash_identity_jaccard
-    # Jaccard on {domain:hash} tokens, OK-only, blocked excluded
-    # ----------------
-    tokens_a: List[str] = []
-    tokens_b: List[str] = []
-
-    for d in domain_names:
-        da = fp_a.domains.get(d)
-        db = fp_b.domains.get(d)
-
-        if da is None or db is None:
-            missing += 1
-            continue
-
-        if da.missing or db.missing:
-            missing += 1
-            continue
-
-        if da.unreadable or db.unreadable:
-            undefined_unreadable += 1
-            continue
-
-        if da.status == STATUS_BLOCKED or db.status == STATUS_BLOCKED:
-            undefined_blocked += 1
-            continue
-
-        if da.status == STATUS_OK and isinstance(da.domain_hash, str) and da.domain_hash:
-            tokens_a.append(f"{d}:{da.domain_hash}")
-        if db.status == STATUS_OK and isinstance(db.domain_hash, str) and db.domain_hash:
-            tokens_b.append(f"{d}:{db.domain_hash}")
-
-    metric_domain_hash_identity_jaccard = jaccard_set(tokens_a, tokens_b)
-
-    # ----------------
-    # Metric 2: domain_status_layout_jaccard
-    # Jaccard on {domain:status} tokens, blocked excluded
-    # ----------------
-    status_tokens_a: List[str] = []
-    status_tokens_b: List[str] = []
-
-    for d in domain_names:
-        da = fp_a.domains.get(d)
-        db = fp_b.domains.get(d)
-
-        if da is None or db is None or da.missing or db.missing:
-            continue
-        if da.unreadable or db.unreadable:
-            continue
-        if da.status == STATUS_BLOCKED or db.status == STATUS_BLOCKED:
-            continue
-
-        status_tokens_a.append(f"{d}:{da.status}")
-        status_tokens_b.append(f"{d}:{db.status}")
-
-    metric_domain_status_layout_jaccard = jaccard_set(status_tokens_a, status_tokens_b)
-
-    # ----------------
-    # Metric 3: signature_multiset_similarity
-    # Per-domain multiset Jaccard over sig hashes (OK-only),
-    # weighted by union mass across comparable domains.
-    # Fallback: if signatures unavailable for a domain, use exact domain-hash equality (OK-only).
-    # ----------------
-    per_domain_scores: List[Tuple[float, int]] = []  # (score, weight)
-    domain_rows: List[DomainSimilarityRow] = []
-    domains_compared_signatures = 0
-
-    for d in domain_names:
-        da = fp_a.domains.get(d)
-        db = fp_b.domains.get(d)
-        if da is None or db is None:
-            domain_rows.append(DomainSimilarityRow(
-                file_a=fp_a.path,
-                file_b=fp_b.path,
-                domain=d,
-                comparable=False,
-                not_comparable_reason="missing",
-                a_total=None,
-                b_total=None,
-                matched=None,
-                added_in_b=None,
-                removed_from_a=None,
-                union_mass=None,
-                set_jaccard=None,
-                multiset_jaccard=None,
-            ))
-            continue
-        if da.missing or db.missing:
-            domain_rows.append(DomainSimilarityRow(
-                file_a=fp_a.path,
-                file_b=fp_b.path,
-                domain=d,
-                comparable=False,
-                not_comparable_reason="missing",
-                a_total=None,
-                b_total=None,
-                matched=None,
-                added_in_b=None,
-                removed_from_a=None,
-                union_mass=None,
-                set_jaccard=None,
-                multiset_jaccard=None,
-            ))
-            continue
-        if da.unreadable or db.unreadable:
-            domain_rows.append(DomainSimilarityRow(
-                file_a=fp_a.path,
-                file_b=fp_b.path,
-                domain=d,
-                comparable=False,
-                not_comparable_reason="unreadable",
-                a_total=None,
-                b_total=None,
-                matched=None,
-                added_in_b=None,
-                removed_from_a=None,
-                union_mass=None,
-                set_jaccard=None,
-                multiset_jaccard=None,
-            ))
-            continue
-        if da.status == STATUS_BLOCKED or db.status == STATUS_BLOCKED:
-            domain_rows.append(DomainSimilarityRow(
-                file_a=fp_a.path,
-                file_b=fp_b.path,
-                domain=d,
-                comparable=False,
-                not_comparable_reason="blocked",
-                a_total=None,
-                b_total=None,
-                matched=None,
-                added_in_b=None,
-                removed_from_a=None,
-                union_mass=None,
-                set_jaccard=None,
-                multiset_jaccard=None,
-            ))
-            continue
-        if da.status != STATUS_OK or db.status != STATUS_OK:
-            domain_rows.append(DomainSimilarityRow(
-                file_a=fp_a.path,
-                file_b=fp_b.path,
-                domain=d,
-                comparable=False,
-                not_comparable_reason="not_ok_status",
-                a_total=None,
-                b_total=None,
-                matched=None,
-                added_in_b=None,
-                removed_from_a=None,
-                union_mass=None,
-                set_jaccard=None,
-                multiset_jaccard=None,
-            ))
-            continue
-
-        if da.sig_hashes is not None and db.sig_hashes is not None:
-            ca = Counter(da.sig_hashes)
-            cb = Counter(db.sig_hashes)
-            score = jaccard_multiset(ca, cb)
-            if score.value is None:
-                continue
-            weight = _domain_union_mass(da.sig_hashes, db.sig_hashes)
-            if weight is None:
-                continue
-            set_score = jaccard_set(ca.keys(), cb.keys())
-            keys = set(ca.keys()) | set(cb.keys())
-            matched = 0
-            added_in_b = 0
-            removed_from_a = 0
-            for k in keys:
-                count_a = int(ca.get(k, 0))
-                count_b = int(cb.get(k, 0))
-                matched += min(count_a, count_b)
-                if count_b > count_a:
-                    added_in_b += count_b - count_a
-                if count_a > count_b:
-                    removed_from_a += count_a - count_b
-            per_domain_scores.append((score.value, weight))
-            domains_compared_signatures += 1
-            domain_rows.append(DomainSimilarityRow(
-                file_a=fp_a.path,
-                file_b=fp_b.path,
-                domain=d,
-                comparable=True,
-                not_comparable_reason=None,
-                a_total=len(da.sig_hashes),
-                b_total=len(db.sig_hashes),
-                matched=matched,
-                added_in_b=added_in_b,
-                removed_from_a=removed_from_a,
-                union_mass=weight,
-                set_jaccard=set_score.value,
-                multiset_jaccard=score.value,
-            ))
-            continue
-
-        if isinstance(da.domain_hash, str) and da.domain_hash and isinstance(db.domain_hash, str) and db.domain_hash:
-            score_val = 1.0 if da.domain_hash == db.domain_hash else 0.0
-            per_domain_scores.append((score_val, 1))
-            domains_compared_signatures += 1
-            domain_rows.append(DomainSimilarityRow(
-                file_a=fp_a.path,
-                file_b=fp_b.path,
-                domain=d,
-                comparable=True,
-                not_comparable_reason=None,
-                a_total=None,
-                b_total=None,
-                matched=1 if score_val == 1.0 else 0,
-                added_in_b=0 if score_val == 1.0 else 1,
-                removed_from_a=0 if score_val == 1.0 else 1,
-                union_mass=1,
-                set_jaccard=score_val,
-                multiset_jaccard=score_val,
-            ))
-            continue
-
-        domain_rows.append(DomainSimilarityRow(
-            file_a=fp_a.path,
-            file_b=fp_b.path,
-            domain=d,
-            comparable=False,
-            not_comparable_reason="no_signatures",
-            a_total=None,
-            b_total=None,
-            matched=None,
-            added_in_b=None,
-            removed_from_a=None,
-            union_mass=None,
-            set_jaccard=None,
-            multiset_jaccard=None,
-        ))
-        continue
-
-    if not per_domain_scores:
-        metric_signature_multiset_similarity = SimilarityScalar(None, "no_comparable_domains_for_signature_multiset_similarity")
-    else:
-        num = sum(s * w for s, w in per_domain_scores)
-        den = sum(w for _, w in per_domain_scores)
-        metric_signature_multiset_similarity = SimilarityScalar(
-            (num / den) if den else None,
-            None if den else "undefined_den_zero",
-        )
-
-    note = None
-    return (
-        SimilarityResult(
-            file_a=fp_a.path,
-            file_b=fp_b.path,
-
-            domain_hash_identity_jaccard=metric_domain_hash_identity_jaccard,
-            domain_status_layout_jaccard=metric_domain_status_layout_jaccard,
-            signature_multiset_similarity=metric_signature_multiset_similarity,
-
-            domains_total=domains_total,
-            domains_compared_signatures=domains_compared_signatures,
-            domains_undefined_blocked=undefined_blocked,
-            domains_undefined_unreadable=undefined_unreadable,
-            domains_missing=missing,
-            note=note,
-        ),
-        domain_rows,
-    )
-
-
-def compare_two(fp_a: FingerprintData, fp_b: FingerprintData) -> SimilarityResult:
-    result, _ = compare_two_full(fp_a, fp_b)
-    return result
-
-@dataclass(frozen=True)
-class DomainSigTopK:
-    # Top-K sig_hash deltas for a domain (bounded)
-    items: List[Tuple[str, int]]  # (sig_hash, count)
-
-
-@dataclass(frozen=True)
-class DomainDetail:
-    domain: str
-    status_a: str
-    status_b: str
-
-    comparable: bool
-    reason: Optional[str]
-
-    # Similarities (only defined when comparable)
-    set_jaccard: SimilarityScalar
-    multiset_jaccard: SimilarityScalar
-
-    # Mass / overlap counters (only meaningful when comparable and sigs available)
-    a_total: Optional[int]
-    b_total: Optional[int]
-    matched: Optional[int]
-    added_in_b: Optional[int]
-    removed_from_a: Optional[int]
-    union_mass: Optional[int]
-
-    # Bounded top-K lists (sig_hash only)
-    top_matched: Optional[DomainSigTopK]
-    top_added: Optional[DomainSigTopK]
-    top_removed: Optional[DomainSigTopK]
-
-    # Optional sig_hash -> label meta maps (record.v2 only)
-    # - *_a / *_b preserve source-file attribution
-    # - merged is a deterministic union (prefer A on conflicts) for backward compatibility
-    sig_label_meta_a: Optional[Dict[str, Dict[str, str]]] = None
-    sig_label_meta_b: Optional[Dict[str, Dict[str, str]]] = None
-    sig_label_meta: Optional[Dict[str, Dict[str, str]]] = None
-
-
-@dataclass(frozen=True)
-class SimilarityDetail:
-    file_a: str
-    file_b: str
-    summary: SimilarityResult
-    domains: List[DomainDetail]
-
-
-def _topk_counter_items(c: Counter, top_k: int) -> List[Tuple[str, int]]:
-    # Deterministic ordering: count desc, then sig_hash asc
-    items = [(k, int(v)) for k, v in c.items() if isinstance(k, str) and k]
-    items.sort(key=lambda kv: (-kv[1], kv[0]))
-    return items[: max(0, int(top_k))]
-
-def _merge_sig_label_meta(
-    a: Optional[Dict[str, Dict[str, str]]],
-    b: Optional[Dict[str, Dict[str, str]]],
-) -> Optional[Dict[str, Dict[str, str]]]:
-    """
-    Deterministic union of sig->label maps.
-    Preference rule on conflict: keep A's entry, ignore B's.
-    Returns None if both are None/empty.
-    """
-    if not a and not b:
-        return None
-
-    out: Dict[str, Dict[str, str]] = {}
-    if isinstance(a, dict):
-        for k, v in a.items():
-            if isinstance(k, str) and k and isinstance(v, dict):
-                out[k] = v
-    if isinstance(b, dict):
-        for k, v in b.items():
-            if isinstance(k, str) and k and isinstance(v, dict) and k not in out:
-                out[k] = v
-
-    return out if out else None
-
-def _extract_sig_label_meta(domain_payload: Dict[str, Any]) -> Optional[Dict[str, Dict[str, str]]]:
-    """
-    Return mapping sig_hash -> label metadata extracted ONLY from record.v2 records.
-
-    Contract source:
-      record.schema_version == "record.v2"
-      record.sig_hash
-      record.label.display / record.label.quality / record.label.provenance
-
-    Safe:
-      - returns None if record.v2 records not present
-      - preserves first occurrence deterministically if duplicates occur
-    """
-    recs = domain_payload.get("records")
-    if not isinstance(recs, list):
-        return None
-
-    out: Dict[str, Dict[str, str]] = {}
-    saw_v2 = False
-
-    for r in recs:
-        if not isinstance(r, dict):
-            continue
-        if r.get("schema_version") != "record.v2":
-            continue
-
-        saw_v2 = True
-
-        sig = r.get("sig_hash")
-        if not isinstance(sig, str) or not sig:
-            # Contract: ok/degraded must have a 32-hex sig_hash; blocked must be null.
-            # If missing/invalid, do not guess; just omit.
-            continue
-
-        lab = r.get("label")
-        if not isinstance(lab, dict):
-            continue
-
-        disp = lab.get("display")
-        qual = lab.get("quality")
-        prov = lab.get("provenance")
-
-        if not isinstance(disp, str):
-            continue
-        if not isinstance(qual, str):
-            continue
-        if not isinstance(prov, str):
-            continue
-
-        if sig not in out:
-            out[sig] = {"display": disp, "quality": qual, "provenance": prov}
-
-    if not saw_v2:
-        return None
-
-    return out if out else None
-
-
-def _compare_domain_signatures(domain: str, da: DomainData, db: DomainData, top_k: int) -> DomainDetail:
-    # Non-negotiable invariants: blocked > degraded > ok; unreadable != missing; no silent failure.
-
-    if da.missing or db.missing:
-        return DomainDetail(
-            domain=domain,
-            status_a=da.status,
-            status_b=db.status,
-            comparable=False,
-            reason="domain_missing_payload",
-            set_jaccard=SimilarityScalar(None, "domain_missing_payload"),
-            multiset_jaccard=SimilarityScalar(None, "domain_missing_payload"),
-            a_total=None,
-            b_total=None,
-            matched=None,
-            added_in_b=None,
-            removed_from_a=None,
-            union_mass=None,
-            top_matched=None,
-            top_added=None,
-            top_removed=None,
-            sig_label_meta_a=None,
-            sig_label_meta_b=None,
-            sig_label_meta=None,
-        )
-
-    if da.unreadable or db.unreadable:
-        return DomainDetail(
-            domain=domain,
-            status_a=da.status,
-            status_b=db.status,
-            comparable=False,
-            reason="domain_unreadable_payload",
-            set_jaccard=SimilarityScalar(None, "domain_unreadable_payload"),
-            multiset_jaccard=SimilarityScalar(None, "domain_unreadable_payload"),
-            a_total=None,
-            b_total=None,
-            matched=None,
-            added_in_b=None,
-            removed_from_a=None,
-            union_mass=None,
-            top_matched=None,
-            top_added=None,
-            top_removed=None,
-            sig_label_meta_a=None,
-            sig_label_meta_b=None,
-            sig_label_meta=None,
-        )
-
-    if da.status == STATUS_BLOCKED or db.status == STATUS_BLOCKED:
-        return DomainDetail(
-            domain=domain,
-            status_a=da.status,
-            status_b=db.status,
-            comparable=False,
-            reason="domain_blocked",
-            set_jaccard=SimilarityScalar(None, "domain_blocked"),
-            multiset_jaccard=SimilarityScalar(None, "domain_blocked"),
-            a_total=None,
-            b_total=None,
-            matched=None,
-            added_in_b=None,
-            removed_from_a=None,
-            union_mass=None,
-            top_matched=None,
-            top_added=None,
-            top_removed=None,
-            sig_label_meta_a=None,
-            sig_label_meta_b=None,
-            sig_label_meta=None,
-        )
-
-    # Conservative: only compare record-level signatures when both OK
-    if da.status != STATUS_OK or db.status != STATUS_OK:
-        return DomainDetail(
-            domain=domain,
-            status_a=da.status,
-            status_b=db.status,
-            comparable=False,
-            reason="domain_not_ok",
-            set_jaccard=SimilarityScalar(None, "domain_not_ok"),
-            multiset_jaccard=SimilarityScalar(None, "domain_not_ok"),
-            a_total=None,
-            b_total=None,
-            matched=None,
-            added_in_b=None,
-            removed_from_a=None,
-            union_mass=None,
-            top_matched=None,
-            top_added=None,
-            top_removed=None,
-            sig_label_meta_a=da.sig_label_meta,
-            sig_label_meta_b=db.sig_label_meta,
-            sig_label_meta=_merge_sig_label_meta(da.sig_label_meta, db.sig_label_meta),
-        )
-
-    if da.sig_hashes is None or db.sig_hashes is None:
-        # Explicitly undefined for record-level questions
-        return DomainDetail(
-            domain=domain,
-            status_a=da.status,
-            status_b=db.status,
-            comparable=False,
-            reason="missing_signature_hashes",
-            set_jaccard=SimilarityScalar(None, "missing_signature_hashes"),
-            multiset_jaccard=SimilarityScalar(None, "missing_signature_hashes"),
-            a_total=None,
-            b_total=None,
-            matched=None,
-            added_in_b=None,
-            removed_from_a=None,
-            union_mass=None,
-            top_matched=None,
-            top_added=None,
-            top_removed=None,
-            sig_label_meta_a=da.sig_label_meta,
-            sig_label_meta_b=db.sig_label_meta,
-            sig_label_meta=_merge_sig_label_meta(da.sig_label_meta, db.sig_label_meta),
-        )
-
-    ca = Counter(da.sig_hashes)
-    cb = Counter(db.sig_hashes)
-
-    set_sim = jaccard_set(ca.keys(), cb.keys())
-    ms_sim = jaccard_multiset(ca, cb)
-
-    # Overlap counters
-    keys = set(ca.keys()) | set(cb.keys())
-    matched = 0
-    union_mass = 0
-    added = Counter()
-    removed = Counter()
-    common = Counter()
-
-    for k in keys:
-        a = int(ca.get(k, 0))
-        b = int(cb.get(k, 0))
-        matched_k = min(a, b)
-        matched += matched_k
+        matched += min(a, b)
         union_mass += max(a, b)
-        if matched_k > 0:
-            common[k] = matched_k
         if b > a:
-            added[k] = b - a
+            added_in_b += b - a
         if a > b:
-            removed[k] = a - b
-
-    label_meta = _merge_sig_label_meta(da.sig_label_meta, db.sig_label_meta)
-
-    return DomainDetail(
-        domain=domain,
-        status_a=da.status,
-        status_b=db.status,
-        comparable=True,
-        reason=None,
-        set_jaccard=set_sim,
-        multiset_jaccard=ms_sim,
-        a_total=sum(ca.values()),
-        b_total=sum(cb.values()),
-        matched=matched,
-        added_in_b=sum(added.values()),
-        removed_from_a=sum(removed.values()),
-        union_mass=union_mass,
-        top_matched=DomainSigTopK(items=_topk_counter_items(common, top_k)),
-        top_added=DomainSigTopK(items=_topk_counter_items(added, top_k)),
-        top_removed=DomainSigTopK(items=_topk_counter_items(removed, top_k)),
-        sig_label_meta_a=da.sig_label_meta,
-        sig_label_meta_b=db.sig_label_meta,
-        sig_label_meta=label_meta,
-    )
+            removed_from_a += a - b
+    score = (matched / union_mass) if union_mass else 1.0
+    return score, matched, added_in_b, removed_from_a, union_mass
 
 
-def compare_two_detailed(fp_a: FingerprintData, fp_b: FingerprintData, top_k: int, domain_filter: Optional[set]) -> SimilarityDetail:
-    summary, _ = compare_two_full(fp_a, fp_b)
-
-    # If unreadable, details are empty but explicit
-    if not fp_a.ok or not fp_b.ok:
-        return SimilarityDetail(file_a=fp_a.path, file_b=fp_b.path, summary=summary, domains=[])
-
-    domain_names = sorted(set(fp_a.domains.keys()) | set(fp_b.domains.keys()))
-    if domain_filter:
-        domain_names = [d for d in domain_names if d in domain_filter]
-
-    domains: List[DomainDetail] = []
-    for d in domain_names:
-        da = fp_a.domains.get(d)
-        db = fp_b.domains.get(d)
-        if da is None or db is None:
-            # Explicit: present in one file only
-            status_a = da.status if da else STATUS_BLOCKED
-            status_b = db.status if db else STATUS_BLOCKED
-            domains.append(DomainDetail(
-                domain=d,
-                status_a=status_a,
-                status_b=status_b,
-                comparable=False,
-                reason="domain_missing_in_one_file",
-                set_jaccard=SimilarityScalar(None, "domain_missing_in_one_file"),
-                multiset_jaccard=SimilarityScalar(None, "domain_missing_in_one_file"),
-                a_total=None,
-                b_total=None,
-                matched=None,
-                added_in_b=None,
-                removed_from_a=None,
-                union_mass=None,
-                top_matched=None,
-                top_added=None,
-                top_removed=None,
-            ))
-            continue
-
-        domains.append(_compare_domain_signatures(d, da, db, top_k))
-
-    # Helpful deterministic ordering for “which domains matter”
-    # (most divergent first, then heavier domains first, then name)
-    def _sort_key(dd: DomainDetail):
-        sim = dd.multiset_jaccard.value
-        sim_key = 1.0 if sim is None else float(sim)
-        mass = 0 if dd.union_mass is None else int(dd.union_mass)
-        return (sim_key, -mass, dd.domain)
-
-    domains.sort(key=_sort_key)
-    return SimilarityDetail(file_a=fp_a.path, file_b=fp_b.path, summary=summary, domains=domains)
-
-
-def _detail_summary_payload(summary: SimilarityResult) -> Dict[str, Any]:
-    return {
-        "domain_hash_identity_jaccard": {
-            "value": summary.domain_hash_identity_jaccard.value,
-            "reason": summary.domain_hash_identity_jaccard.reason,
-        },
-        "domain_status_layout_jaccard": {
-            "value": summary.domain_status_layout_jaccard.value,
-            "reason": summary.domain_status_layout_jaccard.reason,
-        },
-        "signature_multiset_similarity": {
-            "value": summary.signature_multiset_similarity.value,
-            "reason": summary.signature_multiset_similarity.reason,
-        },
-        "domains_total": summary.domains_total,
-        "domains_compared_signatures": summary.domains_compared_signatures,
-        "domains_undefined_blocked": summary.domains_undefined_blocked,
-        "domains_undefined_unreadable": summary.domains_undefined_unreadable,
-        "domains_missing": summary.domains_missing,
-        "note": summary.note,
-    }
-
-
-def _domain_detail_payload(detail: DomainDetail) -> Dict[str, Any]:
-    return {
-        "domain": detail.domain,
-        "status_a": detail.status_a,
-        "status_b": detail.status_b,
-        "comparable": detail.comparable,
-        "reason": detail.reason,
-        "set_jaccard": {"value": detail.set_jaccard.value, "reason": detail.set_jaccard.reason},
-        "multiset_jaccard": {"value": detail.multiset_jaccard.value, "reason": detail.multiset_jaccard.reason},
-        "a_total": detail.a_total,
-        "b_total": detail.b_total,
-        "matched": detail.matched,
-        "added_in_b": detail.added_in_b,
-        "removed_from_a": detail.removed_from_a,
-        "union_mass": detail.union_mass,
-        "top_matched": (detail.top_matched.items if detail.top_matched else None),
-        "top_added": (detail.top_added.items if detail.top_added else None),
-        "top_removed": (detail.top_removed.items if detail.top_removed else None),
-        "sig_label_meta_a": detail.sig_label_meta_a,
-        "sig_label_meta_b": detail.sig_label_meta_b,
-        "sig_label_meta": detail.sig_label_meta,
-    }
-
-
-def _safe_domain_file_stem(domain_name: str) -> str:
-    """
-    Convert an arbitrary domain key into a safe filename stem.
-    """
-    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", domain_name).strip("._-")
-    if not safe:
-        safe = f"domain_{hashlib.sha1(domain_name.encode('utf-8')).hexdigest()[:12]}"
-    if safe in {".", ".."}:
-        safe = f"domain_{hashlib.sha1(domain_name.encode('utf-8')).hexdigest()[:12]}"
-    return safe
-
-
-def write_details_json(details: List[SimilarityDetail], out_path: str) -> List[str]:
-    out_dir = Path(out_path).parent
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_dir_resolved = out_dir.resolve()
-
-    by_domain: Dict[str, List[Dict[str, Any]]] = {}
-    for comparison in details:
-        for domain_detail in comparison.domains:
-            domain_payload = _domain_detail_payload(domain_detail)
-            by_domain.setdefault(domain_detail.domain, []).append({
-                "file_a": comparison.file_a,
-                "file_b": comparison.file_b,
-                "summary": _detail_summary_payload(comparison.summary),
-                # Backward-compatible shape for tools/details_to_csv.py:
-                # it expects row["domains"] to be a list of domain objects.
-                "domains": [domain_payload],
-                # Keep single-domain convenience payload in parallel.
-                "domain": domain_payload,
-            })
-
-    written_paths: List[str] = []
-    used_stems: Dict[str, int] = {}
-    for domain_name, payload in sorted(by_domain.items()):
-        stem = _safe_domain_file_stem(domain_name)
-        suffix = used_stems.get(stem, 0)
-        used_stems[stem] = suffix + 1
-        if suffix:
-            stem = f"{stem}_{suffix}"
-
-        file_path = out_dir / f"{stem}_details.json"
-        resolved_path = file_path.resolve()
-        if out_dir_resolved not in resolved_path.parents:
-            raise ValueError(f"unsafe_details_domain_filename:{domain_name}")
-
-        file_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        written_paths.append(str(file_path))
-
-    return written_paths
-
-# -----------------------------
-# Batch drivers
-# -----------------------------
-
-def find_json_files(dir_path: str) -> List[str]:
-    """Find monolithic JSON files in a directory (excluding legacy bundles)."""
-    p = Path(dir_path)
-    if not p.exists() or not p.is_dir():
-        raise ValueError(f"not_a_directory: {dir_path}")
-
-    files = [str(x) for x in p.glob("*.json") if x.is_file() and not str(x).lower().endswith(".legacy.json")]
-    files.sort()
-    return files
-
-
-def _get_export_run_id_from_fingerprint(raw: dict) -> Optional[str]:
-    """Read export_run_id from _contract block in fingerprint JSON."""
-    contract = raw.get("_contract")
-    if isinstance(contract, dict):
-        eid = contract.get("export_run_id")
-        if isinstance(eid, str) and eid.strip():
-            return eid.strip()
-    return None
-
-
-def load_fingerprints_from_dir(dir_path: str) -> Dict[str, FingerprintData]:
-    """Load all monolithic fingerprints from a directory."""
-    p = Path(dir_path)
-    if not p.exists() or not p.is_dir():
-        raise ValueError(f"not_a_directory: {dir_path}")
-
-    files = sorted([x for x in p.glob("*.json") if x.is_file() and not str(x).lower().endswith(".legacy.json")])
-
-    fps: Dict[str, FingerprintData] = {}
-    for fpath in files:
-        fps[str(fpath)] = load_fingerprint(str(fpath))
-
-    return fps
-
-
-def _parse_fingerprint_data(raw: Dict[str, Any], path: str) -> FingerprintData:
-    """Parse raw JSON dict into FingerprintData (extracted for reuse with merged data)."""
-    p = Path(path)
-    domains_obj = _extract_domains_obj(raw)
-    if domains_obj is None:
-        return FingerprintData(path=os.path.basename(str(p)), ok=False, error="missing_domains_object", domains={})
-
-    # Detect whether this is the new contract (domains_obj == raw["_domains"])
-    is_new_contract = isinstance(raw.get("_domains"), dict) and domains_obj is raw.get("_domains")
-
-    domains: Dict[str, DomainData] = {}
-
-    if is_new_contract:
-        # domains_obj provides meta (status/hash/reasons); per-domain payload is at top-level key with same name.
-        for dname, meta in domains_obj.items():
-            if not isinstance(dname, str):
-                dname = str(dname)
-
-            if not isinstance(meta, dict):
-                domains[dname] = DomainData(
-                    name=dname,
-                    status=STATUS_BLOCKED,
-                    domain_hash=None,
-                    sig_hashes=None,
-                    unreadable=True,
-                    missing=False,
-                    reason=f"domain_meta_not_object:{type(meta).__name__}",
-                )
+def _load_metadata(path: Path) -> Dict[str, dict]:
+    out: Dict[str, dict] = {}
+    with path.open("r", encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            export_run_id = (row.get("export_run_id") or "").strip()
+            if not export_run_id:
                 continue
+            out[export_run_id] = row
+    return out
 
-            status = _extract_domain_status(meta)
-            dhash = _extract_domain_hash(meta)
 
-            payload = raw.get(dname, None)
-            if payload is None:
-                # Domain exists in _domains but has no payload key (distinct from blocked/unreadable)
-                reason = None
-                for rk in ("reason", "block_reason", "degrade_reason", "error"):
-                    rv = meta.get(rk)
-                    if isinstance(rv, str) and rv.strip():
-                        reason = rv.strip()
-                        break
-                if reason is None:
-                    br = meta.get("block_reasons")
-                    if isinstance(br, list) and br:
-                        reason = f"block_reasons:{br[0]}"
-                domains[dname] = DomainData(
-                    name=dname,
-                    status=status,
-                    domain_hash=dhash,
-                    sig_hashes=None,
-                    unreadable=False,
-                    missing=True,
-                    reason=reason or "missing_domain_payload_key",
-                )
+def _load_records_grouped(path: Path) -> Dict[Tuple[str, str], List[str]]:
+    grouped: Dict[Tuple[str, str], List[str]] = defaultdict(list)
+    with path.open("r", encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            status = (row.get("status") or "").strip().lower()
+            sig_hash = (row.get("sig_hash") or "").strip()
+            export_run_id = (row.get("export_run_id") or "").strip()
+            domain = (row.get("domain") or "").strip()
+            if not export_run_id or not domain:
                 continue
-
-            if not isinstance(payload, dict):
-                domains[dname] = DomainData(
-                    name=dname,
-                    status=status,
-                    domain_hash=dhash,
-                    sig_hashes=None,
-                    unreadable=True,
-                    missing=False,
-                    reason=f"domain_payload_not_object:{type(payload).__name__}",
-                )
+            if status not in STATUS_ALLOWED:
                 continue
-
-            sigs = _extract_sig_hashes(payload, dname)
-            sig_label_meta = _extract_sig_label_meta(payload)
-
-            # Capture a reason string if present (meta first, then payload)
-            reason = None
-            for src in (meta, payload):
-                for rk in ("reason", "block_reason", "degrade_reason", "error"):
-                    rv = src.get(rk)
-                    if isinstance(rv, str) and rv.strip():
-                        reason = rv.strip()
-                        break
-                if reason:
-                    break
-            if reason is None:
-                br = meta.get("block_reasons")
-                if isinstance(br, list) and br:
-                    reason = f"block_reasons:{br[0]}"
-
-            domains[dname] = DomainData(
-                name=dname,
-                status=status,
-                domain_hash=dhash,
-                sig_hashes=sigs,
-                unreadable=False,
-                missing=False,
-                reason=reason,
-                sig_label_meta=sig_label_meta,
-            )
-
-        return FingerprintData(path=os.path.basename(str(p)), ok=True, error=None, domains=domains)
-
-    # Legacy path: domains_obj is already per-domain payload
-    for dname, dpayload in domains_obj.items():
-        if not isinstance(dname, str):
-            dname = str(dname)
-
-        if dpayload is None:
-            domains[dname] = DomainData(
-                name=dname,
-                status=STATUS_BLOCKED,
-                domain_hash=None,
-                sig_hashes=None,
-                unreadable=False,
-                missing=True,
-                reason="domain_payload_null",
-            )
-            continue
-
-        if not isinstance(dpayload, dict):
-            domains[dname] = DomainData(
-                name=dname,
-                status=STATUS_BLOCKED,
-                domain_hash=None,
-                sig_hashes=None,
-                unreadable=True,
-                missing=False,
-                reason=f"domain_payload_not_object:{type(dpayload).__name__}",
-            )
-            continue
-
-        status = _extract_domain_status(dpayload)
-        dhash = _extract_domain_hash(dpayload)
-        sigs = _extract_sig_hashes(dpayload, dname)
-        sig_label_meta = _extract_sig_label_meta(dpayload)
-
-        missing = False
-        unreadable = False
-        reason = None
-        for rk in ("reason", "block_reason", "degrade_reason", "error"):
-            rv = dpayload.get(rk)
-            if isinstance(rv, str) and rv.strip():
-                reason = rv.strip()
-                break
-
-        domains[dname] = DomainData(
-            name=dname,
-            status=status,
-            domain_hash=dhash,
-            sig_hashes=sigs,
-            unreadable=unreadable,
-            missing=missing,
-            reason=reason,
-            sig_label_meta=sig_label_meta,
-        )
-
-    return FingerprintData(path=str(p), ok=True, error=None, domains=domains)
+            if not sig_hash:
+                continue
+            grouped[(export_run_id, domain)].append(sig_hash)
+    return grouped
 
 
-def write_csv(results: List[SimilarityResult], out_path: str) -> None:
-    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow([
-            "file_a",
-            "file_b",
-
-            "domain_hash_identity_jaccard_value",
-            "domain_hash_identity_jaccard_reason",
-
-            "domain_status_layout_jaccard_value",
-            "domain_status_layout_jaccard_reason",
-
-            "signature_multiset_similarity_value",
-            "signature_multiset_similarity_reason",
-
-            "domains_total",
-            "domains_compared_signatures",
-            "domains_undefined_blocked",
-            "domains_undefined_unreadable",
-            "domains_missing",
-            "note",
-        ])
-        for r in results:
-            w.writerow([
-                r.file_a,
-                r.file_b,
-
-                "" if r.domain_hash_identity_jaccard.value is None else f"{r.domain_hash_identity_jaccard.value:.6f}",
-                r.domain_hash_identity_jaccard.reason or "",
-
-                "" if r.domain_status_layout_jaccard.value is None else f"{r.domain_status_layout_jaccard.value:.6f}",
-                r.domain_status_layout_jaccard.reason or "",
-
-                "" if r.signature_multiset_similarity.value is None else f"{r.signature_multiset_similarity.value:.6f}",
-                r.signature_multiset_similarity.reason or "",
-
-                r.domains_total,
-                r.domains_compared_signatures,
-                r.domains_undefined_blocked,
-                r.domains_undefined_unreadable,
-                r.domains_missing,
-                r.note or "",
-            ])
+def _pair_type(metadata: Dict[str, dict], file_a: str, file_b: str) -> str:
+    role_a = (metadata.get(file_a, {}).get("governance_role") or "Unknown").strip() or "Unknown"
+    role_b = (metadata.get(file_b, {}).get("governance_role") or "Unknown").strip() or "Unknown"
+    return f"{role_a} vs {role_b}"
 
 
-def write_domain_csv(rows: List[DomainSimilarityRow], out_path: str) -> None:
-    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    sorted_rows = sorted(rows, key=lambda r: (r.file_a, r.file_b, r.domain))
-    with open(out_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow([
-            "file_a",
-            "file_b",
-            "domain",
-            "comparable",
-            "not_comparable_reason",
-            "a_total",
-            "b_total",
-            "matched",
-            "added_in_b",
-            "removed_from_a",
-            "union_mass",
-            "set_jaccard",
-            "multiset_jaccard",
-        ])
-        for r in sorted_rows:
-            w.writerow([
-                r.file_a,
-                r.file_b,
-                r.domain,
-                "true" if r.comparable else "false",
-                r.not_comparable_reason or "",
-                "" if r.a_total is None else r.a_total,
-                "" if r.b_total is None else r.b_total,
-                "" if r.matched is None else r.matched,
-                "" if r.added_in_b is None else r.added_in_b,
-                "" if r.removed_from_a is None else r.removed_from_a,
-                "" if r.union_mass is None else r.union_mass,
-                "" if r.set_jaccard is None else f"{r.set_jaccard:.6f}",
-                "" if r.multiset_jaccard is None else f"{r.multiset_jaccard:.6f}",
-            ])
-
-
-def write_json(results: List[SimilarityResult], out_path: str) -> None:
-    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    payload = []
-    for r in results:
-        payload.append({
-            "file_a": r.file_a,
-            "file_b": r.file_b,
-
-            "domain_hash_identity_jaccard": {
-                "value": r.domain_hash_identity_jaccard.value,
-                "reason": r.domain_hash_identity_jaccard.reason,
-            },
-            "domain_status_layout_jaccard": {
-                "value": r.domain_status_layout_jaccard.value,
-                "reason": r.domain_status_layout_jaccard.reason,
-            },
-            "signature_multiset_similarity": {
-                "value": r.signature_multiset_similarity.value,
-                "reason": r.signature_multiset_similarity.reason,
-            },
-
-            "domains_total": r.domains_total,
-            "domains_compared_signatures": r.domains_compared_signatures,
-            "domains_undefined_blocked": r.domains_undefined_blocked,
-            "domains_undefined_unreadable": r.domains_undefined_unreadable,
-            "domains_missing": r.domains_missing,
-            "note": r.note,
-        })
-    Path(out_path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+def _passes_filters(meta: dict, roles: Optional[set], unit_system: Optional[str], clients: Optional[set]) -> bool:
+    if roles is not None and (meta.get("governance_role") or "") not in roles:
+        return False
+    if unit_system is not None and (meta.get("unit_system") or "") != unit_system:
+        return False
+    if clients is not None and (meta.get("client_label") or "") not in clients:
+        return False
+    return True
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
-        description="""
-Compare Revit fingerprint JSONs using domain hashes and record-level signatures.
+    parser = argparse.ArgumentParser(description="Compute pairwise domain similarity from flattened CSV inputs.")
+    parser.add_argument("--records", required=True, help="Path to records.csv")
+    parser.add_argument("--metadata", required=True, help="Path to file_metadata.csv")
+    parser.add_argument("--output-dir", required=True, help="Output directory")
+    parser.add_argument("--roles", nargs="+", help="Optional governance_role filter")
+    parser.add_argument("--unit-system", help="Optional unit_system filter")
+    parser.add_argument("--client", nargs="+", help="Optional client_label filter")
+    parser.add_argument("--log-every", type=int, default=100, help="Log every N pairs")
+    args = parser.parse_args()
 
-File format notes:
-  - For record-based similarity (signature_multiset_similarity metric), use
-    monolithic .json files which contain metadata and full domain payloads with records.
-"""
-    )
-    ap.add_argument("--baseline", required=False, help="Baseline fingerprint JSON path")
-    ap.add_argument("--dir", required=True, help="Parent directory containing fingerprint JSON files (non-recursive)")
-    ap.add_argument("--mode", choices=["baseline", "pairwise", "both"], default="both")
+    metadata = _load_metadata(Path(args.metadata))
+    grouped = _load_records_grouped(Path(args.records))
 
-    # Output base is always --dir/similarity unless user provides absolute paths.
-    ap.add_argument("--out_baseline", default="baseline_vs_dir.csv", help="Baseline-vs-dir CSV (relative resolves under --dir/similarity)")
-    ap.add_argument("--out_baseline_json", default=None, help="Baseline-vs-dir JSON (relative resolves under --dir/similarity)")
-    ap.add_argument("--out_pairwise", default="pairwise.csv", help="Pairwise CSV (relative resolves under --dir/similarity)")
-    ap.add_argument("--out_pairwise_json", default=None, help="Pairwise JSON (relative resolves under --dir/similarity)")
+    roles = set(args.roles) if args.roles else None
+    clients = set(args.client) if args.client else None
+    unit_system = args.unit_system
 
-    # Details output (optional)
-    ap.add_argument("--details_json", default=None, help="Optional details JSON (relative resolves under --dir/similarity)")
-    ap.add_argument("--details_top_k", type=int, default=50, help="Top-K sig_hash deltas per domain (details only)")
-    ap.add_argument("--details_domain_filter", default=None, help="Comma-separated domain list to include in details (optional)")
+    file_ids = sorted([fid for fid, meta in metadata.items() if _passes_filters(meta, roles, unit_system, clients)])
+    pairs = list(itertools.combinations(file_ids, 2))
+    print(f"[similarity_compare] files={len(file_ids)} pairs={len(pairs)}")
 
-    ap.add_argument("--include_baseline_in_pairwise", action="store_true")
-    ap.add_argument(
-        "--out-dir",
-        default=None,
-        help="Base output directory for all similarity outputs. "
-             "When provided, overrides the default {--dir}/similarity/ resolution "
-             "for all relative output paths (out_pairwise, out_baseline, domain_similarity, etc.)."
-    )
-    ap.add_argument("--metadata-file", default=None, help="Path to file_metadata.csv. Required when --roles is provided.")
-    ap.add_argument(
-        "--roles",
-        nargs="+",
-        default=None,
-        help="Governance roles to include: Project Template Generic Generic-Host Container, or alias template-group",
-    )
+    domain_rows: List[DomainSimilarityRow] = []
+    pairwise_rows: List[dict] = []
 
-    args = ap.parse_args()
+    for idx, (file_a, file_b) in enumerate(pairs, start=1):
+        domains_a = {d for (fid, d) in grouped if fid == file_a}
+        domains_b = {d for (fid, d) in grouped if fid == file_b}
+        domains = sorted(domains_a | domains_b)
 
-    ROLE_GROUP_ALIASES = {
-        "template-group": ["Generic", "Generic-Host", "Template"],
-    }
-    VALID_ROLES = {"Project", "Template", "Generic", "Generic-Host", "Container"}
+        comparable_rows: List[DomainSimilarityRow] = []
 
-    resolved_roles: Optional[List[str]] = None
-    allowed_export_run_ids: Optional[set[str]] = None
-    if args.roles:
-        if not args.metadata_file:
-            raise SystemExit("--metadata-file is required when --roles is provided")
+        for domain in domains:
+            sig_a = grouped.get((file_a, domain), [])
+            sig_b = grouped.get((file_b, domain), [])
 
-        expanded_roles: List[str] = []
-        for role in args.roles:
-            if role in ROLE_GROUP_ALIASES:
-                expanded_roles.extend(ROLE_GROUP_ALIASES[role])
-            else:
-                expanded_roles.append(role)
-
-        invalid_roles = sorted({r for r in expanded_roles if r not in VALID_ROLES})
-        if invalid_roles:
-            raise SystemExit(f"invalid --roles values: {', '.join(invalid_roles)}")
-
-        resolved_roles = sorted(set(expanded_roles))
-        role_set = set(resolved_roles)
-        allowed_export_run_ids = set()
-        with open(args.metadata_file, "r", encoding="utf-8-sig", newline="") as mf:
-            reader = csv.DictReader(mf)
-            for row in reader:
-                role = (row.get("governance_role") or "").strip()
-                export_run_id = (row.get("export_run_id") or "").strip()
-                if role in role_set and export_run_id:
-                    allowed_export_run_ids.add(export_run_id)
-        print(f"[filter] roles={resolved_roles} allowed_files={len(allowed_export_run_ids)}")
-
-    # Discover and load all monolithic fingerprints
-    fps = load_fingerprints_from_dir(args.dir)
-    if allowed_export_run_ids is not None:
-        total_loaded = len(fps)
-        filtered_fps: Dict[str, FingerprintData] = {}
-        excluded = 0
-        for fpath, fp in fps.items():
-            try:
-                raw = json.loads(Path(fpath).read_text(encoding="utf-8"))
-            except Exception as e:
-                print(f"[warn] could_not_read_export_run_id include_file={fpath} reason={e}")
-                filtered_fps[fpath] = fp
+            if not sig_a or not sig_b:
+                row = DomainSimilarityRow(file_a, file_b, domain, False, "missing_in_one_file", len(sig_a), len(sig_b), None, None, None, None, None, None)
+                domain_rows.append(row)
                 continue
 
-            eid = _get_export_run_id_from_fingerprint(raw)
-            if eid is None:
-                print(f"[warn] missing_export_run_id include_file={fpath}")
-                filtered_fps[fpath] = fp
-            elif eid in allowed_export_run_ids:
-                filtered_fps[fpath] = fp
-            else:
-                excluded += 1
+            ca = Counter(sig_a)
+            cb = Counter(sig_b)
+            ms_score, matched, added_in_b, removed_from_a, union_mass = _multiset_jaccard(ca, cb)
+            set_score = _set_jaccard(ca.keys(), cb.keys())
+            row = DomainSimilarityRow(
+                file_a=file_a,
+                file_b=file_b,
+                domain=domain,
+                comparable=True,
+                not_comparable_reason=None,
+                a_total=len(sig_a),
+                b_total=len(sig_b),
+                matched=matched,
+                added_in_b=added_in_b,
+                removed_from_a=removed_from_a,
+                union_mass=union_mass,
+                set_jaccard=set_score,
+                multiset_jaccard=ms_score,
+            )
+            domain_rows.append(row)
+            comparable_rows.append(row)
 
-        fps = filtered_fps
-        print(f"[filter] loaded={total_loaded} after_role_filter={len(fps)} excluded={excluded}")
-    json_files = sorted(fps.keys())
+        domains_compared = len(comparable_rows)
+        if domains_compared:
+            total_weight = sum(r.union_mass or 0 for r in comparable_rows)
+            similarity_multiset = sum((r.multiset_jaccard or 0.0) * (r.union_mass or 0) for r in comparable_rows) / total_weight if total_weight else None
+            similarity_set = sum(r.set_jaccard or 0.0 for r in comparable_rows) / domains_compared
+        else:
+            similarity_multiset = None
+            similarity_set = None
 
-    if args.out_dir:
-        out_base = Path(args.out_dir).resolve()
-    else:
-        out_base = Path(args.dir).resolve() / "similarity"
-    if resolved_roles:
-        out_base = out_base / f"role_{'_'.join(sorted(resolved_roles))}"
-    out_base.mkdir(parents=True, exist_ok=True)
+        pairwise_rows.append({
+            "file_a": file_a,
+            "file_b": file_b,
+            "pair_type": _pair_type(metadata, file_a, file_b),
+            "domains_compared": domains_compared,
+            "similarity_multiset": similarity_multiset,
+            "similarity_set": similarity_set,
+        })
 
-    def _resolve_out(p: Optional[str]) -> Optional[str]:
-        if not p:
-            return None
-        pp = Path(p)
-        if not pp.is_absolute():
-            pp = out_base / pp
-        return str(pp)
+        if idx % max(args.log_every, 1) == 0:
+            print(f"[similarity_compare] processed_pairs={idx}/{len(pairs)}")
 
-    out_baseline_csv = _resolve_out(args.out_baseline)
-    out_baseline_json = _resolve_out(args.out_baseline_json)
-    out_pairwise_csv = _resolve_out(args.out_pairwise)
-    out_pairwise_json = _resolve_out(args.out_pairwise_json)
-    out_domain_csv = str(out_base / "domain_similarity.csv")
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    details_json = _resolve_out(args.details_json)
+    domain_out = out_dir / "domain_similarity.csv"
+    with domain_out.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=[
+            "file_a", "file_b", "domain", "comparable", "not_comparable_reason", "a_total", "b_total",
+            "matched", "added_in_b", "removed_from_a", "union_mass", "set_jaccard", "multiset_jaccard",
+        ])
+        writer.writeheader()
+        for r in domain_rows:
+            writer.writerow(r.__dict__)
 
-    domain_filter = None
-    if args.details_domain_filter:
-        domain_filter = set([x.strip() for x in args.details_domain_filter.split(",") if x.strip()])
+    pair_out = out_dir / "pairwise_similarity.csv"
+    with pair_out.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=[
+            "file_a", "file_b", "pair_type", "domains_compared", "similarity_multiset", "similarity_set",
+        ])
+        writer.writeheader()
+        writer.writerows(pairwise_rows)
 
-    baseline_results: List[SimilarityResult] = []
-    pairwise_results: List[SimilarityResult] = []
-    domain_similarity_rows: List[DomainSimilarityRow] = []
-    domain_similarity_keys: set = set()
-    details: List[SimilarityDetail] = []
-    baseline_export_run_id: Optional[str] = None
-    baseline_allowed_for_role_filter = True
-
-    if args.baseline and allowed_export_run_ids is not None:
-        try:
-            base_raw = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
-            baseline_export_run_id = _get_export_run_id_from_fingerprint(base_raw)
-            if baseline_export_run_id and baseline_export_run_id not in allowed_export_run_ids:
-                baseline_allowed_for_role_filter = False
-                print(
-                    f"[warn] baseline_export_run_id_not_in_allowed_set baseline={args.baseline} "
-                    f"export_run_id={baseline_export_run_id}"
-                )
-        except Exception as e:
-            print(f"[warn] could_not_read_baseline_export_run_id baseline={args.baseline} reason={e}")
-
-    def _extend_unique_domain_rows(rows: List[DomainSimilarityRow]) -> None:
-        for row in rows:
-            key = (row.file_a, row.file_b, row.domain)
-            if key in domain_similarity_keys:
-                continue
-            domain_similarity_keys.add(key)
-            domain_similarity_rows.append(row)
-
-    base_fp = None
-    if args.mode in ("baseline", "both"):
-        if not args.baseline:
-            raise SystemExit("--baseline is required for mode=baseline or both")
-        base_fp = load_fingerprint(args.baseline)
-
-        for fpath in json_files:
-            if os.path.abspath(fpath) == os.path.abspath(args.baseline):
-                continue
-            r, domain_rows = compare_two_full(base_fp, fps[fpath])
-            baseline_results.append(r)
-            _extend_unique_domain_rows(domain_rows)
-            if details_json:
-                details.append(compare_two_detailed(base_fp, fps[fpath], top_k=args.details_top_k, domain_filter=domain_filter))
-
-    if args.mode in ("pairwise", "both"):
-        files_for_pairwise = list(json_files)
-
-        if args.include_baseline_in_pairwise and args.baseline:
-            if not baseline_allowed_for_role_filter:
-                print(
-                    f"[warn] skipping_baseline_in_pairwise_due_to_role_filter baseline={args.baseline} "
-                    f"export_run_id={baseline_export_run_id or 'unknown'}"
-                )
-            elif args.baseline not in files_for_pairwise:
-                files_for_pairwise.append(args.baseline)
-                fps[args.baseline] = load_fingerprint(args.baseline)
-            files_for_pairwise.sort()
-
-        for a, b in itertools.combinations(files_for_pairwise, 2):
-            r, domain_rows = compare_two_full(fps[a], fps[b])
-            pairwise_results.append(r)
-            _extend_unique_domain_rows(domain_rows)
-            if details_json:
-                details.append(compare_two_detailed(fps[a], fps[b], top_k=args.details_top_k, domain_filter=domain_filter))
-
-    # Write outputs named by what they contain
-    if args.mode in ("baseline", "both"):
-        write_csv(baseline_results, str(out_baseline_csv))
-        if out_baseline_json:
-            write_json(baseline_results, out_baseline_json)
-        print(f"Wrote {len(baseline_results)} baseline comparisons to: {out_baseline_csv}")
-        if out_baseline_json:
-            print(f"Wrote baseline JSON to: {out_baseline_json}")
-
-    if args.mode in ("pairwise", "both"):
-        write_csv(pairwise_results, str(out_pairwise_csv))
-        if out_pairwise_json:
-            write_json(pairwise_results, out_pairwise_json)
-        print(f"Wrote {len(pairwise_results)} pairwise comparisons to: {out_pairwise_csv}")
-        if out_pairwise_json:
-            print(f"Wrote pairwise JSON to: {out_pairwise_json}")
-
-    if details_json:
-        written_detail_files = write_details_json(details, details_json)
-        print(f"Wrote {len(written_detail_files)} domain detail JSON files under: {Path(details_json).parent}")
-    write_domain_csv(domain_similarity_rows, out_domain_csv)
-    print(f"Wrote {len(domain_similarity_rows)} domain similarity rows to: {out_domain_csv}")
-
+    print(f"[similarity_compare] wrote {domain_out} and {pair_out}")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
