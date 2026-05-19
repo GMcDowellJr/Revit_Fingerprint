@@ -103,6 +103,32 @@ def _passes_filters(meta: dict, roles: Optional[set], unit_system: Optional[str]
     return True
 
 
+def _build_file_universe(
+    metadata: Dict[str, dict],
+    grouped: Dict[Tuple[str, str], List[str]],
+    roles: Optional[set],
+    unit_system: Optional[str],
+    clients: Optional[set],
+) -> List[str]:
+    file_ids_from_records = {file_id for (file_id, _domain) in grouped.keys()}
+    file_ids: List[str] = []
+
+    for file_id in sorted(file_ids_from_records):
+        meta = metadata.get(file_id)
+        # Keep record-backed files even when metadata is missing; only apply
+        # filters when metadata exists (except when filters are explicitly provided).
+        if meta is None:
+            if roles is not None or unit_system is not None or clients is not None:
+                continue
+            file_ids.append(file_id)
+            continue
+
+        if _passes_filters(meta, roles, unit_system, clients):
+            file_ids.append(file_id)
+
+    return file_ids
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Compute pairwise domain similarity from flattened CSV inputs.")
     parser.add_argument("--records", required=True, help="Path to records.csv")
@@ -124,7 +150,7 @@ def main() -> int:
     clients = set(args.client) if args.client else None
     unit_system = args.unit_system
 
-    file_ids = sorted([fid for fid, meta in metadata.items() if _passes_filters(meta, roles, unit_system, clients)])
+    file_ids = _build_file_universe(metadata, grouped, roles, unit_system, clients)
     pair_count = math.comb(len(file_ids), 2)
     print(f"[similarity_compare] files={len(file_ids)} pairs={pair_count}")
 
