@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import itertools
+import math
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -102,6 +103,32 @@ def _passes_filters(meta: dict, roles: Optional[set], unit_system: Optional[str]
     return True
 
 
+def _build_file_universe(
+    metadata: Dict[str, dict],
+    grouped: Dict[Tuple[str, str], List[str]],
+    roles: Optional[set],
+    unit_system: Optional[str],
+    clients: Optional[set],
+) -> List[str]:
+    file_ids_from_records = {file_id for (file_id, _domain) in grouped.keys()}
+    file_ids: List[str] = []
+
+    for file_id in sorted(file_ids_from_records):
+        meta = metadata.get(file_id)
+        # Keep record-backed files even when metadata is missing; only apply
+        # filters when metadata exists (except when filters are explicitly provided).
+        if meta is None:
+            if roles is not None or unit_system is not None or clients is not None:
+                continue
+            file_ids.append(file_id)
+            continue
+
+        if _passes_filters(meta, roles, unit_system, clients):
+            file_ids.append(file_id)
+
+    return file_ids
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Compute pairwise domain similarity from flattened CSV inputs.")
     parser.add_argument("--records", required=True, help="Path to records.csv")
@@ -115,21 +142,24 @@ def main() -> int:
 
     metadata = _load_metadata(Path(args.metadata))
     grouped = _load_records_grouped(Path(args.records))
+    domains_by_file: Dict[str, set] = defaultdict(set)
+    for file_id, domain in grouped:
+        domains_by_file[file_id].add(domain)
 
     roles = set(args.roles) if args.roles else None
     clients = set(args.client) if args.client else None
     unit_system = args.unit_system
 
-    file_ids = sorted([fid for fid, meta in metadata.items() if _passes_filters(meta, roles, unit_system, clients)])
-    pairs = list(itertools.combinations(file_ids, 2))
-    print(f"[similarity_compare] files={len(file_ids)} pairs={len(pairs)}")
+    file_ids = _build_file_universe(metadata, grouped, roles, unit_system, clients)
+    pair_count = math.comb(len(file_ids), 2)
+    print(f"[similarity_compare] files={len(file_ids)} pairs={pair_count}")
 
     domain_rows: List[DomainSimilarityRow] = []
     pairwise_rows: List[dict] = []
 
-    for idx, (file_a, file_b) in enumerate(pairs, start=1):
-        domains_a = {d for (fid, d) in grouped if fid == file_a}
-        domains_b = {d for (fid, d) in grouped if fid == file_b}
+    for idx, (file_a, file_b) in enumerate(itertools.combinations(file_ids, 2), start=1):
+        domains_a = domains_by_file.get(file_a, set())
+        domains_b = domains_by_file.get(file_b, set())
         domains = sorted(domains_a | domains_b)
 
         comparable_rows: List[DomainSimilarityRow] = []
@@ -184,7 +214,7 @@ def main() -> int:
         })
 
         if idx % max(args.log_every, 1) == 0:
-            print(f"[similarity_compare] processed_pairs={idx}/{len(pairs)}")
+            print(f"[similarity_compare] processed_pairs={idx}/{pair_count}")
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
