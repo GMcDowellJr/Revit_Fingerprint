@@ -11,6 +11,29 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Added
+- `instance_count` and `is_sole_type_in_category` metadata fields added to
+  `text_types`, `dimension_types` (all 7 splits), `arrowheads`, and `compound_types`
+  (all 4 partitions — wall, floor, roof, ceiling). Both fields are additive metadata
+  only — never in sig_hash, join_key, or identity_basis.items. Arrowheads emit
+  `instance_count = None / not_applicable` (tick-mark reverse-lookup deferred).
+  Enables compound placeholder condition `is_purgeable OR (is_sole_type_in_category
+  AND instance_count == 0)` at pipeline/BI layer.
+
+### Fixed
+- `view_filter_applications_view_templates` and `view_templates`: `GetIsFilterEnabled`
+  now captured alongside `GetFilterVisibility` — a toggled-off filter is now
+  distinguishable from a visible one.
+- `view_category_overrides_model` / `view_category_overrides_annotation`:
+  `GetCategoryHidden()` captured per category via `_category_hidden_item()` — template-
+  hidden categories are now reflected in the override record.
+- `object_styles_model`: material resolved to name + class hash (`obj_style.material_sig_hash`)
+  via `_material_ref_item()`, not raw ElementId — cross-project stable.
+- `identity`: `doc.IsWorkshared`, `app.VersionNumber`, `app.VersionName`,
+  `app.VersionBuild` all captured and emitted.
+- `view_templates`: `GetWorksetVisibility()` captured per user workset via
+  `_append_workset_visibility()`.
+
 ### Changed
 - `units` domain expanded from 3 specs (length/area/volume) to 38 specs covering
   all Revit disciplines. Common additions: angle, slope, speed, time, mass_density,
