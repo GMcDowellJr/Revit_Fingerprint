@@ -76,6 +76,8 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             value = (row.get(field) or "").strip()
             if value:
                 dim_values[field] = value
+            elif field == client_field:
+                dim_values[field] = ""
         root_value = dim_values.get(root_field, "")
         if not root_value:
             continue
@@ -95,6 +97,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     rows_out = []
     key_to_row = {}
     key_to_children = defaultdict(list)
+    row_to_key = {}
     for key in keys:
         dim_map = dict(key)
         non_root_fields_present = [f for f in cfg_fields if f != root_field and f in dim_map]
@@ -104,7 +107,6 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         else:
             parent_key = frozenset((f, v) for f, v in key if f != non_root_fields_present[-1])
             parent_id = _subset_to_id(parent_key)
-            key_to_children[parent_key].append(key)
         ancestor_ids = []
         for field in non_root_fields_present:
             anc_key = frozenset((f, v) for f, v in key if f != field)
@@ -140,6 +142,13 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         }
         rows_out.append(row)
         key_to_row[key] = row
+        row_to_key[id(row)] = key
+
+    for parent_key in keys:
+        parent_size = len(parent_key)
+        for child_key in keys:
+            if len(child_key) == parent_size + 1 and parent_key.issubset(child_key):
+                key_to_children[parent_key].append(child_key)
 
     for r in rows_out:
         fc=int(r["file_count"]); role=r["governance_role"]
@@ -154,7 +163,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         if notes:
             r["notes"] = "|".join(notes)
         seg = r["segment_id"]
-        key = next(k for k, v in key_to_row.items() if v is r)
+        key = row_to_key[id(r)]
         has = bool(key_to_children.get(key))
         if has:
             is_cross_org_template = (
@@ -180,7 +189,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         else: r["run_type"]="registration"
     # purpose/label
     def child_span(r):
-        row_key = next(k for k, v in key_to_row.items() if v is r)
+        row_key = row_to_key[id(r)]
         cs={key_to_row[k]["client_label"] for k in key_to_children.get(row_key,[]) if key_to_row[k]["segment_level"]=="3" and key_to_row[k]["client_label"]}
         return "multi_client" if len(cs)>1 else "single_client"
     for r in rows_out:
@@ -209,7 +218,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     # pass5 redundant hash
     for r in rows_out:
         if r["run_type"] not in {"bundle", "registration", "reference"}: continue
-        row_key = next(k for k, v in key_to_row.items() if v is r)
+        row_key = row_to_key[id(r)]
         direct_children = [key_to_row[k] for k in key_to_children.get(row_key, [])]
         matches = [c for c in direct_children if c["population_hash"] == r["population_hash"]]
         if len(direct_children) == 1 and len(matches) == 1:
