@@ -1,4 +1,5 @@
 from __future__ import annotations
+from itertools import combinations
 import argparse,csv,hashlib,re,sys
 from collections import defaultdict
 from pathlib import Path
@@ -7,8 +8,18 @@ from typing import Dict,Iterable,List,Sequence
 
 SEED_ROLES={"Template","Container"}
 REQUIRED_COLUMNS={"export_run_id","unit_system","client_label","governance_role"}
-MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","run_type","file_count","export_run_ids","has_seed_file","seed_export_run_ids","population_hash","notes","segment_purpose","segment_label"]
+MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","export_run_ids","has_seed_file","seed_export_run_ids","population_hash","notes","segment_purpose","segment_label"]
 REGISTRY_FIELDNAMES=["segment_id","parent_segment_id","run_type","population_hash","output_folder","status","last_run_utc","notes","segment_purpose","segment_label"]
+DIMENSION_CONFIG = [
+    {"field": "unit_system", "type": "root"},
+    {"field": "governance_role", "type": "governance"},
+    {"field": "client_label", "type": "cut"},
+    # Future cut dimensions added here:
+    # {"field": "region", "type": "cut"},
+    # {"field": "discipline", "type": "cut"},
+    # {"field": "office_location", "type": "cut"},
+    # {"field": "business_center", "type": "cut"},
+]
 
 def _read_csv(path: Path) -> tuple:
     with path.open("r", encoding="utf-8-sig", newline="") as f:
@@ -37,51 +48,100 @@ def _append_note(row,k,v=""):
     else: row["notes"]=note
 
 def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_template_bundles:bool=False,enable_parent_bundle_runs:bool=False)->List[Dict[str,str]]:
-    l1=defaultdict(list); l1s=defaultdict(list)
-    l2a=defaultdict(list); l2as=defaultdict(list)
-    l2b=defaultdict(list); l2bs=defaultdict(list)
-    l3=defaultdict(list); l3s=defaultdict(list)
-    client_roles=defaultdict(set)
-    role_presence_by_l2: Dict[str, set] = defaultdict(set)
+    root_dims = [d for d in DIMENSION_CONFIG if d["type"] == "root"]
+    gov_dims = [d for d in DIMENSION_CONFIG if d["type"] == "governance"]
+    cut_dims = [d for d in DIMENSION_CONFIG if d["type"] == "cut"]
+    if len(root_dims) != 1 or len(gov_dims) != 1:
+        raise ValueError("DIMENSION_CONFIG must have exactly one root and one governance dimension")
+    root_field = root_dims[0]["field"]
+    governance_field = gov_dims[0]["field"]
+    client_field = "client_label"
+    cfg_fields = [d["field"] for d in DIMENSION_CONFIG]
+
+    populations = defaultdict(list)
+    seed_pops = defaultdict(list)
     project_presence_by_l2: Dict[str, bool] = defaultdict(bool)
+
+    def _subset_to_id(key: frozenset) -> str:
+        kv = dict(key)
+        values = [kv[f] for f in cfg_fields if f in kv]
+        return "|".join(values)
+
     for row in rows:
-        u=(row.get("unit_system") or "").strip(); c=(row.get("client_label") or "").strip(); r=(row.get("governance_role") or "").strip(); e=(row.get("export_run_id") or "").strip()
-        if not u or not e: continue
-        l1[u].append(e); l2a[(u,r)].append(e)
-        l2b[(u,c)].append(e)
-        if c:
-            l3[(u,r,c)].append(e)
-        client_roles[(u,c)].add(r)
-        l2_seg_id = f"{u}|{c}"
-        if r:
-            role_presence_by_l2[l2_seg_id].add(r)
-        if r == "Project":
-            project_presence_by_l2[l2_seg_id] = True
-        if r in SEED_ROLES:
-            l1s[u].append(e); l2as[(u,r)].append(e)
-            if c:
-                l2bs[(u,c)].append(e); l3s[(u,r,c)].append(e)
-            else:
-                l2bs[(u, c)].append(e)
-    m=[]
-    def mk(seg,parent,lev,u,r,c,eids,seeds):
-        eids=sorted(set(eids)); seeds=sorted(set(seeds))
-        m.append({"segment_id":seg,"parent_segment_id":parent,"segment_level":str(lev),"unit_system":u,"governance_role":r,"client_label":c,"run_type":"","file_count":str(len(eids)),"export_run_ids":"|".join(eids),"has_seed_file":"true" if seeds else "false","seed_export_run_ids":"|".join(seeds),"population_hash":_population_hash(eids),"notes":"","segment_purpose":"","segment_label":""})
-    for u in sorted(l1): mk(u,"",1,u,"","",l1[u],l1s[u])
-    for (u,r) in sorted(l2a): mk(f"{u}|{r}",u,2,u,r,"",l2a[(u,r)],l2as[(u,r)])
-    for (u,c) in sorted(l2b):
-        mk(f"{u}|{c}",u,2,u,"",c,l2b[(u,c)],l2bs[(u,c)])
-    for (u,r,c) in sorted(l3): mk(f"{u}|{r}|{c}",f"{u}|{r}",3,u,r,c,l3[(u,r,c)],l3s[(u,r,c)])
-    byid={r["segment_id"]:r for r in m}; kids=defaultdict(list)
-    for r in m:
-        if r["parent_segment_id"]: kids[r["parent_segment_id"]].append(r)
-    # level-3 members per (unit, client) — used to detect children of unit|client segments
-    l3_by_uc: Dict[tuple, List[dict]] = defaultdict(list)
-    for r in m:
-        if r["segment_level"] == "3" and r["unit_system"] and r["client_label"]:
-            l3_by_uc[(r["unit_system"], r["client_label"])].append(r)
-    # pass3 run type
-    for r in m:
+        export_run_id = (row.get("export_run_id") or "").strip()
+        if not export_run_id:
+            continue
+        dim_values = {}
+        for field in cfg_fields:
+            value = (row.get(field) or "").strip()
+            if value:
+                dim_values[field] = value
+        root_value = dim_values.get(root_field, "")
+        if not root_value:
+            continue
+        non_root_pairs = [(f, dim_values[f]) for f in cfg_fields if f != root_field and f in dim_values]
+        for size in range(len(non_root_pairs) + 1):
+            for subset in combinations(non_root_pairs, size):
+                key = frozenset([(root_field, root_value), *subset])
+                populations[key].append(export_run_id)
+                governance_value = dim_values.get(governance_field, "")
+                if governance_value in SEED_ROLES:
+                    seed_pops[key].append(export_run_id)
+                if size == 1 and subset and subset[0][0] == client_field and governance_value == "Project":
+                    project_presence_by_l2[_subset_to_id(key)] = True
+
+    keys = sorted(populations.keys(), key=lambda k: (len(k), _subset_to_id(k)))
+    key_set = set(keys)
+    rows_out = []
+    key_to_row = {}
+    key_to_children = defaultdict(list)
+    for key in keys:
+        dim_map = dict(key)
+        non_root_fields_present = [f for f in cfg_fields if f != root_field and f in dim_map]
+        segment_id = _subset_to_id(key)
+        if not non_root_fields_present:
+            parent_id = ""
+        else:
+            parent_key = frozenset((f, v) for f, v in key if f != non_root_fields_present[-1])
+            parent_id = _subset_to_id(parent_key)
+            key_to_children[parent_key].append(key)
+        ancestor_ids = []
+        for field in non_root_fields_present:
+            anc_key = frozenset((f, v) for f, v in key if f != field)
+            if anc_key in key_set:
+                ancestor_ids.append(_subset_to_id(anc_key))
+        ancestor_ids = sorted(ancestor_ids)
+        eids = sorted(set(populations[key]))
+        seeds = sorted(set(seed_pops.get(key, [])))
+        extra = []
+        for d in cut_dims:
+            if d["field"] == client_field:
+                continue
+            if d["field"] in dim_map:
+                extra.append(f"{d['field']}={dim_map[d['field']]}")
+        row = {
+            "segment_id": segment_id,
+            "parent_segment_id": parent_id,
+            "segment_level": str(len(key)),
+            "unit_system": dim_map.get("unit_system", ""),
+            "governance_role": dim_map.get(governance_field, ""),
+            "client_label": dim_map.get(client_field, ""),
+            "extra_dimensions": "|".join(extra),
+            "ancestor_segment_ids": "|".join(ancestor_ids),
+            "run_type": "",
+            "file_count": str(len(eids)),
+            "export_run_ids": "|".join(eids),
+            "has_seed_file": "true" if seeds else "false",
+            "seed_export_run_ids": "|".join(seeds),
+            "population_hash": _population_hash(eids),
+            "notes": "",
+            "segment_purpose": "",
+            "segment_label": "",
+        }
+        rows_out.append(row)
+        key_to_row[key] = row
+
+    for r in rows_out:
         fc=int(r["file_count"]); role=r["governance_role"]
         notes = []
         if fc < min_files:
@@ -94,17 +154,9 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         if notes:
             r["notes"] = "|".join(notes)
         seg = r["segment_id"]
-        lev = r["segment_level"]
-        cl = r["client_label"]
-        role = r["governance_role"]
-        if lev == "2" and not role and cl:
-            # unit|client segments: their level-3 children parent to unit|role,
-            # not unit|client, so they never appear in kids. Use l3_by_uc instead.
-            has = bool(l3_by_uc.get((r["unit_system"], cl)))
-        else:
-            has = bool(kids.get(seg))
+        key = next(k for k, v in key_to_row.items() if v is r)
+        has = bool(key_to_children.get(key))
         if has:
-            # Determine whether this segment qualifies for bundle analysis despite having children
             is_cross_org_template = (
                 enable_cross_org_template_bundles
                 and r["segment_level"] == "2"
@@ -120,7 +172,6 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             )
             if not is_cross_org_template and not is_role_fixed_parent:
                 r["run_type"] = "registration"; continue
-            # else: fall through to normal bundle/reference assignment below
         if fc>=min_files: r["run_type"]="bundle"
         elif role in {"Template","Container","Generic"}: r["run_type"]="reference"
         elif role=="Project": r["run_type"]="skip"
@@ -129,9 +180,10 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         else: r["run_type"]="registration"
     # purpose/label
     def child_span(r):
-        cs={c["client_label"] for c in kids.get(r["segment_id"],[]) if c["segment_level"]=="3" and c["client_label"]}
+        row_key = next(k for k, v in key_to_row.items() if v is r)
+        cs={key_to_row[k]["client_label"] for k in key_to_children.get(row_key,[]) if key_to_row[k]["segment_level"]=="3" and key_to_row[k]["client_label"]}
         return "multi_client" if len(cs)>1 else "single_client"
-    for r in m:
+    for r in rows_out:
         pur="insufficient_population" if r["run_type"]=="skip" else ""
         lev,role,rt=int(r["segment_level"]),r["governance_role"],r["run_type"]
         if lev==1: pur="population_denominator"
@@ -147,27 +199,24 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         elif lev==3 and role=="Project": pur="client_practice" if rt=="bundle" else "insufficient_population"
         elif lev==3 and role=="Container" and rt=="reference": pur="client_coordination"
         elif lev==3 and role=="Generic" and rt=="reference": pur="client_reference"
-        r["segment_purpose"]=pur or "population_denominator"
+        r["segment_purpose"]=pur
         unit=r["unit_system"].title(); client=r["client_label"]; sid=r["segment_id"]
         templates={"population_denominator":f"All {unit} files","cross_org_template_pool":f"{unit} templates — all organisations (registration only)","cross_template_agreement":f"{unit} templates — cross-template agreement","practiced_standards_corpus":f"{unit} projects — full corpus","cross_project_practice":f"{unit} projects — cross-project practice","coordination_corpus":f"{unit} coordination files","generic_reference_corpus":f"{unit} generic reference","client_population":f"{client} — all roles combined","client_standard_anchor":f"{client} templates — standards as authored","client_practice":f"{client} projects — standards as practiced","client_coordination":f"{client} coordination files","client_reference":f"{client} generic reference","insufficient_population":f"{sid} — below minimum file threshold"}
-        r["segment_label"]=templates.get(r["segment_purpose"],sid)
-    # pass5 redundant hash
-    for r in m:
-        if r["run_type"] not in {"bundle", "registration", "reference"}: continue
-        _seg = r["segment_id"]
-        _lev = r["segment_level"]
-        _cl = r["client_label"]
-        _role = r["governance_role"]
-        if _lev == "2" and not _role and _cl:
-            direct_children = l3_by_uc.get((r["unit_system"], _cl), [])
+        if r["segment_purpose"]:
+            r["segment_label"]=templates.get(r["segment_purpose"],sid)
         else:
-            direct_children = kids.get(_seg, [])
+            r["segment_label"]=sid
+    # pass5 redundant hash
+    for r in rows_out:
+        if r["run_type"] not in {"bundle", "registration", "reference"}: continue
+        row_key = next(k for k, v in key_to_row.items() if v is r)
+        direct_children = [key_to_row[k] for k in key_to_children.get(row_key, [])]
         matches = [c for c in direct_children if c["population_hash"] == r["population_hash"]]
         if len(direct_children) == 1 and len(matches) == 1:
             ch=matches[0]["segment_id"]; _append_note(r,"redundant_single_child",ch)
             r["run_type"]="registration"; r["segment_purpose"]="redundant_single_child"; r["segment_label"]=f"{r['segment_id']} — same population as {ch}"
-    m.sort(key=lambda r:(int(r["segment_level"]),r["segment_id"]))
-    return m
+    rows_out.sort(key=lambda r:(int(r["segment_level"]),r["segment_id"]))
+    return rows_out
 
 # preserve remaining functions from original manually omitted
 
