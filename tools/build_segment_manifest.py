@@ -82,6 +82,9 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         if not root_value:
             continue
         non_root_pairs = [(f, dim_values[f]) for f in cfg_fields if f != root_field and f in dim_values]
+        client_is_blank = (client_field in dim_values and dim_values.get(client_field, "") == "")
+        if client_is_blank:
+            non_root_pairs = [pair for pair in non_root_pairs if pair[0] == client_field]
         for size in range(len(non_root_pairs) + 1):
             for subset in combinations(non_root_pairs, size):
                 key = frozenset([(root_field, root_value), *subset])
