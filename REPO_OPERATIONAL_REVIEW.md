@@ -239,6 +239,21 @@ Layer 3 — Runner (run_dynamo.py, 1301 lines)
 
 ## Highest-Leverage Next Moves
 
+### Resolved Backlog Recommendations (May 2026 code review)
+
+- **RESOLVED:** Placeholder metadata rollout is complete in extractors. `instance_count`
+  and `is_sole_type_in_category` are already emitted in `text_types`,
+  `dimension_types` (all 7 splits), `arrowheads`, and `compound_types` (all 4
+  partitions). Remaining work is downstream pipeline/BI application of the
+  compound placeholder condition: `is_purgeable OR (is_sole_type_in_category AND instance_count == 0)`.
+- **RESOLVED:** RevitLookup descriptor audit gaps are now closed for all five tracked
+  items: `GetIsFilterEnabled`, `GetCategoryHidden()`, object styles material
+  stability encoding, identity worksharing/version fields, and view template
+  workset visibility capture.
+- **OPEN (minor):** `FilterInverseRule` handling in `view_filter_definitions`
+  should still be explicitly re-checked; current behavior is expected fail-soft
+  (`leaf_unsupported`) rather than silent omission.
+
 ### 1. Add CI to Run `pytest tests/` on Push and PR
 
 **Justification:** 155 tests exist and are pure Python (no Revit dependency). A single GitHub Actions workflow running `pytest tests/` would protect the project's core invariants (hash determinism, sentinel policy, architecture rules, contract compliance) with zero new test authoring required. This is the highest ratio of protection-to-effort available.
