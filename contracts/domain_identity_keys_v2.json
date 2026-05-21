@@ -953,13 +953,11 @@
         "wt.coarse_fill_color_rgb"
       ],
       "required_keys": [
-        "wt.function",
         "wt.layer_count",
         "wt.total_thickness_in",
         "wt.stack_hash_loose"
       ],
       "required": [
-        "wt.function",
         "wt.layer_count",
         "wt.total_thickness_in",
         "wt.stack_hash_loose"
