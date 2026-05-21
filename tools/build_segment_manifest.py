@@ -209,7 +209,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         elif lev==2 and role=="Generic" and rt=="reference": pur="generic_reference_corpus"
         elif lev==3 and role=="Template" and rt in {"bundle","reference"}: pur="client_standard_anchor"
         elif lev==3 and role=="Project": pur="client_practice" if rt=="bundle" else "insufficient_population"
-        elif lev==3 and role=="Container" and rt=="reference": pur="client_coordination"
+        elif lev==3 and role=="Container": pur="client_coordination"
         elif lev==3 and role=="Generic" and rt=="reference": pur="client_reference"
         r["segment_purpose"]=pur
         unit=r["unit_system"].title(); client=r["client_label"]; sid=r["segment_id"]
