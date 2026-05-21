@@ -478,9 +478,7 @@
         "line_style.weight.projection",
         "line_style.color.rgb",
         "line_style.weight.cut",
-        "line_style.pattern_ref.sig_hash",
-        "line_style.weight.projection",
-        "line_style.color.rgb"
+        "line_style.pattern_ref.sig_hash"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -758,46 +756,6 @@
         "units.unit_type_id"
       ],
       "sig_hash_schema": "units.sig_hash.v1"
-    },
-    "view_category_overrides": {
-      "allowed_item_prefixes": [],
-      "allowed_items": [
-        "vco.baseline_category_path",
-        "vco.baseline_sig_hash",
-        "vco.override_properties_hash",
-        "vco.projection.line_weight",
-        "vco.projection.color.rgb",
-        "vco.projection.pattern_ref.sig_hash",
-        "vco.projection.fill_pattern_ref.sig_hash",
-        "vco.projection.fill_color.rgb",
-        "vco.cut.line_weight",
-        "vco.cut.color.rgb",
-        "vco.cut.pattern_ref.sig_hash",
-        "vco.cut.fill_pattern_ref.sig_hash",
-        "vco.cut.fill_color.rgb",
-        "vco.halftone",
-        "vco.transparency",
-        "vco.include_controlled",
-        "vco.vg_category_type",
-        "vco.context_type",
-        "vco.template_name",
-        "vco.template_element_id",
-        "vco.template_unique_id"
-      ],
-      "hash_alg": "md5_utf8_join_pipe",
-      "minima": {
-        "block_if_any_required_not_ok": true
-      },
-      "notes": [
-        "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
-      ],
-      "required_items": [
-        "vco.baseline_category_path",
-        "vco.baseline_sig_hash",
-        "vco.override_properties_hash"
-      ],
-      "sig_hash_schema": "view_category_overrides.sig_hash.v1"
     },
     "view_category_overrides_annotation": {
       "allowed_item_prefixes": [],
