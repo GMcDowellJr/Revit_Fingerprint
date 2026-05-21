@@ -705,6 +705,7 @@
     "text_types": {
       "allowed_item_prefixes": [],
       "allowed_items": [
+        "text_type.name",
         "text_type.font",
         "text_type.size_in",
         "text_type.bold",
