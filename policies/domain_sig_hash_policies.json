@@ -1039,7 +1039,6 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "wt.function",
         "wt.layer_count",
         "wt.total_thickness_in",
         "wt.stack_hash_loose"
