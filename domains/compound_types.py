@@ -660,7 +660,6 @@ def extract_wall_types(doc, ctx=None):
 
         identity_items = sorted((semantic + coordination + cosmetic), key=lambda it: safe_str(it.get("k", "")))
         required_keys = {
-            "wt.function",
             "wt.layer_count",
             "wt.total_thickness_in",
             "wt.stack_hash_loose",

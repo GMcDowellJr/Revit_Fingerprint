@@ -495,7 +495,10 @@ def test_stack_hash_preserves_zero_vs_unreadable_thickness(monkeypatch):
     assert get(out["records"][0], "wt.stack_hash_loose") != get(out["records"][1], "wt.stack_hash_loose")
 
 
-def test_required_identity_not_ok_blocks_record(monkeypatch):
+def test_unreadable_function_does_not_block_record(monkeypatch):
+    # wt.function was removed from required_keys: curtain/stacked wall types return
+    # unsupported.not_applicable for WallFunction, which should not block the record
+    # when the compound structure (layer_count, total_thickness_in, stack_hash_loose) is ok.
     m = _setup_module(monkeypatch)
     wall = _basic_wall("BadFn")
     wall._fn = RuntimeError("cannot read function")
@@ -504,10 +507,11 @@ def test_required_identity_not_ok_blocks_record(monkeypatch):
     out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
     rec = out["records"][0]
 
-    assert rec["status"] == "blocked"
-    assert rec["sig_hash"] is None
-    assert "required_identity_not_ok" in rec["status_reasons"]
-    assert out["count"] == 0
+    assert rec["status"] == "ok"
+    assert rec["sig_hash"] is not None
+    fn_item = next(it for it in rec["identity_basis"]["items"] if it["k"] == "wt.function")
+    assert fn_item["q"] == "unreadable"
+    assert out["count"] == 1
 
 
 def test_unreadable_layer_width_blocks_required_total_thickness(monkeypatch):
