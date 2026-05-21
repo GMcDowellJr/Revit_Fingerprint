@@ -102,10 +102,14 @@ def test_apply_sig_hash_policy_to_record_uses_items_and_writes_sig_basis():
     assert "identity_quality" not in out
 
 
-def test_text_types_regression_hash_matches_legacy_preimage_semantics():
+def test_text_types_sig_hash_excludes_name_includes_behavioral_items():
+    # text_type.name was removed from allowed_keys (label-only, not behavioral).
+    # Verify: (a) name is excluded from the hash, (b) all 12 behavioral items are hashed,
+    # (c) extra non-allowed items in the input are silently filtered out.
     policy = get_domain_sig_hash_policy(load_sig_hash_policies(os.path.join("policies", "domain_sig_hash_policies.json")), "text_types")
+    allowed = set(policy["allowed_items"])
     items = [
-        {"k": "text_type.name", "v": "Notes-Medium", "q": "ok"},
+        {"k": "text_type.name", "v": "Notes-Medium", "q": "ok"},  # not in allowed_items
         {"k": "text_type.font", "v": "Arial", "q": "ok"},
         {"k": "text_type.size_in", "v": "1.000000", "q": "ok"},
         {"k": "text_type.width_factor", "v": "1.000000", "q": "ok"},
@@ -119,7 +123,11 @@ def test_text_types_regression_hash_matches_legacy_preimage_semantics():
         {"k": "text_type.italic", "v": "false", "q": "ok"},
         {"k": "text_type.underline", "v": "false", "q": "ok"},
     ]
-    sig_hash, status, _, _ = build_sig_hash_from_policy(domain_policy=policy, items=items)
+    sig_hash, status, _, hash_items = build_sig_hash_from_policy(domain_policy=policy, items=items)
     assert status == "ok"
-    expected = make_hash(serialize_identity_items(items))
+    hashed_keys = [it["k"] for it in hash_items]
+    assert "text_type.name" not in hashed_keys
+    assert all(k in allowed for k in hashed_keys)
+    behavioral_items = [it for it in items if it["k"] in allowed]
+    expected = make_hash(serialize_identity_items(behavioral_items))
     assert sig_hash == expected

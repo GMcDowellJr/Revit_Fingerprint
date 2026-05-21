@@ -90,7 +90,8 @@ def _load_records_grouped(path: Path) -> Dict[Tuple[str, str], List[str]]:
 def _pair_type(metadata: Dict[str, dict], file_a: str, file_b: str) -> str:
     role_a = (metadata.get(file_a, {}).get("governance_role") or "Unknown").strip() or "Unknown"
     role_b = (metadata.get(file_b, {}).get("governance_role") or "Unknown").strip() or "Unknown"
-    return f"{role_a} vs {role_b}"
+    lo, hi = (role_a, role_b) if role_a <= role_b else (role_b, role_a)
+    return f"{lo} vs {hi}"
 
 
 def _passes_filters(meta: dict, roles: Optional[set], unit_system: Optional[str], clients: Optional[set]) -> bool:
