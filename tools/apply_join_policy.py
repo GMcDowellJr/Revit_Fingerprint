@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
 from typing import Dict, List
 
@@ -57,8 +58,18 @@ def main() -> None:
     # Load items domain-by-domain from per-domain shards when available.
     # Falls back to one monolithic load + in-memory partition when shards don't exist
     # (e.g. when applying against a flatten output produced before fix 1).
+    # Shard mode requires the .complete sentinel — a sentinel written only after all
+    # shard handles are closed. Partial/interrupted flatten runs leave CSVs without
+    # a sentinel; treating those as authoritative would return empty items for missing
+    # domain shards and silently overwrite records.csv with incorrect join statuses.
     shard_dir = phase0_dir / "identity_items_by_domain"
-    _use_shards = shard_dir.is_dir() and any(shard_dir.glob("*.csv"))
+    _use_shards = (shard_dir / ".complete").is_file()
+    if not _use_shards and shard_dir.is_dir() and any(shard_dir.glob("*.csv")):
+        sys.stderr.write(
+            "[WARN apply] identity_items_by_domain/ contains CSV files but .complete sentinel "
+            "is absent — possible interrupted flatten run. Falling back to monolithic "
+            "identity_items.csv to avoid silently missing domain items.\n"
+        )
     _monolithic_by_domain: Dict[str, List[Dict[str, str]]] = {}
     if not _use_shards and items_path.exists():
         for _row in _read_csv(items_path):
