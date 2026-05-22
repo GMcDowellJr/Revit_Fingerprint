@@ -131,9 +131,20 @@ def _domain_rows(records,items,domain,target):
 
 def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
     rows=[]; candidates={}
-    items=_load_items(phase0_dir,target)
+    shard_dir=phase0_dir/"identity_items_by_domain"
     stratify_key=getattr(args,'stratify_by','') or ''
     for domain in domains:
+        # Load only this domain's items — prefer per-domain shard, fall back to filtered monolithic.
+        _shard=shard_dir/f"{domain}.csv"
+        if _shard.exists():
+            items=_read_csv(_shard)
+        else:
+            items=[]
+            for _name in TARGET_FILES[target]:
+                _p=phase0_dir/_name
+                if _p.exists():
+                    items=[r for r in _read_csv(_p) if r.get("domain")==domain]
+                    break
         normalized=normalize_policy_block(base_domains.get(domain,{}))
         req=normalized['required_fields']; opt=normalized['optional_items']; excluded=set(normalized['explicitly_excluded_items']); gates=normalized['gates']
         for gate,dom_records_all,dom_items_all in _domain_rows(records,items,domain,target):
