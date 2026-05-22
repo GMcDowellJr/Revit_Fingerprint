@@ -71,7 +71,13 @@ def main() -> None:
             "identity_items.csv to avoid silently missing domain items.\n"
         )
     _monolithic_by_domain: Dict[str, List[Dict[str, str]]] = {}
-    if not _use_shards and items_path.exists():
+    if not _use_shards:
+        if not items_path.exists():
+            raise SystemExit(
+                f"[apply] No complete shard set ({shard_dir / '.complete'} absent) and no "
+                f"monolithic identity_items.csv at {items_path}. "
+                "Run the flatten stage before apply."
+            )
         for _row in _read_csv(items_path):
             _d = str(_row.get("domain", "")).strip()
             _monolithic_by_domain.setdefault(_d, []).append(_row)

@@ -62,7 +62,7 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
 
     shard_dir = items_csv.parent / "identity_items_by_domain"
     lp_shard = shard_dir / "line_patterns.csv"
-    use_shard = shard_dir.is_dir() and lp_shard.is_file()
+    use_shard = (shard_dir / ".complete").is_file() and lp_shard.is_file()
 
     if use_shard:
         with lp_shard.open("r", encoding="utf-8-sig", newline="") as f:
