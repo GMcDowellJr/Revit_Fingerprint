@@ -38,7 +38,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 from .label_resolver import (
@@ -281,6 +281,48 @@ def save_groups_vocab(cache_path: str, vocab: Dict[str, str]) -> None:
 
 
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# CSV-based identity_items lookup (for flattened export format)
+# ---------------------------------------------------------------------------
+
+def _load_identity_items_from_csv(
+    lookup_csv: str,
+) -> Dict[Tuple[str, str], List[Dict[str, Any]]]:
+    """
+    Load identity_items_by_joinhash.csv into a dict keyed by (domain, join_hash).
+
+    CSV schema: domain, join_hash, k, v, q
+    Built by: tools/label_synthesis/build_identity_items_lookup.py
+    """
+    import csv as _csv
+    result: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+    if not lookup_csv or not os.path.exists(lookup_csv):
+        return result
+    try:
+        with open(lookup_csv, "r", encoding="utf-8-sig", newline="") as f:
+            for row in _csv.DictReader(f):
+                domain = (row.get("domain") or "").strip()
+                join_hash = (row.get("join_hash") or "").strip()
+                k = (row.get("k") or "").strip()
+                v = row.get("v", "")
+                q = (row.get("q") or "ok").strip()
+                if not domain or not join_hash or not k:
+                    continue
+                key = (domain, join_hash)
+                result.setdefault(key, []).append({
+                    "k": k,
+                    "v": v if v else None,
+                    "q": q,
+                })
+    except Exception as e:
+        print(f"  WARN: Failed to load identity items lookup: {e}")
+    print(
+        f"  [identity_items_lookup] Loaded {len(result):,} "
+        f"(domain, join_hash) entries from {lookup_csv}"
+    )
+    return result
+
 # Representative identity_items lookup
 # ---------------------------------------------------------------------------
 
@@ -288,13 +330,34 @@ def _load_representative_identity_items(
     exports_dir: str,
     domain: str,
     join_hash: str,
+    *,
+    items_lookup: Optional[Dict] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Find the first export JSON record with this join_hash and return its identity_items.
+    Return identity_items for a representative record with this join_hash.
 
-    Searches exports_dir for *_fingerprint_export*.json files.
-    Returns empty list if not found.
+    Priority:
+      1. CSV lookup (identity_items_by_joinhash.csv) — fast, no JSON scan
+      2. JSON scan of exports_dir — original behavior, works when export
+         JSONs contain inline identity_items
+
+    Args:
+        exports_dir:   Directory with fingerprint export JSON files
+        domain:        Domain name (e.g. "fill_patterns_drafting")
+        join_hash:     Target join_hash to look up
+        items_lookup:  Pre-loaded dict from _load_identity_items_from_csv().
+                       Pass None to skip CSV lookup and go straight to JSON scan.
     """
+    # Path 1: CSV lookup (preferred — fast, no JSON scan needed)
+    if items_lookup is not None:
+        items = items_lookup.get((domain, join_hash))
+        if items:
+            return items
+        # join_hash not in lookup — fall through to JSON scan
+
+    # Path 2: Original JSON scan
+    if not exports_dir or not os.path.isdir(exports_dir):
+        return []
     for fname in sorted(os.listdir(exports_dir)):
         if not fname.endswith(".json"):
             continue
@@ -314,7 +377,6 @@ def _load_representative_identity_items(
                 if isinstance(items, list):
                     return items
     return []
-
 
 def _get_domain_records(data: Any, domain: str) -> List[Dict[str, Any]]:
     """Extract records for a domain from export JSON."""
@@ -420,6 +482,7 @@ def synthesize(
     filter_mode: str = "all",
     domain_patterns_csv: Optional[str] = None,
     bundle_dir: Optional[str] = None,
+    items_lookup_csv: Optional[str] = None,
 ) -> None:
     print(f"\n=== Label Synthesis: {domain} ===")
     print(f"  Exports dir:   {exports_dir}")
@@ -435,6 +498,14 @@ def synthesize(
     # Load existing cache
     cache = load_llm_cache(cache_path)
     print(f"  Existing cache entries: {len(cache)}")
+
+    # Load CSV-based identity items lookup if provided
+    items_lookup: Optional[Dict] = None
+    if items_lookup_csv:
+        items_lookup = _load_identity_items_from_csv(items_lookup_csv)
+    elif not os.path.isdir(exports_dir):
+        print(f"  WARN: --exports-dir does not exist and no --identity-items-lookup provided.")
+        print(f"        LLM prompts will use observed names only (no behavioral parameters).")
 
     if import_results:
         with open(import_results, "r", encoding="utf-8") as f:
@@ -527,7 +598,9 @@ def synthesize(
         for jh in to_process:
             rows = label_pop_by_hash.get(jh, [])
             rows_sorted = sorted(rows, key=lambda r: -int(r.get("files_count", 0)))
-            identity_items = _load_representative_identity_items(exports_dir, domain, jh)
+            identity_items = _load_representative_identity_items(
+                exports_dir, domain, jh, items_lookup=items_lookup
+            )
             user_prompt = build_prompt_fn(
                 join_hash=jh,
                 observed_labels=rows_sorted,
@@ -560,7 +633,9 @@ def synthesize(
     def _process_join_hash(jh: str):
         rows = label_pop_by_hash.get(jh, [])
         rows_sorted = sorted(rows, key=lambda r: -int(r.get("files_count", 0)))
-        identity_items = _load_representative_identity_items(exports_dir, domain, jh)
+        identity_items = _load_representative_identity_items(
+            exports_dir, domain, jh, items_lookup=items_lookup
+        )
         user_prompt = build_prompt_fn(
             join_hash=jh,
             observed_labels=rows_sorted,
@@ -752,6 +827,17 @@ def main():
         ),
     )
     ap.add_argument(
+        "--identity-items-lookup",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path to identity_items_by_joinhash.csv built by "
+            "build_identity_items_lookup.py. Use when export JSONs do not "
+            "contain inline identity_items (flattened export format). "
+            "When provided, JSON scan is skipped for matched patterns."
+        ),
+    )
+    ap.add_argument(
         "--domain-patterns-csv",
         default=None,
         metavar="PATH",
@@ -787,6 +873,7 @@ def main():
         filter_mode=args.filter_mode,
         domain_patterns_csv=args.domain_patterns_csv,
         bundle_dir=args.bundle_dir,
+        items_lookup_csv=args.identity_items_lookup,
     )
 
 
