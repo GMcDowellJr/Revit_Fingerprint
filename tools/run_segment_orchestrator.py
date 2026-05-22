@@ -108,6 +108,12 @@ def _write_segment_records(
     """
     Copy records.csv and file_metadata.csv from corpus records_dir into the
     segment records dir, filtered to the segment's export_run_ids.
+
+    Also copies filtered identity_items shards from
+    records_dir/identity_items_by_domain/ into
+    segment_records_dir/identity_items_by_domain/ so that emit_analysis can
+    load identity_items for synopsis label resolution.
+
     Missing source files are skipped silently — patterns stage will simply see
     an empty (or absent) input and the guard will surface the failure cleanly.
     """
@@ -124,6 +130,37 @@ def _write_segment_records(
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
+
+    # Copy filtered identity_items shards so synopsis formatter has behavioral
+    # parameters at segment emit time. Without this, _load_identity_items_by_record
+    # returns {} for every domain and all synopsis-resolvable patterns fall through
+    # to modal or fallback.
+    corpus_shard_dir = records_dir / "identity_items_by_domain"
+    if corpus_shard_dir.is_dir():
+        seg_shard_dir = segment_records_dir / "identity_items_by_domain"
+        seg_shard_dir.mkdir(parents=True, exist_ok=True)
+        for shard_file in sorted(corpus_shard_dir.iterdir()):
+            if not shard_file.is_file() or not shard_file.suffix == ".csv":
+                continue
+            dst_shard = seg_shard_dir / shard_file.name
+            # Skip if already written and not stale (re-runs are fast to skip)
+            if dst_shard.is_file():
+                continue
+            with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
+                reader = csv.DictReader(f)
+                fieldnames = list(reader.fieldnames or [])
+                rows = [
+                    r for r in reader
+                    if r.get("export_run_id", "").strip() in allowed_ids
+                ]
+            if not rows:
+                continue
+            with dst_shard.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+        # Write completion marker so partial runs are detectable
+        (seg_shard_dir / ".complete").write_text("ok", encoding="utf-8")
 
 
 # ── Diagnostic helpers ────────────────────────────────────────────────────────
