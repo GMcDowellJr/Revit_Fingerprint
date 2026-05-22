@@ -216,7 +216,7 @@ def _patch_one(
             pop_by_domain[domain] = _load_label_population(label_synth_dir, domain)
         label_pop = pop_by_domain[domain].get(join_hash, [])
         modal = _try_modal(label_pop)
-        if modal and current_source == "fallback":
+        if modal and current_source in ("fallback", ""):
             new_label = modal
             new_source = "modal"
 
