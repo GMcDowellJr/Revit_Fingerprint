@@ -223,10 +223,9 @@ def patch(
         label_pop = pop_cache[domain].get(join_hash, [])
         modal = _try_modal(label_pop)
         if modal and current_source not in ("llm", "llm_unreviewed"):
-            # Modal wins — don't overwrite with LLM if modal resolves
-            # (this handles the case where modal wasn't available at original
-            #  emit time but label_population is now built)
-            if current_source == "fallback":
+            # Modal wins — don't overwrite with LLM if modal resolves.
+            # Treat blank source like fallback so legacy rows are patchable.
+            if current_source in ("fallback", ""):
                 new_label = modal
                 new_source = "modal"
             else:

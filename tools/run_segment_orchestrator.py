@@ -143,9 +143,8 @@ def _write_segment_records(
             if not shard_file.is_file() or not shard_file.suffix == ".csv":
                 continue
             dst_shard = seg_shard_dir / shard_file.name
-            # Skip if already written and not stale (re-runs are fast to skip)
-            if dst_shard.is_file():
-                continue
+            # Always rebuild shard on each run so --force/reruns cannot retain
+            # stale identity_items membership from prior segment filters.
             with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
                 reader = csv.DictReader(f)
                 fieldnames = list(reader.fieldnames or [])
