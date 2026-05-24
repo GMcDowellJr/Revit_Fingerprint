@@ -462,6 +462,7 @@ DIRECTED_TYPES = {
     "template_to_project",
     "template_to_container",
     "container_to_project",
+    "parent_sibling_roles",
     "governance_chain",
 }
 
