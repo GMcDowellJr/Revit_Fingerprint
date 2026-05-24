@@ -140,7 +140,7 @@ tools/                  Analysis & comparison utilities
   compare_manifest.py           Diff two manifests
   pairwise_drift.py             Cross-project drift scoring
   score_drift.py                Drift score vs baseline using stable surfaces
-  similarity_compare.py         Similarity comparison
+  similarity_compare.py         Similarity comparison [DEPRECATED May 2026 — superseded by compare_cross_segment.py; see docs/tools_DEPRECATED.md]
   pareto_joinkey_search.py      Join-key optimization (Pareto front)
   pareto_make_shape_inputs.py   Shape-based input prep
   compute_governance_thresholds.py

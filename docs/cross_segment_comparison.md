@@ -100,6 +100,12 @@ When `n_pairs ≤ 50`, every individual pair is also written to `cross_segment_f
 
 ## 6. Output Schema
 
+Three CSV files are written to `--out-dir`:
+
+- **`cross_segment_summary.csv`** — one row per (segment_a, segment_b, domain, comparison_type)
+- **`cross_segment_file_pairs.csv`** — individual file pair detail rows when n_pairs ≤ 50
+- **`cross_segment_delta.csv`** — one row per delta join_hash for directed pairs (suppressed by `--no-delta`)
+
 ### cross_segment_summary.csv
 
 One row per (segment_id_a, segment_id_b, domain, comparison_type).
@@ -151,6 +157,26 @@ Written only for (segment_a, segment_b, domain) triples where `n_pairs ≤ 50`.
 | `containment_a_in_b` | Fraction of A's patterns in B |
 | `containment_b_in_a` | Fraction of B's patterns in A |
 
+### cross_segment_delta.csv
+
+Written for directed comparison types (`template_to_project`, `template_to_container`, `container_to_project`) when `--no-delta` is not set. One row per delta join_hash per (segment_pair, domain). Sorted by comparison_type → segment_id_reference → segment_id_target → domain → pct_files_in_target DESC → join_hash.
+
+| Column | Description |
+|--------|-------------|
+| `comparison_run_id` | Same ID as the corresponding summary row |
+| `segment_id_reference` | Reference segment (Template or Container side) |
+| `segment_id_target` | Target segment (Project or Container side) |
+| `segment_label_reference/target` | Human-readable labels from manifest |
+| `comparison_type` | One of the three directed types |
+| `domain` | Domain name |
+| `join_hash` | The delta pattern's cross-segment identity |
+| `pattern_label` | From target's `domain_patterns.csv`: `pattern_label_human` if populated, else `pattern_label`, else blank |
+| `n_files_in_target` | Count of files in the target segment that carry this join_hash |
+| `pct_files_in_target` | `n_files_in_target / total_files_in_target_segment`, 6 decimal places |
+| `in_any_container` | `true` if this join_hash appears in any Container-role segment with matching unit_system |
+| `in_any_template` | `true` if this join_hash appears in any Template-role segment with matching unit_system |
+| `executed_utc` | ISO-8601 UTC timestamp |
+
 ---
 
 ## 7. CLI Reference
@@ -169,7 +195,8 @@ python tools/compare_cross_segment.py \
   [--segment-a SEGMENT_ID] \
   [--segment-b SEGMENT_ID] \
   [--min-patterns INT] \
-  [--dry-run]
+  [--dry-run] \
+  [--no-delta]
 ```
 
 ### Flags
@@ -189,6 +216,7 @@ python tools/compare_cross_segment.py \
 | `--segment-b SEGMENT_ID` | Restrict the right side of all pairs to this segment. |
 | `--min-patterns INT` | Skip any (segment, domain) with fewer than N join_hashes. Default: 3. |
 | `--dry-run` | Print discovered pairs and exit. No output files are written. |
+| `--no-delta` | Skip delta pattern computation and `cross_segment_delta.csv`. Use for large corpora where delta detail is not needed. |
 
 If no mode flag is specified, all five modes are enabled.
 
@@ -274,7 +302,56 @@ When `containment_b_in_a_mean` (template coverage in project) is low but `n_patt
 
 ---
 
-## 9. Known Limitations
+## 9. Delta Pattern Output
+
+### What delta patterns are
+
+For a directed comparison pair (reference_segment → target_segment, domain):
+
+```
+reference_union_jh = union of all join_hashes in the reference segment
+target_union_jh    = union of all join_hashes in the target segment
+delta_jh           = target_union_jh − reference_union_jh
+```
+
+Each join_hash in `delta_jh` is a pattern present in the target that has no counterpart in the reference. Delta patterns are the explicit complement of template-in-project containment: a project with `containment_b_in_a_mean = 0.60` has delta patterns equal to 40% of the reference mandate, and `cross_segment_delta.csv` names every one of them.
+
+Delta rows are only emitted for `template_to_project`, `template_to_container`, and `container_to_project` comparison types. Symmetric types (`sibling_*`, `within_project`) and `parent_sibling_roles` do not produce delta output.
+
+### Interpretation — three categories
+
+Each delta pattern falls into one of three categories based on `in_any_container` and `in_any_template`:
+
+| in_any_container | in_any_template | Category | Meaning |
+|---|---|---|---|
+| `true` | `false` | Container-sourced enrichment | Governed elsewhere; the pattern exists in a container but was not adopted into this template |
+| — | `true` | Governed by another template | Appears in a sibling or peer template; may indicate wrong template in use or cross-client convergence |
+| `false` | `false` | Project-originated drift | Ungoverned configuration — no reference file in the corpus owns this pattern |
+
+A pattern can be both `in_any_container=true` and `in_any_template=true`; both flags are independent lookups. Project-originated drift (both false) is the most actionable signal: it represents configuration accumulating outside any governance structure.
+
+### Relationship to containment metrics
+
+`pct_files_in_target` answers the follow-on question after the summary row: not just *that* a delta pattern exists, but *how widely* it is spread across the target's files. A delta pattern at `pct_files_in_target = 1.0` is present in every target file — it is a stable, repeatable non-governed addition. A delta pattern at `pct_files_in_target = 0.1` is rare and may represent a one-off outlier.
+
+The total count of delta rows per (pair, domain) equals `n_patterns_b − n_shared_join_hash` from the summary row.
+
+### Output schema
+
+See section 6 for the full field-by-field description of `cross_segment_delta.csv`.
+
+### --no-delta flag
+
+Pass `--no-delta` when:
+- The corpus is large and delta enumeration would produce an unmanageably large CSV
+- Only summary metrics (`containment_*`, `jaccard_*`) are needed for the current analysis
+- Delta computation is not yet applicable (e.g., early population mode before governance authority is established)
+
+When `--no-delta` is set, `cross_segment_delta.csv` is not written and no role join_hash sets are built, which meaningfully reduces I/O for large segment populations.
+
+---
+
+## 10. Known Limitations
 
 ### Small-N caveats (file mode)
 

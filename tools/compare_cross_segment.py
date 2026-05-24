@@ -11,7 +11,7 @@ Usage:
         [--within-segment] [--sibling-segments] [--parent-siblings] \
         [--within-project] [--governance-chain] \
         [--domain DOMAIN] [--segment-a ID] [--segment-b ID] \
-        [--min-patterns INT] [--dry-run]
+        [--min-patterns INT] [--dry-run] [--no-delta]
 """
 from __future__ import annotations
 
@@ -89,6 +89,28 @@ PAIRS_FIELDS: List[str] = [
     "n_patterns_a", "n_patterns_b", "n_shared",
     "jaccard", "containment_a_in_b", "containment_b_in_a",
 ]
+
+DELTA_FIELDS: List[str] = [
+    "comparison_run_id",
+    "segment_id_reference", "segment_id_target",
+    "segment_label_reference", "segment_label_target",
+    "comparison_type", "domain",
+    "join_hash",
+    "pattern_label",
+    "n_files_in_target",
+    "pct_files_in_target",
+    "in_any_container",
+    "in_any_template",
+    "executed_utc",
+]
+
+# Comparison types for which delta rows are emitted (directed, reference side defined).
+# Excludes parent_sibling_roles and governance_chain per spec.
+DELTA_DIRECTED_TYPES = {
+    "template_to_project",
+    "template_to_container",
+    "container_to_project",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +190,12 @@ def discover_domains_for_segment(
 # Cache: (segment_id, domain) -> {pattern_id: join_hash}
 _jh_cache: Dict[Tuple[str, str], Dict[str, str]] = {}
 
+# Cache: (segment_id, domain) -> {join_hash: human_label}
+_pattern_label_cache: Dict[Tuple[str, str], Dict[str, str]] = {}
+
+# Cache: (governance_role, domain, unit_system) -> Set[join_hash]
+_role_jh_cache: Dict[Tuple[str, str, str], Set[str]] = {}
+
 
 def resolve_join_hashes(
     segments_root: Path,
@@ -207,6 +235,92 @@ def resolve_join_hashes(
         result[pid] = scid.split("|")[-1]
 
     _jh_cache[key] = result
+    return result
+
+
+def load_pattern_labels(
+    segments_root: Path,
+    registry: Dict[str, Dict[str, str]],
+    segment_id: str,
+    domain: str,
+) -> Dict[str, str]:
+    """Return {join_hash: label} from the segment's domain_patterns.csv.
+
+    Prefers pattern_label_human; falls back to pattern_label; else empty string.
+    """
+    key = (segment_id, domain)
+    if key in _pattern_label_cache:
+        return _pattern_label_cache[key]
+
+    seg_out = segment_output_dir(segments_root, registry, segment_id)
+    if seg_out is None:
+        _pattern_label_cache[key] = {}
+        return {}
+
+    dp_path = domain_patterns_path(seg_out)
+    if not dp_path.exists():
+        _pattern_label_cache[key] = {}
+        return {}
+
+    result: Dict[str, str] = {}
+    for row in read_csv_rows(dp_path):
+        if row.get("domain", "") != domain:
+            continue
+        scid = row.get("source_cluster_id", "").strip()
+        if not scid:
+            continue
+        jh = scid.split("|")[-1]
+        label = (
+            row.get("pattern_label_human", "").strip()
+            or row.get("pattern_label", "").strip()
+        )
+        result[jh] = label
+
+    _pattern_label_cache[key] = result
+    return result
+
+
+def get_role_jh_set(
+    role: str,
+    domain: str,
+    unit_system: str,
+    manifest: Dict[str, Dict[str, str]],
+    registry: Dict[str, Dict[str, str]],
+    segments_root: Path,
+) -> Set[str]:
+    """Return the union of all join_hashes present in segments with the given role.
+
+    Built once per (role, domain, unit_system) and cached for the run lifetime.
+    Segments with run_type skip/registration are silently excluded.
+    """
+    cache_key = (role, domain, unit_system)
+    if cache_key in _role_jh_cache:
+        return _role_jh_cache[cache_key]
+
+    result: Set[str] = set()
+    for sid, mrow in manifest.items():
+        if mrow.get("governance_role", "").strip().lower() != role:
+            continue
+        if mrow.get("unit_system", "").strip() != unit_system:
+            continue
+        rt = registry.get(sid, {}).get("run_type", "").strip().lower()
+        if rt in ("skip", "registration"):
+            continue
+        seg_out = segment_output_dir(segments_root, registry, sid)
+        if seg_out is None:
+            continue
+        mm_path = bundle_analysis_dir(seg_out, domain) / "membership_matrix.csv"
+        if not mm_path.exists():
+            continue
+        jh_map = resolve_join_hashes(segments_root, registry, sid, domain)
+        for row in read_csv_rows(mm_path):
+            pid = row.get("pattern_id", "").strip()
+            if pid:
+                jh = jh_map.get(pid)
+                if jh:
+                    result.add(jh)
+
+    _role_jh_cache[cache_key] = result
     return result
 
 
@@ -1007,6 +1121,8 @@ def main() -> int:
                     help="Skip domain/segment pairs with fewer than N join_hashes (default: 3)")
     ap.add_argument("--dry-run", action="store_true",
                     help="Print discovered pairs without computing; no output files written")
+    ap.add_argument("--no-delta", action="store_true",
+                    help="Skip delta pattern output (cross_segment_delta.csv); useful for large corpora")
 
     args = ap.parse_args()
 
@@ -1083,6 +1199,8 @@ def main() -> int:
     executed_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     summary_rows: List[Dict[str, str]] = []
     pair_detail_rows: List[Dict[str, str]] = []
+    delta_rows: List[Dict[str, str]] = []
+    delta_combo_count = 0
 
     for seg_a, seg_b, ctype in pairs:
         if not segment_is_runnable(registry, seg_a):
@@ -1120,6 +1238,55 @@ def main() -> int:
                 f"domain={domain} mode={mode_val} pairs={n_p}"
             )
 
+            # Delta pattern output — directed pairs only, opt-out via --no-delta
+            if not args.no_delta and ctype in DELTA_DIRECTED_TYPES:
+                tgt_files = load_file_join_hashes(segments_root, registry, seg_b, domain)
+                ref_files = load_file_join_hashes(segments_root, registry, seg_a, domain)
+                ref_union: Set[str] = set()
+                for jhs in ref_files.values():
+                    ref_union |= jhs
+                tgt_union: Set[str] = set()
+                for jhs in tgt_files.values():
+                    tgt_union |= jhs
+                delta_jhs = tgt_union - ref_union
+
+                if delta_jhs:
+                    unit_system = manifest.get(seg_a, {}).get("unit_system", "")
+                    container_set = get_role_jh_set(
+                        "container", domain, unit_system, manifest, registry, segments_root
+                    )
+                    template_set = get_role_jh_set(
+                        "template", domain, unit_system, manifest, registry, segments_root
+                    )
+                    pattern_labels = load_pattern_labels(
+                        segments_root, registry, seg_b, domain
+                    )
+                    n_tgt_files = len(tgt_files)
+                    crid = result.get("comparison_run_id", "")
+                    ma = manifest.get(seg_a, {})
+                    mb = manifest.get(seg_b, {})
+
+                    for jh in delta_jhs:
+                        n_files_in_tgt = sum(1 for jhs in tgt_files.values() if jh in jhs)
+                        pct = n_files_in_tgt / n_tgt_files if n_tgt_files else 0.0
+                        delta_rows.append({
+                            "comparison_run_id": crid,
+                            "segment_id_reference": seg_a,
+                            "segment_id_target": seg_b,
+                            "segment_label_reference": ma.get("segment_label", ""),
+                            "segment_label_target": mb.get("segment_label", ""),
+                            "comparison_type": ctype,
+                            "domain": domain,
+                            "join_hash": jh,
+                            "pattern_label": pattern_labels.get(jh, ""),
+                            "n_files_in_target": str(n_files_in_tgt),
+                            "pct_files_in_target": _fmt(pct),
+                            "in_any_container": "true" if jh in container_set else "false",
+                            "in_any_template": "true" if jh in template_set else "false",
+                            "executed_utc": executed_utc,
+                        })
+                    delta_combo_count += 1
+
     # Write outputs
     if summary_rows:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -1129,6 +1296,23 @@ def main() -> int:
     if pair_detail_rows:
         atomic_write_csv(out_dir / "cross_segment_file_pairs.csv", PAIRS_FIELDS, pair_detail_rows)
         print(f"[compare] wrote {len(pair_detail_rows)} rows → {out_dir / 'cross_segment_file_pairs.csv'}")
+
+    if delta_rows:
+        delta_rows.sort(key=lambda r: (
+            r["comparison_type"],
+            r["segment_id_reference"],
+            r["segment_id_target"],
+            r["domain"],
+            -float(r["pct_files_in_target"] or "0"),
+            r["join_hash"],
+        ))
+        out_dir.mkdir(parents=True, exist_ok=True)
+        atomic_write_csv(out_dir / "cross_segment_delta.csv", DELTA_FIELDS, delta_rows)
+        print(
+            f"[compare] delta patterns written: {len(delta_rows)} rows across "
+            f"{delta_combo_count} domain/pair combinations"
+        )
+        print(f"[compare] wrote {len(delta_rows)} rows → {out_dir / 'cross_segment_delta.csv'}")
 
     if not summary_rows:
         print("[compare] no comparison rows produced — check segment data and min-patterns threshold")
