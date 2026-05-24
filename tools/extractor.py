@@ -597,11 +597,21 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
     tool_version = _get_tool_version()
     meta_rows: List[Dict[str, str]] = []
     record_rows: List[Dict[str, str]] = []
-    item_rows: List[Dict[str, str]] = []
     label_rows: List[Dict[str, str]] = []
     reason_rows: List[Dict[str, str]] = []
     param_evidence_rows: List[Dict[str, str]] = []
     governance_rules = _load_governance_role_rules()
+    _ITEM_FIELDS = [
+        "schema_version", "export_run_id", "domain", "record_pk", "item_key", "item_value",
+        "item_value_type", "item_role",
+    ]
+    shard_dir = out_dir / "identity_items_by_domain"
+    shard_dir.mkdir(parents=True, exist_ok=True)
+    for _stale in shard_dir.glob("*.csv"):
+        _stale.unlink(missing_ok=True)
+    (shard_dir / ".complete").unlink(missing_ok=True)
+    _item_shard_handles: Dict[str, Any] = {}
+    _item_shard_writers: Dict[str, Any] = {}
 
     for _, primary, secondary in _iter_export_files(exports_dir):
         data = _read_json(primary)
@@ -700,7 +710,13 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                     for it in items:
                         if not isinstance(it, dict):
                             continue
-                        item_rows.append({
+                        if domain not in _item_shard_writers:
+                            _fp = (shard_dir / f"{domain}.csv").open("w", newline="", encoding="utf-8")
+                            _item_shard_handles[domain] = _fp
+                            _w = csv.DictWriter(_fp, fieldnames=_ITEM_FIELDS)
+                            _w.writeheader()
+                            _item_shard_writers[domain] = _w
+                        _item_shard_writers[domain].writerow({
                             "schema_version": SCHEMA_VERSION,
                             "export_run_id": export_run_id,
                             "domain": domain,
@@ -753,6 +769,22 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                             "component_order": str(order),
                         })
 
+    for _fp in _item_shard_handles.values():
+        _fp.close()
+    _item_shard_handles.clear()
+    _item_shard_writers.clear()
+    _monolithic_items_path = out_dir / "identity_items.csv"
+    with _monolithic_items_path.open("w", newline="", encoding="utf-8") as _mono_f:
+        _mono_w = csv.DictWriter(_mono_f, fieldnames=_ITEM_FIELDS)
+        _mono_w.writeheader()
+        for _shard_path in sorted(shard_dir.glob("*.csv")):
+            with _shard_path.open("r", encoding="utf-8-sig", newline="") as _sf:
+                for _srow in csv.DictReader(_sf):
+                    _mono_w.writerow({k: _srow.get(k, "") for k in _ITEM_FIELDS})
+    (shard_dir / ".complete").write_text(
+        str(_monolithic_items_path.stat().st_mtime), encoding="utf-8"
+    )
+
     # Preserve manually-entered annotations from existing file_metadata.csv
     existing_meta_path = out_dir / "file_metadata.csv"
     annotation_columns = ["client_label", "governance_role"]
@@ -804,11 +836,6 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
         "label_display", "label_quality", "label_provenance", "is_purgeable",
         "instance_count", "is_sole_type_in_category",
     ], _sort_rows(record_rows, ["export_run_id", "domain", "record_pk"]))
-
-    _write_csv(out_dir / "identity_items.csv", [
-        "schema_version", "export_run_id", "domain", "record_pk", "item_key", "item_value",
-        "item_value_type", "item_role",
-    ], _sort_rows(item_rows, ["export_run_id", "domain", "record_pk", "item_key", "item_value"]))
 
     _write_csv(out_dir / "label_components.csv", [
         "schema_version", "export_run_id", "domain", "record_pk", "component_key", "component_value", "component_order",

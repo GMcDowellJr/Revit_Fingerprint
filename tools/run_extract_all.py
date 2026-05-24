@@ -37,16 +37,46 @@ _LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.(?:seg|segment)\[(\d{3})\]\.(ki
 _LP_SEGMENT_COUNT_KEY = "line_pattern.segment_count"
 
 
+def _rebuild_monolithic_identity_items(items_csv: Path, shard_dir: Path) -> None:
+    """Rebuild identity_items.csv by streaming all domain shards in sorted order and refresh sentinel."""
+    fieldnames: Optional[List[str]] = None
+    with items_csv.open("w", encoding="utf-8", newline="") as mono_f:
+        mono_writer: Optional[csv.DictWriter] = None
+        for shard in sorted(shard_dir.glob("*.csv")):
+            with shard.open("r", encoding="utf-8-sig", newline="") as sf:
+                reader = csv.DictReader(sf)
+                if fieldnames is None:
+                    fieldnames = list(reader.fieldnames or [])
+                    mono_writer = csv.DictWriter(mono_f, fieldnames=fieldnames)
+                    mono_writer.writeheader()
+                if mono_writer is not None:
+                    for row in reader:
+                        mono_writer.writerow({k: row.get(k, "") for k in fieldnames})
+    (shard_dir / ".complete").write_text(str(items_csv.stat().st_mtime), encoding="utf-8")
+
+
 def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
     """Append synthetic line_pattern.segments_norm_hash rows to identity_items.csv."""
     if not items_csv.is_file():
         return {"total": 0, "ok": 0, "missing": 0}
 
-    with items_csv.open("r", encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.DictReader(f))
-        fieldnames = list((rows[0].keys() if rows else [
-            "schema_version", "export_run_id", "file_id", "domain", "record_id", "record_ordinal", "record_pk", "item_index", "k", "q", "v",
-        ]))
+    shard_dir = items_csv.parent / "identity_items_by_domain"
+    lp_shard = shard_dir / "line_patterns.csv"
+    use_shard = (shard_dir / ".complete").is_file() and lp_shard.is_file()
+
+    if use_shard:
+        with lp_shard.open("r", encoding="utf-8-sig", newline="") as f:
+            rows = list(csv.DictReader(f))
+            fieldnames = list(rows[0].keys() if rows else [
+                "schema_version", "export_run_id", "domain", "record_pk",
+                "item_key", "item_value", "item_value_type", "item_role",
+            ])
+    else:
+        with items_csv.open("r", encoding="utf-8-sig", newline="") as f:
+            rows = list(csv.DictReader(f))
+            fieldnames = list((rows[0].keys() if rows else [
+                "schema_version", "export_run_id", "file_id", "domain", "record_id", "record_ordinal", "record_pk", "item_index", "k", "q", "v",
+            ]))
     key_col = "k" if "k" in fieldnames else "item_key"
     quality_col = "q" if "q" in fieldnames else "item_value_type"
     value_col = "v" if "v" in fieldnames else "item_value"
@@ -157,11 +187,19 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
                 str(r.get(value_col, "")),
             ),
         )
-        with items_csv.open("w", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=fieldnames)
-            w.writeheader()
-            for r in rows:
-                w.writerow({k: r.get(k, "") for k in fieldnames})
+        if use_shard:
+            with lp_shard.open("w", encoding="utf-8", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=fieldnames)
+                w.writeheader()
+                for r in rows:
+                    w.writerow({k: r.get(k, "") for k in fieldnames})
+            _rebuild_monolithic_identity_items(items_csv, shard_dir)
+        else:
+            with items_csv.open("w", encoding="utf-8", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=fieldnames)
+                w.writeheader()
+                for r in rows:
+                    w.writerow({k: r.get(k, "") for k in fieldnames})
 
     return {"total": len(out_rows), "ok": ok, "missing": missing}
 
