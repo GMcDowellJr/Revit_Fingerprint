@@ -647,15 +647,16 @@ def discover_within_project(
         ba_root = seg_out / "results" / "bundle_analysis"
         if not ba_root.exists():
             continue
-        # Check if there are ≥2 files mapping to different projects
-        mm_any = next(ba_root.glob("*/membership_matrix.csv"), None)
-        if mm_any is None:
-            continue
+        # Collect eids from ALL domains so eligibility doesn't depend on which
+        # membership_matrix.csv glob happens to return first.
         eids: Set[str] = set()
-        for row in read_csv_rows(mm_any):
-            eid = row.get("export_run_id", "").strip()
-            if eid:
-                eids.add(eid)
+        for mm_path in ba_root.glob("*/membership_matrix.csv"):
+            for row in read_csv_rows(mm_path):
+                eid = row.get("export_run_id", "").strip()
+                if eid:
+                    eids.add(eid)
+        if not eids:
+            continue
         by_proj: Dict[str, List[str]] = defaultdict(list)
         for eid in eids:
             meta = file_metadata.get(eid, {})
@@ -775,6 +776,10 @@ def run_pair(
         total_jhs: Set[str] = set()
         for eid in participating_eids:
             total_jhs |= all_files.get(eid, set())
+
+        if len(total_jhs) < min_patterns:
+            return None, []
+
         # n_shared: join_hashes that appear in more than one participating file
         from collections import Counter as _Counter
         jhs_file_count: Dict[str, int] = _Counter(
