@@ -671,31 +671,15 @@ def discover_within_project(
 # ---------------------------------------------------------------------------
 
 def deduplicate_pairs(pairs: List[ComparisonPair]) -> List[ComparisonPair]:
-    seen: Dict[Tuple[str, str], str] = {}
+    # Dedup on the full (seg_a, seg_b, comparison_type) triple. Different comparison
+    # types for the same segment pair represent distinct analytical questions and must
+    # all be preserved — only exact triple duplicates (same type from two modes) are dropped.
+    seen: Set[ComparisonPair] = set()
     result: List[ComparisonPair] = []
-    # Directed types take priority over symmetric when same (a,b) appears
-    priority = {
-        "template_to_project": 0,
-        "template_to_container": 1,
-        "container_to_project": 2,
-        "parent_sibling_roles": 3,
-        "sibling_templates": 4,
-        "sibling_projects": 5,
-        "sibling_containers": 6,
-        "within_project": 7,
-    }
-    for a, b, ctype in pairs:
-        k = (a, b) if ctype not in DIRECTED_TYPES else (a, b)
-        existing = seen.get(k)
-        if existing is None or priority.get(ctype, 99) < priority.get(existing, 99):
-            seen[k] = ctype
-    # rebuild in stable order
-    done: Set[Tuple[str, str]] = set()
-    for a, b, ctype in pairs:
-        k = (a, b)
-        if k not in done and seen.get(k) == ctype:
-            result.append((a, b, ctype))
-            done.add(k)
+    for triple in pairs:
+        if triple not in seen:
+            seen.add(triple)
+            result.append(triple)
     return result
 
 
@@ -747,7 +731,8 @@ def run_pair(
     else:
         files_a = files_b = {}
 
-    # For within_project: group by project_label within the single segment
+    # For within_project: group by project_label within the single segment, then
+    # aggregate all intra-project pairs into ONE summary row for (segment, domain).
     if is_within_project:
         all_files = load_file_join_hashes(segments_root, registry, seg_a, domain)
         by_proj: Dict[str, Dict[str, Set[str]]] = defaultdict(dict)
@@ -756,8 +741,10 @@ def run_pair(
             proj = meta.get("project_label", "").strip() or eid
             by_proj[proj][eid] = jhs
 
-        all_summary_rows: List[Dict[str, str]] = []
-        all_pair_rows: List[Dict[str, str]] = []
+        # Collect every intra-project file pair across all project groups
+        PairRecord = Tuple[str, str, str, int, int, int, float, float, float]
+        raw_pairs: List[PairRecord] = []  # (eid_a, eid_b, proj, na, nb, ns, j, c_ab, c_ba)
+        participating_eids: Set[str] = set()
 
         for proj, proj_files in by_proj.items():
             if len(proj_files) < 2:
@@ -765,44 +752,78 @@ def run_pair(
             eids_sorted = sorted(proj_files.keys())
             for i in range(len(eids_sorted)):
                 for j in range(i + 1, len(eids_sorted)):
-                    eid_a2 = eids_sorted[i]
-                    eid_b2 = eids_sorted[j]
-                    fa = {eid_a2: proj_files[eid_a2]}
-                    fb = {eid_b2: proj_files[eid_b2]}
-                    sm, pr = compare_symmetric_file(fa, fb)
-                    if not sm:
-                        continue
-                    crid = make_comparison_run_id(eid_a2, eid_b2, executed_utc)
-                    summary_row = _build_summary_row(
-                        crid, seg_a, seg_b, comparison_type, mode, domain,
-                        manifest, file_metadata,
-                        sm,
-                        n_patterns_a=len(proj_files[eid_a2]),
-                        n_patterns_b=len(proj_files[eid_b2]),
-                        executed_utc=executed_utc,
-                    )
-                    all_summary_rows.append(summary_row)
-                    for r in pr:
-                        r.update({
-                            "comparison_run_id": crid,
-                            "segment_id_a": seg_a,
-                            "segment_id_b": seg_b,
-                            "domain": domain,
-                            "project_label_a": proj,
-                            "project_label_b": proj,
-                        })
-                        all_pair_rows.append(r)
+                    eid_a2, eid_b2 = eids_sorted[i], eids_sorted[j]
+                    jhs_a2 = proj_files[eid_a2]
+                    jhs_b2 = proj_files[eid_b2]
+                    union = jhs_a2 | jhs_b2
+                    j_val = len(jhs_a2 & jhs_b2) / len(union) if union else 0.0
+                    c_ab = len(jhs_a2 & jhs_b2) / len(jhs_a2) if jhs_a2 else 0.0
+                    c_ba = len(jhs_a2 & jhs_b2) / len(jhs_b2) if jhs_b2 else 0.0
+                    raw_pairs.append((
+                        eid_a2, eid_b2, proj,
+                        len(jhs_a2), len(jhs_b2), len(jhs_a2 & jhs_b2),
+                        j_val, c_ab, c_ba,
+                    ))
+                    participating_eids.add(eid_a2)
+                    participating_eids.add(eid_b2)
 
-        # Return first summary row with aggregate (or None if nothing)
-        if not all_summary_rows:
+        if not raw_pairs:
             return None, []
-        # For within_project, callers handle multiple summaries via list;
-        # here we return the first and expect caller to handle list form
-        # Actually: return a sentinel summary row that merges; simpler to return list
-        # We abuse the tuple: return ("MULTI", all_summary_rows, all_pair_rows)
-        # Instead, handle in caller — just return the list packed into a dummy dict
-        # We'll use a special return marker
-        return {"__multi__": "1", "__rows__": all_summary_rows, "__pairs__": all_pair_rows}, []  # type: ignore[return-value]
+
+        # Aggregate Jaccard across all pairs
+        jaccards = [p[6] for p in raw_pairs]
+        total_jhs: Set[str] = set()
+        for eid in participating_eids:
+            total_jhs |= all_files.get(eid, set())
+        # n_shared: join_hashes that appear in more than one participating file
+        from collections import Counter as _Counter
+        jhs_file_count: Dict[str, int] = _Counter(
+            jh for eid in participating_eids for jh in all_files.get(eid, set())
+        )
+        n_shared_jh = sum(1 for v in jhs_file_count.values() if v > 1)
+        n_files = len(participating_eids)
+
+        metrics: Dict[str, str] = {
+            "n_shared_join_hash": str(n_shared_jh),
+            "jaccard_mean": _mean(jaccards),
+            "jaccard_p10": _fmt(_pct(jaccards, 10)) if jaccards else "",
+            "jaccard_p90": _fmt(_pct(jaccards, 90)) if jaccards else "",
+            "n_files_a": str(n_files),
+            "n_files_b": str(n_files),
+            "n_pairs": str(len(raw_pairs)),
+        }
+
+        crid = make_comparison_run_id(seg_a, seg_b, executed_utc)
+        summary_row = _build_summary_row(
+            crid, seg_a, seg_b, comparison_type, mode, domain,
+            manifest, file_metadata, metrics,
+            n_patterns_a=len(total_jhs),
+            n_patterns_b=len(total_jhs),
+            executed_utc=executed_utc,
+        )
+
+        # Detail rows only when pair count is small enough
+        detail_rows: List[Dict[str, str]] = []
+        if len(raw_pairs) <= 50:
+            for eid_a2, eid_b2, proj, na, nb, ns, j_val, c_ab, c_ba in raw_pairs:
+                detail_rows.append({
+                    "comparison_run_id": crid,
+                    "segment_id_a": seg_a,
+                    "segment_id_b": seg_b,
+                    "domain": domain,
+                    "export_run_id_a": eid_a2,
+                    "export_run_id_b": eid_b2,
+                    "project_label_a": proj,
+                    "project_label_b": proj,
+                    "n_patterns_a": str(na),
+                    "n_patterns_b": str(nb),
+                    "n_shared": str(ns),
+                    "jaccard": _fmt(j_val),
+                    "containment_a_in_b": _fmt(c_ab),
+                    "containment_b_in_a": _fmt(c_ba),
+                })
+
+        return summary_row, detail_rows
 
     # Normal path
     all_jhs_a: Set[str] = set()
@@ -1084,26 +1105,14 @@ def main() -> int:
             if result is None:
                 continue
 
-            # Handle within_project multi-row sentinel
-            if isinstance(result, dict) and result.get("__multi__"):
-                multi_rows = result["__rows__"]  # type: ignore[index]
-                multi_pairs = result["__pairs__"]  # type: ignore[index]
-                summary_rows.extend(multi_rows)
-                pair_detail_rows.extend(multi_pairs)
-                n_total = len(multi_rows)
-                print(
-                    f"[compare] segment_a={seg_a} segment_b={seg_b} "
-                    f"domain={domain} mode=file within_project pairs={n_total}"
-                )
-            else:
-                summary_rows.append(result)
-                pair_detail_rows.extend(pairs_out)
-                mode_val = result.get("comparison_mode", "?")
-                n_p = result.get("n_pairs", "?")
-                print(
-                    f"[compare] segment_a={seg_a} segment_b={seg_b} "
-                    f"domain={domain} mode={mode_val} pairs={n_p}"
-                )
+            summary_rows.append(result)
+            pair_detail_rows.extend(pairs_out)
+            mode_val = result.get("comparison_mode", "?")
+            n_p = result.get("n_pairs", "?")
+            print(
+                f"[compare] segment_a={seg_a} segment_b={seg_b} "
+                f"domain={domain} mode={mode_val} pairs={n_p}"
+            )
 
     # Write outputs
     if summary_rows:
