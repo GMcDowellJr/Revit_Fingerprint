@@ -787,7 +787,7 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
 
     # Preserve manually-entered annotations from existing file_metadata.csv
     existing_meta_path = out_dir / "file_metadata.csv"
-    annotation_columns = ["client_label", "governance_role"]
+    annotation_columns = ["client_label", "governance_role", "discipline_label", "project_label"]
     existing_annotations: Dict[str, Dict[str, str]] = {}
 
     if existing_meta_path.exists():
@@ -826,7 +826,7 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
         "project_label", "model_label", "central_path", "central_path_norm",
         "lineage_hash", "revit_version_number", "revit_version_name", "revit_build",
         "is_workshared", "tool_version", "exported_utc",
-        "client_label", "governance_role", "unit_system",
+        "client_label", "governance_role", "unit_system", "discipline_label",
     ], _sort_rows(meta_rows, ["export_run_id"]))
 
     _write_csv(out_dir / "records.csv", [
