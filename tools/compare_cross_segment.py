@@ -117,15 +117,15 @@ DELTA_DIRECTED_TYPES = {
 # Data loading
 # ---------------------------------------------------------------------------
 
-def load_manifest(segments_root: Path) -> Dict[str, Dict[str, str]]:
-    path = segments_root / "segment_manifest.csv"
+def load_manifest(records_dir: Path) -> Dict[str, Dict[str, str]]:
+    path = records_dir / "segment_manifest.csv"
     if not path.exists():
         sys.exit(f"[error] segment_manifest.csv not found at {path}")
     return {row["segment_id"]: row for row in read_csv_rows(path)}
 
 
-def load_registry(segments_root: Path) -> Dict[str, Dict[str, str]]:
-    path = segments_root / "run_registry.csv"
+def load_registry(records_dir: Path) -> Dict[str, Dict[str, str]]:
+    path = records_dir / "run_registry.csv"
     if not path.exists():
         sys.exit(f"[error] run_registry.csv not found at {path}")
     return {row["segment_id"]: row for row in read_csv_rows(path)}
@@ -1092,9 +1092,9 @@ def main() -> int:
         formatter_class=argparse.RawTextHelpFormatter,
     )
     ap.add_argument("--segments-root", required=True, metavar="DIR",
-                    help="Root directory containing segment_manifest.csv and run_registry.csv")
+                    help="Base directory for resolving segment output_folder paths from run_registry.csv")
     ap.add_argument("--records-dir", required=True, metavar="DIR",
-                    help="Directory containing file_metadata.csv")
+                    help="Directory containing segment_manifest.csv, run_registry.csv, and file_metadata.csv")
     ap.add_argument("--out-dir", required=True, metavar="DIR",
                     help="Output directory for cross_segment_summary.csv and cross_segment_file_pairs.csv")
 
@@ -1139,8 +1139,8 @@ def main() -> int:
         args.within_segment = args.sibling_segments = args.parent_siblings = True
         args.within_project = args.governance_chain = True
 
-    manifest = load_manifest(segments_root)
-    registry = load_registry(segments_root)
+    manifest = load_manifest(records_dir)
+    registry = load_registry(records_dir)
     file_metadata = load_file_metadata(records_dir)
 
     # Discover pairs

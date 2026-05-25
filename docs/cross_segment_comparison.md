@@ -203,8 +203,8 @@ python tools/compare_cross_segment.py \
 
 | Flag | Description |
 |------|-------------|
-| `--segments-root DIR` | **Required.** Root directory containing `segment_manifest.csv` and `run_registry.csv`. |
-| `--records-dir DIR` | **Required.** Directory containing `file_metadata.csv`. |
+| `--segments-root DIR` | **Required.** Base directory for resolving segment `output_folder` paths from `run_registry.csv`. |
+| `--records-dir DIR` | **Required.** Directory containing `segment_manifest.csv`, `run_registry.csv`, and `file_metadata.csv`. |
 | `--out-dir DIR` | **Required.** Output directory. Created if absent. |
 | `--within-segment` | Mode A: child Template/Project/Container pairs within the same parent. |
 | `--sibling-segments` | Mode B: same parent, same governance_role. All pairwise combinations. |
