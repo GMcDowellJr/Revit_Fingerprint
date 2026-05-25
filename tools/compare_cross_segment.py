@@ -287,18 +287,23 @@ def get_role_jh_set(
     manifest: Dict[str, Dict[str, str]],
     registry: Dict[str, Dict[str, str]],
     segments_root: Path,
+    exclude_segment_id: str = "",
 ) -> Set[str]:
     """Return the union of all join_hashes present in segments with the given role.
 
-    Built once per (role, domain, unit_system) and cached for the run lifetime.
-    Segments with run_type skip/registration are silently excluded.
+    Built once per (role, domain, unit_system, exclude_segment_id) and cached
+    for the run lifetime. Segments with run_type skip/registration are silently
+    excluded. Pass exclude_segment_id to omit a specific segment from the union
+    (used when the target segment is itself the role being looked up).
     """
-    cache_key = (role, domain, unit_system)
+    cache_key = (role, domain, unit_system, exclude_segment_id)
     if cache_key in _role_jh_cache:
         return _role_jh_cache[cache_key]
 
     result: Set[str] = set()
     for sid, mrow in manifest.items():
+        if sid == exclude_segment_id:
+            continue
         if mrow.get("governance_role", "").strip().lower() != role:
             continue
         if mrow.get("unit_system", "").strip() != unit_system:
@@ -1253,7 +1258,8 @@ def main() -> int:
                 if delta_jhs:
                     unit_system = manifest.get(seg_a, {}).get("unit_system", "")
                     container_set = get_role_jh_set(
-                        "container", domain, unit_system, manifest, registry, segments_root
+                        "container", domain, unit_system, manifest, registry, segments_root,
+                        exclude_segment_id=seg_b,
                     )
                     template_set = get_role_jh_set(
                         "template", domain, unit_system, manifest, registry, segments_root
