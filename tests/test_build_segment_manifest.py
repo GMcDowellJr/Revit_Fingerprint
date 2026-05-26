@@ -17,12 +17,13 @@ from build_segment_manifest import _build_segments, _build_registry, _population
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _meta_row(export_run_id, unit_system, client_label, governance_role):
+def _meta_row(export_run_id, unit_system, client_label, governance_role, discipline_label=""):
     return {
         "export_run_id": export_run_id,
         "unit_system": unit_system,
         "client_label": client_label,
         "governance_role": governance_role,
+        "discipline_label": discipline_label,
     }
 
 
@@ -235,7 +236,7 @@ def test_main_writes_files(tmp_path):
     meta = tmp_path / "file_metadata.csv"
     fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
     with meta.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         w.writeheader()
         for row in ROWS:
             w.writerow(row)
@@ -433,3 +434,206 @@ def test_single_child_suppression_still_fires():
     parent = next(r for r in segs if r["segment_id"] == "imperial|Project")
     assert parent["run_type"] == "registration"
     assert "redundant_single_child" in (parent.get("notes") or "")
+
+
+# ---------------------------------------------------------------------------
+# Discipline-cut dimension tests
+# ---------------------------------------------------------------------------
+
+def _disc_rows():
+    """Multi-client, multi-discipline Container corpus for discipline tests."""
+    return (
+        [_meta_row(f"ka{i:02d}", "imperial", "Kaiser", "Container", "Architectural") for i in range(4)]
+        + [_meta_row(f"ke{i:02d}", "imperial", "Kaiser", "Container", "Electrical") for i in range(3)]
+        + [_meta_row(f"ra{i:02d}", "imperial", "Renown", "Container", "Architectural") for i in range(3)]
+        # rows with no discipline_label — must not generate discipline cuts
+        + [_meta_row(f"nx{i:02d}", "imperial", "Kaiser", "Project") for i in range(3)]
+    )
+
+
+def test_discipline_cut_level3_segment_generated():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg_ids = {r["segment_id"] for r in segs}
+    assert "imperial|Container|Architectural" in seg_ids
+    assert "imperial|Container|Electrical" in seg_ids
+
+
+def test_discipline_cut_level4_segment_generated():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg_ids = {r["segment_id"] for r in segs}
+    assert "imperial|Container|Kaiser|Architectural" in seg_ids
+    assert "imperial|Container|Kaiser|Electrical" in seg_ids
+
+
+def test_discipline_cut_extra_dimensions_populated():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
+    assert seg["extra_dimensions"] == "discipline_label=Architectural"
+    assert seg["client_label"] == ""
+    assert seg["discipline_label"] == "Architectural"
+
+
+def test_discipline_label_top_level_field_blank_for_non_discipline_segments():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    # A pure governance segment has no discipline cut — field must be blank, not absent.
+    container = next(r for r in segs if r["segment_id"] == "imperial|Container")
+    assert container["discipline_label"] == ""
+    # A client-only cut also has no discipline.
+    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
+    assert kaiser["discipline_label"] == ""
+
+
+def test_discipline_label_top_level_field_populated_in_mixed_cut():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    assert seg["discipline_label"] == "Architectural"
+    assert seg["client_label"] == "Kaiser"
+
+
+def test_discipline_cut_level3_purpose():
+    # With two clients contributing, the discipline-only level-3 segment should NOT be
+    # redundant_single_child — it has two distinct child populations (Kaiser + Renown).
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
+    assert seg["segment_purpose"] == "discipline_coordination"
+
+
+def test_discipline_cut_level3_label():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
+    assert seg["segment_label"] == "Architectural coordination files"
+
+
+def test_blank_discipline_does_not_generate_discipline_cut():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg_ids = {r["segment_id"] for r in segs}
+    # Rows with blank discipline contribute to governance and client cuts only
+    assert "imperial|Project" in seg_ids
+    # No discipline cut that includes blank discipline
+    disc_segs = [r for r in segs if "discipline_label=" in r.get("extra_dimensions", "")]
+    for s in disc_segs:
+        assert s["extra_dimensions"] != "discipline_label="
+
+
+def test_no_discipline_column_rows_not_broken():
+    # Rows lacking discipline_label entirely must not generate discipline cuts.
+    rows = [
+        {"export_run_id": f"r{i:02d}", "unit_system": "imperial",
+         "client_label": "Acme", "governance_role": "Container"}
+        for i in range(3)
+    ]
+    segs = _build_segments(rows, min_files=3)
+    disc_segs = [r for r in segs if "discipline_label=" in r.get("extra_dimensions", "")]
+    assert disc_segs == []
+
+
+def test_discipline_cut_not_required_column(tmp_path):
+    # A metadata file without discipline_label must succeed (not exit 1).
+    meta = tmp_path / "file_metadata.csv"
+    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for row in ROWS:
+            w.writerow({k: row.get(k, "") for k in fieldnames})
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "3"])
+    assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# Bug 2: level-3+ governance-role segments must not be demoted by "has children"
+# ---------------------------------------------------------------------------
+
+def test_discipline_cut_level3_bundle_not_demoted_by_children():
+    # imperial|Container|Architectural has two client children (Kaiser + Renown).
+    # The "has children → registration" logic must not fire for level-3 governance-role segments.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    arch = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
+    assert arch["run_type"] == "bundle", (
+        f"Expected bundle, got {arch['run_type']}; "
+        "level-3 scoped segments must not be demoted by child presence"
+    )
+
+
+def test_discipline_cut_level4_bundle_not_affected():
+    # Level-4 combined client+discipline segments have no children and must be bundle.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    assert seg["run_type"] == "bundle"
+
+
+# ---------------------------------------------------------------------------
+# Bug 3: redundant_single_child must not fire when a parent has multiple children
+# ---------------------------------------------------------------------------
+
+def test_multi_child_parent_not_demoted_redundant_single_child():
+    # imperial|Container|Kaiser has both Architectural and Electrical children.
+    # redundant_single_child must NOT fire.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    kaiser_container = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser")
+    assert "redundant_single_child" not in (kaiser_container.get("notes") or ""), (
+        "Multi-child parent must not be flagged redundant_single_child"
+    )
+    assert kaiser_container["run_type"] != "registration" or "redundant_single_child" not in (kaiser_container.get("notes") or "")
+
+
+def test_single_child_same_hash_still_demoted():
+    # imperial|Container|Electrical has only one child (Kaiser|Electrical) with the same population.
+    # redundant_single_child SHOULD fire here.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    elec = next(r for r in segs if r["segment_id"] == "imperial|Container|Electrical")
+    assert "redundant_single_child" in (elec.get("notes") or ""), (
+        "Single child with same population_hash must still trigger redundant_single_child"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Level-4 client+discipline leaf segment purpose and label
+# ---------------------------------------------------------------------------
+
+def test_client_discipline_leaf_purpose_container():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    assert seg["segment_purpose"] == "client_discipline_coordination"
+
+
+def test_client_discipline_leaf_label_container():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    assert seg["segment_label"] == "Kaiser Architectural coordination files"
+
+
+def test_client_discipline_leaf_purpose_template():
+    rows = (
+        [_meta_row(f"t{i:02d}", "imperial", "Kaiser", "Template", "Architectural") for i in range(3)]
+        + [_meta_row(f"u{i:02d}", "imperial", "Renown", "Template", "Architectural") for i in range(3)]
+    )
+    segs = _build_segments(rows, min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Template|Kaiser|Architectural")
+    assert seg["segment_purpose"] == "client_discipline_standard_anchor"
+    assert seg["segment_label"] == "Kaiser Architectural templates — standards as authored"
+
+
+def test_client_discipline_leaf_purpose_project():
+    rows = (
+        [_meta_row(f"p{i:02d}", "imperial", "Kaiser", "Project", "Architectural") for i in range(3)]
+        + [_meta_row(f"q{i:02d}", "imperial", "Renown", "Project", "Architectural") for i in range(3)]
+    )
+    segs = _build_segments(rows, min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Project|Kaiser|Architectural")
+    assert seg["segment_purpose"] == "client_discipline_practice"
+    assert seg["segment_label"] == "Kaiser Architectural projects — standards as practiced"
+
+
+def test_client_discipline_leaf_no_empty_purpose():
+    # No level-4 client+discipline segment should have an empty segment_purpose.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    l4 = [r for r in segs if r["segment_level"] == "4" and r["client_label"] and r["discipline_label"]]
+    assert l4, "Expected level-4 client+discipline segments in _disc_rows fixture"
+    for r in l4:
+        assert r["segment_purpose"], (
+            f"segment_purpose is empty for level-4 segment {r['segment_id']}"
+        )
+        assert r["segment_label"] != r["segment_id"], (
+            f"segment_label fell back to raw ID for {r['segment_id']}"
+        )

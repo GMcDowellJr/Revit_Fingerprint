@@ -8,15 +8,15 @@ from typing import Dict,Iterable,List,Sequence
 
 SEED_ROLES={"Template","Container"}
 REQUIRED_COLUMNS={"export_run_id","unit_system","client_label","governance_role"}
-MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","export_run_ids","has_seed_file","seed_export_run_ids","population_hash","notes","segment_purpose","segment_label"]
+MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","discipline_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","export_run_ids","has_seed_file","seed_export_run_ids","population_hash","notes","segment_purpose","segment_label"]
 REGISTRY_FIELDNAMES=["segment_id","parent_segment_id","run_type","population_hash","output_folder","status","last_run_utc","notes","segment_purpose","segment_label"]
 DIMENSION_CONFIG = [
     {"field": "unit_system", "type": "root"},
     {"field": "governance_role", "type": "governance"},
     {"field": "client_label", "type": "cut"},
+    {"field": "discipline_label", "type": "cut"},
     # Future cut dimensions added here:
     # {"field": "region", "type": "cut"},
-    # {"field": "discipline", "type": "cut"},
     # {"field": "office_location", "type": "cut"},
     # {"field": "business_center", "type": "cut"},
 ]
@@ -39,7 +39,7 @@ def _atomic_write_csv(path: Path, fieldnames: Sequence[str], rows: Iterable[Dict
 def _population_hash(export_run_ids: List[str]) -> str:
     token="|".join(sorted(export_run_ids));return hashlib.sha1(token.encode()).hexdigest()
 
-_UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>\s]+')
+_UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]+')
 def _sanitize_folder(segment_id:str)->str:return _UNSAFE_FOLDER_CHARS.sub("_",segment_id).lower().strip("_")
 
 def _append_note(row,k,v=""):
@@ -64,8 +64,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
 
     def _subset_to_id(key: frozenset) -> str:
         kv = dict(key)
-        values = [kv[f] for f in cfg_fields if f in kv]
-        return "|".join(values)
+        return "|".join(kv[f] for f in cfg_fields if f in kv)
 
     for row in rows:
         export_run_id = (row.get("export_run_id") or "").strip()
@@ -131,6 +130,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             "unit_system": dim_map.get("unit_system", ""),
             "governance_role": dim_map.get(governance_field, ""),
             "client_label": dim_map.get(client_field, ""),
+            "discipline_label": dim_map.get("discipline_label", ""),
             "extra_dimensions": "|".join(extra),
             "ancestor_segment_ids": "|".join(ancestor_ids),
             "run_type": "",
@@ -182,7 +182,11 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
                 and not r["client_label"]
                 and fc >= min_files
             )
-            if not is_cross_org_template and not is_role_fixed_parent:
+            is_scoped_leaf = (
+                int(r["segment_level"]) >= 3
+                and r["governance_role"] != ""
+            )
+            if not is_cross_org_template and not is_role_fixed_parent and not is_scoped_leaf:
                 r["run_type"] = "registration"; continue
         if fc>=min_files: r["run_type"]="bundle"
         elif role in {"Template","Container","Generic"}: r["run_type"]="reference"
@@ -198,6 +202,9 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     for r in rows_out:
         pur="insufficient_population" if r["run_type"]=="skip" else ""
         lev,role,rt=int(r["segment_level"]),r["governance_role"],r["run_type"]
+        disc=r["discipline_label"]
+        is_disc_cut=bool(disc and not r["client_label"])
+        is_client_disc_cut=bool(disc and r["client_label"])
         if lev==1: pur="population_denominator"
         elif lev == 2 and r["client_label"] and not role:
             pur = "client_population"
@@ -207,13 +214,21 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         elif lev==2 and role=="Project": pur="cross_project_practice" if rt=="bundle" else "practiced_standards_corpus"
         elif lev==2 and role=="Container": pur="coordination_corpus"
         elif lev==2 and role=="Generic" and rt=="reference": pur="generic_reference_corpus"
+        elif lev==3 and is_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="discipline_templates"
+        elif lev==3 and is_disc_cut and role=="Project": pur="discipline_practice" if rt=="bundle" else "insufficient_population"
+        elif lev==3 and is_disc_cut and role=="Container": pur="discipline_coordination"
+        elif lev==3 and is_disc_cut and role=="Generic" and rt=="reference": pur="discipline_reference"
         elif lev==3 and role=="Template" and rt in {"bundle","reference"}: pur="client_standard_anchor"
         elif lev==3 and role=="Project": pur="client_practice" if rt=="bundle" else "insufficient_population"
         elif lev==3 and role=="Container": pur="client_coordination"
         elif lev==3 and role=="Generic" and rt=="reference": pur="client_reference"
+        elif lev==4 and is_client_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="client_discipline_standard_anchor"
+        elif lev==4 and is_client_disc_cut and role=="Project": pur="client_discipline_practice" if rt=="bundle" else "insufficient_population"
+        elif lev==4 and is_client_disc_cut and role=="Container": pur="client_discipline_coordination"
+        elif lev==4 and is_client_disc_cut and role=="Generic" and rt=="reference": pur="client_discipline_reference"
         r["segment_purpose"]=pur
         unit=r["unit_system"].title(); client=r["client_label"]; sid=r["segment_id"]
-        templates={"population_denominator":f"All {unit} files","cross_org_template_pool":f"{unit} templates — all organisations (registration only)","cross_template_agreement":f"{unit} templates — cross-template agreement","practiced_standards_corpus":f"{unit} projects — full corpus","cross_project_practice":f"{unit} projects — cross-project practice","coordination_corpus":f"{unit} coordination files","generic_reference_corpus":f"{unit} generic reference","client_population":f"{client} — all roles combined","client_standard_anchor":f"{client} templates — standards as authored","client_practice":f"{client} projects — standards as practiced","client_coordination":f"{client} coordination files","client_reference":f"{client} generic reference","insufficient_population":f"{sid} — below minimum file threshold"}
+        templates={"population_denominator":f"All {unit} files","cross_org_template_pool":f"{unit} templates — all organisations (registration only)","cross_template_agreement":f"{unit} templates — cross-template agreement","practiced_standards_corpus":f"{unit} projects — full corpus","cross_project_practice":f"{unit} projects — cross-project practice","coordination_corpus":f"{unit} coordination files","generic_reference_corpus":f"{unit} generic reference","client_population":f"{client} — all roles combined","client_standard_anchor":f"{client} templates — standards as authored","client_practice":f"{client} projects — standards as practiced","client_coordination":f"{client} coordination files","client_reference":f"{client} generic reference","insufficient_population":f"{sid} — below minimum file threshold","discipline_practice":f"{disc} projects — standards as practiced","discipline_templates":f"{disc} templates — standards as authored","discipline_coordination":f"{disc} coordination files","discipline_reference":f"{disc} generic reference","client_discipline_standard_anchor":f"{client} {disc} templates — standards as authored","client_discipline_practice":f"{client} {disc} projects — standards as practiced","client_discipline_coordination":f"{client} {disc} coordination files","client_discipline_reference":f"{client} {disc} generic reference"}
         if r["segment_purpose"]:
             r["segment_label"]=templates.get(r["segment_purpose"],sid)
         else:
@@ -223,6 +238,8 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         if r["run_type"] not in {"bundle", "registration", "reference"}: continue
         row_key = row_to_key[id(r)]
         direct_children = [key_to_row[k] for k in key_to_children.get(row_key, [])]
+        if len(direct_children) > 1:
+            continue
         matches = [c for c in direct_children if c["population_hash"] == r["population_hash"]]
         if len(direct_children) == 1 and len(matches) == 1:
             ch=matches[0]["segment_id"]; _append_note(r,"redundant_single_child",ch)
