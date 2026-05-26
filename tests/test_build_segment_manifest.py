@@ -17,12 +17,13 @@ from build_segment_manifest import _build_segments, _build_registry, _population
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _meta_row(export_run_id, unit_system, client_label, governance_role):
+def _meta_row(export_run_id, unit_system, client_label, governance_role, discipline_label=""):
     return {
         "export_run_id": export_run_id,
         "unit_system": unit_system,
         "client_label": client_label,
         "governance_role": governance_role,
+        "discipline_label": discipline_label,
     }
 
 
@@ -235,7 +236,7 @@ def test_main_writes_files(tmp_path):
     meta = tmp_path / "file_metadata.csv"
     fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
     with meta.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         w.writeheader()
         for row in ROWS:
             w.writerow(row)
@@ -433,3 +434,89 @@ def test_single_child_suppression_still_fires():
     parent = next(r for r in segs if r["segment_id"] == "imperial|Project")
     assert parent["run_type"] == "registration"
     assert "redundant_single_child" in (parent.get("notes") or "")
+
+
+# ---------------------------------------------------------------------------
+# Discipline-cut dimension tests
+# ---------------------------------------------------------------------------
+
+def _disc_rows():
+    """Multi-client, multi-discipline Container corpus for discipline tests."""
+    return (
+        [_meta_row(f"ka{i:02d}", "imperial", "Kaiser", "Container", "Architectural") for i in range(4)]
+        + [_meta_row(f"ke{i:02d}", "imperial", "Kaiser", "Container", "Electrical") for i in range(3)]
+        + [_meta_row(f"ra{i:02d}", "imperial", "Renown", "Container", "Architectural") for i in range(3)]
+        # rows with no discipline_label — must not generate discipline cuts
+        + [_meta_row(f"nx{i:02d}", "imperial", "Kaiser", "Project") for i in range(3)]
+    )
+
+
+def test_discipline_cut_level3_segment_generated():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg_ids = {r["segment_id"] for r in segs}
+    assert "imperial|Container|Architectural" in seg_ids
+    assert "imperial|Container|Electrical" in seg_ids
+
+
+def test_discipline_cut_level4_segment_generated():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg_ids = {r["segment_id"] for r in segs}
+    assert "imperial|Container|Kaiser|Architectural" in seg_ids
+    assert "imperial|Container|Kaiser|Electrical" in seg_ids
+
+
+def test_discipline_cut_extra_dimensions_populated():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
+    assert seg["extra_dimensions"] == "discipline_label=Architectural"
+    assert seg["client_label"] == ""
+
+
+def test_discipline_cut_level3_purpose():
+    # With two clients contributing, imperial|Container|Architectural should NOT be
+    # redundant_single_child — it has two distinct child populations (Kaiser + Renown).
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
+    assert seg["segment_purpose"] == "discipline_coordination"
+
+
+def test_discipline_cut_level3_label():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
+    assert seg["segment_label"] == "Architectural coordination files"
+
+
+def test_blank_discipline_does_not_generate_discipline_cut():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg_ids = {r["segment_id"] for r in segs}
+    # Rows with blank discipline contribute to governance and client cuts only
+    assert "imperial|Project" in seg_ids
+    # No discipline cut that includes blank discipline
+    disc_segs = [r for r in segs if "discipline_label=" in r.get("extra_dimensions", "")]
+    for s in disc_segs:
+        assert s["extra_dimensions"] != "discipline_label="
+
+
+def test_no_discipline_column_rows_not_broken():
+    # Rows lacking discipline_label entirely must not generate discipline cuts.
+    rows = [
+        {"export_run_id": f"r{i:02d}", "unit_system": "imperial",
+         "client_label": "Acme", "governance_role": "Container"}
+        for i in range(3)
+    ]
+    segs = _build_segments(rows, min_files=3)
+    disc_segs = [r for r in segs if "discipline_label=" in r.get("extra_dimensions", "")]
+    assert disc_segs == []
+
+
+def test_discipline_cut_not_required_column(tmp_path):
+    # A metadata file without discipline_label must succeed (not exit 1).
+    meta = tmp_path / "file_metadata.csv"
+    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for row in ROWS:
+            w.writerow({k: row.get(k, "") for k in fieldnames})
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "3"])
+    assert rc == 0
