@@ -686,7 +686,7 @@ def discover_sibling_segments(
         role = row.get("governance_role", "").strip().lower()
         us = row.get("unit_system", "").strip()
         rt = row.get("run_type", "").strip().lower()
-        if parent and role and us and rt == "bundle":
+        if parent and role and us and rt in ("bundle", "reference"):
             groups[(parent, role, us)].append(sid)
 
     pairs: List[ComparisonPair] = []
