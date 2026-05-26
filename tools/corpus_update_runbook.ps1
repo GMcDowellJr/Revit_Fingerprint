@@ -25,7 +25,7 @@ if ($Run -eq "") {
     Write-Host "Usage:"
     Write-Host "  .\corpus_update_runbook.ps1 -Run A    # flatten + apply + placeholders"
     Write-Host "  .\corpus_update_runbook.ps1 -Run B    # authority + patterns + synthesis + patch"
-    Write-Host "  .\corpus_update_runbook.ps1 -Run C    # segments + similarity"
+    Write-Host "  .\corpus_update_runbook.ps1 -Run C    # segments (use compare_cross_segment.py for cross-segment comparison)"
     Write-Host ""
     Write-Host "MANDATORY PAUSE between Run A and Run B:"
     Write-Host "  Edit $RECORDS\file_metadata.csv"
@@ -107,7 +107,7 @@ if ($Run -eq "B") {
 }
 
 if ($Run -eq "C") {
-    Write-Host "=== RUN C: Segments / Similarity ===" -ForegroundColor Green
+    Write-Host "=== RUN C: Segments ===" -ForegroundColor Green
 
     Write-Host "--- C1: segment manifest ---" -ForegroundColor Cyan
     python tools\build_segment_manifest.py `
@@ -131,14 +131,9 @@ if ($Run -eq "C") {
         --results-root $RESULTS `
         --segments-root $SEGMENTS
 
-    Write-Host "--- C4: similarity ---" -ForegroundColor Cyan
-    python tools/similarity_compare.py `
-        --records "$RECORDS\records.csv" `
-        --metadata "$RECORDS\file_metadata.csv" `
-        --output-dir "$RESULTS\similarity"
-
     Write-Host "=== RUN C COMPLETE ===" -ForegroundColor Green
     Write-Host "Refresh Power BI: open Fingerprint_Segmented_Bundles.pbix and hit Refresh" -ForegroundColor Green
+    Write-Host "Cross-segment comparison: run compare_cross_segment.py separately" -ForegroundColor Cyan
 }
 
 # NOTES

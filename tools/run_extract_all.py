@@ -717,10 +717,20 @@ def main() -> None:
              "Overrides the default {out-root}/results/records/ for authority/patterns stages. "
              "Use when running per-segment analysis where records live at corpus level."
     )
+    ap.add_argument(
+        "--label-synth-dir",
+        default=None,
+        help="Path to a label_synthesis/ directory to use as the read source for label "
+             "population, LLM cache, and curator annotations. Overrides the default "
+             "{out-root}/results/label_synthesis/ for the read path only — analysis outputs "
+             "still write to {out-root}/results/. Use when running per-segment analysis so "
+             "that corpus-level LLM improvements are picked up without rebuilding per segment."
+    )
     args = ap.parse_args()
 
     allow_sig_hash_join_key = args.allow_sig_hash_join_key
     require_join_policy = True
+    label_synth_dir = Path(args.label_synth_dir).resolve() if args.label_synth_dir else None
 
     selected_stages = _parse_stage_csv(args.stages) or ["flatten", "sig_hash", "discover"]
 
@@ -780,8 +790,8 @@ def main() -> None:
         print("[extract_all] Stage flatten (T0): emitting flatten outputs...", flush=True)
         _ensure_dir(v21_phase0_dir)
         report["commands"].append({"stage": "flatten", "out": str(v21_phase0_dir)})
-        meta_rows, record_rows = emit_records(exports_dir, v21_phase0_dir, file_id_mode="basename")
-        print(f"[extract_all] Stage flatten complete: rows={len(record_rows)} files={len(meta_rows)} out={v21_phase0_dir}", flush=True)
+        file_count, record_count = emit_records(exports_dir, v21_phase0_dir, file_id_mode="basename")
+        print(f"[extract_all] Stage flatten complete: rows={record_count} files={file_count} out={v21_phase0_dir}", flush=True)
         items_csv = v21_phase0_dir / "identity_items.csv"
         stats = _append_line_pattern_synthetic_norm_hash(items_csv)
         print(
@@ -953,6 +963,7 @@ def main() -> None:
                     full_seed_dir,
                     phase0_dir=v21_phase0_dir,
                     results_v21_dir=v21_root,
+                    label_synth_dir=label_synth_dir,
                 )
                 corpus_meta_rows = [r for r in meta_rows if str(r.get("export_run_id", "")).strip() != seed_export_run_id]
                 corpus_record_rows = [r for r in record_rows if str(r.get("export_run_id", "")).strip() != seed_export_run_id]
@@ -962,6 +973,7 @@ def main() -> None:
                     v21_analysis_dir,
                     phase0_dir=v21_phase0_dir,
                     results_v21_dir=v21_root,
+                    label_synth_dir=label_synth_dir,
                 )
 
                 corpus_domain_patterns = read_csv_rows(v21_analysis_dir / "domain_patterns.csv")
@@ -1019,6 +1031,7 @@ def main() -> None:
                     v21_analysis_dir,
                     phase0_dir=v21_phase0_dir,
                     results_v21_dir=v21_root,
+                    label_synth_dir=label_synth_dir,
                 )
                 domain_patterns = read_csv_rows(v21_analysis_dir / "domain_patterns.csv")
                 for row in domain_patterns:
@@ -1036,7 +1049,19 @@ def main() -> None:
     split_domains: List[str] = []
     if "split" in selected_stages:
         if args.split_domains is None or str(args.split_domains) == "__ALL__":
-            split_domains = sorted({str(r.get("domain", "")).strip() for r in (record_rows or []) if str(r.get("domain", "")).strip() and str(r.get("domain", "")).strip() not in SUPPRESSED_DOWNSTREAM_DOMAINS}, key=lambda s: s.lower())
+            # Always read from records.csv on disk — it reflects flatten remaps and
+            # suppression correctly and is present whether flatten ran now or previously.
+            # record_rows is empty since emit_records now returns counts only.
+            _phase0_records_csv = v21_phase0_dir / "records.csv"
+            if _phase0_records_csv.is_file():
+                split_domains = sorted(
+                    {
+                        str(r.get("domain", "")).strip()
+                        for r in _iter_csv_rows(_phase0_records_csv)
+                        if str(r.get("domain", "")).strip() and str(r.get("domain", "")).strip() not in SUPPRESSED_DOWNSTREAM_DOMAINS
+                    },
+                    key=lambda s: s.lower(),
+                )
             if not split_domains:
                 split_domains = [d for d in _discover_domains_from_exports(exports_dir) if d not in SUPPRESSED_DOWNSTREAM_DOMAINS]
         else:
