@@ -98,40 +98,40 @@ def test_level2_segments_present():
     segs = _build_segments(ROWS, min_files=3)
     l2 = [r for r in segs if r["segment_level"] == "2"]
     seg_ids = {r["segment_id"] for r in l2}
-    assert "imperial|client_label=Kaiser" in seg_ids
-    assert "imperial|client_label=Renown" in seg_ids
-    assert "metric|client_label=Global" in seg_ids
+    assert "imperial|Kaiser" in seg_ids
+    assert "imperial|Renown" in seg_ids
+    assert "metric|Global" in seg_ids
 
 
 def test_level2_run_type_below_min():
     segs = _build_segments(ROWS, min_files=3)
-    metric_global = next(r for r in segs if r["segment_id"] == "metric|client_label=Global")
+    metric_global = next(r for r in segs if r["segment_id"] == "metric|Global")
     assert metric_global["run_type"] == "registration"
 
 
 def test_level2_run_type_at_min():
     segs = _build_segments(ROWS, min_files=3)
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|client_label=Kaiser")
+    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
     assert kaiser["run_type"] == "registration"
 
 
 def test_seed_detection_level2():
     segs = _build_segments(ROWS, min_files=3)
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|client_label=Kaiser")
+    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
     assert kaiser["has_seed_file"] == "true"
     assert "r04" in kaiser["seed_export_run_ids"].split("|")
 
 
 def test_seed_detection_renown_no_seed():
     segs = _build_segments(ROWS, min_files=3)
-    renown = next(r for r in segs if r["segment_id"] == "imperial|client_label=Renown")
+    renown = next(r for r in segs if r["segment_id"] == "imperial|Renown")
     assert renown["has_seed_file"] == "false"
     assert renown["seed_export_run_ids"] == ""
 
 
 def test_seed_detection_container_role():
     segs = _build_segments(ROWS, min_files=3)
-    global_seg = next(r for r in segs if r["segment_id"] == "metric|client_label=Global")
+    global_seg = next(r for r in segs if r["segment_id"] == "metric|Global")
     assert global_seg["has_seed_file"] == "true"
     assert "r09" in global_seg["seed_export_run_ids"].split("|")
 
@@ -166,14 +166,14 @@ def test_sort_order_within_level_alphabetical():
 
 def test_export_run_ids_sorted_pipe_delimited():
     segs = _build_segments(ROWS, min_files=3)
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|client_label=Kaiser")
+    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
     ids = kaiser["export_run_ids"].split("|")
     assert ids == sorted(ids)
 
 
 def test_population_hash_in_manifest():
     segs = _build_segments(ROWS, min_files=3)
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|client_label=Kaiser")
+    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
     expected = _population_hash(kaiser["export_run_ids"].split("|"))
     assert kaiser["population_hash"] == expected
 
@@ -182,14 +182,14 @@ def test_registry_excludes_skip_segments():
     segs = _build_segments(ROWS, min_files=3)
     reg = _build_registry(segs)
     reg_ids = {r["segment_id"] for r in reg}
-    assert "metric|client_label=Global" not in reg_ids
+    assert "metric|Global" not in reg_ids
 
 
 def test_registry_output_folder_sanitized():
     segs = _build_segments(ROWS, min_files=3)
     reg = _build_registry(segs)
-    kaiser_reg = next(r for r in reg if r["segment_id"] == "imperial|Project|client_label=Kaiser")
-    assert kaiser_reg["output_folder"] == "imperial_project_client_label_kaiser"
+    kaiser_reg = next(r for r in reg if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser_reg["output_folder"] == "imperial_project_kaiser"
 
 
 def test_sanitize_folder_strips_path_separators():
@@ -254,11 +254,11 @@ def test_main_writes_files(tmp_path):
     seg_ids = {r["segment_id"] for r in manifest_rows}
     assert "imperial" in seg_ids
     assert "metric" in seg_ids
-    assert "imperial|client_label=Kaiser" in seg_ids
+    assert "imperial|Kaiser" in seg_ids
 
     reg_rows = _read_csv(registry_path)
     assert all(r["status"] == "pending" for r in reg_rows)
-    assert not any(r["segment_id"] == "metric|client_label=Global" for r in reg_rows)
+    assert not any(r["segment_id"] == "metric|Global" for r in reg_rows)
 
 
 def test_seed_only_note_not_set_for_generic_only_segment():
@@ -325,7 +325,7 @@ def test_blank_client_label_level2_id_distinct_from_level1():
     l1_ids = {r["segment_id"] for r in segs if r["segment_level"] == "1"}
     l2_ids = {r["segment_id"] for r in segs if r["segment_level"] == "2"}
     assert l1_ids.isdisjoint(l2_ids), f"Level-1 and level-2 IDs overlap: {l1_ids & l2_ids}"
-    assert "imperial|client_label=" in l2_ids
+    assert "imperial|" in l2_ids
 
 
 def test_main_missing_metadata_file(tmp_path):
@@ -423,7 +423,7 @@ def test_mixed_role_client_segment_stays_reference():
         _meta_row("s06", "imperial", "Sutter", "Template"),
     ]
     segs = _build_segments(rows, min_files=3, enable_parent_bundle_runs=True)
-    mixed = next(r for r in segs if r["segment_id"] == "imperial|client_label=Sutter")
+    mixed = next(r for r in segs if r["segment_id"] == "imperial|Sutter")
     assert mixed["governance_role"] == ""
     assert mixed["run_type"] == "registration"
 
@@ -454,20 +454,20 @@ def _disc_rows():
 def test_discipline_cut_level3_segment_generated():
     segs = _build_segments(_disc_rows(), min_files=3)
     seg_ids = {r["segment_id"] for r in segs}
-    assert "imperial|Container|discipline_label=Architectural" in seg_ids
-    assert "imperial|Container|discipline_label=Electrical" in seg_ids
+    assert "imperial|Container|Architectural" in seg_ids
+    assert "imperial|Container|Electrical" in seg_ids
 
 
 def test_discipline_cut_level4_segment_generated():
     segs = _build_segments(_disc_rows(), min_files=3)
     seg_ids = {r["segment_id"] for r in segs}
-    assert "imperial|Container|client_label=Kaiser|discipline_label=Architectural" in seg_ids
-    assert "imperial|Container|client_label=Kaiser|discipline_label=Electrical" in seg_ids
+    assert "imperial|Container|Kaiser|Architectural" in seg_ids
+    assert "imperial|Container|Kaiser|Electrical" in seg_ids
 
 
 def test_discipline_cut_extra_dimensions_populated():
     segs = _build_segments(_disc_rows(), min_files=3)
-    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|discipline_label=Architectural")
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
     assert seg["extra_dimensions"] == "discipline_label=Architectural"
     assert seg["client_label"] == ""
     assert seg["discipline_label"] == "Architectural"
@@ -479,13 +479,13 @@ def test_discipline_label_top_level_field_blank_for_non_discipline_segments():
     container = next(r for r in segs if r["segment_id"] == "imperial|Container")
     assert container["discipline_label"] == ""
     # A client-only cut also has no discipline.
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|client_label=Kaiser")
+    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
     assert kaiser["discipline_label"] == ""
 
 
 def test_discipline_label_top_level_field_populated_in_mixed_cut():
     segs = _build_segments(_disc_rows(), min_files=3)
-    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|client_label=Kaiser|discipline_label=Architectural")
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
     assert seg["discipline_label"] == "Architectural"
     assert seg["client_label"] == "Kaiser"
 
@@ -494,13 +494,13 @@ def test_discipline_cut_level3_purpose():
     # With two clients contributing, the discipline-only level-3 segment should NOT be
     # redundant_single_child — it has two distinct child populations (Kaiser + Renown).
     segs = _build_segments(_disc_rows(), min_files=3)
-    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|discipline_label=Architectural")
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
     assert seg["segment_purpose"] == "discipline_coordination"
 
 
 def test_discipline_cut_level3_label():
     segs = _build_segments(_disc_rows(), min_files=3)
-    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|discipline_label=Architectural")
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
     assert seg["segment_label"] == "Architectural coordination files"
 
 
@@ -538,3 +538,50 @@ def test_discipline_cut_not_required_column(tmp_path):
             w.writerow({k: row.get(k, "") for k in fieldnames})
     rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "3"])
     assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# Bug 2: level-3+ governance-role segments must not be demoted by "has children"
+# ---------------------------------------------------------------------------
+
+def test_discipline_cut_level3_bundle_not_demoted_by_children():
+    # imperial|Container|Architectural has two client children (Kaiser + Renown).
+    # The "has children → registration" logic must not fire for level-3 governance-role segments.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    arch = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
+    assert arch["run_type"] == "bundle", (
+        f"Expected bundle, got {arch['run_type']}; "
+        "level-3 scoped segments must not be demoted by child presence"
+    )
+
+
+def test_discipline_cut_level4_bundle_not_affected():
+    # Level-4 combined client+discipline segments have no children and must be bundle.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    assert seg["run_type"] == "bundle"
+
+
+# ---------------------------------------------------------------------------
+# Bug 3: redundant_single_child must not fire when a parent has multiple children
+# ---------------------------------------------------------------------------
+
+def test_multi_child_parent_not_demoted_redundant_single_child():
+    # imperial|Container|Kaiser has both Architectural and Electrical children.
+    # redundant_single_child must NOT fire.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    kaiser_container = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser")
+    assert "redundant_single_child" not in (kaiser_container.get("notes") or ""), (
+        "Multi-child parent must not be flagged redundant_single_child"
+    )
+    assert kaiser_container["run_type"] != "registration" or "redundant_single_child" not in (kaiser_container.get("notes") or "")
+
+
+def test_single_child_same_hash_still_demoted():
+    # imperial|Container|Electrical has only one child (Kaiser|Electrical) with the same population.
+    # redundant_single_child SHOULD fire here.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    elec = next(r for r in segs if r["segment_id"] == "imperial|Container|Electrical")
+    assert "redundant_single_child" in (elec.get("notes") or ""), (
+        "Single child with same population_hash must still trigger redundant_single_child"
+    )

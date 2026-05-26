@@ -64,15 +64,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
 
     def _subset_to_id(key: frozenset) -> str:
         kv = dict(key)
-        parts = []
-        for f in cfg_fields:
-            if f not in kv:
-                continue
-            if f == root_field or f == governance_field:
-                parts.append(kv[f])
-            else:
-                parts.append(f"{f}={kv[f]}")
-        return "|".join(parts)
+        return "|".join(kv[f] for f in cfg_fields if f in kv)
 
     for row in rows:
         export_run_id = (row.get("export_run_id") or "").strip()
@@ -190,7 +182,11 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
                 and not r["client_label"]
                 and fc >= min_files
             )
-            if not is_cross_org_template and not is_role_fixed_parent:
+            is_scoped_leaf = (
+                int(r["segment_level"]) >= 3
+                and r["governance_role"] != ""
+            )
+            if not is_cross_org_template and not is_role_fixed_parent and not is_scoped_leaf:
                 r["run_type"] = "registration"; continue
         if fc>=min_files: r["run_type"]="bundle"
         elif role in {"Template","Container","Generic"}: r["run_type"]="reference"
@@ -237,6 +233,8 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         if r["run_type"] not in {"bundle", "registration", "reference"}: continue
         row_key = row_to_key[id(r)]
         direct_children = [key_to_row[k] for k in key_to_children.get(row_key, [])]
+        if len(direct_children) > 1:
+            continue
         matches = [c for c in direct_children if c["population_hash"] == r["population_hash"]]
         if len(direct_children) == 1 and len(matches) == 1:
             ch=matches[0]["segment_id"]; _append_note(r,"redundant_single_child",ch)
