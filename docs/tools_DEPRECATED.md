@@ -23,6 +23,33 @@ A tool is marked **KEEP (Docs-only)** if it’s useful as an example but not as 
 
 ## DEPRECATED
 
+### tools/similarity_compare.py
+
+**Superseded by**: `tools/compare_cross_segment.py`
+
+**Deprecation date**: May 2026
+
+**Reason**: Three compounding issues made all historical output from this tool unreliable:
+
+1. **Wrong hash grain** — compared files using `sig_hash` (cosmetically sensitive) rather than `join_hash` (structurally canonical). Cosmetic drift across files caused scores to understate alignment even when governed configuration was consistent.
+
+2. **Multiset weighting was unsound** — weighted domain similarity by record count (`union_mass`), giving high-record-count domains like `object_styles` disproportionate influence over the aggregate score. Governed domains like `dimension_types` and `text_types` could be well-aligned while being swamped by subcategory noise.
+
+3. **`union_mass=1` bug** — when the `sig_hash → join_hash` migration broke the hash lookup, all records fell through to a domain-hash fallback path that hardcoded `union_mass=1`. Every historical similarity score is an artefact of unweighted set Jaccard on domain-level hashes, not the intended multiset Jaccard on record-level hashes. April 2026 baseline scores cannot be compared to any corrected scores.
+
+**Migration path**:
+
+| Use case | Replacement |
+|----------|-------------|
+| Governance chain comparisons (template→project, container→project) | `compare_cross_segment.py --governance-chain` |
+| Sibling comparisons (project vs project, template vs template) | `compare_cross_segment.py --sibling-segments` |
+| Within-project file consistency | `compare_cross_segment.py --within-project` |
+| Record-level detail (matched, added, removed counts per domain) | Not yet re-implemented; noted as future addition to `compare_cross_segment.py` |
+
+**Historical output**: Similarity CSVs produced before this deprecation should be discarded. Scores are not salvageable.
+
+---
+
 ### tools/phase1_semantic_sig_dimension_types.py
 **Why deprecated**
 - Broad JSON discovery patterns (often `**/*.json` style) are incompatible with split exports.
