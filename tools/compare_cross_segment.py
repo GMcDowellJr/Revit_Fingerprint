@@ -1,16 +1,58 @@
 """Cross-segment comparison tool.
 
-Discovers comparison pairs from the segment manifest hierarchy and computes
-join_hash overlap metrics using bundle or file membership data.
+Compares pattern vocabularies across segments using join_hash as the
+cross-segment identity unit.
+
+Single measurement path
+-----------------------
+All comparisons load per-file join_hash inventories from membership_matrix.csv
+and resolve join_hash via domain_patterns.csv (source_cluster_id.split('|')[-1]).
+There is no bundle-mode / file-mode branch. All set operations (Jaccard,
+containment) operate on the full join_hash inventories from membership_matrix.csv.
+
+Bundle membership as post-hoc annotation
+-----------------------------------------
+After computing scores, bundle membership is looked up from
+bundle_analysis/<domain>/bundle_membership.csv for each segment and annotated
+onto n_shared using three buckets:
+
+  n_shared_bundle_both   — join_hashes in shared that are bundle members in BOTH
+                           segments (core overlap, strongest signal)
+  n_shared_bundle_a_only — bundle member in A, not B (A has institutionalised the
+                           pattern; the "emerging standard" signal)
+  n_shared_bundle_b_only — bundle member in B, not A (same signal, other direction)
+
+The remainder of n_shared are shared but unstructured (weakest signal). Segments
+without bundle_membership.csv (reference or small segments) contribute an empty
+set — annotation counts are always emitted, with zeros when data is absent.
+
+N-1 pooled comparison (cross_segment_pooled.csv)
+-------------------------------------------------
+Each segment is compared against the union of all sibling segments sharing the
+same (parent_segment_id, governance_role, unit_system). This is the primary
+signal for small segments where pairwise Jaccard is dominated by size asymmetry.
+Containment in both directions is reported; no Jaccard is computed on this file.
+
+data_sufficient flag
+--------------------
+Scores are always computed and emitted. data_sufficient = "true" only when both
+sides have n_files >= 5. The flag signals interpretability, not validity.
+
+Reference segment participation
+--------------------------------
+Reference segments participate in template_to_project, template_to_container, and
+container_to_project comparisons using their file inventories from
+membership_matrix.csv. They will have has_bundles = "false" and
+data_sufficient = "false" for most domains — this is expected and correct.
 
 Usage:
-    python tools/compare_cross_segment.py \
-        --segments-root segments/ \
-        --records-dir   results/records/ \
-        --out-dir       results/cross_segment/ \
-        [--within-segment] [--sibling-segments] [--parent-siblings] \
-        [--within-project] [--governance-chain] \
-        [--domain DOMAIN] [--segment-a ID] [--segment-b ID] \
+    python tools/compare_cross_segment.py \\
+        --segments-root segments/ \\
+        --records-dir   results/records/ \\
+        --out-dir       results/cross_segment/ \\
+        [--within-segment] [--sibling-segments] [--parent-siblings] \\
+        [--within-project] [--governance-chain] \\
+        [--domain DOMAIN] [--segment-a ID] [--segment-b ID] \\
         [--min-patterns INT] [--dry-run] [--no-delta]
 """
 from __future__ import annotations
@@ -69,14 +111,17 @@ SUMMARY_FIELDS: List[str] = [
     "client_label_a", "client_label_b",
     "discipline_label_a", "discipline_label_b",
     "unit_system",
-    "comparison_type", "comparison_mode",
+    "comparison_type",
     "domain",
     "n_patterns_a", "n_patterns_b", "n_shared_join_hash",
+    "n_unique_patterns_a", "n_unique_patterns_b",
     "containment_a_in_b_mean", "containment_a_in_b_min",
     "containment_b_in_a_mean", "containment_b_in_a_min",
     "jaccard_mean", "jaccard_p10", "jaccard_p90",
-    "n_bundles_a", "n_bundles_b",
+    "has_bundles_a", "has_bundles_b",
+    "n_shared_bundle_both", "n_shared_bundle_a_only", "n_shared_bundle_b_only",
     "n_files_a", "n_files_b", "n_pairs",
+    "data_sufficient",
     "executed_utc",
 ]
 
@@ -88,6 +133,7 @@ PAIRS_FIELDS: List[str] = [
     "project_label_a", "project_label_b",
     "n_patterns_a", "n_patterns_b", "n_shared",
     "jaccard", "containment_a_in_b", "containment_b_in_a",
+    "n_shared_bundle_both", "n_shared_bundle_a_only", "n_shared_bundle_b_only",
 ]
 
 DELTA_FIELDS: List[str] = [
@@ -104,8 +150,22 @@ DELTA_FIELDS: List[str] = [
     "executed_utc",
 ]
 
+POOLED_FIELDS: List[str] = [
+    "comparison_run_id",
+    "segment_id", "segment_label",
+    "governance_role", "client_label",
+    "unit_system",
+    "domain",
+    "n_files_focal", "n_files_pool",
+    "n_unique_patterns_focal", "n_unique_patterns_pool", "n_shared_join_hash",
+    "containment_focal_in_pool", "containment_pool_in_focal",
+    "has_bundles_focal", "has_bundles_pool",
+    "n_shared_bundle_both", "n_shared_bundle_focal_only", "n_shared_bundle_pool_only",
+    "data_sufficient",
+    "executed_utc",
+]
+
 # Comparison types for which delta rows are emitted (directed, reference side defined).
-# Excludes parent_sibling_roles and governance_chain per spec.
 DELTA_DIRECTED_TYPES = {
     "template_to_project",
     "template_to_container",
@@ -194,7 +254,10 @@ _jh_cache: Dict[Tuple[str, str], Dict[str, str]] = {}
 _pattern_label_cache: Dict[Tuple[str, str], Dict[str, str]] = {}
 
 # Cache: (governance_role, domain, unit_system) -> Set[join_hash]
-_role_jh_cache: Dict[Tuple[str, str, str], Set[str]] = {}
+_role_jh_cache: Dict[Tuple[str, str, str, str], Set[str]] = {}
+
+# Cache: (segment_id, domain) -> Set[join_hash]  (bundle members only)
+_bundle_jh_cache: Dict[Tuple[str, str], Set[str]] = {}
 
 
 def resolve_join_hashes(
@@ -339,7 +402,7 @@ def load_file_join_hashes(
     segment_id: str,
     domain: str,
 ) -> Dict[str, Set[str]]:
-    """Return {export_run_id: set_of_join_hashes}."""
+    """Return {export_run_id: set_of_join_hashes} from membership_matrix.csv."""
     seg_out = segment_output_dir(segments_root, registry, segment_id)
     if seg_out is None:
         return {}
@@ -361,32 +424,60 @@ def load_file_join_hashes(
     return dict(result)
 
 
-def load_bundle_join_hashes(
+def load_bundle_join_hash_set(
     segments_root: Path,
     registry: Dict[str, Dict[str, str]],
     segment_id: str,
     domain: str,
-) -> Dict[str, Set[str]]:
-    """Return {bundle_id: set_of_join_hashes}. Empty dict if step6 not run."""
+) -> Set[str]:
+    """Return join_hashes that are bundle members for segment/domain.
+
+    Empty set if bundle_membership.csv absent (reference or small segments).
+    Path: {segment_output_folder}/results/bundle_analysis/{domain}/bundle_membership.csv
+    Resolves pattern_id → join_hash via domain_patterns.csv.
+    """
+    key = (segment_id, domain)
+    if key in _bundle_jh_cache:
+        return _bundle_jh_cache[key]
+
     seg_out = segment_output_dir(segments_root, registry, segment_id)
     if seg_out is None:
-        return {}
+        _bundle_jh_cache[key] = set()
+        return set()
 
     bm_path = bundle_analysis_dir(seg_out, domain) / "bundle_membership.csv"
     if not bm_path.exists():
-        return {}
+        _bundle_jh_cache[key] = set()
+        return set()
 
     jh_map = resolve_join_hashes(segments_root, registry, segment_id, domain)
-    result: Dict[str, Set[str]] = defaultdict(set)
+    result: Set[str] = set()
     for row in read_csv_rows(bm_path):
-        bid = row.get("bundle_id", "").strip()
         pid = row.get("pattern_id", "").strip()
-        if not bid or not pid:
+        if not pid:
             continue
         jh = jh_map.get(pid)
         if jh:
-            result[bid].add(jh)
-    return dict(result)
+            result.add(jh)
+
+    _bundle_jh_cache[key] = result
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Bundle annotation
+# ---------------------------------------------------------------------------
+
+def annotate_bundle_overlap(
+    shared_jhs: Set[str],
+    bundle_jhs_a: Set[str],
+    bundle_jhs_b: Set[str],
+) -> Tuple[int, int, int]:
+    """Return (n_both, n_a_only, n_b_only) for shared join_hashes."""
+    n_both = len(shared_jhs & bundle_jhs_a & bundle_jhs_b)
+    n_a_only = len(shared_jhs & bundle_jhs_a - bundle_jhs_b)
+    n_b_only = len(shared_jhs & bundle_jhs_b - bundle_jhs_a)
+    return n_both, n_a_only, n_b_only
 
 
 # ---------------------------------------------------------------------------
@@ -419,47 +510,6 @@ def _min(xs: List[float]) -> str:
 # ---------------------------------------------------------------------------
 # Comparison engine — directed (containment)
 # ---------------------------------------------------------------------------
-
-def compare_directed_bundle(
-    ref_bundles: Dict[str, Set[str]],
-    tgt_bundles: Dict[str, Set[str]],
-) -> Dict[str, str]:
-    """Reference side: union; target side: per-bundle containment."""
-    ref_union: Set[str] = set()
-    for jhs in ref_bundles.values():
-        ref_union |= jhs
-
-    if not ref_union:
-        return {}
-
-    containment_rates: List[float] = []
-    top_ref_cov: List[float] = []
-
-    for jhs in tgt_bundles.values():
-        shared = len(jhs & ref_union)
-        containment_rates.append(shared / len(ref_union))
-        top_ref_cov.append(shared / len(jhs) if jhs else 0.0)
-
-    shared_all: Set[str] = set()
-    for jhs in tgt_bundles.values():
-        shared_all |= jhs & ref_union
-
-    all_a: Set[str] = ref_union
-    all_b: Set[str] = set()
-    for jhs in tgt_bundles.values():
-        all_b |= jhs
-
-    return {
-        "n_shared_join_hash": str(len(all_a & all_b)),
-        "containment_a_in_b_mean": _mean(top_ref_cov),
-        "containment_a_in_b_min": _min(top_ref_cov),
-        "containment_b_in_a_mean": _mean(containment_rates),
-        "containment_b_in_a_min": _min(containment_rates),
-        "n_bundles_a": str(len(ref_bundles)),
-        "n_bundles_b": str(len(tgt_bundles)),
-        "n_pairs": str(len(tgt_bundles)),
-    }
-
 
 def compare_directed_file(
     ref_files: Dict[str, Set[str]],
@@ -497,43 +547,22 @@ def compare_directed_file(
 
 
 # ---------------------------------------------------------------------------
-# Comparison engine — symmetric (Jaccard)
+# Comparison engine — symmetric (Jaccard + containment)
 # ---------------------------------------------------------------------------
-
-def compare_symmetric_bundle(
-    bundles_a: Dict[str, Set[str]],
-    bundles_b: Dict[str, Set[str]],
-) -> Dict[str, str]:
-    jaccards: List[float] = []
-    for jhs_a in bundles_a.values():
-        for jhs_b in bundles_b.values():
-            union = jhs_a | jhs_b
-            jaccards.append(len(jhs_a & jhs_b) / len(union) if union else 0.0)
-
-    all_a: Set[str] = set()
-    for jhs in bundles_a.values():
-        all_a |= jhs
-    all_b: Set[str] = set()
-    for jhs in bundles_b.values():
-        all_b |= jhs
-
-    return {
-        "n_shared_join_hash": str(len(all_a & all_b)),
-        "jaccard_mean": _mean(jaccards),
-        "jaccard_p10": _fmt(_pct(jaccards, 10)) if jaccards else "",
-        "jaccard_p90": _fmt(_pct(jaccards, 90)) if jaccards else "",
-        "n_bundles_a": str(len(bundles_a)),
-        "n_bundles_b": str(len(bundles_b)),
-        "n_pairs": str(len(jaccards)),
-    }
-
 
 def compare_symmetric_file(
     files_a: Dict[str, Set[str]],
     files_b: Dict[str, Set[str]],
 ) -> Tuple[Dict[str, str], List[Dict[str, str]]]:
-    """Return (summary_metrics, pairwise_rows)."""
+    """Return (summary_metrics, pairwise_rows).
+
+    Containment is computed per file pair in both directions and aggregated to
+    mean/min for the summary — these columns are always populated regardless of
+    comparison type.
+    """
     jaccards: List[float] = []
+    c_ab_list: List[float] = []
+    c_ba_list: List[float] = []
     pair_rows: List[Dict[str, str]] = []
 
     for eid_a, jhs_a in files_a.items():
@@ -543,6 +572,8 @@ def compare_symmetric_file(
             c_ab = len(jhs_a & jhs_b) / len(jhs_a) if jhs_a else 0.0
             c_ba = len(jhs_a & jhs_b) / len(jhs_b) if jhs_b else 0.0
             jaccards.append(j)
+            c_ab_list.append(c_ab)
+            c_ba_list.append(c_ba)
             pair_rows.append({
                 "export_run_id_a": eid_a,
                 "export_run_id_b": eid_b,
@@ -563,6 +594,10 @@ def compare_symmetric_file(
 
     summary = {
         "n_shared_join_hash": str(len(all_a & all_b)),
+        "containment_a_in_b_mean": _mean(c_ab_list),
+        "containment_a_in_b_min": _min(c_ab_list),
+        "containment_b_in_a_mean": _mean(c_ba_list),
+        "containment_b_in_a_min": _min(c_ba_list),
         "jaccard_mean": _mean(jaccards),
         "jaccard_p10": _fmt(_pct(jaccards, 10)) if jaccards else "",
         "jaccard_p90": _fmt(_pct(jaccards, 90)) if jaccards else "",
@@ -703,7 +738,8 @@ def discover_governance_chain(
     manifest: Dict[str, Dict[str, str]],
 ) -> List[ComparisonPair]:
     # Directed pairs: Template→Project, Template→Container, Container→Project
-    # Scoped by client_label (and discipline_label when populated)
+    # Scoped by client_label (and discipline_label when populated).
+    # Reference segments are included — they participate using their file inventories.
     def _key(row: Dict[str, str]) -> Tuple[str, str]:
         return (
             row.get("client_label", "").strip(),
@@ -794,7 +830,7 @@ def discover_within_project(
 def deduplicate_pairs(pairs: List[ComparisonPair]) -> List[ComparisonPair]:
     # Dedup on the full (seg_a, seg_b, comparison_type) triple. Different comparison
     # types for the same segment pair represent distinct analytical questions and must
-    # all be preserved — only exact triple duplicates (same type from two modes) are dropped.
+    # all be preserved — only exact triple duplicates are dropped.
     seen: Set[ComparisonPair] = set()
     result: List[ComparisonPair] = []
     for triple in pairs:
@@ -830,27 +866,13 @@ def run_pair(
     min_patterns: int,
     executed_utc: str,
 ) -> Tuple[Optional[Dict[str, str]], List[Dict[str, str]]]:
-    """Return (summary_row_or_None, pair_detail_rows)."""
+    """Return (summary_row_or_None, pair_detail_rows).
+
+    All comparisons use file-level join_hash inventories from membership_matrix.csv.
+    Bundle membership is added as post-hoc annotation after scores are computed.
+    """
     is_directed = comparison_type in DIRECTED_TYPES
     is_within_project = comparison_type == "within_project"
-
-    # Determine mode
-    if not is_within_project:
-        bnd_a = load_bundle_join_hashes(segments_root, registry, seg_a, domain)
-        bnd_b = load_bundle_join_hashes(segments_root, registry, seg_b, domain)
-        use_bundle = bool(bnd_a) and bool(bnd_b)
-    else:
-        bnd_a = bnd_b = {}
-        use_bundle = False
-
-    mode = "bundle" if use_bundle else "file"
-
-    # Load file-level data
-    if not use_bundle:
-        files_a = load_file_join_hashes(segments_root, registry, seg_a, domain)
-        files_b = load_file_join_hashes(segments_root, registry, seg_b, domain)
-    else:
-        files_a = files_b = {}
 
     # For within_project: group by project_label within the single segment, then
     # aggregate all intra-project pairs into ONE summary row for (segment, domain).
@@ -862,7 +884,6 @@ def run_pair(
             proj = meta.get("project_label", "").strip() or eid
             by_proj[proj][eid] = jhs
 
-        # Collect every intra-project file pair across all project groups
         PairRecord = Tuple[str, str, str, int, int, int, float, float, float]
         raw_pairs: List[PairRecord] = []  # (eid_a, eid_b, proj, na, nb, ns, j, c_ab, c_ba)
         participating_eids: Set[str] = set()
@@ -872,8 +893,8 @@ def run_pair(
                 continue
             eids_sorted = sorted(proj_files.keys())
             for i in range(len(eids_sorted)):
-                for j in range(i + 1, len(eids_sorted)):
-                    eid_a2, eid_b2 = eids_sorted[i], eids_sorted[j]
+                for jj in range(i + 1, len(eids_sorted)):
+                    eid_a2, eid_b2 = eids_sorted[i], eids_sorted[jj]
                     jhs_a2 = proj_files[eid_a2]
                     jhs_b2 = proj_files[eid_b2]
                     union = jhs_a2 | jhs_b2
@@ -891,7 +912,6 @@ def run_pair(
         if not raw_pairs:
             return None, []
 
-        # Aggregate Jaccard across all pairs
         jaccards = [p[6] for p in raw_pairs]
         total_jhs: Set[str] = set()
         for eid in participating_eids:
@@ -900,13 +920,20 @@ def run_pair(
         if len(total_jhs) < min_patterns:
             return None, []
 
-        # n_shared: join_hashes that appear in more than one participating file
         from collections import Counter as _Counter
         jhs_file_count: Dict[str, int] = _Counter(
             jh for eid in participating_eids for jh in all_files.get(eid, set())
         )
         n_shared_jh = sum(1 for v in jhs_file_count.values() if v > 1)
         n_files = len(participating_eids)
+
+        # Bundle annotation on the shared set
+        # For within_project, shared is defined as appearing in >1 participating file
+        shared_jhs_wp: Set[str] = {jh for jh, cnt in jhs_file_count.items() if cnt > 1}
+        bnd_a_wp = load_bundle_join_hash_set(segments_root, registry, seg_a, domain)
+        n_both_wp, n_aonly_wp, n_bonly_wp = annotate_bundle_overlap(
+            shared_jhs_wp, bnd_a_wp, bnd_a_wp
+        )
 
         metrics: Dict[str, str] = {
             "n_shared_join_hash": str(n_shared_jh),
@@ -919,51 +946,73 @@ def run_pair(
         }
 
         crid = make_comparison_run_id(seg_a, seg_b, executed_utc)
+        has_bundles = "true" if bnd_a_wp else "false"
+        n_unique_wp = len(total_jhs)
+        n_files_a_int = n_files
+        n_files_b_int = n_files
+        data_suff = "true" if (n_files_a_int >= 5 and n_files_b_int >= 5) else "false"
+
         summary_row = _build_summary_row(
-            crid, seg_a, seg_b, comparison_type, mode, domain,
-            manifest, file_metadata, metrics,
-            n_patterns_a=len(total_jhs),
-            n_patterns_b=len(total_jhs),
+            crid, seg_a, seg_b, comparison_type, domain,
+            manifest, metrics,
+            n_patterns_a=n_unique_wp,
+            n_patterns_b=n_unique_wp,
+            n_unique_patterns_a=n_unique_wp,
+            n_unique_patterns_b=n_unique_wp,
+            has_bundles_a=has_bundles,
+            has_bundles_b=has_bundles,
+            n_shared_bundle_both=n_both_wp,
+            n_shared_bundle_a_only=n_aonly_wp,
+            n_shared_bundle_b_only=n_bonly_wp,
+            data_sufficient=data_suff,
             executed_utc=executed_utc,
         )
 
-        # Detail rows only when pair count is small enough
+        # Emit ALL pair rows (no suppression threshold)
+        c_ab_list_wp = [p[7] for p in raw_pairs]
+        c_ba_list_wp = [p[8] for p in raw_pairs]
         detail_rows: List[Dict[str, str]] = []
-        if len(raw_pairs) <= 50:
-            for eid_a2, eid_b2, proj, na, nb, ns, j_val, c_ab, c_ba in raw_pairs:
-                detail_rows.append({
-                    "comparison_run_id": crid,
-                    "segment_id_a": seg_a,
-                    "segment_id_b": seg_b,
-                    "domain": domain,
-                    "export_run_id_a": eid_a2,
-                    "export_run_id_b": eid_b2,
-                    "project_label_a": proj,
-                    "project_label_b": proj,
-                    "n_patterns_a": str(na),
-                    "n_patterns_b": str(nb),
-                    "n_shared": str(ns),
-                    "jaccard": _fmt(j_val),
-                    "containment_a_in_b": _fmt(c_ab),
-                    "containment_b_in_a": _fmt(c_ba),
-                })
+        for eid_a2, eid_b2, proj, na, nb, ns, j_val, c_ab, c_ba in raw_pairs:
+            shared_pair: Set[str] = all_files.get(eid_a2, set()) & all_files.get(eid_b2, set())
+            pb, pao, pbo = annotate_bundle_overlap(shared_pair, bnd_a_wp, bnd_a_wp)
+            detail_rows.append({
+                "comparison_run_id": crid,
+                "segment_id_a": seg_a,
+                "segment_id_b": seg_b,
+                "domain": domain,
+                "export_run_id_a": eid_a2,
+                "export_run_id_b": eid_b2,
+                "project_label_a": proj,
+                "project_label_b": proj,
+                "n_patterns_a": str(na),
+                "n_patterns_b": str(nb),
+                "n_shared": str(ns),
+                "jaccard": _fmt(j_val),
+                "containment_a_in_b": _fmt(c_ab),
+                "containment_b_in_a": _fmt(c_ba),
+                "n_shared_bundle_both": str(pb),
+                "n_shared_bundle_a_only": str(pao),
+                "n_shared_bundle_b_only": str(pbo),
+            })
+
+        # Patch containment into summary metrics (mean/min over all pairs)
+        summary_row["containment_a_in_b_mean"] = _mean(c_ab_list_wp)
+        summary_row["containment_a_in_b_min"] = _min(c_ab_list_wp)
+        summary_row["containment_b_in_a_mean"] = _mean(c_ba_list_wp)
+        summary_row["containment_b_in_a_min"] = _min(c_ba_list_wp)
 
         return summary_row, detail_rows
 
-    # Normal path
-    all_jhs_a: Set[str] = set()
-    all_jhs_b: Set[str] = set()
+    # Normal path — always file-based
+    files_a = load_file_join_hashes(segments_root, registry, seg_a, domain)
+    files_b = load_file_join_hashes(segments_root, registry, seg_b, domain)
 
-    if use_bundle:
-        for jhs in bnd_a.values():
-            all_jhs_a |= jhs
-        for jhs in bnd_b.values():
-            all_jhs_b |= jhs
-    else:
-        for jhs in files_a.values():
-            all_jhs_a |= jhs
-        for jhs in files_b.values():
-            all_jhs_b |= jhs
+    all_jhs_a: Set[str] = set()
+    for jhs in files_a.values():
+        all_jhs_a |= jhs
+    all_jhs_b: Set[str] = set()
+    for jhs in files_b.values():
+        all_jhs_b |= jhs
 
     n_a = len(all_jhs_a)
     n_b = len(all_jhs_b)
@@ -974,40 +1023,62 @@ def run_pair(
     # Compute metrics
     pair_rows: List[Dict[str, str]] = []
 
-    if use_bundle:
-        if is_directed:
-            metrics = compare_directed_bundle(bnd_a, bnd_b)
-        else:
-            metrics = compare_symmetric_bundle(bnd_a, bnd_b)
+    if is_directed:
+        metrics = compare_directed_file(files_a, files_b)
     else:
-        if is_directed:
-            metrics = compare_directed_file(files_a, files_b)
-        else:
-            metrics, pair_rows_raw = compare_symmetric_file(files_a, files_b)
-            n_pairs_val = int(metrics.get("n_pairs", "0"))
-            if n_pairs_val <= 50:
-                crid = make_comparison_run_id(seg_a, seg_b, executed_utc)
-                for r in pair_rows_raw:
-                    r.update({
-                        "comparison_run_id": crid,
-                        "segment_id_a": seg_a,
-                        "segment_id_b": seg_b,
-                        "domain": domain,
-                        "project_label_a": file_metadata.get(r.get("export_run_id_a", ""), {}).get("project_label", ""),
-                        "project_label_b": file_metadata.get(r.get("export_run_id_b", ""), {}).get("project_label", ""),
-                    })
-                pair_rows = pair_rows_raw
+        metrics, pair_rows_raw = compare_symmetric_file(files_a, files_b)
+        # Emit ALL pair rows — no suppression threshold
+        crid_pre = make_comparison_run_id(seg_a, seg_b, executed_utc)
+        bnd_a_pre = load_bundle_join_hash_set(segments_root, registry, seg_a, domain)
+        bnd_b_pre = load_bundle_join_hash_set(segments_root, registry, seg_b, domain)
+        for r in pair_rows_raw:
+            eid_a2 = r.get("export_run_id_a", "")
+            eid_b2 = r.get("export_run_id_b", "")
+            shared_pair = files_a.get(eid_a2, set()) & files_b.get(eid_b2, set())
+            pb, pao, pbo = annotate_bundle_overlap(shared_pair, bnd_a_pre, bnd_b_pre)
+            r.update({
+                "comparison_run_id": crid_pre,
+                "segment_id_a": seg_a,
+                "segment_id_b": seg_b,
+                "domain": domain,
+                "project_label_a": file_metadata.get(eid_a2, {}).get("project_label", ""),
+                "project_label_b": file_metadata.get(eid_b2, {}).get("project_label", ""),
+                "n_shared_bundle_both": str(pb),
+                "n_shared_bundle_a_only": str(pao),
+                "n_shared_bundle_b_only": str(pbo),
+            })
+        pair_rows = pair_rows_raw
 
     if not metrics:
         return None, []
 
+    # Post-hoc bundle annotation on the population-grain shared set
+    shared_jhs_norm = all_jhs_a & all_jhs_b
+    bnd_a = load_bundle_join_hash_set(segments_root, registry, seg_a, domain)
+    bnd_b = load_bundle_join_hash_set(segments_root, registry, seg_b, domain)
+    n_both, n_aonly, n_bonly = annotate_bundle_overlap(shared_jhs_norm, bnd_a, bnd_b)
+
+    has_bundles_a = "true" if bnd_a else "false"
+    has_bundles_b = "true" if bnd_b else "false"
+
+    n_files_a_int = len(files_a)
+    n_files_b_int = len(files_b)
+    data_suff = "true" if (n_files_a_int >= 5 and n_files_b_int >= 5) else "false"
+
     crid = make_comparison_run_id(seg_a, seg_b, executed_utc)
     summary = _build_summary_row(
-        crid, seg_a, seg_b, comparison_type, mode, domain,
-        manifest, file_metadata,
-        metrics,
+        crid, seg_a, seg_b, comparison_type, domain,
+        manifest, metrics,
         n_patterns_a=n_a,
         n_patterns_b=n_b,
+        n_unique_patterns_a=n_a,
+        n_unique_patterns_b=n_b,
+        has_bundles_a=has_bundles_a,
+        has_bundles_b=has_bundles_b,
+        n_shared_bundle_both=n_both,
+        n_shared_bundle_a_only=n_aonly,
+        n_shared_bundle_b_only=n_bonly,
+        data_sufficient=data_suff,
         executed_utc=executed_utc,
     )
     for r in pair_rows:
@@ -1020,13 +1091,19 @@ def _build_summary_row(
     seg_a: str,
     seg_b: str,
     comparison_type: str,
-    mode: str,
     domain: str,
     manifest: Dict[str, Dict[str, str]],
-    file_metadata: Dict[str, Dict[str, str]],
     metrics: Dict[str, str],
     n_patterns_a: int,
     n_patterns_b: int,
+    n_unique_patterns_a: int,
+    n_unique_patterns_b: int,
+    has_bundles_a: str,
+    has_bundles_b: str,
+    n_shared_bundle_both: int,
+    n_shared_bundle_a_only: int,
+    n_shared_bundle_b_only: int,
+    data_sufficient: str,
     executed_utc: str,
 ) -> Dict[str, str]:
     ma = manifest.get(seg_a, {})
@@ -1045,11 +1122,12 @@ def _build_summary_row(
         "discipline_label_b": mb.get("discipline_label", ""),
         "unit_system": ma.get("unit_system", ""),
         "comparison_type": comparison_type,
-        "comparison_mode": mode,
         "domain": domain,
         "n_patterns_a": str(n_patterns_a),
         "n_patterns_b": str(n_patterns_b),
         "n_shared_join_hash": metrics.get("n_shared_join_hash", ""),
+        "n_unique_patterns_a": str(n_unique_patterns_a),
+        "n_unique_patterns_b": str(n_unique_patterns_b),
         "containment_a_in_b_mean": metrics.get("containment_a_in_b_mean", ""),
         "containment_a_in_b_min": metrics.get("containment_a_in_b_min", ""),
         "containment_b_in_a_mean": metrics.get("containment_b_in_a_mean", ""),
@@ -1057,13 +1135,144 @@ def _build_summary_row(
         "jaccard_mean": metrics.get("jaccard_mean", ""),
         "jaccard_p10": metrics.get("jaccard_p10", ""),
         "jaccard_p90": metrics.get("jaccard_p90", ""),
-        "n_bundles_a": metrics.get("n_bundles_a", ""),
-        "n_bundles_b": metrics.get("n_bundles_b", ""),
+        "has_bundles_a": has_bundles_a,
+        "has_bundles_b": has_bundles_b,
+        "n_shared_bundle_both": str(n_shared_bundle_both),
+        "n_shared_bundle_a_only": str(n_shared_bundle_a_only),
+        "n_shared_bundle_b_only": str(n_shared_bundle_b_only),
         "n_files_a": metrics.get("n_files_a", ""),
         "n_files_b": metrics.get("n_files_b", ""),
         "n_pairs": metrics.get("n_pairs", ""),
+        "data_sufficient": data_sufficient,
         "executed_utc": executed_utc,
     }
+
+
+# ---------------------------------------------------------------------------
+# Pooled comparison
+# ---------------------------------------------------------------------------
+
+def run_pooled_comparison(
+    manifest: Dict[str, Dict[str, str]],
+    registry: Dict[str, Dict[str, str]],
+    segments_root: Path,
+    min_patterns: int,
+    executed_utc: str,
+    domain_filter: Optional[str] = None,
+) -> List[Dict[str, str]]:
+    """N-1 pooled comparison: each segment vs its sibling pool.
+
+    Pool = all files from sibling segments sharing the same
+    (parent_segment_id, governance_role, unit_system), excluding the focal segment.
+    Emits one row per (segment_id, domain).
+    """
+    # Group segments by (parent, role, unit_system)
+    groups: Dict[Tuple[str, str, str], List[str]] = defaultdict(list)
+    for sid, row in manifest.items():
+        parent = row.get("parent_segment_id", "").strip()
+        role = row.get("governance_role", "").strip().lower()
+        us = row.get("unit_system", "").strip()
+        rt = registry.get(sid, {}).get("run_type", "").strip().lower()
+        if rt in ("skip", "registration"):
+            continue
+        if parent and role and us:
+            groups[(parent, role, us)].append(sid)
+
+    # Only groups with >=2 members have siblings
+    sibling_groups = {k: v for k, v in groups.items() if len(v) >= 2}
+
+    rows: List[Dict[str, str]] = []
+
+    for (parent, role, us), members in sibling_groups.items():
+        for focal_sid in members:
+            pool_sids = [s for s in members if s != focal_sid]
+
+            # Discover domains from the focal segment
+            focal_domains = discover_domains_for_segment(segments_root, registry, focal_sid)
+            if domain_filter:
+                focal_domains = focal_domains & {domain_filter}
+
+            for domain in sorted(focal_domains):
+                focal_files = load_file_join_hashes(
+                    segments_root, registry, focal_sid, domain
+                )
+                focal_union: Set[str] = set()
+                for jhs in focal_files.values():
+                    focal_union |= jhs
+
+                if len(focal_union) < min_patterns:
+                    continue
+
+                # Aggregate pool files
+                pool_files_by_eid: Dict[str, Set[str]] = {}
+                for pool_sid in pool_sids:
+                    pf = load_file_join_hashes(segments_root, registry, pool_sid, domain)
+                    pool_files_by_eid.update(pf)
+
+                pool_union: Set[str] = set()
+                for jhs in pool_files_by_eid.values():
+                    pool_union |= jhs
+
+                if len(pool_union) < min_patterns:
+                    continue
+
+                shared = focal_union & pool_union
+                n_shared = len(shared)
+                n_focal_unique = len(focal_union)
+                n_pool_unique = len(pool_union)
+
+                c_focal_in_pool = n_shared / n_focal_unique if n_focal_unique else 0.0
+                c_pool_in_focal = n_shared / n_pool_unique if n_pool_unique else 0.0
+
+                n_files_focal = len(focal_files)
+                n_files_pool = len(pool_files_by_eid)
+                data_suff = "true" if (n_files_focal >= 5 and n_files_pool >= 5) else "false"
+
+                # Bundle annotation
+                focal_bundle = load_bundle_join_hash_set(
+                    segments_root, registry, focal_sid, domain
+                )
+                pool_bundle: Set[str] = set()
+                for pool_sid in pool_sids:
+                    pool_bundle |= load_bundle_join_hash_set(
+                        segments_root, registry, pool_sid, domain
+                    )
+
+                has_bundles_focal = "true" if focal_bundle else "false"
+                has_bundles_pool = "true" if pool_bundle else "false"
+
+                n_both, n_focal_only, n_pool_only = annotate_bundle_overlap(
+                    shared, focal_bundle, pool_bundle
+                )
+
+                mf = manifest.get(focal_sid, {})
+                crid = make_comparison_run_id(focal_sid, f"pool_{parent}_{role}_{us}", executed_utc)
+
+                rows.append({
+                    "comparison_run_id": crid,
+                    "segment_id": focal_sid,
+                    "segment_label": mf.get("segment_label", ""),
+                    "governance_role": mf.get("governance_role", ""),
+                    "client_label": mf.get("client_label", ""),
+                    "unit_system": us,
+                    "domain": domain,
+                    "n_files_focal": str(n_files_focal),
+                    "n_files_pool": str(n_files_pool),
+                    "n_unique_patterns_focal": str(n_focal_unique),
+                    "n_unique_patterns_pool": str(n_pool_unique),
+                    "n_shared_join_hash": str(n_shared),
+                    "containment_focal_in_pool": _fmt(c_focal_in_pool),
+                    "containment_pool_in_focal": _fmt(c_pool_in_focal),
+                    "has_bundles_focal": has_bundles_focal,
+                    "has_bundles_pool": has_bundles_pool,
+                    "n_shared_bundle_both": str(n_both),
+                    "n_shared_bundle_focal_only": str(n_focal_only),
+                    "n_shared_bundle_pool_only": str(n_pool_only),
+                    "data_sufficient": data_suff,
+                    "executed_utc": executed_utc,
+                })
+
+    return rows
 
 
 # ---------------------------------------------------------------------------
@@ -1080,7 +1289,7 @@ def segment_is_runnable(
     rt = rec.get("run_type", "").strip().lower()
     if rt in ("skip", "registration"):
         print(
-            f"[warn] segment={segment_id} has run_type={rt!r} — treating as file-mode only",
+            f"[warn] segment={segment_id} has run_type={rt!r} — skipping",
             file=sys.stderr,
         )
     return True
@@ -1101,7 +1310,7 @@ def main() -> int:
     ap.add_argument("--records-dir", required=True, metavar="DIR",
                     help="Directory containing segment_manifest.csv, run_registry.csv, and file_metadata.csv")
     ap.add_argument("--out-dir", required=True, metavar="DIR",
-                    help="Output directory for cross_segment_summary.csv and cross_segment_file_pairs.csv")
+                    help="Output directory for cross_segment_summary.csv, cross_segment_file_pairs.csv, and cross_segment_pooled.csv")
 
     # Mode flags
     ap.add_argument("--within-segment", action="store_true",
@@ -1176,27 +1385,12 @@ def main() -> int:
     # --dry-run: print table and exit
     if args.dry_run:
         col_w = 36
-        print(f"{'segment_a':<{col_w}}  {'segment_b':<{col_w}}  {'comparison_type':<28}  mode")
-        print("-" * (col_w * 2 + 60))
+        print(f"{'segment_a':<{col_w}}  {'segment_b':<{col_w}}  {'comparison_type':<28}")
+        print("-" * (col_w * 2 + 32))
         for a, b, ctype in pairs:
-            # Peek at mode without loading data
-            seg_out_a = segment_output_dir(segments_root, registry, a)
-            seg_out_b = segment_output_dir(segments_root, registry, b)
-            mode_hint = "?"
-            if seg_out_a and seg_out_b:
-                # Check any domain for bundle_membership
-                ba_a = seg_out_a / "results" / "bundle_analysis"
-                ba_b = seg_out_b / "results" / "bundle_analysis"
-                if ba_a.exists() and ba_b.exists():
-                    domains_a = {p.name for p in ba_a.iterdir() if p.is_dir()}
-                    if domains_a:
-                        d_probe = next(iter(sorted(domains_a)))
-                        bma = ba_a / d_probe / "bundle_membership.csv"
-                        bmb = ba_b / d_probe / "bundle_membership.csv"
-                        mode_hint = "bundle" if (bma.exists() and bmb.exists()) else "file"
             la = manifest.get(a, {}).get("segment_label", a)
             lb = manifest.get(b, {}).get("segment_label", b)
-            print(f"{la:<{col_w}}  {lb:<{col_w}}  {ctype:<28}  {mode_hint}")
+            print(f"{la:<{col_w}}  {lb:<{col_w}}  {ctype:<28}")
         print(f"\n[compare] {len(pairs)} pairs discovered")
         return 0
 
@@ -1236,11 +1430,10 @@ def main() -> int:
 
             summary_rows.append(result)
             pair_detail_rows.extend(pairs_out)
-            mode_val = result.get("comparison_mode", "?")
             n_p = result.get("n_pairs", "?")
             print(
                 f"[compare] segment_a={seg_a} segment_b={seg_b} "
-                f"domain={domain} mode={mode_val} pairs={n_p}"
+                f"domain={domain} pairs={n_p}"
             )
 
             # Delta pattern output — directed pairs only, opt-out via --no-delta
@@ -1293,6 +1486,13 @@ def main() -> int:
                         })
                     delta_combo_count += 1
 
+    # Pooled comparison
+    pooled_rows = run_pooled_comparison(
+        manifest, registry, segments_root,
+        args.min_patterns, executed_utc,
+        domain_filter=args.domain,
+    )
+
     # Write outputs
     if summary_rows:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -1320,7 +1520,12 @@ def main() -> int:
         )
         print(f"[compare] wrote {len(delta_rows)} rows → {out_dir / 'cross_segment_delta.csv'}")
 
-    if not summary_rows:
+    if pooled_rows:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        atomic_write_csv(out_dir / "cross_segment_pooled.csv", POOLED_FIELDS, pooled_rows)
+        print(f"[compare] wrote {len(pooled_rows)} rows → {out_dir / 'cross_segment_pooled.csv'}")
+
+    if not summary_rows and not pooled_rows:
         print("[compare] no comparison rows produced — check segment data and min-patterns threshold")
 
     return 0
