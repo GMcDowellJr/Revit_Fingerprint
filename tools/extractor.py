@@ -656,11 +656,16 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
     governance_counts: Dict[str, int] = defaultdict(int)
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    # Write to .tmp files during the loop. Files are promoted to their final names only
+    # after the loop AND file_metadata.csv both succeed, so a mid-loop failure (corrupt
+    # JSON, disk error, etc.) leaves the previous complete output intact.
+    _streaming_stems = ["records", "label_components", "status_reasons", "parameter_rows"]
+    _tmp: Dict[str, Path] = {s: out_dir / f"{s}.csv.tmp" for s in _streaming_stems}
     with (
-        (out_dir / "records.csv").open("w", newline="", encoding="utf-8") as _rec_f,
-        (out_dir / "label_components.csv").open("w", newline="", encoding="utf-8") as _lbl_f,
-        (out_dir / "status_reasons.csv").open("w", newline="", encoding="utf-8") as _rsn_f,
-        (out_dir / "parameter_rows.csv").open("w", newline="", encoding="utf-8") as _par_f,
+        _tmp["records"].open("w", newline="", encoding="utf-8") as _rec_f,
+        _tmp["label_components"].open("w", newline="", encoding="utf-8") as _lbl_f,
+        _tmp["status_reasons"].open("w", newline="", encoding="utf-8") as _rsn_f,
+        _tmp["parameter_rows"].open("w", newline="", encoding="utf-8") as _par_f,
     ):
         _rec_w = csv.DictWriter(_rec_f, fieldnames=_RECORD_FIELDS)
         _lbl_w = csv.DictWriter(_lbl_f, fieldnames=_LABEL_FIELDS)
@@ -865,6 +870,9 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
         "is_workshared", "tool_version", "exported_utc",
         "client_label", "governance_role", "unit_system", "discipline_label",
     ], _sort_rows(meta_rows, ["export_run_id"]))
+
+    for stem in _streaming_stems:
+        _tmp[stem].replace(out_dir / f"{stem}.csv")
 
     return len(meta_rows), record_count
 
