@@ -1159,6 +1159,7 @@ def run_pooled_comparison(
     min_patterns: int,
     executed_utc: str,
     domain_filter: Optional[str] = None,
+    focal_segment_ids: Optional[Set[str]] = None,
 ) -> List[Dict[str, str]]:
     """N-1 pooled comparison: each segment vs its sibling pool.
 
@@ -1185,6 +1186,8 @@ def run_pooled_comparison(
 
     for (parent, role, us), members in sibling_groups.items():
         for focal_sid in members:
+            if focal_segment_ids is not None and focal_sid not in focal_segment_ids:
+                continue
             pool_sids = [s for s in members if s != focal_sid]
 
             # Discover domains from the focal segment
@@ -1487,10 +1490,19 @@ def main() -> int:
                     delta_combo_count += 1
 
     # Pooled comparison
+    focal_filter: Optional[Set[str]] = None
+    if args.segment_a or args.segment_b:
+        focal_filter = set()
+        if args.segment_a:
+            focal_filter.add(args.segment_a)
+        if args.segment_b:
+            focal_filter.add(args.segment_b)
+
     pooled_rows = run_pooled_comparison(
         manifest, registry, segments_root,
         args.min_patterns, executed_utc,
         domain_filter=args.domain,
+        focal_segment_ids=focal_filter,
     )
 
     # Write outputs
