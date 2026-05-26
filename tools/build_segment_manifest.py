@@ -8,7 +8,7 @@ from typing import Dict,Iterable,List,Sequence
 
 SEED_ROLES={"Template","Container"}
 REQUIRED_COLUMNS={"export_run_id","unit_system","client_label","governance_role"}
-MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","export_run_ids","has_seed_file","seed_export_run_ids","population_hash","notes","segment_purpose","segment_label"]
+MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","discipline_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","export_run_ids","has_seed_file","seed_export_run_ids","population_hash","notes","segment_purpose","segment_label"]
 REGISTRY_FIELDNAMES=["segment_id","parent_segment_id","run_type","population_hash","output_folder","status","last_run_utc","notes","segment_purpose","segment_label"]
 DIMENSION_CONFIG = [
     {"field": "unit_system", "type": "root"},
@@ -138,6 +138,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             "unit_system": dim_map.get("unit_system", ""),
             "governance_role": dim_map.get(governance_field, ""),
             "client_label": dim_map.get(client_field, ""),
+            "discipline_label": dim_map.get("discipline_label", ""),
             "extra_dimensions": "|".join(extra),
             "ancestor_segment_ids": "|".join(ancestor_ids),
             "run_type": "",
@@ -205,10 +206,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     for r in rows_out:
         pur="insufficient_population" if r["run_type"]=="skip" else ""
         lev,role,rt=int(r["segment_level"]),r["governance_role"],r["run_type"]
-        disc=""
-        for _part in r.get("extra_dimensions","").split("|"):
-            if _part.startswith("discipline_label="):
-                disc=_part.split("=",1)[1]; break
+        disc=r["discipline_label"]
         is_disc_cut=bool(disc and not r["client_label"])
         if lev==1: pur="population_denominator"
         elif lev == 2 and r["client_label"] and not role:

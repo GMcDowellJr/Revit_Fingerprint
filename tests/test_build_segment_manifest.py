@@ -470,6 +470,24 @@ def test_discipline_cut_extra_dimensions_populated():
     seg = next(r for r in segs if r["segment_id"] == "imperial|Container|discipline_label=Architectural")
     assert seg["extra_dimensions"] == "discipline_label=Architectural"
     assert seg["client_label"] == ""
+    assert seg["discipline_label"] == "Architectural"
+
+
+def test_discipline_label_top_level_field_blank_for_non_discipline_segments():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    # A pure governance segment has no discipline cut — field must be blank, not absent.
+    container = next(r for r in segs if r["segment_id"] == "imperial|Container")
+    assert container["discipline_label"] == ""
+    # A client-only cut also has no discipline.
+    kaiser = next(r for r in segs if r["segment_id"] == "imperial|client_label=Kaiser")
+    assert kaiser["discipline_label"] == ""
+
+
+def test_discipline_label_top_level_field_populated_in_mixed_cut():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|client_label=Kaiser|discipline_label=Architectural")
+    assert seg["discipline_label"] == "Architectural"
+    assert seg["client_label"] == "Kaiser"
 
 
 def test_discipline_cut_level3_purpose():
