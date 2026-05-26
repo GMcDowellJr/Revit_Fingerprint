@@ -1049,7 +1049,19 @@ def main() -> None:
     split_domains: List[str] = []
     if "split" in selected_stages:
         if args.split_domains is None or str(args.split_domains) == "__ALL__":
-            split_domains = sorted({str(r.get("domain", "")).strip() for r in (record_rows or []) if str(r.get("domain", "")).strip() and str(r.get("domain", "")).strip() not in SUPPRESSED_DOWNSTREAM_DOMAINS}, key=lambda s: s.lower())
+            # Always read from records.csv on disk — it reflects flatten remaps and
+            # suppression correctly and is present whether flatten ran now or previously.
+            # record_rows is empty since emit_records now returns counts only.
+            _phase0_records_csv = v21_phase0_dir / "records.csv"
+            if _phase0_records_csv.is_file():
+                split_domains = sorted(
+                    {
+                        str(r.get("domain", "")).strip()
+                        for r in _iter_csv_rows(_phase0_records_csv)
+                        if str(r.get("domain", "")).strip() and str(r.get("domain", "")).strip() not in SUPPRESSED_DOWNSTREAM_DOMAINS
+                    },
+                    key=lambda s: s.lower(),
+                )
             if not split_domains:
                 split_domains = [d for d in _discover_domains_from_exports(exports_dir) if d not in SUPPRESSED_DOWNSTREAM_DOMAINS]
         else:
