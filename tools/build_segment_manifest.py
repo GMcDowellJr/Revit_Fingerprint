@@ -39,7 +39,7 @@ def _atomic_write_csv(path: Path, fieldnames: Sequence[str], rows: Iterable[Dict
 def _population_hash(export_run_ids: List[str]) -> str:
     token="|".join(sorted(export_run_ids));return hashlib.sha1(token.encode()).hexdigest()
 
-_UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>\s]+')
+_UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]+')
 def _sanitize_folder(segment_id:str)->str:return _UNSAFE_FOLDER_CHARS.sub("_",segment_id).lower().strip("_")
 
 def _append_note(row,k,v=""):
@@ -64,8 +64,15 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
 
     def _subset_to_id(key: frozenset) -> str:
         kv = dict(key)
-        values = [kv[f] for f in cfg_fields if f in kv]
-        return "|".join(values)
+        parts = []
+        for f in cfg_fields:
+            if f not in kv:
+                continue
+            if f == root_field or f == governance_field:
+                parts.append(kv[f])
+            else:
+                parts.append(f"{f}={kv[f]}")
+        return "|".join(parts)
 
     for row in rows:
         export_run_id = (row.get("export_run_id") or "").strip()
