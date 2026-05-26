@@ -1206,14 +1206,17 @@ def run_pooled_comparison(
                 if len(focal_union) < min_patterns:
                     continue
 
-                # Aggregate pool files
-                pool_files_by_eid: Dict[str, Set[str]] = {}
+                # Aggregate pool files — key by (segment_id, export_run_id) so that
+                # the same export_run_id appearing in two sibling segments is counted twice
+                # rather than silently collapsed into one entry.
+                pool_files_keyed: Dict[Tuple[str, str], Set[str]] = {}
                 for pool_sid in pool_sids:
                     pf = load_file_join_hashes(segments_root, registry, pool_sid, domain)
-                    pool_files_by_eid.update(pf)
+                    for eid, jhs in pf.items():
+                        pool_files_keyed[(pool_sid, eid)] = jhs
 
                 pool_union: Set[str] = set()
-                for jhs in pool_files_by_eid.values():
+                for jhs in pool_files_keyed.values():
                     pool_union |= jhs
 
                 if len(pool_union) < min_patterns:
@@ -1228,7 +1231,7 @@ def run_pooled_comparison(
                 c_pool_in_focal = n_shared / n_pool_unique if n_pool_unique else 0.0
 
                 n_files_focal = len(focal_files)
-                n_files_pool = len(pool_files_by_eid)
+                n_files_pool = len(pool_files_keyed)
                 data_suff = "true" if (n_files_focal >= 5 and n_files_pool >= 5) else "false"
 
                 # Bundle annotation
@@ -1383,7 +1386,6 @@ def main() -> int:
 
     if not pairs:
         print("[compare] no pairs discovered — check manifest hierarchy and mode flags")
-        return 0
 
     # --dry-run: print table and exit
     if args.dry_run:
