@@ -585,3 +585,55 @@ def test_single_child_same_hash_still_demoted():
     assert "redundant_single_child" in (elec.get("notes") or ""), (
         "Single child with same population_hash must still trigger redundant_single_child"
     )
+
+
+# ---------------------------------------------------------------------------
+# Level-4 client+discipline leaf segment purpose and label
+# ---------------------------------------------------------------------------
+
+def test_client_discipline_leaf_purpose_container():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    assert seg["segment_purpose"] == "client_discipline_coordination"
+
+
+def test_client_discipline_leaf_label_container():
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    assert seg["segment_label"] == "Kaiser Architectural coordination files"
+
+
+def test_client_discipline_leaf_purpose_template():
+    rows = (
+        [_meta_row(f"t{i:02d}", "imperial", "Kaiser", "Template", "Architectural") for i in range(3)]
+        + [_meta_row(f"u{i:02d}", "imperial", "Renown", "Template", "Architectural") for i in range(3)]
+    )
+    segs = _build_segments(rows, min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Template|Kaiser|Architectural")
+    assert seg["segment_purpose"] == "client_discipline_standard_anchor"
+    assert seg["segment_label"] == "Kaiser Architectural templates — standards as authored"
+
+
+def test_client_discipline_leaf_purpose_project():
+    rows = (
+        [_meta_row(f"p{i:02d}", "imperial", "Kaiser", "Project", "Architectural") for i in range(3)]
+        + [_meta_row(f"q{i:02d}", "imperial", "Renown", "Project", "Architectural") for i in range(3)]
+    )
+    segs = _build_segments(rows, min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Project|Kaiser|Architectural")
+    assert seg["segment_purpose"] == "client_discipline_practice"
+    assert seg["segment_label"] == "Kaiser Architectural projects — standards as practiced"
+
+
+def test_client_discipline_leaf_no_empty_purpose():
+    # No level-4 client+discipline segment should have an empty segment_purpose.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    l4 = [r for r in segs if r["segment_level"] == "4" and r["client_label"] and r["discipline_label"]]
+    assert l4, "Expected level-4 client+discipline segments in _disc_rows fixture"
+    for r in l4:
+        assert r["segment_purpose"], (
+            f"segment_purpose is empty for level-4 segment {r['segment_id']}"
+        )
+        assert r["segment_label"] != r["segment_id"], (
+            f"segment_label fell back to raw ID for {r['segment_id']}"
+        )
