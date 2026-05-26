@@ -780,8 +780,8 @@ def main() -> None:
         print("[extract_all] Stage flatten (T0): emitting flatten outputs...", flush=True)
         _ensure_dir(v21_phase0_dir)
         report["commands"].append({"stage": "flatten", "out": str(v21_phase0_dir)})
-        meta_rows, record_rows = emit_records(exports_dir, v21_phase0_dir, file_id_mode="basename")
-        print(f"[extract_all] Stage flatten complete: rows={len(record_rows)} files={len(meta_rows)} out={v21_phase0_dir}", flush=True)
+        file_count, record_count = emit_records(exports_dir, v21_phase0_dir, file_id_mode="basename")
+        print(f"[extract_all] Stage flatten complete: rows={record_count} files={file_count} out={v21_phase0_dir}", flush=True)
         items_csv = v21_phase0_dir / "identity_items.csv"
         stats = _append_line_pattern_synthetic_norm_hash(items_csv)
         print(
