@@ -717,10 +717,20 @@ def main() -> None:
              "Overrides the default {out-root}/results/records/ for authority/patterns stages. "
              "Use when running per-segment analysis where records live at corpus level."
     )
+    ap.add_argument(
+        "--label-synth-dir",
+        default=None,
+        help="Path to a label_synthesis/ directory to use as the read source for label "
+             "population, LLM cache, and curator annotations. Overrides the default "
+             "{out-root}/results/label_synthesis/ for the read path only — analysis outputs "
+             "still write to {out-root}/results/. Use when running per-segment analysis so "
+             "that corpus-level LLM improvements are picked up without rebuilding per segment."
+    )
     args = ap.parse_args()
 
     allow_sig_hash_join_key = args.allow_sig_hash_join_key
     require_join_policy = True
+    label_synth_dir = Path(args.label_synth_dir).resolve() if args.label_synth_dir else None
 
     selected_stages = _parse_stage_csv(args.stages) or ["flatten", "sig_hash", "discover"]
 
@@ -953,6 +963,7 @@ def main() -> None:
                     full_seed_dir,
                     phase0_dir=v21_phase0_dir,
                     results_v21_dir=v21_root,
+                    label_synth_dir=label_synth_dir,
                 )
                 corpus_meta_rows = [r for r in meta_rows if str(r.get("export_run_id", "")).strip() != seed_export_run_id]
                 corpus_record_rows = [r for r in record_rows if str(r.get("export_run_id", "")).strip() != seed_export_run_id]
@@ -962,6 +973,7 @@ def main() -> None:
                     v21_analysis_dir,
                     phase0_dir=v21_phase0_dir,
                     results_v21_dir=v21_root,
+                    label_synth_dir=label_synth_dir,
                 )
 
                 corpus_domain_patterns = read_csv_rows(v21_analysis_dir / "domain_patterns.csv")
@@ -1019,6 +1031,7 @@ def main() -> None:
                     v21_analysis_dir,
                     phase0_dir=v21_phase0_dir,
                     results_v21_dir=v21_root,
+                    label_synth_dir=label_synth_dir,
                 )
                 domain_patterns = read_csv_rows(v21_analysis_dir / "domain_patterns.csv")
                 for row in domain_patterns:

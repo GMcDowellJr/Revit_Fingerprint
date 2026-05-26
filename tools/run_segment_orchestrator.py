@@ -397,22 +397,20 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 print(f"  (skipped — already complete; use --force to re-run)")
                 continue
 
-            lp_cmd = [
-                sys.executable,
-                str(repo_root / "tools" / "label_synthesis" / "build_label_population.py"),
-                "--out-root", str(out_root),
-            ]
+            corpus_label_synth_dir = records_dir.parent / "label_synthesis"
             extract_cmd = [
                 sys.executable,
                 str(repo_root / "tools" / "run_extract_all.py"),
                 str(exports_dir),
                 "--out-root", str(out_root),
                 "--stages", "patterns",
+                "--records-dir", str(records_dir),
+                "--label-synth-dir", str(corpus_label_synth_dir),
                 "--filter-export-run-ids", str(out_root / "export_run_ids.txt"),
                 "--join-policy", str(join_policy),
                 "--allow-sig-hash-join-key",
             ]
-            print(f"  step 1: {' '.join(lp_cmd[1:])}")
+            print(f"  step 1: prepare (dirs + segment records filter)")
             print(f"  step 2: {' '.join(extract_cmd[1:])}")
             if run_type == "bundle":
                 bundle_cmd = [
@@ -466,7 +464,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         t_start = time.monotonic()
 
         # Step 1 — Prepare: directories, export_run_ids.txt, segment-level records
-        print(f"[orchestrator]   step 1/3 label_population...", flush=True)
+        print(f"[orchestrator]   step 1/3 prepare...", flush=True)
         try:
             segment_records_dir = out_root / "results" / "records"
             segment_records_dir.mkdir(parents=True, exist_ok=True)
@@ -478,28 +476,26 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             ids_file.write_text("\n".join(export_run_ids) + "\n", encoding="utf-8")
 
             _write_segment_records(records_dir, segment_records_dir, set(export_run_ids))
-
-            lp_cmd = [
-                sys.executable,
-                str(repo_root / "tools" / "label_synthesis" / "build_label_population.py"),
-                "--out-root", str(out_root),
-            ]
-            rc, tail, _stderr = run_step_capture(lp_cmd, cwd=str(repo_root))
-            if rc != 0:
-                raise subprocess.CalledProcessError(rc, lp_cmd, stderr=tail)
         except Exception as exc:
-            step_failed = "label_population"
-            failure_notes = f"step=label_population error={exc}"
+            step_failed = "prepare"
+            failure_notes = f"step=prepare error={exc}"
 
         # Step 2 — Patterns stage
+        # --records-dir points at corpus records so build_label_population (run internally
+        # by run_extract_all) reads the full population, not just this segment's subset.
+        # --label-synth-dir points at corpus label_synthesis so emit_analysis picks up the
+        # LLM cache and curator annotations built in Run B without rebuilding per segment.
         if step_failed is None:
             print(f"[orchestrator]   step 2/3 patterns...", flush=True)
+            corpus_label_synth_dir = records_dir.parent / "label_synthesis"
             extract_cmd = [
                 sys.executable,
                 str(repo_root / "tools" / "run_extract_all.py"),
                 str(exports_dir),
                 "--out-root", str(out_root),
                 "--stages", "patterns",
+                "--records-dir", str(records_dir),
+                "--label-synth-dir", str(corpus_label_synth_dir),
                 "--filter-export-run-ids", str(out_root / "export_run_ids.txt"),
                 "--join-policy", str(join_policy),
                 "--allow-sig-hash-join-key",

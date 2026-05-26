@@ -463,35 +463,42 @@ def _load_identity_items_by_record(phase0_dir: Optional[Path], domain: Optional[
     return out
 
 
-def _load_label_resolution_inputs(results_v21_dir: Optional[Path], domain: str) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, str], Dict[str, Any]]:
-    if results_v21_dir is None:
+def _load_label_resolution_inputs(
+    results_v21_dir: Optional[Path],
+    domain: str,
+    label_synth_dir: Optional[Path] = None,
+) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, str], Dict[str, Any]]:
+    if results_v21_dir is None and label_synth_dir is None:
         return {}, {}, {}
 
-    label_synth_dir = results_v21_dir / "label_synthesis"
-    analysis_dir = results_v21_dir / "analysis"
+    # label_synth_dir overrides results_v21_dir/label_synthesis for all read paths so
+    # segment runs can point at the corpus label_synthesis (richer population, LLM cache,
+    # curator annotations) without redirecting the analysis write path.
+    effective_synth = label_synth_dir if label_synth_dir is not None else (results_v21_dir / "label_synthesis" if results_v21_dir else None)
+    analysis_dir = (results_v21_dir / "analysis") if results_v21_dir else None
 
-    population_candidates = [
-        label_synth_dir / f"{domain}.joinhash_label_population.csv",
-        analysis_dir / f"{domain}.joinhash_label_population.csv",
-        analysis_dir / "label_population" / f"{domain}.joinhash_label_population.csv",
-    ]
+    population_candidates = [p for p in [
+        (effective_synth / f"{domain}.joinhash_label_population.csv") if effective_synth else None,
+        (analysis_dir / f"{domain}.joinhash_label_population.csv") if analysis_dir else None,
+        (analysis_dir / "label_population" / f"{domain}.joinhash_label_population.csv") if analysis_dir else None,
+    ] if p is not None]
     pop_path = next((p for p in population_candidates if p.is_file()), None)
     label_pop = load_label_population(str(pop_path), domain) if pop_path else {}
 
-    annotation_candidates = [
-        label_synth_dir / f"{domain}.pattern_annotations.csv",
-        label_synth_dir / "pattern_annotations.csv",
-        analysis_dir / "pattern_annotations.csv",
-    ]
+    annotation_candidates = [p for p in [
+        (effective_synth / f"{domain}.pattern_annotations.csv") if effective_synth else None,
+        (effective_synth / "pattern_annotations.csv") if effective_synth else None,
+        (analysis_dir / "pattern_annotations.csv") if analysis_dir else None,
+    ] if p is not None]
     anno_path = next((p for p in annotation_candidates if p.is_file()), None)
     annotations = load_annotations(str(anno_path)) if anno_path else {}
 
-    llm_cache_candidates = [
-        label_synth_dir / f"{domain}.llm_name_cache.json",
-        label_synth_dir / "llm_name_cache.json",
-        analysis_dir / f"{domain}.llm_name_cache.json",
-        analysis_dir / "llm_name_cache.json",
-    ]
+    llm_cache_candidates = [p for p in [
+        (effective_synth / f"{domain}.llm_name_cache.json") if effective_synth else None,
+        (effective_synth / "llm_name_cache.json") if effective_synth else None,
+        (analysis_dir / f"{domain}.llm_name_cache.json") if analysis_dir else None,
+        (analysis_dir / "llm_name_cache.json") if analysis_dir else None,
+    ] if p is not None]
     llm_path = next((p for p in llm_cache_candidates if p.is_file()), None)
     llm_cache = load_llm_cache(str(llm_path)) if llm_path else {}
     return label_pop, annotations, llm_cache
@@ -884,6 +891,7 @@ def emit_analysis(
     *,
     phase0_dir: Optional[Path] = None,
     results_v21_dir: Optional[Path] = None,
+    label_synth_dir: Optional[Path] = None,
 ) -> str:
     exports = sorted({r["export_run_id"] for r in meta_rows})
     domains = sorted({r["domain"] for r in records if r.get("domain", "") not in SUPPRESSED_ANALYSIS_DOMAINS})
@@ -963,7 +971,7 @@ def emit_analysis(
         cluster_items = dom_clusters.get(dom, [])
         domain_records = records_by_domain.get(dom, [])
         domain_files_present = len({r["export_run_id"] for r in domain_records})
-        label_population_by_hash, annotations, llm_cache = _load_label_resolution_inputs(results_v21_dir, dom)
+        label_population_by_hash, annotations, llm_cache = _load_label_resolution_inputs(results_v21_dir, dom, label_synth_dir=label_synth_dir)
         pattern_ids_taken: set[str] = set()
         cluster_rows: List[Dict[str, Any]] = []
         for (_, schema, join_hash), rows in sorted(cluster_items, key=lambda kv: (kv[0][1], kv[0][2])):
