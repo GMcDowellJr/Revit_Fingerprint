@@ -645,7 +645,8 @@ def discover_within_segment(
     by_parent: Dict[str, List[str]] = defaultdict(list)
     for sid, row in manifest.items():
         parent = row.get("parent_segment_id", "").strip()
-        if parent:
+        rt = row.get("run_type", "").strip().lower()
+        if parent and rt in ("bundle", "reference"):
             by_parent[parent].append(sid)
 
     pairs: List[ComparisonPair] = []
@@ -684,7 +685,8 @@ def discover_sibling_segments(
         parent = row.get("parent_segment_id", "").strip()
         role = row.get("governance_role", "").strip().lower()
         us = row.get("unit_system", "").strip()
-        if parent and role and us:
+        rt = row.get("run_type", "").strip().lower()
+        if parent and role and us and rt == "bundle":
             groups[(parent, role, us)].append(sid)
 
     pairs: List[ComparisonPair] = []
@@ -709,6 +711,7 @@ def discover_parent_siblings(
     level2: List[str] = [
         sid for sid, row in manifest.items()
         if row.get("segment_level", "").strip() == "2"
+        and row.get("run_type", "").strip().lower() in ("bundle", "reference")
     ]
 
     by_parent: Dict[str, List[str]] = defaultdict(list)
@@ -760,7 +763,8 @@ def discover_governance_chain(
     )
     for sid, row in manifest.items():
         role = row.get("governance_role", "").strip().lower()
-        if role in ("template", "project", "container"):
+        rt = row.get("run_type", "").strip().lower()
+        if role in ("template", "project", "container") and rt in ("bundle", "reference"):
             by_key[_key(row)][role].append(sid)
 
     pairs: List[ComparisonPair] = []
