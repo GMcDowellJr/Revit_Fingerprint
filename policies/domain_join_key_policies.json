@@ -371,7 +371,9 @@
         "Dot segments use relative epsilon (1% of non_dot_total) to preserve scale invariance.",
         "segments_def_hash moved to explicitly_excluded — retains exact identity in identity_basis for forensics.",
         "Names are labels only and must not participate in joins.",
-        "lp.is_import added to coordination_items in extractor v2."
+        "lp.is_import added to coordination_items in extractor v2.",
+        "sig_hash intentionally uses segments_def_hash (exact scale identity); see domain_sig_hash_policies.json.",
+        "join_hash (this policy) uses segments_norm_hash (governance equivalence). These are different questions."
       ]
     },
     "line_styles": {

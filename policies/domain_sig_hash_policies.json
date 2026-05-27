@@ -464,13 +464,19 @@
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash uses segments_def_hash: exact structural identity at the recorded scale.",
+        "segments_norm_hash is intentionally excluded from sig_hash — it belongs in join_hash only.",
+        "sig_hash distinguishes scale variants (e.g. hidden 1/8 vs hidden 1/4 are different records).",
+        "join_hash (policy v3, segments_norm_hash) collapses scale variants for governance equivalence.",
+        "Cross-domain reference items (obj_style.pattern_ref.sig_hash, line_style.pattern_ref.sig_hash)",
+        "are written at extraction time using ctx[line_pattern_uid_to_hash] which maps UID to the",
+        "original extraction sig_hash — matching segments_def_hash, not segments_norm_hash.",
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "line_pattern.segments_norm_hash"
+        "line_pattern.segments_def_hash"
       ],
-      "sig_hash_schema": "line_patterns.sig_hash.v1"
+      "sig_hash_schema": "line_patterns.sig_hash.v2"
     },
     "line_styles": {
       "allowed_item_prefixes": [],

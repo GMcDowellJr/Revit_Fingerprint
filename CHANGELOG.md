@@ -11,6 +11,16 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Fixed
+- line_patterns sig_hash policy corrected to segments_def_hash (sig_hash.v2):
+  segments_norm_hash was incorrectly used as sig_hash basis — it belongs in join_hash only.
+  sig_hash answers exact identity (scale variants are distinct records);
+  join_hash answers governance equivalence (scale variants collapse to one pattern).
+  Cross-domain reference joins (obj_style.pattern_ref.sig_hash, line_style.pattern_ref.sig_hash)
+  were broken while norm_hash was in sig_hash; this change restores them.
+  Downstream: re-run sig_hash stage only. Bundle/pattern/segment pipelines unaffected
+  (they operate on join_hash exclusively).
+
 ### Added
 - `instance_count` and `is_sole_type_in_category` metadata fields added to
   `text_types`, `dimension_types` (all 7 splits), `arrowheads`, and `compound_types`
