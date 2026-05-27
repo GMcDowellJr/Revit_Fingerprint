@@ -453,7 +453,7 @@
     "line_patterns": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-		"line_pattern.segment_count",
+        "line_pattern.segment_count",
         "line_pattern.segments_def_hash"
       ],
       "hash_alg": "md5_utf8_join_pipe",
@@ -461,18 +461,18 @@
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "sig_hash uses segments_def_hash: exact structural identity at the recorded scale.",
-        "segments_norm_hash is intentionally excluded from sig_hash — it belongs in join_hash only.",
-        "sig_hash distinguishes scale variants (e.g. hidden 1/8 vs hidden 1/4 are different records).",
-        "join_hash (policy v3, segments_norm_hash) collapses scale variants for governance equivalence.",
-        "Cross-domain reference items (obj_style.pattern_ref.sig_hash, line_style.pattern_ref.sig_hash)",
-        "are written at extraction time using ctx[line_pattern_uid_to_hash] which maps UID to the",
-        "original extraction sig_hash — matching segments_def_hash, not segments_norm_hash.",
+        "sig_hash uses segment_count + segments_def_hash: matches extractor preimage exactly.",
+        "segments_norm_hash excluded from sig_hash — belongs in join_hash only (policy v3).",
+        "sig_hash distinguishes scale variants; join_hash collapses them for governance equivalence.",
+        "Cross-domain refs (obj_style.pattern_ref.sig_hash, line_style.pattern_ref.sig_hash) are written",
+        "at extraction time from ctx[line_pattern_uid_to_hash] which holds the extractor-computed sig_hash.",
+        "Post-extraction sig_hash recomputation must produce the same value for ctx refs to remain valid.",
+        "Indexed seg[NNN].* items are in identity_basis.items (canonical evidence) but NOT in the preimage;",
+        "allowed_item_prefixes is [] so the policy stage hashes only segment_count + segments_def_hash.",
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-		"line_pattern.segment_count",
-        "line_pattern.segments_def_hash"
+        "line_pattern.segment_count"
       ],
       "sig_hash_schema": "line_patterns.sig_hash.v2"
     },
@@ -633,10 +633,9 @@
     "phase_filters": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "phase_filter.name",
-        "phase_filter.new.presentation_id",
-        "phase_filter.existing.presentation_id",
         "phase_filter.demolished.presentation_id",
+        "phase_filter.existing.presentation_id",
+        "phase_filter.new.presentation_id",
         "phase_filter.temporary.presentation_id"
       ],
       "hash_alg": "md5_utf8_join_pipe",
@@ -644,13 +643,15 @@
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash uses all 4 phase status presentation_id items: matches extractor preimage exactly.",
+        "phase_filter.name excluded from allowed_items — it is cosmetic/coordination, not in semantic_keys.",
+        "Prior policy incorrectly included phase_filter.name in allowed_items.",
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "phase_filter.new.presentation_id",
-        "phase_filter.existing.presentation_id",
         "phase_filter.demolished.presentation_id",
+        "phase_filter.existing.presentation_id",
+        "phase_filter.new.presentation_id",
         "phase_filter.temporary.presentation_id"
       ],
       "sig_hash_schema": "phase_filters.sig_hash.v1"
@@ -859,20 +860,27 @@
         "vf.rule["
       ],
       "allowed_items": [
-        "vf.def_hash"
+        "vf.categories",
+        "vf.logic_root",
+        "vf.rule_count"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash hashes raw vf.* items directly: matches extractor preimage exactly.",
+        "vf.def_hash is excluded from allowed_items — it is a derived hash of the raw items",
+        "and must not participate in sig_hash (would produce hash-of-hash, not hash-of-items).",
+        "vf.categories, vf.logic_root, vf.rule_count plus all vf.rule[NNN].* items via prefix.",
+        "vf.categories is always emitted by the extractor (q may be missing/unreadable but key present).",
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "vf.def_hash"
+        "vf.logic_root",
+        "vf.rule_count"
       ],
-      "sig_hash_schema": "view_filter_definitions.sig_hash.v1"
+      "sig_hash_schema": "view_filter_definitions.sig_hash.v2"
     },
     "view_templates_ceiling_plans": {
       "allowed_item_prefixes": [

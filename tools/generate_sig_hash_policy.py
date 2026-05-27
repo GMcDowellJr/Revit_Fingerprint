@@ -21,11 +21,22 @@ def build_policy(registry: Dict[str, Any]) -> Dict[str, Any]:
     for name, block in sorted(domains.items(), key=lambda kv: str(kv[0])):
         if not isinstance(block, dict):
             continue
+        # sig_hash_keys / sig_hash_key_prefixes override allowed_keys / allowed_key_prefixes
+        # when the validator set (allowed_keys) differs from the sig_hash preimage set.
+        # Use key-presence check so an explicit empty list is respected.
+        if "sig_hash_keys" in block:
+            preimage_keys = list(block["sig_hash_keys"])
+        else:
+            preimage_keys = list(block.get("allowed_keys") or [])
+        if "sig_hash_key_prefixes" in block:
+            preimage_prefixes = list(block["sig_hash_key_prefixes"])
+        else:
+            preimage_prefixes = list(block.get("allowed_key_prefixes") or [])
         out["domains"][str(name)] = {
-            "sig_hash_schema": "%s.sig_hash.v1" % name,
+            "sig_hash_schema": block.get("sig_hash_schema") or ("%s.sig_hash.v1" % name),
             "hash_alg": "md5_utf8_join_pipe",
-            "allowed_items": list(block.get("allowed_keys") or []),
-            "allowed_item_prefixes": list(block.get("allowed_key_prefixes") or []),
+            "allowed_items": preimage_keys,
+            "allowed_item_prefixes": preimage_prefixes,
             "required_items": list(block.get("required_keys") or []),
             "minima": dict(block.get("minima") or {}),
             "notes": [

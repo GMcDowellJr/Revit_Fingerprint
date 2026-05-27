@@ -434,7 +434,6 @@
     "line_patterns": {
       "domain_family": "line_patterns",
       "allowed_keys": [
-        "line_pattern.segments_norm_hash",
         "line_pattern.segment_count",
         "line_pattern.segments_def_hash"
       ],
@@ -442,8 +441,14 @@
         "line_pattern.seg["
       ],
       "required_keys": [
-        "line_pattern.segments_norm_hash"
+        "line_pattern.segment_count"
       ],
+      "sig_hash_schema": "line_patterns.sig_hash.v2",
+      "sig_hash_keys": [
+        "line_pattern.segment_count",
+        "line_pattern.segments_def_hash"
+      ],
+      "sig_hash_key_prefixes": [],
       "minima": {
         "block_if_any_required_not_ok": true
       },
@@ -592,17 +597,16 @@
     "phase_filters": {
       "domain_family": "phase_filters",
       "allowed_keys": [
-        "phase_filter.name",
-        "phase_filter.new.presentation_id",
-        "phase_filter.existing.presentation_id",
         "phase_filter.demolished.presentation_id",
+        "phase_filter.existing.presentation_id",
+        "phase_filter.new.presentation_id",
         "phase_filter.temporary.presentation_id"
       ],
       "allowed_key_prefixes": [],
       "required_keys": [
-        "phase_filter.new.presentation_id",
-        "phase_filter.existing.presentation_id",
         "phase_filter.demolished.presentation_id",
+        "phase_filter.existing.presentation_id",
+        "phase_filter.new.presentation_id",
         "phase_filter.temporary.presentation_id"
       ],
       "minima": {
@@ -800,13 +804,23 @@
     "view_filter_definitions": {
       "domain_family": "view_filter_definitions",
       "allowed_keys": [
-        "vf.def_hash"
+        "vf.categories",
+        "vf.def_hash",
+        "vf.logic_root",
+        "vf.rule_count"
       ],
       "allowed_key_prefixes": [
         "vf.rule["
       ],
       "required_keys": [
-        "vf.def_hash"
+        "vf.logic_root",
+        "vf.rule_count"
+      ],
+      "sig_hash_schema": "view_filter_definitions.sig_hash.v2",
+      "sig_hash_keys": [
+        "vf.categories",
+        "vf.logic_root",
+        "vf.rule_count"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -816,6 +830,8 @@
         "vf.rule[i].op": true,
         "vf.rule[i].param_ref.kind": true,
         "vf.rule[i].param_ref.id": true,
+        "vf.rule[i].prefix": true,
+        "vf.rule[i].sig": true,
         "vf.rule[i].value": true
       }
     },
