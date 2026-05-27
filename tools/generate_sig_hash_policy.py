@@ -22,7 +22,7 @@ def build_policy(registry: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(block, dict):
             continue
         out["domains"][str(name)] = {
-            "sig_hash_schema": "%s.sig_hash.v1" % name,
+            "sig_hash_schema": block.get("sig_hash_schema") or ("%s.sig_hash.v1" % name),
             "hash_alg": "md5_utf8_join_pipe",
             "allowed_items": list(block.get("allowed_keys") or []),
             "allowed_item_prefixes": list(block.get("allowed_key_prefixes") or []),
