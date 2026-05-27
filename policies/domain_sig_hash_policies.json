@@ -472,8 +472,7 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "line_pattern.segment_count",
-        "line_pattern.segments_def_hash"
+        "line_pattern.segment_count"
       ],
       "sig_hash_schema": "line_patterns.sig_hash.v2"
     },

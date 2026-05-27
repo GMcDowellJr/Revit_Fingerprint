@@ -441,8 +441,7 @@
         "line_pattern.seg["
       ],
       "required_keys": [
-        "line_pattern.segment_count",
-        "line_pattern.segments_def_hash"
+        "line_pattern.segment_count"
       ],
       "sig_hash_schema": "line_patterns.sig_hash.v2",
       "sig_hash_keys": [
@@ -831,7 +830,7 @@
         "vf.rule[i].op": true,
         "vf.rule[i].param_ref.kind": true,
         "vf.rule[i].param_ref.id": true,
-        "vf.rule[i].param_ref.prefix": true,
+        "vf.rule[i].prefix": true,
         "vf.rule[i].sig": true,
         "vf.rule[i].value": true
       }
