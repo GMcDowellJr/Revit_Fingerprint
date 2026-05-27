@@ -453,6 +453,7 @@
     "line_patterns": {
       "allowed_item_prefixes": [],
       "allowed_items": [
+		"line_pattern.segment_count",
         "line_pattern.segments_def_hash"
       ],
       "hash_alg": "md5_utf8_join_pipe",
@@ -470,6 +471,7 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
+		"line_pattern.segment_count",
         "line_pattern.segments_def_hash"
       ],
       "sig_hash_schema": "line_patterns.sig_hash.v2"
