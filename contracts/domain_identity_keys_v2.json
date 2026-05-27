@@ -437,12 +437,19 @@
         "line_pattern.segment_count",
         "line_pattern.segments_def_hash"
       ],
-      "allowed_key_prefixes": [],
+      "allowed_key_prefixes": [
+        "line_pattern.seg["
+      ],
       "required_keys": [
         "line_pattern.segment_count",
         "line_pattern.segments_def_hash"
       ],
       "sig_hash_schema": "line_patterns.sig_hash.v2",
+      "sig_hash_keys": [
+        "line_pattern.segment_count",
+        "line_pattern.segments_def_hash"
+      ],
+      "sig_hash_key_prefixes": [],
       "minima": {
         "block_if_any_required_not_ok": true
       },
@@ -799,6 +806,7 @@
       "domain_family": "view_filter_definitions",
       "allowed_keys": [
         "vf.categories",
+        "vf.def_hash",
         "vf.logic_root",
         "vf.rule_count"
       ],
@@ -810,6 +818,11 @@
         "vf.rule_count"
       ],
       "sig_hash_schema": "view_filter_definitions.sig_hash.v2",
+      "sig_hash_keys": [
+        "vf.categories",
+        "vf.logic_root",
+        "vf.rule_count"
+      ],
       "minima": {
         "block_if_any_required_not_ok": true
       },

@@ -465,7 +465,10 @@
         "segments_norm_hash excluded from sig_hash — belongs in join_hash only (policy v3).",
         "sig_hash distinguishes scale variants; join_hash collapses them for governance equivalence.",
         "Cross-domain refs (obj_style.pattern_ref.sig_hash, line_style.pattern_ref.sig_hash) are written",
-        "at extraction time from ctx[line_pattern_uid_to_hash] = sig_hash_v2 (extractor-computed).",
+        "at extraction time from ctx[line_pattern_uid_to_hash] which holds the extractor-computed sig_hash.",
+        "Post-extraction sig_hash recomputation must produce the same value for ctx refs to remain valid.",
+        "Indexed seg[NNN].* items are in identity_basis.items (canonical evidence) but NOT in the preimage;",
+        "allowed_item_prefixes is [] so the policy stage hashes only segment_count + segments_def_hash.",
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
