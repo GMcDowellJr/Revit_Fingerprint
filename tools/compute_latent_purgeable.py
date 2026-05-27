@@ -410,26 +410,35 @@ def _classify(
     consumer_domains = chain["consumer_domains"]
     present_for_run = domains_present.get(run_id, set())
 
-    # Any consumer domain had zero records for this export_run_id — cannot infer
-    if any(d not in present_for_run for d in consumer_domains):
-        return ("indeterminate", "consumer_domain_absent", 0, 0)
-
-    # All present consumer domains had missing shard files — no ref data at all
-    if all(d in missing_shard_domains for d in consumer_domains):
-        return ("indeterminate", "ref_field_missing", 0, 0)
-
     ref = ref_data_by_run.get(run_id)
-    if ref is None:
-        return ("indeterminate", "ref_field_missing", 0, 0)
 
-    counts_entry = ref["counts"].get(sig_hash, {"in_use": 0, "total": 0})
-    in_use_cnt = counts_entry["in_use"]
-    total_cnt = counts_entry["total"]
+    # Hash membership checks first — finding the sig_hash in a present domain is
+    # conclusive regardless of whether other consumer domains are absent or have
+    # missing shards.  A project may legitimately lack some view template splits
+    # (e.g. no schedules), but if the present splits already show the record is
+    # in-use there is no need to treat the result as indeterminate.
+    if ref is not None:
+        counts_entry = ref["counts"].get(sig_hash, {"in_use": 0, "total": 0})
+        in_use_cnt = counts_entry["in_use"]
+        total_cnt = counts_entry["total"]
 
-    if sig_hash in ref["in_use_hashes"]:
-        return ("false", "has_nopurgeable_consumer", in_use_cnt, total_cnt)
-    if sig_hash in ref["all_hashes"]:
-        return ("true", "all_consumers_purgeable", in_use_cnt, total_cnt)
+        if sig_hash in ref["in_use_hashes"]:
+            return ("false", "has_nopurgeable_consumer", in_use_cnt, total_cnt)
+        if sig_hash in ref["all_hashes"]:
+            return ("true", "all_consumers_purgeable", in_use_cnt, total_cnt)
+
+    # Hash not found in any present domain.  Coverage gaps now matter: if any
+    # consumer domain is absent or its shard is missing, we cannot safely
+    # conclude the record is unreferenced.
+    absent_or_missing = {
+        d for d in consumer_domains
+        if d not in present_for_run or d in missing_shard_domains
+    }
+    if absent_or_missing:
+        has_absent = any(d not in present_for_run for d in absent_or_missing)
+        reason = "consumer_domain_absent" if has_absent else "ref_field_missing"
+        return ("indeterminate", reason, 0, 0)
+
     return ("true", "no_consumers_in_scope", 0, 0)
 
 
