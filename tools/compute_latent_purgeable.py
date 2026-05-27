@@ -109,8 +109,15 @@ CHAINS: List[dict] = [
             "view_templates_elevations_sections_detail",
             "view_templates_schedules",
             "view_templates_renderings_drafting",
+            "view_filter_applications_view_templates",
         ],
-        # Wildcard: view_template.sig.filter[NNN].def_sig for any zero-padded NNN
+        # Wildcard: view_template.sig.filter[NNN].def_sig (view templates)
+        #           vfa.stack[NNN].filter_sig_hash (filter application stacks)
+        # Both key patterns resolve to the VFD sig_hash via
+        # ctx["view_filter_uid_to_sig_hash_v2"].
+        # VFA records carry is_purgeable=None (unsupported_not_applicable);
+        # the conservative rule treats non-true as non-purgeable, so any
+        # VFD referenced by a VFA record is counted as in-use.
         "ref_item_keys": None,
     },
 ]
@@ -127,11 +134,18 @@ def _is_vfd_ref_key(item_key: str) -> bool:
     )
 
 
+def _is_vfa_filter_ref_key(item_key: str) -> bool:
+    return (
+        item_key.startswith("vfa.stack[")
+        and item_key.endswith("].filter_sig_hash")
+    )
+
+
 def _build_matcher(chain: dict) -> Callable[[str], bool]:
     """Return a callable(item_key) -> bool for the chain's ref items."""
     if chain["ref_item_keys"] is None:
         if chain["target_domain"] == "view_filter_definitions":
-            return _is_vfd_ref_key
+            return lambda key: _is_vfd_ref_key(key) or _is_vfa_filter_ref_key(key)
         raise ValueError(
             f"No wildcard matcher defined for target domain: {chain['target_domain']}"
         )
