@@ -15,8 +15,9 @@ Writes latent_purgeable.csv.  Does NOT mutate any existing CSV.
 Usage:
     python tools/compute_latent_purgeable.py \\
         --records-dir <path_to_extractor_out_dir> \\
-        [--out-file   <path>/latent_purgeable.csv] \\
-        [--chains     arrowheads,line_patterns] \\
+        [--out-file        <path>/latent_purgeable.csv] \\
+        [--chains          arrowheads,line_patterns] \\
+        [--passthrough | --no-passthrough] \\
         [--dry-run]
 """
 from __future__ import annotations
@@ -164,6 +165,10 @@ def _is_purgeable_true(val: str) -> bool:
     return (val or "").strip().lower() == "true"
 
 
+def _is_purgeable_false(val: str) -> bool:
+    return (val or "").strip().lower() == "false"
+
+
 def _make_zero_counts() -> dict:
     return {"in_use": 0, "total": 0}
 
@@ -201,6 +206,7 @@ def _load_records(
     Dict[str, Dict[str, List[dict]]],   # domain_records[run_id][domain] = [{...}]
     Dict[str, Set[str]],                # domains_present[run_id] = set of domain names
     Dict[Tuple[str, str, str], str],    # purgeable_by_pk[(run_id, domain, pk)] = val
+    Set[str],                           # all_seen_domains (every domain name in file)
 ]:
     """Single-pass load of records.csv for all domains of interest.
 
@@ -212,17 +218,24 @@ def _load_records(
 
     purgeable_by_pk provides the is_purgeable value for each consumer record so
     Step 2 can decide whether a reference is in_use.
+
+    all_seen_domains is the complete set of domain names encountered in the file
+    (collected before the domains_of_interest filter) — used to discover
+    passthrough domains in a subsequent targeted second pass.
     """
     domain_records: Dict[str, Dict[str, List[dict]]] = defaultdict(
         lambda: defaultdict(list)
     )
     domains_present: Dict[str, Set[str]] = defaultdict(set)
     purgeable_by_pk: Dict[Tuple[str, str, str], str] = {}
+    all_seen_domains: Set[str] = set()
 
     with open(records_csv, encoding="utf-8-sig", newline="") as fh:
         reader = csv.DictReader(fh)
         for row in reader:
             domain = row.get("domain", "")
+            if domain:
+                all_seen_domains.add(domain)
             if domain not in domains_of_interest:
                 continue
             run_id = row.get("export_run_id", "")
@@ -240,7 +253,7 @@ def _load_records(
                 }
             )
 
-    return dict(domain_records), dict(domains_present), purgeable_by_pk
+    return dict(domain_records), dict(domains_present), purgeable_by_pk, all_seen_domains
 
 
 # ---------------------------------------------------------------------------
@@ -507,6 +520,7 @@ def _print_summary(
     chain_summaries: List[dict],
     dry_run: bool,
     out_file: Path,
+    passthrough_summary: Optional[dict] = None,
 ) -> None:
     if dry_run:
         print("\n[dry-run] No output file written.")
@@ -549,6 +563,30 @@ def _print_summary(
         print(f"  Total records:         {stats['total']:>6}")
         print()
 
+    if passthrough_summary:
+        rc = passthrough_summary["reason_counts"]
+        print(
+            f"Passthrough domains: {passthrough_summary['domain_count']} domains,"
+            f" {passthrough_summary['total']} total records"
+        )
+        print(
+            f"  Direct purgeable   (is_purgeable_direct):  "
+            f"{rc.get('is_purgeable_direct', 0):>8}"
+        )
+        print(
+            f"  Not purgeable      (not_purgeable_direct): "
+            f"{rc.get('not_purgeable_direct', 0):>8}"
+        )
+        print(
+            f"  No purge signal    (no_purge_signal):       "
+            f"{rc.get('no_purge_signal', 0):>8}"
+        )
+        print(
+            f"  Indeterminate      (blocked_no_sig_hash):   "
+            f"{rc.get('blocked_no_sig_hash', 0):>8}"
+        )
+        print()
+
 
 # ---------------------------------------------------------------------------
 # Main
@@ -585,6 +623,16 @@ def main() -> None:
         ),
     )
     ap.add_argument(
+        "--passthrough",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "Emit passthrough rows for all non-chain domains directly from"
+            " records.csv (default: enabled when --chains is not specified,"
+            " disabled when --chains is specified)."
+        ),
+    )
+    ap.add_argument(
         "--dry-run",
         action="store_true",
         help="Print counts without writing the output file",
@@ -607,7 +655,9 @@ def main() -> None:
     doi = _domains_of_interest(active_chains)
 
     print(f"Loading records from {records_csv} ...")
-    domain_records, domains_present, purgeable_by_pk = _load_records(records_csv, doi)
+    domain_records, domains_present, purgeable_by_pk, all_seen_domains = _load_records(
+        records_csv, doi
+    )
 
     all_run_ids: Set[str] = (
         set(domain_records.keys()) | set(domains_present.keys())
@@ -681,6 +731,81 @@ def main() -> None:
             {"chain": chain, "stats": stats, "reason_counts": reason_counts}
         )
 
+    # -------------------------------------------------------------------------
+    # Passthrough: emit rows for all non-chain domains directly from records.csv
+    # -------------------------------------------------------------------------
+
+    # Passthrough domains = every domain in records.csv that is not already
+    # a target or consumer in the active chains.
+    chain_target_domains = {c["target_domain"] for c in active_chains}
+    chain_consumer_domains = {d for c in active_chains for d in c["consumer_domains"]}
+    chain_doi = chain_target_domains | chain_consumer_domains
+    passthrough_domains = all_seen_domains - chain_doi
+    passthrough_domains.discard("")
+
+    # Default: passthrough enabled when no --chains filter is applied.
+    run_passthrough = (
+        args.passthrough if args.passthrough is not None else not bool(args.chains)
+    )
+
+    passthrough_summary: Optional[dict] = None
+
+    if run_passthrough and passthrough_domains:
+        print(
+            f"Processing passthrough: {len(passthrough_domains)} domain(s) ..."
+        )
+        pt_domain_records, _, _, _ = _load_records(records_csv, passthrough_domains)
+
+        pt_reason_counts: Dict[str, int] = defaultdict(int)
+        pt_total = 0
+
+        for run_id in sorted(set(pt_domain_records.keys())):
+            run_domain_map = pt_domain_records.get(run_id, {})
+            for domain in sorted(passthrough_domains):
+                recs = run_domain_map.get(domain)
+                if not recs:
+                    continue
+                for rec in recs:
+                    sig_hash = rec["sig_hash"]
+                    is_purgeable = rec["is_purgeable"]
+
+                    if not sig_hash or sig_hash.strip().lower() == "none":
+                        lp = "indeterminate"
+                        pt_reason = "blocked_no_sig_hash"
+                    elif _is_purgeable_true(is_purgeable):
+                        lp = "true"
+                        pt_reason = "is_purgeable_direct"
+                    elif _is_purgeable_false(is_purgeable):
+                        lp = "false"
+                        pt_reason = "not_purgeable_direct"
+                    else:
+                        lp = "indeterminate"
+                        pt_reason = "no_purge_signal"
+
+                    output_rows.append(
+                        {
+                            "schema_version": OUTPUT_SCHEMA_VERSION,
+                            "export_run_id": run_id,
+                            "domain": domain,
+                            "record_pk": rec["record_pk"],
+                            "sig_hash": sig_hash,
+                            "latent_purgeable": lp,
+                            "latent_purgeable_reason": pt_reason,
+                            "consuming_domains": "",
+                            "consumer_count_in_use": "0",
+                            "consumer_count_total": "0",
+                        }
+                    )
+                    pt_total += 1
+                    pt_reason_counts[pt_reason] += 1
+
+        passthrough_summary = {
+            "domain_count": len(passthrough_domains),
+            "total": pt_total,
+            "reason_counts": dict(pt_reason_counts),
+        }
+        print(f"  {pt_total} passthrough row(s) added.")
+
     # Sort: (export_run_id, domain, record_pk)
     output_rows.sort(
         key=lambda r: (r["export_run_id"], r["domain"], r["record_pk"])
@@ -690,7 +815,7 @@ def main() -> None:
         _write_output(out_file, output_rows)
         print(f"\nWrote {len(output_rows)} row(s) to {out_file}")
 
-    _print_summary(chain_summaries, args.dry_run, out_file)
+    _print_summary(chain_summaries, args.dry_run, out_file, passthrough_summary)
 
 
 if __name__ == "__main__":
