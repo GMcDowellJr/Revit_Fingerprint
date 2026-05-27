@@ -73,6 +73,7 @@ CHAINS: List[dict] = [
         ],
         "ref_item_keys": [
             "dim_type.tick_mark_sig_hash",
+            "dim_type.leader_arrowhead_sig_hash",
             "text_type.leader_arrowhead_sig_hash",
         ],
     },
@@ -80,9 +81,11 @@ CHAINS: List[dict] = [
         "target_domain": "line_patterns",
         "consumer_domains": [
             "object_styles_model",
+            "line_styles",
         ],
         "ref_item_keys": [
             "obj_style.pattern_ref.sig_hash",
+            "line_style.pattern_ref.sig_hash",
         ],
     },
     {
