@@ -451,12 +451,8 @@
       "sig_hash_schema": "identity.sig_hash.v1"
     },
     "line_patterns": {
-      "allowed_item_prefixes": [
-        "line_pattern.seg["
-      ],
+      "allowed_item_prefixes": [],
       "allowed_items": [
-        "line_pattern.segments_norm_hash",
-        "line_pattern.segment_count",
         "line_pattern.segments_def_hash"
       ],
       "hash_alg": "md5_utf8_join_pipe",
