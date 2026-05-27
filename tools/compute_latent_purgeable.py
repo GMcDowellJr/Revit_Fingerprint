@@ -81,6 +81,9 @@ CHAINS: List[dict] = [
         "target_domain": "line_patterns",
         "consumer_domains": [
             "object_styles_model",
+            "object_styles_annotation",
+            "object_styles_analytical",
+            "object_styles_imported",
             "line_styles",
         ],
         "ref_item_keys": [
