@@ -13,7 +13,7 @@ import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 _TOOLS_DIR = str(Path(__file__).resolve().parent)
 if _TOOLS_DIR not in sys.path:
@@ -431,7 +431,11 @@ def _remap_vco_domain(source_domain: str, rec: Dict[str, Any]) -> Optional[str]:
     return source_domain
 
 
-def _load_identity_items_by_record(phase0_dir: Optional[Path], domain: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
+def _load_identity_items_by_record(
+    phase0_dir: Optional[Path],
+    domain: Optional[str] = None,
+    allowed_record_pks: Optional[Set[str]] = None,
+) -> Dict[str, List[Dict[str, Any]]]:
     if phase0_dir is None:
         return {}
 
@@ -455,6 +459,8 @@ def _load_identity_items_by_record(phase0_dir: Optional[Path], domain: Optional[
             record_pk = _safe_str(row.get("record_pk"))
             if not record_pk:
                 continue
+            if allowed_record_pks is not None and record_pk not in allowed_record_pks:
+                continue  # skip rows for records not participating in analysis
             out[record_pk].append({
                 "k": _safe_str(row.get("item_key")),
                 "v": _safe_str(row.get("item_value")),
@@ -971,11 +977,16 @@ def emit_analysis(
     for dom in domains:
         print(f"[extractor] domain={dom} (start)", flush=True)
         _t_dom_start = time.perf_counter()
-        _t_ii = time.perf_counter()
-        identity_items_by_record = _load_identity_items_by_record(phase0_dir, dom)
-        _t_ii = time.perf_counter() - _t_ii
         cluster_items = dom_clusters.get(dom, [])
         domain_records = records_by_domain.get(dom, [])
+        _active_pks: Set[str] = {
+            r["record_pk"]
+            for r in domain_records
+            if r.get("join_hash", "") and r.get("record_pk", "")
+        }
+        _t_ii = time.perf_counter()
+        identity_items_by_record = _load_identity_items_by_record(phase0_dir, dom, allowed_record_pks=_active_pks)
+        _t_ii = time.perf_counter() - _t_ii
         domain_files_present = len({r["export_run_id"] for r in domain_records})
         _t_lr = time.perf_counter()
         label_population_by_hash, annotations, llm_cache = _load_label_resolution_inputs(results_v21_dir, dom, label_synth_dir=label_synth_dir)
@@ -1129,8 +1140,12 @@ def emit_analysis(
             for r in authority_rows
             if r.get("domain") == dom and r.get("pattern_id")
         }
+        _records_by_eid: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+        for _r in domain_records:
+            _records_by_eid[_r["export_run_id"]].append(_r)
+
         for export_run_id in exports:
-            dom_records = [r for r in domain_records if r["export_run_id"] == export_run_id]
+            dom_records = _records_by_eid.get(export_run_id, [])
             total = len(dom_records)
             per_pat = defaultdict(int)
             unknown = 0
