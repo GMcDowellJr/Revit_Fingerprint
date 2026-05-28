@@ -4,6 +4,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 import csv
 import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -49,6 +50,33 @@ ROLE_GROUP_ALIASES = {
     "template-group": ["Generic", "Generic-Host", "Template"],
 }
 VALID_ROLES = {"Project", "Template", "Generic", "Generic-Host", "Container"}
+
+
+def _view_out_dir(out_dir: Path, purge_view: str) -> Path:
+    """Return out_dir/all or out_dir/used."""
+    return out_dir / purge_view
+
+
+def _ensure_latent_purgeable(latent_purgeable_file: Path, records_dir: Path) -> Path:
+    """Run compute_latent_purgeable.py if latent_purgeable.csv does not exist."""
+    if latent_purgeable_file.exists():
+        print(f"[run] latent_purgeable.csv found at {latent_purgeable_file}")
+        return latent_purgeable_file
+
+    print(f"[run] latent_purgeable.csv not found — running compute_latent_purgeable.py ...")
+    cmd = [
+        sys.executable,
+        str(Path(__file__).parent.parent / "compute_latent_purgeable.py"),
+        "--records-dir", str(records_dir),
+        "--out-file", str(latent_purgeable_file),
+    ]
+    subprocess.run(cmd, check=True)
+    if not latent_purgeable_file.exists():
+        raise RuntimeError(
+            f"compute_latent_purgeable.py completed but {latent_purgeable_file} was not created"
+        )
+    print(f"[run] latent_purgeable.csv written to {latent_purgeable_file}")
+    return latent_purgeable_file
 
 
 def _emit_meta_scatter_thresholds(out_dir: Path, run_id: str, domain_filter: str = "") -> None:
@@ -123,6 +151,8 @@ def _run_pipeline_once(
     population_registry_dir: Optional[Path] = None,
     scope_key_filter: Optional[str] = None,
     allowed_export_run_ids: Optional[Set[str]] = None,
+    purge_view: str = "all",
+    latent_purgeable_file: Optional[Path] = None,
 ) -> Dict[str, object]:
     total_bundles = 0
     total_edges = 0
@@ -138,6 +168,8 @@ def _run_pipeline_once(
         population_registry_dir,
         scope_key_filter,
         allowed_export_run_ids,
+        purge_view,
+        latent_purgeable_file,
     )
     t1 = time.time() - t0
     print(f"[run] domain={domain} step1_seconds={t1:.3f}")
@@ -294,6 +326,8 @@ def run_bundle_analysis(
     compute_share_profile: bool = False,
     roles: Optional[List[str]] = None,
     metadata_file: Optional[Path] = None,
+    purge_view: str = "both",
+    latent_purgeable_file: Optional[Path] = None,
 ) -> Dict[str, int]:
     presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     run_id = resolve_analysis_run_id(presence_rows, analysis_run_id)
@@ -325,151 +359,180 @@ def run_bundle_analysis(
                     allowed_export_run_ids.add(eid)
         print(f"[role_filter] roles={resolved_roles} allowed_files={len(allowed_export_run_ids)}")
 
+    # Pre-step: ensure latent_purgeable.csv exists when needed
+    if purge_view in ("used", "both"):
+        records_candidates = [
+            analysis_dir / "records",
+            analysis_dir.parent / "records",
+        ]
+        records_dir_derived = next((p for p in records_candidates if p.is_dir()), analysis_dir.parent / "records")
+        if latent_purgeable_file is None:
+            latent_purgeable_file = records_dir_derived / "latent_purgeable.csv"
+        latent_purgeable_file = _ensure_latent_purgeable(latent_purgeable_file, records_dir_derived)
+
+    views_to_run = ["all", "used"] if purge_view == "both" else [purge_view]
+
     total_bundles = 0
     total_edges = 0
     total_files_no_bundle = 0
-    processed = 0
-    domain_elapsed_seconds: Dict[str, float] = {}
-    domain_population_counts: Dict[str, int] = {}
-    timing_rows: List[Dict[str, str]] = []
-    compare_summary_rows: List[Dict[str, str]] = []
-    reference: Optional[Dict[str, object]] = None
+    processed = len([d for d in domains if d])
 
+    reference: Optional[Dict[str, object]] = None
     if compare:
         reference = load_and_validate(analysis_dir, SCHEMA_VERSION)
-        compare_dir = out_dir.parent / "compare"
-        compare_dir.mkdir(parents=True, exist_ok=True)
 
     if not discover_populations_flag:
-        role_dir_name = f"role_{'_'.join(resolved_roles)}" if resolved_roles else ""
-        role_stage_root = out_dir / "_role_stage"
-        if resolved_roles and role_stage_root.exists():
-            shutil.rmtree(role_stage_root)
-        for dom in domains:
-            if not dom:
-                continue
-            processed += 1
-            print(f"[run] domain={dom} start")
-            try:
-                if not compare:
-                    work_out_base = role_stage_root if resolved_roles else out_dir
-                    stats = _run_pipeline_once(
-                        analysis_dir=analysis_dir,
-                        work_out_dir=work_out_base,
-                        domain=dom,
-                        run_id=run_id,
-                        min_support_count=min_support_count,
-                        min_support_pct=min_support_pct,
-                        compute_share_profile=compute_share_profile,
-                        analysis_run_id=run_id,
-                        allowed_export_run_ids=allowed_export_run_ids,
-                    )
-                else:
-                    work_out_base = role_stage_root if resolved_roles else out_dir
-                    t0 = time.time()
-                    build_membership_matrix(
-                        analysis_dir,
-                        work_out_base,
-                        dom,
-                        run_id,
-                        None,
-                        None,
-                        None,
-                        allowed_export_run_ids,
-                    )
-                    t1 = time.time() - t0
-                    print(f"[run] domain={dom} step1_seconds={t1:.3f}")
+        for view in views_to_run:
+            view_out = _view_out_dir(out_dir, view)
+            view_out.mkdir(parents=True, exist_ok=True)
+            lp_file = latent_purgeable_file if view == "used" else None
 
-                    workers = max(2, min(4, (len(domains) or 1)))
-                    with ThreadPoolExecutor(max_workers=workers) as executor:
-                        discovery_future = executor.submit(
-                            _run_step2_to_step7,
+            role_dir_name = f"role_{'_'.join(resolved_roles)}" if resolved_roles else ""
+            role_stage_root = view_out / "_role_stage"
+            if resolved_roles and role_stage_root.exists():
+                shutil.rmtree(role_stage_root)
+
+            view_timing_rows: List[Dict[str, str]] = []
+            view_compare_summary_rows: List[Dict[str, str]] = []
+            compare_reset_domains: Set[str] = set()
+
+            compare_out: Optional[Path] = None
+            if compare:
+                compare_out = view_out.parent / f"compare_{view}"
+                compare_out.mkdir(parents=True, exist_ok=True)
+
+            for dom in domains:
+                if not dom:
+                    continue
+                print(f"[run] domain={dom} start")
+                try:
+                    work_out_base = role_stage_root if resolved_roles else view_out
+                    if not compare:
+                        stats = _run_pipeline_once(
+                            analysis_dir=analysis_dir,
+                            work_out_dir=work_out_base,
+                            domain=dom,
+                            run_id=run_id,
+                            min_support_count=min_support_count,
+                            min_support_pct=min_support_pct,
+                            compute_share_profile=compute_share_profile,
+                            analysis_run_id=run_id,
+                            allowed_export_run_ids=allowed_export_run_ids,
+                            purge_view=view,
+                            latent_purgeable_file=lp_file,
+                        )
+                    else:
+                        t0 = time.time()
+                        build_membership_matrix(
                             analysis_dir,
                             work_out_base,
                             dom,
-                            min_support_count,
-                            min_support_pct,
                             run_id,
-                            compute_share_profile,
+                            None,
+                            None,
+                            None,
+                            allowed_export_run_ids,
+                            view,
+                            lp_file,
                         )
-                        compare_started = time.time()
-                        compare_future = executor.submit(
-                            run_compare_for_domain,
-                            analysis_dir,
-                            work_out_base,
-                            reference or {},
-                            dom,
-                            eligible_export_run_ids=allowed_export_run_ids,
-                        )
-                        tail = discovery_future.result()
-                        compare_summary = compare_future.result()
-                    compare_seconds = time.time() - compare_started
-                    compare_summary_rows.append(compare_summary)
-                    step_times = {"step1": t1, **tail.get("step_times", {})}
-                    print(
-                        f"[timing] domain={dom} discovery_seconds={sum(float(step_times.get(k, 0.0)) for k in ('step1','step2','step2b','step3','step4','step5','step6','step7')):.3f} "
-                        f"compare_seconds={compare_seconds:.3f}"
-                    )
-                    stats = {
-                        "total_bundles_found": tail.get("total_bundles_found", 0),
-                        "total_dag_edges": tail.get("total_dag_edges", 0),
-                        "files_with_no_bundle_match": tail.get("files_with_no_bundle_match", 0),
-                        "step_times": step_times,
-                    }
-                if resolved_roles:
-                    produced = work_out_base / dom
-                    final_out = out_dir / dom / role_dir_name
-                    if final_out.exists():
-                        shutil.rmtree(final_out)
-                    final_out.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(produced), str(final_out))
-                total_bundles += stats["total_bundles_found"]
-                total_edges += stats["total_dag_edges"]
-                total_files_no_bundle += stats["files_with_no_bundle_match"]
-                step_times = stats.get("step_times", {})
-                for step_name in TIMING_STEPS:
-                    timing_rows.append(
-                        {
-                            "schema_version": SCHEMA_VERSION,
-                            "analysis_run_id": run_id,
-                            "domain": dom,
-                            "population_id": "",
-                            "step": step_name,
-                            "seconds": f"{float(step_times.get(step_name, 0.0)):.3f}",
-                        }
-                    )
-            except Exception as exc:
-                print(f"[run][error] domain={dom} failed: {exc}")
+                        t1 = time.time() - t0
+                        print(f"[run] domain={dom} step1_seconds={t1:.3f}")
 
-        existing_timing_rows = read_csv_rows(out_dir / "bundle_analysis_timing.csv") if (out_dir / "bundle_analysis_timing.csv").exists() else []
-        merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + timing_rows
-        merged_timing_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("step", "")))
-        atomic_write_csv(out_dir / "bundle_analysis_timing.csv", TIMING_FIELDNAMES, merged_timing_rows)
-        if compare:
-            compare_rows = [r for r in compare_summary_rows if r.get("analysis_run_id", "") == run_id]
-            compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
-            atomic_write_csv(
-                out_dir.parent / "compare" / "compare_run_summary.csv",
-                [
-                    "reference_bundle_id",
-                    "effective_date",
-                    "analysis_run_id",
-                    "domain",
-                    "population_id",
-                    "files_scored",
-                    "full_count",
-                    "partial_count",
-                    "none_count",
-                    "no_reference_count",
-                ],
-                compare_rows,
-            )
+                        workers = max(2, min(4, (len(domains) or 1)))
+                        with ThreadPoolExecutor(max_workers=workers) as executor:
+                            discovery_future = executor.submit(
+                                _run_step2_to_step7,
+                                analysis_dir,
+                                work_out_base,
+                                dom,
+                                min_support_count,
+                                min_support_pct,
+                                run_id,
+                                compute_share_profile,
+                            )
+                            compare_started = time.time()
+                            compare_future = executor.submit(
+                                run_compare_for_domain,
+                                analysis_dir,
+                                work_out_base,
+                                reference or {},
+                                dom,
+                                compare_out_dir=compare_out,
+                                eligible_export_run_ids=allowed_export_run_ids,
+                            )
+                            tail = discovery_future.result()
+                            compare_summary = compare_future.result()
+                        compare_seconds = time.time() - compare_started
+                        view_compare_summary_rows.append(compare_summary)
+                        step_times = {"step1": t1, **tail.get("step_times", {})}
+                        print(
+                            f"[timing] domain={dom} discovery_seconds={sum(float(step_times.get(k, 0.0)) for k in ('step1','step2','step2b','step3','step4','step5','step6','step7')):.3f} "
+                            f"compare_seconds={compare_seconds:.3f}"
+                        )
+                        stats = {
+                            "total_bundles_found": tail.get("total_bundles_found", 0),
+                            "total_dag_edges": tail.get("total_dag_edges", 0),
+                            "files_with_no_bundle_match": tail.get("files_with_no_bundle_match", 0),
+                            "step_times": step_times,
+                        }
+
+                    if resolved_roles:
+                        produced = work_out_base / dom
+                        final_out = view_out / dom / role_dir_name
+                        if final_out.exists():
+                            shutil.rmtree(final_out)
+                        final_out.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(produced), str(final_out))
+
+                    total_bundles += stats["total_bundles_found"]
+                    total_edges += stats["total_dag_edges"]
+                    total_files_no_bundle += stats["files_with_no_bundle_match"]
+                    step_times = stats.get("step_times", {})
+                    for step_name in TIMING_STEPS:
+                        view_timing_rows.append(
+                            {
+                                "schema_version": SCHEMA_VERSION,
+                                "analysis_run_id": run_id,
+                                "domain": dom,
+                                "population_id": "",
+                                "step": step_name,
+                                "seconds": f"{float(step_times.get(step_name, 0.0)):.3f}",
+                            }
+                        )
+                except Exception as exc:
+                    print(f"[run][error] domain={dom} failed: {exc}")
+
+            existing_timing_rows = read_csv_rows(view_out / "bundle_analysis_timing.csv") if (view_out / "bundle_analysis_timing.csv").exists() else []
+            merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + view_timing_rows
+            merged_timing_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("step", "")))
+            atomic_write_csv(view_out / "bundle_analysis_timing.csv", TIMING_FIELDNAMES, merged_timing_rows)
+
+            if compare and compare_out is not None:
+                compare_rows = [r for r in view_compare_summary_rows if r.get("analysis_run_id", "") == run_id]
+                compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
+                atomic_write_csv(
+                    compare_out / "compare_run_summary.csv",
+                    [
+                        "reference_bundle_id",
+                        "effective_date",
+                        "analysis_run_id",
+                        "domain",
+                        "population_id",
+                        "files_scored",
+                        "full_count",
+                        "partial_count",
+                        "none_count",
+                        "no_reference_count",
+                    ],
+                    compare_rows,
+                )
+
+            _emit_meta_scatter_thresholds(view_out, run_id, domain)
 
         print(
             f"[run] complete domains_processed={processed} total_bundles_found={total_bundles} "
             f"total_dag_edges={total_edges} files_with_no_bundle_match={total_files_no_bundle}"
         )
-        _emit_meta_scatter_thresholds(out_dir, run_id, domain)
         return {
             "domains_processed": processed,
             "total_bundles_found": total_bundles,
@@ -477,6 +540,7 @@ def run_bundle_analysis(
             "files_with_no_bundle_match": total_files_no_bundle,
         }
 
+    # ── Population-aware path ──────────────────────────────────────────────────
     records_csv_candidates = [
         analysis_dir / "records" / "records.csv",
         analysis_dir.parent / "records" / "records.csv",
@@ -504,17 +568,18 @@ def run_bundle_analysis(
     step0_times: Dict[str, float] = {}
     domain_primary_counts: Dict[str, int] = {}
     outliers_by_domain: Dict[str, int] = {}
-    compare_reset_domains: Set[str] = set()
-
+    domain_elapsed_seconds: Dict[str, float] = {}
+    domain_population_counts: Dict[str, int] = {}
     populations_analyzed = 0
-    staging_root = out_dir / "_population_runs"
-    if staging_root.exists():
-        shutil.rmtree(staging_root)
+
+    # Per-view accumulation structures (keyed by view name)
+    view_timing_rows: Dict[str, List[Dict[str, str]]] = {v: [] for v in views_to_run}
+    view_compare_summary_rows: Dict[str, List[Dict[str, str]]] = {v: [] for v in views_to_run}
+    compare_reset_domains_by_view: Dict[str, Set[str]] = {v: set() for v in views_to_run}
 
     for dom in domains:
         if not dom:
             continue
-        processed += 1
         try:
             t0 = time.time()
             discover_populations(
@@ -560,6 +625,7 @@ def run_bundle_analysis(
         if not pop_ids:
             print(f"[run][warn] domain={dom} has no primary populations; skipping main pass")
             continue
+
         for pid, _scope_key_from_summary in pop_ids:
             scope_keys_for_population = sorted(
                 {
@@ -582,73 +648,85 @@ def run_bundle_analysis(
             print(f"[run] domain={dom} population_id={pid} start")
             populations_analyzed += 1
             domain_population_counts[dom] = domain_population_counts.get(dom, 0) + 1
-            stage_out = staging_root / f"{dom}__{pid}"
-            # `pid` already includes the "pop_" prefix from step0.
-            final_out_base = out_dir / dom
-            if resolved_roles:
-                final_out_base = final_out_base / f"role_{'_'.join(resolved_roles)}"
-            final_out = final_out_base / pid
-            if stage_out.exists():
-                shutil.rmtree(stage_out)
-            if final_out.exists():
-                shutil.rmtree(final_out)
-            try:
-                t0 = time.time()
-                stats = _run_pipeline_once(
-                    analysis_dir=analysis_dir,
-                    work_out_dir=stage_out,
-                    domain=dom,
-                    run_id=run_id,
-                    min_support_count=min_support_count,
-                    min_support_pct=min_support_pct,
-                    compute_share_profile=compute_share_profile,
-                    population_id=pid,
-                    analysis_run_id=run_id,
-                    population_registry_dir=out_dir,
-                    scope_key_filter=population_scope_key,
-                    allowed_export_run_ids=allowed_export_run_ids,
-                )
-                domain_elapsed_seconds[dom] = domain_elapsed_seconds.get(dom, 0.0) + (time.time() - t0)
-                total_bundles += stats["total_bundles_found"]
-                total_edges += stats["total_dag_edges"]
-                total_files_no_bundle += stats["files_with_no_bundle_match"]
-                step_times = stats.get("step_times", {})
-                for step_name in TIMING_STEPS:
-                    timing_rows.append(
-                        {
-                            "schema_version": SCHEMA_VERSION,
-                            "analysis_run_id": run_id,
-                            "domain": dom,
-                            "population_id": pid,
-                            "step": step_name,
-                            "seconds": f"{float(step_times.get(step_name, 0.0)):.3f}",
-                        }
-                    )
 
-                if compare and reference is not None:
-                    membership_rows = read_csv_rows(stage_out / dom / "membership_matrix.csv")
-                    eligible_export_run_ids = {
-                        str(row.get("export_run_id", "")).strip()
-                        for row in membership_rows
-                        if row.get("analysis_run_id", "") == run_id and str(row.get("export_run_id", "")).strip()
-                    }
-                    compare_summary = run_compare_for_domain(
+            for view in views_to_run:
+                view_out = _view_out_dir(out_dir, view)
+                view_out.mkdir(parents=True, exist_ok=True)
+                lp_file = latent_purgeable_file if view == "used" else None
+
+                staging_root = view_out / "_population_runs"
+                stage_out = staging_root / f"{dom}__{pid}"
+                final_out_base = view_out / dom
+                if resolved_roles:
+                    final_out_base = final_out_base / f"role_{'_'.join(resolved_roles)}"
+                final_out = final_out_base / pid
+
+                if stage_out.exists():
+                    shutil.rmtree(stage_out)
+                if final_out.exists():
+                    shutil.rmtree(final_out)
+
+                try:
+                    t0 = time.time()
+                    stats = _run_pipeline_once(
                         analysis_dir=analysis_dir,
-                        out_dir=stage_out,
-                        reference=reference,
+                        work_out_dir=stage_out,
                         domain=dom,
-                        compare_out_dir=out_dir.parent / "compare",
+                        run_id=run_id,
+                        min_support_count=min_support_count,
+                        min_support_pct=min_support_pct,
+                        compute_share_profile=compute_share_profile,
                         population_id=pid,
-                        eligible_export_run_ids=eligible_export_run_ids,
-                        reset_domain_rows=dom not in compare_reset_domains,
+                        analysis_run_id=run_id,
+                        population_registry_dir=out_dir,
+                        scope_key_filter=population_scope_key,
+                        allowed_export_run_ids=allowed_export_run_ids,
+                        purge_view=view,
+                        latent_purgeable_file=lp_file,
                     )
-                    compare_reset_domains.add(dom)
-                    compare_summary_rows.append(compare_summary)
-                produced = stage_out / dom
-                final_out.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(produced), str(final_out))
-            except Exception as exc:
-                print(f"[run][error] domain={dom} population_id={pid} failed: {exc}")
+                    domain_elapsed_seconds[dom] = domain_elapsed_seconds.get(dom, 0.0) + (time.time() - t0)
+                    total_bundles += stats["total_bundles_found"]
+                    total_edges += stats["total_dag_edges"]
+                    total_files_no_bundle += stats["files_with_no_bundle_match"]
+                    step_times = stats.get("step_times", {})
+                    for step_name in TIMING_STEPS:
+                        view_timing_rows[view].append(
+                            {
+                                "schema_version": SCHEMA_VERSION,
+                                "analysis_run_id": run_id,
+                                "domain": dom,
+                                "population_id": pid,
+                                "step": step_name,
+                                "seconds": f"{float(step_times.get(step_name, 0.0)):.3f}",
+                            }
+                        )
+
+                    if compare and reference is not None:
+                        membership_csv = stage_out / dom / "membership_matrix.csv"
+                        eligible_export_run_ids = {
+                            str(row.get("export_run_id", "")).strip()
+                            for row in read_csv_rows(membership_csv)
+                            if row.get("analysis_run_id", "") == run_id and str(row.get("export_run_id", "")).strip()
+                        } if membership_csv.exists() else set()
+                        compare_out_dir = view_out.parent / f"compare_{view}"
+                        compare_summary = run_compare_for_domain(
+                            analysis_dir=analysis_dir,
+                            out_dir=stage_out,
+                            reference=reference,
+                            domain=dom,
+                            compare_out_dir=compare_out_dir,
+                            population_id=pid,
+                            eligible_export_run_ids=eligible_export_run_ids,
+                            reset_domain_rows=dom not in compare_reset_domains_by_view[view],
+                        )
+                        compare_reset_domains_by_view[view].add(dom)
+                        view_compare_summary_rows[view].append(compare_summary)
+
+                    produced = stage_out / dom
+                    final_out.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(produced), str(final_out))
+                except Exception as exc:
+                    print(f"[run][error] domain={dom} population_id={pid} view={view} failed: {exc}")
 
     total_outliers = sum(outliers_by_domain.get(dom, 0) for dom in domains)
     print("[run] complete (population-aware)")
@@ -673,42 +751,47 @@ def run_bundle_analysis(
             f"total_seconds={domain_elapsed_seconds.get(dom, 0.0):.2f}"
         )
         if dom in step0_times:
-            timing_rows.append(
-                {
-                    "schema_version": SCHEMA_VERSION,
-                    "analysis_run_id": run_id,
-                    "domain": dom,
-                    "population_id": "",
-                    "step": "step0",
-                    "seconds": f"{step0_times.get(dom, 0.0):.3f}",
-                }
+            for view in views_to_run:
+                view_timing_rows[view].append(
+                    {
+                        "schema_version": SCHEMA_VERSION,
+                        "analysis_run_id": run_id,
+                        "domain": dom,
+                        "population_id": "",
+                        "step": "step0",
+                        "seconds": f"{step0_times.get(dom, 0.0):.3f}",
+                    }
+                )
+
+    for view in views_to_run:
+        view_out = _view_out_dir(out_dir, view)
+        existing_timing_rows = read_csv_rows(view_out / "bundle_analysis_timing.csv") if (view_out / "bundle_analysis_timing.csv").exists() else []
+        merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + view_timing_rows[view]
+        merged_timing_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("step", "")))
+        atomic_write_csv(view_out / "bundle_analysis_timing.csv", TIMING_FIELDNAMES, merged_timing_rows)
+
+        if compare:
+            compare_out_dir = view_out.parent / f"compare_{view}"
+            compare_rows = [r for r in view_compare_summary_rows[view] if r.get("analysis_run_id", "") == run_id]
+            compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
+            atomic_write_csv(
+                compare_out_dir / "compare_run_summary.csv",
+                [
+                    "reference_bundle_id",
+                    "effective_date",
+                    "analysis_run_id",
+                    "domain",
+                    "population_id",
+                    "files_scored",
+                    "full_count",
+                    "partial_count",
+                    "none_count",
+                    "no_reference_count",
+                ],
+                compare_rows,
             )
 
-    existing_timing_rows = read_csv_rows(out_dir / "bundle_analysis_timing.csv") if (out_dir / "bundle_analysis_timing.csv").exists() else []
-    merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + timing_rows
-    merged_timing_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("step", "")))
-    atomic_write_csv(out_dir / "bundle_analysis_timing.csv", TIMING_FIELDNAMES, merged_timing_rows)
-    if compare:
-        compare_rows = [r for r in compare_summary_rows if r.get("analysis_run_id", "") == run_id]
-        compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
-        atomic_write_csv(
-            out_dir.parent / "compare" / "compare_run_summary.csv",
-            [
-                "reference_bundle_id",
-                "effective_date",
-                "analysis_run_id",
-                "domain",
-                "population_id",
-                "files_scored",
-                "full_count",
-                "partial_count",
-                "none_count",
-                "no_reference_count",
-            ],
-            compare_rows,
-        )
-
-    _emit_meta_scatter_thresholds(out_dir, run_id, domain)
+        _emit_meta_scatter_thresholds(view_out, run_id, domain)
 
     return {
         "domains_processed": processed,
@@ -738,6 +821,8 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--compute-share-profile", action="store_true")
     p.add_argument("--metadata-file", type=Path, default=None, help="Path to file_metadata.csv. Required when --roles is used.")
     p.add_argument("--roles", nargs="+", default=None, help="Governance roles: Project Template Generic Generic-Host Container, or alias template-group")
+    p.add_argument("--purge-view", choices=["all", "used", "both"], default="both")
+    p.add_argument("--latent-purgeable-file", type=Path, default=None, help="Path to latent_purgeable.csv")
     return p.parse_args(argv)
 
 
@@ -759,6 +844,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         compute_share_profile=args.compute_share_profile,
         roles=args.roles,
         metadata_file=args.metadata_file,
+        purge_view=args.purge_view,
+        latent_purgeable_file=args.latent_purgeable_file,
     )
     return 0
 

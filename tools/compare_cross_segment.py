@@ -13,18 +13,17 @@ containment) operate on the full join_hash inventories from membership_matrix.cs
 Bundle membership as post-hoc annotation
 -----------------------------------------
 After computing scores, bundle membership is looked up from
-bundle_analysis/<domain>/bundle_membership.csv for each segment and annotated
-onto n_shared using three buckets:
+bundle_analysis/{all,used}/<domain>/bundle_membership.csv for each segment and
+annotated onto n_shared using two views and three buckets each:
 
-  n_shared_bundle_both   — join_hashes in shared that are bundle members in BOTH
-                           segments (core overlap, strongest signal)
-  n_shared_bundle_a_only — bundle member in A, not B (A has institutionalised the
-                           pattern; the "emerging standard" signal)
-  n_shared_bundle_b_only — bundle member in B, not A (same signal, other direction)
+  all_n_shared_bundle_both   — join_hashes in shared that are bundle members in
+                               BOTH segments under the all view
+  all_n_shared_bundle_a_only — bundle member in A (all view), not B
+  all_n_shared_bundle_b_only — bundle member in B (all view), not A
+  used_*                     — same three columns for the used view
 
-The remainder of n_shared are shared but unstructured (weakest signal). Segments
-without bundle_membership.csv (reference or small segments) contribute an empty
-set — annotation counts are always emitted, with zeros when data is absent.
+The used view excludes patterns that are conclusively purgeable; the delta
+between all and used views quantifies passive inheritance.
 
 N-1 pooled comparison (cross_segment_pooled.csv)
 -------------------------------------------------
@@ -118,8 +117,10 @@ SUMMARY_FIELDS: List[str] = [
     "containment_a_in_b_mean", "containment_a_in_b_min",
     "containment_b_in_a_mean", "containment_b_in_a_min",
     "jaccard_mean", "jaccard_p10", "jaccard_p90",
-    "has_bundles_a", "has_bundles_b",
-    "n_shared_bundle_both", "n_shared_bundle_a_only", "n_shared_bundle_b_only",
+    "all_has_bundles_a", "all_has_bundles_b",
+    "all_n_shared_bundle_both", "all_n_shared_bundle_a_only", "all_n_shared_bundle_b_only",
+    "used_has_bundles_a", "used_has_bundles_b",
+    "used_n_shared_bundle_both", "used_n_shared_bundle_a_only", "used_n_shared_bundle_b_only",
     "n_files_a", "n_files_b", "n_pairs",
     "data_sufficient",
     "executed_utc",
@@ -133,7 +134,8 @@ PAIRS_FIELDS: List[str] = [
     "project_label_a", "project_label_b",
     "n_patterns_a", "n_patterns_b", "n_shared",
     "jaccard", "containment_a_in_b", "containment_b_in_a",
-    "n_shared_bundle_both", "n_shared_bundle_a_only", "n_shared_bundle_b_only",
+    "all_n_shared_bundle_both", "all_n_shared_bundle_a_only", "all_n_shared_bundle_b_only",
+    "used_n_shared_bundle_both", "used_n_shared_bundle_a_only", "used_n_shared_bundle_b_only",
 ]
 
 DELTA_FIELDS: List[str] = [
@@ -159,8 +161,10 @@ POOLED_FIELDS: List[str] = [
     "n_files_focal", "n_files_pool",
     "n_unique_patterns_focal", "n_unique_patterns_pool", "n_shared_join_hash",
     "containment_focal_in_pool", "containment_pool_in_focal",
-    "has_bundles_focal", "has_bundles_pool",
-    "n_shared_bundle_both", "n_shared_bundle_focal_only", "n_shared_bundle_pool_only",
+    "all_has_bundles_focal", "all_has_bundles_pool",
+    "all_n_shared_bundle_both", "all_n_shared_bundle_focal_only", "all_n_shared_bundle_pool_only",
+    "used_has_bundles_focal", "used_has_bundles_pool",
+    "used_n_shared_bundle_both", "used_n_shared_bundle_focal_only", "used_n_shared_bundle_pool_only",
     "data_sufficient",
     "executed_utc",
 ]
@@ -217,8 +221,8 @@ def segment_output_dir(
     return segments_root / folder
 
 
-def bundle_analysis_dir(seg_out: Path, domain: str) -> Path:
-    return seg_out / "results" / "bundle_analysis" / domain
+def bundle_analysis_dir(seg_out: Path, domain: str, purge_view: str = "all") -> Path:
+    return seg_out / "results" / "bundle_analysis" / purge_view / domain
 
 
 def domain_patterns_path(seg_out: Path) -> Path:
@@ -237,7 +241,8 @@ def discover_domains_for_segment(
     seg_out = segment_output_dir(segments_root, registry, segment_id)
     if seg_out is None:
         return set()
-    ba_root = seg_out / "results" / "bundle_analysis"
+    # Always discover from the all view — it is the domain authority source.
+    ba_root = seg_out / "results" / "bundle_analysis" / "all"
     if not ba_root.exists():
         return set()
     return {p.name for p in ba_root.iterdir() if p.is_dir()}
@@ -253,11 +258,11 @@ _jh_cache: Dict[Tuple[str, str], Dict[str, str]] = {}
 # Cache: (segment_id, domain) -> {join_hash: human_label}
 _pattern_label_cache: Dict[Tuple[str, str], Dict[str, str]] = {}
 
-# Cache: (governance_role, domain, unit_system) -> Set[join_hash]
+# Cache: (governance_role, domain, unit_system, exclude_segment_id) -> Set[join_hash]
 _role_jh_cache: Dict[Tuple[str, str, str, str], Set[str]] = {}
 
-# Cache: (segment_id, domain) -> Set[join_hash]  (bundle members only)
-_bundle_jh_cache: Dict[Tuple[str, str], Set[str]] = {}
+# Cache: (segment_id, domain, purge_view) -> Set[join_hash]  (bundle members only)
+_bundle_jh_cache: Dict[Tuple[str, str, str], Set[str]] = {}
 
 
 def resolve_join_hashes(
@@ -377,7 +382,8 @@ def get_role_jh_set(
         seg_out = segment_output_dir(segments_root, registry, sid)
         if seg_out is None:
             continue
-        mm_path = bundle_analysis_dir(seg_out, domain) / "membership_matrix.csv"
+        # Use all view — scores are view-invariant
+        mm_path = bundle_analysis_dir(seg_out, domain, "all") / "membership_matrix.csv"
         if not mm_path.exists():
             continue
         jh_map = resolve_join_hashes(segments_root, registry, sid, domain)
@@ -402,12 +408,13 @@ def load_file_join_hashes(
     segment_id: str,
     domain: str,
 ) -> Dict[str, Set[str]]:
-    """Return {export_run_id: set_of_join_hashes} from membership_matrix.csv."""
+    """Return {export_run_id: set_of_join_hashes} from membership_matrix.csv (all view)."""
     seg_out = segment_output_dir(segments_root, registry, segment_id)
     if seg_out is None:
         return {}
 
-    mm_path = bundle_analysis_dir(seg_out, domain) / "membership_matrix.csv"
+    # Scores are view-invariant — always load from the all view
+    mm_path = bundle_analysis_dir(seg_out, domain, "all") / "membership_matrix.csv"
     if not mm_path.exists():
         return {}
 
@@ -429,14 +436,14 @@ def load_bundle_join_hash_set(
     registry: Dict[str, Dict[str, str]],
     segment_id: str,
     domain: str,
+    purge_view: str = "all",
 ) -> Set[str]:
-    """Return join_hashes that are bundle members for segment/domain.
+    """Return join_hashes that are bundle members for segment/domain/purge_view.
 
-    Empty set if bundle_membership.csv absent (reference or small segments).
-    Path: {segment_output_folder}/results/bundle_analysis/{domain}/bundle_membership.csv
-    Resolves pattern_id → join_hash via domain_patterns.csv.
+    Empty set if bundle_membership.csv absent for this view.
+    Path: {segment_output_folder}/results/bundle_analysis/{purge_view}/{domain}/bundle_membership.csv
     """
-    key = (segment_id, domain)
+    key = (segment_id, domain, purge_view)
     if key in _bundle_jh_cache:
         return _bundle_jh_cache[key]
 
@@ -445,7 +452,7 @@ def load_bundle_join_hash_set(
         _bundle_jh_cache[key] = set()
         return set()
 
-    bm_path = bundle_analysis_dir(seg_out, domain) / "bundle_membership.csv"
+    bm_path = bundle_analysis_dir(seg_out, domain, purge_view) / "bundle_membership.csv"
     if not bm_path.exists():
         _bundle_jh_cache[key] = set()
         return set()
@@ -804,7 +811,8 @@ def discover_within_project(
         seg_out = segment_output_dir(segments_root, registry, sid)
         if seg_out is None:
             continue
-        ba_root = seg_out / "results" / "bundle_analysis"
+        # Always discover from the all view
+        ba_root = seg_out / "results" / "bundle_analysis" / "all"
         if not ba_root.exists():
             continue
         # Collect eids from ALL domains so eligibility doesn't depend on which
@@ -931,12 +939,15 @@ def run_pair(
         n_shared_jh = sum(1 for v in jhs_file_count.values() if v > 1)
         n_files = len(participating_eids)
 
-        # Bundle annotation on the shared set
-        # For within_project, shared is defined as appearing in >1 participating file
+        # Bundle annotation on the shared set (dual-view)
         shared_jhs_wp: Set[str] = {jh for jh, cnt in jhs_file_count.items() if cnt > 1}
-        bnd_a_wp = load_bundle_join_hash_set(segments_root, registry, seg_a, domain)
-        n_both_wp, n_aonly_wp, n_bonly_wp = annotate_bundle_overlap(
-            shared_jhs_wp, bnd_a_wp, bnd_a_wp
+        bnd_a_wp_all = load_bundle_join_hash_set(segments_root, registry, seg_a, domain, "all")
+        bnd_a_wp_used = load_bundle_join_hash_set(segments_root, registry, seg_a, domain, "used")
+        n_both_wp_all, n_aonly_wp_all, n_bonly_wp_all = annotate_bundle_overlap(
+            shared_jhs_wp, bnd_a_wp_all, bnd_a_wp_all
+        )
+        n_both_wp_used, n_aonly_wp_used, n_bonly_wp_used = annotate_bundle_overlap(
+            shared_jhs_wp, bnd_a_wp_used, bnd_a_wp_used
         )
 
         metrics: Dict[str, str] = {
@@ -950,7 +961,8 @@ def run_pair(
         }
 
         crid = make_comparison_run_id(seg_a, seg_b, executed_utc)
-        has_bundles = "true" if bnd_a_wp else "false"
+        all_has_bundles = "true" if bnd_a_wp_all else "false"
+        used_has_bundles = "true" if bnd_a_wp_used else "false"
         n_unique_wp = len(total_jhs)
         n_files_a_int = n_files
         n_files_b_int = n_files
@@ -963,11 +975,16 @@ def run_pair(
             n_patterns_b=n_unique_wp,
             n_unique_patterns_a=n_unique_wp,
             n_unique_patterns_b=n_unique_wp,
-            has_bundles_a=has_bundles,
-            has_bundles_b=has_bundles,
-            n_shared_bundle_both=n_both_wp,
-            n_shared_bundle_a_only=n_aonly_wp,
-            n_shared_bundle_b_only=n_bonly_wp,
+            all_has_bundles_a=all_has_bundles,
+            all_has_bundles_b=all_has_bundles,
+            all_n_shared_bundle_both=n_both_wp_all,
+            all_n_shared_bundle_a_only=n_aonly_wp_all,
+            all_n_shared_bundle_b_only=n_bonly_wp_all,
+            used_has_bundles_a=used_has_bundles,
+            used_has_bundles_b=used_has_bundles,
+            used_n_shared_bundle_both=n_both_wp_used,
+            used_n_shared_bundle_a_only=n_aonly_wp_used,
+            used_n_shared_bundle_b_only=n_bonly_wp_used,
             data_sufficient=data_suff,
             executed_utc=executed_utc,
         )
@@ -978,7 +995,8 @@ def run_pair(
         detail_rows: List[Dict[str, str]] = []
         for eid_a2, eid_b2, proj, na, nb, ns, j_val, c_ab, c_ba in raw_pairs:
             shared_pair: Set[str] = all_files.get(eid_a2, set()) & all_files.get(eid_b2, set())
-            pb, pao, pbo = annotate_bundle_overlap(shared_pair, bnd_a_wp, bnd_a_wp)
+            pb_all, pao_all, pbo_all = annotate_bundle_overlap(shared_pair, bnd_a_wp_all, bnd_a_wp_all)
+            pb_used, pao_used, pbo_used = annotate_bundle_overlap(shared_pair, bnd_a_wp_used, bnd_a_wp_used)
             detail_rows.append({
                 "comparison_run_id": crid,
                 "segment_id_a": seg_a,
@@ -994,9 +1012,12 @@ def run_pair(
                 "jaccard": _fmt(j_val),
                 "containment_a_in_b": _fmt(c_ab),
                 "containment_b_in_a": _fmt(c_ba),
-                "n_shared_bundle_both": str(pb),
-                "n_shared_bundle_a_only": str(pao),
-                "n_shared_bundle_b_only": str(pbo),
+                "all_n_shared_bundle_both": str(pb_all),
+                "all_n_shared_bundle_a_only": str(pao_all),
+                "all_n_shared_bundle_b_only": str(pbo_all),
+                "used_n_shared_bundle_both": str(pb_used),
+                "used_n_shared_bundle_a_only": str(pao_used),
+                "used_n_shared_bundle_b_only": str(pbo_used),
             })
 
         # Patch containment into summary metrics (mean/min over all pairs)
@@ -1024,8 +1045,25 @@ def run_pair(
     if n_a < min_patterns or n_b < min_patterns:
         return None, []
 
+    # TODO (deferred — OB thought id: 8effacfc-eaf8-45e0-9fe7-7e64305ab677):
+    # Used-view Jaccard/containment scores — compute scores from used-view
+    # membership_matrix.csv to answer "are these files working similarly" vs
+    # the current all-view "are these files configured similarly". Delta between
+    # all-view and used-view scores quantifies passive inheritance. Requires:
+    # (1) load_file_join_hashes() accepting a purge_view parameter,
+    # (2) reading membership_matrix.csv from bundle_analysis/used/{domain}/,
+    # (3) new output columns: all_jaccard_mean, used_jaccard_mean,
+    #     all_containment_b_in_a, used_containment_b_in_a, etc.
+    # Scores currently computed from all-view membership matrix only.
+
     # Compute metrics
     pair_rows: List[Dict[str, str]] = []
+
+    # Load bundle sets for both views upfront
+    bnd_a_all = load_bundle_join_hash_set(segments_root, registry, seg_a, domain, "all")
+    bnd_b_all = load_bundle_join_hash_set(segments_root, registry, seg_b, domain, "all")
+    bnd_a_used = load_bundle_join_hash_set(segments_root, registry, seg_a, domain, "used")
+    bnd_b_used = load_bundle_join_hash_set(segments_root, registry, seg_b, domain, "used")
 
     if is_directed:
         metrics = compare_directed_file(files_a, files_b)
@@ -1033,13 +1071,12 @@ def run_pair(
         metrics, pair_rows_raw = compare_symmetric_file(files_a, files_b)
         # Emit ALL pair rows — no suppression threshold
         crid_pre = make_comparison_run_id(seg_a, seg_b, executed_utc)
-        bnd_a_pre = load_bundle_join_hash_set(segments_root, registry, seg_a, domain)
-        bnd_b_pre = load_bundle_join_hash_set(segments_root, registry, seg_b, domain)
         for r in pair_rows_raw:
             eid_a2 = r.get("export_run_id_a", "")
             eid_b2 = r.get("export_run_id_b", "")
             shared_pair = files_a.get(eid_a2, set()) & files_b.get(eid_b2, set())
-            pb, pao, pbo = annotate_bundle_overlap(shared_pair, bnd_a_pre, bnd_b_pre)
+            pb_all, pao_all, pbo_all = annotate_bundle_overlap(shared_pair, bnd_a_all, bnd_b_all)
+            pb_used, pao_used, pbo_used = annotate_bundle_overlap(shared_pair, bnd_a_used, bnd_b_used)
             r.update({
                 "comparison_run_id": crid_pre,
                 "segment_id_a": seg_a,
@@ -1047,23 +1084,27 @@ def run_pair(
                 "domain": domain,
                 "project_label_a": file_metadata.get(eid_a2, {}).get("project_label", ""),
                 "project_label_b": file_metadata.get(eid_b2, {}).get("project_label", ""),
-                "n_shared_bundle_both": str(pb),
-                "n_shared_bundle_a_only": str(pao),
-                "n_shared_bundle_b_only": str(pbo),
+                "all_n_shared_bundle_both": str(pb_all),
+                "all_n_shared_bundle_a_only": str(pao_all),
+                "all_n_shared_bundle_b_only": str(pbo_all),
+                "used_n_shared_bundle_both": str(pb_used),
+                "used_n_shared_bundle_a_only": str(pao_used),
+                "used_n_shared_bundle_b_only": str(pbo_used),
             })
         pair_rows = pair_rows_raw
 
     if not metrics:
         return None, []
 
-    # Post-hoc bundle annotation on the population-grain shared set
+    # Post-hoc bundle annotation on the population-grain shared set (dual-view)
     shared_jhs_norm = all_jhs_a & all_jhs_b
-    bnd_a = load_bundle_join_hash_set(segments_root, registry, seg_a, domain)
-    bnd_b = load_bundle_join_hash_set(segments_root, registry, seg_b, domain)
-    n_both, n_aonly, n_bonly = annotate_bundle_overlap(shared_jhs_norm, bnd_a, bnd_b)
+    n_both_all, n_aonly_all, n_bonly_all = annotate_bundle_overlap(shared_jhs_norm, bnd_a_all, bnd_b_all)
+    n_both_used, n_aonly_used, n_bonly_used = annotate_bundle_overlap(shared_jhs_norm, bnd_a_used, bnd_b_used)
 
-    has_bundles_a = "true" if bnd_a else "false"
-    has_bundles_b = "true" if bnd_b else "false"
+    all_has_bundles_a = "true" if bnd_a_all else "false"
+    all_has_bundles_b = "true" if bnd_b_all else "false"
+    used_has_bundles_a = "true" if bnd_a_used else "false"
+    used_has_bundles_b = "true" if bnd_b_used else "false"
 
     n_files_a_int = len(files_a)
     n_files_b_int = len(files_b)
@@ -1077,11 +1118,16 @@ def run_pair(
         n_patterns_b=n_b,
         n_unique_patterns_a=n_a,
         n_unique_patterns_b=n_b,
-        has_bundles_a=has_bundles_a,
-        has_bundles_b=has_bundles_b,
-        n_shared_bundle_both=n_both,
-        n_shared_bundle_a_only=n_aonly,
-        n_shared_bundle_b_only=n_bonly,
+        all_has_bundles_a=all_has_bundles_a,
+        all_has_bundles_b=all_has_bundles_b,
+        all_n_shared_bundle_both=n_both_all,
+        all_n_shared_bundle_a_only=n_aonly_all,
+        all_n_shared_bundle_b_only=n_bonly_all,
+        used_has_bundles_a=used_has_bundles_a,
+        used_has_bundles_b=used_has_bundles_b,
+        used_n_shared_bundle_both=n_both_used,
+        used_n_shared_bundle_a_only=n_aonly_used,
+        used_n_shared_bundle_b_only=n_bonly_used,
         data_sufficient=data_suff,
         executed_utc=executed_utc,
     )
@@ -1102,11 +1148,16 @@ def _build_summary_row(
     n_patterns_b: int,
     n_unique_patterns_a: int,
     n_unique_patterns_b: int,
-    has_bundles_a: str,
-    has_bundles_b: str,
-    n_shared_bundle_both: int,
-    n_shared_bundle_a_only: int,
-    n_shared_bundle_b_only: int,
+    all_has_bundles_a: str,
+    all_has_bundles_b: str,
+    all_n_shared_bundle_both: int,
+    all_n_shared_bundle_a_only: int,
+    all_n_shared_bundle_b_only: int,
+    used_has_bundles_a: str,
+    used_has_bundles_b: str,
+    used_n_shared_bundle_both: int,
+    used_n_shared_bundle_a_only: int,
+    used_n_shared_bundle_b_only: int,
     data_sufficient: str,
     executed_utc: str,
 ) -> Dict[str, str]:
@@ -1139,11 +1190,16 @@ def _build_summary_row(
         "jaccard_mean": metrics.get("jaccard_mean", ""),
         "jaccard_p10": metrics.get("jaccard_p10", ""),
         "jaccard_p90": metrics.get("jaccard_p90", ""),
-        "has_bundles_a": has_bundles_a,
-        "has_bundles_b": has_bundles_b,
-        "n_shared_bundle_both": str(n_shared_bundle_both),
-        "n_shared_bundle_a_only": str(n_shared_bundle_a_only),
-        "n_shared_bundle_b_only": str(n_shared_bundle_b_only),
+        "all_has_bundles_a": all_has_bundles_a,
+        "all_has_bundles_b": all_has_bundles_b,
+        "all_n_shared_bundle_both": str(all_n_shared_bundle_both),
+        "all_n_shared_bundle_a_only": str(all_n_shared_bundle_a_only),
+        "all_n_shared_bundle_b_only": str(all_n_shared_bundle_b_only),
+        "used_has_bundles_a": used_has_bundles_a,
+        "used_has_bundles_b": used_has_bundles_b,
+        "used_n_shared_bundle_both": str(used_n_shared_bundle_both),
+        "used_n_shared_bundle_a_only": str(used_n_shared_bundle_a_only),
+        "used_n_shared_bundle_b_only": str(used_n_shared_bundle_b_only),
         "n_files_a": metrics.get("n_files_a", ""),
         "n_files_b": metrics.get("n_files_b", ""),
         "n_pairs": metrics.get("n_pairs", ""),
@@ -1238,21 +1294,33 @@ def run_pooled_comparison(
                 n_files_pool = len(pool_files_keyed)
                 data_suff = "true" if (n_files_focal >= 5 and n_files_pool >= 5) else "false"
 
-                # Bundle annotation
-                focal_bundle = load_bundle_join_hash_set(
-                    segments_root, registry, focal_sid, domain
+                # Bundle annotation — dual-view
+                focal_bundle_all = load_bundle_join_hash_set(
+                    segments_root, registry, focal_sid, domain, "all"
                 )
-                pool_bundle: Set[str] = set()
+                focal_bundle_used = load_bundle_join_hash_set(
+                    segments_root, registry, focal_sid, domain, "used"
+                )
+                pool_bundle_all: Set[str] = set()
+                pool_bundle_used: Set[str] = set()
                 for pool_sid in pool_sids:
-                    pool_bundle |= load_bundle_join_hash_set(
-                        segments_root, registry, pool_sid, domain
+                    pool_bundle_all |= load_bundle_join_hash_set(
+                        segments_root, registry, pool_sid, domain, "all"
+                    )
+                    pool_bundle_used |= load_bundle_join_hash_set(
+                        segments_root, registry, pool_sid, domain, "used"
                     )
 
-                has_bundles_focal = "true" if focal_bundle else "false"
-                has_bundles_pool = "true" if pool_bundle else "false"
+                all_has_bundles_focal = "true" if focal_bundle_all else "false"
+                all_has_bundles_pool = "true" if pool_bundle_all else "false"
+                used_has_bundles_focal = "true" if focal_bundle_used else "false"
+                used_has_bundles_pool = "true" if pool_bundle_used else "false"
 
-                n_both, n_focal_only, n_pool_only = annotate_bundle_overlap(
-                    shared, focal_bundle, pool_bundle
+                n_both_all, n_focal_only_all, n_pool_only_all = annotate_bundle_overlap(
+                    shared, focal_bundle_all, pool_bundle_all
+                )
+                n_both_used, n_focal_only_used, n_pool_only_used = annotate_bundle_overlap(
+                    shared, focal_bundle_used, pool_bundle_used
                 )
 
                 mf = manifest.get(focal_sid, {})
@@ -1273,11 +1341,16 @@ def run_pooled_comparison(
                     "n_shared_join_hash": str(n_shared),
                     "containment_focal_in_pool": _fmt(c_focal_in_pool),
                     "containment_pool_in_focal": _fmt(c_pool_in_focal),
-                    "has_bundles_focal": has_bundles_focal,
-                    "has_bundles_pool": has_bundles_pool,
-                    "n_shared_bundle_both": str(n_both),
-                    "n_shared_bundle_focal_only": str(n_focal_only),
-                    "n_shared_bundle_pool_only": str(n_pool_only),
+                    "all_has_bundles_focal": all_has_bundles_focal,
+                    "all_has_bundles_pool": all_has_bundles_pool,
+                    "all_n_shared_bundle_both": str(n_both_all),
+                    "all_n_shared_bundle_focal_only": str(n_focal_only_all),
+                    "all_n_shared_bundle_pool_only": str(n_pool_only_all),
+                    "used_has_bundles_focal": used_has_bundles_focal,
+                    "used_has_bundles_pool": used_has_bundles_pool,
+                    "used_n_shared_bundle_both": str(n_both_used),
+                    "used_n_shared_bundle_focal_only": str(n_focal_only_used),
+                    "used_n_shared_bundle_pool_only": str(n_pool_only_used),
                     "data_sufficient": data_suff,
                     "executed_utc": executed_utc,
                 })

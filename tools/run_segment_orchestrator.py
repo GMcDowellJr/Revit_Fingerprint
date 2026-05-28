@@ -420,6 +420,8 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                     "--out-dir", str(out_root / "results" / "bundle_analysis"),
                     "--metadata-file", str(records_dir / "file_metadata.csv"),
                     "--no-discover-populations",
+                    "--purge-view", "both",
+                    "--latent-purgeable-file", str(out_root / "results" / "records" / "latent_purgeable.csv"),
                 ]
                 print(f"  step 3: {' '.join(bundle_cmd[1:])}")
             print()
@@ -522,6 +524,8 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 "--out-dir", str(out_root / "results" / "bundle_analysis"),
                 "--metadata-file", str(records_dir / "file_metadata.csv"),
                 "--no-discover-populations",
+                "--purge-view", "both",
+                "--latent-purgeable-file", str(out_root / "results" / "records" / "latent_purgeable.csv"),
             ]
             rc, tail, _stderr = run_step_capture(bundle_cmd, cwd=str(repo_root))
             if rc != 0:
@@ -532,7 +536,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
 
         # Post-bundle validation (warn only, runs before registry write so warnings land in notes)
         if step_failed is None and run_type == "bundle":
-            dag_nodes = out_root / "results" / "bundle_analysis" / "line_patterns" / "bundle_dag_nodes.csv"
+            dag_nodes = out_root / "results" / "bundle_analysis" / "all" / "line_patterns" / "bundle_dag_nodes.csv"
             if not dag_nodes.is_file() or dag_nodes.stat().st_size == 0:
                 warn = (
                     f"[WARN orchestrator] segment={sid} line_patterns/bundle_dag_nodes.csv "
@@ -545,7 +549,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         if step_failed is None and run_type == "bundle" and not args.skip_bi_merge:
             try:
                 active_domains = _active_domains_from_presence_csv(out_root / "results" / "analysis")
-                bundle_analysis_dir = out_root / "results" / "bundle_analysis"
+                bundle_analysis_dir = out_root / "results" / "bundle_analysis" / "all"
                 merge_result = merge_bi_outputs(bundle_analysis_dir, active_domains=active_domains)
                 total_files = sum(v["files_merged"] for v in merge_result.values())
                 total_rows = sum(v["rows_written"] for v in merge_result.values())
