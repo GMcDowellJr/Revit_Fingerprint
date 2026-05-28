@@ -130,11 +130,13 @@ def _preshard_corpus_records(
         if not src.is_file():
             continue
 
-        # Determine which segments need this file
+        # Determine which segments need this file.
+        # Gate on the per-segment marker so a header-only file from a partial
+        # prior run does not falsely satisfy the skip check.
         segments_to_write: Dict[str, Dict] = {}
         for sid, plan_entry in segment_plans.items():
-            dst = plan_entry["segment_records_dir"] / fname
-            if not force and dst.is_file() and dst.stat().st_size > 0:
+            marker = plan_entry["segment_records_dir"] / ".preshard_complete"
+            if not force and marker.is_file():
                 continue
             segments_to_write[sid] = plan_entry
 
@@ -193,12 +195,11 @@ def _preshard_corpus_records(
             if not shard_file.is_file() or shard_file.suffix != ".csv":
                 continue
 
-            # Determine which segments need this shard
+            # Determine which segments need this shard — same marker gate.
             segments_to_write: Dict[str, Dict] = {}
             for sid, plan_entry in segment_plans.items():
-                seg_shard_dir = plan_entry["segment_records_dir"] / "identity_items_by_domain"
-                dst_shard = seg_shard_dir / shard_file.name
-                if not force and dst_shard.is_file() and dst_shard.stat().st_size > 0:
+                marker = plan_entry["segment_records_dir"] / ".preshard_complete"
+                if not force and marker.is_file():
                     continue
                 segments_to_write[sid] = plan_entry
 
@@ -251,6 +252,13 @@ def _preshard_corpus_records(
             flush=True,
         )
 
+    # Write per-segment completion markers.  Done after all source files and
+    # shards so a partial run (exception before this point) leaves no markers,
+    # meaning the next run re-processes those segments from scratch.
+    for plan_entry in segment_plans.values():
+        plan_entry["segment_records_dir"].mkdir(parents=True, exist_ok=True)
+        (plan_entry["segment_records_dir"] / ".preshard_complete").write_text("ok", encoding="utf-8")
+
     elapsed = int(time.monotonic() - t0)
     print(f"[preshard] complete elapsed={elapsed}s", flush=True)
 
@@ -272,12 +280,12 @@ def _write_segment_records(
     Missing source files are skipped silently — patterns stage will simply see
     an empty (or absent) input and the guard will surface the failure cleanly.
     """
+    preshard_marker = segment_records_dir / ".preshard_complete"
     for fname in ("records.csv", "file_metadata.csv"):
         src = records_dir / fname
         if not src.is_file():
             continue
-        dst = segment_records_dir / fname
-        if dst.is_file() and dst.stat().st_size > 0:
+        if preshard_marker.is_file():
             continue  # already written by preshard pass
         with src.open("r", encoding="utf-8-sig", newline="") as f:
             reader = csv.DictReader(f)
@@ -300,7 +308,7 @@ def _write_segment_records(
             if not shard_file.is_file() or not shard_file.suffix == ".csv":
                 continue
             dst_shard = seg_shard_dir / shard_file.name
-            if dst_shard.is_file() and dst_shard.stat().st_size > 0:
+            if preshard_marker.is_file():
                 continue  # already written by preshard pass
             with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
                 reader = csv.DictReader(f)
