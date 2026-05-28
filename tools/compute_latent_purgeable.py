@@ -736,11 +736,12 @@ def main() -> None:
     # -------------------------------------------------------------------------
 
     # Passthrough domains = every domain in records.csv that is not already
-    # a target or consumer in the active chains.
+    # emitted by chain processing.  The chain loop only writes rows for each
+    # chain's target_domain — consumer domains (dimension_types_*, text_types,
+    # object_styles_*, line_styles, view_templates_*, etc.) are inputs to the
+    # traversal but never appear in the output, so they must be covered here.
     chain_target_domains = {c["target_domain"] for c in active_chains}
-    chain_consumer_domains = {d for c in active_chains for d in c["consumer_domains"]}
-    chain_doi = chain_target_domains | chain_consumer_domains
-    passthrough_domains = all_seen_domains - chain_doi
+    passthrough_domains = all_seen_domains - chain_target_domains
     passthrough_domains.discard("")
 
     # Default: passthrough enabled when no --chains filter is applied.
