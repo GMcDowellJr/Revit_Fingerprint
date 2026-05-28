@@ -56,6 +56,7 @@ def build_membership_matrix(
     allowed_export_run_ids: Optional[Set[str]] = None,
     purge_view: str = "all",
     latent_purgeable_file: Optional[Path] = None,
+    purgeable_only_set: Optional[Set[Tuple[str, str, str]]] = None,
 ) -> Dict[str, int]:
     pattern_presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     domain_pattern_rows = read_csv_rows(analysis_dir / "domain_patterns.csv")
@@ -133,21 +134,27 @@ def build_membership_matrix(
 
     membership_rows.sort(key=lambda r: (r["domain"], r["scope_key"], r["export_run_id"], r["pattern_id"]))
 
-    if purge_view == "used" and latent_purgeable_file is not None:
-        used_set: Set[Tuple[str, str, str]] = set()
-        excluded_set: Set[Tuple[str, str, str]] = set()
-        for lp_row in read_csv_rows(latent_purgeable_file):
-            eid = lp_row.get("export_run_id", "").strip()
-            dom = lp_row.get("domain", "").strip()
-            sig = lp_row.get("sig_hash", "").strip()
-            lp = lp_row.get("latent_purgeable", "").strip().lower()
-            if not (eid and dom and sig):
-                continue
-            if lp != "true":
-                used_set.add((eid, dom, sig))
-            else:
-                excluded_set.add((eid, dom, sig))
-        purgeable_only: Set[Tuple[str, str, str]] = excluded_set - used_set
+    if purge_view == "used" and (purgeable_only_set is not None or latent_purgeable_file is not None):
+        if purgeable_only_set is not None:
+            purgeable_only: Set[Tuple[str, str, str]] = purgeable_only_set
+            print(
+                f"[step1][used-filter] domain={domain} using pre-loaded purgeable_only_set size={len(purgeable_only_set)}"
+            )
+        else:
+            used_set: Set[Tuple[str, str, str]] = set()
+            excluded_set: Set[Tuple[str, str, str]] = set()
+            for lp_row in read_csv_rows(latent_purgeable_file):
+                eid = lp_row.get("export_run_id", "").strip()
+                dom = lp_row.get("domain", "").strip()
+                sig = lp_row.get("sig_hash", "").strip()
+                lp = lp_row.get("latent_purgeable", "").strip().lower()
+                if not (eid and dom and sig):
+                    continue
+                if lp != "true":
+                    used_set.add((eid, dom, sig))
+                else:
+                    excluded_set.add((eid, dom, sig))
+            purgeable_only = excluded_set - used_set
 
         pid_to_sig: Dict[str, str] = {}
         for dp_row in domain_pattern_rows:
