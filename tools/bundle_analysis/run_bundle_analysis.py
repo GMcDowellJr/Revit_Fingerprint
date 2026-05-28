@@ -457,6 +457,7 @@ def run_bundle_analysis(
                                 work_out_base,
                                 reference or {},
                                 dom,
+                                compare_out_dir=compare_out,
                                 eligible_export_run_ids=allowed_export_run_ids,
                             )
                             tail = discovery_future.result()

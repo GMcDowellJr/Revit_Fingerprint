@@ -174,6 +174,14 @@ def build_membership_matrix(
         )
         membership_rows = filtered
 
+        # Recompute scope counts from filtered rows so step2 thresholds reflect
+        # only the patterns/files still present in the used view.
+        files_by_scope = defaultdict(set)
+        patterns_by_scope = defaultdict(set)
+        for row in membership_rows:
+            files_by_scope[row["scope_key"]].add(row["export_run_id"])
+            patterns_by_scope[row["scope_key"]].add(row["pattern_id"])
+
     scope_rows: List[Dict[str, str]] = []
     for scope_key in sorted(set(files_by_scope.keys()) | set(patterns_by_scope.keys())):
         files_count = len(files_by_scope.get(scope_key, set()))
