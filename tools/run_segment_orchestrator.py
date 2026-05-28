@@ -736,8 +736,12 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 if ln.startswith("[patterns_timing]")
             ]
             if patterns_timing_lines:
-                print(f"[orchestrator]   patterns timing ({len(patterns_timing_lines)} lines):", flush=True)
-                for ln in patterns_timing_lines:
+                summary_lines = [ln for ln in patterns_timing_lines if "domain=" not in ln]
+                domain_lines  = [ln for ln in patterns_timing_lines if "domain=" in ln]
+                # domain lines are already top-5 from extractor; show all of them
+                lines_to_show = domain_lines + summary_lines
+                print(f"[orchestrator]   patterns timing:", flush=True)
+                for ln in lines_to_show:
                     print(f"[orchestrator]     {ln}", flush=True)
 
         # Step 3 — Bundle stage
