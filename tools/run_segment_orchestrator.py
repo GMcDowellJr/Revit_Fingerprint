@@ -24,7 +24,9 @@ import csv
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -37,6 +39,8 @@ from bundle_analysis.common import atomic_write_csv
 # Keeps fd usage well below typical OS limits (1024) regardless of segment count.
 # Each batch re-streams the source file once, so total passes = ceil(N/batch).
 _PRESHARD_BATCH = 64
+
+_CORPUS_PRESHARD_MARKER = ".preshard_complete_corpus"
 
 BI_MERGE_FILES = [
     "membership_matrix.csv",
@@ -88,7 +92,7 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-# ── Subprocess helper ─────────────────────────────────────────────────────────
+# ── Subprocess helpers ────────────────────────────────────────────────────────
 
 def run_step(cmd: List[str]) -> subprocess.CompletedProcess:
     """Run a subprocess step, capturing stderr, raising on non-zero exit."""
@@ -101,6 +105,27 @@ def run_step_capture(cmd: List[str], cwd: Optional[str] = None) -> tuple[int, st
     stderr_lines = (result.stderr or "").splitlines()
     tail = "\n".join(stderr_lines[-20:]) if stderr_lines else ""
     return result.returncode, tail, result.stderr or ""
+
+
+def run_step_log(
+    cmd: List[str],
+    log_path: Path,
+    cwd: Optional[str] = None,
+) -> tuple[int, str, str]:
+    """Run subprocess writing all output (stdout+stderr) to log_path.
+    Returns (returncode, last_20_lines, full_output).
+    """
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("w", encoding="utf-8", errors="replace") as log_f:
+        result = subprocess.run(
+            cmd, stdout=log_f, stderr=subprocess.STDOUT,
+            text=True, cwd=cwd,
+        )
+    with log_path.open("r", encoding="utf-8", errors="replace") as f:
+        content = f.read()
+    lines = content.splitlines()
+    tail = "\n".join(lines[-20:])
+    return result.returncode, tail, content
 
 
 # ── Record helpers ────────────────────────────────────────────────────────────
@@ -517,6 +542,240 @@ def build_run_plan(
     return plan
 
 
+def _run_one_segment(
+    idx: int,
+    total: int,
+    reg_row: dict,
+    mrow: dict,
+    records_dir: Path,
+    exports_dir: Path,
+    segments_root: Path,
+    repo_root: Path,
+    join_policy: Path,
+    skip_bi_merge: bool,
+    registry: List[dict],
+    reg_index: Dict[str, int],
+    registry_file: Path,
+    registry_lock: threading.Lock,
+    counters: Dict[str, object],
+    counters_lock: threading.Lock,
+    worker_id: int,
+) -> str:
+    """Process one segment. Returns segment_id."""
+    sid = reg_row.get("segment_id", "").strip()
+    output_folder = reg_row.get("output_folder", "").strip()
+    out_root = segments_root / output_folder
+
+    try:
+        level = int(mrow.get("segment_level", 0))
+    except (ValueError, TypeError):
+        level = 0
+
+    export_run_ids_raw = mrow.get("export_run_ids", "")
+    export_run_ids = sorted(x.strip() for x in export_run_ids_raw.split("|") if x.strip())
+    file_count = len(export_run_ids)
+    run_type = reg_row.get("run_type", "bundle").strip()
+
+    print(
+        f"\n[orchestrator] ── segment={sid} ({idx}/{total}) level={level} files={file_count} [worker={worker_id}] ──",
+        flush=True,
+    )
+
+    log_path = out_root / "run.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    step_failed: Optional[str] = None
+    failure_notes: str = ""
+    notes_parts: List[str] = []
+    t_start = time.monotonic()
+    t_prepare = 0
+    t_patterns = 0
+    t_bundle: Optional[int] = None
+    t_merge: Optional[int] = None
+    elapsed = 0
+
+    with log_path.open("w", encoding="utf-8", errors="replace") as log_f:
+        def log(msg: str) -> None:
+            log_f.write(msg + "\n")
+            log_f.flush()
+
+        # Step 1 — Prepare: directories, export_run_ids.txt, segment-level records
+        log(f"[orchestrator]   step 1/3 prepare...")
+        t_step1_start = time.monotonic()
+        try:
+            segment_records_dir = out_root / "results" / "records"
+            segment_records_dir.mkdir(parents=True, exist_ok=True)
+            (out_root / "results" / "analysis").mkdir(parents=True, exist_ok=True)
+            (out_root / "results" / "bundle_analysis").mkdir(parents=True, exist_ok=True)
+            (out_root / "results" / "label_synthesis").mkdir(parents=True, exist_ok=True)
+
+            ids_file = out_root / "export_run_ids.txt"
+            ids_file.write_text("\n".join(export_run_ids) + "\n", encoding="utf-8")
+
+            _write_segment_records(records_dir, segment_records_dir, set(export_run_ids))
+        except Exception as exc:
+            step_failed = "prepare"
+            failure_notes = f"step=prepare error={exc}"
+        t_prepare = int(time.monotonic() - t_step1_start)
+        log(f"[orchestrator]   step 1/3 prepare elapsed={t_prepare}s")
+
+        # Step 2 — Patterns stage
+        # --records-dir points at corpus records so build_label_population (run internally
+        # by run_extract_all) reads the full population, not just this segment's subset.
+        # --label-synth-dir points at corpus label_synthesis so emit_analysis picks up the
+        # LLM cache and curator annotations built in Run B without rebuilding per segment.
+        if step_failed is None:
+            log(f"[orchestrator]   step 2/3 patterns...")
+            corpus_label_synth_dir = records_dir.parent / "label_synthesis"
+            extract_cmd = [
+                sys.executable,
+                str(repo_root / "tools" / "run_extract_all.py"),
+                str(exports_dir),
+                "--out-root", str(out_root),
+                "--stages", "patterns",
+                "--records-dir", str(records_dir),
+                "--label-synth-dir", str(corpus_label_synth_dir),
+                "--filter-export-run-ids", str(out_root / "export_run_ids.txt"),
+                "--join-policy", str(join_policy),
+                "--allow-sig-hash-join-key",
+            ]
+            t_step2_start = time.monotonic()
+            rc, tail, patterns_content = run_step_log(extract_cmd, out_root / "patterns.log", cwd=str(repo_root))
+            t_patterns = int(time.monotonic() - t_step2_start)
+            log(f"[orchestrator]   step 2/3 patterns elapsed={t_patterns}s")
+            if rc != 0:
+                step_failed = "patterns"
+                failure_notes = f"step=patterns returncode={rc}\n{tail}"
+            else:
+                presence_csv = out_root / "results" / "analysis" / "pattern_presence_file.csv"
+                if not presence_csv.is_file():
+                    step_failed = "patterns"
+                    failure_notes = _build_patterns_missing_notes(
+                        sid, out_root, records_dir, patterns_content
+                    )
+
+            # Surface patterns timing from captured output — top-5 to console
+            patterns_timing_lines = [
+                ln for ln in patterns_content.splitlines()
+                if ln.startswith("[patterns_timing]")
+            ]
+            if patterns_timing_lines:
+                summary_lines = [ln for ln in patterns_timing_lines if "domain=" not in ln]
+                domain_lines  = [ln for ln in patterns_timing_lines if "domain=" in ln]
+                lines_to_show = domain_lines + summary_lines
+                print(f"[orchestrator]   patterns timing:", flush=True)
+                for ln in lines_to_show:
+                    print(f"[orchestrator]     {ln}", flush=True)
+
+        # Step 3 — Bundle stage
+        if step_failed is None and run_type == "bundle":
+            log(f"[orchestrator]   step 3/3 bundle...")
+            bundle_cmd = [
+                sys.executable,
+                str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
+                "--analysis-dir", str(out_root / "results" / "analysis"),
+                "--out-dir", str(out_root / "results" / "bundle_analysis"),
+                "--metadata-file", str(records_dir / "file_metadata.csv"),
+                "--no-discover-populations",
+                "--purge-view", "both",
+                "--latent-purgeable-file", str(out_root / "results" / "records" / "latent_purgeable.csv"),
+            ]
+            t_step3_start = time.monotonic()
+            rc, tail, _content = run_step_log(bundle_cmd, out_root / "bundle.log", cwd=str(repo_root))
+            t_bundle = int(time.monotonic() - t_step3_start)
+            log(f"[orchestrator]   step 3/3 bundle elapsed={t_bundle}s")
+            if rc != 0:
+                step_failed = "bundle"
+                failure_notes = f"step=bundle returncode={rc}\n{tail}"
+
+        # Post-bundle validation (warn only, runs before registry write so warnings land in notes)
+        if step_failed is None and run_type == "bundle":
+            dag_nodes = out_root / "results" / "bundle_analysis" / "all" / "line_patterns" / "bundle_dag_nodes.csv"
+            if not dag_nodes.is_file() or dag_nodes.stat().st_size == 0:
+                warn = (
+                    f"[WARN orchestrator] segment={sid} line_patterns/bundle_dag_nodes.csv "
+                    f"missing or empty — bundle analysis may not have run correctly"
+                )
+                log(warn)
+                notes_parts.append(warn)
+
+        # BI merge (non-fatal; only runs when bundle succeeded)
+        if step_failed is None and run_type == "bundle" and not skip_bi_merge:
+            t_merge_start = time.monotonic()
+            try:
+                active_domains = _active_domains_from_presence_csv(out_root / "results" / "analysis")
+                bundle_analysis_dir = out_root / "results" / "bundle_analysis" / "all"
+                merge_result = merge_bi_outputs(bundle_analysis_dir, active_domains=active_domains)
+                total_files = sum(v["files_merged"] for v in merge_result.values())
+                total_rows = sum(v["rows_written"] for v in merge_result.values())
+                log(
+                    f"[orchestrator] bi_merge segment={sid} files_merged={total_files} rows_written={total_rows}"
+                )
+            except Exception as merge_exc:
+                log(f"[WARN orchestrator] bi_merge failed for segment={sid}: {merge_exc}")
+            t_merge = int(time.monotonic() - t_merge_start)
+            log(f"[orchestrator]   bi_merge elapsed={t_merge}s")
+
+        elapsed = int(time.monotonic() - t_start)
+
+        timing_parts = [
+            f"segment={sid}",
+            f"prepare={t_prepare}s",
+            f"patterns={t_patterns}s",
+        ]
+        if t_bundle is not None:
+            timing_parts.append(f"bundle={t_bundle}s")
+        if t_merge is not None:
+            timing_parts.append(f"bi_merge={t_merge}s")
+        timing_parts.append(f"total={elapsed}s")
+        log(f"[orchestrator]   timing {' '.join(timing_parts)}")
+
+        if step_failed is not None:
+            log(f"[orchestrator]   failure_notes: {failure_notes}")
+
+    # Update registry under lock
+    with registry_lock:
+        ri = reg_index.get(sid)
+        if ri is not None:
+            if step_failed is None:
+                registry[ri]["status"] = "complete"
+                registry[ri]["last_run_utc"] = utc_now_iso()
+                if "notes" in registry[ri]:
+                    registry[ri]["notes"] = "; ".join(notes_parts)
+            else:
+                registry[ri]["status"] = "failed"
+                registry[ri]["last_run_utc"] = utc_now_iso()
+                registry[ri]["notes"] = failure_notes[:500]
+        write_registry_atomic(registry_file, registry)
+
+    # Update counters and read progress snapshot under lock
+    with counters_lock:
+        if step_failed is None:
+            counters["complete"] += 1
+        else:
+            counters["failed"] += 1
+            counters["failed_ids"].append(sid)
+        done = counters["complete"] + counters["failed"]
+        running = total - done - counters.get("skipped", 0)
+        n_complete_now = counters["complete"]
+        n_failed_now = counters["failed"]
+
+    # Console: complete/failed status
+    if step_failed is None:
+        print(f"[orchestrator]   ✓ complete elapsed={elapsed}s [worker={worker_id}]", flush=True)
+    else:
+        print(f"[orchestrator]   ✗ failed at step={step_failed} [worker={worker_id}]", flush=True)
+
+    # Console: progress after every completion
+    print(
+        f"[orchestrator]   progress: {n_complete_now}/{total} complete"
+        f"  {max(0, running)} running  {n_failed_now} failed",
+        flush=True,
+    )
+
+    return sid
+
+
 def run_orchestrator(args: argparse.Namespace) -> int:
     manifest_file = Path(args.manifest_file).resolve()
     registry_file = Path(args.registry_file).resolve()
@@ -630,213 +889,76 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         }
 
     if segment_plans:
-        t_preshard = time.monotonic()
-        _preshard_corpus_records(records_dir, segment_plans, force=args.force)
-        print(f"[orchestrator] preshard complete elapsed={int(time.monotonic() - t_preshard)}s", flush=True)
+        preshard_marker = records_dir / _CORPUS_PRESHARD_MARKER
+        _do_preshard = False
+        if args.no_preshard:
+            print("[orchestrator] preshard skipped (--no-preshard)", flush=True)
+        elif args.force_preshard:
+            _do_preshard = True
+            preshard_marker.unlink(missing_ok=True)
+        elif preshard_marker.is_file():
+            print("[orchestrator] preshard skipped (corpus marker found)", flush=True)
+        else:
+            _do_preshard = True
 
-    for idx, (reg_row, mrow) in enumerate(plan, 1):
+        if _do_preshard:
+            t_preshard = time.monotonic()
+            _preshard_corpus_records(records_dir, segment_plans, force=args.force)
+            print(f"[orchestrator] preshard complete elapsed={int(time.monotonic()-t_preshard)}s", flush=True)
+            preshard_marker.write_text("ok", encoding="utf-8")
+
+    # Apply --segment filter and skip check; count skips before submitting to executor
+    plan_to_run: List[tuple[dict, dict]] = []
+    for reg_row, mrow in plan:
         sid = reg_row.get("segment_id", "").strip()
-        output_folder = reg_row.get("output_folder", "").strip()
         status = reg_row.get("status", "").strip()
-        out_root = segments_root / output_folder
 
-        # --segment filter
         if args.segment and sid != args.segment:
             continue
 
-        # skip check
         if status == "complete" and not args.force:
             print(f"[orchestrator] skip segment={sid} (status=complete; use --force to re-run)")
             n_skipped += 1
             skipped_ids.append(f"{sid} — status=complete")
             continue
 
-        try:
-            level = int(mrow.get("segment_level", 0))
-        except (ValueError, TypeError):
-            level = 0
+        plan_to_run.append((reg_row, mrow))
 
-        export_run_ids_raw = mrow.get("export_run_ids", "")
-        export_run_ids = sorted(x.strip() for x in export_run_ids_raw.split("|") if x.strip())
-        file_count = len(export_run_ids)
-        run_type = reg_row.get("run_type", "bundle").strip()
+    registry_lock = threading.Lock()
+    counters_lock = threading.Lock()
+    counters: Dict[str, object] = {
+        "complete": 0,
+        "failed": 0,
+        "skipped": n_skipped,
+        "failed_ids": [],
+    }
 
-        print(
-            f"\n[orchestrator] ── segment={sid} ({idx}/{total}) level={level} files={file_count} ──",
-            flush=True,
-        )
-
-        step_failed: Optional[str] = None
-        failure_notes: str = ""
-        notes_parts: List[str] = []
-        t_start = time.monotonic()
-        t_prepare = 0
-        t_patterns = 0
-        t_bundle: Optional[int] = None
-        t_merge: Optional[int] = None
-
-        # Step 1 — Prepare: directories, export_run_ids.txt, segment-level records
-        print(f"[orchestrator]   step 1/3 prepare...", flush=True)
-        t_step1_start = time.monotonic()
-        try:
-            segment_records_dir = out_root / "results" / "records"
-            segment_records_dir.mkdir(parents=True, exist_ok=True)
-            (out_root / "results" / "analysis").mkdir(parents=True, exist_ok=True)
-            (out_root / "results" / "bundle_analysis").mkdir(parents=True, exist_ok=True)
-            (out_root / "results" / "label_synthesis").mkdir(parents=True, exist_ok=True)
-
-            ids_file = out_root / "export_run_ids.txt"
-            ids_file.write_text("\n".join(export_run_ids) + "\n", encoding="utf-8")
-
-            _write_segment_records(records_dir, segment_records_dir, set(export_run_ids))
-        except Exception as exc:
-            step_failed = "prepare"
-            failure_notes = f"step=prepare error={exc}"
-        t_prepare = int(time.monotonic() - t_step1_start)
-        print(f"[orchestrator]   step 1/3 prepare elapsed={t_prepare}s", flush=True)
-
-        # Step 2 — Patterns stage
-        # --records-dir points at corpus records so build_label_population (run internally
-        # by run_extract_all) reads the full population, not just this segment's subset.
-        # --label-synth-dir points at corpus label_synthesis so emit_analysis picks up the
-        # LLM cache and curator annotations built in Run B without rebuilding per segment.
-        if step_failed is None:
-            print(f"[orchestrator]   step 2/3 patterns...", flush=True)
-            corpus_label_synth_dir = records_dir.parent / "label_synthesis"
-            extract_cmd = [
-                sys.executable,
-                str(repo_root / "tools" / "run_extract_all.py"),
-                str(exports_dir),
-                "--out-root", str(out_root),
-                "--stages", "patterns",
-                "--records-dir", str(records_dir),
-                "--label-synth-dir", str(corpus_label_synth_dir),
-                "--filter-export-run-ids", str(out_root / "export_run_ids.txt"),
-                "--join-policy", str(join_policy),
-                "--allow-sig-hash-join-key",
-            ]
-            t_step2_start = time.monotonic()
-            rc, tail, patterns_stderr = run_step_capture(extract_cmd, cwd=str(repo_root))
-            t_patterns = int(time.monotonic() - t_step2_start)
-            print(f"[orchestrator]   step 2/3 patterns elapsed={t_patterns}s", flush=True)
-            if rc != 0:
-                step_failed = "patterns"
-                failure_notes = f"step=patterns returncode={rc}\n{tail}"
-            else:
-                presence_csv = out_root / "results" / "analysis" / "pattern_presence_file.csv"
-                if not presence_csv.is_file():
-                    step_failed = "patterns"
-                    failure_notes = _build_patterns_missing_notes(
-                        sid, out_root, records_dir, patterns_stderr
-                    )
-
-            # Surface patterns timing from captured stderr
-            patterns_timing_lines = [
-                ln for ln in patterns_stderr.splitlines()
-                if ln.startswith("[patterns_timing]")
-            ]
-            if patterns_timing_lines:
-                summary_lines = [ln for ln in patterns_timing_lines if "domain=" not in ln]
-                domain_lines  = [ln for ln in patterns_timing_lines if "domain=" in ln]
-                # domain lines are already top-5 from extractor; show all of them
-                lines_to_show = domain_lines + summary_lines
-                print(f"[orchestrator]   patterns timing:", flush=True)
-                for ln in lines_to_show:
-                    print(f"[orchestrator]     {ln}", flush=True)
-
-        # Step 3 — Bundle stage
-        if step_failed is None and run_type == "bundle":
-            print(f"[orchestrator]   step 3/3 bundle...", flush=True)
-            bundle_cmd = [
-                sys.executable,
-                str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
-                "--analysis-dir", str(out_root / "results" / "analysis"),
-                "--out-dir", str(out_root / "results" / "bundle_analysis"),
-                "--metadata-file", str(records_dir / "file_metadata.csv"),
-                "--no-discover-populations",
-                "--purge-view", "both",
-                "--latent-purgeable-file", str(out_root / "results" / "records" / "latent_purgeable.csv"),
-            ]
-            t_step3_start = time.monotonic()
-            rc, tail, _stderr = run_step_capture(bundle_cmd, cwd=str(repo_root))
-            t_bundle = int(time.monotonic() - t_step3_start)
-            print(f"[orchestrator]   step 3/3 bundle elapsed={t_bundle}s", flush=True)
-            if rc != 0:
-                step_failed = "bundle"
-                failure_notes = f"step=bundle returncode={rc}\n{tail}"
-
-        # Post-bundle validation (warn only, runs before registry write so warnings land in notes)
-        if step_failed is None and run_type == "bundle":
-            dag_nodes = out_root / "results" / "bundle_analysis" / "all" / "line_patterns" / "bundle_dag_nodes.csv"
-            if not dag_nodes.is_file() or dag_nodes.stat().st_size == 0:
-                warn = (
-                    f"[WARN orchestrator] segment={sid} line_patterns/bundle_dag_nodes.csv "
-                    f"missing or empty — bundle analysis may not have run correctly"
-                )
-                print(warn, flush=True)
-                notes_parts.append(warn)
-
-        # BI merge (non-fatal; only runs when bundle succeeded)
-        if step_failed is None and run_type == "bundle" and not args.skip_bi_merge:
-            t_merge_start = time.monotonic()
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        futures = {
+            executor.submit(
+                _run_one_segment,
+                idx, total, reg_row, mrow,
+                records_dir, exports_dir, segments_root, repo_root,
+                join_policy, args.skip_bi_merge,
+                registry, reg_index, registry_file,
+                registry_lock, counters, counters_lock,
+                worker_id=(i % args.workers) + 1,
+            ): reg_row.get("segment_id", "")
+            for i, (idx, (reg_row, mrow)) in enumerate(enumerate(plan_to_run, 1))
+        }
+        for future in as_completed(futures):
             try:
-                active_domains = _active_domains_from_presence_csv(out_root / "results" / "analysis")
-                bundle_analysis_dir = out_root / "results" / "bundle_analysis" / "all"
-                merge_result = merge_bi_outputs(bundle_analysis_dir, active_domains=active_domains)
-                total_files = sum(v["files_merged"] for v in merge_result.values())
-                total_rows = sum(v["rows_written"] for v in merge_result.values())
-                print(
-                    f"[orchestrator] bi_merge segment={sid} files_merged={total_files} rows_written={total_rows}",
-                    flush=True,
-                )
-            except Exception as merge_exc:
-                print(
-                    f"[WARN orchestrator] bi_merge failed for segment={sid}: {merge_exc}",
-                    flush=True,
-                )
-            t_merge = int(time.monotonic() - t_merge_start)
-            print(f"[orchestrator]   bi_merge elapsed={t_merge}s", flush=True)
+                future.result()
+            except Exception as exc:
+                sid = futures[future]
+                print(f"[orchestrator] ✗ segment={sid} unhandled exception: {exc}", flush=True)
+                with counters_lock:
+                    counters["failed"] += 1
+                    counters["failed_ids"].append(sid)
 
-        elapsed = int(time.monotonic() - t_start)
-
-        # Update registry row
-        ri = reg_index.get(sid)
-        if ri is not None:
-            if step_failed is None:
-                registry[ri]["status"] = "complete"
-                registry[ri]["last_run_utc"] = utc_now_iso()
-                if "notes" in registry[ri]:
-                    registry[ri]["notes"] = "; ".join(notes_parts)
-            else:
-                registry[ri]["status"] = "failed"
-                registry[ri]["last_run_utc"] = utc_now_iso()
-                registry[ri]["notes"] = failure_notes[:500]
-
-        write_registry_atomic(registry_file, registry)
-
-        timing_parts = [
-            f"segment={sid}",
-            f"prepare={t_prepare}s",
-            f"patterns={t_patterns}s",
-        ]
-        if t_bundle is not None:
-            timing_parts.append(f"bundle={t_bundle}s")
-        if t_merge is not None:
-            timing_parts.append(f"bi_merge={t_merge}s")
-        timing_parts.append(f"total={elapsed}s")
-        print(f"[orchestrator]   timing {' '.join(timing_parts)}", flush=True)
-
-        if step_failed is None:
-            print(f"[orchestrator]   ✓ complete (elapsed: {elapsed}s)", flush=True)
-            n_complete += 1
-        else:
-            print(
-                f"[orchestrator]   ✗ failed at step={step_failed} (elapsed: {elapsed}s)",
-                flush=True,
-            )
-            print(f"[orchestrator]   {failure_notes}", flush=True)
-            n_failed += 1
-            failed_ids.append(sid)
+    n_complete = counters["complete"]
+    n_failed = counters["failed"]
+    failed_ids = counters["failed_ids"]
 
     # ── Final summary ─────────────────────────────────────────────────────────
     # Count non-bundle rows as additional skips
@@ -905,6 +1027,18 @@ def main() -> None:
     ap.add_argument(
         "--skip-bi-merge", action="store_true",
         help="Skip the BI merge post-processing step (useful for dry runs and debugging)",
+    )
+    ap.add_argument(
+        "--workers", type=int, default=4,
+        help="Max parallel segments (default: 4)",
+    )
+    ap.add_argument(
+        "--no-preshard", action="store_true",
+        help="Skip preshard unconditionally",
+    )
+    ap.add_argument(
+        "--force-preshard", action="store_true",
+        help="Force preshard even if corpus marker exists",
     )
     args = ap.parse_args()
     sys.exit(run_orchestrator(args))
