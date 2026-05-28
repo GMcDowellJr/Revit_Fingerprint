@@ -546,8 +546,6 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 step_failed = "bundle"
                 failure_notes = f"step=bundle returncode={rc}\n{tail}"
 
-        elapsed = int(time.monotonic() - t_start)
-
         # Post-bundle validation (warn only, runs before registry write so warnings land in notes)
         if step_failed is None and run_type == "bundle":
             dag_nodes = out_root / "results" / "bundle_analysis" / "all" / "line_patterns" / "bundle_dag_nodes.csv"
@@ -579,6 +577,8 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 )
             t_merge = int(time.monotonic() - t_merge_start)
             print(f"[orchestrator]   bi_merge elapsed={t_merge}s", flush=True)
+
+        elapsed = int(time.monotonic() - t_start)
 
         # Update registry row
         ri = reg_index.get(sid)
