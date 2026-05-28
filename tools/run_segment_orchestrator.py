@@ -147,7 +147,7 @@ def _preshard_corpus_records(
         segments_to_write: Dict[str, Dict] = {}
         for sid, plan_entry in segment_plans.items():
             marker = plan_entry["segment_records_dir"] / ".preshard_complete"
-            if not force and marker.is_file() and plan_entry.get("status") == "complete":
+            if not force and plan_entry.get("status") == "complete":
                 continue
             segments_to_write[sid] = plan_entry
 
@@ -214,7 +214,7 @@ def _preshard_corpus_records(
             segments_to_write: Dict[str, Dict] = {}
             for sid, plan_entry in segment_plans.items():
                 marker = plan_entry["segment_records_dir"] / ".preshard_complete"
-                if not force and marker.is_file() and plan_entry.get("status") == "complete":
+                if not force and plan_entry.get("status") == "complete":
                     continue
                 segments_to_write[sid] = plan_entry
 
