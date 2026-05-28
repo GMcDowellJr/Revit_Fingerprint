@@ -112,7 +112,12 @@ def _preshard_corpus_records(
     """
     import csv as _csv
 
-    _csv.field_size_limit(sys.maxsize)
+    # csv.field_size_limit() converts to a C long; on Windows CPython the C long
+    # is 32-bit so sys.maxsize overflows.  Cap at 2^31-1 which fits everywhere.
+    try:
+        _csv.field_size_limit(2 ** 31 - 1)
+    except OverflowError:
+        _csv.field_size_limit(2 ** 30)
 
     t0 = time.monotonic()
 
@@ -131,12 +136,13 @@ def _preshard_corpus_records(
             continue
 
         # Determine which segments need this file.
-        # Gate on the per-segment marker so a header-only file from a partial
-        # prior run does not falsely satisfy the skip check.
+        # Only skip when the marker exists AND the segment is already complete —
+        # pending/failed segments must always get fresh inputs so retries without
+        # --force don't run against stale membership from a prior interrupted run.
         segments_to_write: Dict[str, Dict] = {}
         for sid, plan_entry in segment_plans.items():
             marker = plan_entry["segment_records_dir"] / ".preshard_complete"
-            if not force and marker.is_file():
+            if not force and marker.is_file() and plan_entry.get("status") == "complete":
                 continue
             segments_to_write[sid] = plan_entry
 
@@ -195,11 +201,11 @@ def _preshard_corpus_records(
             if not shard_file.is_file() or shard_file.suffix != ".csv":
                 continue
 
-            # Determine which segments need this shard — same marker gate.
+            # Determine which segments need this shard — same marker+status gate.
             segments_to_write: Dict[str, Dict] = {}
             for sid, plan_entry in segment_plans.items():
                 marker = plan_entry["segment_records_dir"] / ".preshard_complete"
-                if not force and marker.is_file():
+                if not force and marker.is_file() and plan_entry.get("status") == "complete":
                     continue
                 segments_to_write[sid] = plan_entry
 
@@ -285,8 +291,9 @@ def _write_segment_records(
         src = records_dir / fname
         if not src.is_file():
             continue
+        dst = segment_records_dir / fname
         if preshard_marker.is_file():
-            continue  # already written by preshard pass
+            continue  # preshard already wrote this segment's inputs
         with src.open("r", encoding="utf-8-sig", newline="") as f:
             reader = csv.DictReader(f)
             fieldnames = list(reader.fieldnames or [])
@@ -309,7 +316,7 @@ def _write_segment_records(
                 continue
             dst_shard = seg_shard_dir / shard_file.name
             if preshard_marker.is_file():
-                continue  # already written by preshard pass
+                continue  # preshard already wrote this segment's inputs
             with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
                 reader = csv.DictReader(f)
                 fieldnames = list(reader.fieldnames or [])
@@ -609,6 +616,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         segment_plans[sid] = {
             "segment_records_dir": segment_records_dir,
             "allowed_ids": allowed_ids,
+            "status": reg_row.get("status", "").strip(),
         }
 
     if segment_plans:
