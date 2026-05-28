@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -965,8 +966,10 @@ def emit_analysis(
             continue
         records_by_domain[r["domain"]].append(r)
     pattern_id_by_cluster: Dict[Tuple[str, str, str], str] = {}
+    _t_emit_analysis_start = time.perf_counter()
     for dom in domains:
         print(f"[extractor] domain={dom} (start)", flush=True)
+        _t_dom_start = time.perf_counter()
         identity_items_by_record = _load_identity_items_by_record(phase0_dir, dom)
         cluster_items = dom_clusters.get(dom, [])
         domain_records = records_by_domain.get(dom, [])
@@ -1268,6 +1271,9 @@ def emit_analysis(
             f"[extractor] domain={dom} (done) clusters={len(sorted_clusters)} records={len(domain_records)}",
             flush=True,
         )
+        _t_dom_elapsed = time.perf_counter() - _t_dom_start
+        sys.stderr.write(f"[patterns_timing] domain={dom} elapsed={_t_dom_elapsed:.2f}s\n")
+        sys.stderr.flush()
 
     # Unknown join_hash rows still get membership rows with blank pattern_id.
     for r in records:
@@ -1331,5 +1337,9 @@ def emit_analysis(
         "files_total", "files_with_unique_dominant", "files_with_tied_dominant", "files_excluded_from_dominance",
         "pct_files_unique_dominant", "governance_state",
     ], _sort_rows(diag_rows, ["analysis_run_id", "domain"]))
+
+    _t_emit_analysis_total = time.perf_counter() - _t_emit_analysis_start
+    sys.stderr.write(f"[patterns_timing] emit_analysis_total elapsed={_t_emit_analysis_total:.2f}s domains={len(domains)}\n")
+    sys.stderr.flush()
 
     return analysis_run_id

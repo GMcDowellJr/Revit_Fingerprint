@@ -730,6 +730,16 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                         sid, out_root, records_dir, patterns_stderr
                     )
 
+            # Surface patterns timing from captured stderr
+            patterns_timing_lines = [
+                ln for ln in patterns_stderr.splitlines()
+                if ln.startswith("[patterns_timing]")
+            ]
+            if patterns_timing_lines:
+                print(f"[orchestrator]   patterns timing ({len(patterns_timing_lines)} lines):", flush=True)
+                for ln in patterns_timing_lines:
+                    print(f"[orchestrator]     {ln}", flush=True)
+
         # Step 3 — Bundle stage
         if step_failed is None and run_type == "bundle":
             print(f"[orchestrator]   step 3/3 bundle...", flush=True)

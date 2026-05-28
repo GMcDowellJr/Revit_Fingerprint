@@ -879,6 +879,7 @@ def main() -> None:
             sys.stderr.write("[WARN extract_all] placeholders stage failed; continuing: {}\n".format(e))
 
     if "authority" in selected_stages or "patterns" in selected_stages:
+        _t_patterns_stage_start = time.perf_counter()
         records_source_dir = Path(args.records_dir).resolve() if args.records_dir else v21_phase0_dir
         phase0_records_csv = records_source_dir / "records.csv"
         if phase0_records_csv.is_file():
@@ -957,6 +958,7 @@ def main() -> None:
             if seed_export_run_id:
                 full_seed_dir = v21_analysis_dir / "_seed_full"
                 _ensure_dir(full_seed_dir)
+                _t0 = time.perf_counter()
                 emit_analysis(
                     meta_rows,
                     record_rows,
@@ -965,8 +967,11 @@ def main() -> None:
                     results_v21_dir=v21_root,
                     label_synth_dir=label_synth_dir,
                 )
+                sys.stderr.write(f"[patterns_timing] stage=emit_analysis_seed elapsed={time.perf_counter()-_t0:.2f}s\n")
+                sys.stderr.flush()
                 corpus_meta_rows = [r for r in meta_rows if str(r.get("export_run_id", "")).strip() != seed_export_run_id]
                 corpus_record_rows = [r for r in record_rows if str(r.get("export_run_id", "")).strip() != seed_export_run_id]
+                _t0 = time.perf_counter()
                 analysis_run_id = emit_analysis(
                     corpus_meta_rows,
                     corpus_record_rows,
@@ -975,6 +980,8 @@ def main() -> None:
                     results_v21_dir=v21_root,
                     label_synth_dir=label_synth_dir,
                 )
+                sys.stderr.write(f"[patterns_timing] stage=emit_analysis_corpus elapsed={time.perf_counter()-_t0:.2f}s\n")
+                sys.stderr.flush()
 
                 corpus_domain_patterns = read_csv_rows(v21_analysis_dir / "domain_patterns.csv")
                 full_domain_patterns = read_csv_rows(full_seed_dir / "domain_patterns.csv")
@@ -1025,6 +1032,7 @@ def main() -> None:
                 sidecar_path = write_sidecar(v21_analysis_dir, seed_export_run_id, seed_sidecar_rows, schema_version)
                 print(f"[extract] Seed reference bundle written to {sidecar_path}")
             else:
+                _t0 = time.perf_counter()
                 analysis_run_id = emit_analysis(
                     meta_rows,
                     record_rows,
@@ -1033,6 +1041,8 @@ def main() -> None:
                     results_v21_dir=v21_root,
                     label_synth_dir=label_synth_dir,
                 )
+                sys.stderr.write(f"[patterns_timing] stage=emit_analysis elapsed={time.perf_counter()-_t0:.2f}s\n")
+                sys.stderr.flush()
                 domain_patterns = read_csv_rows(v21_analysis_dir / "domain_patterns.csv")
                 for row in domain_patterns:
                     row["is_seed"] = "false"
@@ -1042,8 +1052,16 @@ def main() -> None:
                         fieldnames.append("is_seed")
                     atomic_write_csv(v21_analysis_dir / "domain_patterns.csv", fieldnames, domain_patterns)
             report["notes"].append(f"analysis_run_id={analysis_run_id}")
+            _t0 = time.perf_counter()
             emit_element_dominance(v21_analysis_dir)
+            sys.stderr.write(f"[patterns_timing] stage=emit_element_dominance elapsed={time.perf_counter()-_t0:.2f}s\n")
+            sys.stderr.flush()
             report["notes"].append("element_dominance: emitted")
+        sys.stderr.write(
+            f"[patterns_timing] stage=patterns_total elapsed={time.perf_counter()-_t_patterns_stage_start:.2f}s "
+            f"files={len(meta_rows)}\n"
+        )
+        sys.stderr.flush()
         record_rows = _pre_filter_record_rows
 
     split_domains: List[str] = []
