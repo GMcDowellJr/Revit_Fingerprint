@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 if __package__ in (None, ""):
     _THIS_DIR = Path(__file__).resolve().parent
@@ -138,6 +138,33 @@ def _emit_meta_scatter_thresholds(out_dir: Path, run_id: str, domain_filter: str
     )
 
 
+def _load_purgeable_only_set(
+    latent_purgeable_file: Path,
+) -> Set[Tuple[str, str, str]]:
+    """Read latent_purgeable.csv once and return the purgeable_only set.
+
+    purgeable_only = rows where latent_purgeable=true AND the same
+    (export_run_id, domain, sig_hash) triple never appears as latent_purgeable!=true.
+    Matches the logic in step1_membership_matrix.py exactly.
+    """
+    used_set: Set[Tuple[str, str, str]] = set()
+    excluded_set: Set[Tuple[str, str, str]] = set()
+    for row in read_csv_rows(latent_purgeable_file):
+        eid = row.get("export_run_id", "").strip()
+        dom = row.get("domain", "").strip()
+        sig = row.get("sig_hash", "").strip()
+        lp  = row.get("latent_purgeable", "").strip().lower()
+        if not (eid and dom and sig):
+            continue
+        if lp != "true":
+            used_set.add((eid, dom, sig))
+        else:
+            excluded_set.add((eid, dom, sig))
+    result = excluded_set - used_set
+    print(f"[run] purgeable_only_set loaded: {len(result)} entries from {latent_purgeable_file.name}")
+    return result
+
+
 def _run_pipeline_once(
     analysis_dir: Path,
     work_out_dir: Path,
@@ -153,6 +180,7 @@ def _run_pipeline_once(
     allowed_export_run_ids: Optional[Set[str]] = None,
     purge_view: str = "all",
     latent_purgeable_file: Optional[Path] = None,
+    purgeable_only_set: Optional[Set[Tuple[str, str, str]]] = None,
 ) -> Dict[str, object]:
     total_bundles = 0
     total_edges = 0
@@ -170,6 +198,7 @@ def _run_pipeline_once(
         allowed_export_run_ids,
         purge_view,
         latent_purgeable_file,
+        purgeable_only_set=purgeable_only_set,
     )
     t1 = time.time() - t0
     print(f"[run] domain={domain} step1_seconds={t1:.3f}")
@@ -386,6 +415,11 @@ def run_bundle_analysis(
             view_out = _view_out_dir(out_dir, view)
             view_out.mkdir(parents=True, exist_ok=True)
             lp_file = latent_purgeable_file if view == "used" else None
+            purgeable_only_set: Optional[Set[Tuple[str, str, str]]] = None
+            if view == "used" and lp_file is not None:
+                t_lp = time.time()
+                purgeable_only_set = _load_purgeable_only_set(lp_file)
+                print(f"[run] purgeable_only_set load elapsed={time.time()-t_lp:.2f}s")
 
             role_dir_name = f"role_{'_'.join(resolved_roles)}" if resolved_roles else ""
             role_stage_root = view_out / "_role_stage"
@@ -420,6 +454,7 @@ def run_bundle_analysis(
                             allowed_export_run_ids=allowed_export_run_ids,
                             purge_view=view,
                             latent_purgeable_file=lp_file,
+                            purgeable_only_set=purgeable_only_set,
                         )
                     else:
                         t0 = time.time()
@@ -434,6 +469,7 @@ def run_bundle_analysis(
                             allowed_export_run_ids,
                             view,
                             lp_file,
+                            purgeable_only_set=purgeable_only_set,
                         )
                         t1 = time.time() - t0
                         print(f"[run] domain={dom} step1_seconds={t1:.3f}")
@@ -541,6 +577,7 @@ def run_bundle_analysis(
         }
 
     # ── Population-aware path ──────────────────────────────────────────────────
+    # TODO: pre-load purgeable_only_set for population-aware path
     records_csv_candidates = [
         analysis_dir / "records" / "records.csv",
         analysis_dir.parent / "records" / "records.csv",
