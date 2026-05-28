@@ -730,6 +730,20 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                         sid, out_root, records_dir, patterns_stderr
                     )
 
+            # Surface patterns timing from captured stderr
+            patterns_timing_lines = [
+                ln for ln in patterns_stderr.splitlines()
+                if ln.startswith("[patterns_timing]")
+            ]
+            if patterns_timing_lines:
+                summary_lines = [ln for ln in patterns_timing_lines if "domain=" not in ln]
+                domain_lines  = [ln for ln in patterns_timing_lines if "domain=" in ln]
+                # domain lines are already top-5 from extractor; show all of them
+                lines_to_show = domain_lines + summary_lines
+                print(f"[orchestrator]   patterns timing:", flush=True)
+                for ln in lines_to_show:
+                    print(f"[orchestrator]     {ln}", flush=True)
+
         # Step 3 — Bundle stage
         if step_failed is None and run_type == "bundle":
             print(f"[orchestrator]   step 3/3 bundle...", flush=True)
