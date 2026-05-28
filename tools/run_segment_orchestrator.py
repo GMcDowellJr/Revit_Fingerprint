@@ -116,11 +116,13 @@ def _preshard_corpus_records(
 
     t0 = time.monotonic()
 
-    # Flat lookup: export_run_id → segment_id
-    id_to_sid: Dict[str, str] = {}
+    # One-to-many lookup: export_run_id → list of segment_ids
+    # An export_run_id can appear in multiple segments (parent/child and scoped
+    # segments built by build_segment_manifest overlap intentionally).
+    id_to_sids: Dict[str, List[str]] = {}
     for sid, plan_entry in segment_plans.items():
         for eid in plan_entry["allowed_ids"]:
-            id_to_sid[eid] = sid
+            id_to_sids.setdefault(eid, []).append(sid)
 
     # ── records.csv and file_metadata.csv ─────────────────────────────────────
     for fname in ("records.csv", "file_metadata.csv"):
@@ -168,10 +170,9 @@ def _preshard_corpus_records(
 
             for row in reader:
                 eid = row.get("export_run_id", "").strip()
-                row_sid = id_to_sid.get(eid)
-                if row_sid is None or row_sid not in writers:
-                    continue
-                writers[row_sid].writerow(row)
+                for row_sid in id_to_sids.get(eid, ()):
+                    if row_sid in writers:
+                        writers[row_sid].writerow(row)
 
         for fh in handles.values():
             fh.close()
@@ -228,10 +229,9 @@ def _preshard_corpus_records(
 
                 for row in reader:
                     eid = row.get("export_run_id", "").strip()
-                    row_sid = id_to_sid.get(eid)
-                    if row_sid is None or row_sid not in writers:
-                        continue
-                    writers[row_sid].writerow(row)
+                    for row_sid in id_to_sids.get(eid, ()):
+                        if row_sid in writers:
+                            writers[row_sid].writerow(row)
 
             for fh in handles.values():
                 fh.close()
