@@ -54,6 +54,8 @@ def build_membership_matrix(
     population_registry_dir: Optional[Path] = None,
     scope_key_filter: Optional[str] = None,
     allowed_export_run_ids: Optional[Set[str]] = None,
+    purge_view: str = "all",
+    latent_purgeable_file: Optional[Path] = None,
 ) -> Dict[str, int]:
     pattern_presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     domain_pattern_rows = read_csv_rows(analysis_dir / "domain_patterns.csv")
@@ -131,6 +133,47 @@ def build_membership_matrix(
 
     membership_rows.sort(key=lambda r: (r["domain"], r["scope_key"], r["export_run_id"], r["pattern_id"]))
 
+    if purge_view == "used" and latent_purgeable_file is not None:
+        used_set: Set[Tuple[str, str, str]] = set()
+        excluded_set: Set[Tuple[str, str, str]] = set()
+        for lp_row in read_csv_rows(latent_purgeable_file):
+            eid = lp_row.get("export_run_id", "").strip()
+            dom = lp_row.get("domain", "").strip()
+            sig = lp_row.get("sig_hash", "").strip()
+            lp = lp_row.get("latent_purgeable", "").strip().lower()
+            if not (eid and dom and sig):
+                continue
+            if lp != "true":
+                used_set.add((eid, dom, sig))
+            else:
+                excluded_set.add((eid, dom, sig))
+        purgeable_only: Set[Tuple[str, str, str]] = excluded_set - used_set
+
+        pid_to_sig: Dict[str, str] = {}
+        for dp_row in domain_pattern_rows:
+            if dp_row.get("analysis_run_id", "") != run_id or dp_row.get("domain", "") != domain:
+                continue
+            pid = dp_row.get("pattern_id", "").strip()
+            src = dp_row.get("source_cluster_id", "").strip()
+            sig = src.split("|")[-1] if src else ""
+            if pid and sig:
+                pid_to_sig[pid] = sig
+
+        cells_before = len(membership_rows)
+        filtered: List[Dict[str, str]] = []
+        for row in membership_rows:
+            eid = row.get("export_run_id", "").strip()
+            pid = row.get("pattern_id", "").strip()
+            sig = pid_to_sig.get(pid, "")
+            if not sig or (eid, domain, sig) not in purgeable_only:
+                filtered.append(row)
+        cells_after = len(filtered)
+        print(
+            f"[step1][used-filter] domain={domain} cells_before={cells_before} "
+            f"cells_excluded={cells_before - cells_after} cells_after={cells_after}"
+        )
+        membership_rows = filtered
+
     scope_rows: List[Dict[str, str]] = []
     for scope_key in sorted(set(files_by_scope.keys()) | set(patterns_by_scope.keys())):
         files_count = len(files_by_scope.get(scope_key, set()))
@@ -183,6 +226,8 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--analysis-run-id", default="")
     p.add_argument("--population-id", default=None)
     p.add_argument("--population-registry-dir", type=Path, default=None)
+    p.add_argument("--purge-view", choices=["all", "used"], default="all")
+    p.add_argument("--latent-purgeable-file", type=Path, default=None)
     return p.parse_args(argv)
 
 
@@ -196,6 +241,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         args.population_id,
         args.population_registry_dir,
         None,
+        None,
+        args.purge_view,
+        args.latent_purgeable_file,
     )
     return 0
 
