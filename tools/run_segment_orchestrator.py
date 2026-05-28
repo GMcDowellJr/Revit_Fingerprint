@@ -428,6 +428,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         return 0
 
     # ── live run ─────────────────────────────────────────────────────────────
+    run_t_start = time.monotonic()
     for idx, (reg_row, mrow) in enumerate(plan, 1):
         sid = reg_row.get("segment_id", "").strip()
         output_folder = reg_row.get("output_folder", "").strip()
@@ -464,9 +465,14 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         failure_notes: str = ""
         notes_parts: List[str] = []
         t_start = time.monotonic()
+        t_prepare = 0
+        t_patterns = 0
+        t_bundle: Optional[int] = None
+        t_merge: Optional[int] = None
 
         # Step 1 — Prepare: directories, export_run_ids.txt, segment-level records
         print(f"[orchestrator]   step 1/3 prepare...", flush=True)
+        t_step1_start = time.monotonic()
         try:
             segment_records_dir = out_root / "results" / "records"
             segment_records_dir.mkdir(parents=True, exist_ok=True)
@@ -481,6 +487,8 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         except Exception as exc:
             step_failed = "prepare"
             failure_notes = f"step=prepare error={exc}"
+        t_prepare = int(time.monotonic() - t_step1_start)
+        print(f"[orchestrator]   step 1/3 prepare elapsed={t_prepare}s", flush=True)
 
         # Step 2 — Patterns stage
         # --records-dir points at corpus records so build_label_population (run internally
@@ -502,7 +510,10 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 "--join-policy", str(join_policy),
                 "--allow-sig-hash-join-key",
             ]
+            t_step2_start = time.monotonic()
             rc, tail, patterns_stderr = run_step_capture(extract_cmd, cwd=str(repo_root))
+            t_patterns = int(time.monotonic() - t_step2_start)
+            print(f"[orchestrator]   step 2/3 patterns elapsed={t_patterns}s", flush=True)
             if rc != 0:
                 step_failed = "patterns"
                 failure_notes = f"step=patterns returncode={rc}\n{tail}"
@@ -527,7 +538,10 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 "--purge-view", "both",
                 "--latent-purgeable-file", str(out_root / "results" / "records" / "latent_purgeable.csv"),
             ]
+            t_step3_start = time.monotonic()
             rc, tail, _stderr = run_step_capture(bundle_cmd, cwd=str(repo_root))
+            t_bundle = int(time.monotonic() - t_step3_start)
+            print(f"[orchestrator]   step 3/3 bundle elapsed={t_bundle}s", flush=True)
             if rc != 0:
                 step_failed = "bundle"
                 failure_notes = f"step=bundle returncode={rc}\n{tail}"
@@ -547,6 +561,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
 
         # BI merge (non-fatal; only runs when bundle succeeded)
         if step_failed is None and run_type == "bundle" and not args.skip_bi_merge:
+            t_merge_start = time.monotonic()
             try:
                 active_domains = _active_domains_from_presence_csv(out_root / "results" / "analysis")
                 bundle_analysis_dir = out_root / "results" / "bundle_analysis" / "all"
@@ -562,6 +577,8 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                     f"[WARN orchestrator] bi_merge failed for segment={sid}: {merge_exc}",
                     flush=True,
                 )
+            t_merge = int(time.monotonic() - t_merge_start)
+            print(f"[orchestrator]   bi_merge elapsed={t_merge}s", flush=True)
 
         # Update registry row
         ri = reg_index.get(sid)
@@ -577,6 +594,18 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 registry[ri]["notes"] = failure_notes[:500]
 
         write_registry_atomic(registry_file, registry)
+
+        timing_parts = [
+            f"segment={sid}",
+            f"prepare={t_prepare}s",
+            f"patterns={t_patterns}s",
+        ]
+        if t_bundle is not None:
+            timing_parts.append(f"bundle={t_bundle}s")
+        if t_merge is not None:
+            timing_parts.append(f"bi_merge={t_merge}s")
+        timing_parts.append(f"total={elapsed}s")
+        print(f"[orchestrator]   timing {' '.join(timing_parts)}", flush=True)
 
         if step_failed is None:
             print(f"[orchestrator]   ✓ complete (elapsed: {elapsed}s)", flush=True)
@@ -608,6 +637,14 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         skip_detail += f"  ({non_bundle_skipped} non-bundle rows — run_type!=bundle)"
     print(f"  skipped  : {n_skipped + non_bundle_skipped}{skip_detail}")
     print(f"  total    : {total}")
+
+    segments_run = n_complete + n_failed
+    total_elapsed = int(time.monotonic() - run_t_start)
+    avg_per_segment = total_elapsed // segments_run if segments_run > 0 else 0
+    print(
+        f"[orchestrator] timing_summary segments_run={segments_run}"
+        f" total_elapsed={total_elapsed}s avg_per_segment={avg_per_segment}s"
+    )
 
     return 1 if n_failed > 0 else 0
 
