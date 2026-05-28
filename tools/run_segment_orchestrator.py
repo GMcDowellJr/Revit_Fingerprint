@@ -33,6 +33,11 @@ from typing import Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bundle_analysis.common import atomic_write_csv
 
+# Maximum destination file handles open simultaneously during preshard.
+# Keeps fd usage well below typical OS limits (1024) regardless of segment count.
+# Each batch re-streams the source file once, so total passes = ceil(N/batch).
+_PRESHARD_BATCH = 64
+
 BI_MERGE_FILES = [
     "membership_matrix.csv",
     "bundles.csv",
@@ -159,31 +164,35 @@ def _preshard_corpus_records(
         for plan_entry in segments_to_write.values():
             plan_entry["segment_records_dir"].mkdir(parents=True, exist_ok=True)
 
-        # Open one writer per segment that needs the file
-        writers: Dict[str, _csv.DictWriter] = {}
-        handles = {}
-        fieldnames: Optional[List[str]] = None
-
+        # Read fieldnames once before batching so we don't need a separate
+        # header-only open inside the batch loop.
         with src.open("r", encoding="utf-8-sig", newline="") as f:
-            reader = _csv.DictReader(f)
-            fieldnames = list(reader.fieldnames or [])
+            fieldnames: List[str] = list(_csv.DictReader(f).fieldnames or [])
+        if not fieldnames:
+            continue
 
-            for sid, plan_entry in segments_to_write.items():
+        # Fan out in batches so at most _PRESHARD_BATCH destination handles are
+        # open simultaneously.  Each batch re-streams the source file once.
+        seg_items = list(segments_to_write.items())
+        for batch_start in range(0, len(seg_items), _PRESHARD_BATCH):
+            batch = dict(seg_items[batch_start : batch_start + _PRESHARD_BATCH])
+            writers: Dict[str, _csv.DictWriter] = {}
+            handles: Dict[str, object] = {}
+            for sid, plan_entry in batch.items():
                 dst = plan_entry["segment_records_dir"] / fname
                 fh = dst.open("w", newline="", encoding="utf-8")
                 handles[sid] = fh
                 w = _csv.DictWriter(fh, fieldnames=fieldnames)
                 w.writeheader()
                 writers[sid] = w
-
-            for row in reader:
-                eid = row.get("export_run_id", "").strip()
-                for row_sid in id_to_sids.get(eid, ()):
-                    if row_sid in writers:
-                        writers[row_sid].writerow(row)
-
-        for fh in handles.values():
-            fh.close()
+            with src.open("r", encoding="utf-8-sig", newline="") as f:
+                for row in _csv.DictReader(f):
+                    eid = row.get("export_run_id", "").strip()
+                    for row_sid in id_to_sids.get(eid, ()):
+                        if row_sid in writers:
+                            writers[row_sid].writerow(row)
+            for fh in handles.values():
+                fh.close()
 
         print(
             f"[preshard] {fname} → {len(segments_to_write)} segments written,"
@@ -217,31 +226,32 @@ def _preshard_corpus_records(
                 seg_shard_dir = plan_entry["segment_records_dir"] / "identity_items_by_domain"
                 seg_shard_dir.mkdir(parents=True, exist_ok=True)
 
-            writers: Dict[str, _csv.DictWriter] = {}
-            handles = {}
-            fieldnames = None
-
             with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
-                reader = _csv.DictReader(f)
-                fieldnames = list(reader.fieldnames or [])
+                shard_fieldnames: List[str] = list(_csv.DictReader(f).fieldnames or [])
+            if not shard_fieldnames:
+                continue
 
-                for sid, plan_entry in segments_to_write.items():
+            seg_items = list(segments_to_write.items())
+            for batch_start in range(0, len(seg_items), _PRESHARD_BATCH):
+                batch = dict(seg_items[batch_start : batch_start + _PRESHARD_BATCH])
+                writers: Dict[str, _csv.DictWriter] = {}
+                handles: Dict[str, object] = {}
+                for sid, plan_entry in batch.items():
                     seg_shard_dir = plan_entry["segment_records_dir"] / "identity_items_by_domain"
                     dst_shard = seg_shard_dir / shard_file.name
                     fh = dst_shard.open("w", newline="", encoding="utf-8")
                     handles[sid] = fh
-                    w = _csv.DictWriter(fh, fieldnames=fieldnames)
+                    w = _csv.DictWriter(fh, fieldnames=shard_fieldnames)
                     w.writeheader()
                     writers[sid] = w
-
-                for row in reader:
-                    eid = row.get("export_run_id", "").strip()
-                    for row_sid in id_to_sids.get(eid, ()):
-                        if row_sid in writers:
-                            writers[row_sid].writerow(row)
-
-            for fh in handles.values():
-                fh.close()
+                with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
+                    for row in _csv.DictReader(f):
+                        eid = row.get("export_run_id", "").strip()
+                        for row_sid in id_to_sids.get(eid, ()):
+                            if row_sid in writers:
+                                writers[row_sid].writerow(row)
+                for fh in handles.values():
+                    fh.close()
 
             shards_processed += 1
             seg_shard_files_written += len(segments_to_write)
