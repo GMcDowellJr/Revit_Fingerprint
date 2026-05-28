@@ -4,6 +4,7 @@ import argparse
 import json
 import math
 import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -115,6 +116,7 @@ def compute_auto_threshold(
 
 
 def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int = 3, min_support_pct: float = 0.0) -> Dict[str, int]:
+    _t_fn_start = time.perf_counter()
     domain_out_dir = out_dir / domain
     membership_rows = read_csv_rows(domain_out_dir / "membership_matrix.csv")
     scope_rows = read_csv_rows(domain_out_dir / "scope_registry.csv")
@@ -133,12 +135,18 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
     bundle_file_rows: List[Dict[str, str]] = []
     threshold_rows: List[Dict[str, str]] = []
 
+    _n_scopes = 0
+    _total_threshold_seconds = 0.0
+    _total_mining_seconds = 0.0
+    _total_closure_seconds = 0.0
+
     for scope_key in sorted(files_total_by_scope.keys() | file_sets_by_scope.keys()):
         file_sets = {k: frozenset(v) for k, v in file_sets_by_scope.get(scope_key, {}).items() if len(v) >= 2}
         files_total = files_total_by_scope.get(scope_key, len(file_sets))
         patterns_in_scope = len({pid for pset in file_sets.values() for pid in pset})
 
         threshold_result: Dict[str, Any]
+        _t_threshold_start = time.perf_counter()
         try:
             threshold_result = compute_auto_threshold(file_sets, files_total)
             required_keys = {
@@ -180,6 +188,8 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
                 "cooccurrence_distribution": {},
             }
 
+        _t_threshold = time.perf_counter() - _t_threshold_start
+        _total_threshold_seconds += _t_threshold
         effective_min_support = max(2, min_support_count, int(threshold_result["chosen"]))
         threshold_rows.append(
             {
@@ -213,8 +223,22 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
             )
             continue
 
+        _n_scopes += 1
         effective_support = compute_effective_support(files_total, effective_min_support, min_support_pct)
-        closed_itemsets = find_closed_itemsets(file_sets, min_support=effective_support, min_bundle_size=2)
+        _t_mining_start = time.perf_counter()
+        closed_itemsets, _itemset_timing = find_closed_itemsets(file_sets, min_support=effective_support, min_bundle_size=2)
+        _t_mining_elapsed = time.perf_counter() - _t_mining_start
+        _t_mining = _itemset_timing["candidate_gen_seconds"] + _itemset_timing["support_count_seconds"]
+        _t_closure = _itemset_timing["closure_prune_seconds"]
+        _total_mining_seconds += _t_mining
+        _total_closure_seconds += _t_closure
+        print(
+            f"[step2_timing] domain={domain} scope={scope_key!r} n_files={files_total} n_patterns={len(file_sets)} "
+            f"effective_threshold={effective_min_support} threshold_seconds={_t_threshold:.3f} "
+            f"n_raw_candidates={_itemset_timing['n_raw_candidates']} "
+            f"n_support_candidates={_itemset_timing['n_support_candidates']} "
+            f"mining_seconds={_t_mining:.3f} closure_seconds={_t_closure:.3f}"
+        )
 
         closed_itemsets.sort(
             key=lambda item: (
@@ -275,6 +299,15 @@ def find_bundles_for_domain(out_dir: Path, domain: str, min_support_count: int =
             f"[step2] domain={domain} scope={scope_key!r} bundles_found={len(closed_itemsets)} patterns_covered={patterns_covered} "
             f"files_covered={files_covered} effective_threshold={effective_min_support}"
         )
+
+    _step2_total = time.perf_counter() - _t_fn_start
+    print(
+        f"[step2_domain_summary] domain={domain} n_scopes={_n_scopes} "
+        f"total_threshold_seconds={_total_threshold_seconds:.3f} "
+        f"total_mining_seconds={_total_mining_seconds:.3f} "
+        f"total_closure_seconds={_total_closure_seconds:.3f} "
+        f"step2_total_seconds={_step2_total:.3f}"
+    )
 
     key_set = set()
     for row in bundles_rows:
