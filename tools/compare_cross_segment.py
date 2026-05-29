@@ -1731,10 +1731,13 @@ def build_governance_state_outputs(
     tgt_all_den = len(tgt_all)
     tgt_used_den = len(tgt_used)
     provided_configured = len(ref_all & tgt_all)
-    provided_used = len(ref_all & tgt_used)
-    provided_passive = len((ref_all & tgt_all) - tgt_used)
+    # Used-view governance summary metrics are active-delivery signals only for
+    # Project targets. For Template/Generic/most Container targets, target_used is
+    # retained as row-level annotation but not summarized as passive/active state.
+    provided_used = len(ref_all & tgt_used) if tgt_usage_interpretable else 0
+    provided_passive = len((ref_all & tgt_all) - tgt_used) if tgt_usage_interpretable else 0
     provided_missing = len(ref_all - tgt_all)
-    local_active = len(tgt_used - ref_all)
+    local_active = len(tgt_used - ref_all) if tgt_usage_interpretable else 0
 
     summary = {
         "comparison_run_id": crid,
@@ -1751,10 +1754,10 @@ def build_governance_state_outputs(
         "target_all_count": str(tgt_all_den),
         "target_used_count": str(tgt_used_den),
         "provided_to_configured_containment": _fmt(provided_configured / ref_den) if ref_den else "",
-        "provided_to_used_containment": _fmt(provided_used / ref_den) if ref_den else "",
-        "provided_passive_share": _fmt(provided_passive / ref_den) if ref_den else "",
+        "provided_to_used_containment": _fmt(provided_used / ref_den) if tgt_usage_interpretable and ref_den else "",
+        "provided_passive_share": _fmt(provided_passive / ref_den) if tgt_usage_interpretable and ref_den else "",
         "provided_missing_share": _fmt(provided_missing / ref_den) if ref_den else "",
-        "local_active_share": _fmt(local_active / tgt_used_den) if tgt_used_den else "",
+        "local_active_share": _fmt(local_active / tgt_used_den) if tgt_usage_interpretable and tgt_used_den else "",
         "provided_and_used_count": str(state_counts.get("provided_and_used", 0)),
         "provided_but_passive_count": str(state_counts.get("provided_but_passive", 0)),
         "provided_but_missing_count": str(state_counts.get("provided_but_missing", 0)),
@@ -1763,11 +1766,11 @@ def build_governance_state_outputs(
         "local_unbundled_count": str(state_counts.get("local_unbundled", 0)),
         "provided_configured_count": str(state_counts.get("provided_configured", 0)),
         "local_configured_count": str(state_counts.get("local_configured", 0)),
-        "provided_and_used_pct_of_reference_all": _fmt(state_counts.get("provided_and_used", 0) / ref_den) if ref_den else "",
-        "provided_but_passive_pct_of_reference_all": _fmt(state_counts.get("provided_but_passive", 0) / ref_den) if ref_den else "",
+        "provided_and_used_pct_of_reference_all": _fmt(state_counts.get("provided_and_used", 0) / ref_den) if tgt_usage_interpretable and ref_den else "",
+        "provided_but_passive_pct_of_reference_all": _fmt(state_counts.get("provided_but_passive", 0) / ref_den) if tgt_usage_interpretable and ref_den else "",
         "provided_but_missing_pct_of_reference_all": _fmt(state_counts.get("provided_but_missing", 0) / ref_den) if ref_den else "",
-        "local_active_pct_of_target_used": _fmt(state_counts.get("local_active", 0) / tgt_used_den) if tgt_used_den else "",
-        "local_passive_pct_of_target_all": _fmt(state_counts.get("local_passive", 0) / tgt_all_den) if tgt_all_den else "",
+        "local_active_pct_of_target_used": _fmt(state_counts.get("local_active", 0) / tgt_used_den) if tgt_usage_interpretable and tgt_used_den else "",
+        "local_passive_pct_of_target_all": _fmt(state_counts.get("local_passive", 0) / tgt_all_den) if tgt_usage_interpretable and tgt_all_den else "",
         "local_unbundled_pct_of_target_all": _fmt(state_counts.get("local_unbundled", 0) / tgt_all_den) if tgt_all_den else "",
         "reference_usage_interpretable": _bool_str(ref_usage_interpretable),
         "target_usage_interpretable": _bool_str(tgt_usage_interpretable),

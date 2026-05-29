@@ -233,3 +233,74 @@ def test_output_row_sort_helpers_are_stable_by_content():
     ]
     sort_pair_detail_rows(pair_rows)
     assert [row["segment_id_a"] for row in pair_rows] == ["a", "b"]
+
+
+def test_non_project_target_blanks_used_summary_shares(tmp_path):
+    from compare_cross_segment import build_governance_state_outputs  # noqa: E402
+
+    domain = "line_patterns"
+    segments_root = tmp_path / "segments"
+    _write_segment(
+        segments_root,
+        "generic",
+        domain,
+        [("g1", "provided_a", "Provided A"), ("g2", "provided_b", "Provided B")],
+        [
+            {"export_run_id": "generic_file", "pattern_id": "g1"},
+            {"export_run_id": "generic_file", "pattern_id": "g2"},
+        ],
+        [{"export_run_id": "generic_file", "pattern_id": "g1"}],
+        ["g1", "g2"],
+    )
+    _write_segment(
+        segments_root,
+        "template",
+        domain,
+        [
+            ("t1", "provided_a", "Provided A"),
+            ("t2", "provided_b", "Provided B"),
+            ("t3", "template_local", "Template Local"),
+        ],
+        [
+            {"export_run_id": "template_file", "pattern_id": "t1"},
+            {"export_run_id": "template_file", "pattern_id": "t2"},
+            {"export_run_id": "template_file", "pattern_id": "t3"},
+        ],
+        [{"export_run_id": "template_file", "pattern_id": "t3"}],
+        ["t1", "t2", "t3"],
+    )
+    manifest = {
+        "generic": {**_seg("Generic"), "segment_label": "Generic"},
+        "template": {**_seg("Template"), "segment_label": "Template"},
+    }
+    registry = {
+        "generic": {"output_folder": "generic", "run_type": "bundle"},
+        "template": {"output_folder": "template", "run_type": "bundle"},
+    }
+
+    rows, summary = build_governance_state_outputs(
+        "cmp_test",
+        "generic",
+        "template",
+        "generic_to_template",
+        domain,
+        manifest,
+        registry,
+        segments_root,
+        "2026-05-29T00:00:00Z",
+    )
+
+    states = {row["join_hash"]: row["state"] for row in rows}
+    assert states == {
+        "provided_a": "provided_configured",
+        "provided_b": "provided_configured",
+        "template_local": "local_configured",
+    }
+    assert summary["target_usage_interpretable"] == "false"
+    assert summary["provided_to_configured_containment"] == "1.000000"
+    assert summary["provided_to_used_containment"] == ""
+    assert summary["provided_passive_share"] == ""
+    assert summary["local_active_share"] == ""
+    assert summary["provided_and_used_pct_of_reference_all"] == ""
+    assert summary["provided_but_passive_pct_of_reference_all"] == ""
+    assert summary["local_active_pct_of_target_used"] == ""

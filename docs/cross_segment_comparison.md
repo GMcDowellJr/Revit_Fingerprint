@@ -178,7 +178,7 @@ State values for Project targets include `provided_and_used`, `provided_but_pass
 
 ### cross_segment_governance_state_summary.csv
 
-One row per directed governance comparison/domain with counts and unambiguous shares for reporting: `provided_and_used_count`, `provided_but_passive_count`, `provided_but_missing_count`, `local_active_count`, `local_passive_count`, `local_unbundled_count`, plus directed metrics such as `provided_to_configured_containment`, `provided_to_used_containment`, `provided_passive_share`, `provided_missing_share`, and `local_active_share`. Provided-state percentages use `reference_all` as denominator; local active share uses `target_used` when available; local passive/unbundled shares use `target_all`.
+One row per directed governance comparison/domain with counts and unambiguous shares for reporting: `provided_and_used_count`, `provided_but_passive_count`, `provided_but_missing_count`, `local_active_count`, `local_passive_count`, `local_unbundled_count`, plus directed metrics such as `provided_to_configured_containment`, `provided_to_used_containment`, `provided_passive_share`, `provided_missing_share`, and `local_active_share`. Provided-state percentages use `reference_all` as denominator; local active share uses `target_used` when available; local passive/unbundled shares use `target_all`. Used-derived summary shares (`provided_to_used_containment`, `provided_passive_share`, `local_active_share`, and matching used/passive percentages) are blank when `target_usage_interpretable=false` so Template/Generic/most Container stock is not summarized as passive bloat.
 
 ### cross_segment_delta.csv
 
