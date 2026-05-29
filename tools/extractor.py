@@ -1334,6 +1334,8 @@ def emit_analysis(
         _pattern_id_by_cluster.update(result["pattern_id_by_cluster"])
         _domain_timings.append(result["timing"])
 
+    _domain_failures: List[Tuple[str, BaseException]] = []
+
     if workers == 1:
         # Run inline — avoids ProcessPoolExecutor entirely so emit_analysis is safe
         # to call from notebooks, python -c, stdin, or any non-importable __main__.
@@ -1354,6 +1356,7 @@ def emit_analysis(
                 )
             except Exception as exc:
                 print(f"[extractor] domain={dom} failed: {exc}", flush=True)
+                _domain_failures.append((dom, exc))
                 continue
             _merge_result(result)
             print(f"[extractor] domain={dom} complete", flush=True)
@@ -1381,9 +1384,17 @@ def emit_analysis(
                     result = future.result()
                 except Exception as exc:
                     print(f"[extractor] domain={dom} failed: {exc}", flush=True)
+                    _domain_failures.append((dom, exc))
                     continue
                 _merge_result(result)
                 print(f"[extractor] domain={dom} complete", flush=True)
+
+    if _domain_failures:
+        summary = "; ".join(f"{d}: {e}" for d, e in _domain_failures)
+        raise RuntimeError(
+            f"emit_analysis: {len(_domain_failures)} domain(s) failed — "
+            f"analysis output is incomplete and has not been written: {summary}"
+        )
 
     _domain_timings.sort(key=lambda x: -x["total"])
     _n_total = len(_domain_timings)
