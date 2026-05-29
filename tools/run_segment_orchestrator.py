@@ -130,6 +130,86 @@ def run_step_log(
 
 # ── Record helpers ────────────────────────────────────────────────────────────
 
+def _preshard_one_shard(
+    shard_file: Path,
+    segment_plans: Dict[str, Dict],
+    force: bool,
+) -> tuple[str, int, int]:
+    """Process one corpus shard file, fan out to all segment shard dirs.
+    Returns (shard_name, files_written, files_skipped).
+    """
+    if not shard_file.is_file() or shard_file.suffix != ".csv":
+        return shard_file.name, 0, 0
+
+    # Determine which segments need this shard.
+    # Skip only completed segments; pending/failed segments always get fresh
+    # inputs so retries without --force don't run against stale data.
+    segments_to_write = {}
+    for sid, plan in segment_plans.items():
+        if not force and plan.get("status") == "complete":
+            continue
+        seg_shard_dir = plan["segment_records_dir"] / "identity_items_by_domain"
+        dst = seg_shard_dir / shard_file.name
+        segments_to_write[sid] = (plan, seg_shard_dir, dst)
+
+    if not segments_to_write:
+        return shard_file.name, 0, len(segment_plans)
+
+    # Read header once; eid_col is stable across all batches.
+    with shard_file.open("r", encoding="utf-8-sig", newline="") as _hf:
+        header = next(csv.reader(_hf), None)
+    if not header:
+        return shard_file.name, 0, len(segment_plans)
+    eid_col = header.index("export_run_id") if "export_run_id" in header else None
+    if eid_col is None:
+        return shard_file.name, 0, len(segment_plans)
+
+    # Ensure all destination shard dirs exist before batching.
+    seen_dirs: set = set()
+    for sid, (plan, seg_shard_dir, dst) in segments_to_write.items():
+        if seg_shard_dir not in seen_dirs:
+            seg_shard_dir.mkdir(parents=True, exist_ok=True)
+            seen_dirs.add(seg_shard_dir)
+
+    # Fan out in batches so at most _PRESHARD_BATCH destination handles are
+    # open simultaneously.  Each batch re-streams the shard file once.
+    seg_items = list(segments_to_write.items())
+    for batch_start in range(0, len(seg_items), _PRESHARD_BATCH):
+        batch = dict(seg_items[batch_start : batch_start + _PRESHARD_BATCH])
+
+        # Build one-to-many lookup scoped to this batch.
+        id_to_targets: Dict[str, List] = {}
+        for sid, (plan, seg_shard_dir, dst) in batch.items():
+            for eid in plan["allowed_ids"]:
+                id_to_targets.setdefault(eid, []).append(sid)
+
+        writers: Dict[str, Any] = {}
+        handles: Dict[str, Any] = {}
+        try:
+            for sid, (plan, seg_shard_dir, dst) in batch.items():
+                fh = dst.open("w", newline="", encoding="utf-8")
+                handles[sid] = fh
+                w = csv.writer(fh)
+                w.writerow(header)
+                writers[sid] = w
+
+            with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
+                reader = csv.reader(f)
+                next(reader, None)  # skip header row
+                for row in reader:
+                    if len(row) <= eid_col:
+                        continue
+                    eid = row[eid_col].strip()
+                    for sid in id_to_targets.get(eid, ()):
+                        if sid in writers:
+                            writers[sid].writerow(row)
+        finally:
+            for fh in handles.values():
+                fh.close()
+
+    return shard_file.name, len(segments_to_write), len(segment_plans) - len(segments_to_write)
+
+
 def _preshard_corpus_records(
     records_dir: Path,
     segment_plans: Dict[str, Dict],
@@ -140,24 +220,14 @@ def _preshard_corpus_records(
     destination files keyed by export_run_id.  Segments whose destination
     files already exist and are non-empty are skipped when force=False.
     """
-    import csv as _csv
-
     # csv.field_size_limit() converts to a C long; on Windows CPython the C long
     # is 32-bit so sys.maxsize overflows.  Cap at 2^31-1 which fits everywhere.
     try:
-        _csv.field_size_limit(2 ** 31 - 1)
+        csv.field_size_limit(2 ** 31 - 1)
     except OverflowError:
-        _csv.field_size_limit(2 ** 30)
+        csv.field_size_limit(2 ** 30)
 
     t0 = time.monotonic()
-
-    # One-to-many lookup: export_run_id → list of segment_ids
-    # An export_run_id can appear in multiple segments (parent/child and scoped
-    # segments built by build_segment_manifest overlap intentionally).
-    id_to_sids: Dict[str, List[str]] = {}
-    for sid, plan_entry in segment_plans.items():
-        for eid in plan_entry["allowed_ids"]:
-            id_to_sids.setdefault(eid, []).append(sid)
 
     # ── records.csv and file_metadata.csv ─────────────────────────────────────
     for fname in ("records.csv", "file_metadata.csv"):
@@ -166,34 +236,23 @@ def _preshard_corpus_records(
             continue
 
         # Determine which segments need this file.
-        # Only skip when the marker exists AND the segment is already complete —
-        # pending/failed segments must always get fresh inputs so retries without
-        # --force don't run against stale membership from a prior interrupted run.
-        segments_to_write: Dict[str, Dict] = {}
-        for sid, plan_entry in segment_plans.items():
-            marker = plan_entry["segment_records_dir"] / ".preshard_complete"
-            if not force and plan_entry.get("status") == "complete":
-                continue
-            segments_to_write[sid] = plan_entry
-
-        n_skipped = len(segment_plans) - len(segments_to_write)
+        # Skip only completed segments; pending/failed segments always get fresh
+        # inputs so retries without --force don't run against stale data.
+        segments_to_write = {
+            sid: plan for sid, plan in segment_plans.items()
+            if force or plan.get("status") != "complete"
+        }
         if not segments_to_write:
-            print(
-                f"[preshard] {fname} → 0 segments written,"
-                f" {n_skipped} segments skipped (already exist)",
-                flush=True,
-            )
+            print(f"[preshard] {fname} → 0 segments written, {len(segment_plans)} skipped")
             continue
 
-        # Ensure destination dirs exist
-        for plan_entry in segments_to_write.values():
-            plan_entry["segment_records_dir"].mkdir(parents=True, exist_ok=True)
-
-        # Read fieldnames once before batching so we don't need a separate
-        # header-only open inside the batch loop.
-        with src.open("r", encoding="utf-8-sig", newline="") as f:
-            fieldnames: List[str] = list(_csv.DictReader(f).fieldnames or [])
-        if not fieldnames:
+        # Read header once; eid_col is stable across all batches.
+        with src.open("r", encoding="utf-8-sig", newline="") as _hf:
+            header: Optional[List[str]] = next(csv.reader(_hf), None)
+        if not header:
+            continue
+        eid_col = header.index("export_run_id") if "export_run_id" in header else None
+        if eid_col is None:
             continue
 
         # Fan out in batches so at most _PRESHARD_BATCH destination handles are
@@ -201,85 +260,62 @@ def _preshard_corpus_records(
         seg_items = list(segments_to_write.items())
         for batch_start in range(0, len(seg_items), _PRESHARD_BATCH):
             batch = dict(seg_items[batch_start : batch_start + _PRESHARD_BATCH])
-            writers: Dict[str, _csv.DictWriter] = {}
-            handles: Dict[str, object] = {}
-            for sid, plan_entry in batch.items():
-                dst = plan_entry["segment_records_dir"] / fname
-                fh = dst.open("w", newline="", encoding="utf-8")
-                handles[sid] = fh
-                w = _csv.DictWriter(fh, fieldnames=fieldnames)
-                w.writeheader()
-                writers[sid] = w
-            with src.open("r", encoding="utf-8-sig", newline="") as f:
-                for row in _csv.DictReader(f):
-                    eid = row.get("export_run_id", "").strip()
-                    for row_sid in id_to_sids.get(eid, ()):
-                        if row_sid in writers:
-                            writers[row_sid].writerow(row)
-            for fh in handles.values():
-                fh.close()
 
-        print(
-            f"[preshard] {fname} → {len(segments_to_write)} segments written,"
-            f" {n_skipped} segments skipped (already exist)",
-            flush=True,
-        )
+            # Build one-to-many lookup scoped to this batch.
+            id_to_plans: Dict[str, List] = {}
+            for plan in batch.values():
+                for eid in plan["allowed_ids"]:
+                    id_to_plans.setdefault(eid, []).append(plan)
+
+            writers: Dict[str, Any] = {}
+            handles: Dict[str, Any] = {}
+            try:
+                for sid, plan in batch.items():
+                    dst = plan["segment_records_dir"] / fname
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    fh = dst.open("w", newline="", encoding="utf-8")
+                    handles[sid] = fh
+                    w = csv.writer(fh)
+                    w.writerow(header)
+                    writers[sid] = w
+
+                with src.open("r", encoding="utf-8-sig", newline="") as src_f:
+                    reader = csv.reader(src_f)
+                    next(reader, None)  # skip header row
+                    for row in reader:
+                        if len(row) <= eid_col:
+                            continue
+                        eid = row[eid_col].strip()
+                        plans = id_to_plans.get(eid)
+                        if not plans:
+                            continue
+                        for plan in plans:
+                            writers[plan["sid"]].writerow(row)
+            finally:
+                for fh in handles.values():
+                    fh.close()
+
+        print(f"[preshard] {fname} → {len(segments_to_write)} segments written, "
+              f"{len(segment_plans)-len(segments_to_write)} skipped (already exist)")
 
     # ── identity_items_by_domain/ shards ──────────────────────────────────────
     corpus_shard_dir = records_dir / "identity_items_by_domain"
     if corpus_shard_dir.is_dir():
-        shards_processed = 0
-        seg_shard_files_written = 0
+        shard_files = sorted(f for f in corpus_shard_dir.iterdir() if f.is_file() and f.suffix == ".csv")
+        # Cap concurrency so total open handles ≤ _PRESHARD_BATCH:
+        # each worker opens one handle per segment, so workers = BATCH // segments.
+        max_seg = max(1, len(segment_plans))
+        shard_pool_size = max(1, min(8, _PRESHARD_BATCH // max_seg)) if shard_files else 1
 
-        for shard_file in sorted(corpus_shard_dir.iterdir()):
-            if not shard_file.is_file() or shard_file.suffix != ".csv":
-                continue
-
-            # Determine which segments need this shard — same marker+status gate.
-            segments_to_write: Dict[str, Dict] = {}
-            for sid, plan_entry in segment_plans.items():
-                marker = plan_entry["segment_records_dir"] / ".preshard_complete"
-                if not force and plan_entry.get("status") == "complete":
-                    continue
-                segments_to_write[sid] = plan_entry
-
-            if not segments_to_write:
-                continue
-
-            # Ensure shard dirs exist
-            for plan_entry in segments_to_write.values():
-                seg_shard_dir = plan_entry["segment_records_dir"] / "identity_items_by_domain"
-                seg_shard_dir.mkdir(parents=True, exist_ok=True)
-
-            with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
-                shard_fieldnames: List[str] = list(_csv.DictReader(f).fieldnames or [])
-            if not shard_fieldnames:
-                continue
-
-            seg_items = list(segments_to_write.items())
-            for batch_start in range(0, len(seg_items), _PRESHARD_BATCH):
-                batch = dict(seg_items[batch_start : batch_start + _PRESHARD_BATCH])
-                writers: Dict[str, _csv.DictWriter] = {}
-                handles: Dict[str, object] = {}
-                for sid, plan_entry in batch.items():
-                    seg_shard_dir = plan_entry["segment_records_dir"] / "identity_items_by_domain"
-                    dst_shard = seg_shard_dir / shard_file.name
-                    fh = dst_shard.open("w", newline="", encoding="utf-8")
-                    handles[sid] = fh
-                    w = _csv.DictWriter(fh, fieldnames=shard_fieldnames)
-                    w.writeheader()
-                    writers[sid] = w
-                with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
-                    for row in _csv.DictReader(f):
-                        eid = row.get("export_run_id", "").strip()
-                        for row_sid in id_to_sids.get(eid, ()):
-                            if row_sid in writers:
-                                writers[row_sid].writerow(row)
-                for fh in handles.values():
-                    fh.close()
-
-            shards_processed += 1
-            seg_shard_files_written += len(segments_to_write)
+        total_written = 0
+        with ThreadPoolExecutor(max_workers=shard_pool_size) as executor:
+            futures = {
+                executor.submit(_preshard_one_shard, shard_file, segment_plans, force): shard_file
+                for shard_file in shard_files
+            }
+            for future in as_completed(futures):
+                name, written, skipped = future.result()
+                total_written += written
 
         # Write .complete markers for all segment shard dirs
         for plan_entry in segment_plans.values():
@@ -288,8 +324,8 @@ def _preshard_corpus_records(
                 (seg_shard_dir / ".complete").write_text("ok", encoding="utf-8")
 
         print(
-            f"[preshard] identity_items shards → {shards_processed} shards processed,"
-            f" {seg_shard_files_written} segment×shard files written",
+            f"[preshard] identity_items shards → {len(shard_files)} shards processed, "
+            f"{total_written} segment×shard files written",
             flush=True,
         )
 
@@ -883,6 +919,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         out_root = segments_root / output_folder
         segment_records_dir = out_root / "results" / "records"
         segment_plans[sid] = {
+            "sid": sid,
             "segment_records_dir": segment_records_dir,
             "allowed_ids": allowed_ids,
             "status": reg_row.get("status", "").strip(),
