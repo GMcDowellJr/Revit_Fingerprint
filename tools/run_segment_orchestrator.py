@@ -1088,6 +1088,9 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             preshard_marker.write_text("ok", encoding="utf-8")
 
     # Apply --segment filter and skip check; count skips before submitting to executor
+    segment_results: List[Dict] = []
+    segment_results_lock = threading.Lock()
+
     plan_to_run: List[tuple[dict, dict]] = []
     for reg_row, mrow in plan:
         sid = reg_row.get("segment_id", "").strip()
@@ -1100,6 +1103,25 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             print(f"[orchestrator] skip segment={sid} (status=complete; use --force to re-run)")
             n_skipped += 1
             skipped_ids.append(f"{sid} — status=complete")
+            try:
+                _skip_level = int(mrow.get("segment_level", 0))
+            except (ValueError, TypeError):
+                _skip_level = 0
+            _skip_files = len([x for x in mrow.get("export_run_ids", "").split("|") if x.strip()])
+            segment_results.append({
+                "segment_id": sid,
+                "status": "skipped",
+                "files": _skip_files,
+                "level": _skip_level,
+                "prepare_s": 0,
+                "patterns_s": 0,
+                "bundle_s": 0,
+                "bi_merge_s": 0,
+                "total_s": 0,
+                "worker_id": 0,
+                "patterns_top5": [],
+                "failure_note": "",
+            })
             continue
 
         plan_to_run.append((reg_row, mrow))
@@ -1112,9 +1134,6 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         "skipped": n_skipped,
         "failed_ids": [],
     }
-
-    segment_results: List[Dict] = []
-    segment_results_lock = threading.Lock()
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = {
