@@ -241,11 +241,11 @@ def _preshard_corpus_records(
             print(f"[preshard] {fname} → 0 segments written, {len(segment_plans)} skipped")
             continue
 
-        # Build export_run_id → segment plan lookup (only for segments needing the file)
-        id_to_plan: Dict[str, Any] = {}
+        # Build export_run_id → list of segment plans (one-to-many: overlapping segments share eids)
+        id_to_plans: Dict[str, List] = {}
         for plan in segments_to_write.values():
             for eid in plan["allowed_ids"]:
-                id_to_plan[eid] = plan
+                id_to_plans.setdefault(eid, []).append(plan)
 
         # Open one writer per segment
         writers: Dict[str, Any] = {}
@@ -277,11 +277,11 @@ def _preshard_corpus_records(
                     if len(row) <= eid_col:
                         continue
                     eid = row[eid_col].strip()
-                    plan = id_to_plan.get(eid)
-                    if plan is None:
+                    plans = id_to_plans.get(eid)
+                    if not plans:
                         continue
-                    sid = plan["sid"]
-                    writers[sid].writerow(row)
+                    for plan in plans:
+                        writers[plan["sid"]].writerow(row)
                     n_written += 1
         finally:
             for fh in handles.values():
@@ -294,7 +294,10 @@ def _preshard_corpus_records(
     corpus_shard_dir = records_dir / "identity_items_by_domain"
     if corpus_shard_dir.is_dir():
         shard_files = sorted(f for f in corpus_shard_dir.iterdir() if f.is_file() and f.suffix == ".csv")
-        shard_pool_size = min(8, len(shard_files)) if shard_files else 1
+        # Cap concurrency so total open handles ≤ _PRESHARD_BATCH:
+        # each worker opens one handle per segment, so workers = BATCH // segments.
+        max_seg = max(1, len(segment_plans))
+        shard_pool_size = max(1, min(8, _PRESHARD_BATCH // max_seg)) if shard_files else 1
 
         total_written = 0
         with ThreadPoolExecutor(max_workers=shard_pool_size) as executor:
