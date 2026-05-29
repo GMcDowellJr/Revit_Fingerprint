@@ -50,10 +50,22 @@ sides have n_files >= 5. The flag signals interpretability, not validity.
 
 Reference segment participation
 --------------------------------
-Reference segments participate in template_to_project, template_to_container, and
+Reference segments participate in generic_to_template, generic_to_container,
+generic_to_project, template_to_project, template_to_container, and
 container_to_project comparisons using their file inventories from
 membership_matrix.csv. They will have has_bundles = "false" and
 data_sufficient = "false" for most domains — this is expected and correct.
+
+Governance all/used semantics
+------------------------------
+The provision chain is Generic / Generic-Host → Template → Container → Project
+all-view vocabulary. The usage chain is Project all → Project used. Generic,
+Template, and most Container segments are standards-carrier / provided-vocabulary
+references; used-view and purge signals are meaningful primarily when the target
+role is Project and must not be used to label Template or Generic stock content
+as unused bloat. Directed governance-state output therefore compares upstream
+reference all-view vocabulary to downstream target all-view and, for Project
+targets, target used-view vocabulary.
 
 Usage:
     python tools/compare_cross_segment.py \\
@@ -140,6 +152,10 @@ SUMMARY_FIELDS: List[str] = [
     "used_n_shared_bundle_both", "used_n_shared_bundle_a_only", "used_n_shared_bundle_b_only",
     "n_files_a", "n_files_b", "n_pairs",
     "data_sufficient",
+    "reference_usage_interpretable",
+    "target_usage_interpretable",
+    "recommended_primary_view",
+    "comparison_role_semantics",
     "executed_utc",
 ]
 
@@ -192,12 +208,89 @@ POOLED_FIELDS: List[str] = [
     "executed_utc",
 ]
 
+GOVERNANCE_STATE_FIELDS: List[str] = [
+    "comparison_run_id",
+    "comparison_type",
+    "segment_id_reference", "segment_id_target",
+    "segment_label_reference", "segment_label_target",
+    "governance_role_reference", "governance_role_target",
+    "unit_system",
+    "domain",
+    "join_hash",
+    "pattern_label",
+    "in_reference_all",
+    "in_target_all",
+    "in_target_used",
+    "state",
+    "n_files_in_target_all",
+    "pct_files_in_target_all",
+    "n_files_in_target_used",
+    "pct_files_in_target_used",
+    "in_any_generic",
+    "in_any_template",
+    "in_any_container",
+    "is_bundle_member_target_all",
+    "is_bundle_member_target_used",
+    "reference_usage_interpretable",
+    "target_usage_interpretable",
+    "recommended_primary_view",
+    "executed_utc",
+]
+
+GOVERNANCE_STATE_SUMMARY_FIELDS: List[str] = [
+    "comparison_run_id",
+    "comparison_type",
+    "segment_id_reference", "segment_id_target",
+    "segment_label_reference", "segment_label_target",
+    "governance_role_reference", "governance_role_target",
+    "unit_system",
+    "domain",
+    "reference_all_count",
+    "target_all_count",
+    "target_used_count",
+    "provided_to_configured_containment",
+    "provided_to_used_containment",
+    "provided_passive_share",
+    "provided_missing_share",
+    "local_active_share",
+    "provided_and_used_count",
+    "provided_but_passive_count",
+    "provided_but_missing_count",
+    "local_active_count",
+    "local_passive_count",
+    "local_unbundled_count",
+    "provided_configured_count",
+    "local_configured_count",
+    "provided_and_used_pct_of_reference_all",
+    "provided_but_passive_pct_of_reference_all",
+    "provided_but_missing_pct_of_reference_all",
+    "local_active_pct_of_target_used",
+    "local_passive_pct_of_target_all",
+    "local_unbundled_pct_of_target_all",
+    "reference_usage_interpretable",
+    "target_usage_interpretable",
+    "recommended_primary_view",
+    "comparison_role_semantics",
+    "executed_utc",
+]
+
 # Comparison types for which delta rows are emitted (directed, reference side defined).
 DELTA_DIRECTED_TYPES = {
     "template_to_project",
     "template_to_container",
     "container_to_project",
 }
+
+GOVERNANCE_STATE_DIRECTED_TYPES = {
+    "generic_to_template",
+    "generic_to_container",
+    "generic_to_project",
+    "template_to_project",
+    "template_to_container",
+    "container_to_project",
+}
+
+GENERIC_ROLE_KEYS = {"generic", "generic-host", "generic_host"}
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +327,87 @@ def _classify_delta(
     if is_bundle_member_all:
         return "locally_custom_passive"
     return "locally_custom_unbundled"
+
+
+# ---------------------------------------------------------------------------
+# Governance-state semantics
+# ---------------------------------------------------------------------------
+
+def _bool_str(value: bool) -> str:
+    return "true" if value else "false"
+
+
+def _role_key(role: str) -> str:
+    return role.strip().lower().replace("_", "-")
+
+
+def _is_generic_role(role: str) -> bool:
+    return _role_key(role) in GENERIC_ROLE_KEYS
+
+
+def _role_matches(row_role: str, wanted_role: str) -> bool:
+    if wanted_role == "generic":
+        return _is_generic_role(row_role)
+    return _role_key(row_role) == wanted_role
+
+
+def _usage_interpretable_for_role(role: str) -> bool:
+    # Used/non-purgeable is a delivery signal for project targets. Standards-carrier
+    # roles can still have used-view files, but those values are annotations only.
+    return _role_key(role) == "project"
+
+
+def _recommended_primary_view(role_a: str, role_b: str, comparison_type: str) -> str:
+    if comparison_type == "sibling_projects" or _role_key(role_b) == "project":
+        return "used"
+    return "all"
+
+
+def _comparison_role_semantics(role_a: str, role_b: str, comparison_type: str) -> str:
+    if comparison_type in GOVERNANCE_STATE_DIRECTED_TYPES:
+        if _usage_interpretable_for_role(role_b):
+            return "directed_governance: reference all-view provides vocabulary; project target used-view is active delivery"
+        return "directed_governance: reference and target are provided-vocabulary inventories; all-view is primary"
+    if comparison_type == "sibling_projects":
+        return "sibling_projects: used-view is active practice; all-view is configured/inherited context"
+    if comparison_type == "sibling_templates":
+        return "sibling_templates: all-view is primary; used-view must not be interpreted as bloat"
+    if comparison_type == "sibling_containers":
+        return "sibling_containers: all-view is primary unless an external subtype establishes delivery use semantics"
+    if _is_generic_role(role_a) and _is_generic_role(role_b):
+        return "sibling_generic: all-view is primary; used-view is not meaningful"
+    return "all-view is configured vocabulary; used-view is meaningful primarily for Project targets"
+
+
+def _classify_governance_state(
+    in_reference_all: bool,
+    in_target_all: bool,
+    in_target_used: bool,
+    is_bundle_member_target_all: bool,
+    target_usage_interpretable: bool,
+) -> str:
+    if target_usage_interpretable:
+        if in_reference_all and in_target_used:
+            return "provided_and_used"
+        if in_reference_all and in_target_all and not in_target_used:
+            return "provided_but_passive"
+        if in_reference_all and not in_target_all:
+            return "provided_but_missing"
+        if not in_reference_all and in_target_used:
+            return "local_active"
+        if not in_reference_all and in_target_all and is_bundle_member_target_all:
+            return "local_passive"
+        return "local_unbundled"
+
+    # For Template, Generic, and most Container targets, avoid usage-judgment labels:
+    # configured stock is inventory, not passive bloat. Keep target_used as annotation.
+    if in_reference_all and in_target_all:
+        return "provided_configured"
+    if in_reference_all and not in_target_all:
+        return "provided_but_missing"
+    if in_target_all and is_bundle_member_target_all:
+        return "local_configured"
+    return "local_unbundled"
 
 
 # ---------------------------------------------------------------------------
@@ -431,7 +605,7 @@ def get_role_jh_set(
     for sid, mrow in manifest.items():
         if sid == exclude_segment_id:
             continue
-        if mrow.get("governance_role", "").strip().lower() != role:
+        if not _role_matches(mrow.get("governance_role", ""), role):
             continue
         if mrow.get("unit_system", "").strip() != unit_system:
             continue
@@ -488,6 +662,19 @@ def load_file_join_hashes(
         if jh:
             result[eid].add(jh)
     return dict(result)
+
+
+def load_segment_join_hash_union(
+    segments_root: Path,
+    registry: Dict[str, Dict[str, str]],
+    segment_id: str,
+    domain: str,
+    purge_view: str = "all",
+) -> Set[str]:
+    result: Set[str] = set()
+    for jhs in load_file_join_hashes(segments_root, registry, segment_id, domain, purge_view).values():
+        result |= jhs
+    return result
 
 
 def load_bundle_join_hash_set(
@@ -679,6 +866,9 @@ def compare_symmetric_file(
 # ---------------------------------------------------------------------------
 
 DIRECTED_TYPES = {
+    "generic_to_template",
+    "generic_to_container",
+    "generic_to_project",
     "template_to_project",
     "template_to_container",
     "container_to_project",
@@ -720,11 +910,23 @@ def discover_within_segment(
         role_map: Dict[str, List[str]] = defaultdict(list)
         for c in children:
             role = manifest[c].get("governance_role", "").strip().lower()
-            role_map[role].append(c)
+            role_map["generic" if _is_generic_role(role) else role].append(c)
 
+        generics = role_map.get("generic", [])
         templates = role_map.get("template", [])
         projects = role_map.get("project", [])
         containers = role_map.get("container", [])
+
+        for g in generics:
+            for t in templates:
+                if _same_unit(manifest, g, t):
+                    pairs.append((g, t, "generic_to_template"))
+            for c in containers:
+                if _same_unit(manifest, g, c):
+                    pairs.append((g, c, "generic_to_container"))
+            for p in projects:
+                if _same_unit(manifest, g, p):
+                    pairs.append((g, p, "generic_to_project"))
 
         for t in templates:
             for p in projects:
@@ -750,10 +952,11 @@ def discover_sibling_segments(
     for sid, row in manifest.items():
         parent = row.get("parent_segment_id", "").strip()
         role = row.get("governance_role", "").strip().lower()
+        role_key = "generic" if _is_generic_role(role) else role
         us = row.get("unit_system", "").strip()
         rt = row.get("run_type", "").strip().lower()
-        if parent and role and us and rt in ("bundle", "reference"):
-            groups[(parent, role, us)].append(sid)
+        if parent and role_key and us and rt in ("bundle", "reference"):
+            groups[(parent, role_key, us)].append(sid)
 
     pairs: List[ComparisonPair] = []
     for (_, role, _), members in groups.items():
@@ -763,6 +966,9 @@ def discover_sibling_segments(
             "template": "sibling_templates",
             "project": "sibling_projects",
             "container": "sibling_containers",
+            "generic": "sibling_generic",
+            "generic-host": "sibling_generic",
+            "generic_host": "sibling_generic",
         }.get(role, "sibling_segments")
         for a, b in combinations(sorted(members), 2):
             pairs.append((a, b, ctype))
@@ -806,8 +1012,10 @@ def discover_parent_siblings(
 def discover_governance_chain(
     manifest: Dict[str, Dict[str, str]],
 ) -> List[ComparisonPair]:
-    # Directed pairs: Template→Project, Template→Container, Container→Project
-    # Scoped by client_label (and discipline_label when populated).
+    # Directed pairs along the provision chain:
+    # Generic/Generic-Host→Template/Container/Project, Template→Project/Container,
+    # and Container→Project. Project target used-view is usage; other target roles
+    # remain provided-vocabulary inventories.
     # Reference segments are included — they participate using their file inventories.
     def _key(row: Dict[str, str]) -> Tuple[str, str]:
         return (
@@ -830,14 +1038,47 @@ def discover_governance_chain(
     for sid, row in manifest.items():
         role = row.get("governance_role", "").strip().lower()
         rt = row.get("run_type", "").strip().lower()
-        if role in ("template", "project", "container") and rt in ("bundle", "reference"):
-            by_key[_key(row)][role].append(sid)
+        if (role in ("template", "project", "container") or _is_generic_role(role)) and rt in ("bundle", "reference"):
+            by_key[_key(row)]["generic" if _is_generic_role(role) else role].append(sid)
 
     pairs: List[ComparisonPair] = []
+
+    # Generic / Generic-Host is an upstream stock vocabulary. Compare it across
+    # matching unit_system even when its client_label differs from the downstream
+    # Template/Container/Project client scope. Discipline, when populated on both
+    # sides, still scopes the comparison.
+    generic_ids = [
+        sid for sid, row in manifest.items()
+        if _is_generic_role(row.get("governance_role", ""))
+        and row.get("run_type", "").strip().lower() in ("bundle", "reference")
+    ]
+    for g in generic_ids:
+        for sid, row in manifest.items():
+            role = row.get("governance_role", "").strip().lower()
+            if role not in ("template", "container", "project"):
+                continue
+            if row.get("run_type", "").strip().lower() not in ("bundle", "reference"):
+                continue
+            if not _same_unit(manifest, g, sid) or not _disc_match(manifest[g], row):
+                continue
+            pairs.append((g, sid, f"generic_to_{role}"))
+
     for (_client, _us), role_map in by_key.items():
+        generics = role_map.get("generic", [])
         templates = role_map.get("template", [])
         projects = role_map.get("project", [])
         containers = role_map.get("container", [])
+
+        for g in generics:
+            for t in templates:
+                if _disc_match(manifest[g], manifest[t]):
+                    pairs.append((g, t, "generic_to_template"))
+            for c in containers:
+                if _disc_match(manifest[g], manifest[c]):
+                    pairs.append((g, c, "generic_to_container"))
+            for p in projects:
+                if _disc_match(manifest[g], manifest[p]):
+                    pairs.append((g, p, "generic_to_project"))
 
         for t in templates:
             for p in projects:
@@ -1380,8 +1621,164 @@ def _build_summary_row(
         "n_files_b": metrics.get("n_files_b", ""),
         "n_pairs": metrics.get("n_pairs", ""),
         "data_sufficient": data_sufficient,
+        "reference_usage_interpretable": _bool_str(_usage_interpretable_for_role(ma.get("governance_role", ""))),
+        "target_usage_interpretable": _bool_str(_usage_interpretable_for_role(mb.get("governance_role", ""))),
+        "recommended_primary_view": _recommended_primary_view(
+            ma.get("governance_role", ""), mb.get("governance_role", ""), comparison_type
+        ),
+        "comparison_role_semantics": _comparison_role_semantics(
+            ma.get("governance_role", ""), mb.get("governance_role", ""), comparison_type
+        ),
         "executed_utc": executed_utc,
     }
+
+
+def build_governance_state_outputs(
+    crid: str,
+    seg_ref: str,
+    seg_tgt: str,
+    comparison_type: str,
+    domain: str,
+    manifest: Dict[str, Dict[str, str]],
+    registry: Dict[str, Dict[str, str]],
+    segments_root: Path,
+    executed_utc: str,
+) -> Tuple[List[Dict[str, str]], Dict[str, str]]:
+    """Emit directed governance rows over reference_all ∪ target_all.
+
+    Reference all-view represents provisioned vocabulary. Target all-view is the
+    configured downstream vocabulary. Target used-view is a governance/use signal
+    only for Project targets; otherwise it is preserved as annotation.
+    """
+    ma = manifest.get(seg_ref, {})
+    mb = manifest.get(seg_tgt, {})
+    role_ref = ma.get("governance_role", "")
+    role_tgt = mb.get("governance_role", "")
+    unit_system = ma.get("unit_system", "")
+    ref_usage_interpretable = _usage_interpretable_for_role(role_ref)
+    tgt_usage_interpretable = _usage_interpretable_for_role(role_tgt)
+    recommended_view = _recommended_primary_view(role_ref, role_tgt, comparison_type)
+
+    ref_all = load_segment_join_hash_union(segments_root, registry, seg_ref, domain, "all")
+    tgt_files_all = load_file_join_hashes(segments_root, registry, seg_tgt, domain, "all")
+    tgt_files_used = load_file_join_hashes(segments_root, registry, seg_tgt, domain, "used")
+    tgt_all: Set[str] = set()
+    for jhs in tgt_files_all.values():
+        tgt_all |= jhs
+    tgt_used: Set[str] = set()
+    for jhs in tgt_files_used.values():
+        tgt_used |= jhs
+
+    bnd_tgt_all = load_bundle_join_hash_set(segments_root, registry, seg_tgt, domain, "all")
+    bnd_tgt_used = load_bundle_join_hash_set(segments_root, registry, seg_tgt, domain, "used")
+    pattern_labels = load_pattern_labels(segments_root, registry, seg_tgt, domain)
+    ref_labels = load_pattern_labels(segments_root, registry, seg_ref, domain)
+
+    generic_set = get_role_jh_set("generic", domain, unit_system, manifest, registry, segments_root)
+    template_set = get_role_jh_set("template", domain, unit_system, manifest, registry, segments_root)
+    container_set = get_role_jh_set("container", domain, unit_system, manifest, registry, segments_root)
+
+    n_tgt_all_files = len(tgt_files_all)
+    n_tgt_used_files = len(tgt_files_used)
+    rows: List[Dict[str, str]] = []
+    state_counts: Dict[str, int] = defaultdict(int)
+
+    for jh in sorted(ref_all | tgt_all):
+        in_ref = jh in ref_all
+        in_tgt_all = jh in tgt_all
+        in_tgt_used = jh in tgt_used
+        is_bnd_all = jh in bnd_tgt_all
+        is_bnd_used = jh in bnd_tgt_used
+        state = _classify_governance_state(
+            in_ref, in_tgt_all, in_tgt_used, is_bnd_all, tgt_usage_interpretable
+        )
+        state_counts[state] += 1
+        n_files_tgt_all = sum(1 for jhs in tgt_files_all.values() if jh in jhs)
+        n_files_tgt_used = sum(1 for jhs in tgt_files_used.values() if jh in jhs)
+        rows.append({
+            "comparison_run_id": crid,
+            "comparison_type": comparison_type,
+            "segment_id_reference": seg_ref,
+            "segment_id_target": seg_tgt,
+            "segment_label_reference": ma.get("segment_label", ""),
+            "segment_label_target": mb.get("segment_label", ""),
+            "governance_role_reference": role_ref,
+            "governance_role_target": role_tgt,
+            "unit_system": unit_system,
+            "domain": domain,
+            "join_hash": jh,
+            "pattern_label": pattern_labels.get(jh, "") or ref_labels.get(jh, ""),
+            "in_reference_all": _bool_str(in_ref),
+            "in_target_all": _bool_str(in_tgt_all),
+            "in_target_used": _bool_str(in_tgt_used),
+            "state": state,
+            "n_files_in_target_all": str(n_files_tgt_all),
+            "pct_files_in_target_all": _fmt(n_files_tgt_all / n_tgt_all_files) if n_tgt_all_files else _fmt(0.0),
+            "n_files_in_target_used": str(n_files_tgt_used),
+            "pct_files_in_target_used": _fmt(n_files_tgt_used / n_tgt_used_files) if n_tgt_used_files else _fmt(0.0),
+            "in_any_generic": _bool_str(jh in generic_set),
+            "in_any_template": _bool_str(jh in template_set),
+            "in_any_container": _bool_str(jh in container_set),
+            "is_bundle_member_target_all": _bool_str(is_bnd_all),
+            "is_bundle_member_target_used": _bool_str(is_bnd_used),
+            "reference_usage_interpretable": _bool_str(ref_usage_interpretable),
+            "target_usage_interpretable": _bool_str(tgt_usage_interpretable),
+            "recommended_primary_view": recommended_view,
+            "executed_utc": executed_utc,
+        })
+
+    ref_den = len(ref_all)
+    tgt_all_den = len(tgt_all)
+    tgt_used_den = len(tgt_used)
+    provided_configured = len(ref_all & tgt_all)
+    # Used-view governance summary metrics are active-delivery signals only for
+    # Project targets. For Template/Generic/most Container targets, target_used is
+    # retained as row-level annotation but not summarized as passive/active state.
+    provided_used = len(ref_all & tgt_used) if tgt_usage_interpretable else 0
+    provided_passive = len((ref_all & tgt_all) - tgt_used) if tgt_usage_interpretable else 0
+    provided_missing = len(ref_all - tgt_all)
+    local_active = len(tgt_used - ref_all) if tgt_usage_interpretable else 0
+
+    summary = {
+        "comparison_run_id": crid,
+        "comparison_type": comparison_type,
+        "segment_id_reference": seg_ref,
+        "segment_id_target": seg_tgt,
+        "segment_label_reference": ma.get("segment_label", ""),
+        "segment_label_target": mb.get("segment_label", ""),
+        "governance_role_reference": role_ref,
+        "governance_role_target": role_tgt,
+        "unit_system": unit_system,
+        "domain": domain,
+        "reference_all_count": str(ref_den),
+        "target_all_count": str(tgt_all_den),
+        "target_used_count": str(tgt_used_den),
+        "provided_to_configured_containment": _fmt(provided_configured / ref_den) if ref_den else "",
+        "provided_to_used_containment": _fmt(provided_used / ref_den) if tgt_usage_interpretable and ref_den else "",
+        "provided_passive_share": _fmt(provided_passive / ref_den) if tgt_usage_interpretable and ref_den else "",
+        "provided_missing_share": _fmt(provided_missing / ref_den) if ref_den else "",
+        "local_active_share": _fmt(local_active / tgt_used_den) if tgt_usage_interpretable and tgt_used_den else "",
+        "provided_and_used_count": str(state_counts.get("provided_and_used", 0)),
+        "provided_but_passive_count": str(state_counts.get("provided_but_passive", 0)),
+        "provided_but_missing_count": str(state_counts.get("provided_but_missing", 0)),
+        "local_active_count": str(state_counts.get("local_active", 0)),
+        "local_passive_count": str(state_counts.get("local_passive", 0)),
+        "local_unbundled_count": str(state_counts.get("local_unbundled", 0)),
+        "provided_configured_count": str(state_counts.get("provided_configured", 0)),
+        "local_configured_count": str(state_counts.get("local_configured", 0)),
+        "provided_and_used_pct_of_reference_all": _fmt(state_counts.get("provided_and_used", 0) / ref_den) if tgt_usage_interpretable and ref_den else "",
+        "provided_but_passive_pct_of_reference_all": _fmt(state_counts.get("provided_but_passive", 0) / ref_den) if tgt_usage_interpretable and ref_den else "",
+        "provided_but_missing_pct_of_reference_all": _fmt(state_counts.get("provided_but_missing", 0) / ref_den) if ref_den else "",
+        "local_active_pct_of_target_used": _fmt(state_counts.get("local_active", 0) / tgt_used_den) if tgt_usage_interpretable and tgt_used_den else "",
+        "local_passive_pct_of_target_all": _fmt(state_counts.get("local_passive", 0) / tgt_all_den) if tgt_usage_interpretable and tgt_all_den else "",
+        "local_unbundled_pct_of_target_all": _fmt(state_counts.get("local_unbundled", 0) / tgt_all_den) if tgt_all_den else "",
+        "reference_usage_interpretable": _bool_str(ref_usage_interpretable),
+        "target_usage_interpretable": _bool_str(tgt_usage_interpretable),
+        "recommended_primary_view": recommended_view,
+        "comparison_role_semantics": _comparison_role_semantics(role_ref, role_tgt, comparison_type),
+        "executed_utc": executed_utc,
+    }
+    return rows, summary
 
 
 # ---------------------------------------------------------------------------
@@ -1581,6 +1978,62 @@ def segment_is_runnable(
     return True
 
 
+
+def build_pair_domain_work_items(
+    runnable_pairs: Sequence[ComparisonPair],
+    segments_root: Path,
+    registry: Dict[str, Dict[str, str]],
+    requested_domain: Optional[str] = None,
+) -> Tuple[List[Tuple[str, str, str, str]], Dict[str, Set[str]], List[str]]:
+    """Return runnable (pair × domain) work scoped to each pair's domain union.
+
+    Domains are sparse in segmented corpora. Scheduling every pair against every
+    globally active domain creates mostly-empty worker tasks and filesystem churn,
+    so each pair is expanded only across domains present in either participating
+    segment.
+    """
+    segment_ids = sorted({seg for pair in runnable_pairs for seg in (pair[0], pair[1])})
+    domains_by_segment = {
+        sid: discover_domains_for_segment(segments_root, registry, sid)
+        for sid in segment_ids
+    }
+
+    active_domains: Set[str] = set()
+    work_items: List[Tuple[str, str, str, str]] = []
+    for seg_a, seg_b, ctype in runnable_pairs:
+        pair_domains = domains_by_segment.get(seg_a, set()) | domains_by_segment.get(seg_b, set())
+        if requested_domain:
+            domains = [requested_domain] if requested_domain in pair_domains else []
+        else:
+            domains = sorted(pair_domains)
+        active_domains.update(domains)
+        for dom in domains:
+            work_items.append((seg_a, seg_b, ctype, dom))
+
+    return work_items, domains_by_segment, sorted(active_domains)
+
+
+def sort_summary_rows(rows: List[Dict[str, str]]) -> None:
+    rows.sort(key=lambda r: (
+        r.get("comparison_type", ""),
+        r.get("segment_id_a", ""),
+        r.get("segment_id_b", ""),
+        r.get("domain", ""),
+    ))
+
+
+def sort_pair_detail_rows(rows: List[Dict[str, str]]) -> None:
+    rows.sort(key=lambda r: (
+        r.get("_comparison_type", ""),
+        r.get("segment_id_a", ""),
+        r.get("segment_id_b", ""),
+        r.get("domain", ""),
+        r.get("project_label_a", ""),
+        r.get("project_label_b", ""),
+        r.get("export_run_id_a", ""),
+        r.get("export_run_id_b", ""),
+    ))
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -1686,6 +2139,9 @@ def main() -> int:
     summary_rows: List[Dict[str, str]] = []
     pair_detail_rows: List[Dict[str, str]] = []
     delta_rows: List[Dict[str, str]] = []
+    governance_state_rows: List[Dict[str, str]] = []
+    governance_state_summary_rows: List[Dict[str, str]] = []
+    governance_combo_count = 0
     delta_combo_count = 0
 
     if args.workers < 1:
@@ -1698,33 +2154,16 @@ def main() -> int:
         and (seg_a == seg_b or segment_is_runnable(registry, seg_b))
     ]
 
-    # Discover active domains across all relevant segments
-    all_segment_ids = sorted({seg for pair in runnable_pairs for seg in (pair[0], pair[1])})
-    active_domains: Set[str] = set()
-    for sid in all_segment_ids:
-        rec = registry.get(sid, {})
-        out_folder = rec.get("output_folder", "").strip()
-        if not out_folder:
-            continue
-        presence_csv = segments_root / out_folder / "results" / "analysis" / "pattern_presence_file.csv"
-        if presence_csv.is_file():
-            for row in read_csv_rows(presence_csv):
-                dom = row.get("domain", "").strip()
-                if dom:
-                    active_domains.add(dom)
-
-    domain_filter = [args.domain] if args.domain else sorted(active_domains)
-
-    # Build flat work list: one item per (pair × domain)
-    work_items = [
-        (seg_a, seg_b, ctype, dom)
-        for seg_a, seg_b, ctype in runnable_pairs
-        for dom in domain_filter
-    ]
+    # Build flat work list: one item per (pair × domain), limited to domains
+    # present in either side of the pair so sparse corpora do not generate a
+    # global-domain cross product of mostly-empty worker tasks.
+    work_items, _domains_by_segment, active_domain_filter = build_pair_domain_work_items(
+        runnable_pairs, segments_root, registry, args.domain
+    )
 
     print(
-        f"[compare] {len(runnable_pairs)} pairs × {len(domain_filter)} domains = "
-        f"{len(work_items)} work items  workers={args.workers}"
+        f"[compare] {len(runnable_pairs)} pairs × {len(active_domain_filter)} active domains = "
+        f"{len(work_items)} pair-domain work items  workers={args.workers}"
     )
 
     n_complete = 0
@@ -1756,6 +2195,8 @@ def main() -> int:
 
             if result is not None:
                 summary_rows.append(result)
+                for pair_row in pairs_out:
+                    pair_row["_comparison_type"] = ctype
                 pair_detail_rows.extend(pairs_out)
                 n_complete += 1
                 n_p = result.get("n_pairs", "?")
@@ -1841,6 +2282,31 @@ def main() -> int:
             else:
                 n_skipped += 1
 
+            # Governance-state output is independent of legacy run_pair() summary
+            # thresholds. Sparse or empty targets still need provided_but_missing
+            # rows so missing downstream stock is visible.
+            if ctype in GOVERNANCE_STATE_DIRECTED_TYPES:
+                crid = (
+                    result.get("comparison_run_id", "")
+                    if result is not None
+                    else make_comparison_run_id(seg_a, seg_b, executed_utc)
+                )
+                state_rows, state_summary = build_governance_state_outputs(
+                    crid=crid,
+                    seg_ref=seg_a,
+                    seg_tgt=seg_b,
+                    comparison_type=ctype,
+                    domain=domain,
+                    manifest=manifest,
+                    registry=registry,
+                    segments_root=segments_root,
+                    executed_utc=executed_utc,
+                )
+                if state_rows:
+                    governance_state_rows.extend(state_rows)
+                    governance_state_summary_rows.append(state_summary)
+                    governance_combo_count += 1
+
             done = n_complete + n_skipped
             if done % 50 == 0 or done == len(work_items):
                 print(
@@ -1851,7 +2317,7 @@ def main() -> int:
 
     elapsed = time.perf_counter() - t0
     print(
-        f"[compare] done  pairs={len(runnable_pairs)}  domains={len(domain_filter)}  "
+        f"[compare] done  pairs={len(runnable_pairs)}  active_domains={len(active_domain_filter)}  "
         f"work_items={len(work_items)}  complete={n_complete}  skipped={n_skipped}  "
         f"elapsed={elapsed:.1f}s  ({elapsed/60:.1f} min)",
         flush=True,
@@ -1875,13 +2341,54 @@ def main() -> int:
 
     # Write outputs
     if summary_rows:
+        sort_summary_rows(summary_rows)
         out_dir.mkdir(parents=True, exist_ok=True)
         atomic_write_csv(out_dir / "cross_segment_summary.csv", SUMMARY_FIELDS, summary_rows)
         print(f"[compare] wrote {len(summary_rows)} rows → {out_dir / 'cross_segment_summary.csv'}")
 
     if pair_detail_rows:
+        sort_pair_detail_rows(pair_detail_rows)
         atomic_write_csv(out_dir / "cross_segment_file_pairs.csv", PAIRS_FIELDS, pair_detail_rows)
         print(f"[compare] wrote {len(pair_detail_rows)} rows → {out_dir / 'cross_segment_file_pairs.csv'}")
+
+    if governance_state_rows:
+        governance_state_rows.sort(key=lambda r: (
+            r["comparison_type"],
+            r["segment_id_reference"],
+            r["segment_id_target"],
+            r["domain"],
+            r["state"],
+            r["join_hash"],
+        ))
+        governance_state_summary_rows.sort(key=lambda r: (
+            r["comparison_type"],
+            r["segment_id_reference"],
+            r["segment_id_target"],
+            r["domain"],
+        ))
+        out_dir.mkdir(parents=True, exist_ok=True)
+        atomic_write_csv(
+            out_dir / "cross_segment_governance_states.csv",
+            GOVERNANCE_STATE_FIELDS,
+            governance_state_rows,
+        )
+        atomic_write_csv(
+            out_dir / "cross_segment_governance_state_summary.csv",
+            GOVERNANCE_STATE_SUMMARY_FIELDS,
+            governance_state_summary_rows,
+        )
+        print(
+            f"[compare] governance states written: {len(governance_state_rows)} rows across "
+            f"{governance_combo_count} domain/pair combinations"
+        )
+        print(
+            f"[compare] wrote {len(governance_state_rows)} rows → "
+            f"{out_dir / 'cross_segment_governance_states.csv'}"
+        )
+        print(
+            f"[compare] wrote {len(governance_state_summary_rows)} rows → "
+            f"{out_dir / 'cross_segment_governance_state_summary.csv'}"
+        )
 
     if delta_rows:
         delta_rows.sort(key=lambda r: (
@@ -1905,7 +2412,7 @@ def main() -> int:
         atomic_write_csv(out_dir / "cross_segment_pooled.csv", POOLED_FIELDS, pooled_rows)
         print(f"[compare] wrote {len(pooled_rows)} rows → {out_dir / 'cross_segment_pooled.csv'}")
 
-    if not summary_rows and not pooled_rows:
+    if not summary_rows and not pooled_rows and not governance_state_rows:
         print("[compare] no comparison rows produced — check segment data and min-patterns threshold")
 
     return 0

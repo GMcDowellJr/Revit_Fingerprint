@@ -1,0 +1,407 @@
+"""Tests for governance semantics in tools/compare_cross_segment.py."""
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+
+from compare_cross_segment import (  # noqa: E402
+    _classify_governance_state,
+    _comparison_role_semantics,
+    _recommended_primary_view,
+    _usage_interpretable_for_role,
+    build_pair_domain_work_items,
+    discover_governance_chain,
+    main as compare_main,
+    sort_pair_detail_rows,
+    sort_summary_rows,
+)
+
+
+def _seg(role: str, client: str = "Acme", unit: str = "imperial", discipline: str = "Arch"):
+    return {
+        "governance_role": role,
+        "client_label": client,
+        "unit_system": unit,
+        "discipline_label": discipline,
+        "run_type": "bundle",
+    }
+
+
+def test_discover_governance_chain_includes_generic_upstream_roles():
+    manifest = {
+        "g": _seg("Generic", client="Global"),
+        "gh": _seg("Generic-Host", client="Global"),
+        "t": _seg("Template"),
+        "c": _seg("Container"),
+        "p": _seg("Project"),
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    assert ("g", "t", "generic_to_template") in pairs
+    assert ("g", "c", "generic_to_container") in pairs
+    assert ("g", "p", "generic_to_project") in pairs
+    assert ("gh", "t", "generic_to_template") in pairs
+    assert ("t", "p", "template_to_project") in pairs
+    assert ("t", "c", "template_to_container") in pairs
+    assert ("c", "p", "container_to_project") in pairs
+
+
+def test_project_target_governance_state_uses_target_used():
+    assert _usage_interpretable_for_role("Project") is True
+    assert _recommended_primary_view("Template", "Project", "template_to_project") == "used"
+    assert (
+        _classify_governance_state(True, True, False, True, True)
+        == "provided_but_passive"
+    )
+    assert (
+        _classify_governance_state(False, True, True, True, True)
+        == "local_active"
+    )
+
+
+def test_standards_carrier_target_avoids_passive_bloat_label():
+    assert _usage_interpretable_for_role("Template") is False
+    assert _recommended_primary_view("Generic", "Template", "generic_to_template") == "all"
+    assert (
+        _classify_governance_state(True, True, False, True, False)
+        == "provided_configured"
+    )
+    assert "all-view is primary" in _comparison_role_semantics(
+        "Generic", "Template", "generic_to_template"
+    )
+
+
+def _write_csv(path: Path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        raise AssertionError("test helper requires at least one row")
+    import csv
+
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _write_segment(seg_root: Path, folder: str, domain: str, patterns, all_rows, used_rows, bundle_all):
+    base = seg_root / folder / "results"
+    _write_csv(
+        base / "analysis" / "domain_patterns.csv",
+        [
+            {
+                "domain": domain,
+                "pattern_id": pid,
+                "source_cluster_id": f"src|{jh}",
+                "pattern_label_human": label,
+                "pattern_label": label,
+            }
+            for pid, jh, label in patterns
+        ],
+    )
+    _write_csv(base / "bundle_analysis" / "all" / domain / "membership_matrix.csv", all_rows)
+    _write_csv(base / "bundle_analysis" / "used" / domain / "membership_matrix.csv", used_rows)
+    _write_csv(
+        base / "bundle_analysis" / "all" / domain / "bundle_membership.csv",
+        [{"pattern_id": pid} for pid in bundle_all],
+    )
+
+
+def test_build_governance_state_rows_include_inherited_unused_and_local_active(tmp_path):
+    from compare_cross_segment import build_governance_state_outputs  # noqa: E402
+
+    domain = "line_patterns"
+    segments_root = tmp_path / "segments"
+    _write_segment(
+        segments_root,
+        "ref",
+        domain,
+        [("r1", "provided_used", "Provided Used"), ("r2", "provided_passive", "Provided Passive")],
+        [
+            {"export_run_id": "ref_file", "pattern_id": "r1"},
+            {"export_run_id": "ref_file", "pattern_id": "r2"},
+        ],
+        [{"export_run_id": "ref_file", "pattern_id": "r1"}],
+        ["r1", "r2"],
+    )
+    _write_segment(
+        segments_root,
+        "tgt",
+        domain,
+        [
+            ("t1", "provided_used", "Provided Used"),
+            ("t2", "provided_passive", "Provided Passive"),
+            ("t3", "local_active", "Local Active"),
+        ],
+        [
+            {"export_run_id": "target_file", "pattern_id": "t1"},
+            {"export_run_id": "target_file", "pattern_id": "t2"},
+            {"export_run_id": "target_file", "pattern_id": "t3"},
+        ],
+        [
+            {"export_run_id": "target_file", "pattern_id": "t1"},
+            {"export_run_id": "target_file", "pattern_id": "t3"},
+        ],
+        ["t1", "t2", "t3"],
+    )
+    manifest = {
+        "ref": {**_seg("Template"), "segment_label": "Template"},
+        "tgt": {**_seg("Project"), "segment_label": "Project"},
+    }
+    registry = {
+        "ref": {"output_folder": "ref", "run_type": "bundle"},
+        "tgt": {"output_folder": "tgt", "run_type": "bundle"},
+    }
+
+    rows, summary = build_governance_state_outputs(
+        "cmp_test",
+        "ref",
+        "tgt",
+        "template_to_project",
+        domain,
+        manifest,
+        registry,
+        segments_root,
+        "2026-05-29T00:00:00Z",
+    )
+
+    states = {row["join_hash"]: row["state"] for row in rows}
+    assert states == {
+        "provided_used": "provided_and_used",
+        "provided_passive": "provided_but_passive",
+        "local_active": "local_active",
+    }
+    assert summary["provided_to_configured_containment"] == "1.000000"
+    assert summary["provided_to_used_containment"] == "0.500000"
+    assert summary["provided_passive_share"] == "0.500000"
+    assert summary["local_active_share"] == "0.500000"
+
+
+def test_pair_domain_work_items_use_pair_domain_union(tmp_path):
+    segments_root = tmp_path / "segments"
+    registry = {
+        "a": {"output_folder": "a"},
+        "b": {"output_folder": "b"},
+        "c": {"output_folder": "c"},
+    }
+    for folder, domain in [("a", "domain_a"), ("b", "domain_b"), ("c", "domain_c")]:
+        (segments_root / folder / "results" / "bundle_analysis" / "all" / domain).mkdir(
+            parents=True
+        )
+
+    work_items, _domains_by_segment, active_domains = build_pair_domain_work_items(
+        [("a", "b", "sibling_projects"), ("a", "c", "sibling_projects")],
+        segments_root,
+        registry,
+    )
+
+    assert work_items == [
+        ("a", "b", "sibling_projects", "domain_a"),
+        ("a", "b", "sibling_projects", "domain_b"),
+        ("a", "c", "sibling_projects", "domain_a"),
+        ("a", "c", "sibling_projects", "domain_c"),
+    ]
+    assert active_domains == ["domain_a", "domain_b", "domain_c"]
+
+
+def test_output_row_sort_helpers_are_stable_by_content():
+    summary_rows = [
+        {"comparison_type": "z", "segment_id_a": "b", "segment_id_b": "a", "domain": "d2"},
+        {"comparison_type": "a", "segment_id_a": "b", "segment_id_b": "a", "domain": "d1"},
+    ]
+    sort_summary_rows(summary_rows)
+    assert [row["comparison_type"] for row in summary_rows] == ["a", "z"]
+
+    pair_rows = [
+        {
+            "_comparison_type": "sibling_projects",
+            "segment_id_a": "b",
+            "segment_id_b": "c",
+            "domain": "d",
+            "export_run_id_a": "2",
+            "export_run_id_b": "1",
+        },
+        {
+            "_comparison_type": "sibling_projects",
+            "segment_id_a": "a",
+            "segment_id_b": "c",
+            "domain": "d",
+            "export_run_id_a": "1",
+            "export_run_id_b": "1",
+        },
+    ]
+    sort_pair_detail_rows(pair_rows)
+    assert [row["segment_id_a"] for row in pair_rows] == ["a", "b"]
+
+
+def test_non_project_target_blanks_used_summary_shares(tmp_path):
+    from compare_cross_segment import build_governance_state_outputs  # noqa: E402
+
+    domain = "line_patterns"
+    segments_root = tmp_path / "segments"
+    _write_segment(
+        segments_root,
+        "generic",
+        domain,
+        [("g1", "provided_a", "Provided A"), ("g2", "provided_b", "Provided B")],
+        [
+            {"export_run_id": "generic_file", "pattern_id": "g1"},
+            {"export_run_id": "generic_file", "pattern_id": "g2"},
+        ],
+        [{"export_run_id": "generic_file", "pattern_id": "g1"}],
+        ["g1", "g2"],
+    )
+    _write_segment(
+        segments_root,
+        "template",
+        domain,
+        [
+            ("t1", "provided_a", "Provided A"),
+            ("t2", "provided_b", "Provided B"),
+            ("t3", "template_local", "Template Local"),
+        ],
+        [
+            {"export_run_id": "template_file", "pattern_id": "t1"},
+            {"export_run_id": "template_file", "pattern_id": "t2"},
+            {"export_run_id": "template_file", "pattern_id": "t3"},
+        ],
+        [{"export_run_id": "template_file", "pattern_id": "t3"}],
+        ["t1", "t2", "t3"],
+    )
+    manifest = {
+        "generic": {**_seg("Generic"), "segment_label": "Generic"},
+        "template": {**_seg("Template"), "segment_label": "Template"},
+    }
+    registry = {
+        "generic": {"output_folder": "generic", "run_type": "bundle"},
+        "template": {"output_folder": "template", "run_type": "bundle"},
+    }
+
+    rows, summary = build_governance_state_outputs(
+        "cmp_test",
+        "generic",
+        "template",
+        "generic_to_template",
+        domain,
+        manifest,
+        registry,
+        segments_root,
+        "2026-05-29T00:00:00Z",
+    )
+
+    states = {row["join_hash"]: row["state"] for row in rows}
+    assert states == {
+        "provided_a": "provided_configured",
+        "provided_b": "provided_configured",
+        "template_local": "local_configured",
+    }
+    assert summary["target_usage_interpretable"] == "false"
+    assert summary["provided_to_configured_containment"] == "1.000000"
+    assert summary["provided_to_used_containment"] == ""
+    assert summary["provided_passive_share"] == ""
+    assert summary["local_active_share"] == ""
+    assert summary["provided_and_used_pct_of_reference_all"] == ""
+    assert summary["provided_but_passive_pct_of_reference_all"] == ""
+    assert summary["local_active_pct_of_target_used"] == ""
+
+
+def test_main_emits_governance_states_when_pair_skipped_by_min_patterns(tmp_path, monkeypatch):
+    import csv
+
+    domain = "sparse_line_patterns"
+    records_dir = tmp_path / "records"
+    segments_root = tmp_path / "segments"
+    out_dir = tmp_path / "out"
+    records_dir.mkdir()
+
+    _write_csv(
+        records_dir / "segment_manifest.csv",
+        [
+            {
+                "segment_id": "generic_sparse",
+                "segment_label": "Generic",
+                "governance_role": "Generic",
+                "client_label": "Global",
+                "discipline_label": "Arch",
+                "unit_system": "imperial",
+                "run_type": "bundle",
+                "segment_level": "2",
+                "parent_segment_id": "imperial",
+            },
+            {
+                "segment_id": "project_sparse",
+                "segment_label": "Project",
+                "governance_role": "Project",
+                "client_label": "Acme",
+                "discipline_label": "Arch",
+                "unit_system": "imperial",
+                "run_type": "bundle",
+                "segment_level": "2",
+                "parent_segment_id": "imperial",
+            },
+        ],
+    )
+    _write_csv(
+        records_dir / "run_registry.csv",
+        [
+            {"segment_id": "generic_sparse", "output_folder": "generic_sparse", "run_type": "bundle"},
+            {"segment_id": "project_sparse", "output_folder": "project_sparse", "run_type": "bundle"},
+        ],
+    )
+    _write_csv(records_dir / "file_metadata.csv", [{"export_run_id": "generic_file", "project_label": ""}])
+    _write_segment(
+        segments_root,
+        "generic_sparse",
+        domain,
+        [("g1", "provided_missing_a", "Provided Missing A"), ("g2", "provided_missing_b", "Provided Missing B")],
+        [
+            {"export_run_id": "generic_file", "pattern_id": "g1"},
+            {"export_run_id": "generic_file", "pattern_id": "g2"},
+        ],
+        [{"export_run_id": "generic_file", "pattern_id": "g1"}],
+        ["g1", "g2"],
+    )
+    (segments_root / "project_sparse").mkdir(parents=True)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "compare_cross_segment.py",
+            "--segments-root",
+            str(segments_root),
+            "--records-dir",
+            str(records_dir),
+            "--out-dir",
+            str(out_dir),
+            "--governance-chain",
+            "--domain",
+            domain,
+            "--min-patterns",
+            "3",
+            "--workers",
+            "1",
+            "--no-delta",
+        ],
+    )
+
+    assert compare_main() == 0
+
+    summary_path = out_dir / "cross_segment_summary.csv"
+    states_path = out_dir / "cross_segment_governance_states.csv"
+    state_summary_path = out_dir / "cross_segment_governance_state_summary.csv"
+    assert not summary_path.exists()
+    assert states_path.exists()
+    assert state_summary_path.exists()
+
+    with states_path.open("r", encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert {row["state"] for row in rows} == {"provided_but_missing"}
+    assert {row["join_hash"] for row in rows} == {"provided_missing_a", "provided_missing_b"}
+
+    with state_summary_path.open("r", encoding="utf-8", newline="") as f:
+        summary_rows = list(csv.DictReader(f))
+    assert summary_rows[0]["provided_but_missing_count"] == "2"
+    assert summary_rows[0]["provided_missing_share"] == "1.000000"
