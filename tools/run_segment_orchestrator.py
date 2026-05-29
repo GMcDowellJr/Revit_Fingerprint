@@ -155,56 +155,57 @@ def _preshard_one_shard(
     if not segments_to_write:
         return shard_file.name, 0, len(segment_plans)
 
-    # Build id → (plan, dst) lookup
-    id_to_targets: Dict[str, List] = {}
-    for sid, (plan, seg_shard_dir, dst) in segments_to_write.items():
-        for eid in plan["allowed_ids"]:
-            if eid not in id_to_targets:
-                id_to_targets[eid] = []
-            id_to_targets[eid].append((sid, plan, seg_shard_dir, dst))
+    # Read header once; eid_col is stable across all batches.
+    with shard_file.open("r", encoding="utf-8-sig", newline="") as _hf:
+        header = next(csv.reader(_hf), None)
+    if not header:
+        return shard_file.name, 0, len(segment_plans)
+    eid_col = header.index("export_run_id") if "export_run_id" in header else None
+    if eid_col is None:
+        return shard_file.name, 0, len(segment_plans)
 
-    # Ensure shard dirs exist
+    # Ensure all destination shard dirs exist before batching.
     seen_dirs: set = set()
     for sid, (plan, seg_shard_dir, dst) in segments_to_write.items():
         if seg_shard_dir not in seen_dirs:
             seg_shard_dir.mkdir(parents=True, exist_ok=True)
             seen_dirs.add(seg_shard_dir)
 
-    writers: Dict[str, Any] = {}
-    handles: Dict[str, Any] = {}
-    header = None
-    eid_col = None
+    # Fan out in batches so at most _PRESHARD_BATCH destination handles are
+    # open simultaneously.  Each batch re-streams the shard file once.
+    seg_items = list(segments_to_write.items())
+    for batch_start in range(0, len(seg_items), _PRESHARD_BATCH):
+        batch = dict(seg_items[batch_start : batch_start + _PRESHARD_BATCH])
 
-    try:
-        with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
-            reader = csv.reader(f)
-            header = next(reader, None)
-            if not header:
-                return shard_file.name, 0, len(segment_plans)
-            eid_col = header.index("export_run_id") if "export_run_id" in header else None
-            if eid_col is None:
-                return shard_file.name, 0, len(segment_plans)
+        # Build one-to-many lookup scoped to this batch.
+        id_to_targets: Dict[str, List] = {}
+        for sid, (plan, seg_shard_dir, dst) in batch.items():
+            for eid in plan["allowed_ids"]:
+                id_to_targets.setdefault(eid, []).append(sid)
 
-            for sid, (plan, seg_shard_dir, dst) in segments_to_write.items():
+        writers: Dict[str, Any] = {}
+        handles: Dict[str, Any] = {}
+        try:
+            for sid, (plan, seg_shard_dir, dst) in batch.items():
                 fh = dst.open("w", newline="", encoding="utf-8")
                 handles[sid] = fh
                 w = csv.writer(fh)
                 w.writerow(header)
                 writers[sid] = w
 
-            for row in reader:
-                if len(row) <= eid_col:
-                    continue
-                eid = row[eid_col].strip()
-                targets = id_to_targets.get(eid)
-                if not targets:
-                    continue
-                for sid, _, _, _ in targets:
-                    if sid in writers:
-                        writers[sid].writerow(row)
-    finally:
-        for fh in handles.values():
-            fh.close()
+            with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
+                reader = csv.reader(f)
+                next(reader, None)  # skip header row
+                for row in reader:
+                    if len(row) <= eid_col:
+                        continue
+                    eid = row[eid_col].strip()
+                    for sid in id_to_targets.get(eid, ()):
+                        if sid in writers:
+                            writers[sid].writerow(row)
+        finally:
+            for fh in handles.values():
+                fh.close()
 
     return shard_file.name, len(segments_to_write), len(segment_plans) - len(segments_to_write)
 
