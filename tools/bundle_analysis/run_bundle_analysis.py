@@ -438,6 +438,10 @@ def run_bundle_analysis(
 
             if not compare:
                 active_domains = [d for d in domains if d]
+                if not active_domains:
+                    print(f"[run] view={view} no active domains — skipping")
+                    continue
+
                 pool_size = min(workers, len(active_domains))
 
                 print(f"[run] view={view} submitting {len(active_domains)} domains to {pool_size} workers")
