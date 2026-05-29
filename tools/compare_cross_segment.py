@@ -703,10 +703,11 @@ def load_file_join_hashes(
         return dict(result)
 
     # Generic/reference segments are provided-vocabulary sources. They may not
-    # produce bundle_analysis or membership matrices, but their all-view
-    # domain_patterns.csv inventory is valid for containment/provision
-    # comparisons. Used-view is intentionally not inferred because analysis rows
-    # do not distinguish active project use from configured/provided vocabulary.
+    # produce bundle_analysis or membership matrices, but their analysis
+    # inventory is valid for all-view containment/provision comparisons. File
+    # membership comes from pattern_presence_file.csv when available. Used-view
+    # is intentionally not inferred because analysis rows do not distinguish
+    # active project use from configured/provided vocabulary.
     if purge_view != "all":
         return {}
 
@@ -714,19 +715,57 @@ def load_file_join_hashes(
     if not dp_path.exists():
         return {}
 
-    export_run_ids = _load_export_run_ids_for_segment(seg_out)
-    single_export_run_id = export_run_ids[0] if len(export_run_ids) == 1 else ""
-    result = defaultdict(set)
+    pattern_join_hashes: Dict[str, str] = {}
+    pattern_export_run_ids: Dict[str, str] = {}
     for row in read_csv_rows(dp_path):
         if row.get("domain", "").strip() != domain:
             continue
-        eid = row.get("export_run_id", "").strip() or single_export_run_id
+        pid = row.get("pattern_id", "").strip()
         scid = row.get("source_cluster_id", "").strip()
-        if not eid or not scid:
+        if not pid or not scid:
             continue
         join_hash = scid.split("|")[-1]
         if join_hash:
+            pattern_join_hashes[pid] = join_hash
+            eid = row.get("export_run_id", "").strip()
+            if eid:
+                pattern_export_run_ids[pid] = eid
+
+    if not pattern_join_hashes:
+        return {}
+
+    result: Dict[str, Set[str]] = defaultdict(set)
+
+    # Standard v2.1 analysis writes file membership to pattern_presence_file.csv,
+    # not domain_patterns.csv. Use it when present so multi-file Generic/reference
+    # inventories preserve per-export containment inputs instead of collapsing or
+    # dropping rows that have no export_run_id in domain_patterns.csv.
+    presence_path = pattern_presence_file_path(seg_out)
+    if presence_path.exists():
+        for row in read_csv_rows(presence_path):
+            if row.get("domain", "").strip() != domain:
+                continue
+            eid = row.get("export_run_id", "").strip()
+            pid = row.get("pattern_id", "").strip()
+            if not eid or not pid:
+                continue
+            join_hash = pattern_join_hashes.get(pid)
+            if join_hash:
+                result[eid].add(join_hash)
+        if result:
+            return dict(result)
+
+    for pid, join_hash in pattern_join_hashes.items():
+        eid = pattern_export_run_ids.get(pid, "")
+        if eid:
             result[eid].add(join_hash)
+    if result:
+        return dict(result)
+
+    export_run_ids = _load_export_run_ids_for_segment(seg_out)
+    single_export_run_id = export_run_ids[0] if len(export_run_ids) == 1 else ""
+    if single_export_run_id:
+        result[single_export_run_id] = set(pattern_join_hashes.values())
     return dict(result)
 
 

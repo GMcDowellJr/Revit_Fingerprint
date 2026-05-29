@@ -112,7 +112,12 @@ def _write_segment(seg_root: Path, folder: str, domain: str, patterns, all_rows,
 
 
 def _write_reference_analysis_segment(
-    seg_root: Path, folder: str, domain: str, rows, export_run_ids=None
+    seg_root: Path,
+    folder: str,
+    domain: str,
+    rows,
+    export_run_ids=None,
+    presence_rows=None,
 ):
     base = seg_root / folder
     if export_run_ids is not None:
@@ -138,6 +143,18 @@ def _write_reference_analysis_segment(
             for row in rows
         ],
     )
+    if presence_rows is not None:
+        _write_csv(
+            base / "results" / "analysis" / "pattern_presence_file.csv",
+            [
+                {
+                    "export_run_id": row["export_run_id"],
+                    "domain": row.get("domain", domain),
+                    "pattern_id": row["pattern_id"],
+                }
+                for row in presence_rows
+            ],
+        )
 
 
 def test_reference_analysis_segment_discovers_domains_without_bundle_outputs(tmp_path):
@@ -193,6 +210,32 @@ def test_reference_analysis_segment_groups_fallback_by_export_run_id_column(tmp_
             {"pattern_id": "g2", "join_hash": "provided_b", "export_run_id": "file_b"},
         ],
         export_run_ids=["file_a", "file_b"],
+    )
+
+    assert load_file_join_hashes(
+        segments_root, registry, "generic", "line_patterns", "all"
+    ) == {
+        "file_a": {"provided_a"},
+        "file_b": {"provided_b"},
+    }
+
+
+def test_reference_analysis_segment_uses_presence_for_multi_file_fallback(tmp_path):
+    segments_root = tmp_path / "segments"
+    registry = {"generic": {"output_folder": "generic"}}
+    _write_reference_analysis_segment(
+        segments_root,
+        "generic",
+        "line_patterns",
+        [
+            {"pattern_id": "g1", "join_hash": "provided_a"},
+            {"pattern_id": "g2", "join_hash": "provided_b"},
+        ],
+        export_run_ids=["file_a", "file_b"],
+        presence_rows=[
+            {"export_run_id": "file_a", "pattern_id": "g1"},
+            {"export_run_id": "file_b", "pattern_id": "g2"},
+        ],
     )
 
     assert load_file_join_hashes(
