@@ -792,6 +792,7 @@ def _process_one_domain(
     for _r in domain_records:
         _records_by_eid[_r["export_run_id"]].append(_r)
 
+    _t_file_loop = time.perf_counter()
     for export_run_id in exports:
         dom_records = _records_by_eid.get(export_run_id, [])
         total = len(dom_records)
@@ -863,6 +864,7 @@ def _process_one_domain(
                 "deviation_score": "0.000000",
                 "corpus_classification": "UNKNOWN",
             })
+    _t_file_loop = time.perf_counter() - _t_file_loop
 
     known_domain_records = sum(int(c["records_count"]) for c in sorted_clusters)
     unknown_domain = max(0, len(domain_records) - known_domain_records)
@@ -929,11 +931,22 @@ def _process_one_domain(
         "pct_files_unique_dominant": f"{(dominant_files_with_valid_pattern / files_total) if files_total else 0.0:.6f}",
         "governance_state": governance_state,
     })
+    _t_sort = time.perf_counter()
+    domain_patterns_local = _sort_rows(domain_patterns_local, ["analysis_run_id", "domain", "pattern_id"])
+    presence_rows_local = _sort_rows(presence_rows_local, ["analysis_run_id", "export_run_id", "domain", "pattern_id"])
+    authority_rows_local = _sort_rows(authority_rows_local, ["analysis_run_id", "domain", "pattern_id"])
+    rec_membership_local = _sort_rows(rec_membership_local, ["analysis_run_id", "export_run_id", "domain", "record_pk"])
+    file_domain_rows_local = _sort_rows(file_domain_rows_local, ["analysis_run_id", "export_run_id", "domain"])
+    diag_rows_local = _sort_rows(diag_rows_local, ["analysis_run_id", "domain"])
+    _t_sort = time.perf_counter() - _t_sort
+    _t_csv = 0.0
+
     print(
         f"[extractor] domain={dom} (done) clusters={len(sorted_clusters)} records={len(domain_records)}",
         flush=True,
     )
     _t_dom_elapsed = time.perf_counter() - _t_dom_start
+    _t_residual = max(0.0, _t_dom_elapsed - _t_ii - _t_lr - _t_cl - _t_file_loop - _t_sort - _t_csv)
     return {
         "domain_patterns": domain_patterns_local,
         "authority_rows": authority_rows_local,
@@ -949,7 +962,13 @@ def _process_one_domain(
             "identity_items": _t_ii,
             "label_inputs": _t_lr,
             "cluster_loop": _t_cl,
-            "other": max(0.0, _t_dom_elapsed - _t_ii - _t_lr - _t_cl),
+            "file_loop": _t_file_loop,
+            "sort": _t_sort,
+            "csv_write": _t_csv,
+            "residual": _t_residual,
+            "n_records": len(domain_records),
+            "n_clusters": len(cluster_items),
+            "n_files": len([e for e in exports if _records_by_eid.get(e)]),
         },
     }
 
@@ -1404,7 +1423,11 @@ def emit_analysis(
             f"identity_items={_dt['identity_items']:.2f}s "
             f"label_inputs={_dt['label_inputs']:.2f}s "
             f"cluster_loop={_dt['cluster_loop']:.2f}s "
-            f"other={_dt['other']:.2f}s "
+            f"file_loop={_dt['file_loop']:.2f}s "
+            f"sort={_dt['sort']:.2f}s "
+            f"csv_write={_dt['csv_write']:.2f}s "
+            f"residual={_dt['residual']:.2f}s "
+            f"n_records={_dt['n_records']} n_clusters={_dt['n_clusters']} "
             f"rank={_rank}/{_n_total}\n"
         )
     sys.stderr.flush()
