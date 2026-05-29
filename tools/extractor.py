@@ -1322,41 +1322,68 @@ def emit_analysis(
     _pattern_id_by_cluster: Dict[Tuple[str, str, str], str] = {}
     _t_emit_analysis_start = time.perf_counter()
     _domain_timings: List[Dict] = []
-    pool_size = max(1, min(workers, len([d for d in domains if d])))
 
-    with ProcessPoolExecutor(max_workers=pool_size) as executor:
-        future_to_dom = {
-            executor.submit(
-                _process_one_domain,
-                dom,
-                dom_clusters.get(dom, []),
-                records_by_domain.get(dom, []),
-                exports,
-                files_total,
-                analysis_run_id,
-                phase0_dir,
-                results_v21_dir,
-                label_synth_dir,
-            ): dom
-            for dom in domains if dom
-        }
-        for future in as_completed(future_to_dom):
-            dom = future_to_dom[future]
+    def _merge_result(result: Dict) -> None:
+        domain_patterns.extend(result["domain_patterns"])
+        authority_rows.extend(result["authority_rows"])
+        presence_rows.extend(result["presence_rows"])
+        file_domain_rows.extend(result["file_domain_rows"])
+        rec_membership.extend(result["rec_membership"])
+        diag_rows.extend(result["diag_rows"])
+        domain_metrics.extend(result["domain_metrics"])
+        _pattern_id_by_cluster.update(result["pattern_id_by_cluster"])
+        _domain_timings.append(result["timing"])
+
+    if workers == 1:
+        # Run inline — avoids ProcessPoolExecutor entirely so emit_analysis is safe
+        # to call from notebooks, python -c, stdin, or any non-importable __main__.
+        for dom in domains:
+            if not dom:
+                continue
             try:
-                result = future.result()
+                result = _process_one_domain(
+                    dom,
+                    dom_clusters.get(dom, []),
+                    records_by_domain.get(dom, []),
+                    exports,
+                    files_total,
+                    analysis_run_id,
+                    phase0_dir,
+                    results_v21_dir,
+                    label_synth_dir,
+                )
             except Exception as exc:
                 print(f"[extractor] domain={dom} failed: {exc}", flush=True)
                 continue
-            domain_patterns.extend(result["domain_patterns"])
-            authority_rows.extend(result["authority_rows"])
-            presence_rows.extend(result["presence_rows"])
-            file_domain_rows.extend(result["file_domain_rows"])
-            rec_membership.extend(result["rec_membership"])
-            diag_rows.extend(result["diag_rows"])
-            domain_metrics.extend(result["domain_metrics"])
-            _pattern_id_by_cluster.update(result["pattern_id_by_cluster"])
-            _domain_timings.append(result["timing"])
+            _merge_result(result)
             print(f"[extractor] domain={dom} complete", flush=True)
+    else:
+        pool_size = max(1, min(workers, len([d for d in domains if d])))
+        with ProcessPoolExecutor(max_workers=pool_size) as executor:
+            future_to_dom = {
+                executor.submit(
+                    _process_one_domain,
+                    dom,
+                    dom_clusters.get(dom, []),
+                    records_by_domain.get(dom, []),
+                    exports,
+                    files_total,
+                    analysis_run_id,
+                    phase0_dir,
+                    results_v21_dir,
+                    label_synth_dir,
+                ): dom
+                for dom in domains if dom
+            }
+            for future in as_completed(future_to_dom):
+                dom = future_to_dom[future]
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    print(f"[extractor] domain={dom} failed: {exc}", flush=True)
+                    continue
+                _merge_result(result)
+                print(f"[extractor] domain={dom} complete", flush=True)
 
     _domain_timings.sort(key=lambda x: -x["total"])
     _n_total = len(_domain_timings)
