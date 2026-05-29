@@ -1282,25 +1282,18 @@ def _run_pair_domain(
 ) -> Tuple[Optional[Dict[str, str]], List[Dict[str, str]]]:
     """Wrapper around run_pair for a single pair×domain. Returns (summary_row, detail_rows)."""
     _ = no_delta  # Accepted for future use; run_pair does not currently consume it.
-    try:
-        return run_pair(
-            seg_a=seg_a,
-            seg_b=seg_b,
-            comparison_type=comparison_type,
-            domain=domain,
-            manifest=manifest,
-            registry=registry,
-            file_metadata=file_metadata,
-            segments_root=segments_root,
-            min_patterns=min_patterns,
-            executed_utc=executed_utc,
-        )
-    except Exception as exc:
-        print(
-            f"[warn] pair=({seg_a}, {seg_b}) type={comparison_type} domain={domain} failed: {exc}",
-            file=sys.stderr,
-        )
-        return None, []
+    return run_pair(
+        seg_a=seg_a,
+        seg_b=seg_b,
+        comparison_type=comparison_type,
+        domain=domain,
+        manifest=manifest,
+        registry=registry,
+        file_metadata=file_metadata,
+        segments_root=segments_root,
+        min_patterns=min_patterns,
+        executed_utc=executed_utc,
+    )
 
 
 def _build_summary_row(
@@ -1754,19 +1747,12 @@ def main() -> int:
             try:
                 result, pairs_out = future.result()
             except Exception as exc:
-                print(
-                    f"[warn] unhandled: pair=({seg_a},{seg_b}) dom={domain}: {exc}",
-                    file=sys.stderr,
-                )
-                n_skipped += 1
-                done = n_complete + n_skipped
-                if done % 50 == 0 or done == len(work_items):
-                    print(
-                        f"[compare] progress: {done}/{len(work_items)} "
-                        f"complete={n_complete} skipped={n_skipped}",
-                        flush=True,
-                    )
-                continue
+                for pending in future_to_item:
+                    if pending is not future:
+                        pending.cancel()
+                raise RuntimeError(
+                    f"pair=({seg_a}, {seg_b}) type={ctype} domain={domain} failed"
+                ) from exc
 
             if result is not None:
                 summary_rows.append(result)
