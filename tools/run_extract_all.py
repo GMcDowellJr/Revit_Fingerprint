@@ -726,6 +726,13 @@ def main() -> None:
              "still write to {out-root}/results/. Use when running per-segment analysis so "
              "that corpus-level LLM improvements are picked up without rebuilding per segment."
     )
+    ap.add_argument(
+        "--emit-analysis-workers",
+        type=int,
+        default=4,
+        help="Number of worker processes for the emit_analysis domain loop. Default: 4. "
+             "Use 1 to run sequentially (same behaviour as before parallelism was added).",
+    )
     args = ap.parse_args()
 
     allow_sig_hash_join_key = args.allow_sig_hash_join_key
@@ -966,6 +973,7 @@ def main() -> None:
                     phase0_dir=v21_phase0_dir,
                     results_v21_dir=v21_root,
                     label_synth_dir=label_synth_dir,
+                    workers=args.emit_analysis_workers,
                 )
                 sys.stderr.write(f"[patterns_timing] stage=emit_analysis_seed elapsed={time.perf_counter()-_t0:.2f}s\n")
                 sys.stderr.flush()
@@ -979,6 +987,7 @@ def main() -> None:
                     phase0_dir=v21_phase0_dir,
                     results_v21_dir=v21_root,
                     label_synth_dir=label_synth_dir,
+                    workers=args.emit_analysis_workers,
                 )
                 sys.stderr.write(f"[patterns_timing] stage=emit_analysis_corpus elapsed={time.perf_counter()-_t0:.2f}s\n")
                 sys.stderr.flush()
@@ -1040,6 +1049,7 @@ def main() -> None:
                     phase0_dir=v21_phase0_dir,
                     results_v21_dir=v21_root,
                     label_synth_dir=label_synth_dir,
+                    workers=args.emit_analysis_workers,
                 )
                 sys.stderr.write(f"[patterns_timing] stage=emit_analysis elapsed={time.perf_counter()-_t0:.2f}s\n")
                 sys.stderr.flush()
