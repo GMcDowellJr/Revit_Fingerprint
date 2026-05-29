@@ -92,6 +92,134 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _write_run_summary(
+    segments_root: Path,
+    run_start_utc: str,
+    run_end_utc: str,
+    total_elapsed_s: int,
+    segment_results: List[Dict],
+    workers: int,
+) -> Path:
+    """Write run_summary.txt to segments_root atomically (temp + replace)."""
+    out_path = segments_root / "run_summary.txt"
+    tmp_path = segments_root / "run_summary.txt.tmp"
+
+    n_complete = sum(1 for r in segment_results if r.get("status") == "complete")
+    n_failed = sum(1 for r in segment_results if r.get("status") == "failed")
+    n_skipped = sum(1 for r in segment_results if r.get("status") == "skipped")
+    segments_run = len(segment_results)
+
+    total_min = total_elapsed_s / 60.0
+
+    # Per-segment timing table
+    col_w = max((len(r.get("segment_id", "")) for r in segment_results), default=30)
+    col_w = max(col_w, 30)
+    header_fmt = f"{{:<{col_w}}}  {{:>3}}  {{:>5}}  {{:>7}}  {{:>8}}  {{:>6}}  {{:>8}}  {{:>5}}  {{}}"
+    row_fmt    = f"{{:<{col_w}}}  {{:>3}}  {{:>5}}  {{:>7}}  {{:>8}}  {{:>6}}  {{:>8}}  {{:>5}}  {{}}"
+
+    seg_lines: List[str] = [
+        header_fmt.format("segment", "lvl", "files", "prepare", "patterns", "bundle", "bi_merge", "total", "status"),
+    ]
+    for r in sorted(segment_results, key=lambda x: (-x.get("patterns_s", 0), x.get("segment_id", ""))):
+        sid     = r.get("segment_id", "")
+        lvl     = r.get("level", 0)
+        files   = r.get("files", 0)
+        prep    = r.get("prepare_s", 0)
+        pat     = r.get("patterns_s", 0)
+        bun     = r.get("bundle_s", 0)
+        mrg     = r.get("bi_merge_s", 0)
+        tot     = r.get("total_s", 0)
+        status  = "✓" if r.get("status") == "complete" else "✗"
+        seg_lines.append(
+            row_fmt.format(sid, lvl, files, f"{prep}s", f"{pat}s", f"{bun}s", f"{mrg}s", f"{tot}s", status)
+        )
+
+    # Failed segments block
+    failed_lines: List[str] = []
+    for r in segment_results:
+        if r.get("status") == "failed":
+            note = r.get("failure_note", "").split("\n")[0][:120]
+            failed_lines.append(
+                f"  {r.get('segment_id', ''):<{col_w}}  {note}"
+            )
+
+    # Top-5 patterns timing — sub-breakdown only for the 3 slowest by patterns_s
+    sorted_by_pat = sorted(
+        [r for r in segment_results if r.get("patterns_s", 0) > 0],
+        key=lambda x: -x.get("patterns_s", 0),
+    )
+    top3_sids = {r["segment_id"] for r in sorted_by_pat[:3]}
+    timing_blocks: List[str] = []
+    for r in sorted_by_pat[:5]:
+        sid = r.get("segment_id", "")
+        pat_s = r.get("patterns_s", 0)
+        top5 = r.get("patterns_top5", [])
+        timing_blocks.append(f"[segment: {sid}  patterns={pat_s}s]")
+        for ln in top5:
+            if sid in top3_sids:
+                timing_blocks.append(f"  {ln}")
+            else:
+                # Truncate to domain name + total only (drop sub-breakdown fields)
+                parts = ln.split()
+                short_parts = [p for p in parts if p.startswith("domain=") or p.startswith("elapsed=")]
+                timing_blocks.append(f"  {' '.join(short_parts)}")
+
+    # Totals
+    total_prep_s    = sum(r.get("prepare_s", 0) for r in segment_results)
+    total_pat_s     = sum(r.get("patterns_s", 0) for r in segment_results)
+    total_bun_s     = sum(r.get("bundle_s", 0) for r in segment_results)
+    total_mrg_s     = sum(r.get("bi_merge_s", 0) for r in segment_results)
+    total_work_s    = sum(r.get("total_s", 0) for r in segment_results)
+    avg_pat         = total_pat_s // segments_run if segments_run > 0 else 0
+    avg_bun         = total_bun_s // segments_run if segments_run > 0 else 0
+    avg_mrg         = total_mrg_s // segments_run if segments_run > 0 else 0
+    parallelism_eff = total_work_s / total_elapsed_s if total_elapsed_s > 0 else 0.0
+
+    lines: List[str] = [
+        "Revit Fingerprint — Run Summary",
+        "================================",
+        f"run_start_utc : {run_start_utc}",
+        f"run_end_utc   : {run_end_utc}",
+        f"total_elapsed : {total_elapsed_s}s ({total_min:.1f} min)",
+        f"workers       : {workers}",
+        f"segments_run  : {segments_run}",
+        f"  complete    : {n_complete}",
+        f"  failed      : {n_failed}",
+        f"  skipped     : {n_skipped}",
+        "",
+        "── Per-segment timing ──────────────────────────────────────────────────────",
+    ]
+    lines.extend(seg_lines)
+
+    if failed_lines:
+        lines.append("")
+        lines.append("── Failed segments ─────────────────────────────────────────────────────────")
+        lines.extend(failed_lines)
+
+    if timing_blocks:
+        lines.append("")
+        lines.append("── Patterns top-5 domains (slowest segments only, top 3 segments by patterns time) ──")
+        lines.extend(timing_blocks)
+
+    lines += [
+        "",
+        "── Totals ──────────────────────────────────────────────────────────────────",
+        f"total_prepare   : {total_prep_s:>6}s",
+        f"total_patterns  : {total_pat_s:>6}s  (avg {avg_pat}s/segment)",
+        f"total_bundle    : {total_bun_s:>6}s  (avg {avg_bun}s/segment)",
+        f"total_bi_merge  : {total_mrg_s:>6}s  (avg {avg_mrg}s/segment)",
+        f"total_work      : {total_work_s:>6}s  (sum of all segment times, not wall time)",
+        f"wall_time       : {total_elapsed_s:>6}s  ({total_min:.1f} min)",
+        f"parallelism_eff : {parallelism_eff:.2f}×   (total_work / wall_time)",
+        "",
+    ]
+
+    segments_root.mkdir(parents=True, exist_ok=True)
+    tmp_path.write_text("\n".join(lines), encoding="utf-8")
+    tmp_path.replace(out_path)
+    return out_path
+
+
 # ── Subprocess helpers ────────────────────────────────────────────────────────
 
 def run_step(cmd: List[str]) -> subprocess.CompletedProcess:
@@ -596,8 +724,8 @@ def _run_one_segment(
     counters: Dict[str, object],
     counters_lock: threading.Lock,
     worker_id: int,
-) -> str:
-    """Process one segment. Returns segment_id."""
+) -> Dict:
+    """Process one segment. Returns result dict."""
     sid = reg_row.get("segment_id", "").strip()
     output_folder = reg_row.get("output_folder", "").strip()
     out_root = segments_root / output_folder
@@ -623,6 +751,7 @@ def _run_one_segment(
     step_failed: Optional[str] = None
     failure_notes: str = ""
     notes_parts: List[str] = []
+    patterns_timing_lines: List[str] = []
     t_start = time.monotonic()
     t_prepare = 0
     t_patterns = 0
@@ -809,7 +938,20 @@ def _run_one_segment(
         flush=True,
     )
 
-    return sid
+    return {
+        "segment_id": sid,
+        "status": "complete" if step_failed is None else "failed",
+        "files": file_count,
+        "level": level,
+        "prepare_s": t_prepare,
+        "patterns_s": t_patterns,
+        "bundle_s": t_bundle if t_bundle is not None else 0,
+        "bi_merge_s": t_merge if t_merge is not None else 0,
+        "total_s": elapsed,
+        "worker_id": worker_id,
+        "patterns_top5": patterns_timing_lines[:5],
+        "failure_note": failure_notes if step_failed else "",
+    }
 
 
 def run_orchestrator(args: argparse.Namespace) -> int:
@@ -905,6 +1047,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         return 0
 
     # ── live run ─────────────────────────────────────────────────────────────
+    run_start_utc = utc_now_iso()
     run_t_start = time.monotonic()
 
     # Build segment_plans for preshard (respects --segment filter)
@@ -970,6 +1113,9 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         "failed_ids": [],
     }
 
+    segment_results: List[Dict] = []
+    segment_results_lock = threading.Lock()
+
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = {
             executor.submit(
@@ -985,14 +1131,32 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         }
         for future in as_completed(futures):
             try:
-                future.result()
+                result = future.result()
+                with segment_results_lock:
+                    segment_results.append(result)
             except Exception as exc:
                 sid = futures[future]
                 print(f"[orchestrator] ✗ segment={sid} unhandled exception: {exc}", flush=True)
                 with counters_lock:
                     counters["failed"] += 1
                     counters["failed_ids"].append(sid)
+                with segment_results_lock:
+                    segment_results.append({
+                        "segment_id": sid,
+                        "status": "failed",
+                        "files": 0,
+                        "level": 0,
+                        "prepare_s": 0,
+                        "patterns_s": 0,
+                        "bundle_s": 0,
+                        "bi_merge_s": 0,
+                        "total_s": 0,
+                        "worker_id": 0,
+                        "patterns_top5": [],
+                        "failure_note": str(exc),
+                    })
 
+    run_end_utc = utc_now_iso()
     n_complete = counters["complete"]
     n_failed = counters["failed"]
     failed_ids = counters["failed_ids"]
@@ -1023,6 +1187,20 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         f"[orchestrator] timing_summary segments_run={segments_run}"
         f" total_elapsed={total_elapsed}s avg_per_segment={avg_per_segment}s"
     )
+
+    if segment_results:
+        try:
+            summary_path = _write_run_summary(
+                segments_root,
+                run_start_utc,
+                run_end_utc,
+                total_elapsed,
+                segment_results,
+                workers=args.workers,
+            )
+            print(f"[orchestrator] run_summary written to {summary_path}", flush=True)
+        except Exception as _sum_exc:
+            print(f"[WARN orchestrator] run_summary write failed: {_sum_exc}", flush=True)
 
     return 1 if n_failed > 0 else 0
 
