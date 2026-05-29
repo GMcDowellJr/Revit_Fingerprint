@@ -25,7 +25,7 @@ if ($Run -eq "") {
     Write-Host "Usage:"
     Write-Host "  .\corpus_update_runbook.ps1 -Run A    # flatten + apply + placeholders"
     Write-Host "  .\corpus_update_runbook.ps1 -Run B    # authority + patterns + synthesis + patch"
-    Write-Host "  .\corpus_update_runbook.ps1 -Run C    # segments (use compare_cross_segment.py for cross-segment comparison)"
+    Write-Host "  .\corpus_update_runbook.ps1 -Run C    # segments + all/used bundle analysis (use compare_cross_segment.py for cross-segment comparison)"
     Write-Host ""
     Write-Host "MANDATORY PAUSE between Run A and Run B:"
     Write-Host "  Edit $RECORDS\file_metadata.csv"
@@ -107,7 +107,12 @@ if ($Run -eq "B") {
 }
 
 if ($Run -eq "C") {
-    Write-Host "=== RUN C: Segments ===" -ForegroundColor Green
+    Write-Host "=== RUN C: Segments + all/used bundle analysis ===" -ForegroundColor Green
+    Write-Host "Run C contract:" -ForegroundColor Cyan
+    Write-Host "  All view  = full configured vocabulary for each segment." -ForegroundColor Cyan
+    Write-Host "  Used view = project vocabulary excluding conclusively purgeable records." -ForegroundColor Cyan
+    Write-Host "  Template, Generic, and most Container roles are provided-vocabulary references;" -ForegroundColor Cyan
+    Write-Host "  purge/used interpretation is meaningful primarily for Project targets." -ForegroundColor Cyan
 
     Write-Host "--- C1: segment manifest ---" -ForegroundColor Cyan
     python tools\build_segment_manifest.py `
@@ -115,7 +120,10 @@ if ($Run -eq "C") {
         --out-dir $RECORDS `
         --enable-parent-bundle-runs
 
-    Write-Host "--- C2: segment orchestrator ---" -ForegroundColor Cyan
+    # The orchestrator invokes run_bundle_analysis.py with --purge-view both,
+    # producing results/bundle_analysis/all/... and results/bundle_analysis/used/...
+    # for downstream governance comparisons.
+    Write-Host "--- C2: segment orchestrator (produces all-view and used-view bundle analysis) ---" -ForegroundColor Cyan
     python tools/run_segment_orchestrator.py `
         --manifest-file "$RECORDS\segment_manifest.csv" `
         --registry-file "$RECORDS\run_registry.csv" `
@@ -134,6 +142,7 @@ if ($Run -eq "C") {
     Write-Host "=== RUN C COMPLETE ===" -ForegroundColor Green
     Write-Host "Refresh Power BI: open Fingerprint_Segmented_Bundles.pbix and hit Refresh" -ForegroundColor Green
     Write-Host "Cross-segment comparison: run compare_cross_segment.py separately" -ForegroundColor Cyan
+    Write-Host "Reminder: used/purge signals are active-delivery signals primarily for Project targets; do not label Template or Generic stock content as unused bloat." -ForegroundColor Cyan
 }
 
 # NOTES
@@ -142,6 +151,10 @@ if ($Run -eq "C") {
 #   B3 (synthesis) - skips cached join_hashes, only new patterns cost tokens
 #   B4/C3 (patch)  - skips synopsis/modal/curator/llm sources
 #   C2 (segments)  - --force re-runs all; use --segment <id> for one segment
+#                    emits both all-view (full configured vocabulary) and used-view
+#                    (excluding conclusively purgeable records) bundle analysis.
+#                    Used/purge interpretation is meaningful primarily for Project
+#                    targets, not Template/Generic standards stock.
 #
 # After major synthesis additions (new prompt modules or --force-refresh):
 #   Replace B4 with full patterns re-emit:

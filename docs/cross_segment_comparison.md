@@ -13,11 +13,21 @@
 | Are sibling segments (same role, same parent) converging over time? | Sibling Jaccard (Mode B) |
 | Do peer level-2 segments from the same level-1 parent share governance patterns? | Parent-sibling Jaccard (Mode C) |
 | How consistent are files within the same project? | Within-project Jaccard (Mode D) |
+| Is Generic / Generic-Host stock flowing into downstream standards and projects? | Generic→Template / Generic→Container / Generic→Project (Mode E) |
 | Is the template driving pattern adoption across the governance chain? | Full governance chain (Mode E) |
 
 **attribution_gap**: The fraction of project-bundle join_hashes that do *not* appear in the reference template union. High values indicate locally invented (non-governed) patterns.
 
 **phantom_governance**: A template-to-project containment_b_in_a near 1.0 but containment_a_in_b near 0.0 signals the template has patterns the projects never use — governance rules that exist on paper but not in practice.
+
+### All-view vs used-view governance semantics
+
+The workflow separates the provision chain from the usage chain:
+
+* Provision chain: `Generic / Generic-Host → Template → Container → Project all`.
+* Usage chain: `Project all → Project used`.
+
+All-view is the full configured vocabulary for a segment. Used-view is the vocabulary after excluding conclusively purgeable records. Used/non-purgeable is meaningful primarily for Project targets where it represents active delivery practice. Generic, Template, and most Container roles are provided-vocabulary references; their used-view values, when present, are annotations and must not be used to call standards stock “unused bloat.”
 
 ---
 
@@ -25,9 +35,12 @@
 
 | comparison_type | Direction | Side A | Side B | Primary metric | Governance question |
 |---|---|---|---|---|---|
-| `template_to_project` | Directed | Template segment | Project segment | `containment_b_in_a` | What fraction of template patterns appear in each project bundle? |
-| `template_to_container` | Directed | Template segment | Container segment | `containment_b_in_a` | Does the container inherit template patterns? |
-| `container_to_project` | Directed | Container segment | Project segment | `containment_b_in_a` | Does the project use the container's patterns? |
+| `generic_to_template` | Directed | Generic / Generic-Host segment | Template segment | all-view `provided_to_configured_containment` | Which Generic stock patterns are configured in templates? |
+| `generic_to_container` | Directed | Generic / Generic-Host segment | Container segment | all-view `provided_to_configured_containment` | Which Generic stock patterns are configured in containers? |
+| `generic_to_project` | Directed | Generic / Generic-Host segment | Project segment | `provided_to_configured_containment`; project `provided_to_used_containment` | Which Generic stock patterns reach project configuration and active project use? |
+| `template_to_project` | Directed | Template segment | Project segment | `provided_to_configured_containment`; project `provided_to_used_containment` | What fraction of template patterns appear in project all-view and used-view vocabularies? |
+| `template_to_container` | Directed | Template segment | Container segment | all-view `provided_to_configured_containment` | Does the container inherit template patterns? |
+| `container_to_project` | Directed | Container segment | Project segment | `provided_to_configured_containment`; project `provided_to_used_containment` | Does the project configure and actively use the container's patterns? |
 | `parent_sibling_roles` | Directed | Template-role level-2 | Project-role level-2 | `containment_b_in_a` | Template efficacy at peer level within the hierarchy |
 | `sibling_templates` | Symmetric | Template segment | Template segment | `jaccard_mean` | Are template siblings converging? |
 | `sibling_projects` | Symmetric | Project segment | Project segment | `jaccard_mean` | Are project siblings consistent? |
@@ -138,7 +151,7 @@ One row per (segment_id_a, segment_id_b, domain, comparison_type).
 | `n_pairs` | Number of unit pairs that produced Jaccard values, or number of target units for directed |
 | `executed_utc` | ISO-8601 UTC timestamp of the comparison run |
 
-Columns that do not apply to a comparison direction are emitted as blank strings. For directed pairs: `jaccard_*` columns are blank. For symmetric pairs: `containment_*` columns are blank.
+Columns that do not apply to a comparison direction are emitted as blank strings. For directed pairs: `jaccard_*` columns are blank. For symmetric pairs: `containment_*` columns are blank. Semantic columns (`reference_usage_interpretable`, `target_usage_interpretable`, `recommended_primary_view`, `comparison_role_semantics`) clarify when used-view scores are active-practice signals versus annotations.
 
 ### cross_segment_file_pairs.csv
 
@@ -156,6 +169,16 @@ Written only for (segment_a, segment_b, domain) triples where `n_pairs ≤ 50`.
 | `jaccard` | Pairwise Jaccard score |
 | `containment_a_in_b` | Fraction of A's patterns in B |
 | `containment_b_in_a` | Fraction of B's patterns in A |
+
+### cross_segment_governance_states.csv
+
+Written for directed governance comparison types (`generic_to_template`, `generic_to_container`, `generic_to_project`, `template_to_project`, `template_to_container`, `container_to_project`). One row is emitted for each join_hash in `reference_all ∪ target_all`, so inherited-but-unused (`provided_but_passive`) and upstream-missing (`provided_but_missing`) states are visible and not limited to legacy target deltas. Bundle membership is target-side annotation (`is_bundle_member_target_all`, `is_bundle_member_target_used`) and Generic references do not need bundle output to participate as upstream vocabulary.
+
+State values for Project targets include `provided_and_used`, `provided_but_passive`, `provided_but_missing`, `local_active`, `local_passive`, and `local_unbundled`. For Template, Generic, and most Container targets, `target_usage_interpretable=false`, `recommended_primary_view=all`, and configured inventory uses non-bloat labels such as `provided_configured` / `local_configured`.
+
+### cross_segment_governance_state_summary.csv
+
+One row per directed governance comparison/domain with counts and unambiguous shares for reporting: `provided_and_used_count`, `provided_but_passive_count`, `provided_but_missing_count`, `local_active_count`, `local_passive_count`, `local_unbundled_count`, plus directed metrics such as `provided_to_configured_containment`, `provided_to_used_containment`, `provided_passive_share`, `provided_missing_share`, and `local_active_share`. Provided-state percentages use `reference_all` as denominator; local active share uses `target_used` when available; local passive/unbundled shares use `target_all`.
 
 ### cross_segment_delta.csv
 
@@ -210,7 +233,7 @@ python tools/compare_cross_segment.py \
 | `--sibling-segments` | Mode B: same parent, same governance_role. All pairwise combinations. |
 | `--parent-siblings` | Mode C: level-2 Template-vs-Project under the same level-1 parent. |
 | `--within-project` | Mode D: per-segment file pairs grouped by `project_label`. |
-| `--governance-chain` | Mode E: directed Template→Project, Template→Container, Container→Project, scoped by `client_label`. |
+| `--governance-chain` | Mode E: directed Generic/Generic-Host→Template/Container/Project by `unit_system` (and populated discipline), plus Template→Project/Container and Container→Project scoped by `client_label`. |
 | `--domain DOMAIN` | Restrict all comparisons to a single domain name. |
 | `--segment-a SEGMENT_ID` | Restrict the left side of all pairs to this segment. |
 | `--segment-b SEGMENT_ID` | Restrict the right side of all pairs to this segment. |
