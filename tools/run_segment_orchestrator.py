@@ -893,7 +893,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         _do_preshard = False
         if args.no_preshard:
             print("[orchestrator] preshard skipped (--no-preshard)", flush=True)
-        elif args.force_preshard:
+        elif args.force_preshard or args.force:
             _do_preshard = True
             preshard_marker.unlink(missing_ok=True)
         elif preshard_marker.is_file():
