@@ -12,7 +12,9 @@ from compare_cross_segment import (  # noqa: E402
     _recommended_primary_view,
     _usage_interpretable_for_role,
     build_pair_domain_work_items,
+    discover_domains_for_segment,
     discover_governance_chain,
+    load_file_join_hashes,
     main as compare_main,
     sort_pair_detail_rows,
     sort_summary_rows,
@@ -107,6 +109,98 @@ def _write_segment(seg_root: Path, folder: str, domain: str, patterns, all_rows,
         base / "bundle_analysis" / "all" / domain / "bundle_membership.csv",
         [{"pattern_id": pid} for pid in bundle_all],
     )
+
+
+def _write_reference_analysis_segment(
+    seg_root: Path, folder: str, domain: str, rows, export_run_ids=None
+):
+    base = seg_root / folder
+    if export_run_ids is not None:
+        base.mkdir(parents=True, exist_ok=True)
+        (base / "export_run_ids.txt").write_text(
+            "\n".join(export_run_ids) + "\n", encoding="utf-8"
+        )
+    _write_csv(
+        base / "results" / "analysis" / "domain_patterns.csv",
+        [
+            {
+                "domain": row.get("domain", domain),
+                "pattern_id": row["pattern_id"],
+                "source_cluster_id": f"src|{row['join_hash']}",
+                "pattern_label_human": row.get("label", row["pattern_id"]),
+                "pattern_label": row.get("label", row["pattern_id"]),
+                **(
+                    {"export_run_id": row["export_run_id"]}
+                    if "export_run_id" in row
+                    else {}
+                ),
+            }
+            for row in rows
+        ],
+    )
+
+
+def test_reference_analysis_segment_discovers_domains_without_bundle_outputs(tmp_path):
+    segments_root = tmp_path / "segments"
+    registry = {"generic": {"output_folder": "generic"}}
+    _write_reference_analysis_segment(
+        segments_root,
+        "generic",
+        "line_patterns",
+        [{"pattern_id": "g1", "join_hash": "provided_a"}],
+        export_run_ids=["generic_file"],
+    )
+
+    assert discover_domains_for_segment(segments_root, registry, "generic") == {
+        "line_patterns"
+    }
+
+
+def test_reference_analysis_segment_loads_all_view_from_domain_patterns(tmp_path):
+    segments_root = tmp_path / "segments"
+    registry = {"generic": {"output_folder": "generic"}}
+    _write_reference_analysis_segment(
+        segments_root,
+        "generic",
+        "line_patterns",
+        [
+            {"pattern_id": "g1", "join_hash": "provided_a"},
+            {"pattern_id": "g2", "join_hash": "provided_b"},
+        ],
+        export_run_ids=["generic_file"],
+    )
+
+    assert load_file_join_hashes(
+        segments_root, registry, "generic", "line_patterns", "all"
+    ) == {"generic_file": {"provided_a", "provided_b"}}
+    assert (
+        load_file_join_hashes(
+            segments_root, registry, "generic", "line_patterns", "used"
+        )
+        == {}
+    )
+
+
+def test_reference_analysis_segment_groups_fallback_by_export_run_id_column(tmp_path):
+    segments_root = tmp_path / "segments"
+    registry = {"generic": {"output_folder": "generic"}}
+    _write_reference_analysis_segment(
+        segments_root,
+        "generic",
+        "line_patterns",
+        [
+            {"pattern_id": "g1", "join_hash": "provided_a", "export_run_id": "file_a"},
+            {"pattern_id": "g2", "join_hash": "provided_b", "export_run_id": "file_b"},
+        ],
+        export_run_ids=["file_a", "file_b"],
+    )
+
+    assert load_file_join_hashes(
+        segments_root, registry, "generic", "line_patterns", "all"
+    ) == {
+        "file_a": {"provided_a"},
+        "file_b": {"provided_b"},
+    }
 
 
 def test_build_governance_state_rows_include_inherited_unused_and_local_active(tmp_path):
