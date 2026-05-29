@@ -107,7 +107,7 @@ def _write_run_summary(
     n_complete = sum(1 for r in segment_results if r.get("status") == "complete")
     n_failed = sum(1 for r in segment_results if r.get("status") == "failed")
     n_skipped = sum(1 for r in segment_results if r.get("status") == "skipped")
-    segments_run = len(segment_results)
+    segments_run = n_complete + n_failed
 
     total_min = total_elapsed_s / 60.0
 
