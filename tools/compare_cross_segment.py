@@ -5,10 +5,12 @@ cross-segment identity unit.
 
 Single measurement path
 -----------------------
-All comparisons load per-file join_hash inventories from membership_matrix.csv
+Comparisons prefer per-file join_hash inventories from membership_matrix.csv
 and resolve join_hash via domain_patterns.csv (source_cluster_id.split('|')[-1]).
-There is no bundle-mode / file-mode branch. All set operations (Jaccard,
-containment) operate on the full join_hash inventories from membership_matrix.csv.
+Generic/reference segments that only provide analysis outputs can fall back to
+domain_patterns.csv for all-view provision inventories. There is no bundle-mode /
+file-mode branch. All set operations (Jaccard, containment) operate on the full
+join_hash inventories loaded for the selected view.
 
 Bundle membership as post-hoc annotation
 -----------------------------------------
@@ -53,7 +55,9 @@ Reference segment participation
 Reference segments participate in generic_to_template, generic_to_container,
 generic_to_project, template_to_project, template_to_container, and
 container_to_project comparisons using their file inventories from
-membership_matrix.csv. They will have has_bundles = "false" and
+membership_matrix.csv when present. Generic/reference provided-vocabulary sources
+may not emit bundle_analysis membership matrices; for all-view comparisons they
+fall back to domain_patterns.csv. They will have has_bundles = "false" and
 data_sufficient = "false" for most domains — this is expected and correct.
 
 Governance all/used semantics
@@ -462,6 +466,21 @@ def domain_patterns_path(seg_out: Path) -> Path:
     return seg_out / "results" / "analysis" / "domain_patterns.csv"
 
 
+def pattern_presence_file_path(seg_out: Path) -> Path:
+    return seg_out / "results" / "analysis" / "pattern_presence_file.csv"
+
+
+def _load_export_run_ids_for_segment(seg_out: Path) -> List[str]:
+    ids_path = seg_out / "export_run_ids.txt"
+    if not ids_path.exists():
+        return []
+    return [
+        line.strip()
+        for line in ids_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Domain discovery
 # ---------------------------------------------------------------------------
@@ -474,11 +493,40 @@ def discover_domains_for_segment(
     seg_out = segment_output_dir(segments_root, registry, segment_id)
     if seg_out is None:
         return set()
-    # Always discover from the all view — it is the domain authority source.
+    # Always prefer bundle all-view discovery — it remains the domain authority
+    # source for bundle-producing segments. Generic/reference segments, however,
+    # are provided-vocabulary sources and may only have analysis CSVs. In that
+    # case, discover their domains from analysis outputs so they can participate
+    # in containment/provision comparisons.
     ba_root = seg_out / "results" / "bundle_analysis" / "all"
-    if not ba_root.exists():
-        return set()
-    return {p.name for p in ba_root.iterdir() if p.is_dir()}
+    domains: Set[str] = set()
+    if ba_root.exists():
+        domains = {
+            p.name.strip()
+            for p in ba_root.iterdir()
+            if p.is_dir() and p.name.strip()
+        }
+    if domains:
+        return domains
+
+    dp_path = domain_patterns_path(seg_out)
+    if dp_path.exists():
+        domains = {
+            row.get("domain", "").strip()
+            for row in read_csv_rows(dp_path)
+            if row.get("domain", "").strip()
+        }
+    if domains:
+        return domains
+
+    presence_path = pattern_presence_file_path(seg_out)
+    if presence_path.exists():
+        domains = {
+            row.get("domain", "").strip()
+            for row in read_csv_rows(presence_path)
+            if row.get("domain", "").strip()
+        }
+    return domains
 
 
 # ---------------------------------------------------------------------------
@@ -612,20 +660,13 @@ def get_role_jh_set(
         rt = registry.get(sid, {}).get("run_type", "").strip().lower()
         if rt in ("skip", "registration"):
             continue
-        seg_out = segment_output_dir(segments_root, registry, sid)
-        if seg_out is None:
-            continue
-        # Use all view — scores are view-invariant
-        mm_path = bundle_analysis_dir(seg_out, domain, "all") / "membership_matrix.csv"
-        if not mm_path.exists():
-            continue
-        jh_map = resolve_join_hashes(segments_root, registry, sid, domain)
-        for row in read_csv_rows(mm_path):
-            pid = row.get("pattern_id", "").strip()
-            if pid:
-                jh = jh_map.get(pid)
-                if jh:
-                    result.add(jh)
+        # Use all view — scores are view-invariant. load_segment_join_hash_union
+        # preserves membership_matrix behavior for bundle segments and also allows
+        # Generic/reference provided-vocabulary segments to contribute their
+        # domain_patterns.csv fallback inventory when bundle outputs are absent.
+        result |= load_segment_join_hash_union(
+            segments_root, registry, sid, domain, "all"
+        )
 
     _role_jh_cache[cache_key] = result
     return result
@@ -642,25 +683,89 @@ def load_file_join_hashes(
     domain: str,
     purge_view: str = "all",
 ) -> Dict[str, Set[str]]:
-    """Return {export_run_id: set_of_join_hashes} from membership_matrix.csv."""
+    """Return {export_run_id: set_of_join_hashes} for a segment/domain/view."""
     seg_out = segment_output_dir(segments_root, registry, segment_id)
     if seg_out is None:
         return {}
 
     mm_path = bundle_analysis_dir(seg_out, domain, purge_view) / "membership_matrix.csv"
-    if not mm_path.exists():
+    if mm_path.exists():
+        jh_map = resolve_join_hashes(segments_root, registry, segment_id, domain)
+        result: Dict[str, Set[str]] = defaultdict(set)
+        for row in read_csv_rows(mm_path):
+            eid = row.get("export_run_id", "").strip()
+            pid = row.get("pattern_id", "").strip()
+            if not eid or not pid:
+                continue
+            jh = jh_map.get(pid)
+            if jh:
+                result[eid].add(jh)
+        return dict(result)
+
+    # Generic/reference segments are provided-vocabulary sources. They may not
+    # produce bundle_analysis or membership matrices, but their analysis
+    # inventory is valid for all-view containment/provision comparisons. File
+    # membership comes from pattern_presence_file.csv when available. Used-view
+    # is intentionally not inferred because analysis rows do not distinguish
+    # active project use from configured/provided vocabulary.
+    if purge_view != "all":
         return {}
 
-    jh_map = resolve_join_hashes(segments_root, registry, segment_id, domain)
-    result: Dict[str, Set[str]] = defaultdict(set)
-    for row in read_csv_rows(mm_path):
-        eid = row.get("export_run_id", "").strip()
-        pid = row.get("pattern_id", "").strip()
-        if not eid or not pid:
+    dp_path = domain_patterns_path(seg_out)
+    if not dp_path.exists():
+        return {}
+
+    pattern_join_hashes: Dict[str, str] = {}
+    pattern_export_run_ids: Dict[str, str] = {}
+    for row in read_csv_rows(dp_path):
+        if row.get("domain", "").strip() != domain:
             continue
-        jh = jh_map.get(pid)
-        if jh:
-            result[eid].add(jh)
+        pid = row.get("pattern_id", "").strip()
+        scid = row.get("source_cluster_id", "").strip()
+        if not pid or not scid:
+            continue
+        join_hash = scid.split("|")[-1]
+        if join_hash:
+            pattern_join_hashes[pid] = join_hash
+            eid = row.get("export_run_id", "").strip()
+            if eid:
+                pattern_export_run_ids[pid] = eid
+
+    if not pattern_join_hashes:
+        return {}
+
+    result: Dict[str, Set[str]] = defaultdict(set)
+
+    # Standard v2.1 analysis writes file membership to pattern_presence_file.csv,
+    # not domain_patterns.csv. Use it when present so multi-file Generic/reference
+    # inventories preserve per-export containment inputs instead of collapsing or
+    # dropping rows that have no export_run_id in domain_patterns.csv.
+    presence_path = pattern_presence_file_path(seg_out)
+    if presence_path.exists():
+        for row in read_csv_rows(presence_path):
+            if row.get("domain", "").strip() != domain:
+                continue
+            eid = row.get("export_run_id", "").strip()
+            pid = row.get("pattern_id", "").strip()
+            if not eid or not pid:
+                continue
+            join_hash = pattern_join_hashes.get(pid)
+            if join_hash:
+                result[eid].add(join_hash)
+        if result:
+            return dict(result)
+
+    for pid, join_hash in pattern_join_hashes.items():
+        eid = pattern_export_run_ids.get(pid, "")
+        if eid:
+            result[eid].add(join_hash)
+    if result:
+        return dict(result)
+
+    export_run_ids = _load_export_run_ids_for_segment(seg_out)
+    single_export_run_id = export_run_ids[0] if len(export_run_ids) == 1 else ""
+    if single_export_run_id:
+        result[single_export_run_id] = set(pattern_join_hashes.values())
     return dict(result)
 
 
