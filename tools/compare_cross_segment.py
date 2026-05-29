@@ -25,12 +25,23 @@ annotated onto n_shared using two views and three buckets each:
 The used view excludes patterns that are conclusively purgeable; the delta
 between all and used views quantifies passive inheritance.
 
+All-view vs used-view scores
+-----------------------------
+Jaccard and containment scores are computed independently from both the all-view
+and used-view membership matrices. All-view scores (all_jaccard_*, all_containment_*)
+reflect the full configured pattern vocabulary. Used-view scores (used_jaccard_*,
+used_containment_*) reflect only patterns present in active view/sheet assignments.
+The delta between all-view and used-view scores quantifies passive inheritance —
+patterns configured but never rendered. used_n_shared_join_hash is the count of
+join_hashes that appear in both segments' used-view inventories.
+
 N-1 pooled comparison (cross_segment_pooled.csv)
 -------------------------------------------------
 Each segment is compared against the union of all sibling segments sharing the
 same (parent_segment_id, governance_role, unit_system). This is the primary
 signal for small segments where pairwise Jaccard is dominated by size asymmetry.
-Containment in both directions is reported; no Jaccard is computed on this file.
+Containment in both directions is reported for both all and used views; no
+Jaccard is computed on this file.
 
 data_sufficient flag
 --------------------
@@ -114,9 +125,13 @@ SUMMARY_FIELDS: List[str] = [
     "domain",
     "n_patterns_a", "n_patterns_b", "n_shared_join_hash",
     "n_unique_patterns_a", "n_unique_patterns_b",
-    "containment_a_in_b_mean", "containment_a_in_b_min",
-    "containment_b_in_a_mean", "containment_b_in_a_min",
-    "jaccard_mean", "jaccard_p10", "jaccard_p90",
+    "all_containment_a_in_b_mean", "all_containment_a_in_b_min",
+    "all_containment_b_in_a_mean", "all_containment_b_in_a_min",
+    "all_jaccard_mean", "all_jaccard_p10", "all_jaccard_p90",
+    "used_jaccard_mean", "used_jaccard_p10", "used_jaccard_p90",
+    "used_containment_a_in_b_mean", "used_containment_a_in_b_min",
+    "used_containment_b_in_a_mean", "used_containment_b_in_a_min",
+    "used_n_shared_join_hash",
     "all_has_bundles_a", "all_has_bundles_b",
     "all_n_shared_bundle_both", "all_n_shared_bundle_a_only", "all_n_shared_bundle_b_only",
     "used_has_bundles_a", "used_has_bundles_b",
@@ -133,7 +148,8 @@ PAIRS_FIELDS: List[str] = [
     "export_run_id_a", "export_run_id_b",
     "project_label_a", "project_label_b",
     "n_patterns_a", "n_patterns_b", "n_shared",
-    "jaccard", "containment_a_in_b", "containment_b_in_a",
+    "all_jaccard", "all_containment_a_in_b", "all_containment_b_in_a",
+    "used_n_shared", "used_jaccard", "used_containment_a_in_b", "used_containment_b_in_a",
     "all_n_shared_bundle_both", "all_n_shared_bundle_a_only", "all_n_shared_bundle_b_only",
     "used_n_shared_bundle_both", "used_n_shared_bundle_a_only", "used_n_shared_bundle_b_only",
 ]
@@ -149,6 +165,10 @@ DELTA_FIELDS: List[str] = [
     "pct_files_in_target",
     "in_any_container",
     "in_any_template",
+    "used_pct_files_in_target",
+    "is_bundle_member_all",
+    "is_bundle_member_used",
+    "delta_class",
     "executed_utc",
 ]
 
@@ -160,7 +180,8 @@ POOLED_FIELDS: List[str] = [
     "domain",
     "n_files_focal", "n_files_pool",
     "n_unique_patterns_focal", "n_unique_patterns_pool", "n_shared_join_hash",
-    "containment_focal_in_pool", "containment_pool_in_focal",
+    "all_containment_focal_in_pool", "all_containment_pool_in_focal",
+    "used_containment_focal_in_pool", "used_containment_pool_in_focal",
     "all_has_bundles_focal", "all_has_bundles_pool",
     "all_n_shared_bundle_both", "all_n_shared_bundle_focal_only", "all_n_shared_bundle_pool_only",
     "used_has_bundles_focal", "used_has_bundles_pool",
@@ -175,6 +196,42 @@ DELTA_DIRECTED_TYPES = {
     "template_to_container",
     "container_to_project",
 }
+
+
+# ---------------------------------------------------------------------------
+# Delta pattern classification
+# ---------------------------------------------------------------------------
+
+def _classify_delta(
+    in_any_container: bool,
+    in_any_template: bool,
+    is_bundle_member_all: bool,
+    is_bundle_member_used: bool,
+) -> str:
+    """Classify a delta pattern by origin and active-use status.
+
+    Classes:
+      passive_inherited   — pattern came from governance (container/template) but is
+                            not actively used in the target; pure configuration bloat
+      active_inherited    — came from governance AND is actively used in the target;
+                            target intentionally extends the governance vocabulary
+      locally_custom_active  — not from governance context, actively used; target has
+                                its own patterns it is rendering
+      locally_custom_passive — not from governance, in all-view bundle but not used;
+                                locally defined orphan
+      locally_custom_unbundled — not from governance, not in any bundle analysis;
+                                  raw local definition with no bundle data
+    """
+    from_governance = in_any_container or in_any_template
+    if from_governance:
+        if is_bundle_member_used:
+            return "active_inherited"
+        return "passive_inherited"
+    if is_bundle_member_used:
+        return "locally_custom_active"
+    if is_bundle_member_all:
+        return "locally_custom_passive"
+    return "locally_custom_unbundled"
 
 
 # ---------------------------------------------------------------------------
@@ -407,14 +464,14 @@ def load_file_join_hashes(
     registry: Dict[str, Dict[str, str]],
     segment_id: str,
     domain: str,
+    purge_view: str = "all",
 ) -> Dict[str, Set[str]]:
-    """Return {export_run_id: set_of_join_hashes} from membership_matrix.csv (all view)."""
+    """Return {export_run_id: set_of_join_hashes} from membership_matrix.csv."""
     seg_out = segment_output_dir(segments_root, registry, segment_id)
     if seg_out is None:
         return {}
 
-    # Scores are view-invariant — always load from the all view
-    mm_path = bundle_analysis_dir(seg_out, domain, "all") / "membership_matrix.csv"
+    mm_path = bundle_analysis_dir(seg_out, domain, purge_view) / "membership_matrix.csv"
     if not mm_path.exists():
         return {}
 
@@ -543,10 +600,10 @@ def compare_directed_file(
 
     return {
         "n_shared_join_hash": str(len(ref_union & all_b)),
-        "containment_a_in_b_mean": _mean(a_in_b),
-        "containment_a_in_b_min": _min(a_in_b),
-        "containment_b_in_a_mean": _mean(b_in_a),
-        "containment_b_in_a_min": _min(b_in_a),
+        "all_containment_a_in_b_mean": _mean(a_in_b),
+        "all_containment_a_in_b_min": _min(a_in_b),
+        "all_containment_b_in_a_mean": _mean(b_in_a),
+        "all_containment_b_in_a_min": _min(b_in_a),
         "n_files_a": str(len(ref_files)),
         "n_files_b": str(len(tgt_files)),
         "n_pairs": str(len(tgt_files)),
@@ -587,9 +644,9 @@ def compare_symmetric_file(
                 "n_patterns_a": str(len(jhs_a)),
                 "n_patterns_b": str(len(jhs_b)),
                 "n_shared": str(len(jhs_a & jhs_b)),
-                "jaccard": _fmt(j),
-                "containment_a_in_b": _fmt(c_ab),
-                "containment_b_in_a": _fmt(c_ba),
+                "all_jaccard": _fmt(j),
+                "all_containment_a_in_b": _fmt(c_ab),
+                "all_containment_b_in_a": _fmt(c_ba),
             })
 
     all_a: Set[str] = set()
@@ -601,13 +658,13 @@ def compare_symmetric_file(
 
     summary = {
         "n_shared_join_hash": str(len(all_a & all_b)),
-        "containment_a_in_b_mean": _mean(c_ab_list),
-        "containment_a_in_b_min": _min(c_ab_list),
-        "containment_b_in_a_mean": _mean(c_ba_list),
-        "containment_b_in_a_min": _min(c_ba_list),
-        "jaccard_mean": _mean(jaccards),
-        "jaccard_p10": _fmt(_pct(jaccards, 10)) if jaccards else "",
-        "jaccard_p90": _fmt(_pct(jaccards, 90)) if jaccards else "",
+        "all_containment_a_in_b_mean": _mean(c_ab_list),
+        "all_containment_a_in_b_min": _min(c_ab_list),
+        "all_containment_b_in_a_mean": _mean(c_ba_list),
+        "all_containment_b_in_a_min": _min(c_ba_list),
+        "all_jaccard_mean": _mean(jaccards),
+        "all_jaccard_p10": _fmt(_pct(jaccards, 10)) if jaccards else "",
+        "all_jaccard_p90": _fmt(_pct(jaccards, 90)) if jaccards else "",
         "n_files_a": str(len(files_a)),
         "n_files_b": str(len(files_b)),
         "n_pairs": str(len(jaccards)),
@@ -890,11 +947,20 @@ def run_pair(
     # aggregate all intra-project pairs into ONE summary row for (segment, domain).
     if is_within_project:
         all_files = load_file_join_hashes(segments_root, registry, seg_a, domain)
+        all_files_used = load_file_join_hashes(segments_root, registry, seg_a, domain, "used")
+
         by_proj: Dict[str, Dict[str, Set[str]]] = defaultdict(dict)
         for eid, jhs in all_files.items():
             meta = file_metadata.get(eid, {})
             proj = meta.get("project_label", "").strip() or eid
             by_proj[proj][eid] = jhs
+
+        # Used-view project grouping (same labels, but used-view join_hash sets)
+        by_proj_used: Dict[str, Dict[str, Set[str]]] = defaultdict(dict)
+        for eid, jhs in all_files_used.items():
+            meta = file_metadata.get(eid, {})
+            proj = meta.get("project_label", "").strip() or eid
+            by_proj_used[proj][eid] = jhs
 
         PairRecord = Tuple[str, str, str, int, int, int, float, float, float]
         raw_pairs: List[PairRecord] = []  # (eid_a, eid_b, proj, na, nb, ns, j, c_ab, c_ba)
@@ -939,6 +1005,32 @@ def run_pair(
         n_shared_jh = sum(1 for v in jhs_file_count.values() if v > 1)
         n_files = len(participating_eids)
 
+        # Used-view intra-project pairs (indexed by (eid_a, eid_b) for join onto all-view)
+        UsedRec = Tuple[int, float, float, float]  # (n_shared, jaccard, c_ab, c_ba)
+        used_pair_index_wp: Dict[Tuple[str, str], UsedRec] = {}
+        used_jaccards_wp: List[float] = []
+        for proj, proj_files_used in by_proj_used.items():
+            if len(proj_files_used) < 2:
+                continue
+            eids_sorted_u = sorted(proj_files_used.keys())
+            for i in range(len(eids_sorted_u)):
+                for jj in range(i + 1, len(eids_sorted_u)):
+                    eu_a, eu_b = eids_sorted_u[i], eids_sorted_u[jj]
+                    ju_a = proj_files_used[eu_a]
+                    ju_b = proj_files_used[eu_b]
+                    union_u = ju_a | ju_b
+                    j_u = len(ju_a & ju_b) / len(union_u) if union_u else 0.0
+                    cu_ab = len(ju_a & ju_b) / len(ju_a) if ju_a else 0.0
+                    cu_ba = len(ju_a & ju_b) / len(ju_b) if ju_b else 0.0
+                    used_pair_index_wp[(eu_a, eu_b)] = (len(ju_a & ju_b), j_u, cu_ab, cu_ba)
+                    used_jaccards_wp.append(j_u)
+
+        # Used-view shared join_hash count (patterns seen in >1 file under used view)
+        used_jhs_file_count_wp: Dict[str, int] = _Counter(
+            jh for eid in participating_eids for jh in all_files_used.get(eid, set())
+        )
+        used_n_shared_jh_wp = sum(1 for v in used_jhs_file_count_wp.values() if v > 1)
+
         # Bundle annotation on the shared set (dual-view)
         shared_jhs_wp: Set[str] = {jh for jh, cnt in jhs_file_count.items() if cnt > 1}
         bnd_a_wp_all = load_bundle_join_hash_set(segments_root, registry, seg_a, domain, "all")
@@ -952,9 +1044,9 @@ def run_pair(
 
         metrics: Dict[str, str] = {
             "n_shared_join_hash": str(n_shared_jh),
-            "jaccard_mean": _mean(jaccards),
-            "jaccard_p10": _fmt(_pct(jaccards, 10)) if jaccards else "",
-            "jaccard_p90": _fmt(_pct(jaccards, 90)) if jaccards else "",
+            "all_jaccard_mean": _mean(jaccards),
+            "all_jaccard_p10": _fmt(_pct(jaccards, 10)) if jaccards else "",
+            "all_jaccard_p90": _fmt(_pct(jaccards, 90)) if jaccards else "",
             "n_files_a": str(n_files),
             "n_files_b": str(n_files),
             "n_pairs": str(len(raw_pairs)),
@@ -985,6 +1077,10 @@ def run_pair(
             used_n_shared_bundle_both=n_both_wp_used,
             used_n_shared_bundle_a_only=n_aonly_wp_used,
             used_n_shared_bundle_b_only=n_bonly_wp_used,
+            used_n_shared_join_hash=str(used_n_shared_jh_wp),
+            used_jaccard_mean=_mean(used_jaccards_wp),
+            used_jaccard_p10=_fmt(_pct(used_jaccards_wp, 10)) if used_jaccards_wp else "",
+            used_jaccard_p90=_fmt(_pct(used_jaccards_wp, 90)) if used_jaccards_wp else "",
             data_sufficient=data_suff,
             executed_utc=executed_utc,
         )
@@ -993,10 +1089,15 @@ def run_pair(
         c_ab_list_wp = [p[7] for p in raw_pairs]
         c_ba_list_wp = [p[8] for p in raw_pairs]
         detail_rows: List[Dict[str, str]] = []
+        used_c_ab_list_wp: List[float] = []
+        used_c_ba_list_wp: List[float] = []
         for eid_a2, eid_b2, proj, na, nb, ns, j_val, c_ab, c_ba in raw_pairs:
             shared_pair: Set[str] = all_files.get(eid_a2, set()) & all_files.get(eid_b2, set())
             pb_all, pao_all, pbo_all = annotate_bundle_overlap(shared_pair, bnd_a_wp_all, bnd_a_wp_all)
             pb_used, pao_used, pbo_used = annotate_bundle_overlap(shared_pair, bnd_a_wp_used, bnd_a_wp_used)
+            u_ns, u_j, u_cab, u_cba = used_pair_index_wp.get((eid_a2, eid_b2), (0, 0.0, 0.0, 0.0))
+            used_c_ab_list_wp.append(u_cab)
+            used_c_ba_list_wp.append(u_cba)
             detail_rows.append({
                 "comparison_run_id": crid,
                 "segment_id_a": seg_a,
@@ -1009,9 +1110,13 @@ def run_pair(
                 "n_patterns_a": str(na),
                 "n_patterns_b": str(nb),
                 "n_shared": str(ns),
-                "jaccard": _fmt(j_val),
-                "containment_a_in_b": _fmt(c_ab),
-                "containment_b_in_a": _fmt(c_ba),
+                "all_jaccard": _fmt(j_val),
+                "all_containment_a_in_b": _fmt(c_ab),
+                "all_containment_b_in_a": _fmt(c_ba),
+                "used_n_shared": str(u_ns),
+                "used_jaccard": _fmt(u_j),
+                "used_containment_a_in_b": _fmt(u_cab),
+                "used_containment_b_in_a": _fmt(u_cba),
                 "all_n_shared_bundle_both": str(pb_all),
                 "all_n_shared_bundle_a_only": str(pao_all),
                 "all_n_shared_bundle_b_only": str(pbo_all),
@@ -1021,16 +1126,22 @@ def run_pair(
             })
 
         # Patch containment into summary metrics (mean/min over all pairs)
-        summary_row["containment_a_in_b_mean"] = _mean(c_ab_list_wp)
-        summary_row["containment_a_in_b_min"] = _min(c_ab_list_wp)
-        summary_row["containment_b_in_a_mean"] = _mean(c_ba_list_wp)
-        summary_row["containment_b_in_a_min"] = _min(c_ba_list_wp)
+        summary_row["all_containment_a_in_b_mean"] = _mean(c_ab_list_wp)
+        summary_row["all_containment_a_in_b_min"] = _min(c_ab_list_wp)
+        summary_row["all_containment_b_in_a_mean"] = _mean(c_ba_list_wp)
+        summary_row["all_containment_b_in_a_min"] = _min(c_ba_list_wp)
+        summary_row["used_containment_a_in_b_mean"] = _mean(used_c_ab_list_wp)
+        summary_row["used_containment_a_in_b_min"] = _min(used_c_ab_list_wp)
+        summary_row["used_containment_b_in_a_mean"] = _mean(used_c_ba_list_wp)
+        summary_row["used_containment_b_in_a_min"] = _min(used_c_ba_list_wp)
 
         return summary_row, detail_rows
 
-    # Normal path — always file-based
+    # Normal path — file-based, both all-view and used-view
     files_a = load_file_join_hashes(segments_root, registry, seg_a, domain)
     files_b = load_file_join_hashes(segments_root, registry, seg_b, domain)
+    files_a_used = load_file_join_hashes(segments_root, registry, seg_a, domain, "used")
+    files_b_used = load_file_join_hashes(segments_root, registry, seg_b, domain, "used")
 
     all_jhs_a: Set[str] = set()
     for jhs in files_a.values():
@@ -1045,18 +1156,6 @@ def run_pair(
     if n_a < min_patterns or n_b < min_patterns:
         return None, []
 
-    # TODO (deferred — OB thought id: 8effacfc-eaf8-45e0-9fe7-7e64305ab677):
-    # Used-view Jaccard/containment scores — compute scores from used-view
-    # membership_matrix.csv to answer "are these files working similarly" vs
-    # the current all-view "are these files configured similarly". Delta between
-    # all-view and used-view scores quantifies passive inheritance. Requires:
-    # (1) load_file_join_hashes() accepting a purge_view parameter,
-    # (2) reading membership_matrix.csv from bundle_analysis/used/{domain}/,
-    # (3) new output columns: all_jaccard_mean, used_jaccard_mean,
-    #     all_containment_b_in_a, used_containment_b_in_a, etc.
-    # Scores currently computed from all-view membership matrix only.
-
-    # Compute metrics
     pair_rows: List[Dict[str, str]] = []
 
     # Load bundle sets for both views upfront
@@ -1065,10 +1164,18 @@ def run_pair(
     bnd_a_used = load_bundle_join_hash_set(segments_root, registry, seg_a, domain, "used")
     bnd_b_used = load_bundle_join_hash_set(segments_root, registry, seg_b, domain, "used")
 
+    # All-view metrics
     if is_directed:
         metrics = compare_directed_file(files_a, files_b)
+        metrics_used = compare_directed_file(files_a_used, files_b_used)
     else:
         metrics, pair_rows_raw = compare_symmetric_file(files_a, files_b)
+        metrics_used, pair_rows_used = compare_symmetric_file(files_a_used, files_b_used)
+        # Index used-view rows by (eid_a, eid_b) for join
+        used_row_index: Dict[Tuple[str, str], Dict[str, str]] = {
+            (r["export_run_id_a"], r["export_run_id_b"]): r
+            for r in pair_rows_used
+        }
         # Emit ALL pair rows — no suppression threshold
         crid_pre = make_comparison_run_id(seg_a, seg_b, executed_utc)
         for r in pair_rows_raw:
@@ -1077,6 +1184,7 @@ def run_pair(
             shared_pair = files_a.get(eid_a2, set()) & files_b.get(eid_b2, set())
             pb_all, pao_all, pbo_all = annotate_bundle_overlap(shared_pair, bnd_a_all, bnd_b_all)
             pb_used, pao_used, pbo_used = annotate_bundle_overlap(shared_pair, bnd_a_used, bnd_b_used)
+            ur = used_row_index.get((eid_a2, eid_b2), {})
             r.update({
                 "comparison_run_id": crid_pre,
                 "segment_id_a": seg_a,
@@ -1084,6 +1192,10 @@ def run_pair(
                 "domain": domain,
                 "project_label_a": file_metadata.get(eid_a2, {}).get("project_label", ""),
                 "project_label_b": file_metadata.get(eid_b2, {}).get("project_label", ""),
+                "used_n_shared": ur.get("n_shared", "0"),
+                "used_jaccard": ur.get("all_jaccard", ""),
+                "used_containment_a_in_b": ur.get("all_containment_a_in_b", ""),
+                "used_containment_b_in_a": ur.get("all_containment_b_in_a", ""),
                 "all_n_shared_bundle_both": str(pb_all),
                 "all_n_shared_bundle_a_only": str(pao_all),
                 "all_n_shared_bundle_b_only": str(pbo_all),
@@ -1095,6 +1207,15 @@ def run_pair(
 
     if not metrics:
         return None, []
+
+    # Used-view population-grain shared count
+    all_jhs_a_used: Set[str] = set()
+    for jhs in files_a_used.values():
+        all_jhs_a_used |= jhs
+    all_jhs_b_used: Set[str] = set()
+    for jhs in files_b_used.values():
+        all_jhs_b_used |= jhs
+    used_n_shared_jh = len(all_jhs_a_used & all_jhs_b_used)
 
     # Post-hoc bundle annotation on the population-grain shared set (dual-view)
     shared_jhs_norm = all_jhs_a & all_jhs_b
@@ -1128,6 +1249,14 @@ def run_pair(
         used_n_shared_bundle_both=n_both_used,
         used_n_shared_bundle_a_only=n_aonly_used,
         used_n_shared_bundle_b_only=n_bonly_used,
+        used_n_shared_join_hash=str(used_n_shared_jh),
+        used_jaccard_mean=metrics_used.get("all_jaccard_mean", ""),
+        used_jaccard_p10=metrics_used.get("all_jaccard_p10", ""),
+        used_jaccard_p90=metrics_used.get("all_jaccard_p90", ""),
+        used_containment_a_in_b_mean=metrics_used.get("all_containment_a_in_b_mean", ""),
+        used_containment_a_in_b_min=metrics_used.get("all_containment_a_in_b_min", ""),
+        used_containment_b_in_a_mean=metrics_used.get("all_containment_b_in_a_mean", ""),
+        used_containment_b_in_a_min=metrics_used.get("all_containment_b_in_a_min", ""),
         data_sufficient=data_suff,
         executed_utc=executed_utc,
     )
@@ -1160,6 +1289,14 @@ def _build_summary_row(
     used_n_shared_bundle_b_only: int,
     data_sufficient: str,
     executed_utc: str,
+    used_n_shared_join_hash: str = "",
+    used_jaccard_mean: str = "",
+    used_jaccard_p10: str = "",
+    used_jaccard_p90: str = "",
+    used_containment_a_in_b_mean: str = "",
+    used_containment_a_in_b_min: str = "",
+    used_containment_b_in_a_mean: str = "",
+    used_containment_b_in_a_min: str = "",
 ) -> Dict[str, str]:
     ma = manifest.get(seg_a, {})
     mb = manifest.get(seg_b, {})
@@ -1183,13 +1320,21 @@ def _build_summary_row(
         "n_shared_join_hash": metrics.get("n_shared_join_hash", ""),
         "n_unique_patterns_a": str(n_unique_patterns_a),
         "n_unique_patterns_b": str(n_unique_patterns_b),
-        "containment_a_in_b_mean": metrics.get("containment_a_in_b_mean", ""),
-        "containment_a_in_b_min": metrics.get("containment_a_in_b_min", ""),
-        "containment_b_in_a_mean": metrics.get("containment_b_in_a_mean", ""),
-        "containment_b_in_a_min": metrics.get("containment_b_in_a_min", ""),
-        "jaccard_mean": metrics.get("jaccard_mean", ""),
-        "jaccard_p10": metrics.get("jaccard_p10", ""),
-        "jaccard_p90": metrics.get("jaccard_p90", ""),
+        "all_containment_a_in_b_mean": metrics.get("all_containment_a_in_b_mean", ""),
+        "all_containment_a_in_b_min": metrics.get("all_containment_a_in_b_min", ""),
+        "all_containment_b_in_a_mean": metrics.get("all_containment_b_in_a_mean", ""),
+        "all_containment_b_in_a_min": metrics.get("all_containment_b_in_a_min", ""),
+        "all_jaccard_mean": metrics.get("all_jaccard_mean", ""),
+        "all_jaccard_p10": metrics.get("all_jaccard_p10", ""),
+        "all_jaccard_p90": metrics.get("all_jaccard_p90", ""),
+        "used_jaccard_mean": used_jaccard_mean,
+        "used_jaccard_p10": used_jaccard_p10,
+        "used_jaccard_p90": used_jaccard_p90,
+        "used_containment_a_in_b_mean": used_containment_a_in_b_mean,
+        "used_containment_a_in_b_min": used_containment_a_in_b_min,
+        "used_containment_b_in_a_mean": used_containment_b_in_a_mean,
+        "used_containment_b_in_a_min": used_containment_b_in_a_min,
+        "used_n_shared_join_hash": used_n_shared_join_hash,
         "all_has_bundles_a": all_has_bundles_a,
         "all_has_bundles_b": all_has_bundles_b,
         "all_n_shared_bundle_both": str(all_n_shared_bundle_both),
@@ -1290,6 +1435,31 @@ def run_pooled_comparison(
                 c_focal_in_pool = n_shared / n_focal_unique if n_focal_unique else 0.0
                 c_pool_in_focal = n_shared / n_pool_unique if n_pool_unique else 0.0
 
+                # Used-view containment
+                focal_files_used = load_file_join_hashes(
+                    segments_root, registry, focal_sid, domain, "used"
+                )
+                focal_union_used: Set[str] = set()
+                for jhs in focal_files_used.values():
+                    focal_union_used |= jhs
+                pool_files_used_keyed: Dict[Tuple[str, str], Set[str]] = {}
+                for pool_sid in pool_sids:
+                    pf_u = load_file_join_hashes(
+                        segments_root, registry, pool_sid, domain, "used"
+                    )
+                    for eid, jhs in pf_u.items():
+                        pool_files_used_keyed[(pool_sid, eid)] = jhs
+                pool_union_used: Set[str] = set()
+                for jhs in pool_files_used_keyed.values():
+                    pool_union_used |= jhs
+                shared_used = focal_union_used & pool_union_used
+                used_c_focal_in_pool = (
+                    len(shared_used) / len(focal_union_used) if focal_union_used else 0.0
+                )
+                used_c_pool_in_focal = (
+                    len(shared_used) / len(pool_union_used) if pool_union_used else 0.0
+                )
+
                 n_files_focal = len(focal_files)
                 n_files_pool = len(pool_files_keyed)
                 data_suff = "true" if (n_files_focal >= 5 and n_files_pool >= 5) else "false"
@@ -1339,8 +1509,10 @@ def run_pooled_comparison(
                     "n_unique_patterns_focal": str(n_focal_unique),
                     "n_unique_patterns_pool": str(n_pool_unique),
                     "n_shared_join_hash": str(n_shared),
-                    "containment_focal_in_pool": _fmt(c_focal_in_pool),
-                    "containment_pool_in_focal": _fmt(c_pool_in_focal),
+                    "all_containment_focal_in_pool": _fmt(c_focal_in_pool),
+                    "all_containment_pool_in_focal": _fmt(c_pool_in_focal),
+                    "used_containment_focal_in_pool": _fmt(used_c_focal_in_pool),
+                    "used_containment_pool_in_focal": _fmt(used_c_pool_in_focal),
                     "all_has_bundles_focal": all_has_bundles_focal,
                     "all_has_bundles_pool": all_has_bundles_pool,
                     "all_n_shared_bundle_both": str(n_both_all),
@@ -1521,6 +1693,9 @@ def main() -> int:
             # Delta pattern output — directed pairs only, opt-out via --no-delta
             if not args.no_delta and ctype in DELTA_DIRECTED_TYPES:
                 tgt_files = load_file_join_hashes(segments_root, registry, seg_b, domain)
+                tgt_files_used = load_file_join_hashes(
+                    segments_root, registry, seg_b, domain, "used"
+                )
                 ref_files = load_file_join_hashes(segments_root, registry, seg_a, domain)
                 ref_union: Set[str] = set()
                 for jhs in ref_files.values():
@@ -1542,6 +1717,12 @@ def main() -> int:
                     pattern_labels = load_pattern_labels(
                         segments_root, registry, seg_b, domain
                     )
+                    bnd_tgt_all = load_bundle_join_hash_set(
+                        segments_root, registry, seg_b, domain, "all"
+                    )
+                    bnd_tgt_used = load_bundle_join_hash_set(
+                        segments_root, registry, seg_b, domain, "used"
+                    )
                     n_tgt_files = len(tgt_files)
                     crid = result.get("comparison_run_id", "")
                     ma = manifest.get(seg_a, {})
@@ -1550,6 +1731,14 @@ def main() -> int:
                     for jh in delta_jhs:
                         n_files_in_tgt = sum(1 for jhs in tgt_files.values() if jh in jhs)
                         pct = n_files_in_tgt / n_tgt_files if n_tgt_files else 0.0
+                        used_n_files_in_tgt = sum(
+                            1 for jhs in tgt_files_used.values() if jh in jhs
+                        )
+                        used_pct = used_n_files_in_tgt / n_tgt_files if n_tgt_files else 0.0
+                        in_container = jh in container_set
+                        in_template = jh in template_set
+                        is_bnd_all = jh in bnd_tgt_all
+                        is_bnd_used = jh in bnd_tgt_used
                         delta_rows.append({
                             "comparison_run_id": crid,
                             "segment_id_reference": seg_a,
@@ -1562,8 +1751,14 @@ def main() -> int:
                             "pattern_label": pattern_labels.get(jh, ""),
                             "n_files_in_target": str(n_files_in_tgt),
                             "pct_files_in_target": _fmt(pct),
-                            "in_any_container": "true" if jh in container_set else "false",
-                            "in_any_template": "true" if jh in template_set else "false",
+                            "in_any_container": "true" if in_container else "false",
+                            "in_any_template": "true" if in_template else "false",
+                            "used_pct_files_in_target": _fmt(used_pct),
+                            "is_bundle_member_all": "true" if is_bnd_all else "false",
+                            "is_bundle_member_used": "true" if is_bnd_used else "false",
+                            "delta_class": _classify_delta(
+                                in_container, in_template, is_bnd_all, is_bnd_used
+                            ),
                             "executed_utc": executed_utc,
                         })
                     delta_combo_count += 1
