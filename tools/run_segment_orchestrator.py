@@ -815,7 +815,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             out_root = segments_root / output_folder
 
             # --segment filter
-            if args.segment and sid != args.segment:
+            if args.segment and sid not in set(args.segment):
                 continue
 
             # skip check
@@ -875,7 +875,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
     segment_plans: Dict[str, Dict] = {}
     for reg_row, mrow in plan:
         sid = reg_row.get("segment_id", "").strip()
-        if args.segment and sid != args.segment:
+        if args.segment and sid not in set(args.segment):
             continue
         output_folder = reg_row.get("output_folder", "").strip()
         export_run_ids_raw = mrow.get("export_run_ids", "")
@@ -913,7 +913,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         sid = reg_row.get("segment_id", "").strip()
         status = reg_row.get("status", "").strip()
 
-        if args.segment and sid != args.segment:
+        if args.segment and sid not in set(args.segment):
             continue
 
         if status == "complete" and not args.force:
@@ -1013,8 +1013,8 @@ def main() -> None:
     ap.add_argument("--repo-root", required=True, help="Path to repo root (for resolving tool script paths)")
     ap.add_argument("--join-policy", required=True, help="Path to domain_join_key_policies.json")
     ap.add_argument(
-        "--segment", default=None,
-        help="Optional: run only this segment_id (targeted re-run or resume)",
+        "--segment", nargs="+", default=None,
+        help="Optional: run only these segment_id(s) (space-separated, targeted re-run or resume)",
     )
     ap.add_argument(
         "--force", action="store_true",
