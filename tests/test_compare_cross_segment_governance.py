@@ -13,6 +13,7 @@ from compare_cross_segment import (  # noqa: E402
     _usage_interpretable_for_role,
     build_pair_domain_work_items,
     discover_governance_chain,
+    main as compare_main,
     sort_pair_detail_rows,
     sort_summary_rows,
 )
@@ -304,3 +305,103 @@ def test_non_project_target_blanks_used_summary_shares(tmp_path):
     assert summary["provided_and_used_pct_of_reference_all"] == ""
     assert summary["provided_but_passive_pct_of_reference_all"] == ""
     assert summary["local_active_pct_of_target_used"] == ""
+
+
+def test_main_emits_governance_states_when_pair_skipped_by_min_patterns(tmp_path, monkeypatch):
+    import csv
+
+    domain = "sparse_line_patterns"
+    records_dir = tmp_path / "records"
+    segments_root = tmp_path / "segments"
+    out_dir = tmp_path / "out"
+    records_dir.mkdir()
+
+    _write_csv(
+        records_dir / "segment_manifest.csv",
+        [
+            {
+                "segment_id": "generic_sparse",
+                "segment_label": "Generic",
+                "governance_role": "Generic",
+                "client_label": "Global",
+                "discipline_label": "Arch",
+                "unit_system": "imperial",
+                "run_type": "bundle",
+                "segment_level": "2",
+                "parent_segment_id": "imperial",
+            },
+            {
+                "segment_id": "project_sparse",
+                "segment_label": "Project",
+                "governance_role": "Project",
+                "client_label": "Acme",
+                "discipline_label": "Arch",
+                "unit_system": "imperial",
+                "run_type": "bundle",
+                "segment_level": "2",
+                "parent_segment_id": "imperial",
+            },
+        ],
+    )
+    _write_csv(
+        records_dir / "run_registry.csv",
+        [
+            {"segment_id": "generic_sparse", "output_folder": "generic_sparse", "run_type": "bundle"},
+            {"segment_id": "project_sparse", "output_folder": "project_sparse", "run_type": "bundle"},
+        ],
+    )
+    _write_csv(records_dir / "file_metadata.csv", [{"export_run_id": "generic_file", "project_label": ""}])
+    _write_segment(
+        segments_root,
+        "generic_sparse",
+        domain,
+        [("g1", "provided_missing_a", "Provided Missing A"), ("g2", "provided_missing_b", "Provided Missing B")],
+        [
+            {"export_run_id": "generic_file", "pattern_id": "g1"},
+            {"export_run_id": "generic_file", "pattern_id": "g2"},
+        ],
+        [{"export_run_id": "generic_file", "pattern_id": "g1"}],
+        ["g1", "g2"],
+    )
+    (segments_root / "project_sparse").mkdir(parents=True)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "compare_cross_segment.py",
+            "--segments-root",
+            str(segments_root),
+            "--records-dir",
+            str(records_dir),
+            "--out-dir",
+            str(out_dir),
+            "--governance-chain",
+            "--domain",
+            domain,
+            "--min-patterns",
+            "3",
+            "--workers",
+            "1",
+            "--no-delta",
+        ],
+    )
+
+    assert compare_main() == 0
+
+    summary_path = out_dir / "cross_segment_summary.csv"
+    states_path = out_dir / "cross_segment_governance_states.csv"
+    state_summary_path = out_dir / "cross_segment_governance_state_summary.csv"
+    assert not summary_path.exists()
+    assert states_path.exists()
+    assert state_summary_path.exists()
+
+    with states_path.open("r", encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert {row["state"] for row in rows} == {"provided_but_missing"}
+    assert {row["join_hash"] for row in rows} == {"provided_missing_a", "provided_missing_b"}
+
+    with state_summary_path.open("r", encoding="utf-8", newline="") as f:
+        summary_rows = list(csv.DictReader(f))
+    assert summary_rows[0]["provided_but_missing_count"] == "2"
+    assert summary_rows[0]["provided_missing_share"] == "1.000000"

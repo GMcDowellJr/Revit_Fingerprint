@@ -2205,27 +2205,6 @@ def main() -> int:
                     f"domain={domain} pairs={n_p}"
                 )
 
-                # Governance-state output — directed governance pairs only. This is
-                # intentionally broader than legacy delta output: rows cover
-                # reference_all ∪ target_all so inherited-but-unused and
-                # provided-but-missing states are visible.
-                if ctype in GOVERNANCE_STATE_DIRECTED_TYPES:
-                    state_rows, state_summary = build_governance_state_outputs(
-                        crid=result.get("comparison_run_id", ""),
-                        seg_ref=seg_a,
-                        seg_tgt=seg_b,
-                        comparison_type=ctype,
-                        domain=domain,
-                        manifest=manifest,
-                        registry=registry,
-                        segments_root=segments_root,
-                        executed_utc=executed_utc,
-                    )
-                    if state_rows:
-                        governance_state_rows.extend(state_rows)
-                        governance_state_summary_rows.append(state_summary)
-                        governance_combo_count += 1
-
                 # Delta pattern output — directed pairs only, opt-out via --no-delta.
                 # Delta generation remains in the parent process so worker results stay
                 # limited to the existing (summary_row, detail_rows) contract.
@@ -2302,6 +2281,31 @@ def main() -> int:
                         delta_combo_count += 1
             else:
                 n_skipped += 1
+
+            # Governance-state output is independent of legacy run_pair() summary
+            # thresholds. Sparse or empty targets still need provided_but_missing
+            # rows so missing downstream stock is visible.
+            if ctype in GOVERNANCE_STATE_DIRECTED_TYPES:
+                crid = (
+                    result.get("comparison_run_id", "")
+                    if result is not None
+                    else make_comparison_run_id(seg_a, seg_b, executed_utc)
+                )
+                state_rows, state_summary = build_governance_state_outputs(
+                    crid=crid,
+                    seg_ref=seg_a,
+                    seg_tgt=seg_b,
+                    comparison_type=ctype,
+                    domain=domain,
+                    manifest=manifest,
+                    registry=registry,
+                    segments_root=segments_root,
+                    executed_utc=executed_utc,
+                )
+                if state_rows:
+                    governance_state_rows.extend(state_rows)
+                    governance_state_summary_rows.append(state_summary)
+                    governance_combo_count += 1
 
             done = n_complete + n_skipped
             if done % 50 == 0 or done == len(work_items):
@@ -2408,7 +2412,7 @@ def main() -> int:
         atomic_write_csv(out_dir / "cross_segment_pooled.csv", POOLED_FIELDS, pooled_rows)
         print(f"[compare] wrote {len(pooled_rows)} rows → {out_dir / 'cross_segment_pooled.csv'}")
 
-    if not summary_rows and not pooled_rows:
+    if not summary_rows and not pooled_rows and not governance_state_rows:
         print("[compare] no comparison rows produced — check segment data and min-patterns threshold")
 
     return 0
