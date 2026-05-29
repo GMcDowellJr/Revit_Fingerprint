@@ -141,13 +141,16 @@ def _preshard_one_shard(
     if not shard_file.is_file() or shard_file.suffix != ".csv":
         return shard_file.name, 0, 0
 
-    # Determine which segments need this shard
+    # Determine which segments need this shard.
+    # Skip only completed segments; pending/failed segments always get fresh
+    # inputs so retries without --force don't run against stale data.
     segments_to_write = {}
     for sid, plan in segment_plans.items():
+        if not force and plan.get("status") == "complete":
+            continue
         seg_shard_dir = plan["segment_records_dir"] / "identity_items_by_domain"
         dst = seg_shard_dir / shard_file.name
-        if force or not dst.is_file() or dst.stat().st_size == 0:
-            segments_to_write[sid] = (plan, seg_shard_dir, dst)
+        segments_to_write[sid] = (plan, seg_shard_dir, dst)
 
     if not segments_to_write:
         return shard_file.name, 0, len(segment_plans)
@@ -231,11 +234,12 @@ def _preshard_corpus_records(
         if not src.is_file():
             continue
 
-        # Determine which segments need this file
+        # Determine which segments need this file.
+        # Skip only completed segments; pending/failed segments always get fresh
+        # inputs so retries without --force don't run against stale data.
         segments_to_write = {
             sid: plan for sid, plan in segment_plans.items()
-            if force or not (plan["segment_records_dir"] / fname).is_file()
-            or (plan["segment_records_dir"] / fname).stat().st_size == 0
+            if force or plan.get("status") != "complete"
         }
         if not segments_to_write:
             print(f"[preshard] {fname} → 0 segments written, {len(segment_plans)} skipped")
