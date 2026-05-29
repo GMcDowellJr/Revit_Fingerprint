@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import csv
 import shutil
 import subprocess
@@ -357,6 +357,7 @@ def run_bundle_analysis(
     metadata_file: Optional[Path] = None,
     purge_view: str = "both",
     latent_purgeable_file: Optional[Path] = None,
+    workers: int = 4,
 ) -> Dict[str, int]:
     presence_rows = read_csv_rows(analysis_dir / "pattern_presence_file.csv")
     run_id = resolve_analysis_run_id(presence_rows, analysis_run_id)
@@ -435,16 +436,18 @@ def run_bundle_analysis(
                 compare_out = view_out.parent / f"compare_{view}"
                 compare_out.mkdir(parents=True, exist_ok=True)
 
-            for dom in domains:
-                if not dom:
-                    continue
-                print(f"[run] domain={dom} start")
-                try:
-                    work_out_base = role_stage_root if resolved_roles else view_out
-                    if not compare:
-                        stats = _run_pipeline_once(
+            if not compare:
+                active_domains = [d for d in domains if d]
+                pool_size = min(workers, len(active_domains))
+
+                print(f"[run] view={view} submitting {len(active_domains)} domains to {pool_size} workers")
+
+                with ProcessPoolExecutor(max_workers=pool_size) as executor:
+                    future_to_dom = {
+                        executor.submit(
+                            _run_pipeline_once,
                             analysis_dir=analysis_dir,
-                            work_out_dir=work_out_base,
+                            work_out_dir=role_stage_root if resolved_roles else view_out,
                             domain=dom,
                             run_id=run_id,
                             min_support_count=min_support_count,
@@ -455,8 +458,46 @@ def run_bundle_analysis(
                             purge_view=view,
                             latent_purgeable_file=lp_file,
                             purgeable_only_set=purgeable_only_set,
-                        )
-                    else:
+                        ): dom
+                        for dom in active_domains
+                    }
+                    for future in as_completed(future_to_dom):
+                        dom = future_to_dom[future]
+                        try:
+                            stats = future.result()
+                        except Exception as exc:
+                            print(f"[run][error] domain={dom} view={view} failed: {exc}")
+                            continue
+                        if resolved_roles:
+                            produced = (role_stage_root if resolved_roles else view_out) / dom
+                            final_out = view_out / dom / role_dir_name
+                            if final_out.exists():
+                                shutil.rmtree(final_out)
+                            final_out.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.move(str(produced), str(final_out))
+                        total_bundles += stats["total_bundles_found"]
+                        total_edges += stats["total_dag_edges"]
+                        total_files_no_bundle += stats["files_with_no_bundle_match"]
+                        step_times = stats.get("step_times", {})
+                        for step_name in TIMING_STEPS:
+                            view_timing_rows.append(
+                                {
+                                    "schema_version": SCHEMA_VERSION,
+                                    "analysis_run_id": run_id,
+                                    "domain": dom,
+                                    "population_id": "",
+                                    "step": step_name,
+                                    "seconds": f"{float(step_times.get(step_name, 0.0)):.3f}",
+                                }
+                            )
+                        print(f"[run] domain={dom} view={view} complete")
+            else:
+                for dom in domains:
+                    if not dom:
+                        continue
+                    print(f"[run] domain={dom} start")
+                    try:
+                        work_out_base = role_stage_root if resolved_roles else view_out
                         t0 = time.time()
                         build_membership_matrix(
                             analysis_dir,
@@ -474,8 +515,8 @@ def run_bundle_analysis(
                         t1 = time.time() - t0
                         print(f"[run] domain={dom} step1_seconds={t1:.3f}")
 
-                        workers = max(2, min(4, (len(domains) or 1)))
-                        with ThreadPoolExecutor(max_workers=workers) as executor:
+                        _thread_workers = max(2, min(4, (len(domains) or 1)))
+                        with ThreadPoolExecutor(max_workers=_thread_workers) as executor:
                             discovery_future = executor.submit(
                                 _run_step2_to_step7,
                                 analysis_dir,
@@ -512,31 +553,31 @@ def run_bundle_analysis(
                             "step_times": step_times,
                         }
 
-                    if resolved_roles:
-                        produced = work_out_base / dom
-                        final_out = view_out / dom / role_dir_name
-                        if final_out.exists():
-                            shutil.rmtree(final_out)
-                        final_out.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.move(str(produced), str(final_out))
+                        if resolved_roles:
+                            produced = work_out_base / dom
+                            final_out = view_out / dom / role_dir_name
+                            if final_out.exists():
+                                shutil.rmtree(final_out)
+                            final_out.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.move(str(produced), str(final_out))
 
-                    total_bundles += stats["total_bundles_found"]
-                    total_edges += stats["total_dag_edges"]
-                    total_files_no_bundle += stats["files_with_no_bundle_match"]
-                    step_times = stats.get("step_times", {})
-                    for step_name in TIMING_STEPS:
-                        view_timing_rows.append(
-                            {
-                                "schema_version": SCHEMA_VERSION,
-                                "analysis_run_id": run_id,
-                                "domain": dom,
-                                "population_id": "",
-                                "step": step_name,
-                                "seconds": f"{float(step_times.get(step_name, 0.0)):.3f}",
-                            }
-                        )
-                except Exception as exc:
-                    print(f"[run][error] domain={dom} failed: {exc}")
+                        total_bundles += stats["total_bundles_found"]
+                        total_edges += stats["total_dag_edges"]
+                        total_files_no_bundle += stats["files_with_no_bundle_match"]
+                        step_times = stats.get("step_times", {})
+                        for step_name in TIMING_STEPS:
+                            view_timing_rows.append(
+                                {
+                                    "schema_version": SCHEMA_VERSION,
+                                    "analysis_run_id": run_id,
+                                    "domain": dom,
+                                    "population_id": "",
+                                    "step": step_name,
+                                    "seconds": f"{float(step_times.get(step_name, 0.0)):.3f}",
+                                }
+                            )
+                    except Exception as exc:
+                        print(f"[run][error] domain={dom} failed: {exc}")
 
             existing_timing_rows = read_csv_rows(view_out / "bundle_analysis_timing.csv") if (view_out / "bundle_analysis_timing.csv").exists() else []
             merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + view_timing_rows
@@ -860,6 +901,8 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--roles", nargs="+", default=None, help="Governance roles: Project Template Generic Generic-Host Container, or alias template-group")
     p.add_argument("--purge-view", choices=["all", "used", "both"], default="both")
     p.add_argument("--latent-purgeable-file", type=Path, default=None, help="Path to latent_purgeable.csv")
+    p.add_argument("--workers", type=int, default=4,
+                   help="Max parallel domains for bundle analysis (default: 4)")
     return p.parse_args(argv)
 
 
@@ -883,6 +926,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         metadata_file=args.metadata_file,
         purge_view=args.purge_view,
         latent_purgeable_file=args.latent_purgeable_file,
+        workers=args.workers,
     )
     return 0
 
