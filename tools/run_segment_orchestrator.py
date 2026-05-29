@@ -245,29 +245,31 @@ def _preshard_corpus_records(
             print(f"[preshard] {fname} → 0 segments written, {len(segment_plans)} skipped")
             continue
 
-        # Build export_run_id → list of segment plans (one-to-many: overlapping segments share eids)
-        id_to_plans: Dict[str, List] = {}
-        for plan in segments_to_write.values():
-            for eid in plan["allowed_ids"]:
-                id_to_plans.setdefault(eid, []).append(plan)
+        # Read header once; eid_col is stable across all batches.
+        with src.open("r", encoding="utf-8-sig", newline="") as _hf:
+            header: Optional[List[str]] = next(csv.reader(_hf), None)
+        if not header:
+            continue
+        eid_col = header.index("export_run_id") if "export_run_id" in header else None
+        if eid_col is None:
+            continue
 
-        # Open one writer per segment
-        writers: Dict[str, Any] = {}
-        handles: Dict[str, Any] = {}
-        header: Optional[List[str]] = None
+        # Fan out in batches so at most _PRESHARD_BATCH destination handles are
+        # open simultaneously.  Each batch re-streams the source file once.
+        seg_items = list(segments_to_write.items())
+        for batch_start in range(0, len(seg_items), _PRESHARD_BATCH):
+            batch = dict(seg_items[batch_start : batch_start + _PRESHARD_BATCH])
 
-        try:
-            with src.open("r", encoding="utf-8-sig", newline="") as src_f:
-                reader = csv.reader(src_f)
-                header = next(reader, None)
-                if header is None:
-                    continue
+            # Build one-to-many lookup scoped to this batch.
+            id_to_plans: Dict[str, List] = {}
+            for plan in batch.values():
+                for eid in plan["allowed_ids"]:
+                    id_to_plans.setdefault(eid, []).append(plan)
 
-                eid_col = header.index("export_run_id") if "export_run_id" in header else None
-                if eid_col is None:
-                    continue
-
-                for sid, plan in segments_to_write.items():
+            writers: Dict[str, Any] = {}
+            handles: Dict[str, Any] = {}
+            try:
+                for sid, plan in batch.items():
                     dst = plan["segment_records_dir"] / fname
                     dst.parent.mkdir(parents=True, exist_ok=True)
                     fh = dst.open("w", newline="", encoding="utf-8")
@@ -276,20 +278,21 @@ def _preshard_corpus_records(
                     w.writerow(header)
                     writers[sid] = w
 
-                n_written = 0
-                for row in reader:
-                    if len(row) <= eid_col:
-                        continue
-                    eid = row[eid_col].strip()
-                    plans = id_to_plans.get(eid)
-                    if not plans:
-                        continue
-                    for plan in plans:
-                        writers[plan["sid"]].writerow(row)
-                    n_written += 1
-        finally:
-            for fh in handles.values():
-                fh.close()
+                with src.open("r", encoding="utf-8-sig", newline="") as src_f:
+                    reader = csv.reader(src_f)
+                    next(reader, None)  # skip header row
+                    for row in reader:
+                        if len(row) <= eid_col:
+                            continue
+                        eid = row[eid_col].strip()
+                        plans = id_to_plans.get(eid)
+                        if not plans:
+                            continue
+                        for plan in plans:
+                            writers[plan["sid"]].writerow(row)
+            finally:
+                for fh in handles.values():
+                    fh.close()
 
         print(f"[preshard] {fname} → {len(segments_to_write)} segments written, "
               f"{len(segment_plans)-len(segments_to_write)} skipped (already exist)")
