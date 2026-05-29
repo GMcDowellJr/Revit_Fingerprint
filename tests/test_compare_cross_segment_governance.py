@@ -11,7 +11,10 @@ from compare_cross_segment import (  # noqa: E402
     _comparison_role_semantics,
     _recommended_primary_view,
     _usage_interpretable_for_role,
+    build_pair_domain_work_items,
     discover_governance_chain,
+    sort_pair_detail_rows,
+    sort_summary_rows,
 )
 
 
@@ -173,3 +176,60 @@ def test_build_governance_state_rows_include_inherited_unused_and_local_active(t
     assert summary["provided_to_used_containment"] == "0.500000"
     assert summary["provided_passive_share"] == "0.500000"
     assert summary["local_active_share"] == "0.500000"
+
+
+def test_pair_domain_work_items_use_pair_domain_union(tmp_path):
+    segments_root = tmp_path / "segments"
+    registry = {
+        "a": {"output_folder": "a"},
+        "b": {"output_folder": "b"},
+        "c": {"output_folder": "c"},
+    }
+    for folder, domain in [("a", "domain_a"), ("b", "domain_b"), ("c", "domain_c")]:
+        (segments_root / folder / "results" / "bundle_analysis" / "all" / domain).mkdir(
+            parents=True
+        )
+
+    work_items, _domains_by_segment, active_domains = build_pair_domain_work_items(
+        [("a", "b", "sibling_projects"), ("a", "c", "sibling_projects")],
+        segments_root,
+        registry,
+    )
+
+    assert work_items == [
+        ("a", "b", "sibling_projects", "domain_a"),
+        ("a", "b", "sibling_projects", "domain_b"),
+        ("a", "c", "sibling_projects", "domain_a"),
+        ("a", "c", "sibling_projects", "domain_c"),
+    ]
+    assert active_domains == ["domain_a", "domain_b", "domain_c"]
+
+
+def test_output_row_sort_helpers_are_stable_by_content():
+    summary_rows = [
+        {"comparison_type": "z", "segment_id_a": "b", "segment_id_b": "a", "domain": "d2"},
+        {"comparison_type": "a", "segment_id_a": "b", "segment_id_b": "a", "domain": "d1"},
+    ]
+    sort_summary_rows(summary_rows)
+    assert [row["comparison_type"] for row in summary_rows] == ["a", "z"]
+
+    pair_rows = [
+        {
+            "_comparison_type": "sibling_projects",
+            "segment_id_a": "b",
+            "segment_id_b": "c",
+            "domain": "d",
+            "export_run_id_a": "2",
+            "export_run_id_b": "1",
+        },
+        {
+            "_comparison_type": "sibling_projects",
+            "segment_id_a": "a",
+            "segment_id_b": "c",
+            "domain": "d",
+            "export_run_id_a": "1",
+            "export_run_id_b": "1",
+        },
+    ]
+    sort_pair_detail_rows(pair_rows)
+    assert [row["segment_id_a"] for row in pair_rows] == ["a", "b"]

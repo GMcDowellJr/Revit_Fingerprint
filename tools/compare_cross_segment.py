@@ -1975,6 +1975,62 @@ def segment_is_runnable(
     return True
 
 
+
+def build_pair_domain_work_items(
+    runnable_pairs: Sequence[ComparisonPair],
+    segments_root: Path,
+    registry: Dict[str, Dict[str, str]],
+    requested_domain: Optional[str] = None,
+) -> Tuple[List[Tuple[str, str, str, str]], Dict[str, Set[str]], List[str]]:
+    """Return runnable (pair × domain) work scoped to each pair's domain union.
+
+    Domains are sparse in segmented corpora. Scheduling every pair against every
+    globally active domain creates mostly-empty worker tasks and filesystem churn,
+    so each pair is expanded only across domains present in either participating
+    segment.
+    """
+    segment_ids = sorted({seg for pair in runnable_pairs for seg in (pair[0], pair[1])})
+    domains_by_segment = {
+        sid: discover_domains_for_segment(segments_root, registry, sid)
+        for sid in segment_ids
+    }
+
+    active_domains: Set[str] = set()
+    work_items: List[Tuple[str, str, str, str]] = []
+    for seg_a, seg_b, ctype in runnable_pairs:
+        pair_domains = domains_by_segment.get(seg_a, set()) | domains_by_segment.get(seg_b, set())
+        if requested_domain:
+            domains = [requested_domain] if requested_domain in pair_domains else []
+        else:
+            domains = sorted(pair_domains)
+        active_domains.update(domains)
+        for dom in domains:
+            work_items.append((seg_a, seg_b, ctype, dom))
+
+    return work_items, domains_by_segment, sorted(active_domains)
+
+
+def sort_summary_rows(rows: List[Dict[str, str]]) -> None:
+    rows.sort(key=lambda r: (
+        r.get("comparison_type", ""),
+        r.get("segment_id_a", ""),
+        r.get("segment_id_b", ""),
+        r.get("domain", ""),
+    ))
+
+
+def sort_pair_detail_rows(rows: List[Dict[str, str]]) -> None:
+    rows.sort(key=lambda r: (
+        r.get("_comparison_type", ""),
+        r.get("segment_id_a", ""),
+        r.get("segment_id_b", ""),
+        r.get("domain", ""),
+        r.get("project_label_a", ""),
+        r.get("project_label_b", ""),
+        r.get("export_run_id_a", ""),
+        r.get("export_run_id_b", ""),
+    ))
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -2095,33 +2151,16 @@ def main() -> int:
         and (seg_a == seg_b or segment_is_runnable(registry, seg_b))
     ]
 
-    # Discover active domains across all relevant segments
-    all_segment_ids = sorted({seg for pair in runnable_pairs for seg in (pair[0], pair[1])})
-    active_domains: Set[str] = set()
-    for sid in all_segment_ids:
-        rec = registry.get(sid, {})
-        out_folder = rec.get("output_folder", "").strip()
-        if not out_folder:
-            continue
-        presence_csv = segments_root / out_folder / "results" / "analysis" / "pattern_presence_file.csv"
-        if presence_csv.is_file():
-            for row in read_csv_rows(presence_csv):
-                dom = row.get("domain", "").strip()
-                if dom:
-                    active_domains.add(dom)
-
-    domain_filter = [args.domain] if args.domain else sorted(active_domains)
-
-    # Build flat work list: one item per (pair × domain)
-    work_items = [
-        (seg_a, seg_b, ctype, dom)
-        for seg_a, seg_b, ctype in runnable_pairs
-        for dom in domain_filter
-    ]
+    # Build flat work list: one item per (pair × domain), limited to domains
+    # present in either side of the pair so sparse corpora do not generate a
+    # global-domain cross product of mostly-empty worker tasks.
+    work_items, _domains_by_segment, active_domain_filter = build_pair_domain_work_items(
+        runnable_pairs, segments_root, registry, args.domain
+    )
 
     print(
-        f"[compare] {len(runnable_pairs)} pairs × {len(domain_filter)} domains = "
-        f"{len(work_items)} work items  workers={args.workers}"
+        f"[compare] {len(runnable_pairs)} pairs × {len(active_domain_filter)} active domains = "
+        f"{len(work_items)} pair-domain work items  workers={args.workers}"
     )
 
     n_complete = 0
@@ -2153,6 +2192,8 @@ def main() -> int:
 
             if result is not None:
                 summary_rows.append(result)
+                for pair_row in pairs_out:
+                    pair_row["_comparison_type"] = ctype
                 pair_detail_rows.extend(pairs_out)
                 n_complete += 1
                 n_p = result.get("n_pairs", "?")
@@ -2269,7 +2310,7 @@ def main() -> int:
 
     elapsed = time.perf_counter() - t0
     print(
-        f"[compare] done  pairs={len(runnable_pairs)}  domains={len(domain_filter)}  "
+        f"[compare] done  pairs={len(runnable_pairs)}  active_domains={len(active_domain_filter)}  "
         f"work_items={len(work_items)}  complete={n_complete}  skipped={n_skipped}  "
         f"elapsed={elapsed:.1f}s  ({elapsed/60:.1f} min)",
         flush=True,
@@ -2293,11 +2334,13 @@ def main() -> int:
 
     # Write outputs
     if summary_rows:
+        sort_summary_rows(summary_rows)
         out_dir.mkdir(parents=True, exist_ok=True)
         atomic_write_csv(out_dir / "cross_segment_summary.csv", SUMMARY_FIELDS, summary_rows)
         print(f"[compare] wrote {len(summary_rows)} rows → {out_dir / 'cross_segment_summary.csv'}")
 
     if pair_detail_rows:
+        sort_pair_detail_rows(pair_detail_rows)
         atomic_write_csv(out_dir / "cross_segment_file_pairs.csv", PAIRS_FIELDS, pair_detail_rows)
         print(f"[compare] wrote {len(pair_detail_rows)} rows → {out_dir / 'cross_segment_file_pairs.csv'}")
 
