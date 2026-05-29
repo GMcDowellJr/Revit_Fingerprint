@@ -71,6 +71,8 @@ import argparse
 import csv
 import hashlib
 import sys
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import defaultdict
 from datetime import datetime, timezone
 from itertools import combinations
@@ -1265,6 +1267,35 @@ def run_pair(
     return summary, pair_rows
 
 
+def _run_pair_domain(
+    seg_a: str,
+    seg_b: str,
+    comparison_type: str,
+    domain: str,
+    manifest: Dict[str, Dict[str, str]],
+    registry: Dict[str, Dict[str, str]],
+    file_metadata: Dict[str, Dict[str, str]],
+    segments_root: Path,
+    min_patterns: int,
+    executed_utc: str,
+    no_delta: bool,
+) -> Tuple[Optional[Dict[str, str]], List[Dict[str, str]]]:
+    """Wrapper around run_pair for a single pair×domain. Returns (summary_row, detail_rows)."""
+    _ = no_delta  # Accepted for future use; run_pair does not currently consume it.
+    return run_pair(
+        seg_a=seg_a,
+        seg_b=seg_b,
+        comparison_type=comparison_type,
+        domain=domain,
+        manifest=manifest,
+        registry=registry,
+        file_metadata=file_metadata,
+        segments_root=segments_root,
+        min_patterns=min_patterns,
+        executed_utc=executed_utc,
+    )
+
+
 def _build_summary_row(
     crid: str,
     seg_a: str,
@@ -1592,6 +1623,8 @@ def main() -> int:
                     help="Print discovered pairs without computing; no output files written")
     ap.add_argument("--no-delta", action="store_true",
                     help="Skip delta pattern output (cross_segment_delta.csv); useful for large corpora")
+    ap.add_argument("--workers", type=int, default=4,
+                    help="Max parallel pair×domain workers (default: 4)")
 
     args = ap.parse_args()
 
@@ -1655,113 +1688,174 @@ def main() -> int:
     delta_rows: List[Dict[str, str]] = []
     delta_combo_count = 0
 
-    for seg_a, seg_b, ctype in pairs:
-        if not segment_is_runnable(registry, seg_a):
-            continue
-        if seg_a != seg_b and not segment_is_runnable(registry, seg_b):
-            continue
+    if args.workers < 1:
+        sys.exit("[error] --workers must be >= 1")
 
-        # Discover domains for this pair
-        if args.domain:
-            domains = [args.domain]
-        else:
-            domains_a = discover_domains_for_segment(segments_root, registry, seg_a)
-            domains_b = (
-                discover_domains_for_segment(segments_root, registry, seg_b)
-                if seg_a != seg_b
-                else domains_a
-            )
-            domains = sorted(domains_a | domains_b)
+    runnable_pairs = [
+        (seg_a, seg_b, ctype)
+        for seg_a, seg_b, ctype in pairs
+        if segment_is_runnable(registry, seg_a)
+        and (seg_a == seg_b or segment_is_runnable(registry, seg_b))
+    ]
 
-        for domain in domains:
-            result, pairs_out = run_pair(
-                seg_a, seg_b, ctype, domain,
+    # Discover active domains across all relevant segments
+    all_segment_ids = sorted({seg for pair in runnable_pairs for seg in (pair[0], pair[1])})
+    active_domains: Set[str] = set()
+    for sid in all_segment_ids:
+        rec = registry.get(sid, {})
+        out_folder = rec.get("output_folder", "").strip()
+        if not out_folder:
+            continue
+        presence_csv = segments_root / out_folder / "results" / "analysis" / "pattern_presence_file.csv"
+        if presence_csv.is_file():
+            for row in read_csv_rows(presence_csv):
+                dom = row.get("domain", "").strip()
+                if dom:
+                    active_domains.add(dom)
+
+    domain_filter = [args.domain] if args.domain else sorted(active_domains)
+
+    # Build flat work list: one item per (pair × domain)
+    work_items = [
+        (seg_a, seg_b, ctype, dom)
+        for seg_a, seg_b, ctype in runnable_pairs
+        for dom in domain_filter
+    ]
+
+    print(
+        f"[compare] {len(runnable_pairs)} pairs × {len(domain_filter)} domains = "
+        f"{len(work_items)} work items  workers={args.workers}"
+    )
+
+    n_complete = 0
+    n_skipped = 0
+
+    t0 = time.perf_counter()
+    with ProcessPoolExecutor(max_workers=args.workers) as executor:
+        future_to_item = {
+            executor.submit(
+                _run_pair_domain,
+                seg_a, seg_b, ctype, dom,
                 manifest, registry, file_metadata,
-                segments_root, args.min_patterns, executed_utc,
-            )
-            if result is None:
-                continue
+                segments_root, args.min_patterns,
+                executed_utc, args.no_delta,
+            ): (seg_a, seg_b, ctype, dom)
+            for seg_a, seg_b, ctype, dom in work_items
+        }
+        for future in as_completed(future_to_item):
+            seg_a, seg_b, ctype, domain = future_to_item[future]
+            try:
+                result, pairs_out = future.result()
+            except Exception as exc:
+                for pending in future_to_item:
+                    if pending is not future:
+                        pending.cancel()
+                raise RuntimeError(
+                    f"pair=({seg_a}, {seg_b}) type={ctype} domain={domain} failed"
+                ) from exc
 
-            summary_rows.append(result)
-            pair_detail_rows.extend(pairs_out)
-            n_p = result.get("n_pairs", "?")
-            print(
-                f"[compare] segment_a={seg_a} segment_b={seg_b} "
-                f"domain={domain} pairs={n_p}"
-            )
-
-            # Delta pattern output — directed pairs only, opt-out via --no-delta
-            if not args.no_delta and ctype in DELTA_DIRECTED_TYPES:
-                tgt_files = load_file_join_hashes(segments_root, registry, seg_b, domain)
-                tgt_files_used = load_file_join_hashes(
-                    segments_root, registry, seg_b, domain, "used"
+            if result is not None:
+                summary_rows.append(result)
+                pair_detail_rows.extend(pairs_out)
+                n_complete += 1
+                n_p = result.get("n_pairs", "?")
+                print(
+                    f"[compare] segment_a={seg_a} segment_b={seg_b} "
+                    f"domain={domain} pairs={n_p}"
                 )
-                ref_files = load_file_join_hashes(segments_root, registry, seg_a, domain)
-                ref_union: Set[str] = set()
-                for jhs in ref_files.values():
-                    ref_union |= jhs
-                tgt_union: Set[str] = set()
-                for jhs in tgt_files.values():
-                    tgt_union |= jhs
-                delta_jhs = tgt_union - ref_union
 
-                if delta_jhs:
-                    unit_system = manifest.get(seg_a, {}).get("unit_system", "")
-                    container_set = get_role_jh_set(
-                        "container", domain, unit_system, manifest, registry, segments_root,
-                        exclude_segment_id=seg_b,
-                    )
-                    template_set = get_role_jh_set(
-                        "template", domain, unit_system, manifest, registry, segments_root
-                    )
-                    pattern_labels = load_pattern_labels(
-                        segments_root, registry, seg_b, domain
-                    )
-                    bnd_tgt_all = load_bundle_join_hash_set(
-                        segments_root, registry, seg_b, domain, "all"
-                    )
-                    bnd_tgt_used = load_bundle_join_hash_set(
+                # Delta pattern output — directed pairs only, opt-out via --no-delta.
+                # Delta generation remains in the parent process so worker results stay
+                # limited to the existing (summary_row, detail_rows) contract.
+                if not args.no_delta and ctype in DELTA_DIRECTED_TYPES:
+                    tgt_files = load_file_join_hashes(segments_root, registry, seg_b, domain)
+                    tgt_files_used = load_file_join_hashes(
                         segments_root, registry, seg_b, domain, "used"
                     )
-                    n_tgt_files = len(tgt_files)
-                    crid = result.get("comparison_run_id", "")
-                    ma = manifest.get(seg_a, {})
-                    mb = manifest.get(seg_b, {})
+                    ref_files = load_file_join_hashes(segments_root, registry, seg_a, domain)
+                    ref_union: Set[str] = set()
+                    for jhs in ref_files.values():
+                        ref_union |= jhs
+                    tgt_union: Set[str] = set()
+                    for jhs in tgt_files.values():
+                        tgt_union |= jhs
+                    delta_jhs = tgt_union - ref_union
 
-                    for jh in delta_jhs:
-                        n_files_in_tgt = sum(1 for jhs in tgt_files.values() if jh in jhs)
-                        pct = n_files_in_tgt / n_tgt_files if n_tgt_files else 0.0
-                        used_n_files_in_tgt = sum(
-                            1 for jhs in tgt_files_used.values() if jh in jhs
+                    if delta_jhs:
+                        unit_system = manifest.get(seg_a, {}).get("unit_system", "")
+                        container_set = get_role_jh_set(
+                            "container", domain, unit_system, manifest, registry, segments_root,
+                            exclude_segment_id=seg_b,
                         )
-                        used_pct = used_n_files_in_tgt / n_tgt_files if n_tgt_files else 0.0
-                        in_container = jh in container_set
-                        in_template = jh in template_set
-                        is_bnd_all = jh in bnd_tgt_all
-                        is_bnd_used = jh in bnd_tgt_used
-                        delta_rows.append({
-                            "comparison_run_id": crid,
-                            "segment_id_reference": seg_a,
-                            "segment_id_target": seg_b,
-                            "segment_label_reference": ma.get("segment_label", ""),
-                            "segment_label_target": mb.get("segment_label", ""),
-                            "comparison_type": ctype,
-                            "domain": domain,
-                            "join_hash": jh,
-                            "pattern_label": pattern_labels.get(jh, ""),
-                            "n_files_in_target": str(n_files_in_tgt),
-                            "pct_files_in_target": _fmt(pct),
-                            "in_any_container": "true" if in_container else "false",
-                            "in_any_template": "true" if in_template else "false",
-                            "used_pct_files_in_target": _fmt(used_pct),
-                            "is_bundle_member_all": "true" if is_bnd_all else "false",
-                            "is_bundle_member_used": "true" if is_bnd_used else "false",
-                            "delta_class": _classify_delta(
-                                in_container, in_template, is_bnd_all, is_bnd_used
-                            ),
-                            "executed_utc": executed_utc,
-                        })
-                    delta_combo_count += 1
+                        template_set = get_role_jh_set(
+                            "template", domain, unit_system, manifest, registry, segments_root
+                        )
+                        pattern_labels = load_pattern_labels(
+                            segments_root, registry, seg_b, domain
+                        )
+                        bnd_tgt_all = load_bundle_join_hash_set(
+                            segments_root, registry, seg_b, domain, "all"
+                        )
+                        bnd_tgt_used = load_bundle_join_hash_set(
+                            segments_root, registry, seg_b, domain, "used"
+                        )
+                        n_tgt_files = len(tgt_files)
+                        crid = result.get("comparison_run_id", "")
+                        ma = manifest.get(seg_a, {})
+                        mb = manifest.get(seg_b, {})
+
+                        for jh in delta_jhs:
+                            n_files_in_tgt = sum(1 for jhs in tgt_files.values() if jh in jhs)
+                            pct = n_files_in_tgt / n_tgt_files if n_tgt_files else 0.0
+                            used_n_files_in_tgt = sum(
+                                1 for jhs in tgt_files_used.values() if jh in jhs
+                            )
+                            used_pct = used_n_files_in_tgt / n_tgt_files if n_tgt_files else 0.0
+                            in_container = jh in container_set
+                            in_template = jh in template_set
+                            is_bnd_all = jh in bnd_tgt_all
+                            is_bnd_used = jh in bnd_tgt_used
+                            delta_rows.append({
+                                "comparison_run_id": crid,
+                                "segment_id_reference": seg_a,
+                                "segment_id_target": seg_b,
+                                "segment_label_reference": ma.get("segment_label", ""),
+                                "segment_label_target": mb.get("segment_label", ""),
+                                "comparison_type": ctype,
+                                "domain": domain,
+                                "join_hash": jh,
+                                "pattern_label": pattern_labels.get(jh, ""),
+                                "n_files_in_target": str(n_files_in_tgt),
+                                "pct_files_in_target": _fmt(pct),
+                                "in_any_container": "true" if in_container else "false",
+                                "in_any_template": "true" if in_template else "false",
+                                "used_pct_files_in_target": _fmt(used_pct),
+                                "is_bundle_member_all": "true" if is_bnd_all else "false",
+                                "is_bundle_member_used": "true" if is_bnd_used else "false",
+                                "delta_class": _classify_delta(
+                                    in_container, in_template, is_bnd_all, is_bnd_used
+                                ),
+                                "executed_utc": executed_utc,
+                            })
+                        delta_combo_count += 1
+            else:
+                n_skipped += 1
+
+            done = n_complete + n_skipped
+            if done % 50 == 0 or done == len(work_items):
+                print(
+                    f"[compare] progress: {done}/{len(work_items)} "
+                    f"complete={n_complete} skipped={n_skipped}",
+                    flush=True,
+                )
+
+    elapsed = time.perf_counter() - t0
+    print(
+        f"[compare] done  pairs={len(runnable_pairs)}  domains={len(domain_filter)}  "
+        f"work_items={len(work_items)}  complete={n_complete}  skipped={n_skipped}  "
+        f"elapsed={elapsed:.1f}s  ({elapsed/60:.1f} min)",
+        flush=True,
+    )
 
     # Pooled comparison
     focal_filter: Optional[Set[str]] = None
