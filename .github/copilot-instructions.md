@@ -50,6 +50,14 @@ This file bootstraps AI behavior for the Revit Fingerprint repository.
 - Do not make pure refactor changes appear as semantic changes.
 - Do not create cross-domain imports inside `domains/`.
 
+## Knowledge graph (graphify)
+
+This project has a knowledge graph at `graphify-out/` with god nodes, community structure, and cross-file relationships.
+
+- For codebase questions, run `graphify query "<question>"` when `graphify-out/graph.json` exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than reading source files.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
 ## Helpful quick links
 
 - `CLAUDE.md` — AI assistant guide for this repo
