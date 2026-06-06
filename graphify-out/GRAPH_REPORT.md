@@ -1,16 +1,16 @@
 # Graph Report - Revit_Fingerprint  (2026-06-06)
 
 ## Corpus Check
-- 332 files · ~1,854,154 words
+- 453 files · ~1,884,876 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5178 nodes · 10845 edges · 378 communities (369 shown, 9 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 174 edges (avg confidence: 0.71)
+- 6482 nodes · 12362 edges · 497 communities (482 shown, 15 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 174 edges (avg confidence: 0.71)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a9c59c17`
+- Built from commit: `d3786f92`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -361,6 +361,123 @@
 - [[_COMMUNITY_Micro Cluster 351|Micro Cluster 351]]
 - [[_COMMUNITY_Micro Cluster 354|Micro Cluster 354]]
 - [[_COMMUNITY_Community 377|Community 377]]
+- [[_COMMUNITY_Community 378|Community 378]]
+- [[_COMMUNITY_Community 379|Community 379]]
+- [[_COMMUNITY_Community 380|Community 380]]
+- [[_COMMUNITY_Community 381|Community 381]]
+- [[_COMMUNITY_Community 382|Community 382]]
+- [[_COMMUNITY_Community 383|Community 383]]
+- [[_COMMUNITY_Community 384|Community 384]]
+- [[_COMMUNITY_Community 385|Community 385]]
+- [[_COMMUNITY_Community 386|Community 386]]
+- [[_COMMUNITY_Community 387|Community 387]]
+- [[_COMMUNITY_Community 388|Community 388]]
+- [[_COMMUNITY_Community 389|Community 389]]
+- [[_COMMUNITY_Community 390|Community 390]]
+- [[_COMMUNITY_Community 391|Community 391]]
+- [[_COMMUNITY_Community 392|Community 392]]
+- [[_COMMUNITY_Community 393|Community 393]]
+- [[_COMMUNITY_Community 394|Community 394]]
+- [[_COMMUNITY_Community 395|Community 395]]
+- [[_COMMUNITY_Community 396|Community 396]]
+- [[_COMMUNITY_Community 397|Community 397]]
+- [[_COMMUNITY_Community 398|Community 398]]
+- [[_COMMUNITY_Community 399|Community 399]]
+- [[_COMMUNITY_Community 400|Community 400]]
+- [[_COMMUNITY_Community 401|Community 401]]
+- [[_COMMUNITY_Community 402|Community 402]]
+- [[_COMMUNITY_Community 403|Community 403]]
+- [[_COMMUNITY_Community 404|Community 404]]
+- [[_COMMUNITY_Community 405|Community 405]]
+- [[_COMMUNITY_Community 406|Community 406]]
+- [[_COMMUNITY_Community 407|Community 407]]
+- [[_COMMUNITY_Community 408|Community 408]]
+- [[_COMMUNITY_Community 409|Community 409]]
+- [[_COMMUNITY_Community 410|Community 410]]
+- [[_COMMUNITY_Community 411|Community 411]]
+- [[_COMMUNITY_Community 412|Community 412]]
+- [[_COMMUNITY_Community 413|Community 413]]
+- [[_COMMUNITY_Community 414|Community 414]]
+- [[_COMMUNITY_Community 415|Community 415]]
+- [[_COMMUNITY_Community 416|Community 416]]
+- [[_COMMUNITY_Community 417|Community 417]]
+- [[_COMMUNITY_Community 418|Community 418]]
+- [[_COMMUNITY_Community 419|Community 419]]
+- [[_COMMUNITY_Community 420|Community 420]]
+- [[_COMMUNITY_Community 421|Community 421]]
+- [[_COMMUNITY_Community 422|Community 422]]
+- [[_COMMUNITY_Community 423|Community 423]]
+- [[_COMMUNITY_Community 424|Community 424]]
+- [[_COMMUNITY_Community 425|Community 425]]
+- [[_COMMUNITY_Community 426|Community 426]]
+- [[_COMMUNITY_Community 427|Community 427]]
+- [[_COMMUNITY_Community 428|Community 428]]
+- [[_COMMUNITY_Community 429|Community 429]]
+- [[_COMMUNITY_Community 430|Community 430]]
+- [[_COMMUNITY_Community 431|Community 431]]
+- [[_COMMUNITY_Community 432|Community 432]]
+- [[_COMMUNITY_Community 433|Community 433]]
+- [[_COMMUNITY_Community 434|Community 434]]
+- [[_COMMUNITY_Community 435|Community 435]]
+- [[_COMMUNITY_Community 436|Community 436]]
+- [[_COMMUNITY_Community 437|Community 437]]
+- [[_COMMUNITY_Community 438|Community 438]]
+- [[_COMMUNITY_Community 439|Community 439]]
+- [[_COMMUNITY_Community 440|Community 440]]
+- [[_COMMUNITY_Community 441|Community 441]]
+- [[_COMMUNITY_Community 442|Community 442]]
+- [[_COMMUNITY_Community 443|Community 443]]
+- [[_COMMUNITY_Community 444|Community 444]]
+- [[_COMMUNITY_Community 445|Community 445]]
+- [[_COMMUNITY_Community 446|Community 446]]
+- [[_COMMUNITY_Community 447|Community 447]]
+- [[_COMMUNITY_Community 448|Community 448]]
+- [[_COMMUNITY_Community 449|Community 449]]
+- [[_COMMUNITY_Community 450|Community 450]]
+- [[_COMMUNITY_Community 451|Community 451]]
+- [[_COMMUNITY_Community 452|Community 452]]
+- [[_COMMUNITY_Community 453|Community 453]]
+- [[_COMMUNITY_Community 454|Community 454]]
+- [[_COMMUNITY_Community 455|Community 455]]
+- [[_COMMUNITY_Community 456|Community 456]]
+- [[_COMMUNITY_Community 457|Community 457]]
+- [[_COMMUNITY_Community 458|Community 458]]
+- [[_COMMUNITY_Community 459|Community 459]]
+- [[_COMMUNITY_Community 460|Community 460]]
+- [[_COMMUNITY_Community 461|Community 461]]
+- [[_COMMUNITY_Community 462|Community 462]]
+- [[_COMMUNITY_Community 463|Community 463]]
+- [[_COMMUNITY_Community 464|Community 464]]
+- [[_COMMUNITY_Community 465|Community 465]]
+- [[_COMMUNITY_Community 466|Community 466]]
+- [[_COMMUNITY_Community 467|Community 467]]
+- [[_COMMUNITY_Community 468|Community 468]]
+- [[_COMMUNITY_Community 469|Community 469]]
+- [[_COMMUNITY_Community 470|Community 470]]
+- [[_COMMUNITY_Community 471|Community 471]]
+- [[_COMMUNITY_Community 472|Community 472]]
+- [[_COMMUNITY_Community 473|Community 473]]
+- [[_COMMUNITY_Community 474|Community 474]]
+- [[_COMMUNITY_Community 475|Community 475]]
+- [[_COMMUNITY_Community 476|Community 476]]
+- [[_COMMUNITY_Community 477|Community 477]]
+- [[_COMMUNITY_Community 478|Community 478]]
+- [[_COMMUNITY_Community 479|Community 479]]
+- [[_COMMUNITY_Community 480|Community 480]]
+- [[_COMMUNITY_Community 481|Community 481]]
+- [[_COMMUNITY_Community 482|Community 482]]
+- [[_COMMUNITY_Community 483|Community 483]]
+- [[_COMMUNITY_Community 484|Community 484]]
+- [[_COMMUNITY_Community 485|Community 485]]
+- [[_COMMUNITY_Community 486|Community 486]]
+- [[_COMMUNITY_Community 487|Community 487]]
+- [[_COMMUNITY_Community 488|Community 488]]
+- [[_COMMUNITY_Community 489|Community 489]]
+- [[_COMMUNITY_Community 490|Community 490]]
+- [[_COMMUNITY_Community 491|Community 491]]
+- [[_COMMUNITY_Community 492|Community 492]]
+- [[_COMMUNITY_Community 493|Community 493]]
+- [[_COMMUNITY_Community 494|Community 494]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `make_identity_item()` - 120 edges
@@ -368,11 +485,11 @@
 3. `safe_str()` - 106 edges
 4. `serialize_identity_items()` - 98 edges
 5. `build_join_key_from_policy()` - 85 edges
-6. `get_domain_join_key_policy()` - 79 edges
-7. `canonicalize_str()` - 76 edges
-8. `canonicalize_int()` - 60 edges
-9. `build_record_v2()` - 59 edges
-10. `canon_str()` - 55 edges
+6. `Descriptor` - 81 edges
+7. `get_domain_join_key_policy()` - 79 edges
+8. `canonicalize_str()` - 76 edges
+9. `canonicalize_int()` - 60 edges
+10. `build_record_v2()` - 59 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `is_purgeable Purgeability Fields` --semantically_similar_to--> `Governance Role Classification (Container/Template/Project/Generic)`  [INFERRED] [semantically similar]
@@ -397,7 +514,7 @@
 - **Join Key Policy: Shape-Gating + Pareto Discovery + Pinned Policy** — docs_join_key_shape_gating_shape_gating_schema, docs_phase2_join_key_discovery_pareto_discovery, tools_dimension_types_join_key_md_dimension_join_key_policy, docs_hash_discovery_tooling_discover_hash_policy [INFERRED 0.85]
 - **Governance Chain: Summary + Delta + State CSVs for directed comparisons** — docs_cross_segment_comparison_cross_segment_summary_csv, docs_cross_segment_comparison_cross_segment_delta_csv, docs_cross_segment_comparison_governance_states_csv, tools_refreshed_revit_governance_dod_governance_state [INFERRED 0.85]
 
-## Communities (378 total, 9 thin omitted)
+## Communities (497 total, 15 thin omitted)
 
 ### Community 0 - "Wall Type Test Suite"
 Cohesion: 0.06
@@ -408,44 +525,44 @@ Cohesion: 0.05
 Nodes (85): build_wide_kv_table(), compute_v_norm(), _dedupe_preserve_order(), dominates(), eval_subset(), EvalConfig, _load_join_key_policy(), main() (+77 more)
 
 ### Community 2 - "Core Hashing & Join-Key Builder"
-Cohesion: 0.08
-Nodes (80): make_hash(), _make_hash_impl(), Deterministic hash based on a sequence of strings.      Streaming/incremental im, Inner hash implementation (separated for timing wrapper clarity)., build_join_key_from_policy(), _dedupe_preserve_order(), _expand_sequence_key(), _get_shape_specific_requirements() (+72 more)
+Cohesion: 0.06
+Nodes (101): canon_bool(), canon_id(), canon_num(), str, Canonicalize Revit ElementId-like values to a decimal string.      Accepts:, Canonicalize booleans.      - None -> <MISSING>     - bool -> "true"/"false", Canonicalize numbers to a fixed decimal string.      - None -> <MISSING>     - C, make_hash() (+93 more)
 
 ### Community 3 - "Cross-Segment Comparison & Governance Tests"
 Cohesion: 0.08
 Nodes (89): ComparisonPair, Path, str, Tests for governance semantics in tools/compare_cross_segment.py., _seg(), test_build_governance_state_rows_include_inherited_unused_and_local_active(), test_discover_governance_chain_includes_generic_upstream_roles(), test_main_emits_governance_states_when_pair_skipped_by_min_patterns() (+81 more)
 
 ### Community 4 - "Dimension Type Helpers"
-Cohesion: 0.06
-Nodes (93): fnum(), int, Legacy alias for canon_num., purge_lookup(), _build_text_appearance_items(), _fmt_float(), _fmt_in_from_ft(), _format_options_to_kv() (+85 more)
+Cohesion: 0.09
+Nodes (75): purge_lookup(), _build_text_appearance_items(), _fmt_float(), _fmt_in_from_ft(), _format_options_to_kv(), _get_dimension_shape(), get_type_display_name(), Detect dimension shape from a Revit DimensionType object.      Revit exposes sha (+67 more)
 
 ### Community 5 - "Segment Manifest Tests"
 Cohesion: 0.06
 Nodes (70): _disc_rows(), _meta_row(), Path, Tests for tools/build_segment_manifest.py., Multi-client, multi-discipline Container corpus for discipline tests., _read_csv(), test_blank_client_label_level2_id_distinct_from_level1(), test_blank_discipline_does_not_generate_discipline_cut() (+62 more)
 
 ### Community 6 - "Graphic Override Extraction"
-Cohesion: 0.06
-Nodes (50): _append_color_item(), _append_pattern_items(), _append_value_item(), extract_cut_graphics(), extract_halftone(), extract_projection_graphics(), extract_transparency(), _is_category() (+42 more)
+Cohesion: 0.07
+Nodes (59): _append_color_item(), _append_pattern_items(), _append_value_item(), extract_cut_graphics(), extract_halftone(), extract_projection_graphics(), extract_transparency(), _is_category() (+51 more)
 
 ### Community 7 - "Element Collector Cache"
 Cohesion: 0.06
 Nodes (35): CacheKey, build_purgeable_id_set(), collect_elements(), collect_id_ints(), _collect_id_ints_uncached(), CollectCtx, _get_element(), _is_invalid_element_id() (+27 more)
 
 ### Community 8 - "Signature Hash Policy Engine"
-Cohesion: 0.08
-Nodes (61): apply_sig_hash_policy_to_record(), build_sig_hash_from_policy(), _items_to_map(), _key_allowed(), Any, bool, str, Return (sig_hash, status, status_reasons, hash_items).      The builder hashes e (+53 more)
+Cohesion: 0.10
+Nodes (49): get_domain_sig_hash_policy(), _is_list_of_str(), load_sig_hash_policies(), Any, bool, str, validate_domain_sig_hash_policy(), _fingerprint_payload() (+41 more)
 
 ### Community 9 - "Governance Narrative Generator"
 Cohesion: 0.08
 Nodes (62): _add_float(), assign_tier(), build_cascade(), build_client_summary(), build_governance_state_summary(), _client_onboarding_profile(), _col(), detect_anomalies() (+54 more)
 
 ### Community 10 - "Phase-2 Join Hash & Record Schema"
-Cohesion: 0.11
-Nodes (35): _block_record_for_unstable_id(), block_record_v2(), canonical_structural_fields(), _canonical_structural_value(), compute_identity_quality(), _default_record_id_secondary_key(), finalize_record_ids_for_domain(), make_record_id_structural() (+27 more)
+Cohesion: 0.07
+Nodes (61): _block_record_for_unstable_id(), block_record_v2(), build_record_v2(), canonical_structural_fields(), _canonical_structural_value(), canonicalize_str(), compute_identity_quality(), _default_record_id_secondary_key() (+53 more)
 
 ### Community 11 - "Architecture & Design Decisions"
-Cohesion: 0.05
-Nodes (59): Architecture Overview, Changelog, Behavior-First Fingerprinting (D-001), central_path_norm Normalization Pipeline, Corpus Update Pipeline (Run A/B/C Stages), CSV Contract v2.1 Split-Analysis Schema, Context Dictionary (ctx) Cross-Domain Data Flow, Deterministic Auditable Hashes (D-002) (+51 more)
+Cohesion: 0.12
+Nodes (25): Changelog, Behavior-First Fingerprinting (D-001), Deterministic Auditable Hashes (D-002), Domain-Driven Architecture (D-011), Domain Family Split Architecture (D-015), Hash Mode Migration Legacy to Semantic (D-014 Completed), Line Patterns Scale-Invariant Join Key Normalized Segments (D-017), Loaded Family Types Scope Loaded Families Only (D-018) (+17 more)
 
 ### Community 12 - "Archive: Split Detection Clustering"
 Cohesion: 0.08
@@ -472,12 +589,12 @@ Cohesion: 0.05
 Nodes (35): Adding a New Domain, Adding a New Partition to a Consolidated Domain, Adding Shape-Gated Properties, Analysis Pipeline, Architecture, CHANGELOG Discipline, Commands, Commit Message Convention (+27 more)
 
 ### Community 18 - "View Graphics Signature"
-Cohesion: 0.08
-Nodes (57): canon_str(), Canonicalize string-like values.      Rules:     - None -> <MISSING>     - str(., collect_instances(), Blocked, Any, str, core/deps.py  Centralized dependency enforcement for domain execution.  Non-nego, Typed exception used to signal a hard dependency block.      Attributes: (+49 more)
+Cohesion: 0.07
+Nodes (62): canon_str(), Canonicalize string-like values.      Rules:     - None -> <MISSING>     - str(., collect_instances(), # NOTE: Current repo domains are mostly non-geometry; link/transform helpers are, Blocked, Any, str, core/deps.py  Centralized dependency enforcement for domain execution.  Non-nego (+54 more)
 
 ### Community 19 - "Canonical Items Pipeline"
-Cohesion: 0.10
-Nodes (35): build_flat_items(), canonicalize_record(), compile_role_policy(), merge_legacy_buckets(), _normalize_item(), Any, str, Resolve roles from item.k via runtime lookup.      Returns grouped items without (+27 more)
+Cohesion: 0.19
+Nodes (20): build_flat_items(), canonicalize_record(), compile_role_policy(), merge_legacy_buckets(), _normalize_item(), Any, str, Resolve roles from item.k via runtime lookup.      Returns grouped items without (+12 more)
 
 ### Community 20 - "Cross-Domain Alignment Policies"
 Cohesion: 0.05
@@ -488,8 +605,8 @@ Cohesion: 0.10
 Nodes (41): CompletedProcess, Lock, _active_domains_from_presence_csv(), _build_patterns_missing_notes(), build_run_plan(), load_manifest(), load_registry(), main() (+33 more)
 
 ### Community 22 - "Compound Types Domain"
-Cohesion: 0.08
-Nodes (58): collect_types(), Convert any value to a string representation safely.      Handles both str and u, safe_str(), build_record_v2(), canonicalize_bool(), canonicalize_float(), int, Canonicalize a float-like value for IdentityItem.v.      Returns:         (value (+50 more)
+Cohesion: 0.12
+Nodes (43): collect_types(), Convert any value to a string representation safely.      Handles both str and u, safe_str(), _compute_delta_items(), Semantic selector list over canonical evidence.      Keep join-key material sepa, Compare override to baseline, return only changed properties.      Same logic as, _semantic_keys_from_identity_items(), _attach_placeholder_metadata() (+35 more)
 
 ### Community 23 - "Label Synthesis & Semantic Grouping"
 Cohesion: 0.15
@@ -508,8 +625,8 @@ Cohesion: 0.14
 Nodes (37): _make_layer_row(), _make_wall_record(), Any, bool, float, int, Path, str (+29 more)
 
 ### Community 27 - "Code Cluster 27"
-Cohesion: 0.17
-Nodes (38): _b32_sha1_16(), compute_attribute_concentration_metrics(), emit_analysis(), emit_records(), _extract_acc_project_label(), _file_id(), _fmt_metric(), _get_tool_version() (+30 more)
+Cohesion: 0.14
+Nodes (43): _b32_sha1_16(), compute_attribute_concentration_metrics(), compute_effective_clusters(), compute_hhi_from_shares(), emit_analysis(), emit_records(), _extract_acc_project_label(), _file_id() (+35 more)
 
 ### Community 28 - "Code Cluster 28"
 Cohesion: 0.22
@@ -524,20 +641,20 @@ Cohesion: 0.09
 Nodes (33): _build_synthetic_items_for_pair(), _build_template_lookup(), _extract_active_vco_fields(), _extract_graphic_fields(), _extract_object_style_baseline_fields(), _get_domain_payload(), _get_identity_item_value(), _get_phase2_cosmetic_value() (+25 more)
 
 ### Community 31 - "Code Cluster 31"
-Cohesion: 0.12
-Nodes (32): build_reference_standards_from_clusters(), main(), Build reference standards from cluster representatives., get_contract(), get_domain_envelope(), get_domain_payload(), get_domain_records(), get_domains_map() (+24 more)
+Cohesion: 0.10
+Nodes (39): apply_join_keys_by_ids(), compute_join_hash(), extract_identity_map(), main(), md5_utf8_join_pipe(), build_reference_standards_from_clusters(), main(), Build reference standards from cluster representatives. (+31 more)
 
 ### Community 32 - "Code Cluster 32"
 Cohesion: 0.07
-Nodes (30): _domain_run(), _ensure_parent_dir(), _extract_legacy_quality(), _extract_v2_block_reasons(), _extract_v2_hash(), get_doc(), _get_output_path_from_dynamo(), _has_v2_surface() (+22 more)
+Nodes (35): _canonicalize_all_domain_records(), _domain_run(), _enabled(), _ensure_parent_dir(), _extract_legacy_quality(), _extract_v2_block_reasons(), _extract_v2_hash(), get_doc() (+27 more)
 
 ### Community 33 - "Code Cluster 33"
 Cohesion: 0.16
 Nodes (32): analyze(), authority_confidence(), authority_scope_recommendation(), _canonical_item_str(), classify_authority_outcome(), classify_convergence(), _domain_payload_from_fp(), extract_domains_summary() (+24 more)
 
 ### Community 34 - "Code Cluster 34"
-Cohesion: 0.13
-Nodes (30): _call_llm(), _generic_build_prompt(), _generic_system_prompt(), _get_domain_records(), _groups_vocab_path(), _load_domain_prompt_module(), _load_governance_join_hashes(), load_groups_vocab() (+22 more)
+Cohesion: 0.16
+Nodes (26): _call_llm(), _generic_build_prompt(), _generic_system_prompt(), _get_domain_records(), _groups_vocab_path(), _load_governance_join_hashes(), load_groups_vocab(), _load_identity_items_from_csv() (+18 more)
 
 ### Community 35 - "Code Cluster 35"
 Cohesion: 0.15
@@ -560,16 +677,16 @@ Cohesion: 0.16
 Nodes (24): ChangeCounts, classify_pair(), Classify changes for one domain between baseline and other.      Definitions:, ExportFile, One exported fingerprint JSON treated as one authority sample., ensure_dir(), format_console_summary(), Write baseline-vs-file change classification counts.      CSV is purely descript (+16 more)
 
 ### Community 40 - "Code Cluster 40"
-Cohesion: 0.29
-Nodes (9): load_exports(), Load all monolithic exports in a directory (each file = one authority sample)., main(), _multiplicity_map(), join_hash -> multiplicity within a file, including duplicates.      DomainIndex., run_identity_collision_diagnostics(), int, int (+1 more)
+Cohesion: 0.03
+Nodes (36): ColorMediaDescriptor, ConnectorDescriptor, DefinitionFileDescriptor, DocumentCreationDescriptor, EdgeEndPointDescriptor, ExternalDefinitionDescriptor, ExternalResourceReferenceDescriptor, ExternalResourceTypeDescriptor (+28 more)
 
 ### Community 41 - "Code Cluster 41"
-Cohesion: 0.08
-Nodes (52): canon_bool(), canon_id(), canon_num(), is_sentinel(), Any, bool, str, Canonicalize Revit ElementId-like values to a decimal string.      Accepts: (+44 more)
+Cohesion: 0.10
+Nodes (32): fnum(), is_sentinel(), Any, bool, int, Legacy alias for canon_num., Create RGB signature string from a Revit Color object., Create RGB dict from a Revit Color object.      Returns None on missing/unreadab (+24 more)
 
 ### Community 42 - "Code Cluster 42"
 Cohesion: 0.15
-Nodes (26): _are_near_duplicates(), _extract_kv_typed(), find_near_duplicate_merges(), _get_synopsis_formatter(), is_fragmented(), load_annotations(), load_label_population(), load_llm_cache() (+18 more)
+Nodes (27): _are_near_duplicates(), _extract_kv_typed(), find_near_duplicate_merges(), _get_synopsis_formatter(), is_fragmented(), load_annotations(), load_label_population(), load_llm_cache() (+19 more)
 
 ### Community 43 - "Code Cluster 43"
 Cohesion: 0.13
@@ -588,8 +705,8 @@ Cohesion: 0.13
 Nodes (26): build_class_profiles(), build_dim_summaries(), build_exact_match_table(), build_family_file_detail(), build_name_cluster_table(), build_subgroups(), extract_category(), extract_family_name() (+18 more)
 
 ### Community 47 - "Code Cluster 47"
-Cohesion: 0.09
-Nodes (38): build_domain_index(), _get_join_hash(), _phase2_items_by_k(), Build a per-file join_hash index for one domain., Return a map k -> (q, v) across concatenated phase2 item buckets.      Also retu, main(), _phase2_items_map_no_dups(), Return k -> (q, v) across all phase2 buckets.      If duplicate k is detected wi (+30 more)
+Cohesion: 0.11
+Nodes (27): build_domain_index(), _get_join_hash(), _phase2_items_by_k(), Build a per-file join_hash index for one domain., Return a map k -> (q, v) across concatenated phase2 item buckets.      Also retu, main(), _phase2_items_map_no_dups(), Return k -> (q, v) across all phase2 buckets.      If duplicate k is detected wi (+19 more)
 
 ### Community 48 - "Code Cluster 48"
 Cohesion: 0.25
@@ -652,8 +769,8 @@ Cohesion: 0.22
 Nodes (19): check_domain_records(), check_phase1_compatibility(), diagnose_config(), diagnose_exports(), extract_domains_from_fp(), load_json(), main(), predict_phase1_output() (+11 more)
 
 ### Community 63 - "Code Cluster 63"
-Cohesion: 0.24
-Nodes (19): _discover_families_from_exports(), _families_present_in_baseline(), _family_shape(), FamilyRun, _filter_export_domain_records(), _get(), main(), _prepare_filtered_dirs() (+11 more)
+Cohesion: 0.15
+Nodes (29): load_exports(), Load all monolithic exports in a directory (each file = one authority sample)., _discover_families_from_exports(), _families_present_in_baseline(), _family_shape(), FamilyRun, _filter_export_domain_records(), _get() (+21 more)
 
 ### Community 64 - "Code Cluster 64"
 Cohesion: 0.21
@@ -708,8 +825,8 @@ Cohesion: 0.12
 Nodes (17): type, enum, type, properties, debug, identity_quality, is_purgeable, record_id (+9 more)
 
 ### Community 77 - "Code Cluster 77"
-Cohesion: 0.27
-Nodes (10): _load_json(), main(), _now_stamp(), _write_json(), _write_text(), _canonicalize_all_domain_records(), _enabled(), Allowlist gate for domain execution.     - ENABLED_DOMAINS = None  -> run all do (+2 more)
+Cohesion: 0.07
+Nodes (22): Definition, ApiObjectDescriptor, BoundarySegmentDescriptor, CityDescriptor, CompoundStructureLayerDescriptor, DefinitionDescriptor, DefinitionGroupDescriptor, DisposableDescriptor (+14 more)
 
 ### Community 78 - "Code Cluster 78"
 Cohesion: 0.28
@@ -728,8 +845,8 @@ Cohesion: 0.27
 Nodes (15): make_bundle_id(), _collapse_subset_related_roots(), discover_populations(), main(), _parse_args(), _pattern_summary(), _population_id(), Collapse subset/superset-related roots to most general representatives.      Thi (+7 more)
 
 ### Community 82 - "Code Cluster 82"
-Cohesion: 0.24
-Nodes (15): bytes, _canon_obj(), canonical_json_bytes(), compare_json(), diff_paths(), pretty_json(), Returns (equal, summary)     summary includes stable hashes and bounded diffs., Return an object that is stable under json.dumps(sort_keys=True). (+7 more)
+Cohesion: 0.18
+Nodes (20): bytes, _canon_obj(), canonical_json_bytes(), compare_json(), diff_paths(), pretty_json(), Returns (equal, summary)     summary includes stable hashes and bounded diffs., Return an object that is stable under json.dumps(sort_keys=True). (+12 more)
 
 ### Community 83 - "Code Cluster 83"
 Cohesion: 0.12
@@ -745,7 +862,7 @@ Nodes (12): _element_filter_kind(), _flatten_element_filter(), _get_rules_from_e
 
 ### Community 86 - "Code Cluster 86"
 Cohesion: 0.12
-Nodes (16): additional_optional, additional_required, notes, additional_optional, additional_required, notes, shape_gating, default_shape_behavior (+8 more)
+Nodes (16): additional_optional, additional_required, notes, shape_gating, default_shape_behavior, discriminator_key, shape_requirements, LinearFixed (+8 more)
 
 ### Community 87 - "Code Cluster 87"
 Cohesion: 0.12
@@ -796,16 +913,16 @@ Cohesion: 0.13
 Nodes (14): analysis_run_id, cluster_method, convergence_thresholds, high, medium, domains_in_scope, ignored_thresholds, hhi_max (+6 more)
 
 ### Community 99 - "Code Cluster 99"
-Cohesion: 0.25
-Nodes (13): AttrStabilityRow, compute_attr_stability(), compute_stress_rank(), StressRow, _phase2_items_map(), Return k -> (q,v) across phase2 buckets, and duplicate_k_count.      Used for eq, DomainIndex, Per-file index for one domain keyed by join_key.join_hash.      Ambiguity handli (+5 more)
+Cohesion: 0.11
+Nodes (30): AttrStabilityRow, compute_attr_stability(), compute_stress_rank(), StressRow, _phase2_items_map(), Return k -> (q,v) across phase2 buckets, and duplicate_k_count.      Used for eq, DomainIndex, Per-file index for one domain keyed by join_key.join_hash.      Ambiguity handli (+22 more)
 
 ### Community 100 - "Code Cluster 100"
 Cohesion: 0.26
 Nodes (13): classify(), containment_score(), jaccard_multiset(), main(), _parse_args(), step_template_governance_discovery.py  Reads records.csv and computes per-domain, Share of template's sig_hashes present in the corpus file.      Iterates templat, run() (+5 more)
 
 ### Community 101 - "Code Cluster 101"
-Cohesion: 0.42
-Nodes (9): _as_dict(), _as_int(), build_features(), _extract_counts_from_legacy(), Any, int, str, Extract stable count signals from legacy domain payloads when present.      Conv (+1 more)
+Cohesion: 0.30
+Nodes (12): _as_dict(), _as_int(), build_features(), _extract_counts_from_legacy(), Any, int, str, Extract stable count signals from legacy domain payloads when present.      Conv (+4 more)
 
 ### Community 102 - "Code Cluster 102"
 Cohesion: 0.15
@@ -860,8 +977,8 @@ Cohesion: 0.15
 Nodes (13): category, evidence, reason, category, evidence, reason, category, evidence (+5 more)
 
 ### Community 115 - "Code Cluster 115"
-Cohesion: 0.15
-Nodes (13): category, importance, pareto_score, reason, category, importance, pareto_score, reason (+5 more)
+Cohesion: 0.11
+Nodes (18): category, importance, pareto_score, reason, category, importance, pareto_score, reason (+10 more)
 
 ### Community 116 - "Code Cluster 116"
 Cohesion: 0.27
@@ -876,8 +993,8 @@ Cohesion: 0.17
 Nodes (12): line_patterns, line_pattern.seg[i].kind, line_pattern.seg[i].length, allowed_key_prefixes, allowed_keys, domain_family, indexed_key_rules, minima (+4 more)
 
 ### Community 119 - "Code Cluster 119"
-Cohesion: 0.29
-Nodes (11): _canon_id_local(), _export_ctx(), extract(), _mk_item(), Return (value, q) safe for make_identity_item without sentinel literals., Return (v, q) for optional identity metadata fields., _read_param_as_string(), _read_prop() (+3 more)
+Cohesion: 0.05
+Nodes (40): 0.1 Flatten split exports to flat tables (CSV), 1.1 Domain authority clustering, 1.2 Population framing, 1.3 Pairwise summaries, 2.0 Phase-2 IO contract, 2.1 Join-key discovery (population mode), 2.2 Stability, 2.3 Collisions (+32 more)
 
 ### Community 120 - "Code Cluster 120"
 Cohesion: 0.17
@@ -924,8 +1041,8 @@ Cohesion: 0.27
 Nodes (10): analyze_override_patterns(), _extract_override_record(), main(), View Category Overrides Join Key Discovery  Hypothesis: Override identity = base, Compute a stable hash for delta items (k/v pairs) to model delta_sig_hash., Return (baseline_sig, delta_sig, delta_items, record_id, label)., Analyze view_category_overrides for join key discovery.      Metrics:     - Base, _stable_delta_hash() (+2 more)
 
 ### Community 131 - "Code Cluster 131"
-Cohesion: 0.20
-Nodes (11): attribution_gap Metric, compare_cross_segment.py, cross_segment_delta.csv, cross_segment_summary.csv, Governance Chain (Generic→Template→Container→Project), cross_segment_governance_states.csv, join_hash Cross-Segment Resolution, phantom_governance Concept (+3 more)
+Cohesion: 0.15
+Nodes (15): 6. Output Schema, attribution_gap Metric, compare_cross_segment.py, cross_segment_delta.csv, cross_segment_file_pairs.csv, cross_segment_governance_state_summary.csv, cross_segment_governance_states.csv, cross_segment_summary.csv (+7 more)
 
 ### Community 132 - "Code Cluster 132"
 Cohesion: 0.40
@@ -968,8 +1085,8 @@ Cohesion: 0.22
 Nodes (10): additionalProperties, items, minItems, properties, required, type, items, k (+2 more)
 
 ### Community 142 - "Code Cluster 142"
-Cohesion: 0.22
-Nodes (10): Phase 0: Inventory & Observability, Phase 1: Baseline Gravity & Population Shape, Phase 2: Identity & Drift Explanation, Exploration (DAX) vs Evidence (Python artifacts), Identity vs Semantic Meaning Separation, Phase-2 Join Key Design Plan, Definition-Based Identity Principle, Zero Fragmentation Acceptance Criterion (+2 more)
+Cohesion: 0.18
+Nodes (11): Phase 0: Inventory & Observability, Phase 1: Baseline Gravity & Population Shape, Phase 2: Identity & Drift Explanation, Phase 3: Normative Interpretation, Phase 4: Causal Analysis, Phase 5: Intervention Design, Phase 6: Strategic & Predictive Insight, Exploration (DAX) vs Evidence (Python artifacts) (+3 more)
 
 ### Community 143 - "Code Cluster 143"
 Cohesion: 0.38
@@ -996,8 +1113,8 @@ Cohesion: 0.25
 Nodes (7): DocViewContext, Any, str, Deterministic, explainable view context snapshot.      Fields:     - view_id: in, Shared context object for domains that need consistent view-scoped reads.      T, Return a cached ViewInfo for `view`, with explicit reasons for missing/unreadabl, ViewInfo
 
 ### Community 150 - "Code Cluster 150"
-Cohesion: 0.26
-Nodes (11): _is_list_of_str(), Validate shape-gating semantics and return structured issues.      Args:, Validate shape_gating section of a policy.      Args:         domain_name: Name, validate_domain_join_key_policy(), _validate_shape_gating(), test_rule_a1_discriminator_first_required(), test_rule_a2_no_overlap_common_required(), test_rule_a3_additional_required_in_optional_items() (+3 more)
+Cohesion: 0.39
+Nodes (8): Validate shape-gating semantics and return structured issues.      Args:, validate_domain_join_key_policy(), test_rule_a1_discriminator_first_required(), test_rule_a2_no_overlap_common_required(), test_rule_a3_additional_required_in_optional_items(), test_rule_a4_requires_non_empty_additional_required(), test_rule_a5_orphaned_keys_warning_only(), test_valid_shape_gated_policy_has_no_errors()
 
 ### Community 151 - "Code Cluster 151"
 Cohesion: 0.42
@@ -1020,16 +1137,16 @@ Cohesion: 0.22
 Nodes (9): allowed_item_prefixes, allowed_items, hash_alg, minima, notes, required_items, sig_hash_schema, arrowheads (+1 more)
 
 ### Community 156 - "Code Cluster 156"
-Cohesion: 0.22
+Cohesion: 0.36
 Nodes (8): domain, explicitly_excluded_items, hash_alg, join_key_schema, notes, optional_items, required_items, version_history
 
 ### Community 157 - "Code Cluster 157"
-Cohesion: 0.54
-Nodes (7): apply_join_keys_by_ids(), compute_join_hash(), extract_identity_map(), main(), md5_utf8_join_pipe(), Any, str
+Cohesion: 0.05
+Nodes (38): 1. Add CI to Run `pytest tests/` on Push and PR, 1. Single Point of Failure — Knowledge Concentration, 2. No Automated Quality Gate, 2. Update CHANGELOG and README to Reflect Current State, 3. Register Missing Domains in `domain_identity_keys_v2.json`, 3. Untestable Core Path Without Revit, 4. Add Unit Tests for `core/collect.py` and `core/graphic_overrides.py`, 4. Stale Documentation Creates False Confidence (+30 more)
 
 ### Community 158 - "Code Cluster 158"
-Cohesion: 0.54
-Nodes (7): _diff_manifests(), _load_json(), main(), _to_manifest(), Any, int, str
+Cohesion: 0.26
+Nodes (13): _diff_manifests(), _load_json(), main(), _to_manifest(), build_manifest(), Any, bool, str (+5 more)
 
 ### Community 159 - "Code Cluster 159"
 Cohesion: 0.61
@@ -1040,12 +1157,12 @@ Cohesion: 0.61
 Nodes (7): _extract_features(), _get(), main(), _qv(), run_candidate_joinkey_simulation(), Any, str
 
 ### Community 161 - "Code Cluster 161"
-Cohesion: 0.46
-Nodes (7): _extract_label_qv(), _get_join_hash(), main(), Best-effort extraction of a label surface.      Preserves explicit states:     -, run_joinhash_label_population(), Any, str
+Cohesion: 0.05
+Nodes (26): AssetPropertiesDescriptor, CurtainGridDescriptor, FamilySizeTableDescriptor, MepSectionDescriptor, ScheduleDefinitionDescriptor, WorksetTableDescriptor, IDescriptorResolver, Func (+18 more)
 
 ### Community 162 - "Code Cluster 162"
-Cohesion: 0.31
-Nodes (9): build_manifest(), Any, bool, str, Build a deterministic manifest derived from payload["_contract"].      Args:, _safe_dict(), _sample_monolithic(), test_monolithic_features_surface() (+1 more)
+Cohesion: 0.15
+Nodes (29): _as_bool_from_param(), _as_double(), _as_int(), _as_string(), canon_str(), first_param(), fnum(), format_len_inches() (+21 more)
 
 ### Community 163 - "Code Cluster 163"
 Cohesion: 0.43
@@ -1064,12 +1181,12 @@ Cohesion: 0.25
 Nodes (7): additionalProperties, allOf, $id, required, $schema, title, type
 
 ### Community 167 - "Code Cluster 167"
-Cohesion: 0.25
-Nodes (8): discover_hash_policy.py, Policy Modes (discover/validate/harsh), Pareto Discovery for Join Keys, Pattern ID (pat_ + base32lower sha1), export_run_id (file-id basename mode), phase0_identity_items.csv, phase0_records.csv, Domain Probe Inventory (2024-02-05)
+Cohesion: 0.15
+Nodes (13): Apply Stage (T2), Discover Stage (T1), Flatten Stage (T0), run_extract_all.py Orchestrator, sig_hash_as_join_key (DEGRADED identity mode), similarity_compare.py (DEPRECATED), export_to_flat_tables.py, Pattern ID (pat_ + base32lower sha1) (+5 more)
 
 ### Community 168 - "Code Cluster 168"
-Cohesion: 0.32
-Nodes (8): similarity_compare.py (DEPRECATED), Authority vs Probe Mode (Phase-1), export_to_flat_tables.py, Phase 0 Tools Map, phase1_domain_authority.py, Phase-2 Baseline (change analysis anchor), Seed-Baseline (Phase-1 labeling bias), PowerShell Command Examples
+Cohesion: 0.60
+Nodes (5): Authority vs Probe Mode (Phase-1), Phase 0 Tools Map, phase1_domain_authority.py, Phase-2 Baseline (change analysis anchor), Seed-Baseline (Phase-1 labeling bias)
 
 ### Community 169 - "Code Cluster 169"
 Cohesion: 0.54
@@ -1544,8 +1661,8 @@ Cohesion: 0.47
 Nodes (3): _Id, test_text_types_extract_emits_flat_items_only(), _Type
 
 ### Community 287 - "Code Cluster 287"
-Cohesion: 0.33
-Nodes (6): compute_effective_clusters(), compute_hhi_from_shares(), bool, float, Compute HHI from a generic share vector.      Shares must be non-negative propor, Return effective cluster count (1/HHI) or None when undefined.      This helper
+Cohesion: 0.07
+Nodes (28): 10. Runner Global Notes (Required), 11. Phase Graphics Special Rule, 12. Diff Interpretability Requirements, 13. Discovery vs Governed Hash Contracts, 1. Domain Output Contract (Required), 2.1 Hash Only Semantic Data, 2.2 Unreadable Data Policy, 2.3 No Per-Document Conditional Hashing (+20 more)
 
 ### Community 288 - "Code Cluster 288"
 Cohesion: 0.50
@@ -1608,12 +1725,12 @@ Cohesion: 0.40
 Nodes (5): minLength, pattern, status_reasons, items, type
 
 ### Community 303 - "Code Cluster 303"
-Cohesion: 0.40
-Nodes (5): Apply Stage (T2), Discover Stage (T1), Flatten Stage (T0), run_extract_all.py Orchestrator, sig_hash_as_join_key (DEGRADED identity mode)
+Cohesion: 0.08
+Nodes (23): 1. Data-scope checkpoint, 1. What is the scope?, 2. All/used checkpoint, 2. What is internally consistent?, 3. Governance-state checkpoint, 3. What is provided, carried, and used?, 4. Ratification checkpoint, 4. What is created or modified locally? (+15 more)
 
 ### Community 304 - "Code Cluster 304"
-Cohesion: 0.40
-Nodes (5): default_shape_behavior (common_only / block), Shape Discriminator Key, Join Key Shape-Gating Schema (v3), shape_requirements (per-shape additional_required/optional), dimension_types Join Key Policy
+Cohesion: 0.18
+Nodes (11): discover_hash_policy.py, Policy Modes (discover/validate/harsh), default_shape_behavior (common_only / block), Shape Discriminator Key, Join Key Shape-Gating Schema (v3), shape_requirements (per-shape additional_required/optional), Zero Fragmentation Acceptance Criterion, Global Join Key Consistency Principle (+3 more)
 
 ### Community 305 - "Code Cluster 305"
 Cohesion: 0.40
@@ -1660,16 +1777,16 @@ Cohesion: 0.50
 Nodes (4): str, Enforces PR3 sentinel policy:      - Domains may not contain any "<Token>" liter, _repo_root(), test_domains_do_not_emit_extra_angle_bracket_tokens()
 
 ### Community 317 - "Code Cluster 317"
-Cohesion: 0.40
-Nodes (5): category, importance, pareto_score, reason, dim_type.accuracy
+Cohesion: 0.09
+Nodes (21): 2025-12-17, Added, Added, Added, Added, Added, Changed, Changed (+13 more)
 
 ### Community 318 - "Code Cluster 318"
-Cohesion: 0.40
-Nodes (5): category, importance, pareto_score, reason, dim_type.rounding
+Cohesion: 0.10
+Nodes (16): Architecture Overview, Context Dictionary Schema, Dependency Contract, Dependency Direction, Design Intent, Domain-Populated Keys, Layer 0 — Core (Pure Python), Layer 1 — Domain Extractors (Revit-aware) (+8 more)
 
 ### Community 319 - "Code Cluster 319"
-Cohesion: 0.40
-Nodes (5): spot_family, additional_required, pareto_score, reason, shapes
+Cohesion: 0.19
+Nodes (15): iter_input_files(), main(), parse_domains(), process_payload(), transform_record(), test_identity_lineage_items_are_preserved_in_canonical_conversion(), _extract_record(), _Id (+7 more)
 
 ### Community 320 - "Code Cluster 320"
 Cohesion: 0.50
@@ -1684,8 +1801,8 @@ Cohesion: 0.50
 Nodes (4): minLength, pattern, type, domain
 
 ### Community 323 - "Micro Cluster 323"
-Cohesion: 0.50
-Nodes (4): Phase 3: Normative Interpretation, Phase 4: Causal Analysis, Phase 5: Intervention Design, Phase 6: Strategic & Predictive Insight
+Cohesion: 0.16
+Nodes (14): CurveLoop, CurveLoopDescriptor, SelectCurveLoop(), ShowCurveLoop(), ContextMenu, Document, ExternalEvent, Func (+6 more)
 
 ### Community 324 - "Micro Cluster 324"
 Cohesion: 0.83
@@ -1720,8 +1837,8 @@ Cohesion: 0.50
 Nodes (4): additional_optional, additional_required, notes, Linear
 
 ### Community 332 - "Micro Cluster 332"
-Cohesion: 0.50
-Nodes (4): additional_optional, additional_required, notes, LinearFixed
+Cohesion: 0.19
+Nodes (12): ElementDescriptor, RegisterCoordinationModelExtensions(), Element, ElementId, ICollection, ContextMenu, ExternalEvent, IExtensionManager (+4 more)
 
 ### Community 333 - "Micro Cluster 333"
 Cohesion: 0.50
@@ -1732,8 +1849,8 @@ Cohesion: 0.50
 Nodes (4): SpotElevation, additional_optional, additional_required, notes
 
 ### Community 335 - "Micro Cluster 335"
-Cohesion: 0.50
-Nodes (4): SpotElevationFixed, additional_optional, additional_required, notes
+Cohesion: 0.11
+Nodes (18): 10. Known Limitations, 1. Purpose and Analytical Questions, 2. Comparison Types, 3. Mode Switching: Bundle vs File, 4. join_hash Resolution, 5. Aggregation Approach, 7. CLI Reference, All-view vs used-view governance semantics (+10 more)
 
 ### Community 336 - "Micro Cluster 336"
 Cohesion: 0.50
@@ -1747,25 +1864,469 @@ Nodes (3): enum, type, is_purgeable_q
 Cohesion: 0.67
 Nodes (3): Revit Integration Tests (golden baselines), revit_test_runner_pyrevit.py, REVIT_FP_UPDATE_GOLDEN Env Var Workflow
 
+### Community 354 - "Micro Cluster 354"
+Cohesion: 0.20
+Nodes (9): Changes, Notes for reviewers, Risks / Failure modes, Rollback plan, Scope, Summary, Type, Verification (+1 more)
+
+### Community 377 - "Community 377"
+Cohesion: 0.16
+Nodes (13): CylindricalFaceDescriptor, FaceDescriptor, SelectFace(), ShowFace(), Face, Func, IVariant, ParameterInfo (+5 more)
+
+### Community 378 - "Community 378"
+Cohesion: 0.11
+Nodes (17): Backward Compatibility, Core Fields (Required), default_shape_behavior Values, Example: dimension_types Domain, Join Key Composition by Shape, Join Key Shape-Gating Schema Extension, Join Matching Algorithm, Migration Guide (+9 more)
+
+### Community 379 - "Community 379"
+Cohesion: 0.11
+Nodes (16): CHANGELOG Discipline, Commit Discipline, Definition of Done (Refactor Phase), Execution Order (Dependency Safe), M0 — Anchor Baseline, M1 — Introduce Runner (No Semantic Change), M2 — Extract Core Utilities (No Semantic Change), M3 — Extract Domains (One at a Time, No Semantic Change) (+8 more)
+
+### Community 380 - "Community 380"
+Cohesion: 0.17
+Nodes (14): Explicit Ordering Rules Per Domain (D-006), Fail-Soft Is Mandatory (D-005), IdentityItem {k, q, v} Schema, Identity Quality Dominance Order, join_hash Governance Equivalence Hash, Pattern ID Stable Identity from join_hash, Phase-2 Buckets (semantic, cosmetic, coordination, unknown items), record_rows as Canonical Explainability (D-003) (+6 more)
+
+### Community 381 - "Community 381"
+Cohesion: 0.24
+Nodes (15): apply_sig_hash_policy_to_record(), build_sig_hash_from_policy(), _items_to_map(), _key_allowed(), Any, bool, str, Return (sig_hash, status, status_reasons, hash_items).      The builder hashes e (+7 more)
+
+### Community 382 - "Community 382"
+Cohesion: 0.12
+Nodes (16): Core Principles, Exit Criteria, Exit Criteria, Exit Criteria, INTERMEDIATE TERM — Lock Identity, Scale the Pattern, LONG TERM — Expand Semantic Insight Safely, NEAR TERM — Design the Join Key (No Exporter Changes), Objective (+8 more)
+
+### Community 383 - "Community 383"
+Cohesion: 0.12
+Nodes (16): domain — `arrowheads`, domain — `dimension_types`, domain — `fill_patterns`, domain — `identity`, domain — `line_patterns`, domain — `line_styles`, domain — `object_styles`, domain — `phase_filters` (+8 more)
+
+### Community 384 - "Community 384"
+Cohesion: 0.12
+Nodes (16): Definitions, Domain Hypotheses, Exported Surfaces Relevant to Join, External Feasibility (Empirical), External Join-Key Generation (from Exported JSON), IdentityItem Invariants, Join Hash, Join Key (+8 more)
+
+### Community 385 - "Community 385"
+Cohesion: 0.12
+Nodes (16): Blocked Records, Determinism, Domain key registry and minima, Identity bans, identity_quality semantics (authoritative), IdentityItem (identity_basis.items), Invariants (non-negotiable), Label enums (+8 more)
+
+### Community 386 - "Community 386"
+Cohesion: 0.19
+Nodes (12): Curve, CurveDescriptor, SelectCurve(), ShowCurve(), ContextMenu, ExternalEvent, Func, IServiceProvider (+4 more)
+
+### Community 387 - "Community 387"
+Cohesion: 0.17
+Nodes (10): ParameterDescriptor, Parameter, ContextMenu, ExternalEvent, Func, IExtensionManager, IServiceProvider, IVariant (+2 more)
+
+### Community 388 - "Community 388"
+Cohesion: 0.16
+Nodes (12): ReferenceDescriptor, SelectReference(), Reference, ContextMenu, Document, ExternalEvent, Func, IExtensionManager (+4 more)
+
+### Community 389 - "Community 389"
+Cohesion: 0.15
+Nodes (10): MeshDescriptor, XyzDescriptor, IContextMenuConnector, Mesh, ContextMenu, IServiceProvider, Task, ContextMenu (+2 more)
+
+### Community 390 - "Community 390"
+Cohesion: 0.16
+Nodes (9): BoundingBoxXYZ, BoundingBoxXyzDescriptor, ContextMenu, Func, IExtensionManager, IServiceProvider, IVariant, ParameterInfo (+1 more)
+
+### Community 391 - "Community 391"
+Cohesion: 0.14
+Nodes (9): DependencyObjectDescriptor, UiElementDescriptor, Func, IExtensionManager, IVariant, ParameterInfo, Func, IVariant (+1 more)
+
+### Community 392 - "Community 392"
+Cohesion: 0.23
+Nodes (10): SelectSolid(), ShowSolid(), SolidDescriptor, ContextMenu, ExternalEvent, IExtensionManager, IServiceProvider, Task (+2 more)
+
+### Community 393 - "Community 393"
+Cohesion: 0.14
+Nodes (13): 1) `dimension_types`, 2) `line_patterns`, 3) `line_styles`, 4) `object_styles`, 5) `units`, Acceptance Criteria, Architectural Decision, Deliverables (+5 more)
+
+### Community 394 - "Community 394"
+Cohesion: 0.15
+Nodes (13): D-001 — Behavior-First Fingerprinting, D-002 — Deterministic, Auditable Hashes, D-003 — `record_rows` as Canonical Explainability, D-004 — UniqueId Usage Is Restricted, D-005 — Fail-Soft Is Mandatory, D-006 — Ordering Rules Are Explicit Per Domain, D-007 — Global vs Contextual Domain Split, D-008 — View Templates Are Behavioral, Not Nominal (+5 more)
+
+### Community 395 - "Community 395"
+Cohesion: 0.15
+Nodes (12): CONDITIONAL / OPTIONAL (use only if you explicitly need it), DEPRECATED, Deprecated / Legacy Tools (tools/), Deprecation rules used here, KEEP (Docs-only / Example), Niche probes (keep only if intentionally used), Notes / Warnings, tools/details_to_csv.py (+4 more)
+
+### Community 396 - "Community 396"
+Cohesion: 0.15
+Nodes (12): Change set, Classification, Compatibility & migration, Design, Feature PR — New or Extended Capability, Motivation / Problem statement, Reviewer guidance, Risks / failure modes (+4 more)
+
+### Community 397 - "Community 397"
+Cohesion: 0.17
+Nodes (11): Auto-threshold derivation, Bundle Analysis Pipeline, Diagnostics output, Discovery flags, Effective threshold, Logging, Per-population output directories, Population-aware mode (Step 0 + per-population runs) (+3 more)
+
+### Community 398 - "Community 398"
+Cohesion: 0.22
+Nodes (7): EntityDescriptor, Field, MethodInfo, ForgeTypeId, Func, IVariant, ParameterInfo
+
+### Community 399 - "Community 399"
+Cohesion: 0.20
+Nodes (7): ExternalServiceDescriptor, ExternalService, Func, IVariant, ParameterInfo, DescriptorsMap, Type
+
+### Community 400 - "Community 400"
+Cohesion: 0.18
+Nodes (10): Governance Note, One-Line Summary, Phase 0–6: Questions Each Phase Can Answer, Phase 0 — Inventory & Observability, Phase 1 — Baseline Gravity & Population Shape, Phase 2 — Identity & Drift Explanation, Phase 3 — Normative Interpretation, Phase 4 — Causal Analysis (+2 more)
+
+### Community 401 - "Community 401"
+Cohesion: 0.18
+Nodes (10): 1) `hhi_domain_presence`, 2) `hhi_domain_dominance`, 3) `hhi_domain_records`, 4) `hhi_file_records`, 5) Effective cluster variants, Dominance diagnostics fields, HHI Metric Definitions, Legacy Fields (+2 more)
+
+### Community 402 - "Community 402"
+Cohesion: 0.18
+Nodes (10): Contextual Domains, Core Principles, Execution Environment, Global Filter / Phase Domains, Global Style Domains, Metadata Domains, Planned, Revit Fingerprint — MVP → Baseline (+2 more)
+
+### Community 403 - "Community 403"
+Cohesion: 0.22
+Nodes (7): Category, CategoryDescriptor, Document, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 404 - "Community 404"
+Cohesion: 0.27
+Nodes (9): Corpus Update Pipeline (Run A/B/C Stages), CSV Contract v2.1 Split-Analysis Schema, domain_patterns.csv with semantic_group Column, Governance Role Classification (Container/Template/Project/Generic), HHI Concentration Metrics, is_purgeable Purgeability Fields, LLM Label Synthesis for Fragmented Pattern Labels, Segment Orchestrator for Bundle Analysis (+1 more)
+
+### Community 405 - "Community 405"
+Cohesion: 0.20
+Nodes (6): DefinitionBindingMapIteratorDescriptor, EnumeratorDescriptor, IDescriptorRedirector, IEnumerator, object, object
+
+### Community 406 - "Community 406"
+Cohesion: 0.31
+Nodes (8): EdgeDescriptor, SelectEdge(), ShowEdge(), Edge, ContextMenu, ExternalEvent, IServiceProvider, UIApplication
+
+### Community 407 - "Community 407"
+Cohesion: 0.22
+Nodes (6): DocumentDescriptor, Document, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 408 - "Community 408"
+Cohesion: 0.22
+Nodes (6): ForgeTypeIdDescriptor, ForgeTypeId, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 409 - "Community 409"
+Cohesion: 0.25
+Nodes (6): PartDescriptor, Document, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 410 - "Community 410"
+Cohesion: 0.22
+Nodes (8): Fail-Soft Policy, Fingerprinting Invariants, Hash Semantics, Identity Rules, Ordering Rules, Phase-2 Buckets, record_rows, Refactor Discipline
+
+### Community 411 - "Community 411"
+Cohesion: 0.25
+Nodes (5): CurveElementDescriptor, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 412 - "Community 412"
+Cohesion: 0.29
+Nodes (6): EvaluatedParameterDescriptor, EvaluatedParameter, Document, Func, IVariant, ParameterInfo
+
+### Community 413 - "Community 413"
+Cohesion: 0.25
+Nodes (5): FamilyDescriptor, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 414 - "Community 414"
+Cohesion: 0.25
+Nodes (5): HostObjectDescriptor, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 415 - "Community 415"
+Cohesion: 0.25
+Nodes (5): PartMakerDescriptor, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 416 - "Community 416"
+Cohesion: 0.25
+Nodes (5): PipeDescriptor, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 417 - "Community 417"
+Cohesion: 0.29
+Nodes (6): SchedulableFieldDescriptor, Document, Func, IVariant, ParameterInfo, SchedulableField
+
+### Community 418 - "Community 418"
+Cohesion: 0.25
+Nodes (5): UnitsDescriptor, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 419 - "Community 419"
+Cohesion: 0.25
+Nodes (5): ViewDescriptor, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 420 - "Community 420"
+Cohesion: 0.25
+Nodes (5): WallDescriptor, Func, IExtensionManager, IVariant, ParameterInfo
+
+### Community 421 - "Community 421"
+Cohesion: 0.25
+Nodes (7): CSV Contract v2.1 (Option 2 joinable split-analysis), `domain_patterns.csv` semantic grouping column, Evidence vs derived boundary, Grains, Pattern linkage, Required split-analysis contract columns (Option 2), Versioning
+
+### Community 422 - "Community 422"
+Cohesion: 0.25
+Nodes (8): CI context, Helpful quick links, Important conventions, Project structure, Revit Fingerprint workspace instructions, Test and development commands, Use this repo guidance, What to avoid
+
+### Community 423 - "Community 423"
+Cohesion: 0.25
+Nodes (7): Change set, Evidence, Intent, Invariants, PATCH PR — Non-breaking only, Post-conditions, Reviewer checklist
+
+### Community 424 - "Community 424"
+Cohesion: 0.25
+Nodes (7): Descriptor files that don't map to current domains, Direct descriptor coverage, Future domains — descriptor availability, How to read a descriptor against an extractor, Indirect / compound coverage, (potential future domain signals), RevitLookup Descriptor → Fingerprint Domain Map
+
+### Community 425 - "Community 425"
+Cohesion: 0.25
+Nodes (7): branch, commit_sha, files_not_found, files_written, priority_only, repo, sync_date
+
+### Community 426 - "Community 426"
+Cohesion: 0.25
+Nodes (3): In OGS context, 0 means 'no override' and should be invalid., Object without IntegerValue should not be considered invalid., TestIsInvalidElementId
+
+### Community 427 - "Community 427"
+Cohesion: 0.29
+Nodes (7): Affected domains in this branch, Consequences, Context, Cross-domain alignment, D-015 — Domain Family Architecture, Decision, Vocabulary
+
+### Community 428 - "Community 428"
+Cohesion: 0.29
+Nodes (5): EnumerableDescriptor, IDescriptorEnumerator, Func, IVariant, ParameterInfo
+
+### Community 429 - "Community 429"
+Cohesion: 0.29
+Nodes (5): FailureDefinitionAccessorDescriptor, FailureDefinitionAccessor, Func, IVariant, ParameterInfo
+
+### Community 430 - "Community 430"
+Cohesion: 0.33
+Nodes (5): FamilyManagerDescriptor, Document, Func, IVariant, ParameterInfo
+
+### Community 431 - "Community 431"
+Cohesion: 0.33
+Nodes (5): PerformanceAdviserDescriptor, Document, Func, IVariant, ParameterInfo
+
+### Community 432 - "Community 432"
+Cohesion: 0.33
+Nodes (5): TableSectionDataDescriptor, Document, Func, IVariant, ParameterInfo
+
+### Community 433 - "Community 433"
+Cohesion: 0.29
+Nodes (7): 8. Interpretation Guide, attribution_gap concept, phantom_governance concept, Sibling Jaccard (sibling_templates, sibling_projects), Template → Project (containment_a_in_b), Template → Project (containment_b_in_a), Within-Project Jaccard
+
+### Community 434 - "Community 434"
+Cohesion: 0.33
+Nodes (6): Consequences, Context, D-013 — Phase Graphics Domain Disabled (API Limitation), Decision, Rationale, Revisit Criteria
+
+### Community 435 - "Community 435"
+Cohesion: 0.33
+Nodes (6): Consequences, D-017 — line_patterns Join Key Upgraded to Scale-Invariant Normalized Segments, Decision, Normalization rule, Rationale, Validation extension (accepted operating practice)
+
+### Community 436 - "Community 436"
+Cohesion: 0.33
+Nodes (4): AnalyticalLinkTypeDescriptor, Func, IVariant, ParameterInfo
+
+### Community 437 - "Community 437"
+Cohesion: 0.33
+Nodes (4): AreaVolumeSettingsDescriptor, Func, IVariant, ParameterInfo
+
+### Community 438 - "Community 438"
+Cohesion: 0.33
+Nodes (4): AssetPropertyDescriptor, Func, IVariant, ParameterInfo
+
+### Community 439 - "Community 439"
+Cohesion: 0.33
+Nodes (4): BasePointDescriptor, Func, IVariant, ParameterInfo
+
+### Community 440 - "Community 440"
+Cohesion: 0.33
+Nodes (4): CompoundStructureDescriptor, Func, IVariant, ParameterInfo
+
+### Community 441 - "Community 441"
+Cohesion: 0.33
+Nodes (4): ConnectorManagerDescriptor, Func, IVariant, ParameterInfo
+
+### Community 442 - "Community 442"
+Cohesion: 0.33
+Nodes (4): DatumPlaneDescriptor, Func, IVariant, ParameterInfo
+
+### Community 443 - "Community 443"
+Cohesion: 0.47
+Nodes (4): ElementTypeDescriptor, RegisterCoordinationModelExtensions(), IExtensionManager, MethodImpl
+
+### Community 444 - "Community 444"
+Cohesion: 0.33
+Nodes (4): ElevationMarkerDescriptor, Func, IVariant, ParameterInfo
+
+### Community 445 - "Community 445"
+Cohesion: 0.33
+Nodes (4): FamilySizeTableManagerDescriptor, Func, IVariant, ParameterInfo
+
+### Community 446 - "Community 446"
+Cohesion: 0.33
+Nodes (4): IndependentTagDescriptor, Func, IVariant, ParameterInfo
+
+### Community 447 - "Community 447"
+Cohesion: 0.33
+Nodes (4): InternalOriginDescriptor, Func, IVariant, ParameterInfo
+
+### Community 448 - "Community 448"
+Cohesion: 0.33
+Nodes (4): LightFamilyDescriptor, Func, IVariant, ParameterInfo
+
+### Community 449 - "Community 449"
+Cohesion: 0.33
+Nodes (4): LocationCurveDescriptor, Func, IVariant, ParameterInfo
+
+### Community 450 - "Community 450"
+Cohesion: 0.33
+Nodes (4): MepSystemDescriptor, Func, IVariant, ParameterInfo
+
+### Community 451 - "Community 451"
+Cohesion: 0.33
+Nodes (4): PanelDescriptor, Func, IVariant, ParameterInfo
+
+### Community 452 - "Community 452"
+Cohesion: 0.33
+Nodes (4): PlanViewRangeDescriptor, Func, IVariant, ParameterInfo
+
+### Community 453 - "Community 453"
+Cohesion: 0.33
+Nodes (4): PrintManagerDescriptor, Func, IVariant, ParameterInfo
+
+### Community 454 - "Community 454"
+Cohesion: 0.33
+Nodes (4): RevisionNumberingSequenceDescriptor, Func, IVariant, ParameterInfo
+
+### Community 455 - "Community 455"
+Cohesion: 0.33
+Nodes (4): RevitLinkTypeDescriptor, Func, IVariant, ParameterInfo
+
+### Community 456 - "Community 456"
+Cohesion: 0.33
+Nodes (4): SpatialElementDescriptor, Func, IVariant, ParameterInfo
+
+### Community 457 - "Community 457"
+Cohesion: 0.33
+Nodes (4): StructuralSettingsDescriptor, Func, IVariant, ParameterInfo
+
+### Community 458 - "Community 458"
+Cohesion: 0.33
+Nodes (4): SunAndShadowSettingsDescriptor, Func, IVariant, ParameterInfo
+
+### Community 459 - "Community 459"
+Cohesion: 0.33
+Nodes (4): TableDataDescriptor, Func, IVariant, ParameterInfo
+
+### Community 460 - "Community 460"
+Cohesion: 0.33
+Nodes (4): TableViewDescriptor, Func, IVariant, ParameterInfo
+
+### Community 461 - "Community 461"
+Cohesion: 0.33
+Nodes (4): ViewScheduleDescriptor, Func, IVariant, ParameterInfo
+
+### Community 462 - "Community 462"
+Cohesion: 0.33
+Nodes (4): WallTypeDescriptor, Func, IVariant, ParameterInfo
+
+### Community 463 - "Community 463"
+Cohesion: 0.33
+Nodes (4): WireDescriptor, Func, IVariant, ParameterInfo
+
+### Community 464 - "Community 464"
+Cohesion: 0.33
+Nodes (6): 9. Delta Pattern Output, Interpretation — three categories, --no-delta flag, Output schema, Relationship to containment metrics, What delta patterns are
+
+### Community 465 - "Community 465"
+Cohesion: 0.33
+Nodes (5): Canonical command matrix, Extract Orchestrator Stage Matrix, Join-policy compatibility notes, Join-policy gate matrix, Stage execution matrix
+
+### Community 466 - "Community 466"
+Cohesion: 0.33
+Nodes (5): Data source, Gating behavior (`loaded_family_types`), Hash Discovery Tooling (`tools/discover_hash_policy.py`), Option reference, `--policy-json` intent
+
+### Community 467 - "Community 467"
+Cohesion: 0.33
+Nodes (5): Important distinction, Keeping up to date, Purpose, RevitLookup Descriptor Reference, When to use
+
+### Community 468 - "Community 468"
+Cohesion: 0.40
+Nodes (3): Application, ApplicationDescriptor, IExtensionManager
+
+### Community 469 - "Community 469"
+Cohesion: 0.50
+Nodes (5): Architecture Overview, Context Dictionary (ctx) Cross-Domain Data Flow, Global vs Contextual Domain Split (D-007), Layered Architecture Core-Domains-Context-Runner, require_domain Dependency Enforcement
+
+### Community 470 - "Community 470"
+Cohesion: 0.40
+Nodes (4): central_path_norm Normalization Pipeline, Monolithic Single JSON Export Per Run, record.v2 Schema, Split export removed
+
+### Community 471 - "Community 471"
+Cohesion: 0.40
+Nodes (4): D-014 — Hash Mode Migration Timeline (COMPLETED), D-015 — Domain Family Split Architecture, DECISIONS, Notes
+
+### Community 472 - "Community 472"
+Cohesion: 0.40
+Nodes (5): Category 3 hooks, Consequences, Context, D-016 — View Category Overrides Scope and Category Classification, Decision
+
+### Community 473 - "Community 473"
+Cohesion: 0.40
+Nodes (5): Consequences, Context, D-014 — Hash Mode Migration Timeline, Decision, Rationale
+
+### Community 474 - "Community 474"
+Cohesion: 0.40
+Nodes (5): Consequences, Context, D-018 — loaded_family_types scope: loaded families only; system families deferred, Decision, Status
+
+### Community 475 - "Community 475"
+Cohesion: 0.50
+Nodes (3): ColorDescriptor, Color, IExtensionManager
+
+### Community 476 - "Community 476"
+Cohesion: 0.40
+Nodes (3): ModelPathDescriptor, ModelPath, IExtensionManager
+
+### Community 477 - "Community 477"
+Cohesion: 0.40
+Nodes (4): `domain_patterns.csv` additive column, Files, Notes, V2.1 Analysis Schema
+
+### Community 478 - "Community 478"
+Cohesion: 0.40
+Nodes (4): Determinism, Pattern Identity, Threshold placeholders, V2.1 Determinism & Identity
+
+### Community 479 - "Community 479"
+Cohesion: 0.40
+Nodes (4): Files, Notes, `phase0_records.csv` columns, V2.1 Phase 0 Export Schema
+
+### Community 480 - "Community 480"
+Cohesion: 0.60
+Nodes (4): _load_domain_prompt_module(), Import domain prompt module, with progressive base-name fallback.      Tries exa, test_domain_prompt_loader_falls_back_to_base_for_multi_segment_domains(), test_domain_prompt_loader_supports_single_word_domains()
+
+### Community 481 - "Community 481"
+Cohesion: 0.40
+Nodes (4): Revit integration tests (golden baselines), Run, Setup, Update workflow (intentional semantic changes)
+
+### Community 482 - "Community 482"
+Cohesion: 0.40
+Nodes (5): category, importance, pareto_score, reason, dim_type.suffix
+
+### Community 483 - "Community 483"
+Cohesion: 0.40
+Nodes (5): additional_required, pareto_score, reason, shapes, linear_family
+
+### Community 486 - "Community 486"
+Cohesion: 0.50
+Nodes (3): Func, IVariant, ParameterInfo
+
+### Community 492 - "Community 492"
+Cohesion: 0.50
+Nodes (4): additional_optional, additional_required, notes, Angular
+
+### Community 493 - "Community 493"
+Cohesion: 0.50
+Nodes (4): additional_optional, additional_required, notes, ArcLength
+
 ## Knowledge Gaps
-- **1256 isolated node(s):** `PreToolUse`, `Project Overview`, `Commands`, `Architecture`, `Directory Structure` (+1251 more)
+- **1926 isolated node(s):** `version`, `record_schema_version`, `identity_item_schema`, `identity_quality_dominance_order`, `banned_identity_value_substrings` (+1921 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **15 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `load_exports()` connect `Code Cluster 40` to `Code Cluster 160`, `Code Cluster 161`, `Code Cluster 129`, `Code Cluster 39`, `Signature Hash Policy Engine`, `Code Cluster 107`, `Code Cluster 75`, `Archive: Split Detection Clustering`, `Archive: Join-Key Derivation`, `Code Cluster 47`, `Code Cluster 80`, `Code Cluster 63`, `Code Cluster 90`, `Code Cluster 157`, `Code Cluster 31`?**
-  _High betweenness centrality (0.046) - this node is a cross-community bridge._
-- **Why does `make_hash()` connect `Core Hashing & Join-Key Builder` to `Wall Type Test Suite`, `Dimension Type Helpers`, `Code Cluster 135`, `Signature Hash Policy Engine`, `Code Cluster 41`, `Phase-2 Join Hash & Record Schema`, `Extraction Timing & Profiling`, `View Graphics Signature`, `Compound Types Domain`, `Code Cluster 119`, `Code Cluster 28`?**
+- **Why does `load_exports()` connect `Code Cluster 63` to `Code Cluster 160`, `Code Cluster 129`, `Code Cluster 99`, `Code Cluster 39`, `Signature Hash Policy Engine`, `Code Cluster 107`, `Code Cluster 75`, `Archive: Split Detection Clustering`, `Code Cluster 47`, `Archive: Join-Key Derivation`, `Code Cluster 80`, `Code Cluster 90`, `Code Cluster 31`?**
   _High betweenness centrality (0.040) - this node is a cross-community bridge._
-- **Why does `build_sig_hash_from_policy()` connect `Signature Hash Policy Engine` to `Core Hashing & Join-Key Builder`?**
-  _High betweenness centrality (0.028) - this node is a cross-community bridge._
-- **What connects `PreToolUse`, `Project Overview`, `Commands` to the rest of the system?**
-  _1966 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `make_hash()` connect `Core Hashing & Join-Key Builder` to `Wall Type Test Suite`, `Dimension Type Helpers`, `Graphic Override Extraction`, `Code Cluster 135`, `Code Cluster 41`, `Phase-2 Join Hash & Record Schema`, `Extraction Timing & Profiling`, `View Graphics Signature`, `Compound Types Domain`, `Code Cluster 28`, `Community 381`?**
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
+- **Why does `build_sig_hash_from_policy()` connect `Community 381` to `Signature Hash Policy Engine`, `Core Hashing & Join-Key Builder`?**
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
+- **What connects `version`, `record_schema_version`, `identity_item_schema` to the rest of the system?**
+  _2642 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Wall Type Test Suite` be split into smaller, more focused modules?**
   _Cohesion score 0.05825242718446602 - nodes in this community are weakly interconnected._
 - **Should `Archive: Pareto Join-Key Optimizer` be split into smaller, more focused modules?**
   _Cohesion score 0.053763440860215055 - nodes in this community are weakly interconnected._
 - **Should `Core Hashing & Join-Key Builder` be split into smaller, more focused modules?**
-  _Cohesion score 0.07511230907457322 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06268794818413138 - nodes in this community are weakly interconnected._

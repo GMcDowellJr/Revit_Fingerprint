@@ -1475,7 +1475,7 @@
     "semantic_hash": "9a90aee7629ca47d8ca08cac3db0ed14"
   },
   ".github/copilot-instructions.md": {
-    "mtime": 1780712000.3206687,
+    "mtime": 1780718512.7430327,
     "ast_hash": "92fa5dcb21c43fe6221e6a08f09f8f98",
     "semantic_hash": "92fa5dcb21c43fe6221e6a08f09f8f98"
   },
@@ -1500,7 +1500,7 @@
     "semantic_hash": "aa43247c851f9a9d65e0aedf1fad7275"
   },
   "CLAUDE.md": {
-    "mtime": 1780712941.306643,
+    "mtime": 1780718513.2645724,
     "ast_hash": "ef56056aca461cdb249e4f4df432ded3",
     "semantic_hash": ""
   },
@@ -1677,6 +1677,616 @@
   ".claude/settings.json": {
     "mtime": 1780712941.307063,
     "ast_hash": "bfee062c3962c14264fd704e975a6b38",
+    "semantic_hash": ""
+  },
+  "legacy/fingerprint_mvp.py": {
+    "mtime": 1780712000.3414888,
+    "ast_hash": "3bcb41e12e6adc5a5339263fe1eaf9c4",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/.sync_manifest.json": {
+    "mtime": 1780712000.3487017,
+    "ast_hash": "c1addee72aef32a3c68276ded7c9ea9c",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/APIObjectDescriptor.cs": {
+    "mtime": 1780712000.3494072,
+    "ast_hash": "c3362617c287ec94ae8a84416dd0158b",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/AnalyticalLinkTypeDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "e489c6dbbb1cd6a0776d90f7f1f95d0e",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ApplicationDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "da33628bdca1d7b2f2e07a4c5a4c0eb7",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/AreaVolumeSettingsDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "d75df1e09205b9bc6142386ec3be0dcd",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/AssemblyInstanceDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "a56e97c08fbc190a73a2237b2d656179",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/AssetPropertiesDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "13c06b5982a7c160f1cb62bf4f5f6634",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/AssetPropertyDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "87638ec82d0fbf99655dcaa9fe3e42e7",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/BasePointDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "5a289c7ec3ebc7b635fd40e9d2b5d71e",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/BoundarySegmentDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "f53769a3786174526cfaf67500074767",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/BoundingBoxXyzDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "f135e04af05cffc6f1b14eb5ad1ff719",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/CategoryDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "749b735a5cfcc88ce3534cbb3f242273",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/CityDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "d11a04b91970963d63191ee40cfecbdd",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ColorDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "5b49632cde7c533dd521a02669911151",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ColorMediaDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "260913a1d4014db453d349340172c9e6",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/CompoundStructureDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "9d62de18916bacfbe031d6eab91b161d",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/CompoundStructureLayerDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "c08fa44a69768ed46673488dd127a0c8",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ConnectorDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "a33e679602066283a58c55b14ed92b8e",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ConnectorManagerDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "d45636de4357660489719f77be29578f",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/CurtainGridDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "ad1a1b7c10f138d686bed932b61d7731",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/CurveDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "5d10a61863c9873473d69f8ef410c2ab",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/CurveElementDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "bf9a4e282b7933fa5f578a8afc5a46c2",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/CurveLoopDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "601502e8e978d431acc7d8a6a797a5e7",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/CylindricalFaceDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "878687ed25a9ea55a4649a0e9e73d548",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/DatumPlaneDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "1c85d66756cc652729937b2b3abcc848",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/DefinitionBindingMapIteratorDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "8b964f080e8cf8c28968e051d1b0fb6e",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/DefinitionDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "c0a8aecea602f14974550eb471513724",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/DefinitionFileDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "268ee57bb456ac1090fdee0be8eb82cd",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/DefinitionGroupDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "6852dbc30919a15a6d809c23055ed495",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/DependencyObjectDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "433771903f406f7fd82b319f87cecc26",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/DisposableDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "f4e09b130a6d5db843d1688669d18041",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/DocumentCreationDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "dfa155f2aa5734224a4d3d19b4e3ae5f",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/DocumentDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "179fc71240b427d9b897a346d24c28be",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/DuctDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "8e3cd0734a30ea552d9dba1250d5ecaa",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/EdgeDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "3553862b481115885db7016a003a9eb0",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/EdgeEndPointDescriptor.cs": {
+    "mtime": 1780712000.3498552,
+    "ast_hash": "9a0cc860549db1a9656bbeb4a507f8fb",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ElementDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "4269eb39a988f860c5b8add368122787",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ElementIdDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "a06af1e5812a095504334219ec72fcc0",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ElementTypeDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "ebec47094a330aa7087ac1daf5376730",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ElevationMarkerDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "154acdba88cc58a40eeebd5d9e5d83e9",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/EntityDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "0655c131306f59a3885a2649d036506b",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/EnumerableDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "22a2f0d95155681871f38d34cc0850e9",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/EnumeratorDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "f0434d0774195eba1004ed9863f18d0f",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/EvaluatedParameterDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "42d9770fefea4dca212217c02eed911a",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ExternalDefinitionDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "cfebdcd2e7b10a0353ec4a6acabf4408",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ExternalResourceReferenceDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "606f4fcb5011004ccc782b7068570b99",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ExternalResourceTypeDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "a03802abdfe27cb1db121a3555d0f8bb",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ExternalServiceDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "b8480b4d139e492de579b642ce2eb80f",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FaceDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "596591c39399dbfc789c9730be2d20ca",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FailureDefinitionAccessorDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "a0ce01e4e554ba7a22dabf0124a8ec02",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FailureMessageDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "b898c2acb4b13d865a0ed7deee9bb535",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FamilyDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "523e83db70f722a7d8b86723e3e8f9ba",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FamilyInstanceDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "e07b388fc63b08c7d588e94698ff9d32",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FamilyManagerDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "ff695ce3865c914881c7d08ef1c6393f",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FamilyParameterDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "f3e66ac7675a37e7d19e8d3e8132f3c2",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FamilySizeTableColumnDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "5562ee597764429cde2cf41d293bb0bc",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FamilySizeTableDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "8e5a89bec085b294c82f02a27ce178b8",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FamilySizeTableManagerDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "044062b48ebda90a17557d29d74e58fd",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FamilySymbolDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "dffd4de75f26329f9f1a57d3989d85a5",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/FieldDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "0bbb1e2c69b3bebc29c61460ce03b795",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ForgeTypeIdDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "eedddb4fb08b6f7afa81782d3d4fbf59",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/GeometryObjectDescriptor.cs": {
+    "mtime": 1780712000.3534887,
+    "ast_hash": "ba4bbc6247c49d5dcfcdf8f3fb4df6e0",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/GlobalParameterDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "1359befdb85c7cd93b4d9617ba2c84f0",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/GuidEnumDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "4177431571fe8008561c6e66870b0df1",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/HostObjectDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "447fe52d04c3279bcfcece84011eb120",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/IndependentTagDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "e5b7ad4a67b86c9dd40e7655f805c8fe",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/InternalOriginDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "67db6929c4a7935cd403af356ccb0a83",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/LightFamilyDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "e1e8e6a01480fa2b7cff7e6af309269c",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/LocationCurveDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "be0d669b5b696bc7920eebca4f18c877",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/MepSectionDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "9cba59debadfc400aaa3b544605b556b",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/MepSystemDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "a076c4b4a224f82fe036d722a14cea12",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/MeshDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "e7b8186a5c4e8ad620a3ef033f59dc84",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ModelPathDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "922bbd1e7bbaf27882f2584fe15d8005",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/PanelDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "ad105f36b090f3449edd6cff92303edd",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/PaperSizeDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "586e66a89b4318111bb74c1d3314142a",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ParameterDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "bf1726bcd3116006a008f6e6db345148",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/PartDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "d450bfe22cfd9738d5e8ceb135b2ac3a",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/PartMakerDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "69b408c0124b0ca80ce229282f7a3eec",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/PerformanceAdviserDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "5aa12b53dcdc43740d7420cd048ea396",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/PipeDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "c59040d40b46979b14d80548279d06ce",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/PlanViewRangeDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "a8594881b54527e7b3f170d834696237",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/PointCloudFilterDescriptor.cs": {
+    "mtime": 1780712000.3574889,
+    "ast_hash": "dabc40755438c3deacd27475b3700778",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/PrintManagerDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "f953e66a188e176abe1e521e5e22e4bd",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/RebarDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "6fd44a46e2fcb35ee38dcc43bdf04bb9",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/RebarShapeDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "507767fbf0469c4144fc27a92147c3ee",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ReferenceDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "91c626fec2cec4ec0628ade2513c7c54",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ReferencePointDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "eff8154617cdae2531b1b657a1e570dd",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/RevisionNumberingSequenceDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "afeae946f25a21ad87d64ff11b3efbad",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/RevitLinkTypeDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "0ea58299fb422ffe71a55043757bff8b",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/RibbonItemDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "4eef16695c0fee519b7e00de58104ade",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/RibbonPanelDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "47d99568f0f1d7d6d2797d04ff30ac49",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/RibbonTabDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "0983908dc70f574a9acfa033d0f22e89",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/SchedulableFieldDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "07571ddc30abb4aace10a6178c1986a1",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ScheduleDefinitionDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "a2b56a952e0e4c4736c2ab6f77fbcee1",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/SchemaDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "0723efe47ce94013fef7f95ca22e7b5e",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/SolidDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "6a658836e8998a540ccb9137e4fe2aeb",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/SpatialElementDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "fd2a75654ec5b059974bbe1cb97b303a",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/StructuralSettingsDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "c45ef5623cfb53c6d73e72af480f87cd",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/SubelementDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "ca62cd3b3435745640ae46b6098e82c0",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/SunAndShadowSettingsDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "4dc30e15c5f974e0e0e82a1ff59aa2db",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/SurfaceDescriptor.cs": {
+    "mtime": 1780712000.3614888,
+    "ast_hash": "c4754e28810091f5bddb6d6850c74b62",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/TableDataDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "f826869882066ee74c8ac6ced66a8700",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/TableSectionDataDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "948f91bfc8f69fa48b8121223b861abd",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/TableViewDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "7c09f547a5fbde49b11b32e2ccff72e8",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/TriangulationInterfaceDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "6b4a09408a7af7a8dd0e79b8ef311ce8",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/UiApplicationDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "854d5de8b2053818723086b2ab32906f",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/UiElementDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "b2563628c40be3ee543ee8c2bd8b83b2",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/UiObjectDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "7146f1a785380ccb18902c80821a7644",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/UnitsDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "804ee509fb9467a2509b0db56caeadfb",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/UpdaterInfoDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "d6e660ebd746678843be3b084c71394f",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ViewDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "3018c79b4d43a8f2b1a47093f474a7ed",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/ViewScheduleDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "5fb709184caa3d02e49a539bf227391a",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/WallDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "1d3356a5eaa3322893c06b83f4b8aff4",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/WallTypeDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "3465ebec471ce6f5efbe28e906d391cc",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/WireDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "45c3781d8208ed47ae3051b43194aaae",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/WorksetDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "a453180c843de72b17c2c0501a555733",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/WorksetTableDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "2c133bf4938bfd9c1939c914d124fce3",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/Descriptors/XyzDescriptor.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "b4cbb8d1bd8d65ce4f96066c7587ff81",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/DescriptorsMap.cs": {
+    "mtime": 1780712000.3654888,
+    "ast_hash": "7401bc8a9b44af588b57cb9ef5923ab0",
+    "semantic_hash": ""
+  },
+  "reference/revit_lookup/README.md": {
+    "mtime": 1780712000.3694887,
+    "ast_hash": "96328ce097e20ce9e680ed4ef775cb5c",
+    "semantic_hash": ""
+  },
+  "tests/golden/README.md": {
+    "mtime": 1780712000.376661,
+    "ast_hash": "3f86fc25367e0cdcb654f51208dfc1f0",
     "semantic_hash": ""
   }
 }
