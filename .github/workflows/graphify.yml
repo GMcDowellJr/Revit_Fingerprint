@@ -20,13 +20,12 @@ jobs:
           python-version: '3.11'
 
       - name: Install graphify
-        run: pip install "git+https://github.com/safishamsi/graphify.git@v8" openai -q
+        run: pip install "git+https://github.com/safishamsi/graphify.git@v8" -q
 
       - name: Build graph
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          OPENAI_BASE_URL: https://openrouter.ai/api/v1
-        run: graphify . --no-viz --backend openai
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: graphify . --no-viz --backend gemini
 
       - name: Generate HTML
         run: graphify export html
