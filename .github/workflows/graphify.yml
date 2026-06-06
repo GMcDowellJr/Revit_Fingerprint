@@ -1,0 +1,37 @@
+name: graphify
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'graphify-out/**'
+
+jobs:
+  build-graph:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install graphify
+        run: pip install "git+https://github.com/safishamsi/graphify.git@v8" -q
+
+      - name: Build graph
+        run: graphify . --no-viz
+
+      - name: Generate HTML
+        run: graphify export html
+
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./graphify-out
+          destination_dir: graphify-out
+          keep_files: true
