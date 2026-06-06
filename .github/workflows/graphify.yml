@@ -1,10 +1,7 @@
 name: graphify
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'graphify-out/**'
+  workflow_dispatch:
 
 jobs:
   build-graph:
