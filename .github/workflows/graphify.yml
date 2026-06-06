@@ -21,8 +21,10 @@ jobs:
 
       - name: Build graph
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: graphify . --no-viz --backend gemini
+          OLLAMA_BASE_URL: https://openrouter.ai/api/v1
+          OLLAMA_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OLLAMA_MODEL: google/gemini-flash-1.5
+        run: graphify . --no-viz --backend ollama
 
       - name: Generate HTML
         run: graphify export html
