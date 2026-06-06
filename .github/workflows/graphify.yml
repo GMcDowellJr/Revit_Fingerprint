@@ -19,6 +19,9 @@ jobs:
       - name: Install graphify
         run: pip install "git+https://github.com/safishamsi/graphify.git@v8" openai -q
 
+      - name: Merge .gitignore into .graphifyignore
+        run: [ -f .gitignore ] && cat .gitignore >> .graphifyignore || true
+
       - name: Build graph
         env:
           OLLAMA_BASE_URL: https://openrouter.ai/api/v1
