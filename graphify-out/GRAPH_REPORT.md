@@ -1,12 +1,18 @@
-# Graph Report - .  (2026-06-06)
+# Graph Report - Revit_Fingerprint  (2026-06-06)
 
 ## Corpus Check
-- Large corpus: 335 files · ~1,853,857 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
+- 332 files · ~1,854,154 words
+- Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5139 nodes · 10808 edges · 377 communities (369 shown, 8 thin omitted)
+- 5178 nodes · 10845 edges · 378 communities (369 shown, 9 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 174 edges (avg confidence: 0.71)
-- Token cost: 18,500 input · 4,800 output
+- Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `a9c59c17`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - [[_COMMUNITY_Wall Type Test Suite|Wall Type Test Suite]]
@@ -354,6 +360,7 @@
 - [[_COMMUNITY_Micro Cluster 350|Micro Cluster 350]]
 - [[_COMMUNITY_Micro Cluster 351|Micro Cluster 351]]
 - [[_COMMUNITY_Micro Cluster 354|Micro Cluster 354]]
+- [[_COMMUNITY_Community 377|Community 377]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `make_identity_item()` - 120 edges
@@ -390,7 +397,7 @@
 - **Join Key Policy: Shape-Gating + Pareto Discovery + Pinned Policy** — docs_join_key_shape_gating_shape_gating_schema, docs_phase2_join_key_discovery_pareto_discovery, tools_dimension_types_join_key_md_dimension_join_key_policy, docs_hash_discovery_tooling_discover_hash_policy [INFERRED 0.85]
 - **Governance Chain: Summary + Delta + State CSVs for directed comparisons** — docs_cross_segment_comparison_cross_segment_summary_csv, docs_cross_segment_comparison_cross_segment_delta_csv, docs_cross_segment_comparison_governance_states_csv, tools_refreshed_revit_governance_dod_governance_state [INFERRED 0.85]
 
-## Communities (377 total, 8 thin omitted)
+## Communities (378 total, 9 thin omitted)
 
 ### Community 0 - "Wall Type Test Suite"
 Cohesion: 0.06
@@ -402,15 +409,15 @@ Nodes (85): build_wide_kv_table(), compute_v_norm(), _dedupe_preserve_order(), d
 
 ### Community 2 - "Core Hashing & Join-Key Builder"
 Cohesion: 0.08
-Nodes (70): make_hash(), _make_hash_impl(), Deterministic hash based on a sequence of strings.      Streaming/incremental im, Inner hash implementation (separated for timing wrapper clarity)., build_join_key_from_policy(), _dedupe_preserve_order(), _expand_sequence_key(), _get_shape_specific_requirements() (+62 more)
+Nodes (80): make_hash(), _make_hash_impl(), Deterministic hash based on a sequence of strings.      Streaming/incremental im, Inner hash implementation (separated for timing wrapper clarity)., build_join_key_from_policy(), _dedupe_preserve_order(), _expand_sequence_key(), _get_shape_specific_requirements() (+72 more)
 
 ### Community 3 - "Cross-Segment Comparison & Governance Tests"
 Cohesion: 0.08
 Nodes (89): ComparisonPair, Path, str, Tests for governance semantics in tools/compare_cross_segment.py., _seg(), test_build_governance_state_rows_include_inherited_unused_and_local_active(), test_discover_governance_chain_includes_generic_upstream_roles(), test_main_emits_governance_states_when_pair_skipped_by_min_patterns() (+81 more)
 
 ### Community 4 - "Dimension Type Helpers"
-Cohesion: 0.08
-Nodes (84): purge_lookup(), _build_text_appearance_items(), _fmt_float(), _fmt_in_from_ft(), _format_options_to_kv(), _get_dimension_shape(), get_type_display_name(), Detect dimension shape from a Revit DimensionType object.      Revit exposes sha (+76 more)
+Cohesion: 0.06
+Nodes (93): fnum(), int, Legacy alias for canon_num., purge_lookup(), _build_text_appearance_items(), _fmt_float(), _fmt_in_from_ft(), _format_options_to_kv() (+85 more)
 
 ### Community 5 - "Segment Manifest Tests"
 Cohesion: 0.06
@@ -426,19 +433,19 @@ Nodes (35): CacheKey, build_purgeable_id_set(), collect_elements(), collect_id_i
 
 ### Community 8 - "Signature Hash Policy Engine"
 Cohesion: 0.08
-Nodes (62): apply_sig_hash_policy_to_record(), build_sig_hash_from_policy(), _items_to_map(), _key_allowed(), Any, bool, str, Return (sig_hash, status, status_reasons, hash_items).      The builder hashes e (+54 more)
+Nodes (61): apply_sig_hash_policy_to_record(), build_sig_hash_from_policy(), _items_to_map(), _key_allowed(), Any, bool, str, Return (sig_hash, status, status_reasons, hash_items).      The builder hashes e (+53 more)
 
 ### Community 9 - "Governance Narrative Generator"
 Cohesion: 0.08
 Nodes (62): _add_float(), assign_tier(), build_cascade(), build_client_summary(), build_governance_state_summary(), _client_onboarding_profile(), _col(), detect_anomalies() (+54 more)
 
 ### Community 10 - "Phase-2 Join Hash & Record Schema"
-Cohesion: 0.07
-Nodes (58): phase2_join_hash(), Deterministic join-hash for Phase-2 joins.     Expects caller to have already so, _block_record_for_unstable_id(), block_record_v2(), build_record_v2(), canonical_structural_fields(), _canonical_structural_value(), canonicalize_bool() (+50 more)
+Cohesion: 0.11
+Nodes (35): _block_record_for_unstable_id(), block_record_v2(), canonical_structural_fields(), _canonical_structural_value(), compute_identity_quality(), _default_record_id_secondary_key(), finalize_record_ids_for_domain(), make_record_id_structural() (+27 more)
 
 ### Community 11 - "Architecture & Design Decisions"
 Cohesion: 0.05
-Nodes (60): Architecture Overview, Changelog, Claude AI Assistant Guide, Behavior-First Fingerprinting (D-001), central_path_norm Normalization Pipeline, Corpus Update Pipeline (Run A/B/C Stages), CSV Contract v2.1 Split-Analysis Schema, Context Dictionary (ctx) Cross-Domain Data Flow (+52 more)
+Nodes (59): Architecture Overview, Changelog, Behavior-First Fingerprinting (D-001), central_path_norm Normalization Pipeline, Corpus Update Pipeline (Run A/B/C Stages), CSV Contract v2.1 Split-Analysis Schema, Context Dictionary (ctx) Cross-Domain Data Flow, Deterministic Auditable Hashes (D-002) (+51 more)
 
 ### Community 12 - "Archive: Split Detection Clustering"
 Cohesion: 0.08
@@ -461,16 +468,16 @@ Cohesion: 0.10
 Nodes (49): Path, str, test_compute_alignment_rates_and_contract_header_preserves_is_named_cluster(), test_compute_alignment_rates_falls_back_to_percentage_when_size_absent(), test_compute_alignment_rates_falls_back_to_percentage_when_size_values_are_invalid(), test_compute_alignment_rates_uses_raw_share_or_size_for_unrounded_result(), test_thresholds_breaks_and_ordering(), test_thresholds_reject_non_three_classes() (+41 more)
 
 ### Community 17 - "Canonicalization & Parameter Reading"
-Cohesion: 0.08
-Nodes (45): fnum(), int, Legacy alias for canon_num., _as_bool_from_param(), _as_double(), _as_int(), _canon_rgb(), format_len_inches() (+37 more)
+Cohesion: 0.05
+Nodes (35): Adding a New Domain, Adding a New Partition to a Consolidated Domain, Adding Shape-Gated Properties, Analysis Pipeline, Architecture, CHANGELOG Discipline, Commands, Commit Message Convention (+27 more)
 
 ### Community 18 - "View Graphics Signature"
-Cohesion: 0.10
-Nodes (47): collect_instances(), make_record_id_from_element(), Create a stable record_id from a Revit element.      Priority:       1) UniqueId, _canonical_identity_items_from_signature(), _compute_delta_items(), emit_builtin_params(), emit_shared_params_stub(), _phase2_items_from_def_signature() (+39 more)
+Cohesion: 0.08
+Nodes (57): canon_str(), Canonicalize string-like values.      Rules:     - None -> <MISSING>     - str(., collect_instances(), Blocked, Any, str, core/deps.py  Centralized dependency enforcement for domain execution.  Non-nego, Typed exception used to signal a hard dependency block.      Attributes: (+49 more)
 
 ### Community 19 - "Canonical Items Pipeline"
-Cohesion: 0.09
-Nodes (36): build_flat_items(), canonicalize_record(), compile_role_policy(), merge_legacy_buckets(), _normalize_item(), Any, str, Resolve roles from item.k via runtime lookup.      Returns grouped items without (+28 more)
+Cohesion: 0.10
+Nodes (35): build_flat_items(), canonicalize_record(), compile_role_policy(), merge_legacy_buckets(), _normalize_item(), Any, str, Resolve roles from item.k via runtime lookup.      Returns grouped items without (+27 more)
 
 ### Community 20 - "Cross-Domain Alignment Policies"
 Cohesion: 0.05
@@ -481,8 +488,8 @@ Cohesion: 0.10
 Nodes (41): CompletedProcess, Lock, _active_domains_from_presence_csv(), _build_patterns_missing_notes(), build_run_plan(), load_manifest(), load_registry(), main() (+33 more)
 
 ### Community 22 - "Compound Types Domain"
-Cohesion: 0.13
-Nodes (39): collect_types(), Convert any value to a string representation safely.      Handles both str and u, safe_str(), _attach_placeholder_metadata(), _blocked_required_items(), _build_instance_count_map(), _canon_non_sentinel_str(), _coarse_fill_reads() (+31 more)
+Cohesion: 0.08
+Nodes (58): collect_types(), Convert any value to a string representation safely.      Handles both str and u, safe_str(), build_record_v2(), canonicalize_bool(), canonicalize_float(), int, Canonicalize a float-like value for IdentityItem.v.      Returns:         (value (+50 more)
 
 ### Community 23 - "Label Synthesis & Semantic Grouping"
 Cohesion: 0.15
@@ -505,8 +512,8 @@ Cohesion: 0.17
 Nodes (38): _b32_sha1_16(), compute_attribute_concentration_metrics(), emit_analysis(), emit_records(), _extract_acc_project_label(), _file_id(), _fmt_metric(), _get_tool_version() (+30 more)
 
 ### Community 28 - "Code Cluster 28"
-Cohesion: 0.10
-Nodes (31): build_subcategory_used_id_set(), Build/cache used subcategory ids for a given parent category., Blocked, Any, str, core/deps.py  Centralized dependency enforcement for domain execution.  Non-nego, Typed exception used to signal a hard dependency block.      Attributes:, Require an upstream domain envelope to exist and be acceptable.      Args: (+23 more)
+Cohesion: 0.22
+Nodes (15): build_subcategory_used_id_set(), Build/cache used subcategory ids for a given parent category., _build_info(), _collect_categories(), extract_analytical(), extract_annotation(), extract_imported(), extract_model() (+7 more)
 
 ### Community 29 - "Code Cluster 29"
 Cohesion: 0.06
@@ -553,12 +560,12 @@ Cohesion: 0.16
 Nodes (24): ChangeCounts, classify_pair(), Classify changes for one domain between baseline and other.      Definitions:, ExportFile, One exported fingerprint JSON treated as one authority sample., ensure_dir(), format_console_summary(), Write baseline-vs-file change classification counts.      CSV is purely descript (+16 more)
 
 ### Community 40 - "Code Cluster 40"
-Cohesion: 0.13
-Nodes (24): build_domain_index(), _get_join_hash(), _phase2_items_by_k(), Build a per-file join_hash index for one domain., Return a map k -> (q, v) across concatenated phase2 item buckets.      Also retu, load_exports(), Load all monolithic exports in a directory (each file = one authority sample)., main() (+16 more)
+Cohesion: 0.29
+Nodes (9): load_exports(), Load all monolithic exports in a directory (each file = one authority sample)., main(), _multiplicity_map(), join_hash -> multiplicity within a file, including duplicates.      DomainIndex., run_identity_collision_diagnostics(), int, int (+1 more)
 
 ### Community 41 - "Code Cluster 41"
-Cohesion: 0.19
-Nodes (18): canon_bool(), canon_id(), canon_num(), canon_str(), is_sentinel(), Any, bool, str (+10 more)
+Cohesion: 0.08
+Nodes (52): canon_bool(), canon_id(), canon_num(), is_sentinel(), Any, bool, str, Canonicalize Revit ElementId-like values to a decimal string.      Accepts: (+44 more)
 
 ### Community 42 - "Code Cluster 42"
 Cohesion: 0.15
@@ -581,8 +588,8 @@ Cohesion: 0.13
 Nodes (26): build_class_profiles(), build_dim_summaries(), build_exact_match_table(), build_family_file_detail(), build_name_cluster_table(), build_subgroups(), extract_category(), extract_family_name() (+18 more)
 
 ### Community 47 - "Code Cluster 47"
-Cohesion: 0.13
-Nodes (23): extract_phase2_items(), main(), Return k -> (q, v) map across all phase2 buckets.     Assumes caller has already, run_attribute_stress(), main(), _parse_args(), run_population_stability(), presence_counts() (+15 more)
+Cohesion: 0.09
+Nodes (38): build_domain_index(), _get_join_hash(), _phase2_items_by_k(), Build a per-file join_hash index for one domain., Return a map k -> (q, v) across concatenated phase2 item buckets.      Also retu, main(), _phase2_items_map_no_dups(), Return k -> (q, v) across all phase2 buckets.      If duplicate k is detected wi (+30 more)
 
 ### Community 48 - "Code Cluster 48"
 Cohesion: 0.25
@@ -597,8 +604,8 @@ Cohesion: 0.15
 Nodes (20): exported_fingerprint_json(), Provide exporter output JSON for validation.      Options:       1) Set env var, test_all_exported_records_conform_to_record_contract_v2(), _compute_identity_quality(), _hash_preimage(), _is_allowed_indexed_key(), load_json_file(), _normalize_indexed_key() (+12 more)
 
 ### Community 51 - "Code Cluster 51"
-Cohesion: 0.14
-Nodes (22): read_csv_rows(), _choose_threshold(), compute_placeholder_exclusions(), _is_truthy(), _largest_gap_threshold(), main(), _parse_args(), lg() (+14 more)
+Cohesion: 0.11
+Nodes (31): atomic_write_csv(), read_csv_rows(), _choose_threshold(), compute_placeholder_exclusions(), _is_truthy(), _largest_gap_threshold(), main(), _parse_args() (+23 more)
 
 ### Community 52 - "Code Cluster 52"
 Cohesion: 0.16
@@ -701,8 +708,8 @@ Cohesion: 0.12
 Nodes (17): type, enum, type, properties, debug, identity_quality, is_purgeable, record_id (+9 more)
 
 ### Community 77 - "Code Cluster 77"
-Cohesion: 0.20
-Nodes (15): build_manifest(), Any, bool, str, Build a deterministic manifest derived from payload["_contract"].      Args:, _safe_dict(), _load_json(), main() (+7 more)
+Cohesion: 0.27
+Nodes (10): _load_json(), main(), _now_stamp(), _write_json(), _write_text(), _canonicalize_all_domain_records(), _enabled(), Allowlist gate for domain execution.     - ENABLED_DOMAINS = None  -> run all do (+2 more)
 
 ### Community 78 - "Code Cluster 78"
 Cohesion: 0.28
@@ -757,8 +764,8 @@ Cohesion: 0.32
 Nodes (14): _extract_qv_from_value(), _get_join_hash(), _is_scalar(), _iter_record_parameters(), main(), _phase2_bucket_items(), Yield (param_key, q, v) observations for a single record.     Returns (observati, Normalize a value into (q, v_str) while preserving explicit states when present. (+6 more)
 
 ### Community 91 - "Code Cluster 91"
-Cohesion: 0.22
-Nodes (13): atomic_write_csv(), emit_stub(), main(), _parse_args(), Path, str, test_emit_stub_classifies_root_to_leaf_patterns_as_differentiating(), _write_csv() (+5 more)
+Cohesion: 0.26
+Nodes (11): emit_stub(), main(), _parse_args(), Path, str, test_emit_stub_classifies_root_to_leaf_patterns_as_differentiating(), _write_csv(), int (+3 more)
 
 ### Community 92 - "Code Cluster 92"
 Cohesion: 0.13
@@ -797,8 +804,8 @@ Cohesion: 0.26
 Nodes (13): classify(), containment_score(), jaccard_multiset(), main(), _parse_args(), step_template_governance_discovery.py  Reads records.csv and computes per-domain, Share of template's sig_hashes present in the corpus file.      Iterates templat, run() (+5 more)
 
 ### Community 101 - "Code Cluster 101"
-Cohesion: 0.30
-Nodes (12): _as_dict(), _as_int(), build_features(), _extract_counts_from_legacy(), Any, int, str, Extract stable count signals from legacy domain payloads when present.      Conv (+4 more)
+Cohesion: 0.42
+Nodes (9): _as_dict(), _as_int(), build_features(), _extract_counts_from_legacy(), Any, int, str, Extract stable count signals from legacy domain payloads when present.      Conv (+1 more)
 
 ### Community 102 - "Code Cluster 102"
 Cohesion: 0.15
@@ -989,8 +996,8 @@ Cohesion: 0.25
 Nodes (7): DocViewContext, Any, str, Deterministic, explainable view context snapshot.      Fields:     - view_id: in, Shared context object for domains that need consistent view-scoped reads.      T, Return a cached ViewInfo for `view`, with explicit reasons for missing/unreadabl, ViewInfo
 
 ### Community 150 - "Code Cluster 150"
-Cohesion: 0.39
-Nodes (8): Validate shape-gating semantics and return structured issues.      Args:, validate_domain_join_key_policy(), test_rule_a1_discriminator_first_required(), test_rule_a2_no_overlap_common_required(), test_rule_a3_additional_required_in_optional_items(), test_rule_a4_requires_non_empty_additional_required(), test_rule_a5_orphaned_keys_warning_only(), test_valid_shape_gated_policy_has_no_errors()
+Cohesion: 0.26
+Nodes (11): _is_list_of_str(), Validate shape-gating semantics and return structured issues.      Args:, Validate shape_gating section of a policy.      Args:         domain_name: Name, validate_domain_join_key_policy(), _validate_shape_gating(), test_rule_a1_discriminator_first_required(), test_rule_a2_no_overlap_common_required(), test_rule_a3_additional_required_in_optional_items() (+3 more)
 
 ### Community 151 - "Code Cluster 151"
 Cohesion: 0.42
@@ -1037,8 +1044,8 @@ Cohesion: 0.46
 Nodes (7): _extract_label_qv(), _get_join_hash(), main(), Best-effort extraction of a label surface.      Preserves explicit states:     -, run_joinhash_label_population(), Any, str
 
 ### Community 162 - "Code Cluster 162"
-Cohesion: 0.43
-Nodes (7): build_dag_for_domain(), main(), _parse_args(), int, Namespace, Path, str
+Cohesion: 0.31
+Nodes (9): build_manifest(), Any, bool, str, Build a deterministic manifest derived from payload["_contract"].      Args:, _safe_dict(), _sample_monolithic(), test_monolithic_features_surface() (+1 more)
 
 ### Community 163 - "Code Cluster 163"
 Cohesion: 0.43
@@ -1741,24 +1748,24 @@ Cohesion: 0.67
 Nodes (3): Revit Integration Tests (golden baselines), revit_test_runner_pyrevit.py, REVIT_FP_UPDATE_GOLDEN Env Var Workflow
 
 ## Knowledge Gaps
-- **1225 isolated node(s):** `version`, `record_schema_version`, `identity_item_schema`, `identity_quality_dominance_order`, `banned_identity_value_substrings` (+1220 more)
+- **1256 isolated node(s):** `PreToolUse`, `Project Overview`, `Commands`, `Architecture`, `Directory Structure` (+1251 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `load_exports()` connect `Code Cluster 40` to `Code Cluster 160`, `Code Cluster 161`, `Code Cluster 129`, `Code Cluster 39`, `Signature Hash Policy Engine`, `Code Cluster 107`, `Code Cluster 75`, `Archive: Split Detection Clustering`, `Archive: Join-Key Derivation`, `Code Cluster 47`, `Code Cluster 80`, `Code Cluster 63`, `Code Cluster 90`, `Code Cluster 157`, `Code Cluster 31`?**
-  _High betweenness centrality (0.051) - this node is a cross-community bridge._
-- **Why does `make_hash()` connect `Core Hashing & Join-Key Builder` to `Wall Type Test Suite`, `Dimension Type Helpers`, `Code Cluster 135`, `Signature Hash Policy Engine`, `Code Cluster 41`, `Phase-2 Join Hash & Record Schema`, `Extraction Timing & Profiling`, `Canonicalization & Parameter Reading`, `View Graphics Signature`, `Compound Types Domain`, `Code Cluster 119`, `Code Cluster 28`?**
-  _High betweenness centrality (0.042) - this node is a cross-community bridge._
-- **Why does `emit_stub()` connect `Code Cluster 91` to `Archive: Pareto Join-Key Optimizer`, `Code Cluster 53`, `Governance Narrative Generator`?**
-  _High betweenness centrality (0.033) - this node is a cross-community bridge._
-- **What connects `version`, `record_schema_version`, `identity_item_schema` to the rest of the system?**
-  _1935 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _High betweenness centrality (0.046) - this node is a cross-community bridge._
+- **Why does `make_hash()` connect `Core Hashing & Join-Key Builder` to `Wall Type Test Suite`, `Dimension Type Helpers`, `Code Cluster 135`, `Signature Hash Policy Engine`, `Code Cluster 41`, `Phase-2 Join Hash & Record Schema`, `Extraction Timing & Profiling`, `View Graphics Signature`, `Compound Types Domain`, `Code Cluster 119`, `Code Cluster 28`?**
+  _High betweenness centrality (0.040) - this node is a cross-community bridge._
+- **Why does `build_sig_hash_from_policy()` connect `Signature Hash Policy Engine` to `Core Hashing & Join-Key Builder`?**
+  _High betweenness centrality (0.028) - this node is a cross-community bridge._
+- **What connects `PreToolUse`, `Project Overview`, `Commands` to the rest of the system?**
+  _1966 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Wall Type Test Suite` be split into smaller, more focused modules?**
   _Cohesion score 0.05825242718446602 - nodes in this community are weakly interconnected._
 - **Should `Archive: Pareto Join-Key Optimizer` be split into smaller, more focused modules?**
   _Cohesion score 0.053763440860215055 - nodes in this community are weakly interconnected._
 - **Should `Core Hashing & Join-Key Builder` be split into smaller, more focused modules?**
-  _Cohesion score 0.08217869087434305 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07511230907457322 - nodes in this community are weakly interconnected._
