@@ -23,7 +23,7 @@ jobs:
         env:
           OLLAMA_BASE_URL: https://openrouter.ai/api/v1
           OLLAMA_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          OLLAMA_MODEL: google/gemini-2.0-flash-001
+          OLLAMA_MODEL: openai/gpt-4o-mini
         run: graphify . --no-viz --backend ollama
 
       - name: Generate HTML
