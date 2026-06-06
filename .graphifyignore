@@ -1,0 +1,18 @@
+# Graphify ignore rules for Revit_Fingerprint
+# Archived MVP — superseded by modular architecture
+legacy/
+
+# Large export artifacts and generated analysis outputs
+*.details.json
+*.index.json
+*.legacy.json
+graphify-out/
+
+# Golden test fixtures (binary reference data, not source)
+tests/golden/
+
+# Reference data pulled from external sources
+reference/
+
+# Dynamo script file (binary XML)
+*.dyn

@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# Graphify build directory (intermediate files and cache; final outputs committed via git add -f)
+graphify-out/
