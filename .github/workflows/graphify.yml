@@ -33,7 +33,8 @@ jobs:
           pip install "git+https://github.com/safishamsi/graphify.git@v8" openai
 
       - name: Merge .gitignore into .graphifyignore
-        run: [ -f .gitignore ] && cat .gitignore >> .graphifyignore || true
+        run: |
+          [ -f .gitignore ] && cat .gitignore >> .graphifyignore || true
 
       - name: Rebuild knowledge graph
         run: |
