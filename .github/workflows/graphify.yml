@@ -1,1 +1,77 @@
-https://gmcdowelljr.github.io/ob1/graphify-out/graph.html
+name: Rebuild Knowledge Graph
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 1'  # every Monday at 4am UTC
+
+permissions:
+  contents: write
+
+jobs:
+  graphify:
+    runs-on: ubuntu-latest
+
+    env:
+      OLLAMA_BASE_URL: https://openrouter.ai/api/v1
+      OLLAMA_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OLLAMA_MODEL: openai/gpt-4o-mini
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install graphify
+        run: |
+          pip install "git+https://github.com/safishamsi/graphify.git@v8" openai
+
+      - name: Merge .gitignore into .graphifyignore
+        run: |
+          [ -f .gitignore ] && cat .gitignore >> .graphifyignore || true
+
+      - name: Rebuild knowledge graph
+        run: |
+          graphify . --no-viz --backend ollama --update 2>&1 | tee /tmp/graphify_run.log
+          log_line=$(grep 'tokens:.*in.*out' /tmp/graphify_run.log || true)
+          if [ -n "$log_line" ]; then
+            tokens_in=$(echo "$log_line" | sed 's/.*tokens: \([0-9,]*\) in.*/\1/' | tr -d ',')
+            tokens_out=$(echo "$log_line" | sed 's/.* \([0-9,]*\) out.*/\1/' | tr -d ',')
+            mkdir -p graphify-out
+            printf '{\n  "tokens_in": %s,\n  "tokens_out": %s,\n  "est_cost_usd": 0.0,\n  "backend": "%s"\n}\n' \
+              "$tokens_in" "$tokens_out" "$OLLAMA_MODEL" > graphify-out/cost.json
+          fi
+
+      - name: Cluster and generate report
+        run: |
+          graphify cluster-only .
+
+      - name: Generate HTML visualization
+        run: |
+          graphify export html
+
+      - name: Commit graph to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f graphify-out/graph.json
+          git add -f graphify-out/cost.json 2>/dev/null || true
+          git add -f graphify-out/manifest.json 2>/dev/null || true
+          git add -f graphify-out/GRAPH_REPORT.md 2>/dev/null || true
+          git add -f graphify-out/cache/stat-index.json 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "chore: update knowledge graph [skip ci]"
+          git push origin main
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./graphify-out
+          destination_dir: graphify-out
+          keep_files: true
