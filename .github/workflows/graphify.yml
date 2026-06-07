@@ -40,6 +40,10 @@ jobs:
         run: |
           graphify . --no-viz --backend ollama
 
+      - name: Cluster and generate report
+        run: |
+          graphify cluster-only .
+
       - name: Generate HTML visualization
         run: |
           graphify export html
