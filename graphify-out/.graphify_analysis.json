@@ -2,6 +2,8 @@
   "communities": {
     "0": [
       "archive_pareto_joinkey_search_rationale_78",
+      "core_canon_canon_bool",
+      "core_canon_rationale_74",
       "core_hashing",
       "core_hashing_make_hash",
       "core_hashing_make_hash_impl",
@@ -21,19 +23,29 @@
       "core_join_key_builder_rationale_82",
       "core_join_key_policy",
       "core_join_key_policy_get_domain_join_key_policy",
-      "core_join_key_policy_is_list_of_str",
       "core_join_key_policy_load_join_key_policies",
       "core_join_key_policy_rationale_234",
       "core_join_key_policy_rationale_289",
-      "core_join_key_policy_rationale_39",
-      "core_join_key_policy_validate_shape_gating",
+      "core_phase2_phase2_join_hash",
+      "core_phase2_rationale_66",
       "core_record_v2_make_identity_item",
       "core_record_v2_rationale_422",
       "core_record_v2_rationale_456",
       "core_record_v2_serialize_identity_items",
+      "domains_identity",
+      "domains_identity_extract",
+      "domains_identity_rationale_143",
+      "domains_identity_rationale_95",
+      "domains_line_styles",
+      "domains_line_styles_extract",
+      "domains_line_styles_rationale_73",
+      "domains_phases",
+      "domains_phases_extract",
+      "domains_phases_rationale_112",
       "domains_units",
       "domains_units_extract",
       "domains_units_rationale_85",
+      "tests_test_arrowheads_shape_gating",
       "tests_test_arrowheads_shape_gating_test_join_key_builder_additional_required_only_for_shape",
       "tests_test_arrowheads_shape_gating_test_join_key_builder_other_style",
       "tests_test_arrowheads_shape_gating_test_join_key_keys_used_and_hash_for_arrow_style",
@@ -44,16 +56,6 @@
       "tests_test_dimension_types_shape_gating_testcanonicalevidenceselectors_test_linear_join_key_uses_required_keys_only",
       "tests_test_fill_patterns_canonical_selectors",
       "tests_test_fill_patterns_canonical_selectors_test_fill_patterns_model_join_key_uses_policy_required_keys_only",
-      "tests_test_hashing_incremental",
-      "tests_test_hashing_incremental_rationale_10",
-      "tests_test_hashing_incremental_reference_hash",
-      "tests_test_hashing_incremental_test_make_hash_accepts_generator_large_input_sanity",
-      "tests_test_hashing_incremental_test_make_hash_deterministic_repeated_calls",
-      "tests_test_hashing_incremental_test_make_hash_handles_unrepr_values",
-      "tests_test_hashing_incremental_test_make_hash_is_order_sensitive_contract",
-      "tests_test_hashing_incremental_test_make_hash_matches_reference_empty",
-      "tests_test_hashing_incremental_test_make_hash_matches_reference_multiple_and_unicode_and_pipes",
-      "tests_test_hashing_incremental_test_make_hash_separator_off_by_one_cases",
       "tests_test_identity_canonical_selectors",
       "tests_test_identity_canonical_selectors_test_identity_join_key_uses_required_plus_gated_required_only",
       "tests_test_join_key_builder_shape_gating_dedupe",
@@ -96,6 +98,194 @@
       "tests_test_view_filter_definitions_empty_domain_test_view_filter_definitions_empty_collection_is_not_blocked"
     ],
     "1": [
+      "core_canon_canon_str",
+      "core_canon_fnum",
+      "core_canon_rationale_147",
+      "core_canon_rationale_42",
+      "core_collect_purge_lookup",
+      "core_dimension_type_helpers",
+      "core_dimension_type_helpers_build_text_appearance_items",
+      "core_dimension_type_helpers_fmt_float",
+      "core_dimension_type_helpers_fmt_in_from_ft",
+      "core_dimension_type_helpers_format_options_to_kv",
+      "core_dimension_type_helpers_get_dimension_shape",
+      "core_dimension_type_helpers_get_type_display_name",
+      "core_dimension_type_helpers_rationale_121",
+      "core_dimension_type_helpers_rationale_245",
+      "core_dimension_type_helpers_rationale_256",
+      "core_dimension_type_helpers_rationale_270",
+      "core_dimension_type_helpers_rationale_318",
+      "core_dimension_type_helpers_rationale_393",
+      "core_dimension_type_helpers_rationale_519",
+      "core_dimension_type_helpers_rationale_568",
+      "core_dimension_type_helpers_rationale_642",
+      "core_dimension_type_helpers_read_prefix_suffix",
+      "core_dimension_type_helpers_read_tick_mark_sig_hash",
+      "core_dimension_type_helpers_read_unit_format_info",
+      "core_record_v2_canonicalize_enum",
+      "core_record_v2_canonicalize_float",
+      "core_record_v2_canonicalize_str_allow_empty",
+      "core_record_v2_rationale_110",
+      "core_record_v2_rationale_179",
+      "core_record_v2_rationale_238",
+      "core_rows",
+      "core_rows_as_bool_from_param",
+      "core_rows_as_double",
+      "core_rows_as_int",
+      "core_rows_as_string",
+      "core_rows_as_value_string",
+      "core_rows_canon_rgb",
+      "core_rows_first_param",
+      "core_rows_format_len_inches",
+      "core_rows_get_element_display_name",
+      "core_rows_get_type_display_name",
+      "core_rows_param",
+      "core_rows_rationale_101",
+      "core_rows_rationale_119",
+      "core_rows_rationale_135",
+      "core_rows_rationale_175",
+      "core_rows_rationale_197",
+      "core_rows_rationale_22",
+      "core_rows_rationale_231",
+      "core_rows_rationale_260",
+      "core_rows_rationale_302",
+      "core_rows_rationale_39",
+      "core_rows_rationale_59",
+      "core_rows_rationale_83",
+      "core_rows_try_get_color_rgb_from_elem",
+      "domains_arrowheads",
+      "domains_arrowheads_as_value_string",
+      "domains_arrowheads_build_arrow_identity_items",
+      "domains_arrowheads_build_common_identity_items",
+      "domains_arrowheads_build_tick_identity_items",
+      "domains_arrowheads_canon_yesno_bool",
+      "domains_arrowheads_extract",
+      "domains_arrowheads_fmt_deg_from_rad",
+      "domains_arrowheads_get_arrowhead_style",
+      "domains_arrowheads_is_arrowhead_type",
+      "domains_arrowheads_iter_arrowhead_ids_from_element",
+      "domains_arrowheads_rationale_108",
+      "domains_arrowheads_rationale_213",
+      "domains_arrowheads_rationale_231",
+      "domains_arrowheads_rationale_92",
+      "domains_dimension_types",
+      "domains_dimension_types_apply_family_name_override",
+      "domains_dimension_types_attach_placeholder_metadata",
+      "domains_dimension_types_build_dimension_instance_count_map",
+      "domains_dimension_types_collect_dim_types",
+      "domains_dimension_types_extract_angular",
+      "domains_dimension_types_extract_diameter",
+      "domains_dimension_types_extract_linear",
+      "domains_dimension_types_extract_radial",
+      "domains_dimension_types_extract_spot_coordinate",
+      "domains_dimension_types_extract_spot_elevation",
+      "domains_dimension_types_extract_spot_slope",
+      "domains_dimension_types_rationale_1314",
+      "domains_dimension_types_rationale_1335",
+      "domains_dimension_types_rationale_151",
+      "domains_dimension_types_read_symbol_name",
+      "domains_text_types",
+      "domains_text_types_build_textnote_instance_count_map",
+      "domains_text_types_extract",
+      "domains_text_types_rationale_196",
+      "domains_text_types_read_instance_and_sole_flags",
+      "tests_test_arrowheads_shape_gating_test_get_arrowhead_style_fallback",
+      "tests_test_arrowheads_shape_gating_test_no_missing_for_unrelated_style_properties",
+      "tests_test_arrowheads_shape_gating_test_style_discriminator_first",
+      "tests_test_arrowheads_shape_gating_test_style_specific_keys_are_omitted_when_not_applicable"
+    ],
+    "2": [
+      "contracts_domain_identity_keys_v2_materials_notes",
+      "core_phase2",
+      "core_phase2_phase2_qv_from_legacy_sentinel_str",
+      "core_phase2_phase2_sorted_items",
+      "core_phase2_rationale_32",
+      "core_phase2_rationale_37",
+      "core_record_v2",
+      "core_record_v2_block_record_for_unstable_id",
+      "core_record_v2_block_record_v2",
+      "core_record_v2_build_record_v2",
+      "core_record_v2_canonical_structural_fields",
+      "core_record_v2_canonical_structural_value",
+      "core_record_v2_canonicalize_bool",
+      "core_record_v2_canonicalize_int",
+      "core_record_v2_canonicalize_str",
+      "core_record_v2_compute_identity_quality",
+      "core_record_v2_default_record_id_secondary_key",
+      "core_record_v2_finalize_record_ids_for_domain",
+      "core_record_v2_make_record_id_from_element",
+      "core_record_v2_py_any",
+      "core_record_v2_rationale_136",
+      "core_record_v2_rationale_206",
+      "core_record_v2_rationale_269",
+      "core_record_v2_rationale_328",
+      "core_record_v2_rationale_358",
+      "core_record_v2_rationale_443",
+      "core_record_v2_rationale_486",
+      "core_record_v2_rationale_548",
+      "core_record_v2_rationale_618",
+      "core_record_v2_rationale_70",
+      "core_record_v2_rationale_84",
+      "core_vg_sig",
+      "core_vg_sig_canonical_identity_items_from_signature",
+      "core_vg_sig_phase2_items_from_def_signature",
+      "core_vg_sig_rationale_286",
+      "core_vg_sig_rationale_336",
+      "domains_fill_patterns",
+      "domains_fill_patterns_collect_fill_patterns",
+      "domains_fill_patterns_export_fill_pattern_ctx",
+      "domains_fill_patterns_extract_drafting",
+      "domains_fill_patterns_extract_model",
+      "domains_fill_patterns_rationale_512",
+      "domains_fill_patterns_rationale_716",
+      "domains_identity_phase2_build_lineage_items",
+      "domains_identity_rationale_59",
+      "domains_line_patterns_extract",
+      "domains_line_patterns_rationale_143",
+      "domains_phase_filters_extract",
+      "domains_phase_filters_rationale_65",
+      "domains_phase_graphics",
+      "domains_phase_graphics_extract",
+      "domains_phase_graphics_phase2_build_join_key_items",
+      "domains_phase_graphics_rationale_57",
+      "domains_phase_graphics_rationale_69",
+      "domains_phases_rationale_66",
+      "domains_text_types_phase2_build_payload",
+      "domains_view_category_overrides",
+      "domains_view_category_overrides_annotation",
+      "domains_view_category_overrides_annotation_category_hidden_item",
+      "domains_view_category_overrides_annotation_extract",
+      "domains_view_category_overrides_annotation_phase2_partition_items",
+      "domains_view_category_overrides_annotation_safe_bool",
+      "domains_view_category_overrides_model_category_hidden_item",
+      "domains_view_category_overrides_model_compute_override_properties_hash",
+      "domains_view_category_overrides_model_extract",
+      "domains_view_category_overrides_model_phase2_partition_items",
+      "domains_view_category_overrides_model_safe_bool",
+      "domains_view_filter_applications_view_templates",
+      "domains_view_filter_applications_view_templates_extract",
+      "domains_view_filter_applications_view_templates_is_schedule_view",
+      "domains_view_filter_applications_view_templates_rationale_315",
+      "domains_view_filter_applications_view_templates_rationale_86",
+      "domains_view_filter_definitions",
+      "domains_view_filter_definitions_extract",
+      "domains_view_filter_definitions_logic_root_token",
+      "domains_view_filter_definitions_op_token_from_rule",
+      "domains_view_filter_definitions_param_ref_from_param_id",
+      "domains_view_filter_definitions_py_any",
+      "domains_view_filter_definitions_rationale_118",
+      "domains_view_filter_definitions_rationale_163",
+      "domains_view_filter_definitions_rationale_176",
+      "domains_view_filter_definitions_rationale_236",
+      "domains_view_filter_definitions_rationale_56",
+      "domains_view_filter_definitions_rationale_70",
+      "domains_view_filter_definitions_value_token_from_rule",
+      "domains_view_filter_definitions_walk_rules",
+      "domains_view_templates_phase2_items_from_def_signature",
+      "tests_test_compound_types_wall_fillpatternelem_getfillpattern",
+      "tests_test_fill_patterns_canonical_selectors_test_fill_pattern_ctx_contract_exports_specials_and_preserves_uid_map"
+    ],
+    "3": [
       "comparisonpair",
       "tests_test_compare_cross_segment_governance",
       "tests_test_compare_cross_segment_governance_py_path",
@@ -183,7 +373,7 @@
       "tools_compare_cross_segment_sort_summary_rows",
       "tools_compare_cross_segment_usage_interpretable_for_role"
     ],
-    "2": [
+    "4": [
       "object",
       "tests_test_compound_types_wall",
       "tests_test_compound_types_wall_basic_wall",
@@ -267,163 +457,6 @@
       "tests_test_materials_test_optional_identity_fields_do_not_emit_canonical_sentinel_literals",
       "tests_test_materials_test_sig_basis_keys_used_reproduces_sig_hash",
       "tests_test_materials_test_use_render_appearance_captured_but_not_hashed"
-    ],
-    "3": [
-      "archive_pareto_joinkey_search",
-      "archive_pareto_joinkey_search_build_wide_kv_table",
-      "archive_pareto_joinkey_search_compute_v_norm",
-      "archive_pareto_joinkey_search_dedupe_preserve_order",
-      "archive_pareto_joinkey_search_dominates",
-      "archive_pareto_joinkey_search_eval_subset",
-      "archive_pareto_joinkey_search_evalconfig",
-      "archive_pareto_joinkey_search_main",
-      "archive_pareto_joinkey_search_pareto_front",
-      "archive_pareto_joinkey_search_pareto_search",
-      "archive_pareto_joinkey_search_rank_challengers_from_wide",
-      "archive_pareto_joinkey_search_rationale_108",
-      "archive_pareto_joinkey_search_rationale_148",
-      "archive_pareto_joinkey_search_rationale_171",
-      "archive_pareto_joinkey_search_rationale_219",
-      "archive_pareto_joinkey_search_rationale_270",
-      "archive_pareto_joinkey_search_rationale_43",
-      "archive_pareto_joinkey_search_sample_records",
-      "archive_pareto_joinkey_search_shape_label",
-      "join_key_discovery_eval",
-      "join_key_discovery_eval_build_candidate_join_key",
-      "join_key_discovery_eval_build_candidate_join_key_with_details",
-      "join_key_discovery_eval_build_identity_index",
-      "join_key_discovery_eval_listish",
-      "join_key_discovery_eval_lookup_shape_cfg",
-      "join_key_discovery_eval_norm",
-      "join_key_discovery_eval_normalize_policy_block",
-      "join_key_discovery_eval_rationale_101",
-      "join_key_discovery_eval_rationale_12",
-      "join_key_discovery_eval_rationale_45",
-      "join_key_discovery_eval_score_candidate",
-      "join_key_discovery_greedy",
-      "join_key_discovery_greedy_discover_greedy",
-      "join_key_discovery_greedy_score",
-      "tests_test_join_key_discovery_shape_matching",
-      "tests_test_join_key_discovery_shape_matching_test_identity_index_keeps_q_only_rows_for_required_presence",
-      "tests_test_join_key_discovery_shape_matching_test_shape_gating_does_not_require_phase_filter_for_false",
-      "tests_test_join_key_discovery_shape_matching_test_shape_gating_matches_bool_case_variants",
-      "tests_test_record_id_determinism_make_record",
-      "tests_test_v21_join_policy_compat",
-      "tests_test_v21_join_policy_compat_py_path",
-      "tests_test_v21_join_policy_compat_test_apply_diagnostics_include_discriminator_context",
-      "tests_test_v21_join_policy_compat_test_discover_emits_legacy_compat_shape_and_lists",
-      "tests_test_v21_join_policy_compat_test_flat_required_fields_backward_compatible",
-      "tests_test_v21_join_policy_compat_test_optional_items_not_required_or_selected_by_default",
-      "tests_test_v21_join_policy_compat_test_required_items_alias_and_shape_gating",
-      "tests_test_v21_join_policy_compat_test_validate_pareto_auto_bumps_max_k_for_required_items",
-      "tests_test_v21_join_policy_compat_write_csv",
-      "tools_apply_join_policy",
-      "tools_apply_join_policy_main",
-      "tools_apply_join_policy_py_path",
-      "tools_apply_join_policy_read_csv",
-      "tools_apply_join_policy_write_csv",
-      "tools_archive_pareto_joinkey_search_py_dataframe",
-      "tools_archive_pareto_joinkey_search_py_path",
-      "tools_archive_pareto_joinkey_search_py_series",
-      "tools_discover_hash_policy",
-      "tools_discover_hash_policy_domain_rows",
-      "tools_discover_hash_policy_load_items",
-      "tools_discover_hash_policy_main",
-      "tools_discover_hash_policy_py_path",
-      "tools_discover_hash_policy_rationale_20",
-      "tools_discover_hash_policy_rationale_80",
-      "tools_discover_hash_policy_resolve_phase0_dir",
-      "tools_discover_hash_policy_run_target",
-      "tools_discover_hash_policy_stratified_sample",
-      "tools_discover_join_policy",
-      "tools_discover_join_policy_dedupe",
-      "tools_discover_join_policy_main",
-      "tools_discover_join_policy_pareto_search_adapter",
-      "tools_discover_join_policy_pick_candidate_fields",
-      "tools_discover_join_policy_py_path",
-      "tools_discover_join_policy_read_csv",
-      "tools_discover_join_policy_sample_domain_records",
-      "tools_discover_join_policy_to_legacy_shape_gating",
-      "tools_discover_join_policy_without_excluded",
-      "tools_discover_join_policy_write_csv",
-      "tools_join_key_derivation",
-      "tools_join_key_discovery_eval_py_any",
-      "tools_join_key_discovery_greedy_py_any"
-    ],
-    "4": [
-      "core_dimension_type_helpers",
-      "core_dimension_type_helpers_build_text_appearance_items",
-      "core_dimension_type_helpers_fmt_float",
-      "core_dimension_type_helpers_fmt_in_from_ft",
-      "core_dimension_type_helpers_format_options_to_kv",
-      "core_dimension_type_helpers_get_dimension_shape",
-      "core_dimension_type_helpers_get_type_display_name",
-      "core_dimension_type_helpers_rationale_121",
-      "core_dimension_type_helpers_rationale_245",
-      "core_dimension_type_helpers_rationale_256",
-      "core_dimension_type_helpers_rationale_270",
-      "core_dimension_type_helpers_rationale_318",
-      "core_dimension_type_helpers_rationale_393",
-      "core_dimension_type_helpers_rationale_519",
-      "core_dimension_type_helpers_rationale_568",
-      "core_dimension_type_helpers_rationale_642",
-      "core_dimension_type_helpers_read_prefix_suffix",
-      "core_dimension_type_helpers_read_tick_mark_sig_hash",
-      "core_dimension_type_helpers_read_unit_format_info",
-      "core_record_v2_canonicalize_float",
-      "core_record_v2_canonicalize_int",
-      "core_record_v2_canonicalize_str_allow_empty",
-      "core_record_v2_rationale_110",
-      "core_record_v2_rationale_136",
-      "core_record_v2_rationale_179",
-      "core_rows",
-      "core_rows_as_bool_from_param",
-      "core_rows_as_double",
-      "core_rows_as_int",
-      "core_rows_as_string",
-      "core_rows_as_value_string",
-      "core_rows_canon_rgb",
-      "core_rows_first_param",
-      "core_rows_format_len_inches",
-      "core_rows_get_element_display_name",
-      "core_rows_get_type_display_name",
-      "core_rows_param",
-      "core_rows_rationale_101",
-      "core_rows_rationale_119",
-      "core_rows_rationale_135",
-      "core_rows_rationale_175",
-      "core_rows_rationale_197",
-      "core_rows_rationale_22",
-      "core_rows_rationale_231",
-      "core_rows_rationale_260",
-      "core_rows_rationale_302",
-      "core_rows_rationale_39",
-      "core_rows_rationale_59",
-      "core_rows_rationale_83",
-      "core_rows_try_get_color_rgb_from_elem",
-      "domains_dimension_types",
-      "domains_dimension_types_apply_family_name_override",
-      "domains_dimension_types_attach_placeholder_metadata",
-      "domains_dimension_types_build_dimension_instance_count_map",
-      "domains_dimension_types_collect_dim_types",
-      "domains_dimension_types_extract_angular",
-      "domains_dimension_types_extract_diameter",
-      "domains_dimension_types_extract_linear",
-      "domains_dimension_types_extract_radial",
-      "domains_dimension_types_extract_spot_coordinate",
-      "domains_dimension_types_extract_spot_elevation",
-      "domains_dimension_types_extract_spot_slope",
-      "domains_dimension_types_rationale_1314",
-      "domains_dimension_types_rationale_1335",
-      "domains_dimension_types_rationale_151",
-      "domains_dimension_types_read_symbol_name",
-      "domains_phases_rationale_66",
-      "domains_text_types",
-      "domains_text_types_build_textnote_instance_count_map",
-      "domains_text_types_extract",
-      "domains_text_types_phase2_build_payload",
-      "domains_text_types_rationale_196",
-      "domains_text_types_read_instance_and_sole_flags"
     ],
     "5": [
       "core_graphic_overrides",
@@ -576,77 +609,70 @@
       "tools_build_segment_manifest_sanitize_folder"
     ],
     "7": [
-      "bundle_analysis_reference_bundle",
-      "bundle_analysis_reference_bundle_escape_control_chars_in_json_strings",
-      "bundle_analysis_reference_bundle_load_and_validate",
-      "bundle_analysis_reference_bundle_rationale_11",
-      "bundle_analysis_reference_bundle_write_sidecar",
-      "core_sig_hash_builder",
-      "core_sig_hash_builder_apply_sig_hash_policy_to_record",
-      "core_sig_hash_builder_build_sig_hash_from_policy",
-      "core_sig_hash_builder_items_to_map",
-      "core_sig_hash_builder_key_allowed",
-      "core_sig_hash_builder_py_any",
-      "core_sig_hash_builder_rationale_45",
-      "core_sig_hash_builder_rationale_94",
-      "core_sig_hash_policy",
-      "core_sig_hash_policy_get_domain_sig_hash_policy",
-      "core_sig_hash_policy_is_list_of_str",
-      "core_sig_hash_policy_load_sig_hash_policies",
-      "core_sig_hash_policy_py_any",
-      "core_sig_hash_policy_validate_domain_sig_hash_policy",
-      "tests_test_fingerprint_export_discovery",
-      "tests_test_fingerprint_export_discovery_fingerprint_payload",
-      "tests_test_fingerprint_export_discovery_py_path",
-      "tests_test_fingerprint_export_discovery_test_detect_surfaces_counts_fingerprint_separately",
-      "tests_test_fingerprint_export_discovery_test_domain_discovery_prefers_fingerprint_candidates",
-      "tests_test_fingerprint_export_discovery_test_iter_export_files_prioritizes_fingerprint_and_uses_none_secondary",
-      "tests_test_fingerprint_export_discovery_test_load_exports_prefers_fingerprint_files_before_plain_fallback",
-      "tests_test_fingerprint_export_discovery_test_pick_sample_file_prefers_fingerprint_and_falls_back_to_split",
-      "tests_test_fingerprint_export_discovery_write_json",
-      "tests_test_reference_bundle",
-      "tests_test_reference_bundle_py_path",
-      "tests_test_reference_bundle_test_load_and_validate_allows_legacy_control_characters",
-      "tests_test_reference_bundle_test_load_and_validate_allows_raw_newline_in_string",
-      "tests_test_sig_hash_policy_builder",
-      "tests_test_sig_hash_policy_builder_test_apply_sig_hash_policy_to_record_uses_items_and_writes_sig_basis",
-      "tests_test_sig_hash_policy_builder_test_generated_sig_hash_policy_loads",
-      "tests_test_sig_hash_policy_builder_test_sig_hash_builder_blocks_when_required_not_ok",
-      "tests_test_sig_hash_policy_builder_test_sig_hash_builder_degrades_when_required_not_ok_and_block_disabled",
-      "tests_test_sig_hash_policy_builder_test_sig_hash_builder_hashes_allowed_items_from_items_list_order_independent",
-      "tests_test_sig_hash_policy_builder_test_sig_hash_builder_prefix_and_first_writer_wins",
-      "tests_test_sig_hash_policy_builder_test_text_types_sig_hash_excludes_name_includes_behavioral_items",
-      "tools_bundle_analysis_reference_bundle_py_path",
-      "tools_run_extract_all",
-      "tools_run_extract_all_append_line_pattern_synthetic_norm_hash",
-      "tools_run_extract_all_apply_sig_hash_to_phase0",
-      "tools_run_extract_all_detect_surfaces",
-      "tools_run_extract_all_discover_domains_from_exports",
-      "tools_run_extract_all_emit_join_policy_diagnostics",
-      "tools_run_extract_all_enforce_policy_gate",
-      "tools_run_extract_all_ensure_dir",
-      "tools_run_extract_all_ensure_domain_scoped_identity_items",
-      "tools_run_extract_all_infer_domains",
-      "tools_run_extract_all_iter_csv_rows",
-      "tools_run_extract_all_main",
-      "tools_run_extract_all_merge_index_details",
-      "tools_run_extract_all_parse_stage_csv",
-      "tools_run_extract_all_pick_sample_file",
-      "tools_run_extract_all_py_any",
-      "tools_run_extract_all_py_path",
-      "tools_run_extract_all_rationale_208",
-      "tools_run_extract_all_rationale_41",
-      "tools_run_extract_all_rationale_535",
-      "tools_run_extract_all_rationale_545",
-      "tools_run_extract_all_rationale_59",
-      "tools_run_extract_all_rationale_600",
-      "tools_run_extract_all_read_csv_rows",
-      "tools_run_extract_all_read_json",
-      "tools_run_extract_all_rebuild_monolithic_identity_items",
-      "tools_run_extract_all_resolve_sig_hash_policy_path",
-      "tools_run_extract_all_run",
-      "tools_run_extract_all_validate_line_pattern_synthetic_norm_hash",
-      "tools_run_extract_all_warn_deprecated_alias"
+      "core_canonical_items",
+      "core_canonical_items_build_flat_items",
+      "core_canonical_items_canonicalize_record",
+      "core_canonical_items_compile_role_policy",
+      "core_canonical_items_merge_legacy_buckets",
+      "core_canonical_items_normalize_item",
+      "core_canonical_items_py_any",
+      "core_canonical_items_rationale_108",
+      "core_canonical_items_rationale_131",
+      "core_canonical_items_rationale_36",
+      "core_canonical_items_rationale_59",
+      "core_canonical_items_rationale_73",
+      "core_canonical_items_resolve_item_roles",
+      "migration_reformat_to_flat_items",
+      "migration_reformat_to_flat_items_iter_input_files",
+      "migration_reformat_to_flat_items_main",
+      "migration_reformat_to_flat_items_parse_domains",
+      "migration_reformat_to_flat_items_process_payload",
+      "migration_reformat_to_flat_items_transform_record",
+      "runner_run_dynamo_canonicalize_all_domain_records",
+      "tests_test_canonical_items_migration",
+      "tests_test_canonical_items_migration_test_build_flat_items_preserves_counts_for_unique_keys",
+      "tests_test_canonical_items_migration_test_compile_and_resolve_roles_runtime_from_key_only",
+      "tests_test_canonical_items_migration_test_compile_role_policy_accepts_top_level_domains_wrapper",
+      "tests_test_canonical_items_migration_test_compile_role_policy_skips_scalar_string_for_role_keys",
+      "tests_test_canonical_items_migration_test_merge_legacy_buckets_preserves_existing_canonical_items",
+      "tests_test_canonical_items_migration_test_merge_legacy_buckets_to_flat_items_equivalence_and_dedupe",
+      "tests_test_reformat_to_flat_items_identity_lineage",
+      "tests_test_reformat_to_flat_items_identity_lineage_test_identity_lineage_items_are_preserved_in_canonical_conversion",
+      "tests_test_runner_canonicalization",
+      "tests_test_runner_canonicalization_test_canonicalize_record_merges_all_sources_and_strips_legacy_keys",
+      "tools_domain_authority",
+      "tools_domain_authority_analyze",
+      "tools_domain_authority_authority_confidence",
+      "tools_domain_authority_authority_scope_recommendation",
+      "tools_domain_authority_classify_authority_outcome",
+      "tools_domain_authority_classify_convergence",
+      "tools_domain_authority_domain_payload_from_fp",
+      "tools_domain_authority_extract_domains_summary",
+      "tools_domain_authority_extract_record_sig_hashes_v2",
+      "tools_domain_authority_hhi",
+      "tools_domain_authority_jaccard_multiset",
+      "tools_domain_authority_jaccard_set",
+      "tools_domain_authority_load_json",
+      "tools_domain_authority_main",
+      "tools_domain_authority_md5_utf8",
+      "tools_domain_authority_project_id_from_fp",
+      "tools_domain_authority_py_any",
+      "tools_domain_authority_py_path",
+      "tools_domain_authority_rationale_192",
+      "tools_domain_authority_rationale_215",
+      "tools_domain_authority_rationale_251",
+      "tools_domain_authority_rationale_275",
+      "tools_domain_authority_rationale_306",
+      "tools_domain_authority_rationale_93",
+      "tools_domain_authority_runconfig",
+      "tools_domain_authority_runconfig_from_json",
+      "tools_domain_authority_semantic_domain_multiset_hash",
+      "tools_domain_authority_semantic_record_sig_hash",
+      "tools_domain_authority_strip_revit_uid_tail",
+      "tools_domain_authority_write_csv",
+      "tools_migration_reformat_to_flat_items_py_any",
+      "tools_migration_reformat_to_flat_items_py_counter",
+      "tools_migration_reformat_to_flat_items_py_path"
     ],
     "8": [
       "cachekey",
@@ -714,71 +740,6 @@
       "tests_test_collect_testsafeuniqueid_test_unique_id_whitespace"
     ],
     "9": [
-      "core_canonical_items",
-      "core_canonical_items_build_flat_items",
-      "core_canonical_items_canonicalize_record",
-      "core_canonical_items_compile_role_policy",
-      "core_canonical_items_merge_legacy_buckets",
-      "core_canonical_items_normalize_item",
-      "core_canonical_items_py_any",
-      "core_canonical_items_rationale_108",
-      "core_canonical_items_rationale_131",
-      "core_canonical_items_rationale_36",
-      "core_canonical_items_rationale_59",
-      "core_canonical_items_rationale_73",
-      "core_canonical_items_resolve_item_roles",
-      "migration_reformat_to_flat_items",
-      "migration_reformat_to_flat_items_iter_input_files",
-      "migration_reformat_to_flat_items_main",
-      "migration_reformat_to_flat_items_parse_domains",
-      "migration_reformat_to_flat_items_process_payload",
-      "migration_reformat_to_flat_items_transform_record",
-      "tests_test_canonical_items_migration",
-      "tests_test_canonical_items_migration_test_build_flat_items_preserves_counts_for_unique_keys",
-      "tests_test_canonical_items_migration_test_compile_and_resolve_roles_runtime_from_key_only",
-      "tests_test_canonical_items_migration_test_compile_role_policy_accepts_top_level_domains_wrapper",
-      "tests_test_canonical_items_migration_test_compile_role_policy_skips_scalar_string_for_role_keys",
-      "tests_test_canonical_items_migration_test_merge_legacy_buckets_preserves_existing_canonical_items",
-      "tests_test_canonical_items_migration_test_merge_legacy_buckets_to_flat_items_equivalence_and_dedupe",
-      "tests_test_reformat_to_flat_items_identity_lineage",
-      "tests_test_reformat_to_flat_items_identity_lineage_test_identity_lineage_items_are_preserved_in_canonical_conversion",
-      "tests_test_runner_canonicalization",
-      "tests_test_runner_canonicalization_test_canonicalize_record_merges_all_sources_and_strips_legacy_keys",
-      "tools_domain_authority",
-      "tools_domain_authority_analyze",
-      "tools_domain_authority_authority_confidence",
-      "tools_domain_authority_authority_scope_recommendation",
-      "tools_domain_authority_classify_authority_outcome",
-      "tools_domain_authority_classify_convergence",
-      "tools_domain_authority_domain_payload_from_fp",
-      "tools_domain_authority_extract_domains_summary",
-      "tools_domain_authority_extract_record_sig_hashes_v2",
-      "tools_domain_authority_hhi",
-      "tools_domain_authority_jaccard_multiset",
-      "tools_domain_authority_jaccard_set",
-      "tools_domain_authority_load_json",
-      "tools_domain_authority_main",
-      "tools_domain_authority_md5_utf8",
-      "tools_domain_authority_project_id_from_fp",
-      "tools_domain_authority_py_any",
-      "tools_domain_authority_py_path",
-      "tools_domain_authority_rationale_192",
-      "tools_domain_authority_rationale_215",
-      "tools_domain_authority_rationale_251",
-      "tools_domain_authority_rationale_275",
-      "tools_domain_authority_rationale_306",
-      "tools_domain_authority_rationale_93",
-      "tools_domain_authority_runconfig",
-      "tools_domain_authority_runconfig_from_json",
-      "tools_domain_authority_semantic_domain_multiset_hash",
-      "tools_domain_authority_semantic_record_sig_hash",
-      "tools_domain_authority_strip_revit_uid_tail",
-      "tools_domain_authority_write_csv",
-      "tools_migration_reformat_to_flat_items_py_any",
-      "tools_migration_reformat_to_flat_items_py_counter",
-      "tools_migration_reformat_to_flat_items_py_path"
-    ],
-    "10": [
       "tools_generate_governance_narrative",
       "tools_generate_governance_narrative_add_float",
       "tools_generate_governance_narrative_assign_tier",
@@ -840,7 +801,7 @@
       "tools_generate_governance_narrative_truthy",
       "tools_generate_governance_narrative_used_view_falls_back_to_legacy"
     ],
-    "11": [
+    "10": [
       "contracts_record_contract_v2_schema",
       "contracts_record_contract_v2_schema_additionalproperties",
       "contracts_record_contract_v2_schema_allof",
@@ -900,65 +861,179 @@
       "tools_compute_latent_purgeable_select_chains",
       "tools_compute_latent_purgeable_write_output"
     ],
+    "11": [
+      "bundle_analysis_reference_bundle",
+      "bundle_analysis_reference_bundle_escape_control_chars_in_json_strings",
+      "bundle_analysis_reference_bundle_load_and_validate",
+      "bundle_analysis_reference_bundle_rationale_11",
+      "bundle_analysis_reference_bundle_write_sidecar",
+      "core_sig_hash_policy",
+      "core_sig_hash_policy_get_domain_sig_hash_policy",
+      "core_sig_hash_policy_is_list_of_str",
+      "core_sig_hash_policy_load_sig_hash_policies",
+      "core_sig_hash_policy_py_any",
+      "core_sig_hash_policy_validate_domain_sig_hash_policy",
+      "tests_test_fingerprint_export_discovery",
+      "tests_test_fingerprint_export_discovery_fingerprint_payload",
+      "tests_test_fingerprint_export_discovery_py_path",
+      "tests_test_fingerprint_export_discovery_test_detect_surfaces_counts_fingerprint_separately",
+      "tests_test_fingerprint_export_discovery_test_domain_discovery_prefers_fingerprint_candidates",
+      "tests_test_fingerprint_export_discovery_test_iter_export_files_prioritizes_fingerprint_and_uses_none_secondary",
+      "tests_test_fingerprint_export_discovery_test_load_exports_prefers_fingerprint_files_before_plain_fallback",
+      "tests_test_fingerprint_export_discovery_test_pick_sample_file_prefers_fingerprint_and_falls_back_to_split",
+      "tests_test_fingerprint_export_discovery_write_json",
+      "tests_test_reference_bundle",
+      "tests_test_reference_bundle_py_path",
+      "tests_test_reference_bundle_test_load_and_validate_allows_legacy_control_characters",
+      "tests_test_reference_bundle_test_load_and_validate_allows_raw_newline_in_string",
+      "tests_test_sig_hash_policy_builder_test_generated_sig_hash_policy_loads",
+      "tools_bundle_analysis_reference_bundle_py_path",
+      "tools_run_extract_all",
+      "tools_run_extract_all_append_line_pattern_synthetic_norm_hash",
+      "tools_run_extract_all_apply_sig_hash_to_phase0",
+      "tools_run_extract_all_detect_surfaces",
+      "tools_run_extract_all_discover_domains_from_exports",
+      "tools_run_extract_all_emit_join_policy_diagnostics",
+      "tools_run_extract_all_enforce_policy_gate",
+      "tools_run_extract_all_ensure_dir",
+      "tools_run_extract_all_ensure_domain_scoped_identity_items",
+      "tools_run_extract_all_infer_domains",
+      "tools_run_extract_all_iter_csv_rows",
+      "tools_run_extract_all_main",
+      "tools_run_extract_all_merge_index_details",
+      "tools_run_extract_all_parse_stage_csv",
+      "tools_run_extract_all_pick_sample_file",
+      "tools_run_extract_all_py_any",
+      "tools_run_extract_all_py_path",
+      "tools_run_extract_all_rationale_208",
+      "tools_run_extract_all_rationale_41",
+      "tools_run_extract_all_rationale_535",
+      "tools_run_extract_all_rationale_545",
+      "tools_run_extract_all_rationale_59",
+      "tools_run_extract_all_rationale_600",
+      "tools_run_extract_all_read_csv_rows",
+      "tools_run_extract_all_read_json",
+      "tools_run_extract_all_rebuild_monolithic_identity_items",
+      "tools_run_extract_all_resolve_sig_hash_policy_path",
+      "tools_run_extract_all_run",
+      "tools_run_extract_all_validate_line_pattern_synthetic_norm_hash",
+      "tools_run_extract_all_warn_deprecated_alias"
+    ],
     "12": [
-      "core_canon_canon_str",
-      "core_canon_rationale_42",
-      "core_collect_collect_instances",
-      "core_collect_purge_lookup",
-      "core_phase2_phase2_qv_from_legacy_sentinel_str",
-      "core_phase2_rationale_37",
-      "core_record_v2_make_record_id_from_element",
-      "core_record_v2_rationale_269",
-      "core_vg_sig",
-      "core_vg_sig_canonical_identity_items_from_signature",
-      "core_vg_sig_emit_builtin_params",
-      "core_vg_sig_emit_shared_params_stub",
-      "core_vg_sig_phase2_items_from_def_signature",
-      "core_vg_sig_rationale_169",
-      "core_vg_sig_rationale_212",
-      "core_vg_sig_rationale_275",
-      "core_vg_sig_rationale_286",
-      "core_vg_sig_rationale_336",
-      "core_vg_sig_rationale_408",
-      "core_vg_sig_read_bip_int",
-      "core_vg_sig_traceability_unknown_items",
-      "domains_line_patterns_extract",
-      "domains_line_patterns_rationale_143",
-      "domains_line_styles_extract",
-      "domains_line_styles_rationale_73",
-      "domains_phase_filters_extract",
-      "domains_phase_filters_rationale_65",
-      "domains_view_templates",
-      "domains_view_templates_append_assigned_view_count_cosmetic_item",
-      "domains_view_templates_append_filter_stack_signature",
-      "domains_view_templates_append_phase_filter_value",
-      "domains_view_templates_append_workset_visibility",
-      "domains_view_templates_build_ceiling_plan_viewtype_set",
-      "domains_view_templates_build_elevation_section_detail_viewtype_set",
-      "domains_view_templates_build_floor_structural_area_viewtype_set",
-      "domains_view_templates_build_renderings_drafting_viewtype_set",
-      "domains_view_templates_canonical_identity_items_from_signature",
-      "domains_view_templates_collect_templates",
-      "domains_view_templates_extract_ceiling_plans",
-      "domains_view_templates_extract_elevations_sections_detail",
-      "domains_view_templates_extract_floor_structural_area_plans",
-      "domains_view_templates_extract_renderings_drafting",
-      "domains_view_templates_extract_schedules",
-      "domains_view_templates_is_schedule_view",
-      "domains_view_templates_is_template_param_included",
-      "domains_view_templates_non_ctrl_bips_from_view",
-      "domains_view_templates_phase2_items_from_def_signature",
-      "domains_view_templates_rationale_1219",
-      "domains_view_templates_rationale_1639",
-      "domains_view_templates_rationale_2036",
-      "domains_view_templates_rationale_2272",
-      "domains_view_templates_rationale_352",
-      "domains_view_templates_rationale_396",
-      "domains_view_templates_rationale_409",
-      "domains_view_templates_semantic_keys_from_identity_items",
-      "tests_test_view_instances_cache_key_consistency"
+      "archive_compare",
+      "archive_compare_changecounts",
+      "archive_compare_classify_pair",
+      "archive_compare_phase2_items_map",
+      "archive_compare_rationale_28",
+      "archive_compare_rationale_87",
+      "archive_index",
+      "archive_index_build_domain_index",
+      "archive_index_domainindex",
+      "archive_index_get_join_hash",
+      "archive_index_rationale_104",
+      "archive_index_rationale_49",
+      "archive_index_rationale_9",
+      "archive_report",
+      "archive_report_ensure_dir",
+      "archive_report_format_console_summary",
+      "archive_report_rationale_27",
+      "archive_report_rationale_60",
+      "archive_report_rationale_79",
+      "archive_report_utc_timestamp",
+      "archive_report_write_change_type_csv",
+      "archive_report_write_json_report",
+      "archive_run_attribute_stress",
+      "archive_run_attribute_stress_all_joinable",
+      "archive_run_attribute_stress_all_joinable_main",
+      "archive_run_attribute_stress_all_joinable_phase2_items_map_no_dups",
+      "archive_run_attribute_stress_all_joinable_rationale_16",
+      "archive_run_attribute_stress_extract_phase2_items",
+      "archive_run_attribute_stress_main",
+      "archive_run_attribute_stress_rationale_16",
+      "archive_run_change_type",
+      "archive_run_change_type_main",
+      "archive_run_change_type_parse_args",
+      "archive_run_change_type_rationale_20",
+      "archive_run_population_stability",
+      "archive_run_population_stability_main",
+      "archive_run_population_stability_parse_args",
+      "archive_stability",
+      "archive_stability_presence_counts",
+      "archive_stability_presencestability",
+      "archive_stability_rationale_29",
+      "archive_stability_rationale_42",
+      "archive_stability_rationale_63",
+      "archive_stability_stability_distribution",
+      "archive_stability_stable_join_hashes",
+      "changecounts",
+      "domains_text_types_phase2_item",
+      "tools_patterns_analysis_archive_compare_py_any",
+      "tools_patterns_analysis_archive_compare_py_domainindex",
+      "tools_patterns_analysis_archive_index_py_any",
+      "tools_patterns_analysis_archive_report_py_any",
+      "tools_patterns_analysis_archive_run_change_type_py_any",
+      "tools_patterns_analysis_archive_run_change_type_py_namespace",
+      "tools_patterns_analysis_archive_run_population_stability_py_namespace",
+      "tools_patterns_analysis_archive_stability_py_domainindex"
     ],
     "13": [
+      "contracts_domain_identity_keys_v2_line_patterns_sig_hash_key_prefixes",
+      "contracts_domain_identity_keys_v2_line_patterns_sig_hash_keys",
+      "contracts_domain_identity_keys_v2_line_patterns_sig_hash_schema",
+      "core_canon",
+      "core_canon_canon_num",
+      "core_canon_is_sentinel",
+      "core_canon_py_any",
+      "core_canon_rationale_152",
+      "core_canon_rationale_162",
+      "core_canon_rationale_94",
+      "core_canon_rgb_dict_from_color",
+      "core_canon_rgb_sig_from_color",
+      "core_context",
+      "core_context_rationale_11",
+      "domains_line_patterns",
+      "domains_line_patterns_lp_seg_type_id_and_name",
+      "domains_line_patterns_rationale_77",
+      "domains_materials",
+      "domains_materials_canon_id_local",
+      "domains_materials_export_ctx",
+      "domains_materials_extract",
+      "domains_materials_mk_item",
+      "domains_materials_rationale_212",
+      "domains_materials_rationale_87",
+      "domains_materials_read_param_as_string",
+      "domains_materials_read_prop",
+      "domains_materials_resolve_pattern_slot",
+      "domains_materials_rgb_sig",
+      "domains_materials_safe_item_value",
+      "domains_phase_filters",
+      "migration_role_policy_line_patterns_line_pattern_element_id",
+      "migration_role_policy_line_patterns_line_pattern_segments_def_hash",
+      "migration_role_policy_line_patterns_line_pattern_source_element_id",
+      "migration_role_policy_line_patterns_line_pattern_source_unique_id",
+      "migration_role_policy_line_patterns_line_pattern_uid_or_namekey",
+      "migration_role_policy_phase_filters_phase_filter_id_int",
+      "migration_role_policy_phase_filters_phase_filter_name",
+      "migration_role_policy_phase_filters_phase_filter_source_element_id",
+      "migration_role_policy_phase_filters_phase_filter_source_unique_id",
+      "runner_run_dynamo",
+      "runner_run_dynamo_get_doc",
+      "runner_run_dynamo_get_output_path_from_dynamo",
+      "runner_run_dynamo_is_probably_sync_path",
+      "runner_run_dynamo_is_repo_root",
+      "runner_run_dynamo_looks_like_unc_path",
+      "runner_run_dynamo_rationale_1360",
+      "runner_run_dynamo_rationale_1394",
+      "runner_run_dynamo_rationale_170",
+      "runner_run_dynamo_rationale_31",
+      "runner_run_dynamo_rationale_485",
+      "runner_run_dynamo_rationale_555",
+      "runner_run_dynamo_read_tool_version",
+      "runner_run_dynamo_sha256_of_file",
+      "runner_run_dynamo_use_filename_stamp",
+      "runner_run_dynamo_write_fingerprint"
+    ],
+    "14": [
       "contracts_domain_identity_keys_v2",
       "contracts_domain_identity_keys_v2_banned_identity_value_substrings",
       "contracts_domain_identity_keys_v2_domains",
@@ -1014,7 +1089,117 @@
       "contracts_domain_identity_keys_v2_units_required_keys",
       "contracts_domain_identity_keys_v2_version"
     ],
-    "14": [
+    "15": [
+      "archive_split_detection",
+      "archive_split_detection_build_distance_matrix_from_similarity",
+      "archive_split_detection_cluster",
+      "archive_split_detection_cluster_assignments_to_labels",
+      "archive_split_detection_compute_silhouette_score",
+      "archive_split_detection_extract_dates_from_paths",
+      "archive_split_detection_extract_metadata_patterns",
+      "archive_split_detection_file_level",
+      "archive_split_detection_file_level_build_element_profiles",
+      "archive_split_detection_file_level_compute_avg_between_cluster_similarity",
+      "archive_split_detection_file_level_compute_avg_internal_similarity",
+      "archive_split_detection_file_level_compute_named_cluster_flags",
+      "archive_split_detection_file_level_compute_pairwise_similarity",
+      "archive_split_detection_file_level_compute_pairwise_similarity_candidates",
+      "archive_split_detection_file_level_files_with_any_candidate",
+      "archive_split_detection_file_level_hierarchical_cluster_files",
+      "archive_split_detection_file_level_infer_standard_name",
+      "archive_split_detection_file_level_main",
+      "archive_split_detection_file_level_rationale_112",
+      "archive_split_detection_file_level_rationale_188",
+      "archive_split_detection_file_level_rationale_218",
+      "archive_split_detection_file_level_rationale_285",
+      "archive_split_detection_file_level_rationale_34",
+      "archive_split_detection_file_level_rationale_366",
+      "archive_split_detection_file_level_rationale_385",
+      "archive_split_detection_file_level_rationale_407",
+      "archive_split_detection_file_level_rationale_429",
+      "archive_split_detection_file_level_rationale_454",
+      "archive_split_detection_file_level_rationale_77",
+      "archive_split_detection_file_level_run_file_level_clustering",
+      "archive_split_detection_file_level_select_cluster_representative",
+      "archive_split_detection_file_level_threshold_graph_cluster_files",
+      "archive_split_detection_find_common_path_components",
+      "archive_split_detection_infer_office_from_paths",
+      "archive_split_detection_infer_region_from_paths",
+      "archive_split_detection_interpret_silhouette_score",
+      "archive_split_detection_rationale_106",
+      "archive_split_detection_rationale_133",
+      "archive_split_detection_rationale_162",
+      "archive_split_detection_rationale_181",
+      "archive_split_detection_rationale_201",
+      "archive_split_detection_rationale_21",
+      "archive_split_detection_rationale_214",
+      "archive_split_detection_rationale_231",
+      "archive_split_detection_rationale_34",
+      "archive_split_detection_rationale_43",
+      "archive_split_detection_rationale_86",
+      "archive_split_detection_splitsignal",
+      "tools_patterns_analysis_archive_split_detection_file_level_py_cluster",
+      "tools_patterns_analysis_archive_split_detection_file_level_py_dataframe",
+      "tools_patterns_analysis_archive_split_detection_file_level_py_series",
+      "tools_patterns_analysis_archive_split_detection_py_any",
+      "tools_patterns_analysis_archive_split_detection_py_ndarray"
+    ],
+    "16": [
+      "core_canon_canon_id",
+      "core_canon_rationale_109",
+      "core_collect_collect_instances",
+      "core_deps",
+      "core_deps_blocked",
+      "core_deps_blocked_str",
+      "core_deps_py_any",
+      "core_deps_rationale_1",
+      "core_deps_rationale_30",
+      "core_deps_rationale_61",
+      "core_deps_require_domain",
+      "core_vg_sig_emit_builtin_params",
+      "core_vg_sig_emit_shared_params_stub",
+      "core_vg_sig_rationale_169",
+      "core_vg_sig_rationale_212",
+      "core_vg_sig_rationale_275",
+      "core_vg_sig_rationale_408",
+      "core_vg_sig_read_bip_int",
+      "core_vg_sig_traceability_unknown_items",
+      "domains_view_templates",
+      "domains_view_templates_append_assigned_view_count_cosmetic_item",
+      "domains_view_templates_append_filter_stack_signature",
+      "domains_view_templates_append_phase_filter_value",
+      "domains_view_templates_append_workset_visibility",
+      "domains_view_templates_build_ceiling_plan_viewtype_set",
+      "domains_view_templates_build_elevation_section_detail_viewtype_set",
+      "domains_view_templates_build_floor_structural_area_viewtype_set",
+      "domains_view_templates_build_renderings_drafting_viewtype_set",
+      "domains_view_templates_canonical_identity_items_from_signature",
+      "domains_view_templates_collect_templates",
+      "domains_view_templates_extract_ceiling_plans",
+      "domains_view_templates_extract_elevations_sections_detail",
+      "domains_view_templates_extract_floor_structural_area_plans",
+      "domains_view_templates_extract_renderings_drafting",
+      "domains_view_templates_extract_schedules",
+      "domains_view_templates_is_schedule_view",
+      "domains_view_templates_is_template_param_included",
+      "domains_view_templates_non_ctrl_bips_from_view",
+      "domains_view_templates_rationale_1219",
+      "domains_view_templates_rationale_1639",
+      "domains_view_templates_rationale_2036",
+      "domains_view_templates_rationale_2272",
+      "domains_view_templates_rationale_352",
+      "domains_view_templates_rationale_396",
+      "domains_view_templates_rationale_409",
+      "domains_view_templates_semantic_keys_from_identity_items",
+      "exception",
+      "tests_test_deps_require_domain",
+      "tests_test_deps_require_domain_test_require_domain_allows_degraded_by_default",
+      "tests_test_deps_require_domain_test_require_domain_invalid_envelope_blocks",
+      "tests_test_deps_require_domain_test_require_domain_missing_upstream_blocks",
+      "tests_test_deps_require_domain_test_require_domain_upstream_not_acceptable_blocks",
+      "tests_test_view_instances_cache_key_consistency"
+    ],
+    "17": [
       "core_timing_collector",
       "core_timing_collector_py_any",
       "core_timing_collector_rationale_107",
@@ -1069,62 +1254,7 @@
       "tests_test_timing_collector_testtimingcollectorthreadsafety",
       "tests_test_timing_collector_testtimingcollectorthreadsafety_test_concurrent_timers"
     ],
-    "15": [
-      "patterns_analysis_split_detection",
-      "patterns_analysis_split_detection_build_distance_matrix_from_similarity",
-      "patterns_analysis_split_detection_cluster",
-      "patterns_analysis_split_detection_cluster_assignments_to_labels",
-      "patterns_analysis_split_detection_compute_silhouette_score",
-      "patterns_analysis_split_detection_extract_dates_from_paths",
-      "patterns_analysis_split_detection_extract_metadata_patterns",
-      "patterns_analysis_split_detection_file_level",
-      "patterns_analysis_split_detection_file_level_build_element_profiles",
-      "patterns_analysis_split_detection_file_level_compute_avg_between_cluster_similarity",
-      "patterns_analysis_split_detection_file_level_compute_avg_internal_similarity",
-      "patterns_analysis_split_detection_file_level_compute_named_cluster_flags",
-      "patterns_analysis_split_detection_file_level_compute_pairwise_similarity",
-      "patterns_analysis_split_detection_file_level_compute_pairwise_similarity_candidates",
-      "patterns_analysis_split_detection_file_level_files_with_any_candidate",
-      "patterns_analysis_split_detection_file_level_hierarchical_cluster_files",
-      "patterns_analysis_split_detection_file_level_infer_standard_name",
-      "patterns_analysis_split_detection_file_level_main",
-      "patterns_analysis_split_detection_file_level_rationale_112",
-      "patterns_analysis_split_detection_file_level_rationale_188",
-      "patterns_analysis_split_detection_file_level_rationale_218",
-      "patterns_analysis_split_detection_file_level_rationale_285",
-      "patterns_analysis_split_detection_file_level_rationale_34",
-      "patterns_analysis_split_detection_file_level_rationale_366",
-      "patterns_analysis_split_detection_file_level_rationale_385",
-      "patterns_analysis_split_detection_file_level_rationale_407",
-      "patterns_analysis_split_detection_file_level_rationale_429",
-      "patterns_analysis_split_detection_file_level_rationale_454",
-      "patterns_analysis_split_detection_file_level_rationale_77",
-      "patterns_analysis_split_detection_file_level_run_file_level_clustering",
-      "patterns_analysis_split_detection_file_level_select_cluster_representative",
-      "patterns_analysis_split_detection_file_level_threshold_graph_cluster_files",
-      "patterns_analysis_split_detection_find_common_path_components",
-      "patterns_analysis_split_detection_infer_office_from_paths",
-      "patterns_analysis_split_detection_infer_region_from_paths",
-      "patterns_analysis_split_detection_interpret_silhouette_score",
-      "patterns_analysis_split_detection_rationale_106",
-      "patterns_analysis_split_detection_rationale_133",
-      "patterns_analysis_split_detection_rationale_162",
-      "patterns_analysis_split_detection_rationale_181",
-      "patterns_analysis_split_detection_rationale_201",
-      "patterns_analysis_split_detection_rationale_21",
-      "patterns_analysis_split_detection_rationale_214",
-      "patterns_analysis_split_detection_rationale_231",
-      "patterns_analysis_split_detection_rationale_34",
-      "patterns_analysis_split_detection_rationale_43",
-      "patterns_analysis_split_detection_rationale_86",
-      "patterns_analysis_split_detection_splitsignal",
-      "tools_patterns_analysis_split_detection_file_level_py_cluster",
-      "tools_patterns_analysis_split_detection_file_level_py_dataframe",
-      "tools_patterns_analysis_split_detection_file_level_py_series",
-      "tools_patterns_analysis_split_detection_py_any",
-      "tools_patterns_analysis_split_detection_py_ndarray"
-    ],
-    "16": [
+    "18": [
       "policies_domain_join_key_policies",
       "policies_domain_join_key_policies_domains",
       "policies_domain_join_key_policies_domains_arrowheads",
@@ -1179,7 +1309,7 @@
       "policies_domain_join_key_policies_units_optional_items",
       "policies_domain_join_key_policies_units_required_items"
     ],
-    "17": [
+    "19": [
       "tools_dimension_types_join_key",
       "tools_dimension_types_join_key_dim_type_name_category",
       "tools_dimension_types_join_key_dim_type_name_evidence",
@@ -1233,60 +1363,112 @@
       "tools_dimension_types_join_key_spot_family_shapes",
       "tools_dimension_types_join_key_version_history"
     ],
-    "18": [
-      "archive_split_detection",
-      "archive_split_detection_build_distance_matrix_from_similarity",
-      "archive_split_detection_cluster",
-      "archive_split_detection_cluster_assignments_to_labels",
-      "archive_split_detection_compute_silhouette_score",
-      "archive_split_detection_extract_dates_from_paths",
-      "archive_split_detection_extract_metadata_patterns",
-      "archive_split_detection_file_level",
-      "archive_split_detection_file_level_compute_avg_between_cluster_similarity",
-      "archive_split_detection_file_level_compute_avg_internal_similarity",
-      "archive_split_detection_file_level_compute_named_cluster_flags",
-      "archive_split_detection_file_level_compute_pairwise_similarity",
-      "archive_split_detection_file_level_compute_pairwise_similarity_candidates",
-      "archive_split_detection_file_level_files_with_any_candidate",
-      "archive_split_detection_file_level_hierarchical_cluster_files",
-      "archive_split_detection_file_level_infer_standard_name",
-      "archive_split_detection_file_level_main",
-      "archive_split_detection_file_level_rationale_112",
-      "archive_split_detection_file_level_rationale_188",
-      "archive_split_detection_file_level_rationale_218",
-      "archive_split_detection_file_level_rationale_285",
-      "archive_split_detection_file_level_rationale_34",
-      "archive_split_detection_file_level_rationale_366",
-      "archive_split_detection_file_level_rationale_385",
-      "archive_split_detection_file_level_rationale_407",
-      "archive_split_detection_file_level_rationale_429",
-      "archive_split_detection_file_level_rationale_454",
-      "archive_split_detection_file_level_run_file_level_clustering",
-      "archive_split_detection_file_level_select_cluster_representative",
-      "archive_split_detection_file_level_threshold_graph_cluster_files",
-      "archive_split_detection_find_common_path_components",
-      "archive_split_detection_infer_office_from_paths",
-      "archive_split_detection_infer_region_from_paths",
-      "archive_split_detection_interpret_silhouette_score",
-      "archive_split_detection_rationale_106",
-      "archive_split_detection_rationale_133",
-      "archive_split_detection_rationale_162",
-      "archive_split_detection_rationale_181",
-      "archive_split_detection_rationale_201",
-      "archive_split_detection_rationale_21",
-      "archive_split_detection_rationale_214",
-      "archive_split_detection_rationale_231",
-      "archive_split_detection_rationale_34",
-      "archive_split_detection_rationale_43",
-      "archive_split_detection_rationale_86",
-      "archive_split_detection_splitsignal",
-      "tools_patterns_analysis_archive_split_detection_file_level_py_cluster",
-      "tools_patterns_analysis_archive_split_detection_file_level_py_dataframe",
-      "tools_patterns_analysis_archive_split_detection_file_level_py_series",
-      "tools_patterns_analysis_archive_split_detection_py_any",
-      "tools_patterns_analysis_archive_split_detection_py_ndarray"
+    "20": [
+      "patterns_analysis_split_detection",
+      "patterns_analysis_split_detection_build_distance_matrix_from_similarity",
+      "patterns_analysis_split_detection_cluster",
+      "patterns_analysis_split_detection_cluster_assignments_to_labels",
+      "patterns_analysis_split_detection_compute_silhouette_score",
+      "patterns_analysis_split_detection_extract_dates_from_paths",
+      "patterns_analysis_split_detection_extract_metadata_patterns",
+      "patterns_analysis_split_detection_file_level",
+      "patterns_analysis_split_detection_file_level_compute_avg_between_cluster_similarity",
+      "patterns_analysis_split_detection_file_level_compute_avg_internal_similarity",
+      "patterns_analysis_split_detection_file_level_compute_named_cluster_flags",
+      "patterns_analysis_split_detection_file_level_compute_pairwise_similarity",
+      "patterns_analysis_split_detection_file_level_compute_pairwise_similarity_candidates",
+      "patterns_analysis_split_detection_file_level_files_with_any_candidate",
+      "patterns_analysis_split_detection_file_level_hierarchical_cluster_files",
+      "patterns_analysis_split_detection_file_level_infer_standard_name",
+      "patterns_analysis_split_detection_file_level_main",
+      "patterns_analysis_split_detection_file_level_rationale_112",
+      "patterns_analysis_split_detection_file_level_rationale_188",
+      "patterns_analysis_split_detection_file_level_rationale_218",
+      "patterns_analysis_split_detection_file_level_rationale_285",
+      "patterns_analysis_split_detection_file_level_rationale_34",
+      "patterns_analysis_split_detection_file_level_rationale_366",
+      "patterns_analysis_split_detection_file_level_rationale_385",
+      "patterns_analysis_split_detection_file_level_rationale_407",
+      "patterns_analysis_split_detection_file_level_rationale_429",
+      "patterns_analysis_split_detection_file_level_rationale_454",
+      "patterns_analysis_split_detection_file_level_run_file_level_clustering",
+      "patterns_analysis_split_detection_file_level_select_cluster_representative",
+      "patterns_analysis_split_detection_file_level_threshold_graph_cluster_files",
+      "patterns_analysis_split_detection_find_common_path_components",
+      "patterns_analysis_split_detection_infer_office_from_paths",
+      "patterns_analysis_split_detection_infer_region_from_paths",
+      "patterns_analysis_split_detection_interpret_silhouette_score",
+      "patterns_analysis_split_detection_rationale_106",
+      "patterns_analysis_split_detection_rationale_133",
+      "patterns_analysis_split_detection_rationale_162",
+      "patterns_analysis_split_detection_rationale_181",
+      "patterns_analysis_split_detection_rationale_201",
+      "patterns_analysis_split_detection_rationale_21",
+      "patterns_analysis_split_detection_rationale_214",
+      "patterns_analysis_split_detection_rationale_231",
+      "patterns_analysis_split_detection_rationale_34",
+      "patterns_analysis_split_detection_rationale_43",
+      "patterns_analysis_split_detection_rationale_86",
+      "patterns_analysis_split_detection_splitsignal",
+      "tools_patterns_analysis_split_detection_file_level_py_cluster",
+      "tools_patterns_analysis_split_detection_file_level_py_dataframe",
+      "tools_patterns_analysis_split_detection_file_level_py_series",
+      "tools_patterns_analysis_split_detection_py_any",
+      "tools_patterns_analysis_split_detection_py_ndarray"
     ],
-    "19": [
+    "21": [
+      "core_collect_collect_types",
+      "core_hashing_rationale_15",
+      "core_hashing_safe_str",
+      "core_vg_sig_compute_delta_items",
+      "core_vg_sig_rationale_359",
+      "core_vg_sig_rationale_433",
+      "core_vg_sig_semantic_keys_from_identity_items",
+      "domains_compound_types",
+      "domains_compound_types_attach_placeholder_metadata",
+      "domains_compound_types_blocked_required_items",
+      "domains_compound_types_build_instance_count_map",
+      "domains_compound_types_canon_non_sentinel_str",
+      "domains_compound_types_coarse_fill_reads",
+      "domains_compound_types_enum_name",
+      "domains_compound_types_extract_ceiling_types",
+      "domains_compound_types_extract_floor_types",
+      "domains_compound_types_extract_roof_types",
+      "domains_compound_types_extract_wall_types",
+      "domains_compound_types_family_name_of",
+      "domains_compound_types_label_for_type",
+      "domains_compound_types_label_for_wall_type",
+      "domains_compound_types_layer_function_str",
+      "domains_compound_types_material_identity_from_layer",
+      "domains_compound_types_na_or",
+      "domains_compound_types_rationale_736",
+      "domains_compound_types_read_compound_structure",
+      "domains_compound_types_read_type_name",
+      "domains_compound_types_read_wall_kind",
+      "domains_compound_types_require_compound_dependencies",
+      "domains_compound_types_stack_hash_field",
+      "domains_line_patterns_line_pattern_segments_def_hash",
+      "domains_line_patterns_rationale_112",
+      "domains_loaded_family_types",
+      "domains_loaded_family_types_binding_scope",
+      "domains_loaded_family_types_build_param_key",
+      "domains_loaded_family_types_extract",
+      "domains_loaded_family_types_extract_param_meta",
+      "domains_loaded_family_types_param_id_int",
+      "domains_loaded_family_types_rationale_171",
+      "domains_loaded_family_types_rationale_188",
+      "domains_loaded_family_types_rationale_89",
+      "domains_loaded_family_types_read_param_value",
+      "domains_loaded_family_types_safe_attr",
+      "domains_loaded_family_types_safe_guid_str",
+      "domains_loaded_family_types_semantic_role",
+      "domains_view_category_overrides_extract",
+      "domains_view_category_overrides_rationale_19",
+      "domains_view_filter_applications_view_templates_py_any",
+      "domains_view_filter_applications_view_templates_rationale_72",
+      "domains_view_filter_applications_view_templates_semantic_keys_from_identity_items"
+    ],
+    "22": [
       "policies_domain_sig_hash_policies",
       "policies_domain_sig_hash_policies_domains",
       "policies_domain_sig_hash_policies_domains_arrowheads",
@@ -1338,7 +1520,7 @@
       "policies_domain_sig_hash_policies_units_sig_hash_schema",
       "policies_domain_sig_hash_policies_version"
     ],
-    "20": [
+    "23": [
       "core_contracts",
       "core_contracts_add_bounded_error",
       "core_contracts_compute_run_status",
@@ -1387,152 +1569,6 @@
       "tests_test_contracts_run_status_test_run_status_all_ok",
       "tests_test_contracts_run_status_test_run_status_degraded_if_any_blocked",
       "tests_test_contracts_run_status_test_run_status_failed_if_any_failed"
-    ],
-    "21": [
-      "core_collect_collect_types",
-      "core_hashing_rationale_15",
-      "core_hashing_safe_str",
-      "core_record_v2_build_record_v2",
-      "core_record_v2_rationale_548",
-      "core_vg_sig_compute_delta_items",
-      "core_vg_sig_rationale_359",
-      "core_vg_sig_rationale_433",
-      "core_vg_sig_semantic_keys_from_identity_items",
-      "domains_compound_types",
-      "domains_compound_types_attach_placeholder_metadata",
-      "domains_compound_types_blocked_required_items",
-      "domains_compound_types_build_instance_count_map",
-      "domains_compound_types_canon_non_sentinel_str",
-      "domains_compound_types_coarse_fill_reads",
-      "domains_compound_types_enum_name",
-      "domains_compound_types_extract_ceiling_types",
-      "domains_compound_types_extract_floor_types",
-      "domains_compound_types_extract_roof_types",
-      "domains_compound_types_extract_wall_types",
-      "domains_compound_types_family_name_of",
-      "domains_compound_types_label_for_type",
-      "domains_compound_types_label_for_wall_type",
-      "domains_compound_types_layer_function_str",
-      "domains_compound_types_material_identity_from_layer",
-      "domains_compound_types_na_or",
-      "domains_compound_types_rationale_736",
-      "domains_compound_types_read_compound_structure",
-      "domains_compound_types_read_type_name",
-      "domains_compound_types_read_wall_kind",
-      "domains_compound_types_require_compound_dependencies",
-      "domains_compound_types_stack_hash_field",
-      "domains_loaded_family_types",
-      "domains_loaded_family_types_binding_scope",
-      "domains_loaded_family_types_build_param_key",
-      "domains_loaded_family_types_extract",
-      "domains_loaded_family_types_extract_param_meta",
-      "domains_loaded_family_types_param_id_int",
-      "domains_loaded_family_types_rationale_171",
-      "domains_loaded_family_types_rationale_188",
-      "domains_loaded_family_types_rationale_89",
-      "domains_loaded_family_types_read_param_value",
-      "domains_loaded_family_types_safe_attr",
-      "domains_loaded_family_types_safe_guid_str",
-      "domains_loaded_family_types_semantic_role",
-      "domains_phases_extract",
-      "domains_phases_rationale_112"
-    ],
-    "22": [
-      "core_record_v2",
-      "core_record_v2_block_record_for_unstable_id",
-      "core_record_v2_block_record_v2",
-      "core_record_v2_canonical_structural_fields",
-      "core_record_v2_canonical_structural_value",
-      "core_record_v2_canonicalize_enum",
-      "core_record_v2_canonicalize_str",
-      "core_record_v2_compute_identity_quality",
-      "core_record_v2_default_record_id_secondary_key",
-      "core_record_v2_finalize_record_ids_for_domain",
-      "core_record_v2_make_record_id_structural",
-      "core_record_v2_py_any",
-      "core_record_v2_rationale_238",
-      "core_record_v2_rationale_328",
-      "core_record_v2_rationale_336",
-      "core_record_v2_rationale_358",
-      "core_record_v2_rationale_443",
-      "core_record_v2_rationale_486",
-      "core_record_v2_rationale_618",
-      "core_record_v2_rationale_70",
-      "core_record_v2_rationale_84",
-      "domains_view_filter_applications_view_templates",
-      "domains_view_filter_applications_view_templates_extract",
-      "domains_view_filter_applications_view_templates_is_schedule_view",
-      "domains_view_filter_applications_view_templates_py_any",
-      "domains_view_filter_applications_view_templates_rationale_315",
-      "domains_view_filter_applications_view_templates_rationale_72",
-      "domains_view_filter_applications_view_templates_rationale_86",
-      "domains_view_filter_applications_view_templates_semantic_keys_from_identity_items",
-      "domains_view_filter_definitions",
-      "domains_view_filter_definitions_extract",
-      "domains_view_filter_definitions_logic_root_token",
-      "domains_view_filter_definitions_op_token_from_rule",
-      "domains_view_filter_definitions_param_ref_from_param_id",
-      "domains_view_filter_definitions_py_any",
-      "domains_view_filter_definitions_rationale_118",
-      "domains_view_filter_definitions_rationale_163",
-      "domains_view_filter_definitions_rationale_176",
-      "domains_view_filter_definitions_rationale_236",
-      "domains_view_filter_definitions_rationale_56",
-      "domains_view_filter_definitions_rationale_70",
-      "domains_view_filter_definitions_value_token_from_rule",
-      "domains_view_filter_definitions_walk_rules",
-      "tests_test_record_id_determinism",
-      "tests_test_record_id_determinism_test_structural_record_id_dup_index_deterministic",
-      "tests_test_record_id_determinism_test_structural_record_id_duplicate_keys_blocked",
-      "tests_test_record_id_determinism_test_structural_record_id_stable_across_runs"
-    ],
-    "23": [
-      "core_collect_build_subcategory_used_id_set",
-      "core_collect_rationale_479",
-      "core_deps",
-      "core_deps_blocked",
-      "core_deps_blocked_str",
-      "core_deps_py_any",
-      "core_deps_rationale_1",
-      "core_deps_rationale_30",
-      "core_deps_rationale_61",
-      "core_deps_require_domain",
-      "domains_object_styles",
-      "domains_object_styles_build_info",
-      "domains_object_styles_collect_categories",
-      "domains_object_styles_extract_analytical",
-      "domains_object_styles_extract_annotation",
-      "domains_object_styles_extract_imported",
-      "domains_object_styles_extract_model",
-      "domains_object_styles_extract_object_styles",
-      "domains_object_styles_is_analytical_category_type",
-      "domains_object_styles_is_model_category_int0",
-      "domains_object_styles_matches_category_type",
-      "domains_object_styles_material_ref_item",
-      "domains_object_styles_rgb_sig",
-      "domains_object_styles_subcategory_purge_lookup",
-      "exception",
-      "runner_run_dynamo",
-      "runner_run_dynamo_get_doc",
-      "runner_run_dynamo_get_output_path_from_dynamo",
-      "runner_run_dynamo_is_probably_sync_path",
-      "runner_run_dynamo_is_repo_root",
-      "runner_run_dynamo_looks_like_unc_path",
-      "runner_run_dynamo_rationale_1360",
-      "runner_run_dynamo_rationale_1394",
-      "runner_run_dynamo_rationale_170",
-      "runner_run_dynamo_rationale_31",
-      "runner_run_dynamo_rationale_485",
-      "runner_run_dynamo_rationale_555",
-      "runner_run_dynamo_read_tool_version",
-      "runner_run_dynamo_sha256_of_file",
-      "runner_run_dynamo_use_filename_stamp",
-      "runner_run_dynamo_write_fingerprint",
-      "tests_test_deps_require_domain",
-      "tests_test_deps_require_domain_test_require_domain_allows_degraded_by_default",
-      "tests_test_deps_require_domain_test_require_domain_invalid_envelope_blocks",
-      "tests_test_deps_require_domain_test_require_domain_missing_upstream_blocks",
-      "tests_test_deps_require_domain_test_require_domain_upstream_not_acceptable_blocks"
     ],
     "24": [
       "tests_test_split_named_clusters_and_thresholds",
@@ -1583,6 +1619,52 @@
       "tools_run_split_detection_all_write_no_data_stub_reports"
     ],
     "25": [
+      "archive_derive_join_keys_by_ids",
+      "archive_derive_join_keys_by_ids_compute_coverage",
+      "archive_derive_join_keys_by_ids_compute_join_hash_for_record",
+      "archive_derive_join_keys_by_ids_evaluate_gates",
+      "archive_derive_join_keys_by_ids_evaluate_keyset",
+      "archive_derive_join_keys_by_ids_extract_identity_map",
+      "archive_derive_join_keys_by_ids_greedy_select_keys",
+      "archive_derive_join_keys_by_ids_is_eligible_join_key_item",
+      "archive_derive_join_keys_by_ids_jaccard_similarity",
+      "archive_derive_join_keys_by_ids_main",
+      "archive_derive_join_keys_by_ids_md5_utf8_join_pipe",
+      "archive_derive_join_keys_by_ids_rationale_156",
+      "archive_derive_join_keys_by_ids_rationale_185",
+      "archive_derive_join_keys_by_ids_rationale_210",
+      "archive_derive_join_keys_by_ids_rationale_394",
+      "archive_derive_join_keys_by_ids_rationale_40",
+      "archive_derive_join_keys_by_ids_rationale_57",
+      "archive_derive_join_keys_by_ids_rationale_90",
+      "archive_derive_join_keys_by_ids_sample_records_by_file",
+      "archive_domain_identity_contract",
+      "archive_domain_identity_contract_domainidentitycontract_allowed_keys_for_domain",
+      "archive_domain_identity_contract_domainidentitycontract_init",
+      "archive_domain_identity_contract_domainidentitycontract_is_key_allowed",
+      "archive_domain_identity_contract_domainidentitycontract_load",
+      "archive_domain_identity_contract_domainidentitycontract_required_keys_for_domain",
+      "archive_pareto_join_keys_by_ids",
+      "archive_pareto_join_keys_by_ids_beam_search_candidates",
+      "archive_pareto_join_keys_by_ids_build_candidate_pool",
+      "archive_pareto_join_keys_by_ids_candidate",
+      "archive_pareto_join_keys_by_ids_candidate_key_str",
+      "archive_pareto_join_keys_by_ids_choose_from_front",
+      "archive_pareto_join_keys_by_ids_compute_join_hash_for_record",
+      "archive_pareto_join_keys_by_ids_dominates",
+      "archive_pareto_join_keys_by_ids_evaluate_keyset",
+      "archive_pareto_join_keys_by_ids_extract_identity_map",
+      "archive_pareto_join_keys_by_ids_is_eligible_join_key_item",
+      "archive_pareto_join_keys_by_ids_main",
+      "archive_pareto_join_keys_by_ids_md5_utf8_join_pipe",
+      "archive_pareto_join_keys_by_ids_pareto_front",
+      "archive_pareto_join_keys_by_ids_rationale_181",
+      "archive_pareto_join_keys_by_ids_rationale_247",
+      "archive_pareto_join_keys_by_ids_run_pareto_by_ids",
+      "tools_patterns_analysis_archive_derive_join_keys_by_ids_py_any",
+      "tools_patterns_analysis_archive_pareto_join_keys_by_ids_py_any"
+    ],
+    "26": [
       "label_synthesis_label_resolver_load_annotations",
       "tools_extractor",
       "tools_extractor_b32_sha1_16",
@@ -1625,7 +1707,7 @@
       "tools_extractor_utc_now_iso",
       "tools_extractor_write_csv"
     ],
-    "26": [
+    "27": [
       "tests_test_join_key_migration",
       "tests_test_join_key_migration_rationale_108",
       "tests_test_join_key_migration_rationale_111",
@@ -1666,47 +1748,6 @@
       "tests_test_join_key_migration_testviewtemplatesjoinkey",
       "tests_test_join_key_migration_testviewtemplatesjoinkey_test_join_hash_equals_def_hash",
       "tests_test_join_key_migration_testviewtemplatesjoinkey_test_join_hash_format"
-    ],
-    "27": [
-      "archive_io_get_domain_payload",
-      "archive_io_get_domain_records",
-      "archive_io_load_exports",
-      "archive_io_rationale_116",
-      "archive_io_rationale_122",
-      "archive_io_rationale_64",
-      "archive_run_dimension_types_by_family",
-      "archive_run_dimension_types_by_family_discover_families_from_exports",
-      "archive_run_dimension_types_by_family_families_present_in_baseline",
-      "archive_run_dimension_types_by_family_family_shape",
-      "archive_run_dimension_types_by_family_familyrun",
-      "archive_run_dimension_types_by_family_filter_export_domain_records",
-      "archive_run_dimension_types_by_family_get",
-      "archive_run_dimension_types_by_family_main",
-      "archive_run_dimension_types_by_family_prepare_filtered_dirs",
-      "archive_run_dimension_types_by_family_qv_to_v",
-      "archive_run_dimension_types_by_family_rationale_122",
-      "archive_run_dimension_types_by_family_rationale_34",
-      "archive_run_dimension_types_by_family_rationale_47",
-      "archive_run_dimension_types_by_family_run_all_phase2",
-      "archive_run_dimension_types_by_family_slug",
-      "archive_run_dimension_types_by_family_write_json",
-      "archive_run_identity_collision_diagnostics",
-      "archive_run_identity_collision_diagnostics_main",
-      "archive_run_identity_collision_diagnostics_multiplicity_map",
-      "archive_run_identity_collision_diagnostics_rationale_15",
-      "archive_run_joinhash_label_population",
-      "archive_run_joinhash_label_population_extract_label_qv",
-      "archive_run_joinhash_label_population_get_join_hash",
-      "archive_run_joinhash_label_population_main",
-      "archive_run_joinhash_label_population_rationale_29",
-      "archive_run_population_stability",
-      "archive_run_population_stability_main",
-      "archive_run_population_stability_parse_args",
-      "archive_split_detection_file_level_build_element_profiles",
-      "archive_split_detection_file_level_rationale_77",
-      "tools_patterns_analysis_archive_run_dimension_types_by_family_py_any",
-      "tools_patterns_analysis_archive_run_joinhash_label_population_py_any",
-      "tools_patterns_analysis_archive_run_population_stability_py_namespace"
     ],
     "28": [
       "compare_templates_stand_alone_compare_view_templates_stand_alone",
@@ -1790,46 +1831,6 @@
       "tools_run_segment_orchestrator_write_segment_records"
     ],
     "30": [
-      "contracts_domain_identity_keys_v2_materials_notes",
-      "core_phase2",
-      "core_phase2_phase2_join_hash",
-      "core_phase2_phase2_sorted_items",
-      "core_phase2_rationale_32",
-      "core_phase2_rationale_66",
-      "core_record_v2_canonicalize_bool",
-      "core_record_v2_rationale_206",
-      "domains_identity",
-      "domains_identity_extract",
-      "domains_identity_phase2_build_lineage_items",
-      "domains_identity_rationale_143",
-      "domains_identity_rationale_59",
-      "domains_identity_rationale_95",
-      "domains_phase_graphics",
-      "domains_phase_graphics_extract",
-      "domains_phase_graphics_phase2_build_join_key_items",
-      "domains_phase_graphics_rationale_57",
-      "domains_phase_graphics_rationale_69",
-      "domains_view_category_overrides",
-      "domains_view_category_overrides_annotation",
-      "domains_view_category_overrides_annotation_category_hidden_item",
-      "domains_view_category_overrides_annotation_extract",
-      "domains_view_category_overrides_annotation_phase2_partition_items",
-      "domains_view_category_overrides_annotation_safe_bool",
-      "domains_view_category_overrides_extract",
-      "domains_view_category_overrides_model_category_hidden_item",
-      "domains_view_category_overrides_model_compute_override_properties_hash",
-      "domains_view_category_overrides_model_extract",
-      "domains_view_category_overrides_model_phase2_partition_items",
-      "domains_view_category_overrides_model_safe_bool",
-      "domains_view_category_overrides_rationale_19",
-      "tests_test_revitlookup_audit_regressions",
-      "tests_test_revitlookup_audit_regressions_install_revit_stubs",
-      "tests_test_revitlookup_audit_regressions_test_object_styles_model_semantic_keys_include_material_sig_hash",
-      "tests_test_revitlookup_audit_regressions_test_vco_category_hidden_is_semantic_for_model_and_annotation",
-      "tests_test_revitlookup_audit_regressions_test_vfa_phase2_payload_carries_semantic_keys",
-      "tests_test_revitlookup_audit_regressions_test_view_templates_signatures_capture_filter_enabled_and_workset_visibility"
-    ],
-    "31": [
       "label_synthesis_build_semantic_groups",
       "label_synthesis_build_semantic_groups_build_grouping_prompt",
       "label_synthesis_build_semantic_groups_call_grouping_llm",
@@ -1869,7 +1870,7 @@
       "tools_label_synthesis_build_semantic_groups_py_any",
       "tools_label_synthesis_build_semantic_groups_py_path"
     ],
-    "32": [
+    "31": [
       "synopsis_formatters_dimension_types",
       "synopsis_formatters_dimension_types_accuracy_label",
       "synopsis_formatters_dimension_types_center_marks_label",
@@ -1908,45 +1909,43 @@
       "tools_label_synthesis_synopsis_formatters_phase_filters_py_any",
       "tools_label_synthesis_synopsis_formatters_text_types_py_any"
     ],
-    "33": [
-      "contracts_domain_identity_keys_v2_line_patterns_sig_hash_key_prefixes",
-      "contracts_domain_identity_keys_v2_line_patterns_sig_hash_keys",
-      "contracts_domain_identity_keys_v2_line_patterns_sig_hash_schema",
-      "core_canon",
-      "core_canon_canon_bool",
-      "core_canon_canon_id",
-      "core_canon_canon_num",
-      "core_canon_is_sentinel",
-      "core_canon_py_any",
-      "core_canon_rationale_109",
-      "core_canon_rationale_152",
-      "core_canon_rationale_162",
-      "core_canon_rationale_74",
-      "core_canon_rationale_94",
-      "core_canon_rgb_dict_from_color",
-      "core_canon_rgb_sig_from_color",
+    "32": [
       "core_collect",
-      "core_context",
-      "core_context_rationale_11",
-      "domains_line_patterns",
-      "domains_line_patterns_line_pattern_segments_def_hash",
-      "domains_line_patterns_lp_seg_type_id_and_name",
-      "domains_line_patterns_rationale_112",
-      "domains_line_patterns_rationale_77",
-      "domains_line_styles",
-      "domains_phase_filters",
-      "domains_phases",
-      "migration_role_policy_line_patterns_line_pattern_element_id",
-      "migration_role_policy_line_patterns_line_pattern_segments_def_hash",
-      "migration_role_policy_line_patterns_line_pattern_source_element_id",
-      "migration_role_policy_line_patterns_line_pattern_source_unique_id",
-      "migration_role_policy_line_patterns_line_pattern_uid_or_namekey",
-      "migration_role_policy_phase_filters_phase_filter_id_int",
-      "migration_role_policy_phase_filters_phase_filter_name",
-      "migration_role_policy_phase_filters_phase_filter_source_element_id",
-      "migration_role_policy_phase_filters_phase_filter_source_unique_id"
+      "core_collect_build_subcategory_used_id_set",
+      "core_collect_rationale_479",
+      "domains_object_styles",
+      "domains_object_styles_build_info",
+      "domains_object_styles_collect_categories",
+      "domains_object_styles_extract_analytical",
+      "domains_object_styles_extract_annotation",
+      "domains_object_styles_extract_imported",
+      "domains_object_styles_extract_model",
+      "domains_object_styles_extract_object_styles",
+      "domains_object_styles_is_analytical_category_type",
+      "domains_object_styles_is_model_category_int0",
+      "domains_object_styles_matches_category_type",
+      "domains_object_styles_material_ref_item",
+      "domains_object_styles_rgb_sig",
+      "domains_object_styles_subcategory_purge_lookup",
+      "policies_cross_domain_alignment_keys",
+      "policies_cross_domain_alignment_keys_arrowheads_alignment_keys",
+      "policies_cross_domain_alignment_keys_arrowheads_member_domains",
+      "policies_cross_domain_alignment_keys_arrowheads_notes",
+      "policies_cross_domain_alignment_keys_description",
+      "policies_cross_domain_alignment_keys_domain_families",
+      "policies_cross_domain_alignment_keys_domain_families_arrowheads",
+      "policies_cross_domain_alignment_keys_domain_families_line_patterns",
+      "policies_cross_domain_alignment_keys_domain_families_line_styles",
+      "policies_cross_domain_alignment_keys_domain_families_text_types",
+      "policies_cross_domain_alignment_keys_schema",
+      "tests_test_revitlookup_audit_regressions",
+      "tests_test_revitlookup_audit_regressions_install_revit_stubs",
+      "tests_test_revitlookup_audit_regressions_test_object_styles_model_semantic_keys_include_material_sig_hash",
+      "tests_test_revitlookup_audit_regressions_test_vco_category_hidden_is_semantic_for_model_and_annotation",
+      "tests_test_revitlookup_audit_regressions_test_vfa_phase2_payload_carries_semantic_keys",
+      "tests_test_revitlookup_audit_regressions_test_view_templates_signatures_capture_filter_enabled_and_workset_visibility"
     ],
-    "34": [
+    "33": [
       "lib_vt_profile",
       "lib_vt_profile_build_synthetic_items_for_pair",
       "lib_vt_profile_build_template_lookup",
@@ -1981,7 +1980,7 @@
       "lib_vt_profile_reconstruct_effective",
       "lib_vt_profile_viewtemplatedomainprofile_reconstruct"
     ],
-    "35": [
+    "34": [
       "tests_test_export_layer_stacks",
       "tests_test_export_layer_stacks_make_layer_row",
       "tests_test_export_layer_stacks_make_wall_record",
@@ -2016,6 +2015,39 @@
       "tools_export_to_flat_tables_read_json",
       "tools_export_to_flat_tables_safe_str"
     ],
+    "35": [
+      "archive_io_get_domain_payload",
+      "archive_io_get_domain_records",
+      "archive_io_rationale_116",
+      "archive_io_rationale_122",
+      "archive_run_dimension_types_by_family",
+      "archive_run_dimension_types_by_family_discover_families_from_exports",
+      "archive_run_dimension_types_by_family_families_present_in_baseline",
+      "archive_run_dimension_types_by_family_family_shape",
+      "archive_run_dimension_types_by_family_familyrun",
+      "archive_run_dimension_types_by_family_filter_export_domain_records",
+      "archive_run_dimension_types_by_family_get",
+      "archive_run_dimension_types_by_family_main",
+      "archive_run_dimension_types_by_family_prepare_filtered_dirs",
+      "archive_run_dimension_types_by_family_qv_to_v",
+      "archive_run_dimension_types_by_family_rationale_122",
+      "archive_run_dimension_types_by_family_rationale_34",
+      "archive_run_dimension_types_by_family_rationale_47",
+      "archive_run_dimension_types_by_family_run_all_phase2",
+      "archive_run_dimension_types_by_family_slug",
+      "archive_run_dimension_types_by_family_write_json",
+      "archive_run_identity_collision_diagnostics",
+      "archive_run_identity_collision_diagnostics_main",
+      "archive_run_identity_collision_diagnostics_multiplicity_map",
+      "archive_run_identity_collision_diagnostics_rationale_15",
+      "archive_run_joinhash_label_population",
+      "archive_run_joinhash_label_population_extract_label_qv",
+      "archive_run_joinhash_label_population_get_join_hash",
+      "archive_run_joinhash_label_population_main",
+      "archive_run_joinhash_label_population_rationale_29",
+      "tools_patterns_analysis_archive_run_dimension_types_by_family_py_any",
+      "tools_patterns_analysis_archive_run_joinhash_label_population_py_any"
+    ],
     "36": [
       "label_synthesis_label_resolver_is_fragmented",
       "label_synthesis_label_resolver_load_label_population",
@@ -2049,37 +2081,6 @@
       "tools_label_synthesis_synthesize_fragmented_labels_py_any"
     ],
     "37": [
-      "archive_report",
-      "archive_report_ensure_dir",
-      "archive_report_rationale_27",
-      "archive_report_rationale_60",
-      "archive_report_utc_timestamp",
-      "archive_report_write_change_type_csv",
-      "archive_report_write_json_report",
-      "archive_run_attribute_stress",
-      "archive_run_attribute_stress_all_joinable",
-      "archive_run_attribute_stress_all_joinable_main",
-      "archive_run_attribute_stress_all_joinable_phase2_items_map_no_dups",
-      "archive_run_attribute_stress_all_joinable_rationale_16",
-      "archive_run_attribute_stress_extract_phase2_items",
-      "archive_run_attribute_stress_main",
-      "archive_run_attribute_stress_rationale_16",
-      "archive_split_detection_element_level",
-      "archive_split_detection_element_level_classify_file_elements",
-      "archive_split_detection_element_level_compute_element_statistics",
-      "archive_split_detection_element_level_extract_label_display",
-      "archive_split_detection_element_level_generate_remediation_plan",
-      "archive_split_detection_element_level_main",
-      "archive_split_detection_element_level_rationale_188",
-      "archive_split_detection_element_level_rationale_228",
-      "archive_split_detection_element_level_rationale_290",
-      "archive_split_detection_element_level_rationale_31",
-      "archive_split_detection_element_level_rationale_84",
-      "archive_split_detection_element_level_read_csv_rows",
-      "archive_split_detection_element_level_run_element_level_classification",
-      "tools_patterns_analysis_archive_report_py_any"
-    ],
-    "38": [
       "bundle_analysis_common_compute_effective_support",
       "bundle_analysis_common_derive_scope_key",
       "bundle_analysis_common_make_bundle_id",
@@ -2109,6 +2110,36 @@
       "tools_bundle_analysis_step2_find_bundles_py_any",
       "tools_bundle_analysis_step2_find_bundles_py_namespace",
       "tools_bundle_analysis_step2_find_bundles_py_path"
+    ],
+    "38": [
+      "archive_build_reference_standards",
+      "archive_build_reference_standards_build_reference_standards_from_clusters",
+      "archive_build_reference_standards_main",
+      "archive_build_reference_standards_rationale_26",
+      "archive_io",
+      "archive_io_get_contract",
+      "archive_io_get_domain_envelope",
+      "archive_io_get_domains_map",
+      "archive_io_get_run_provenance",
+      "archive_io_iter_json_paths",
+      "archive_io_load_records_file_paths",
+      "archive_io_load_records_records_with_identity",
+      "archive_io_load_records_sig_profiles",
+      "archive_io_ordered_export_names",
+      "archive_io_rationale_142",
+      "archive_io_rationale_166",
+      "archive_io_rationale_175",
+      "archive_io_rationale_199",
+      "archive_io_rationale_22",
+      "archive_io_rationale_250",
+      "archive_io_rationale_36",
+      "archive_io_rationale_83",
+      "archive_io_rationale_89",
+      "archive_io_rationale_95",
+      "archive_io_read_csv_rows",
+      "patterns_analysis_split_detection_file_level_build_element_profiles",
+      "patterns_analysis_split_detection_file_level_rationale_77",
+      "tools_patterns_analysis_archive_io_py_any"
     ],
     "39": [
       "probes_probe_view_category_overrides",
@@ -2199,34 +2230,6 @@
       "probes_probe_units_unitutils_get_discipline_id"
     ],
     "42": [
-      "archive_build_reference_standards",
-      "archive_build_reference_standards_build_reference_standards_from_clusters",
-      "archive_build_reference_standards_main",
-      "archive_build_reference_standards_rationale_26",
-      "archive_io",
-      "archive_io_get_contract",
-      "archive_io_get_domain_envelope",
-      "archive_io_get_domains_map",
-      "archive_io_get_run_provenance",
-      "archive_io_iter_json_paths",
-      "archive_io_load_records_file_paths",
-      "archive_io_load_records_records_with_identity",
-      "archive_io_load_records_sig_profiles",
-      "archive_io_ordered_export_names",
-      "archive_io_rationale_142",
-      "archive_io_rationale_166",
-      "archive_io_rationale_175",
-      "archive_io_rationale_199",
-      "archive_io_rationale_22",
-      "archive_io_rationale_250",
-      "archive_io_rationale_36",
-      "archive_io_rationale_83",
-      "archive_io_rationale_89",
-      "archive_io_rationale_95",
-      "archive_io_read_csv_rows",
-      "tools_patterns_analysis_archive_io_py_any"
-    ],
-    "43": [
       "tools_inspect_lft_similarity",
       "tools_inspect_lft_similarity_build_class_profiles",
       "tools_inspect_lft_similarity_build_dim_summaries",
@@ -2254,7 +2257,7 @@
       "tools_inspect_lft_similarity_write_csv",
       "tools_inspect_lft_similarity_write_detail_file"
     ],
-    "44": [
+    "43": [
       "governance_standards_governance_report",
       "governance_standards_governance_report_build_html_report",
       "governance_standards_governance_report_build_pattern_table",
@@ -2281,85 +2284,86 @@
       "governance_standards_governance_report_standardsgovernanceanalyzer_load_exports",
       "tools_governance_standards_governance_report_py_any"
     ],
+    "44": [
+      "join_key_discovery_eval",
+      "join_key_discovery_eval_build_candidate_join_key",
+      "join_key_discovery_eval_build_candidate_join_key_with_details",
+      "join_key_discovery_eval_build_identity_index",
+      "join_key_discovery_eval_listish",
+      "join_key_discovery_eval_lookup_shape_cfg",
+      "join_key_discovery_eval_norm",
+      "join_key_discovery_eval_normalize_policy_block",
+      "join_key_discovery_eval_rationale_101",
+      "join_key_discovery_eval_rationale_12",
+      "join_key_discovery_eval_rationale_45",
+      "join_key_discovery_eval_score_candidate",
+      "tests_test_join_key_discovery_shape_matching",
+      "tests_test_join_key_discovery_shape_matching_test_identity_index_keeps_q_only_rows_for_required_presence",
+      "tests_test_join_key_discovery_shape_matching_test_shape_gating_does_not_require_phase_filter_for_false",
+      "tests_test_join_key_discovery_shape_matching_test_shape_gating_matches_bool_case_variants",
+      "tests_test_v21_join_policy_compat_test_flat_required_fields_backward_compatible",
+      "tests_test_v21_join_policy_compat_test_required_items_alias_and_shape_gating",
+      "tools_apply_join_policy",
+      "tools_apply_join_policy_main",
+      "tools_apply_join_policy_py_path",
+      "tools_apply_join_policy_read_csv",
+      "tools_apply_join_policy_write_csv",
+      "tools_join_key_derivation",
+      "tools_join_key_discovery_eval_py_any"
+    ],
     "45": [
-      "archive_attributes",
-      "archive_attributes_attrstabilityrow",
-      "archive_attributes_compute_attr_stability",
-      "archive_attributes_compute_stress_rank",
-      "archive_attributes_stressrow",
-      "archive_index",
-      "archive_index_build_domain_index",
-      "archive_index_domainindex",
-      "archive_index_get_join_hash",
-      "archive_index_rationale_104",
-      "archive_index_rationale_49",
-      "archive_index_rationale_9",
-      "archive_stability",
-      "archive_stability_presence_counts",
-      "archive_stability_presencestability",
-      "archive_stability_rationale_29",
-      "archive_stability_rationale_42",
-      "archive_stability_rationale_63",
-      "archive_stability_stability_distribution",
-      "archive_stability_stable_join_hashes",
-      "domains_text_types_phase2_item",
-      "tools_patterns_analysis_archive_attributes_py_domainindex",
-      "tools_patterns_analysis_archive_index_py_any",
-      "tools_patterns_analysis_archive_stability_py_domainindex"
+      "join_key_discovery_greedy",
+      "join_key_discovery_greedy_discover_greedy",
+      "join_key_discovery_greedy_score",
+      "tools_discover_hash_policy",
+      "tools_discover_hash_policy_domain_rows",
+      "tools_discover_hash_policy_load_items",
+      "tools_discover_hash_policy_main",
+      "tools_discover_hash_policy_py_path",
+      "tools_discover_hash_policy_rationale_20",
+      "tools_discover_hash_policy_rationale_80",
+      "tools_discover_hash_policy_resolve_phase0_dir",
+      "tools_discover_hash_policy_run_target",
+      "tools_discover_hash_policy_stratified_sample",
+      "tools_discover_join_policy",
+      "tools_discover_join_policy_dedupe",
+      "tools_discover_join_policy_main",
+      "tools_discover_join_policy_pareto_search_adapter",
+      "tools_discover_join_policy_pick_candidate_fields",
+      "tools_discover_join_policy_py_path",
+      "tools_discover_join_policy_read_csv",
+      "tools_discover_join_policy_sample_domain_records",
+      "tools_discover_join_policy_to_legacy_shape_gating",
+      "tools_discover_join_policy_without_excluded",
+      "tools_discover_join_policy_write_csv",
+      "tools_join_key_discovery_greedy_py_any"
     ],
     "46": [
-      "archive_domain_identity_contract",
-      "archive_domain_identity_contract_domainidentitycontract_allowed_keys_for_domain",
-      "archive_domain_identity_contract_domainidentitycontract_init",
-      "archive_domain_identity_contract_domainidentitycontract_is_key_allowed",
-      "archive_domain_identity_contract_domainidentitycontract_load",
-      "archive_domain_identity_contract_domainidentitycontract_required_keys_for_domain",
-      "archive_pareto_join_keys_by_ids",
-      "archive_pareto_join_keys_by_ids_beam_search_candidates",
-      "archive_pareto_join_keys_by_ids_build_candidate_pool",
-      "archive_pareto_join_keys_by_ids_candidate",
-      "archive_pareto_join_keys_by_ids_candidate_key_str",
-      "archive_pareto_join_keys_by_ids_choose_from_front",
-      "archive_pareto_join_keys_by_ids_compute_join_hash_for_record",
-      "archive_pareto_join_keys_by_ids_dominates",
-      "archive_pareto_join_keys_by_ids_evaluate_keyset",
-      "archive_pareto_join_keys_by_ids_extract_identity_map",
-      "archive_pareto_join_keys_by_ids_is_eligible_join_key_item",
-      "archive_pareto_join_keys_by_ids_main",
-      "archive_pareto_join_keys_by_ids_md5_utf8_join_pipe",
-      "archive_pareto_join_keys_by_ids_pareto_front",
-      "archive_pareto_join_keys_by_ids_rationale_181",
-      "archive_pareto_join_keys_by_ids_rationale_247",
-      "archive_pareto_join_keys_by_ids_run_pareto_by_ids",
-      "tools_patterns_analysis_archive_pareto_join_keys_by_ids_py_any"
+      "archive_pareto_joinkey_search",
+      "archive_pareto_joinkey_search_build_wide_kv_table",
+      "archive_pareto_joinkey_search_compute_v_norm",
+      "archive_pareto_joinkey_search_dedupe_preserve_order",
+      "archive_pareto_joinkey_search_dominates",
+      "archive_pareto_joinkey_search_eval_subset",
+      "archive_pareto_joinkey_search_evalconfig",
+      "archive_pareto_joinkey_search_main",
+      "archive_pareto_joinkey_search_pareto_front",
+      "archive_pareto_joinkey_search_pareto_search",
+      "archive_pareto_joinkey_search_rank_challengers_from_wide",
+      "archive_pareto_joinkey_search_rationale_108",
+      "archive_pareto_joinkey_search_rationale_148",
+      "archive_pareto_joinkey_search_rationale_171",
+      "archive_pareto_joinkey_search_rationale_219",
+      "archive_pareto_joinkey_search_rationale_270",
+      "archive_pareto_joinkey_search_rationale_43",
+      "archive_pareto_joinkey_search_sample_records",
+      "archive_pareto_joinkey_search_shape_label",
+      "tests_test_record_id_determinism_make_record",
+      "tools_archive_pareto_joinkey_search_py_dataframe",
+      "tools_archive_pareto_joinkey_search_py_path",
+      "tools_archive_pareto_joinkey_search_py_series"
     ],
     "47": [
-      "archive_join_key_derivation_phase05_rationale_389",
-      "lib_diff_engine",
-      "lib_diff_engine_build_index",
-      "lib_diff_engine_compare_entries",
-      "lib_diff_engine_ensure_str",
-      "lib_diff_engine_extract_records",
-      "lib_diff_engine_get_domain_payload",
-      "lib_diff_engine_get_items",
-      "lib_diff_engine_get_label_and_quality",
-      "lib_diff_engine_load_json",
-      "lib_diff_engine_normalize_name",
-      "lib_diff_engine_pair_name",
-      "lib_diff_engine_parse_name_map",
-      "lib_diff_engine_rebuild_unmatched",
-      "lib_diff_engine_run_comparison",
-      "lib_diff_engine_validate_paths",
-      "lib_diff_engine_write_csv",
-      "tests_test_text_types_conversion_convergence",
-      "tests_test_text_types_conversion_convergence_id",
-      "tests_test_text_types_conversion_convergence_id_init",
-      "tests_test_text_types_conversion_convergence_test_converted_old_and_new_records_converge",
-      "tests_test_text_types_conversion_convergence_type",
-      "tools_lib_diff_engine_py_namespace",
-      "validators_record_v2_rationale_28"
-    ],
-    "48": [
       "domain_prompts_dimension_types",
       "domain_prompts_dimension_types_build_prompt",
       "domain_prompts_dimension_types_fmt_accuracy",
@@ -2384,7 +2388,7 @@
       "tools_label_synthesis_domain_prompts_line_styles_py_any",
       "tools_label_synthesis_domain_prompts_text_types_py_any"
     ],
-    "49": [
+    "48": [
       "probes_probe_text_types",
       "probes_probe_text_types_contract_value",
       "probes_probe_text_types_find_leader_arrow_param",
@@ -2409,31 +2413,7 @@
       "probes_probe_text_types_slug",
       "probes_probe_text_types_text_font_key"
     ],
-    "50": [
-      "core_canon_fnum",
-      "core_canon_rationale_147",
-      "domains_arrowheads",
-      "domains_arrowheads_as_value_string",
-      "domains_arrowheads_build_arrow_identity_items",
-      "domains_arrowheads_build_common_identity_items",
-      "domains_arrowheads_build_tick_identity_items",
-      "domains_arrowheads_canon_yesno_bool",
-      "domains_arrowheads_extract",
-      "domains_arrowheads_fmt_deg_from_rad",
-      "domains_arrowheads_get_arrowhead_style",
-      "domains_arrowheads_is_arrowhead_type",
-      "domains_arrowheads_iter_arrowhead_ids_from_element",
-      "domains_arrowheads_rationale_108",
-      "domains_arrowheads_rationale_213",
-      "domains_arrowheads_rationale_231",
-      "domains_arrowheads_rationale_92",
-      "tests_test_arrowheads_shape_gating",
-      "tests_test_arrowheads_shape_gating_test_get_arrowhead_style_fallback",
-      "tests_test_arrowheads_shape_gating_test_no_missing_for_unrelated_style_properties",
-      "tests_test_arrowheads_shape_gating_test_style_discriminator_first",
-      "tests_test_arrowheads_shape_gating_test_style_specific_keys_are_omitted_when_not_applicable"
-    ],
-    "51": [
+    "49": [
       "tests_test_record_contract_v2",
       "tests_test_record_contract_v2_domain_identity_registry_v2",
       "tests_test_record_contract_v2_exported_fingerprint_json",
@@ -2457,7 +2437,7 @@
       "validators_record_v2_validate_record_v2",
       "validators_record_v2_validate_records_v2"
     ],
-    "52": [
+    "50": [
       "tests_test_view_templates_canonical_selectors",
       "tests_test_view_templates_canonical_selectors_load_policy",
       "tests_test_view_templates_canonical_selectors_rationale_109",
@@ -2481,32 +2461,9 @@
       "tests_test_view_templates_canonical_selectors_test_view_templates_renderings_policy",
       "tests_test_view_templates_canonical_selectors_test_view_templates_schedules_policy"
     ],
-    "53": [
-      "archive_compare",
-      "archive_compare_changecounts",
-      "archive_compare_classify_pair",
-      "archive_compare_phase2_items_map",
-      "archive_compare_rationale_28",
-      "archive_compare_rationale_87",
-      "archive_io_exportfile",
-      "archive_io_load_export_file",
-      "archive_io_rationale_14",
-      "archive_io_rationale_50",
-      "archive_report_format_console_summary",
-      "archive_report_rationale_79",
-      "archive_run_change_type",
-      "archive_run_change_type_main",
-      "archive_run_change_type_parse_args",
-      "archive_run_change_type_rationale_20",
-      "changecounts",
-      "tools_patterns_analysis_archive_compare_py_any",
-      "tools_patterns_analysis_archive_compare_py_domainindex",
-      "tools_patterns_analysis_archive_run_change_type_py_any",
-      "tools_patterns_analysis_archive_run_change_type_py_namespace"
-    ],
-    "54": [
+    "51": [
       "bundle_analysis_common_atomic_write_csv",
-      "bundle_analysis_run_bundle_analysis_run_step2_to_step7",
+      "bundle_analysis_run_bundle_analysis_run_pipeline_once",
       "bundle_analysis_step3_build_dag",
       "bundle_analysis_step3_build_dag_build_dag_for_domain",
       "bundle_analysis_step3_build_dag_main",
@@ -2527,7 +2484,7 @@
       "tools_bundle_analysis_step7_overlap_report_py_namespace",
       "tools_bundle_analysis_step7_overlap_report_py_path"
     ],
-    "55": [
+    "52": [
       "join_key_discovery_materials_joinkey_discover",
       "join_key_discovery_materials_joinkey_discover_build_key",
       "join_key_discovery_materials_joinkey_discover_build_key_files",
@@ -2550,7 +2507,7 @@
       "join_key_discovery_materials_joinkey_discover_write_csv",
       "tools_join_key_discovery_materials_joinkey_discover_py_path"
     ],
-    "56": [
+    "53": [
       "probes_probe_line_patterns",
       "probes_probe_line_patterns_category_line_pattern_id",
       "probes_probe_line_patterns_contract_from_raw",
@@ -2573,7 +2530,7 @@
       "probes_probe_line_patterns_to_inches",
       "probes_probe_line_patterns_touch_param"
     ],
-    "57": [
+    "54": [
       "probes_probe_object_styles",
       "probes_probe_object_styles_bool_int",
       "probes_probe_object_styles_category_type_label",
@@ -2596,29 +2553,7 @@
       "probes_probe_object_styles_rgb_triplet",
       "probes_probe_object_styles_safe"
     ],
-    "58": [
-      "archive_derive_join_keys_by_ids",
-      "archive_derive_join_keys_by_ids_compute_coverage",
-      "archive_derive_join_keys_by_ids_compute_join_hash_for_record",
-      "archive_derive_join_keys_by_ids_evaluate_gates",
-      "archive_derive_join_keys_by_ids_evaluate_keyset",
-      "archive_derive_join_keys_by_ids_extract_identity_map",
-      "archive_derive_join_keys_by_ids_greedy_select_keys",
-      "archive_derive_join_keys_by_ids_is_eligible_join_key_item",
-      "archive_derive_join_keys_by_ids_jaccard_similarity",
-      "archive_derive_join_keys_by_ids_main",
-      "archive_derive_join_keys_by_ids_md5_utf8_join_pipe",
-      "archive_derive_join_keys_by_ids_rationale_156",
-      "archive_derive_join_keys_by_ids_rationale_185",
-      "archive_derive_join_keys_by_ids_rationale_210",
-      "archive_derive_join_keys_by_ids_rationale_394",
-      "archive_derive_join_keys_by_ids_rationale_40",
-      "archive_derive_join_keys_by_ids_rationale_57",
-      "archive_derive_join_keys_by_ids_rationale_90",
-      "archive_derive_join_keys_by_ids_sample_records_by_file",
-      "tools_patterns_analysis_archive_derive_join_keys_by_ids_py_any"
-    ],
-    "59": [
+    "55": [
       "bundle_analysis_common",
       "bundle_analysis_common_read_csv_rows",
       "bundle_analysis_common_resolve_analysis_run_id",
@@ -2640,29 +2575,7 @@
       "tools_bundle_analysis_step4_difference_sets_py_path",
       "tools_bundle_analysis_step_compare_py_path"
     ],
-    "60": [
-      "domains_fill_patterns",
-      "domains_fill_patterns_collect_fill_patterns",
-      "domains_fill_patterns_export_fill_pattern_ctx",
-      "domains_fill_patterns_extract_drafting",
-      "domains_fill_patterns_extract_model",
-      "domains_fill_patterns_rationale_512",
-      "domains_fill_patterns_rationale_716",
-      "policies_cross_domain_alignment_keys",
-      "policies_cross_domain_alignment_keys_arrowheads_alignment_keys",
-      "policies_cross_domain_alignment_keys_arrowheads_member_domains",
-      "policies_cross_domain_alignment_keys_arrowheads_notes",
-      "policies_cross_domain_alignment_keys_description",
-      "policies_cross_domain_alignment_keys_domain_families",
-      "policies_cross_domain_alignment_keys_domain_families_arrowheads",
-      "policies_cross_domain_alignment_keys_domain_families_line_patterns",
-      "policies_cross_domain_alignment_keys_domain_families_line_styles",
-      "policies_cross_domain_alignment_keys_domain_families_text_types",
-      "policies_cross_domain_alignment_keys_schema",
-      "tests_test_compound_types_wall_fillpatternelem_getfillpattern",
-      "tests_test_fill_patterns_canonical_selectors_test_fill_pattern_ctx_contract_exports_specials_and_preserves_uid_map"
-    ],
-    "61": [
+    "56": [
       "probes_probe_fill_patterns",
       "probes_probe_fill_patterns_add_computed_surface",
       "probes_probe_fill_patterns_bucket_key_for_fill_pattern",
@@ -2684,7 +2597,7 @@
       "probes_probe_fill_patterns_to_degrees",
       "probes_probe_fill_patterns_to_inches"
     ],
-    "62": [
+    "57": [
       "tests_test_dimension_types_shape_gating_rationale_167",
       "tests_test_dimension_types_shape_gating_rationale_170",
       "tests_test_dimension_types_shape_gating_rationale_175",
@@ -2706,7 +2619,28 @@
       "tests_test_dimension_types_shape_gating_testsplitdomainpolicies_test_spot_elevation_policy_exists",
       "tests_test_dimension_types_shape_gating_testsplitdomainpolicies_test_spot_slope_policy_exists"
     ],
-    "63": [
+    "58": [
+      "archive_io_exportfile",
+      "archive_io_load_export_file",
+      "archive_io_load_exports",
+      "archive_io_rationale_14",
+      "archive_io_rationale_50",
+      "archive_io_rationale_64",
+      "archive_split_detection_element_level",
+      "archive_split_detection_element_level_classify_file_elements",
+      "archive_split_detection_element_level_compute_element_statistics",
+      "archive_split_detection_element_level_extract_label_display",
+      "archive_split_detection_element_level_generate_remediation_plan",
+      "archive_split_detection_element_level_main",
+      "archive_split_detection_element_level_rationale_188",
+      "archive_split_detection_element_level_rationale_228",
+      "archive_split_detection_element_level_rationale_290",
+      "archive_split_detection_element_level_rationale_31",
+      "archive_split_detection_element_level_rationale_84",
+      "archive_split_detection_element_level_read_csv_rows",
+      "archive_split_detection_element_level_run_element_level_classification"
+    ],
+    "59": [
       "archive_join_key_derivation_phase05",
       "archive_join_key_derivation_phase05_as_str_list",
       "archive_join_key_derivation_phase05_choose_candidate_deterministically",
@@ -2727,7 +2661,7 @@
       "lib_diff_engine_index_items_by_key",
       "tools_archive_join_key_derivation_phase05_py_any"
     ],
-    "64": [
+    "60": [
       "bundle_analysis_placeholder_exclusions",
       "bundle_analysis_placeholder_exclusions_choose_threshold",
       "bundle_analysis_placeholder_exclusions_compute_placeholder_exclusions",
@@ -2747,7 +2681,7 @@
       "tools_bundle_analysis_placeholder_exclusions_py_path",
       "tools_extractor_load_governance_role_rules"
     ],
-    "65": [
+    "61": [
       "probes_probe_line_styles",
       "probes_probe_line_styles_bucket_key",
       "probes_probe_line_styles_contract_value",
@@ -2767,7 +2701,7 @@
       "probes_probe_line_styles_safe_param_def_name",
       "probes_probe_line_styles_virtual_surface"
     ],
-    "66": [
+    "62": [
       "archive_annotate_cluster_labels",
       "archive_annotate_cluster_labels_clean_text",
       "archive_annotate_cluster_labels_extract_cluster_id",
@@ -2786,7 +2720,7 @@
       "tools_patterns_analysis_archive_annotate_cluster_labels_py_dataframe",
       "tools_patterns_analysis_archive_annotate_cluster_labels_py_path"
     ],
-    "67": [
+    "63": [
       "archive_backfill_cluster_label_inputs",
       "archive_backfill_cluster_label_inputs_build_cluster_representative_items",
       "archive_backfill_cluster_label_inputs_build_discriminator_lookup",
@@ -2805,7 +2739,7 @@
       "tools_patterns_analysis_archive_backfill_cluster_label_inputs_py_dataframe",
       "tools_patterns_analysis_archive_backfill_cluster_label_inputs_py_path"
     ],
-    "68": [
+    "64": [
       "archive_diagnose_phase1_empty",
       "archive_diagnose_phase1_empty_check_domain_records",
       "archive_diagnose_phase1_empty_check_phase1_compatibility",
@@ -2824,7 +2758,7 @@
       "tools_archive_diagnose_phase1_empty_py_any",
       "tools_archive_diagnose_phase1_empty_py_path"
     ],
-    "69": [
+    "65": [
       "archive_merge_split_exports",
       "archive_merge_split_exports_find_split_pairs",
       "archive_merge_split_exports_load_json",
@@ -2843,7 +2777,7 @@
       "tools_archive_merge_split_exports_py_any",
       "tools_archive_merge_split_exports_py_path"
     ],
-    "70": [
+    "66": [
       "bundle_analysis_run_bundle_analysis",
       "bundle_analysis_run_bundle_analysis_emit_meta_scatter_thresholds",
       "bundle_analysis_run_bundle_analysis_ensure_latent_purgeable",
@@ -2854,7 +2788,7 @@
       "bundle_analysis_run_bundle_analysis_rationale_56",
       "bundle_analysis_run_bundle_analysis_rationale_61",
       "bundle_analysis_run_bundle_analysis_rationale_625",
-      "bundle_analysis_run_bundle_analysis_run_pipeline_once",
+      "bundle_analysis_run_bundle_analysis_run_step2_to_step7",
       "bundle_analysis_run_bundle_analysis_view_out_dir",
       "tools_bundle_analysis_run_bundle_analysis_py_namespace",
       "tools_bundle_analysis_run_bundle_analysis_py_path",
@@ -2862,7 +2796,7 @@
       "tools_jenks_utils_jenks_breaks",
       "tools_jenks_utils_rationale_7"
     ],
-    "71": [
+    "67": [
       "domain_prompts_fill_patterns",
       "domain_prompts_fill_patterns_build_prompt",
       "domain_prompts_fill_patterns_extract_grid_geometry",
@@ -2881,7 +2815,25 @@
       "tools_label_synthesis_domain_prompts_fill_patterns_py_any",
       "tools_label_synthesis_domain_prompts_line_patterns_py_any"
     ],
-    "72": [
+    "68": [
+      "lib_diff_engine",
+      "lib_diff_engine_build_index",
+      "lib_diff_engine_compare_entries",
+      "lib_diff_engine_ensure_str",
+      "lib_diff_engine_get_items",
+      "lib_diff_engine_get_label_and_quality",
+      "lib_diff_engine_load_json",
+      "lib_diff_engine_normalize_name",
+      "lib_diff_engine_pair_name",
+      "lib_diff_engine_parse_name_map",
+      "lib_diff_engine_rebuild_unmatched",
+      "lib_diff_engine_run_comparison",
+      "lib_diff_engine_validate_paths",
+      "lib_diff_engine_write_csv",
+      "tools_lib_diff_engine_py_namespace",
+      "validators_record_v2_rationale_28"
+    ],
+    "69": [
       "lib_domain_profile_domainprofile",
       "lib_domain_profile_domainprofile_build_maps_for_file",
       "lib_domain_profile_domainprofile_build_resolution_maps",
@@ -2899,7 +2851,7 @@
       "lib_domain_profile_rationale_18",
       "tools_lib_domain_profile_py_any"
     ],
-    "73": [
+    "70": [
       "lib_vt_profile_get_identity_item_value",
       "lib_vt_profile_rationale_112",
       "migration_migrate_materials_identity_items",
@@ -2917,7 +2869,7 @@
       "tools_migration_migrate_materials_identity_items_py_any",
       "tools_migration_migrate_materials_identity_items_py_path"
     ],
-    "74": [
+    "71": [
       "probes_probe_view_filter_definitions",
       "probes_probe_view_filter_definitions_as_param_payload",
       "probes_probe_view_filter_definitions_bucket_label_from_categories",
@@ -2935,7 +2887,24 @@
       "probes_probe_view_filter_definitions_safe",
       "probes_probe_view_filter_definitions_sha1"
     ],
-    "75": [
+    "72": [
+      "core_sig_hash_builder",
+      "core_sig_hash_builder_apply_sig_hash_policy_to_record",
+      "core_sig_hash_builder_build_sig_hash_from_policy",
+      "core_sig_hash_builder_items_to_map",
+      "core_sig_hash_builder_key_allowed",
+      "core_sig_hash_builder_py_any",
+      "core_sig_hash_builder_rationale_45",
+      "core_sig_hash_builder_rationale_94",
+      "tests_test_sig_hash_policy_builder",
+      "tests_test_sig_hash_policy_builder_test_apply_sig_hash_policy_to_record_uses_items_and_writes_sig_basis",
+      "tests_test_sig_hash_policy_builder_test_sig_hash_builder_blocks_when_required_not_ok",
+      "tests_test_sig_hash_policy_builder_test_sig_hash_builder_degrades_when_required_not_ok_and_block_disabled",
+      "tests_test_sig_hash_policy_builder_test_sig_hash_builder_hashes_allowed_items_from_items_list_order_independent",
+      "tests_test_sig_hash_policy_builder_test_sig_hash_builder_prefix_and_first_writer_wins",
+      "tests_test_sig_hash_policy_builder_test_text_types_sig_hash_excludes_name_includes_behavioral_items"
+    ],
+    "73": [
       "label_synthesis_label_resolver",
       "label_synthesis_label_resolver_are_near_duplicates",
       "label_synthesis_label_resolver_extract_kv_typed",
@@ -2952,7 +2921,7 @@
       "label_synthesis_label_resolver_try_synopsis",
       "label_synthesis_label_resolver_within_tolerance"
     ],
-    "76": [
+    "74": [
       "policies_placeholder_known_defaults",
       "policies_placeholder_known_defaults_domains",
       "policies_placeholder_known_defaults_domains_arrowheads",
@@ -2969,7 +2938,7 @@
       "policies_placeholder_known_defaults_wall_types_known_defaults",
       "policies_placeholder_known_defaults_wall_types_placeholder_patterns"
     ],
-    "77": [
+    "75": [
       "probes_probe_phase_filters",
       "probes_probe_phase_filters_add_inventory_obs",
       "probes_probe_phase_filters_fmt_display",
@@ -2986,7 +2955,7 @@
       "probes_probe_phase_filters_safe_param_def_name",
       "probes_probe_phase_filters_status_enum"
     ],
-    "78": [
+    "76": [
       "probes_probe_phase_graphics",
       "probes_probe_phase_graphics_cap",
       "probes_probe_phase_graphics_fmt_display",
@@ -3003,7 +2972,7 @@
       "probes_probe_phase_graphics_safe_get_datatype",
       "probes_probe_phase_graphics_safe_param_def_name"
     ],
-    "79": [
+    "77": [
       "tools_probe_config",
       "tools_probe_config_analysis_run_id",
       "tools_probe_config_cluster_method",
@@ -3020,7 +2989,7 @@
       "tools_probe_config_status_failed_set",
       "tools_probe_config_status_unsupported_set"
     ],
-    "80": [
+    "78": [
       "tools_run_config",
       "tools_run_config_analysis_run_id",
       "tools_run_config_cluster_method",
@@ -3037,23 +3006,7 @@
       "tools_run_config_status_failed_set",
       "tools_run_config_status_unsupported_set"
     ],
-    "81": [
-      "Powershell_Commands_tools_Powershell_Commands",
-      "analysis-phases-question-map_phase0",
-      "analysis-phases-question-map_phase1",
-      "analysis-phases-question-map_phase2",
-      "cross_segment_comparison_tools_compare_cross_segment",
-      "extract_stage_matrix_tools_run_extract_all",
-      "fingerprint_hashing_rules_tools_fingerprint_hashing_rules",
-      "hash_discovery_tooling_tools_discover_hash_policy",
-      "join_key_shape_gating_tools_join_key_shape_gating",
-      "phase2-identity-and-semantic-plan_tools_phase2_identity_and_semantic_plan",
-      "phase_2_join-key_discovery_tools_phase_2_join-key_discovery",
-      "revit_README_tests_revit",
-      "tools_DEPRECATED_tools_similarity_compare",
-      "tools_PHASE0_1_2_MAP_tools_run_extract_all"
-    ],
-    "82": [
+    "79": [
       "archive_compare_view_templates",
       "archive_compare_view_templates_main",
       "archive_compare_view_templates_parse_args",
@@ -3069,7 +3022,7 @@
       "lib_vt_profile_viewtemplatedomainprofile_get_hash_resolution_meta",
       "lib_vt_profile_viewtemplatedomainprofile_post_init"
     ],
-    "83": [
+    "80": [
       "label_synthesis_patch_all_domain_patterns",
       "label_synthesis_patch_all_domain_patterns_find_targets",
       "label_synthesis_patch_all_domain_patterns_load_cache",
@@ -3085,7 +3038,7 @@
       "tools_label_synthesis_patch_all_domain_patterns_py_any",
       "tools_label_synthesis_patch_all_domain_patterns_py_path"
     ],
-    "84": [
+    "81": [
       "migration_compress_fingerprint_json",
       "migration_compress_fingerprint_json_compress_file",
       "migration_compress_fingerprint_json_find_json_files",
@@ -3101,7 +3054,7 @@
       "tools_migration_compress_fingerprint_json_py_any",
       "tools_migration_compress_fingerprint_json_py_path"
     ],
-    "85": [
+    "82": [
       "patterns_analysis_split_detection_element_level",
       "patterns_analysis_split_detection_element_level_classify_file_elements",
       "patterns_analysis_split_detection_element_level_compute_element_statistics",
@@ -3117,7 +3070,7 @@
       "patterns_analysis_split_detection_element_level_read_csv_rows",
       "patterns_analysis_split_detection_element_level_run_element_level_classification"
     ],
-    "86": [
+    "83": [
       "archive_run_collision_differencing",
       "archive_run_collision_differencing_collisiongroup",
       "archive_run_collision_differencing_get_join_hash",
@@ -3132,7 +3085,7 @@
       "archive_run_collision_differencing_top_level_field_variants",
       "tools_patterns_analysis_archive_run_collision_differencing_py_any"
     ],
-    "87": [
+    "84": [
       "archive_run_view_templates_joinkey_analysis",
       "archive_run_view_templates_joinkey_analysis_analyze_view_templates",
       "archive_run_view_templates_joinkey_analysis_detect_demo_plan",
@@ -3147,7 +3100,7 @@
       "archive_run_view_templates_joinkey_analysis_rationale_69",
       "archive_run_view_templates_joinkey_analysis_test_join_key"
     ],
-    "88": [
+    "85": [
       "migration_role_policy_materials",
       "migration_role_policy_materials_material_class",
       "migration_role_policy_materials_material_comments",
@@ -3162,7 +3115,7 @@
       "migration_role_policy_materials_material_name",
       "migration_role_policy_materials_material_url"
     ],
-    "89": [
+    "86": [
       "migration_role_policy_view_category_overrides_annotation",
       "migration_role_policy_view_category_overrides_model",
       "migration_role_policy_view_category_overrides_vco_category_path",
@@ -3177,7 +3130,7 @@
       "migration_role_policy_view_category_overrides_vco_template_unique_id",
       "migration_role_policy_view_category_overrides_vco_transparency"
     ],
-    "90": [
+    "87": [
       "probes_probe_arrowheads",
       "probes_probe_arrowheads_arrow_style_key",
       "probes_probe_arrowheads_collect_dimension_types_with_tick_param",
@@ -3192,7 +3145,7 @@
       "probes_probe_arrowheads_safe_param_def_name",
       "probes_probe_arrowheads_safe_type_name"
     ],
-    "91": [
+    "88": [
       "probes_probe_identity",
       "probes_probe_identity_add_inventory_record",
       "probes_probe_identity_as_str",
@@ -3207,7 +3160,7 @@
       "probes_probe_identity_safe_defn_builtin",
       "probes_probe_identity_shared_guid_if_any"
     ],
-    "92": [
+    "89": [
       "archive_emit_element_dominance_main",
       "archive_emit_element_dominance_read_csv_rows",
       "archive_emit_element_dominance_split_label",
@@ -3221,35 +3174,21 @@
       "tools_emit_element_dominance_split_label",
       "tools_emit_element_dominance_write_csv_atomic"
     ],
-    "93": [
-      "core_features",
-      "core_features_as_dict",
-      "core_features_as_int",
-      "core_features_build_features",
-      "core_features_extract_counts_from_legacy",
-      "core_features_py_any",
-      "core_features_rationale_42",
-      "core_features_rationale_56",
-      "tests_test_split_export",
-      "tests_test_split_export_sample_monolithic",
-      "tests_test_split_export_test_monolithic_features_surface",
-      "tests_test_split_export_test_monolithic_manifest_surface"
+    "90": [
+      "core_join_key_policy_is_list_of_str",
+      "core_join_key_policy_rationale_109",
+      "core_join_key_policy_rationale_39",
+      "core_join_key_policy_validate_domain_join_key_policy",
+      "core_join_key_policy_validate_shape_gating",
+      "tests_test_join_key_policy_validation",
+      "tests_test_join_key_policy_validation_test_rule_a1_discriminator_first_required",
+      "tests_test_join_key_policy_validation_test_rule_a2_no_overlap_common_required",
+      "tests_test_join_key_policy_validation_test_rule_a3_additional_required_in_optional_items",
+      "tests_test_join_key_policy_validation_test_rule_a4_requires_non_empty_additional_required",
+      "tests_test_join_key_policy_validation_test_rule_a5_orphaned_keys_warning_only",
+      "tests_test_join_key_policy_validation_test_valid_shape_gated_policy_has_no_errors"
     ],
-    "94": [
-      "domains_materials",
-      "domains_materials_canon_id_local",
-      "domains_materials_export_ctx",
-      "domains_materials_extract",
-      "domains_materials_mk_item",
-      "domains_materials_rationale_212",
-      "domains_materials_rationale_87",
-      "domains_materials_read_param_as_string",
-      "domains_materials_read_prop",
-      "domains_materials_resolve_pattern_slot",
-      "domains_materials_rgb_sig",
-      "domains_materials_safe_item_value"
-    ],
-    "95": [
+    "91": [
       "label_synthesis_patch_domain_patterns_labels",
       "label_synthesis_patch_domain_patterns_labels_load_cache",
       "label_synthesis_patch_domain_patterns_labels_load_label_population",
@@ -3263,21 +3202,7 @@
       "tools_label_synthesis_patch_domain_patterns_labels_py_any",
       "tools_label_synthesis_patch_domain_patterns_labels_py_path"
     ],
-    "96": [
-      "migration_role_policy",
-      "migration_role_policy_ceiling_types",
-      "migration_role_policy_fill_patterns_drafting",
-      "migration_role_policy_fill_patterns_model",
-      "migration_role_policy_fill_patterns_model_fill_pattern_source_element_id",
-      "migration_role_policy_fill_patterns_model_fill_pattern_source_unique_id",
-      "migration_role_policy_floor_types",
-      "migration_role_policy_notes",
-      "migration_role_policy_roof_types",
-      "migration_role_policy_wall_types",
-      "migration_role_policy_wall_types_wt_coarse_fill_color_rgb",
-      "migration_role_policy_wall_types_wt_type_name"
-    ],
-    "97": [
+    "92": [
       "probes_probe_loaded_family_types",
       "probes_probe_loaded_family_types_cat_info",
       "probes_probe_loaded_family_types_element_name",
@@ -3291,7 +3216,7 @@
       "probes_probe_loaded_family_types_parameters_for_element",
       "probes_probe_loaded_family_types_safe"
     ],
-    "98": [
+    "93": [
       "probes_probe_phases",
       "probes_probe_phases_fmt_display",
       "probes_probe_phases_format_param_contract",
@@ -3305,7 +3230,7 @@
       "probes_probe_phases_safe_param_def_name",
       "probes_probe_phases_synthetic_value_contract"
     ],
-    "99": [
+    "94": [
       "probes_probe_view_templates",
       "probes_probe_view_templates_fmt_display",
       "probes_probe_view_templates_format_param_contract",
@@ -3319,7 +3244,7 @@
       "probes_probe_view_templates_safe_view_name",
       "probes_probe_view_templates_viewtype_bucket"
     ],
-    "100": [
+    "95": [
       "revit_json_diff",
       "revit_json_diff_canon_obj",
       "revit_json_diff_canonical_json_bytes",
@@ -3333,7 +3258,7 @@
       "revit_json_diff_sha256_of_json",
       "tests_revit_json_diff_py_any"
     ],
-    "101": [
+    "96": [
       "runner_thin_runner",
       "runner_thin_runner_candidate_repo_dirs",
       "runner_thin_runner_is_probably_sync_path",
@@ -3347,7 +3272,7 @@
       "runner_thin_runner_rationale_154",
       "runner_thin_runner_rationale_410"
     ],
-    "102": [
+    "97": [
       "tests_test_dimension_types_shape_gating_rationale_132",
       "tests_test_dimension_types_shape_gating_rationale_135",
       "tests_test_dimension_types_shape_gating_rationale_140",
@@ -3361,7 +3286,7 @@
       "tests_test_dimension_types_shape_gating_testfamilymappings_test_spot_shapes_map_to_spot_family",
       "tests_test_dimension_types_shape_gating_testfamilymappings_test_unknown_maps_to_unknown_family"
     ],
-    "103": [
+    "98": [
       "tests_test_discover_hash_policy",
       "tests_test_discover_hash_policy_py_path",
       "tests_test_discover_hash_policy_rationale_197",
@@ -3375,7 +3300,7 @@
       "tests_test_discover_hash_policy_test_validate_pareto_auto_bumps_max_k_to_required_count",
       "tests_test_discover_hash_policy_write_csv"
     ],
-    "104": [
+    "99": [
       "tools_acc_scan_dc",
       "tools_acc_scan_dc_load_existing_includes",
       "tools_acc_scan_dc_main",
@@ -3389,7 +3314,7 @@
       "tools_acc_scan_dc_scan",
       "tools_acc_scan_dc_write_manifest"
     ],
-    "105": [
+    "100": [
       "tools_acc_sync_dc",
       "tools_acc_sync_dc_hydrate",
       "tools_acc_sync_dc_is_stub",
@@ -3403,7 +3328,7 @@
       "tools_acc_sync_dc_trigger_read",
       "tools_acc_sync_dc_write_log"
     ],
-    "106": [
+    "101": [
       "tools_population_framing",
       "tools_population_framing_classify_population_shape",
       "tools_population_framing_effective_cluster_count",
@@ -3417,7 +3342,7 @@
       "tools_population_framing_rationale_54",
       "tools_population_framing_write_csv"
     ],
-    "107": [
+    "102": [
       "tools_similarity_compare",
       "tools_similarity_compare_build_file_universe",
       "tools_similarity_compare_domainsimilarityrow",
@@ -3431,20 +3356,7 @@
       "tools_similarity_compare_py_path",
       "tools_similarity_compare_set_jaccard"
     ],
-    "108": [
-      "archive_compare_manifest",
-      "archive_compare_manifest_diff_manifests",
-      "archive_compare_manifest_load_json",
-      "archive_compare_manifest_main",
-      "archive_compare_manifest_to_manifest",
-      "core_manifest",
-      "core_manifest_build_manifest",
-      "core_manifest_py_any",
-      "core_manifest_rationale_24",
-      "core_manifest_safe_dict",
-      "tools_archive_compare_manifest_py_any"
-    ],
-    "109": [
+    "103": [
       "archive_intradomain_summary",
       "archive_intradomain_summary_build_intradomain_summary",
       "archive_intradomain_summary_extract_identity_items",
@@ -3457,7 +3369,7 @@
       "tools_patterns_analysis_archive_intradomain_summary_py_any",
       "tools_patterns_analysis_archive_intradomain_summary_py_dataframe"
     ],
-    "110": [
+    "104": [
       "archive_run_joinhash_parameter_population",
       "archive_run_joinhash_parameter_population_extract_qv_from_value",
       "archive_run_joinhash_parameter_population_get_join_hash",
@@ -3470,7 +3382,7 @@
       "archive_run_joinhash_parameter_population_stable_json",
       "tools_patterns_analysis_archive_run_joinhash_parameter_population_py_any"
     ],
-    "111": [
+    "105": [
       "archive_step_template_governance_discovery",
       "archive_step_template_governance_discovery_classify",
       "archive_step_template_governance_discovery_containment_score",
@@ -3483,7 +3395,20 @@
       "tools_archive_step_template_governance_discovery_py_counter",
       "tools_archive_step_template_governance_discovery_py_namespace"
     ],
-    "112": [
+    "106": [
+      "migration_role_policy",
+      "migration_role_policy_notes",
+      "migration_role_policy_view_filter_definitions_vf_source_unique_id",
+      "migration_role_policy_view_templates_ceiling_plans",
+      "migration_role_policy_view_templates_elevations_sections_detail",
+      "migration_role_policy_view_templates_floor_structural_area_plans",
+      "migration_role_policy_view_templates_renderings_drafting",
+      "migration_role_policy_view_templates_schedules",
+      "migration_role_policy_view_templates_schedules_view_template_category_overrides_def_hash",
+      "migration_role_policy_view_templates_schedules_view_template_element_id",
+      "migration_role_policy_view_templates_schedules_vt_source_element_id"
+    ],
+    "107": [
       "migration_role_policy_dimension_types_angular",
       "migration_role_policy_dimension_types_diameter",
       "migration_role_policy_dimension_types_linear",
@@ -3496,7 +3421,7 @@
       "migration_role_policy_dimension_types_spot_elevation",
       "migration_role_policy_dimension_types_spot_slope"
     ],
-    "113": [
+    "108": [
       "runner_run_dynamo_domain_run",
       "runner_run_dynamo_extract_legacy_quality",
       "runner_run_dynamo_extract_v2_block_reasons",
@@ -3509,7 +3434,7 @@
       "runner_run_dynamo_rationale_284",
       "runner_run_dynamo_rationale_301"
     ],
-    "114": [
+    "109": [
       "archive_example_use_split_export",
       "archive_example_use_split_export_example_combined_workflow",
       "archive_example_use_split_export_example_details_workflow",
@@ -3521,7 +3446,7 @@
       "archive_example_use_split_export_rationale_89",
       "tools_archive_example_use_split_export_py_path"
     ],
-    "115": [
+    "110": [
       "bundle_analysis_step5_classify_patterns",
       "bundle_analysis_step5_classify_patterns_emit_stub",
       "bundle_analysis_step5_classify_patterns_main",
@@ -3533,7 +3458,7 @@
       "tools_bundle_analysis_step5_classify_patterns_py_namespace",
       "tools_bundle_analysis_step5_classify_patterns_py_path"
     ],
-    "116": [
+    "111": [
       "core_naming",
       "core_naming_build_output_filename",
       "core_naming_derive_doc_key",
@@ -3545,19 +3470,7 @@
       "core_naming_safe_slug",
       "core_naming_short_uid"
     ],
-    "117": [
-      "revit_revit_test_runner_pyrevit",
-      "revit_revit_test_runner_pyrevit_main",
-      "revit_revit_test_runner_pyrevit_now_stamp",
-      "revit_revit_test_runner_pyrevit_write_json",
-      "revit_revit_test_runner_pyrevit_write_text",
-      "runner_run_dynamo_canonicalize_all_domain_records",
-      "runner_run_dynamo_enabled",
-      "runner_run_dynamo_rationale_471",
-      "runner_run_dynamo_rationale_489",
-      "runner_run_dynamo_run_fingerprint"
-    ],
-    "118": [
+    "112": [
       "tests_test_dimension_types_shape_gating_rationale_113",
       "tests_test_dimension_types_shape_gating_rationale_63",
       "tests_test_dimension_types_shape_gating_rationale_66",
@@ -3569,7 +3482,19 @@
       "tests_test_dimension_types_shape_gating_testshapeconstants_test_shape_int_to_name_mapping",
       "tests_test_dimension_types_shape_gating_testshapeconstants_test_shape_to_family_mapping_complete"
     ],
-    "119": [
+    "113": [
+      "tests_test_hashing_incremental",
+      "tests_test_hashing_incremental_rationale_10",
+      "tests_test_hashing_incremental_reference_hash",
+      "tests_test_hashing_incremental_test_make_hash_accepts_generator_large_input_sanity",
+      "tests_test_hashing_incremental_test_make_hash_deterministic_repeated_calls",
+      "tests_test_hashing_incremental_test_make_hash_handles_unrepr_values",
+      "tests_test_hashing_incremental_test_make_hash_is_order_sensitive_contract",
+      "tests_test_hashing_incremental_test_make_hash_matches_reference_empty",
+      "tests_test_hashing_incremental_test_make_hash_matches_reference_multiple_and_unicode_and_pipes",
+      "tests_test_hashing_incremental_test_make_hash_separator_off_by_one_cases"
+    ],
+    "114": [
       "tests_test_record_v2_utils",
       "tests_test_record_v2_utils_test_canonicalize_bool_rules",
       "tests_test_record_v2_utils_test_canonicalize_float_rules",
@@ -3581,7 +3506,18 @@
       "tests_test_record_v2_utils_test_make_identity_item_empty_string_becomes_null_missing",
       "tests_test_record_v2_utils_test_serialize_identity_items_is_sorted_and_deterministic"
     ],
-    "120": [
+    "115": [
+      "agents_graphify",
+      "architecture_dependency_direction",
+      "architecture_design_intent",
+      "architecture_layer_0",
+      "architecture_layer_1",
+      "architecture_layer_2",
+      "architecture_layer_3",
+      "claude_commands",
+      "claude_project_overview"
+    ],
+    "116": [
       "archive_pareto_with_splits",
       "archive_pareto_with_splits_assess_split_likelihood",
       "archive_pareto_with_splits_detect_pareto_cliffs",
@@ -3592,7 +3528,7 @@
       "archive_pareto_with_splits_run_pareto_with_split_detection",
       "tools_patterns_analysis_archive_pareto_with_splits_py_dataframe"
     ],
-    "121": [
+    "117": [
       "archive_run_text_types_candidate_joinkey_simulation",
       "archive_run_text_types_candidate_joinkey_simulation_extract_features",
       "archive_run_text_types_candidate_joinkey_simulation_get_p2_value",
@@ -3603,7 +3539,7 @@
       "archive_run_text_types_candidate_joinkey_simulation_run",
       "tools_patterns_analysis_archive_run_text_types_candidate_joinkey_simulation_py_any"
     ],
-    "122": [
+    "118": [
       "archive_run_view_category_overrides_joinkey_analysis",
       "archive_run_view_category_overrides_joinkey_analysis_analyze_override_patterns",
       "archive_run_view_category_overrides_joinkey_analysis_extract_override_record",
@@ -3614,7 +3550,7 @@
       "archive_run_view_category_overrides_joinkey_analysis_rationale_56",
       "archive_run_view_category_overrides_joinkey_analysis_stable_delta_hash"
     ],
-    "123": [
+    "119": [
       "archive_score_drift",
       "archive_score_drift_as_dict",
       "archive_score_drift_load_json",
@@ -3625,29 +3561,29 @@
       "archive_score_drift_to_manifest",
       "tools_archive_score_drift_py_any"
     ],
-    "124": [
-      "core_join_key_policy_rationale_109",
-      "core_join_key_policy_validate_domain_join_key_policy",
-      "tests_test_join_key_policy_validation",
-      "tests_test_join_key_policy_validation_test_rule_a1_discriminator_first_required",
-      "tests_test_join_key_policy_validation_test_rule_a2_no_overlap_common_required",
-      "tests_test_join_key_policy_validation_test_rule_a3_additional_required_in_optional_items",
-      "tests_test_join_key_policy_validation_test_rule_a4_requires_non_empty_additional_required",
-      "tests_test_join_key_policy_validation_test_rule_a5_orphaned_keys_warning_only",
-      "tests_test_join_key_policy_validation_test_valid_shape_gated_policy_has_no_errors"
+    "120": [
+      "core_manifest",
+      "core_manifest_build_manifest",
+      "core_manifest_py_any",
+      "core_manifest_rationale_24",
+      "core_manifest_safe_dict",
+      "tests_test_split_export",
+      "tests_test_split_export_sample_monolithic",
+      "tests_test_split_export_test_monolithic_features_surface",
+      "tests_test_split_export_test_monolithic_manifest_surface"
     ],
-    "125": [
-      "migration_role_policy_view_filter_definitions_vf_source_unique_id",
-      "migration_role_policy_view_templates_ceiling_plans",
-      "migration_role_policy_view_templates_elevations_sections_detail",
-      "migration_role_policy_view_templates_floor_structural_area_plans",
-      "migration_role_policy_view_templates_renderings_drafting",
-      "migration_role_policy_view_templates_schedules",
-      "migration_role_policy_view_templates_schedules_view_template_category_overrides_def_hash",
-      "migration_role_policy_view_templates_schedules_view_template_element_id",
-      "migration_role_policy_view_templates_schedules_vt_source_element_id"
+    "121": [
+      "revit_revit_test_runner_pyrevit",
+      "revit_revit_test_runner_pyrevit_main",
+      "revit_revit_test_runner_pyrevit_now_stamp",
+      "revit_revit_test_runner_pyrevit_write_json",
+      "revit_revit_test_runner_pyrevit_write_text",
+      "runner_run_dynamo_enabled",
+      "runner_run_dynamo_rationale_471",
+      "runner_run_dynamo_rationale_489",
+      "runner_run_dynamo_run_fingerprint"
     ],
-    "126": [
+    "122": [
       "sync_revitlookup_reference",
       "sync_revitlookup_reference_fetch_raw",
       "sync_revitlookup_reference_get_current_commit_sha",
@@ -3658,7 +3594,17 @@
       "sync_revitlookup_reference_rationale_1",
       "sync_revitlookup_reference_sync"
     ],
-    "127": [
+    "123": [
+      "archive_join_key_derivation_phase05_rationale_389",
+      "lib_diff_engine_extract_records",
+      "lib_diff_engine_get_domain_payload",
+      "tests_test_text_types_conversion_convergence",
+      "tests_test_text_types_conversion_convergence_id",
+      "tests_test_text_types_conversion_convergence_id_init",
+      "tests_test_text_types_conversion_convergence_test_converted_old_and_new_records_converge",
+      "tests_test_text_types_conversion_convergence_type"
+    ],
+    "124": [
       "archive_pairwise_drift",
       "archive_pairwise_drift_as_dict",
       "archive_pairwise_drift_main",
@@ -3668,7 +3614,7 @@
       "archive_pairwise_drift_safe_float",
       "archive_pairwise_drift_summarize_drift"
     ],
-    "128": [
+    "125": [
       "bundle_analysis_step2b_bundle_share_profile",
       "bundle_analysis_step2b_bundle_share_profile_build_bundle_share_profile",
       "bundle_analysis_step2b_bundle_share_profile_fmt_float",
@@ -3678,7 +3624,7 @@
       "tools_bundle_analysis_step2b_bundle_share_profile_py_namespace",
       "tools_bundle_analysis_step2b_bundle_share_profile_py_path"
     ],
-    "129": [
+    "126": [
       "core_context_docviewcontext",
       "core_context_docviewcontext_init",
       "core_context_docviewcontext_view_info",
@@ -3688,7 +3634,17 @@
       "core_context_rationale_64",
       "core_context_viewinfo"
     ],
-    "130": [
+    "127": [
+      "core_features",
+      "core_features_as_dict",
+      "core_features_as_int",
+      "core_features_build_features",
+      "core_features_extract_counts_from_legacy",
+      "core_features_py_any",
+      "core_features_rationale_42",
+      "core_features_rationale_56"
+    ],
+    "128": [
       "label_synthesis_build_identity_items_lookup",
       "label_synthesis_build_identity_items_lookup_build_lookup",
       "label_synthesis_build_identity_items_lookup_find_file",
@@ -3698,7 +3654,7 @@
       "label_synthesis_build_identity_items_lookup_sniff_item_columns",
       "tools_label_synthesis_build_identity_items_lookup_py_path"
     ],
-    "131": [
+    "129": [
       "migration_role_policy_object_styles_analytical",
       "migration_role_policy_object_styles_annotation",
       "migration_role_policy_object_styles_imported",
@@ -3708,7 +3664,7 @@
       "migration_role_policy_object_styles_model_obj_style_source_element_id",
       "migration_role_policy_object_styles_model_obj_style_source_unique_id"
     ],
-    "132": [
+    "130": [
       "migration_role_policy_text_types",
       "migration_role_policy_text_types_text_type_color_int",
       "migration_role_policy_text_types_text_type_leader_arrowhead_sig_hash",
@@ -3718,7 +3674,7 @@
       "migration_role_policy_text_types_text_type_source_unique_id",
       "migration_role_policy_text_types_text_type_type_id"
     ],
-    "133": [
+    "131": [
       "tests_test_extractor_unit_system",
       "tests_test_extractor_unit_system_length_record",
       "tests_test_extractor_unit_system_payload",
@@ -3728,7 +3684,7 @@
       "tests_test_extractor_unit_system_test_continues_after_unrecognized_or_missing_unit_type_id",
       "tools_extractor_derive_unit_system"
     ],
-    "134": [
+    "132": [
       "tools_reset_wall_types_for_reapply",
       "tools_reset_wall_types_for_reapply_is_function_only_block",
       "tools_reset_wall_types_for_reapply_main",
@@ -3738,16 +3694,7 @@
       "tools_reset_wall_types_for_reapply_rationale_51",
       "tools_reset_wall_types_for_reapply_read_wall_items"
     ],
-    "135": [
-      "agents_graphify",
-      "architecture_graphify",
-      "changelog_added",
-      "changelog_changed",
-      "changelog_decisions",
-      "changelog_fixed",
-      "changelog_removed"
-    ],
-    "136": [
+    "133": [
       "domain_prompts_arrowheads",
       "domain_prompts_arrowheads_build_prompt",
       "domain_prompts_arrowheads_detect_record_class",
@@ -3756,7 +3703,7 @@
       "domain_prompts_arrowheads_rationale_1",
       "tools_label_synthesis_domain_prompts_arrowheads_py_any"
     ],
-    "137": [
+    "134": [
       "migration_role_policy_view_filter_definitions",
       "migration_role_policy_view_filter_definitions_vf_categories",
       "migration_role_policy_view_filter_definitions_vf_elem_id",
@@ -3765,7 +3712,7 @@
       "migration_role_policy_view_filter_definitions_vf_source_element_id",
       "migration_role_policy_view_filter_definitions_vf_uid_or_namekey"
     ],
-    "138": [
+    "135": [
       "runner_run_dynamo_ensure_parent_dir",
       "runner_run_dynamo_rationale_1119",
       "runner_run_dynamo_rationale_1128",
@@ -3774,13 +3721,38 @@
       "runner_run_dynamo_strip_detail_surfaces",
       "runner_run_dynamo_write_json_to_disk"
     ],
-    "139": [
+    "136": [
+      "tests_test_v21_join_policy_compat",
+      "tests_test_v21_join_policy_compat_py_path",
+      "tests_test_v21_join_policy_compat_test_apply_diagnostics_include_discriminator_context",
+      "tests_test_v21_join_policy_compat_test_discover_emits_legacy_compat_shape_and_lists",
+      "tests_test_v21_join_policy_compat_test_optional_items_not_required_or_selected_by_default",
+      "tests_test_v21_join_policy_compat_test_validate_pareto_auto_bumps_max_k_for_required_items",
+      "tests_test_v21_join_policy_compat_write_csv"
+    ],
+    "137": [
       "archive_apply_join_keys_by_ids",
       "archive_apply_join_keys_by_ids_compute_join_hash",
       "archive_apply_join_keys_by_ids_extract_identity_map",
       "archive_apply_join_keys_by_ids_main",
       "archive_apply_join_keys_by_ids_md5_utf8_join_pipe",
       "tools_patterns_analysis_archive_apply_join_keys_by_ids_py_any"
+    ],
+    "138": [
+      "archive_attributes",
+      "archive_attributes_attrstabilityrow",
+      "archive_attributes_compute_attr_stability",
+      "archive_attributes_compute_stress_rank",
+      "archive_attributes_stressrow",
+      "tools_patterns_analysis_archive_attributes_py_domainindex"
+    ],
+    "139": [
+      "archive_compare_manifest",
+      "archive_compare_manifest_diff_manifests",
+      "archive_compare_manifest_load_json",
+      "archive_compare_manifest_main",
+      "archive_compare_manifest_to_manifest",
+      "tools_archive_compare_manifest_py_any"
     ],
     "140": [
       "archive_compute_synthetic_keys",
@@ -3807,6 +3779,22 @@
       "tools_patterns_analysis_archive_run_candidate_joinkey_simulation_py_any"
     ],
     "143": [
+      "core_record_v2_make_record_id_structural",
+      "core_record_v2_rationale_336",
+      "tests_test_record_id_determinism",
+      "tests_test_record_id_determinism_test_structural_record_id_dup_index_deterministic",
+      "tests_test_record_id_determinism_test_structural_record_id_duplicate_keys_blocked",
+      "tests_test_record_id_determinism_test_structural_record_id_stable_across_runs"
+    ],
+    "144": [
+      "migration_role_policy_ceiling_types",
+      "migration_role_policy_floor_types",
+      "migration_role_policy_roof_types",
+      "migration_role_policy_wall_types",
+      "migration_role_policy_wall_types_wt_coarse_fill_color_rgb",
+      "migration_role_policy_wall_types_wt_type_name"
+    ],
+    "145": [
       "migration_role_policy_view_filter_applications_view_templates",
       "migration_role_policy_view_filter_applications_view_templates_vfa_filter_stack_count",
       "migration_role_policy_view_filter_applications_view_templates_vfa_source_element_id",
@@ -3814,7 +3802,7 @@
       "migration_role_policy_view_filter_applications_view_templates_vfa_template_elem_id",
       "migration_role_policy_view_filter_applications_view_templates_vfa_template_uid_or_namekey"
     ],
-    "144": [
+    "146": [
       "tools_pairwise_analysis",
       "tools_pairwise_analysis_load_csv",
       "tools_pairwise_analysis_main",
@@ -3822,441 +3810,489 @@
       "tools_pairwise_analysis_py_path",
       "tools_pairwise_analysis_write_csv"
     ],
-    "145": [
+    "147": [
       "archive_pareto_make_shape_inputs",
       "archive_pareto_make_shape_inputs_add_record_key",
       "archive_pareto_make_shape_inputs_main",
       "tools_archive_pareto_make_shape_inputs_py_dataframe",
       "tools_archive_pareto_make_shape_inputs_py_series"
     ],
-    "146": [
-      "claude_overview",
-      "refactor_approach",
-      "repo_operational_review",
-      "revit_fingerprint",
-      "revit_lookup_domain_map"
+    "148": [
+      "changelog_added",
+      "changelog_changed",
+      "changelog_decisions",
+      "changelog_fixed",
+      "changelog_removed"
     ],
-    "147": [
+    "149": [
       "label_synthesis_synthesize_fragmented_labels_load_domain_prompt_module",
       "label_synthesis_synthesize_fragmented_labels_rationale_403",
       "tests_test_label_synthesis_domain_prompt_loader",
       "tests_test_label_synthesis_domain_prompt_loader_test_domain_prompt_loader_falls_back_to_base_for_multi_segment_domains",
       "tests_test_label_synthesis_domain_prompt_loader_test_domain_prompt_loader_supports_single_word_domains"
     ],
-    "148": [
+    "150": [
       "migration_role_policy_arrowheads",
       "migration_role_policy_arrowheads_arrowhead_name",
       "migration_role_policy_arrowheads_arrowhead_source_element_id",
       "migration_role_policy_arrowheads_arrowhead_source_unique_id",
       "migration_role_policy_arrowheads_arrowhead_type_id"
     ],
-    "149": [
+    "151": [
       "migration_role_policy_line_styles",
       "migration_role_policy_line_styles_line_style_path",
       "migration_role_policy_line_styles_line_style_pattern_ref_kind",
       "migration_role_policy_line_styles_line_style_source_element_id",
       "migration_role_policy_line_styles_line_style_source_unique_id"
     ],
-    "150": [
+    "152": [
       "probes_sweep_line_pattern_normhash_precision",
       "probes_sweep_line_pattern_normhash_precision_compute_norm_hash_for_group",
       "probes_sweep_line_pattern_normhash_precision_detect_cols",
       "probes_sweep_line_pattern_normhash_precision_main",
       "probes_sweep_line_pattern_normhash_precision_md5s"
     ],
-    "151": [
+    "153": [
       "revit_config_example",
       "revit_config_example_cases",
       "revit_config_example_golden_dir",
       "revit_config_example_max_diffs",
       "revit_config_example_out_dir"
     ],
-    "152": [
+    "154": [
       "runner_purge_sys_modules_standalone",
       "runner_purge_sys_modules_standalone_is_protected",
       "runner_purge_sys_modules_standalone_purge_modules",
       "runner_purge_sys_modules_standalone_to_bool",
       "runner_purge_sys_modules_standalone_to_list"
     ],
-    "153": [
+    "155": [
       "synopsis_formatters_arrowheads",
       "synopsis_formatters_arrowheads_format_synopsis",
       "synopsis_formatters_arrowheads_inches_to_fraction",
       "synopsis_formatters_arrowheads_rationale_1",
       "tools_label_synthesis_synopsis_formatters_arrowheads_py_any"
     ],
-    "154": [
+    "156": [
       "tests_test_text_types_flat_items_export",
       "tests_test_text_types_flat_items_export_id",
       "tests_test_text_types_flat_items_export_id_init",
       "tests_test_text_types_flat_items_export_test_text_types_extract_emits_flat_items_only",
       "tests_test_text_types_flat_items_export_type"
     ],
-    "155": [
+    "157": [
       "archive_validate_v21_contract",
       "archive_validate_v21_contract_main",
       "archive_validate_v21_contract_read_csv",
       "tools_archive_validate_v21_contract_py_path"
     ],
-    "156": [
+    "158": [
+      "migration_role_policy_fill_patterns_drafting",
+      "migration_role_policy_fill_patterns_model",
+      "migration_role_policy_fill_patterns_model_fill_pattern_source_element_id",
+      "migration_role_policy_fill_patterns_model_fill_pattern_source_unique_id"
+    ],
+    "159": [
       "migration_role_policy_identity",
       "migration_role_policy_identity_identity_central_path",
       "migration_role_policy_identity_identity_filename",
       "migration_role_policy_identity_identity_project_title"
     ],
-    "157": [
+    "160": [
       "migration_role_policy_phases",
       "migration_role_policy_phases_phase_source_element_id",
       "migration_role_policy_phases_phase_source_unique_id",
       "migration_role_policy_phases_phase_uid"
     ],
-    "158": [
+    "161": [
       "policies_governance_role_path_patterns",
       "policies_governance_role_path_patterns_notes",
       "policies_governance_role_path_patterns_rules",
       "policies_governance_role_path_patterns_schema_version"
     ],
-    "159": [
+    "162": [
       "tests_test_dimension_types_shape_gating_rationale_242",
       "tests_test_dimension_types_shape_gating_rationale_245",
       "tests_test_dimension_types_shape_gating_testpolicyloadpattern",
       "tests_test_dimension_types_shape_gating_testpolicyloadpattern_test_policy_load_integration_pattern"
     ],
-    "160": [
+    "163": [
       "tests_test_no_direct_filtered_element_collector_in_domains",
       "tests_test_no_direct_filtered_element_collector_in_domains_rationale_11",
       "tests_test_no_direct_filtered_element_collector_in_domains_repo_root",
       "tests_test_no_direct_filtered_element_collector_in_domains_test_domains_do_not_reference_filtered_element_collector"
     ],
-    "161": [
+    "164": [
       "tests_test_sentinel_policy",
       "tests_test_sentinel_policy_rationale_15",
       "tests_test_sentinel_policy_repo_root",
       "tests_test_sentinel_policy_test_domains_do_not_emit_extra_angle_bracket_tokens"
     ],
-    "162": [
+    "165": [
       "tools_generate_sig_hash_policy",
       "tools_generate_sig_hash_policy_build_policy",
       "tools_generate_sig_hash_policy_main",
       "tools_generate_sig_hash_policy_py_any"
     ],
-    "163": [
+    "166": [
       "archive_calibrate_join_key_gates",
       "archive_calibrate_join_key_gates_calibrate",
       "archive_calibrate_join_key_gates_main"
     ],
-    "164": [
+    "167": [
       "archive_details_to_csv",
       "archive_details_to_csv_fmt",
       "archive_details_to_csv_main"
     ],
-    "165": [
+    "168": [
       "claude_settings",
       "claude_settings_hooks",
       "claude_settings_hooks_pretooluse"
     ],
-    "166": [
+    "169": [
       "codex_hooks",
       "codex_hooks_hooks",
       "codex_hooks_hooks_pretooluse"
     ],
-    "167": [
+    "170": [
       "label_synthesis_build_label_population",
       "label_synthesis_build_label_population_main",
       "tools_label_synthesis_build_label_population_py_path"
     ],
-    "168": [
+    "171": [
       "migration_extract_first_record",
       "migration_extract_first_record_main",
       "tools_migration_extract_first_record_py_any"
     ],
-    "169": [
+    "172": [
       "tests_test_dimension_types_placeholder_fields",
       "tests_test_dimension_types_placeholder_fields_test_attach_placeholder_metadata_ok",
       "tests_test_dimension_types_placeholder_fields_test_attach_placeholder_metadata_unreadable"
     ],
-    "170": [
+    "173": [
       "tests_test_pareto_shape_gating",
       "tests_test_pareto_shape_gating_py_path",
       "tests_test_pareto_shape_gating_write_csv"
     ],
-    "171": [
+    "174": [
       "bundle_analysis_init",
       "bundle_analysis_init_rationale_1"
     ],
-    "172": [
+    "175": [
       "patterns_analysis_init",
       "patterns_analysis_init_rationale_1"
     ],
-    "173": [
+    "176": [
       "probes_check_line_patterns_normhash",
       "probes_check_line_patterns_normhash_sample_problem_records"
     ],
-    "174": [
+    "177": [
       "tests_conftest",
       "tests_conftest_pytest_configure"
     ],
-    "175": [
+    "178": [
       "tests_run_join_key_tests",
       "tests_run_join_key_tests_compute_override_properties_hash"
     ],
-    "176": [
+    "179": [
       "tests_test_placeholder_exclusions",
       "tests_test_placeholder_exclusions_wcsv"
     ],
-    "177": [
-      "compare_templates_stand_alone_compare_view_templates_stand_alone_mapping"
-    ],
-    "178": [
-      "core_init"
-    ],
-    "179": [
-      "domain_prompts_init"
-    ],
     "180": [
-      "domains_init"
+      "analysis_phases_question_map"
     ],
     "181": [
-      "label_synthesis_init"
+      "architecture_graph_structure"
     ],
     "182": [
-      "lib_init"
+      "compare_templates_stand_alone_compare_view_templates_stand_alone_mapping"
     ],
     "183": [
-      "probes_probe_arrowheads_2026_02_04"
+      "core_init"
     ],
     "184": [
-      "probes_probe_dimension_types_2026_02_04"
+      "cross_segment_comparison"
     ],
     "185": [
-      "probes_probe_dimension_types_2026_03_19"
+      "domain_prompts_init"
     ],
     "186": [
-      "probes_probe_fill_patterns_2026_02_04"
+      "domains_init"
     ],
     "187": [
-      "probes_probe_identity_2026_02_04"
+      "extract_stage_matrix"
     ],
     "188": [
-      "probes_probe_line_patterns_2026_02_04"
+      "fingerprint_hashing_rules"
     ],
     "189": [
-      "probes_probe_line_styles_2026_02_04"
+      "hash_discovery_tooling"
     ],
     "190": [
-      "probes_probe_phase_filters_2026_02_04"
+      "join_key_shape_gating"
     ],
     "191": [
-      "probes_probe_phase_graphics_2026_02_04"
+      "label_synthesis_init"
     ],
     "192": [
-      "probes_probe_phases_2026_02_04"
+      "lib_init"
     ],
     "193": [
-      "probes_probe_roof_type_import"
+      "phase2_identity_and_semantic_plan"
     ],
     "194": [
-      "probes_probe_text_types_2026_02_04"
+      "phase_2_join-key_discovery"
     ],
     "195": [
-      "probes_probe_units_2026_02_04"
+      "probes_probe_arrowheads_2026_02_04"
     ],
     "196": [
-      "probes_probe_view_category_overrides_2026_02_04"
+      "probes_probe_dimension_types_2026_02_04"
     ],
     "197": [
-      "probes_probe_view_filter_applications_2026_02_05"
+      "probes_probe_dimension_types_2026_03_19"
     ],
     "198": [
-      "probes_probe_view_filter_definitions_2026_02_05"
+      "probes_probe_fill_patterns_2026_02_04"
     ],
     "199": [
-      "probes_probe_view_templates_2026_02_05"
+      "probes_probe_identity_2026_02_04"
     ],
     "200": [
-      "runner_init"
+      "probes_probe_line_patterns_2026_02_04"
     ],
     "201": [
-      "synopsis_formatters_init"
+      "probes_probe_line_styles_2026_02_04"
     ],
     "202": [
+      "probes_probe_phase_filters_2026_02_04"
+    ],
+    "203": [
+      "probes_probe_phase_graphics_2026_02_04"
+    ],
+    "204": [
+      "probes_probe_phases_2026_02_04"
+    ],
+    "205": [
+      "probes_probe_roof_type_import"
+    ],
+    "206": [
+      "probes_probe_text_types_2026_02_04"
+    ],
+    "207": [
+      "probes_probe_units_2026_02_04"
+    ],
+    "208": [
+      "probes_probe_view_category_overrides_2026_02_04"
+    ],
+    "209": [
+      "probes_probe_view_filter_applications_2026_02_05"
+    ],
+    "210": [
+      "probes_probe_view_filter_definitions_2026_02_05"
+    ],
+    "211": [
+      "probes_probe_view_templates_2026_02_05"
+    ],
+    "212": [
+      "runner_init"
+    ],
+    "213": [
+      "synopsis_formatters_init"
+    ],
+    "214": [
+      "tests_revit_readme"
+    ],
+    "215": [
+      "tools_DEPRECATED"
+    ],
+    "216": [
+      "tools_PHASE0_1_2_MAP"
+    ],
+    "217": [
+      "tools_Powershell_Commands"
+    ],
+    "218": [
       "tools_corpus_update_runbook"
+    ],
+    "219": [
+      "v21_phase0_export_schema"
     ]
   },
   "cohesion": {
-    "0": 0.07690509583917718,
-    "1": 0.06894664842681258,
-    "2": 0.08345577431677931,
-    "3": 0.0620253164556962,
-    "4": 0.09512937595129375,
+    "0": 0.08353863381858903,
+    "1": 0.07144456886898096,
+    "2": 0.06128702757916241,
+    "3": 0.06894664842681258,
+    "4": 0.08345577431677931,
     "5": 0.0578386605783866,
     "6": 0.06316590563165905,
-    "7": 0.06800804828973843,
+    "7": 0.06448412698412699,
     "8": 0.055811571940604196,
-    "9": 0.06605222734254992,
-    "10": 0.07005649717514124,
-    "11": 0.0647307924984876,
-    "12": 0.0987012987012987,
-    "13": 0.11180992313067785,
-    "14": 0.0602322206095791,
+    "9": 0.07005649717514124,
+    "10": 0.0647307924984876,
+    "11": 0.08636363636363636,
+    "12": 0.07272727272727272,
+    "13": 0.04781144781144781,
+    "14": 0.11180992313067785,
     "15": 0.06748911465892599,
-    "16": 0.19593613933236576,
-    "17": 0.09728506787330317,
-    "18": 0.07058823529411765,
-    "19": 0.24,
-    "20": 0.08953900709219859,
-    "21": 0.11840888066604996,
-    "22": 0.08880666049953746,
-    "23": 0.06956521739130435,
+    "16": 0.09361393323657474,
+    "17": 0.0602322206095791,
+    "18": 0.19593613933236576,
+    "19": 0.09728506787330317,
+    "20": 0.07058823529411765,
+    "21": 0.10040816326530612,
+    "22": 0.24,
+    "23": 0.08953900709219859,
     "24": 0.10628019323671498,
-    "25": 0.11707317073170732,
-    "26": 0.05128205128205128,
-    "27": 0.09986504723346828,
+    "25": 0.08456659619450317,
+    "26": 0.11707317073170732,
+    "27": 0.05128205128205128,
     "28": 0.09446693657219973,
     "29": 0.09103840682788052,
-    "30": 0.10241820768136557,
-    "31": 0.10668563300142248,
-    "32": 0.06906906906906907,
-    "33": 0.09047619047619047,
-    "34": 0.0928030303030303,
-    "35": 0.17045454545454544,
+    "30": 0.10668563300142248,
+    "31": 0.06906906906906907,
+    "32": 0.11764705882352941,
+    "33": 0.0928030303030303,
+    "34": 0.17045454545454544,
+    "35": 0.12043010752688173,
     "36": 0.12183908045977011,
-    "37": 0.10098522167487685,
-    "38": 0.13054187192118227,
+    "37": 0.13054187192118227,
+    "38": 0.11375661375661375,
     "39": 0.15608465608465608,
     "40": 0.12535612535612536,
     "41": 0.21082621082621084,
-    "42": 0.12615384615384614,
-    "43": 0.13538461538461538,
-    "44": 0.14,
-    "45": 0.15579710144927536,
-    "46": 0.18115942028985507,
-    "47": 0.17391304347826086,
-    "48": 0.14624505928853754,
-    "49": 0.13043478260869565,
-    "50": 0.17316017316017315,
-    "51": 0.14285714285714285,
-    "52": 0.1341991341991342,
-    "53": 0.14285714285714285,
-    "54": 0.14761904761904762,
-    "55": 0.19523809523809524,
-    "56": 0.1523809523809524,
-    "57": 0.1380952380952381,
-    "58": 0.15263157894736842,
-    "59": 0.21052631578947367,
-    "60": 0.21052631578947367,
-    "61": 0.19473684210526315,
-    "62": 0.14210526315789473,
-    "63": 0.2982456140350877,
-    "64": 0.19607843137254902,
-    "65": 0.19607843137254902,
-    "66": 0.22058823529411764,
-    "67": 0.27205882352941174,
-    "68": 0.2426470588235294,
-    "69": 0.18382352941176472,
-    "70": 0.17647058823529413,
-    "71": 0.22058823529411764,
-    "72": 0.23333333333333334,
-    "73": 0.25,
-    "74": 0.24166666666666667,
-    "75": 0.19047619047619047,
-    "76": 0.3333333333333333,
-    "77": 0.24761904761904763,
-    "78": 0.2571428571428571,
-    "79": 0.13333333333333333,
-    "80": 0.13333333333333333,
-    "81": 0.14285714285714285,
-    "82": 0.17582417582417584,
-    "83": 0.31868131868131866,
-    "84": 0.2857142857142857,
-    "85": 0.2087912087912088,
-    "86": 0.2564102564102564,
-    "87": 0.2564102564102564,
-    "88": 0.15384615384615385,
-    "89": 0.24358974358974358,
-    "90": 0.2692307692307692,
-    "91": 0.24358974358974358,
-    "92": 0.3181818181818182,
-    "93": 0.3484848484848485,
-    "94": 0.2878787878787879,
-    "95": 0.36363636363636365,
-    "96": 0.2878787878787879,
-    "97": 0.45454545454545453,
-    "98": 0.30303030303030304,
-    "99": 0.30303030303030304,
-    "100": 0.3181818181818182,
-    "101": 0.21212121212121213,
-    "102": 0.16666666666666666,
-    "103": 0.42424242424242425,
-    "104": 0.24242424242424243,
-    "105": 0.24242424242424243,
-    "106": 0.3484848484848485,
-    "107": 0.3333333333333333,
-    "108": 0.34545454545454546,
-    "109": 0.36363636363636365,
-    "110": 0.32727272727272727,
-    "111": 0.3090909090909091,
-    "112": 0.5454545454545454,
-    "113": 0.18181818181818182,
-    "114": 0.3333333333333333,
-    "115": 0.3111111111111111,
-    "116": 0.4444444444444444,
-    "117": 0.28888888888888886,
-    "118": 0.2,
-    "119": 0.2,
-    "120": 0.3055555555555556,
-    "121": 0.5,
-    "122": 0.3055555555555556,
-    "123": 0.4444444444444444,
-    "124": 0.3888888888888889,
-    "125": 0.5555555555555556,
-    "126": 0.4166666666666667,
-    "127": 0.42857142857142855,
-    "128": 0.39285714285714285,
-    "129": 0.2857142857142857,
-    "130": 0.42857142857142855,
-    "131": 0.5,
-    "132": 0.25,
-    "133": 0.6785714285714286,
-    "134": 0.35714285714285715,
+    "42": 0.13538461538461538,
+    "43": 0.14,
+    "44": 0.17333333333333334,
+    "45": 0.21,
+    "46": 0.16996047430830039,
+    "47": 0.14624505928853754,
+    "48": 0.13043478260869565,
+    "49": 0.14285714285714285,
+    "50": 0.1341991341991342,
+    "51": 0.14761904761904762,
+    "52": 0.19523809523809524,
+    "53": 0.1523809523809524,
+    "54": 0.1380952380952381,
+    "55": 0.21052631578947367,
+    "56": 0.19473684210526315,
+    "57": 0.14210526315789473,
+    "58": 0.15789473684210525,
+    "59": 0.2982456140350877,
+    "60": 0.19607843137254902,
+    "61": 0.19607843137254902,
+    "62": 0.22058823529411764,
+    "63": 0.27205882352941174,
+    "64": 0.2426470588235294,
+    "65": 0.18382352941176472,
+    "66": 0.17647058823529413,
+    "67": 0.22058823529411764,
+    "68": 0.2833333333333333,
+    "69": 0.23333333333333334,
+    "70": 0.25,
+    "71": 0.24166666666666667,
+    "72": 0.2571428571428571,
+    "73": 0.19047619047619047,
+    "74": 0.3333333333333333,
+    "75": 0.24761904761904763,
+    "76": 0.2571428571428571,
+    "77": 0.13333333333333333,
+    "78": 0.13333333333333333,
+    "79": 0.17582417582417584,
+    "80": 0.31868131868131866,
+    "81": 0.2857142857142857,
+    "82": 0.2087912087912088,
+    "83": 0.2564102564102564,
+    "84": 0.2564102564102564,
+    "85": 0.15384615384615385,
+    "86": 0.24358974358974358,
+    "87": 0.2692307692307692,
+    "88": 0.24358974358974358,
+    "89": 0.3181818181818182,
+    "90": 0.25757575757575757,
+    "91": 0.36363636363636365,
+    "92": 0.45454545454545453,
+    "93": 0.30303030303030304,
+    "94": 0.30303030303030304,
+    "95": 0.3181818181818182,
+    "96": 0.21212121212121213,
+    "97": 0.16666666666666666,
+    "98": 0.42424242424242425,
+    "99": 0.24242424242424243,
+    "100": 0.24242424242424243,
+    "101": 0.3484848484848485,
+    "102": 0.3333333333333333,
+    "103": 0.36363636363636365,
+    "104": 0.32727272727272727,
+    "105": 0.3090909090909091,
+    "106": 0.4727272727272727,
+    "107": 0.5454545454545454,
+    "108": 0.18181818181818182,
+    "109": 0.3333333333333333,
+    "110": 0.3111111111111111,
+    "111": 0.4444444444444444,
+    "112": 0.2,
+    "113": 0.28888888888888886,
+    "114": 0.2,
+    "115": 0.2222222222222222,
+    "116": 0.3055555555555556,
+    "117": 0.5,
+    "118": 0.3055555555555556,
+    "119": 0.4444444444444444,
+    "120": 0.3888888888888889,
+    "121": 0.3333333333333333,
+    "122": 0.4166666666666667,
+    "123": 0.35714285714285715,
+    "124": 0.42857142857142855,
+    "125": 0.39285714285714285,
+    "126": 0.2857142857142857,
+    "127": 0.5357142857142857,
+    "128": 0.42857142857142855,
+    "129": 0.5,
+    "130": 0.25,
+    "131": 0.6785714285714286,
+    "132": 0.35714285714285715,
+    "133": 0.5238095238095238,
+    "134": 0.2857142857142857,
     "135": 0.2857142857142857,
-    "136": 0.5238095238095238,
-    "137": 0.2857142857142857,
-    "138": 0.2857142857142857,
-    "139": 0.5333333333333333,
+    "136": 0.5714285714285714,
+    "137": 0.5333333333333333,
+    "138": 0.5333333333333333,
+    "139": 0.6666666666666666,
     "140": 0.4666666666666667,
     "141": 0.4666666666666667,
     "142": 0.6,
-    "143": 0.3333333333333333,
-    "144": 0.6,
-    "145": 0.5,
-    "146": 0.4,
-    "147": 0.6,
+    "143": 0.5333333333333333,
+    "144": 0.5333333333333333,
+    "145": 0.3333333333333333,
+    "146": 0.6,
+    "147": 0.5,
     "148": 0.4,
-    "149": 0.4,
-    "150": 0.7,
+    "149": 0.6,
+    "150": 0.4,
     "151": 0.4,
-    "152": 0.5,
-    "153": 0.5,
-    "154": 0.6,
-    "155": 0.8333333333333334,
-    "156": 0.5,
-    "157": 0.5,
-    "158": 0.5,
+    "152": 0.7,
+    "153": 0.4,
+    "154": 0.5,
+    "155": 0.5,
+    "156": 0.6,
+    "157": 0.8333333333333334,
+    "158": 0.6666666666666666,
     "159": 0.5,
-    "160": 0.6666666666666666,
-    "161": 0.6666666666666666,
-    "162": 0.6666666666666666,
-    "163": 1.0,
-    "164": 1.0,
+    "160": 0.5,
+    "161": 0.5,
+    "162": 0.5,
+    "163": 0.6666666666666666,
+    "164": 0.6666666666666666,
     "165": 0.6666666666666666,
-    "166": 0.6666666666666666,
+    "166": 1.0,
     "167": 1.0,
     "168": 0.6666666666666666,
     "169": 0.6666666666666666,
     "170": 1.0,
-    "171": 1.0,
-    "172": 1.0,
+    "171": 0.6666666666666666,
+    "172": 0.6666666666666666,
     "173": 1.0,
     "174": 1.0,
     "175": 1.0,
@@ -4286,7 +4322,24 @@
     "199": 1.0,
     "200": 1.0,
     "201": 1.0,
-    "202": 1.0
+    "202": 1.0,
+    "203": 1.0,
+    "204": 1.0,
+    "205": 1.0,
+    "206": 1.0,
+    "207": 1.0,
+    "208": 1.0,
+    "209": 1.0,
+    "210": 1.0,
+    "211": 1.0,
+    "212": 1.0,
+    "213": 1.0,
+    "214": 1.0,
+    "215": 1.0,
+    "216": 1.0,
+    "217": 1.0,
+    "218": 1.0,
+    "219": 1.0
   },
   "gods": [
     {
@@ -4342,6 +4395,39 @@
   ],
   "surprises": [
     {
+      "source": "test_make_hash_accepts_generator_large_input_sanity()",
+      "target": "make_hash()",
+      "source_files": [
+        "tests/test_hashing_incremental.py",
+        "core/hashing.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities; peripheral node `test_make_hash_accepts_generator_large_input_sanity()` unexpectedly reaches hub `make_hash()`"
+    },
+    {
+      "source": "test_make_hash_deterministic_repeated_calls()",
+      "target": "make_hash()",
+      "source_files": [
+        "tests/test_hashing_incremental.py",
+        "core/hashing.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities; peripheral node `test_make_hash_deterministic_repeated_calls()` unexpectedly reaches hub `make_hash()`"
+    },
+    {
+      "source": "test_make_hash_is_order_sensitive_contract()",
+      "target": "make_hash()",
+      "source_files": [
+        "tests/test_hashing_incremental.py",
+        "core/hashing.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities; peripheral node `test_make_hash_is_order_sensitive_contract()` unexpectedly reaches hub `make_hash()`"
+    },
+    {
       "source": "load_join_key_policies()",
       "target": "Path",
       "source_files": [
@@ -4362,43 +4448,10 @@
       "confidence": "INFERRED",
       "relation": "calls",
       "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `test_blank_unit_system_excluded()` unexpectedly reaches hub `_build_segments()`"
-    },
-    {
-      "source": "test_level1_segments_present()",
-      "target": "_build_segments()",
-      "source_files": [
-        "tests/test_build_segment_manifest.py",
-        "tools/build_segment_manifest.py"
-      ],
-      "confidence": "INFERRED",
-      "relation": "calls",
-      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `test_level1_segments_present()` unexpectedly reaches hub `_build_segments()`"
-    },
-    {
-      "source": "test_level1_file_counts()",
-      "target": "_build_segments()",
-      "source_files": [
-        "tests/test_build_segment_manifest.py",
-        "tools/build_segment_manifest.py"
-      ],
-      "confidence": "INFERRED",
-      "relation": "calls",
-      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `test_level1_file_counts()` unexpectedly reaches hub `_build_segments()`"
-    },
-    {
-      "source": "test_level2_run_type_below_min()",
-      "target": "_build_segments()",
-      "source_files": [
-        "tests/test_build_segment_manifest.py",
-        "tools/build_segment_manifest.py"
-      ],
-      "confidence": "INFERRED",
-      "relation": "calls",
-      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `test_level2_run_type_below_min()` unexpectedly reaches hub `_build_segments()`"
     }
   ],
   "tokens": {
-    "input": 96843,
-    "output": 2794
+    "input": 97050,
+    "output": 3096
   }
 }
