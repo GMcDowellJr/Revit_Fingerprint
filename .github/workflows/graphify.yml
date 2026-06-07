@@ -40,6 +40,10 @@ jobs:
         run: |
           graphify . --no-viz --backend ollama
 
+      - name: Generate HTML visualization
+        run: |
+          graphify export html
+
       - name: Commit graph to main
         run: |
           git config user.name "github-actions[bot]"
@@ -50,10 +54,6 @@ jobs:
           git add -f graphify-out/GRAPH_REPORT.md 2>/dev/null || true
           git diff --cached --quiet || git commit -m "chore: update knowledge graph [skip ci]"
           git push origin main
-
-      - name: Generate HTML visualization
-        run: |
-          graphify export html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
