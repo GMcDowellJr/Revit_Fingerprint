@@ -38,7 +38,7 @@ jobs:
 
       - name: Rebuild knowledge graph
         run: |
-          graphify . --no-viz --backend ollama
+          graphify . --no-viz --backend ollama --update
 
       - name: Cluster and generate report
         run: |
