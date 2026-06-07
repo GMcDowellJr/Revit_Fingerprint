@@ -36979,9 +36979,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "powershell_commands",
       "community": 195,
-      "norm_label": "powershell commands",
-      "id": "powershell_commands"
+      "norm_label": "powershell commands"
     },
     {
       "label": "Bundle Analysis Pipeline",
@@ -36992,9 +36992,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "bundle_analysis_pipeline",
       "community": 181,
-      "norm_label": "bundle analysis pipeline",
-      "id": "bundle_analysis_pipeline"
+      "norm_label": "bundle analysis pipeline"
     },
     {
       "label": "View Template Comparison Report",
@@ -37005,9 +37005,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "compare_templates_stand_alone",
       "community": 182,
-      "norm_label": "view template comparison report",
-      "id": "compare_templates_stand_alone"
+      "norm_label": "view template comparison report"
     },
     {
       "label": "Domain Probe Inventory",
@@ -37018,9 +37018,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "domain_probe_inventory",
       "community": 186,
-      "norm_label": "domain probe inventory",
-      "id": "domain_probe_inventory"
+      "norm_label": "domain probe inventory"
     }
   ],
   "links": [
