@@ -16809,7 +16809,7 @@
       "source_file": "tools/bundle_analysis/run_bundle_analysis.py",
       "source_location": "L276",
       "_origin": "ast",
-      "community": 78,
+      "community": 71,
       "norm_label": "_run_step2_to_step7()",
       "id": "bundle_analysis_run_bundle_analysis_run_step2_to_step7"
     },
@@ -17299,7 +17299,7 @@
       "source_file": "tools/bundle_analysis/step4_difference_sets.py",
       "source_location": "L1",
       "_origin": "ast",
-      "community": 78,
+      "community": 141,
       "norm_label": "step4_difference_sets.py",
       "id": "bundle_analysis_step4_difference_sets"
     },
@@ -17309,7 +17309,7 @@
       "source_file": "tools/bundle_analysis/step4_difference_sets.py",
       "source_location": "L17",
       "_origin": "ast",
-      "community": 78,
+      "community": 141,
       "norm_label": "emit_stub()",
       "id": "bundle_analysis_step4_difference_sets_emit_stub"
     },
@@ -17319,7 +17319,7 @@
       "source_file": "tools/bundle_analysis/step4_difference_sets.py",
       "source_location": "L17",
       "_origin": "ast",
-      "community": 78,
+      "community": 141,
       "norm_label": "path",
       "id": "tools_bundle_analysis_step4_difference_sets_py_path"
     },
@@ -17329,7 +17329,7 @@
       "source_file": "tools/bundle_analysis/step4_difference_sets.py",
       "source_location": "L140",
       "_origin": "ast",
-      "community": 78,
+      "community": 141,
       "norm_label": "_parse_args()",
       "id": "bundle_analysis_step4_difference_sets_parse_args"
     },
@@ -17339,7 +17339,7 @@
       "source_file": "tools/bundle_analysis/step4_difference_sets.py",
       "source_location": "L140",
       "_origin": "ast",
-      "community": 78,
+      "community": 141,
       "norm_label": "namespace",
       "id": "tools_bundle_analysis_step4_difference_sets_py_namespace"
     },
@@ -17349,7 +17349,7 @@
       "source_file": "tools/bundle_analysis/step4_difference_sets.py",
       "source_location": "L147",
       "_origin": "ast",
-      "community": 78,
+      "community": 141,
       "norm_label": "main()",
       "id": "bundle_analysis_step4_difference_sets_main"
     },
@@ -20569,7 +20569,7 @@
       "source_file": "tools/extractor.py",
       "source_location": "L474",
       "_origin": "ast",
-      "community": 27,
+      "community": 60,
       "norm_label": "_load_label_resolution_inputs()",
       "id": "tools_extractor_load_label_resolution_inputs"
     },
@@ -23259,7 +23259,7 @@
       "source_file": "tools/label_synthesis/label_resolver.py",
       "source_location": "L60",
       "_origin": "ast",
-      "community": 42,
+      "community": 60,
       "norm_label": "any",
       "id": "tools_label_synthesis_label_resolver_py_any"
     },
@@ -23349,7 +23349,7 @@
       "source_file": "tools/label_synthesis/label_resolver.py",
       "source_location": "L357",
       "_origin": "ast",
-      "community": 42,
+      "community": 60,
       "norm_label": "load_llm_cache()",
       "id": "label_synthesis_label_resolver_load_llm_cache"
     },
@@ -23359,7 +23359,7 @@
       "source_file": "tools/label_synthesis/label_resolver.py",
       "source_location": "L367",
       "_origin": "ast",
-      "community": 42,
+      "community": 60,
       "norm_label": "save_llm_cache()",
       "id": "label_synthesis_label_resolver_save_llm_cache"
     },
@@ -23369,7 +23369,7 @@
       "source_file": "tools/label_synthesis/label_resolver.py",
       "source_location": "L373",
       "_origin": "ast",
-      "community": 27,
+      "community": 60,
       "norm_label": "load_annotations()",
       "id": "label_synthesis_label_resolver_load_annotations"
     },
@@ -36958,9 +36958,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "architecture_domain_extractors",
       "community": 54,
-      "norm_label": "domain extractors",
-      "id": "architecture_domain_extractors"
+      "norm_label": "domain extractors"
     },
     {
       "label": "Context Builder",
@@ -36971,9 +36971,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "architecture_context_builder",
       "community": 54,
-      "norm_label": "context builder",
-      "id": "architecture_context_builder"
+      "norm_label": "context builder"
     },
     {
       "label": "Runner",
@@ -36984,9 +36984,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "architecture_runner",
       "community": 54,
-      "norm_label": "runner",
-      "id": "architecture_runner"
+      "norm_label": "runner"
     },
     {
       "label": "Unreleased",
@@ -36997,9 +36997,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "changelog_unreleased",
       "community": 142,
-      "norm_label": "unreleased",
-      "id": "changelog_unreleased"
+      "norm_label": "unreleased"
     },
     {
       "label": "Revit Fingerprint",
@@ -37010,9 +37010,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "revit_fingerprint",
       "community": 148,
-      "norm_label": "revit fingerprint",
-      "id": "revit_fingerprint"
+      "norm_label": "revit fingerprint"
     },
     {
       "label": "Core Principles",
@@ -37023,9 +37023,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "revit_fingerprint_core_principles",
       "community": 148,
-      "norm_label": "core principles",
-      "id": "revit_fingerprint_core_principles"
+      "norm_label": "core principles"
     },
     {
       "label": "Scope",
@@ -37036,9 +37036,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "revit_fingerprint_scope",
       "community": 148,
-      "norm_label": "scope",
-      "id": "revit_fingerprint_scope"
+      "norm_label": "scope"
     },
     {
       "label": "Execution Environment",
@@ -37049,9 +37049,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "revit_fingerprint_execution_environment",
       "community": 148,
-      "norm_label": "execution environment",
-      "id": "revit_fingerprint_execution_environment"
+      "norm_label": "execution environment"
     },
     {
       "label": "RevitLookup Descriptor \u2192 Fingerprint Domain Map",
@@ -37062,9 +37062,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "revit_lookup_domain_map",
       "community": 148,
-      "norm_label": "revitlookup descriptor \u2192 fingerprint domain map",
-      "id": "revit_lookup_domain_map"
+      "norm_label": "revitlookup descriptor \u2192 fingerprint domain map"
     },
     {
       "label": "graphify reference: extra exports and benchmark",
@@ -37075,9 +37075,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "references_exports",
       "community": 55,
-      "norm_label": "graphify reference: extra exports and benchmark",
-      "id": "references_exports"
+      "norm_label": "graphify reference: extra exports and benchmark"
     },
     {
       "label": "graphify reference: extraction subagent prompt",
@@ -37088,9 +37088,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "references_extraction_spec",
       "community": 55,
-      "norm_label": "graphify reference: extraction subagent prompt",
-      "id": "references_extraction_spec"
+      "norm_label": "graphify reference: extraction subagent prompt"
     },
     {
       "label": "graphify reference: GitHub clone and cross-repo merge",
@@ -37101,9 +37101,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "references_github_and_merge",
       "community": 55,
-      "norm_label": "graphify reference: github clone and cross-repo merge",
-      "id": "references_github_and_merge"
+      "norm_label": "graphify reference: github clone and cross-repo merge"
     },
     {
       "label": "graphify reference: commit hook and native CLAUDE.md integration",
@@ -37114,9 +37114,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "references_hooks",
       "community": 55,
-      "norm_label": "graphify reference: commit hook and native claude.md integration",
-      "id": "references_hooks"
+      "norm_label": "graphify reference: commit hook and native claude.md integration"
     },
     {
       "label": "graphify reference: query, path, explain",
@@ -37127,9 +37127,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "references_query",
       "community": 55,
-      "norm_label": "graphify reference: query, path, explain",
-      "id": "references_query"
+      "norm_label": "graphify reference: query, path, explain"
     },
     {
       "label": "graphify reference: transcribe video and audio",
@@ -37140,9 +37140,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "references_transcribe",
       "community": 55,
-      "norm_label": "graphify reference: transcribe video and audio",
-      "id": "references_transcribe"
+      "norm_label": "graphify reference: transcribe video and audio"
     },
     {
       "label": "graphify reference: incremental update and cluster-only",
@@ -37153,9 +37153,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "references_update",
       "community": 55,
-      "norm_label": "graphify reference: incremental update and cluster-only",
-      "id": "references_update"
+      "norm_label": "graphify reference: incremental update and cluster-only"
     },
     {
       "label": "pull request template",
@@ -37166,9 +37166,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "github_pull_request_template",
       "community": 55,
-      "norm_label": "pull request template",
-      "id": "github_pull_request_template"
+      "norm_label": "pull request template"
     },
     {
       "label": "feature PR \u2014 New or Extended Capability",
@@ -37179,9 +37179,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "github_pr_template_feature",
       "community": 55,
-      "norm_label": "feature pr \u2014 new or extended capability",
-      "id": "github_pr_template_feature"
+      "norm_label": "feature pr \u2014 new or extended capability"
     },
     {
       "label": "PATCH PR \u2014 Non-breaking only",
@@ -37192,9 +37192,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "github_pr_template_patch",
       "community": 55,
-      "norm_label": "patch pr \u2014 non-breaking only",
-      "id": "github_pr_template_patch"
+      "norm_label": "patch pr \u2014 non-breaking only"
     },
     {
       "label": "CI",
@@ -37205,9 +37205,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "github_workflows_ci",
       "community": 55,
-      "norm_label": "ci",
-      "id": "github_workflows_ci"
+      "norm_label": "ci"
     },
     {
       "label": "Rebuild Knowledge Graph",
@@ -37218,9 +37218,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "github_workflows_graphify",
       "community": 55,
-      "norm_label": "rebuild knowledge graph",
-      "id": "github_workflows_graphify"
+      "norm_label": "rebuild knowledge graph"
     },
     {
       "label": "Phase 2 Join Keys \u2014 Hypotheses & External Feasibility",
@@ -37231,9 +37231,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "contracts_phase2_join_keys",
       "community": 55,
-      "norm_label": "phase 2 join keys \u2014 hypotheses & external feasibility",
-      "id": "contracts_phase2_join_keys"
+      "norm_label": "phase 2 join keys \u2014 hypotheses & external feasibility"
     },
     {
       "label": "Record Contract v2 (record.v2)",
@@ -37244,9 +37244,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "contracts_record_contract_v2",
       "community": 55,
-      "norm_label": "record contract v2 (record.v2)",
-      "id": "contracts_record_contract_v2"
+      "norm_label": "record contract v2 (record.v2)"
     },
     {
       "label": "central_path_norm Rule (v2.1)",
@@ -37257,9 +37257,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "docs_central_path_norm_rule",
       "community": 55,
-      "norm_label": "central_path_norm rule (v2.1)",
-      "id": "docs_central_path_norm_rule"
+      "norm_label": "central_path_norm rule (v2.1)"
     },
     {
       "label": "CSV Contract v2.1 (Option 2 joinable split-analysis)",
@@ -37270,9 +37270,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "docs_csv_contract_v2_1",
       "community": 55,
-      "norm_label": "csv contract v2.1 (option 2 joinable split-analysis)",
-      "id": "docs_csv_contract_v2_1"
+      "norm_label": "csv contract v2.1 (option 2 joinable split-analysis)"
     },
     {
       "label": "Metrics",
@@ -37283,9 +37283,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "docs_metrics",
       "community": 55,
-      "norm_label": "metrics",
-      "id": "docs_metrics"
+      "norm_label": "metrics"
     },
     {
       "label": "Pattern ID and Label Rules (v2.1)",
@@ -37296,9 +37296,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "docs_pattern_id_and_label_rules",
       "community": 55,
-      "norm_label": "pattern id and label rules (v2.1)",
-      "id": "docs_pattern_id_and_label_rules"
+      "norm_label": "pattern id and label rules (v2.1)"
     },
     {
       "label": "Split export removed",
@@ -37309,9 +37309,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "docs_split_export",
       "community": 55,
-      "norm_label": "split export removed",
-      "id": "docs_split_export"
+      "norm_label": "split export removed"
     },
     {
       "label": "V2.1 Analysis Schema",
@@ -37322,9 +37322,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "docs_v21_analysis_schema",
       "community": 55,
-      "norm_label": "v2.1 analysis schema",
-      "id": "docs_v21_analysis_schema"
+      "norm_label": "v2.1 analysis schema"
     },
     {
       "label": "V2.1 Determinism & Identity",
@@ -37335,9 +37335,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "docs_v21_determinism_and_identity",
       "community": 55,
-      "norm_label": "v2.1 determinism & identity",
-      "id": "docs_v21_determinism_and_identity"
+      "norm_label": "v2.1 determinism & identity"
     },
     {
       "label": "Bundle Analysis Pipeline",
@@ -37348,9 +37348,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "id": "bundle_analysis",
       "community": 37,
-      "norm_label": "bundle analysis pipeline",
-      "id": "bundle_analysis"
+      "norm_label": "bundle analysis pipeline"
     }
   ],
   "links": [
