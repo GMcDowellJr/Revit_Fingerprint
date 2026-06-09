@@ -101,8 +101,24 @@ def _resolve_segment_paths(
     seg_out = segments_root / output_folder
     ba_root = seg_out / "results" / "bundle_analysis" / purge_view
     domain_patterns_path = seg_out / "results" / "analysis" / "domain_patterns.csv"
-    records_csv = records_dir / "records.csv"
-    identity_items_dir = records_dir / "identity_items_by_domain"
+
+    # Prefer segment-scoped records (authoritative source for this segment's
+    # domain_patterns.csv / bundles.csv); fall back to corpus-level if the
+    # segment hasn't been presharded yet.
+    seg_records_dir = seg_out / "results" / "records"
+    preshard_marker = seg_records_dir / ".preshard_complete"
+    if preshard_marker.is_file():
+        records_csv = seg_records_dir / "records.csv"
+        identity_items_dir = seg_records_dir / "identity_items_by_domain"
+    else:
+        print(
+            f"[WARN] {preshard_marker} not found; falling back to corpus-level "
+            f"records under {records_dir}",
+            file=sys.stderr,
+        )
+        records_csv = records_dir / "records.csv"
+        identity_items_dir = records_dir / "identity_items_by_domain"
+
     label_synth_dir = records_dir.parent / "label_synthesis"
 
     return segment_id, ba_root, domain_patterns_path, records_csv, identity_items_dir, label_synth_dir
