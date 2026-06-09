@@ -79,27 +79,26 @@ def _int_safe(val: str) -> int:
 # ---------------------------------------------------------------------------
 
 def _resolve_segment_paths(
-    segment_id: str,
+    output_folder: str,
     segments_root: Path,
     records_dir: Path,
     purge_view: str,
-) -> Tuple[Path, Path, Path, Path, Path]:
+) -> Tuple[str, Path, Path, Path, Path, Path]:
     """
-    Returns (ba_root, domain_patterns_path, records_csv, identity_items_dir, label_synth_dir).
-    Raises SystemExit on missing registry or unknown segment_id.
+    Returns (segment_id, ba_root, domain_patterns_path, records_csv,
+             identity_items_dir, label_synth_dir).
+    Raises SystemExit on missing registry or unknown output_folder.
     """
     registry_path = records_dir / "run_registry.csv"
     if not registry_path.exists():
         raise SystemExit(f"run_registry.csv not found: {registry_path}")
 
     registry_rows = _read_csv(registry_path)
-    seg_row = next((r for r in registry_rows if r.get("segment_id") == segment_id), None)
+    seg_row = next((r for r in registry_rows if r.get("output_folder") == output_folder), None)
     if seg_row is None:
-        raise SystemExit(f"Segment '{segment_id}' not found in {registry_path}")
+        raise SystemExit(f"output_folder '{output_folder}' not found in {registry_path}")
 
-    output_folder = seg_row.get("output_folder", "")
-    if not output_folder:
-        raise SystemExit(f"Segment '{segment_id}' has empty output_folder in registry")
+    segment_id = seg_row.get("segment_id", "")
 
     seg_out = segments_root / output_folder
     ba_root = seg_out / "results" / "bundle_analysis" / purge_view
@@ -108,7 +107,7 @@ def _resolve_segment_paths(
     identity_items_dir = records_dir / "identity_items_by_domain"
     label_synth_dir = records_dir.parent / "label_synthesis"
 
-    return ba_root, domain_patterns_path, records_csv, identity_items_dir, label_synth_dir
+    return segment_id, ba_root, domain_patterns_path, records_csv, identity_items_dir, label_synth_dir
 
 
 # ---------------------------------------------------------------------------
@@ -429,7 +428,7 @@ def main() -> None:
             "for one segment into three BI-ready CSVs."
         )
     )
-    ap.add_argument("--segment", required=True, help="segment_id to process")
+    ap.add_argument("--output-folder", required=True, help="output_folder value from run_registry.csv")
     ap.add_argument("--segments-root", required=True, help="Path to segments output root")
     ap.add_argument("--records-dir", required=True, help="Path to corpus-level records dir")
     ap.add_argument("--out-dir", required=True, help="Output directory for the three CSVs")
@@ -462,8 +461,8 @@ def main() -> None:
     if not records_dir.is_dir():
         raise SystemExit(f"records-dir not found: {records_dir}")
 
-    ba_root, domain_patterns_path, records_csv, identity_items_dir, label_synth_dir = (
-        _resolve_segment_paths(args.segment, segments_root, records_dir, args.purge_view)
+    segment_id, ba_root, domain_patterns_path, records_csv, identity_items_dir, label_synth_dir = (
+        _resolve_segment_paths(args.output_folder, segments_root, records_dir, args.purge_view)
     )
 
     if args.domain:
@@ -485,7 +484,7 @@ def main() -> None:
 
     for domain in domains:
         inv, sett, names, nb, np_, jhi, jhn = _process_domain(
-            segment_id=args.segment,
+            segment_id=segment_id,
             domain=domain,
             purge_view=args.purge_view,
             ba_root=ba_root,
