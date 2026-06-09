@@ -106,7 +106,7 @@ def _resolve_segment_paths(
     domain_patterns_path = seg_out / "results" / "analysis" / "domain_patterns.csv"
     records_csv = records_dir / "records.csv"
     identity_items_dir = records_dir / "identity_items_by_domain"
-    label_synth_dir = records_dir / "label_synth"
+    label_synth_dir = records_dir.parent / "label_synthesis"
 
     return ba_root, domain_patterns_path, records_csv, identity_items_dir, label_synth_dir
 
