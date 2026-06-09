@@ -64,8 +64,6 @@ def _atomic_write_csv(
 # Helpers
 # ---------------------------------------------------------------------------
 
-_LARGE_FILE_BYTES = 50 * 1024 * 1024  # 50 MB
-
 
 def _int_safe(val: str) -> int:
     try:
@@ -195,32 +193,24 @@ def _iter_identity_csv(path: Path) -> Iterator[Dict[str, str]]:
 
 
 def _load_identity_items(
-    identity_items_dir: Path, domain: str
+    identity_items_dir: Path,
+    domain: str,
+    needed_keys: Set[Tuple[str, str]],
 ) -> Dict[Tuple[str, str], List[Dict[str, str]]]:
     """
-    (export_run_id, record_pk) → list of normalised item rows.
-
-    For shards >50 MB, rows are streamed directly into the dict rather than
-    being materialised as a list first.
+    Stream the domain shard and collect only rows whose (export_run_id, record_pk)
+    is in needed_keys.  Memory is bounded by the representative records actually
+    referenced by the in-scope bundles, not by the full shard size.
     """
     path = identity_items_dir / f"{domain}.csv"
-    if not path.exists():
+    if not path.exists() or not needed_keys:
         return {}
 
     result: Dict[Tuple[str, str], List[Dict[str, str]]] = {}
-    large = path.stat().st_size > _LARGE_FILE_BYTES
-
-    if large:
-        # Stream: never hold the entire file as a Python list
-        for row in _iter_identity_csv(path):
-            key = (row.get("export_run_id", ""), row.get("record_pk", ""))
+    for row in _iter_identity_csv(path):
+        key = (row.get("export_run_id", ""), row.get("record_pk", ""))
+        if key in needed_keys:
             result.setdefault(key, []).append(row)
-    else:
-        rows = list(_iter_identity_csv(path))
-        for row in rows:
-            key = (row.get("export_run_id", ""), row.get("record_pk", ""))
-            result.setdefault(key, []).append(row)
-
     return result
 
 
@@ -280,7 +270,6 @@ def _process_domain(
         )
         return [], [], [], 0, 0, 0, 0
 
-    # Load all domain-level data up front (once per domain)
     bundles = _read_csv(bundles_csv_path)
     if top_bundles is not None:
         bundles = [r for r in bundles if _int_safe(r.get("bundle_rank", "")) <= top_bundles]
@@ -288,8 +277,6 @@ def _process_domain(
     membership_rows = _read_csv(membership_csv_path)
     pattern_map = _load_pattern_map(domain_patterns_path, domain)
     rep_map = _load_representative_map(records_csv, domain)
-    identity_map = _load_identity_items(identity_items_dir, domain)
-    label_map = _load_label_population(label_synth_dir, domain)
 
     # bundle_id → [pattern_id, ...] from membership table
     bundle_to_patterns: Dict[str, List[str]] = {}
@@ -298,6 +285,18 @@ def _process_domain(
         pid = row.get("pattern_id", "")
         if bid and pid:
             bundle_to_patterns.setdefault(bid, []).append(pid)
+
+    # Determine the representative (export_run_id, record_pk) pairs referenced
+    # by the in-scope bundles so the identity shard is filtered while streaming.
+    needed_keys: Set[Tuple[str, str]] = set()
+    for brow in bundles:
+        for pid in bundle_to_patterns.get(brow.get("bundle_id", ""), []):
+            jh = pattern_map.get(pid, {}).get("join_hash", "")
+            if jh and jh in rep_map:
+                needed_keys.add(rep_map[jh])
+
+    identity_map = _load_identity_items(identity_items_dir, domain, needed_keys)
+    label_map = _load_label_population(label_synth_dir, domain)
 
     inventory_rows: List[Dict[str, str]] = []
     settings_rows: List[Dict[str, str]] = []
