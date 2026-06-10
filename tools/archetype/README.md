@@ -1,0 +1,345 @@
+# Cross-Domain Archetype Discovery Pipeline (`tools/archetype/`)
+
+Status date: 2026-06-10
+Scope: `tools/archetype/*.py` + `config/archetype/`
+Audience: Phase-2+ analysis users building the Power BI archetype slicer
+
+This pipeline answers: **"What governance archetype does this file behave
+like?"** It joins identity items across domains (e.g. dimension types ->
+arrowheads, wall types -> fill patterns, view filter applications -> view
+filter definitions) to detect recurring cross-domain configurations, turns
+those configurations into named **archetypes**, and classifies every file
+against the promoted archetypes for use as a Power BI slicer dimension.
+
+All outputs land under `Fingerprint_Out/archetype_analysis/`. All scripts
+take `--repo-root` plus explicit `--<input>`/`--out*` overrides, support
+`--dry-run`, and write CSV/JSON atomically (temp file + `os.replace`). Every
+stage logs row counts and skip/availability counts to stderr with a
+`[archetype:<stage>]` prefix.
+
+---
+
+## Two-pass methodology
+
+1. **join_hash grain (stages 1-3)** — classification. Cross-domain links
+   are resolved via `join_hash` (the cross-file identity unit; under the
+   current bootstrap join policy `join_hash == sig_hash`).
+2. **sig_hash grain (stage 4)** — validation. `archetype_validation*.csv`
+   re-resolves the same fired signals to `sig_hash` to check whether files
+   classified into the same archetype actually share the same underlying
+   configuration ("coherence").
+
+## Graceful degradation
+
+- An edge with `available == false` in `reference_graph.json` produces a
+  **null signal**, never an error. `build_cross_domain_items.py` skips it
+  entirely; `compute_cross_domain_cooccurrence.py` records
+  `n_*_unavailable == n_files_total` for it.
+- A file with zero fired signals for an archetype gets **no classification
+  row** for that archetype.
+- An archetype whose **required** signals are all unavailable emits only a
+  coverage-summary note (`"all_required_signals_unavailable"`), with
+  `n_files_no_evidence == n_files_total` and no per-file rows.
+- Missing optional inputs (e.g. `tests/output/vfd_dynamic_edges.csv`) are
+  treated as empty, not as errors.
+
+---
+
+## Config
+
+### `config/archetype/static_edges_seed.json`
+
+Hand-maintained seed list of **structural** cross-domain edges (no
+`available` flag — that's computed by stage 0). Each entry:
+
+```json
+{
+  "edge_id": "...",
+  "source_domain": "...",
+  "source_field": "...",          // identity_items item_key (or [*]-indexed pattern)
+  "target_domain": "...",
+  "edge_type": "structural",
+  "direction": "forward",
+  "field_match": "exact" | "indexed",
+  "requires_extraction": [...]     // human-visible caveats, e.g. hash-space mismatches
+}
+```
+
+Edges were derived directly from `make_identity_item()` calls in the
+relevant `domains/*.py` extractors (dimension_types, text_types,
+object_styles, line_styles, view_filter_applications_view_templates,
+compound_types/wall_types, materials, view_category_overrides_*).
+
+### `config/archetype/archetype_definitions.json` (hand-maintained, not generated)
+
+Reviewed/promoted archetype definitions consumed by stages 3 and 4. Only
+entries with `"promoted": true` are used. Produced by hand-editing/curating
+the output of `generate_archetype_candidates.py`
+(`archetype_definitions_candidates.json`) — copy promising candidates in,
+set `governance_question` / `approach_label`, flip `promoted` to `true`.
+
+---
+
+## Stage 0 — Build the reference graph
+
+### `generate_reference_graph.py`
+
+**Purpose**
+Resolve which cross-domain edges are actually backed by data in this
+export, and merge in dynamically-discovered View Filter Definition (VFD)
+edges.
+
+**Inputs**
+- `config/archetype/static_edges_seed.json`
+- `Fingerprint_Out/identity_items_by_domain/*.csv`
+- Optional: `tests/output/vfd_dynamic_edges.csv`,
+  `tests/output/vfd_param_inventory.csv`, `tests/output/bip_lookup.json`,
+  `tests/output/shared_param_names.json`
+
+**Output**
+- `Fingerprint_Out/archetype_analysis/reference_graph.json`
+  (`{schema_version, generated_utc, support_threshold, edge_count, edges:[...]}`)
+
+**What it does**
+- For each static edge, checks whether `source_field` appears as
+  `item_key` in the source domain's identity_items shard with at least one
+  row carrying a usable value (`item_value` not a sentinel and
+  `item_value_type == "ok"`); sets `available` + evidence counts
+  accordingly.
+- Builds **dynamic** edges from `vfd_dynamic_edges.csv`: drops
+  `kind == "project"` rows, applies `--support-threshold` (default 10) on
+  `file_count`, groups by `(param_id, target_domain)` into
+  `scope_conditions.{param_ids, category_ids}`. Param names resolve via
+  `bip_lookup.json` (for `bip:`-prefixed ids) or `shared_param_names.json`,
+  normalized into `edge_id = "vfd__{target_domain}.{param_name_normalized}"`.
+
+**Typical command**
+```
+python tools/archetype/generate_reference_graph.py --repo-root .
+```
+
+---
+
+## Stage 1 — Build per-file cross-domain join rows
+
+### `build_cross_domain_items.py`
+
+**Purpose**
+Materialize every place a (file, edge) pair actually fires, with the
+join hashes needed for downstream co-occurrence and classification.
+
+**Inputs**
+- `Fingerprint_Out/archetype_analysis/reference_graph.json`
+- `results/records/records.csv`
+- `Fingerprint_Out/identity_items_by_domain/*.csv`
+
+**Output**
+- `Fingerprint_Out/archetype_analysis/cross_domain_items.csv`
+  (`export_run_id, edge_id, source_domain, target_domain, source_record_pk,
+  source_join_hash, target_ref_value, target_join_hash`)
+
+**What it does**
+- Skips edges with `available == false` entirely.
+- **Structural edges**: filters identity_items where `item_key` matches
+  `source_field` (exact or `[*]`-indexed) and the value is usable. Joins
+  `records.csv` on `(export_run_id, domain=source_domain, record_pk)` for
+  `source_join_hash`, and again on `(domain=target_domain, sig_hash=item_value)`
+  for `target_join_hash`.
+- **Dynamic VFD edges**: per record, requires a `vf.rule[*].param_ref.id`
+  item matching `scope_conditions.param_ids` AND a `vf.categories` item
+  (comma-separated category ids) intersecting `scope_conditions.category_ids`.
+  `target_join_hash` is empty for dynamic edges.
+
+**Typical command**
+```
+python tools/archetype/build_cross_domain_items.py --repo-root .
+```
+
+---
+
+## Stage 2 — Compute co-occurrence and patterns
+
+### `compute_cross_domain_cooccurrence.py`
+
+**Purpose**
+Find which pairs of cross-domain edges tend to fire together, and which
+specific `join_hash` pairs recur often enough to be candidate archetypes.
+
+**Inputs**
+- `Fingerprint_Out/archetype_analysis/cross_domain_items.csv`
+- `Fingerprint_Out/archetype_analysis/reference_graph.json`
+
+**Outputs**
+- `Fingerprint_Out/archetype_analysis/cross_domain_edge_pairs.csv` —
+  edge-pair level: `n_both, n_a_only, n_b_only, n_neither,
+  n_a_unavailable, n_b_unavailable, support_pct, jaccard,
+  containment_a_in_b, containment_b_in_a`, computed for **every** pair of
+  edges in the reference graph (including unavailable ones, which
+  contribute `n_*_unavailable == n_files_total`).
+- `Fingerprint_Out/archetype_analysis/cross_domain_patterns.csv` —
+  `join_hash`-pair level, only for edge pairs with `n_both >=
+  --support-min-files` (default 5). `pattern_id` is an order-independent
+  md5 of the sorted `(edge_id, join_hash)` pair.
+
+**Typical command**
+```
+python tools/archetype/compute_cross_domain_cooccurrence.py --repo-root . --support-min-files 5
+```
+
+---
+
+## Stage 2.5 — Generate candidate archetype definitions
+
+### `generate_archetype_candidates.py`
+
+**Purpose**
+Turn recurring `(edge_id_a, edge_id_b)` patterns into draft archetype
+definitions for human review/promotion.
+
+**Inputs**
+- `Fingerprint_Out/archetype_analysis/cross_domain_patterns.csv`
+- `Fingerprint_Out/archetype_analysis/reference_graph.json`
+
+**Output**
+- `Fingerprint_Out/archetype_analysis/archetype_definitions_candidates.json`
+
+**What it does**
+- Groups pattern rows by `(edge_id_a, edge_id_b)`.
+- Derives a `governance_question_hint` from the pair's target domains
+  (checked in priority order):
+  - `wall_graphics` — either target domain contains `"wall_types"`
+  - `fill_pattern_usage` — either target domain starts with `"fill_patterns"`
+  - `line_pattern_usage` — either target domain == `"line_patterns"`
+  - `view_filter_strategy` — either target domain == `"view_filter_definitions"`
+  - otherwise `"unknown"`
+- Emits one candidate per cluster: `archetype_id` containing a `CANDIDATE`
+  marker, `promoted: false`, `auto_generated: true`, one signal stub per
+  edge, and the top `--top-n-join-hash-pairs` (default 5) join_hash pairs
+  by `file_count` for human inspection.
+
+**Typical command**
+```
+python tools/archetype/generate_archetype_candidates.py --repo-root . --top-n-join-hash-pairs 5
+```
+
+**Human step (manual, not scripted)**: review
+`archetype_definitions_candidates.json`, copy/curate promising candidates
+into `config/archetype/archetype_definitions.json`, set
+`governance_question` / `approach_label`, and flip `"promoted": true`.
+
+---
+
+## Stage 3 — Classify files against promoted archetypes
+
+### `assign_archetype_classifications.py`
+
+**Purpose**
+Produce the per-file archetype classification table that becomes the
+Power BI slicer dimension.
+
+**Inputs**
+- `Fingerprint_Out/archetype_analysis/cross_domain_items.csv`
+- `config/archetype/archetype_definitions.json` (only `promoted == true`)
+- `Fingerprint_Out/archetype_analysis/reference_graph.json`
+- `results/records/file_metadata.csv`
+
+**Outputs**
+- `Fingerprint_Out/archetype_analysis/archetype_classifications.csv` —
+  one row per `(export_run_id, archetype_id)` with `confidence_tier`,
+  `is_mixed`, `signals_fired`/`signals_absent`/`signals_null`,
+  plus `client_label`, `governance_role`, `discipline_label`,
+  `unit_system` from `file_metadata.csv`.
+- `Fingerprint_Out/archetype_analysis/archetype_coverage_summary.json` —
+  per-archetype `n_files_full` / `n_files_partial` / `n_files_no_evidence`
+  and `unavailable_signal_ids`.
+
+**What it does**
+For each promoted archetype and each candidate file (any file where a
+required signal's edge fired at least once anywhere):
+- Evaluates every signal as `unavailable` (edge unavailable),
+  `fired` (edge active for this file, and `join_hash` filter — if any —
+  matches the row's `source_join_hash`/`target_join_hash`), or `absent`.
+- Emits a row only if **at least one required signal fired**.
+- `confidence_tier = "Full"` if **all** required signals fired and
+  **no** signal is unavailable; otherwise `"Partial"`.
+- `is_mixed = true` when a file has more than one archetype row for the
+  same `governance_question`.
+
+**Typical command**
+```
+python tools/archetype/assign_archetype_classifications.py --repo-root .
+```
+
+---
+
+## Stage 4 — Validate signal coherence
+
+### `validate_archetype_signals.py`
+
+**Purpose**
+Sanity-check the join_hash-grain classifications by re-resolving fired
+signals to `sig_hash` and measuring how consistent the underlying
+configuration actually is across classified files.
+
+**Inputs**
+- `Fingerprint_Out/archetype_analysis/archetype_classifications.csv`
+- `Fingerprint_Out/archetype_analysis/cross_domain_items.csv`
+- `config/archetype/archetype_definitions.json` (only `promoted == true`,
+  used to map `signal_id -> edge_id`)
+- `results/records/records.csv`
+
+**Outputs**
+- `Fingerprint_Out/archetype_analysis/archetype_validation.csv` — one row
+  per `(archetype_id, signal_id)`:
+  - `n_files_classified` — distinct files where the signal fired
+  - `n_distinct_sig_hashes` — distinct resolved `sig_hash` values
+  - `coherence_score = n_distinct_sig_hashes / n_files_classified`
+  - `coherence_tier`: `Convergent` (`< 0.3`) | `Variable` (`0.3-0.8`) |
+    `Fragmented` (`>= 0.8`)
+  - `n_multi_instance_files` — files where the signal fired with more
+    than one distinct `join_hash`
+- `Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv` —
+  forensic detail, one row per `(export_run_id, archetype_id, signal_id,
+  source_join_hash)` with the resolved `sig_hash` and
+  `n_join_hashes_in_file`.
+
+**What it does**
+- Joins `records.csv` on `(export_run_id, domain=source_domain,
+  join_hash=source_join_hash)` to resolve `sig_hash`.
+- Low `coherence_score` = files in this archetype tend to share the same
+  underlying signal configuration (good for a "standard" archetype). High
+  scores indicate the signal varies a lot even among files classified the
+  same way — a candidate for archetype refinement or splitting.
+
+**Typical command**
+```
+python tools/archetype/validate_archetype_signals.py --repo-root .
+```
+
+---
+
+## Running the full pipeline
+
+```bash
+python tools/archetype/generate_reference_graph.py --repo-root .
+python tools/archetype/build_cross_domain_items.py --repo-root .
+python tools/archetype/compute_cross_domain_cooccurrence.py --repo-root .
+python tools/archetype/generate_archetype_candidates.py --repo-root .
+# --- human review/promotion of config/archetype/archetype_definitions.json ---
+python tools/archetype/assign_archetype_classifications.py --repo-root .
+python tools/archetype/validate_archetype_signals.py --repo-root .
+```
+
+## Shared helpers
+
+### `_common.py`
+
+Internal module (not a CLI entrypoint) shared by all stages:
+- `read_csv_rows`, `read_json`, `atomic_write_csv`, `atomic_write_json` —
+  IO with the same atomic-write pattern as `tools/compare_cross_segment.py`.
+- `is_valid_item(item_value, item_value_type)` — sentinel/quality filter
+  for identity_items rows.
+- `field_matches(item_key, source_field, field_match)` — exact or
+  `[*]`-indexed item_key matching.
+- `slugify(value)` — used to build `CANDIDATE__...` archetype ids.
+- `log(stage, msg)` — `[archetype:<stage>]`-prefixed stderr logging.
