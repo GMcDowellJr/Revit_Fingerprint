@@ -12,16 +12,22 @@ Processing:
   - For each (edge_id_a, edge_id_b) edge pair appearing in
     cross_domain_patterns.csv, derive a governance_question_hint from the
     target domains touched by the pair:
-      target domain containing "wall_types"      -> wall_graphics
-      target domain starting with "fill_patterns" -> fill_pattern_usage
-      target domain == "line_patterns"            -> line_pattern_usage
-      target domain == "view_filter_definitions"  -> view_filter_strategy
-      otherwise                                    -> unknown
+      both target domains == "arrowheads"          -> arrowhead_consistency
+      target domain containing "wall_types"        -> wall_graphics
+      target domain starting with "fill_patterns"  -> fill_pattern_usage
+      target domain == "line_patterns"             -> line_pattern_usage
+      target domain == "view_filter_definitions"   -> view_filter_strategy
+      otherwise                                     -> unknown
     (checked against both target domains in the pair, in that priority order)
   - Patterns sharing the same (governance_question_hint, edge_id_a, edge_id_b)
     are clustered into one candidate archetype definition.
   - Each candidate gets archetype_id containing a "CANDIDATE" marker,
-    promoted=false, auto_generated=true, and one signal stub per edge.
+    promoted=false, auto_generated=true, and one signal stub per edge. Each
+    signal stub's join_hash is seeded from the top-ranked (by file_count)
+    cross_domain_patterns.csv row for that edge pair: signal for edge_id_a
+    gets that row's join_hash_a, signal for edge_id_b gets join_hash_b.
+    join_hash_populated is true iff that value is non-empty. This is a
+    starting point for human review, not a hard filter.
 
 Usage:
     python tools/archetype/generate_archetype_candidates.py \\
@@ -63,6 +69,8 @@ def _utc_now_iso() -> str:
 
 
 def _governance_question_hint(target_domain_a: str, target_domain_b: str) -> str:
+    if target_domain_a == "arrowheads" and target_domain_b == "arrowheads":
+        return "arrowhead_consistency"
     for hint, predicate in _HINT_PRIORITY:
         if predicate(target_domain_a) or predicate(target_domain_b):
             return hint
@@ -125,6 +133,10 @@ def main() -> int:
             for r in sorted_rows[: args.top_n_join_hash_pairs]
         ]
 
+        top_row = sorted_rows[0] if sorted_rows else {}
+        top_join_hash_a = top_row.get("join_hash_a", "")
+        top_join_hash_b = top_row.get("join_hash_b", "")
+
         candidates.append({
             "archetype_id": archetype_id,
             "governance_question": hint,
@@ -141,7 +153,8 @@ def main() -> int:
                     "source_domain": edge_a.get("source_domain", ""),
                     "target_domain": target_domain_a,
                     "required": True,
-                    "join_hash": None,
+                    "join_hash": top_join_hash_a or None,
+                    "join_hash_populated": bool(top_join_hash_a),
                 },
                 {
                     "signal_id": edge_id_b,
@@ -149,7 +162,8 @@ def main() -> int:
                     "source_domain": edge_b.get("source_domain", ""),
                     "target_domain": target_domain_b,
                     "required": True,
-                    "join_hash": None,
+                    "join_hash": top_join_hash_b or None,
+                    "join_hash_populated": bool(top_join_hash_b),
                 },
             ],
         })

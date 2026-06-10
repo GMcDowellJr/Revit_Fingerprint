@@ -169,17 +169,43 @@ specific `join_hash` pairs recur often enough to be candidate archetypes.
 - `Fingerprint_Out/archetype_analysis/cross_domain_items.csv`
 - `Fingerprint_Out/archetype_analysis/reference_graph.json`
 
+**Edge aliasing**
+Before pairs are enumerated, edges are collapsed onto a canonical edge_id
+where they represent the same underlying join in different partitions:
+- Edges whose `target_domain` is a `_drafting`/`_model` partition of the
+  same prefix and that share `(source_domain, source_field)` are collapsed
+  onto the `_drafting` edge (e.g. `fill_patterns_drafting` /
+  `fill_patterns_model`).
+- The `dimension_types_{linear,angular,radial,diameter}.tick_mark__arrowheads`
+  edges (same `source_field`/`target_domain`, different `source_domain`
+  partitions) are collapsed onto `dimension_types_linear`.
+
+Collapsed (non-canonical) edge_ids are dropped from the canonical edge set
+before pairs are enumerated; their fired/join_hash data is merged into the
+canonical edge.
+
+**Edge pair eligibility**
+Only canonical edge pairs satisfying one of the following are emitted (all
+others produce no rows in either output CSV):
+- `shared_target` — `edge_a.target_domain == edge_b.target_domain`
+- `chain` — `edge_a.target_domain == edge_b.source_domain` or vice versa
+- `whitelist` — the pair appears in `reference_graph.json`'s
+  `whitelisted_pairs` (defaults to `[]` if absent)
+
 **Outputs**
 - `Fingerprint_Out/archetype_analysis/cross_domain_edge_pairs.csv` —
   edge-pair level: `n_both, n_a_only, n_b_only, n_neither,
   n_a_unavailable, n_b_unavailable, support_pct, jaccard,
-  containment_a_in_b, containment_b_in_a`, computed for **every** pair of
-  edges in the reference graph (including unavailable ones, which
-  contribute `n_*_unavailable == n_files_total`).
+  containment_a_in_b, containment_b_in_a, pair_eligibility_reason`
+  (`shared_target` | `chain` | `whitelist`), computed for every **eligible**
+  canonical edge pair (including unavailable ones, which contribute
+  `n_*_unavailable == n_files_total`).
 - `Fingerprint_Out/archetype_analysis/cross_domain_patterns.csv` —
   `join_hash`-pair level, only for edge pairs with `n_both >=
   --support-min-files` (default 5). `pattern_id` is an order-independent
-  md5 of the sorted `(edge_id, join_hash)` pair.
+  md5 of the sorted `(edge_id, join_hash)` pair. `collapsed_edge_ids_a` /
+  `collapsed_edge_ids_b` list (pipe-separated) any non-canonical edge_ids
+  collapsed onto `edge_id_a`/`edge_id_b`.
 
 **Typical command**
 ```
@@ -207,6 +233,7 @@ definitions for human review/promotion.
 - Groups pattern rows by `(edge_id_a, edge_id_b)`.
 - Derives a `governance_question_hint` from the pair's target domains
   (checked in priority order):
+  - `arrowhead_consistency` — both target domains == `"arrowheads"`
   - `wall_graphics` — either target domain contains `"wall_types"`
   - `fill_pattern_usage` — either target domain starts with `"fill_patterns"`
   - `line_pattern_usage` — either target domain == `"line_patterns"`
@@ -215,7 +242,11 @@ definitions for human review/promotion.
 - Emits one candidate per cluster: `archetype_id` containing a `CANDIDATE`
   marker, `promoted: false`, `auto_generated: true`, one signal stub per
   edge, and the top `--top-n-join-hash-pairs` (default 5) join_hash pairs
-  by `file_count` for human inspection.
+  by `file_count` for human inspection. Each signal stub's `join_hash` is
+  seeded from the top-ranked (by `file_count`) `cross_domain_patterns.csv`
+  row for that edge pair (`join_hash_a` for edge_id_a's signal, `join_hash_b`
+  for edge_id_b's signal); `join_hash_populated` indicates whether that value
+  is non-empty. This is a starting point for human review, not a hard filter.
 
 **Typical command**
 ```
