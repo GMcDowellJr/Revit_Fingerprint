@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""Assign per-file archetype classifications based on cross-domain signals.
+
+Inputs:
+  - Fingerprint_Out/archetype_analysis/cross_domain_items.csv
+  - config/archetype/archetype_definitions.json (only promoted == true entries)
+  - Fingerprint_Out/archetype_analysis/reference_graph.json
+  - file_metadata.csv
+
+Outputs:
+  - Fingerprint_Out/archetype_analysis/archetype_classifications.csv
+  - Fingerprint_Out/archetype_analysis/archetype_coverage_summary.json
+
+Processing:
+  - Build a per-file active_edges set (edge_id -> set of (source_join_hash,
+    target_join_hash) pairs) from cross_domain_items.csv.
+  - Build a corpus-level unavailable_edges set from reference_graph.json
+    entries with available == false.
+  - For each (file, promoted archetype), evaluate each signal:
+      unavailable -- signal.edge_id in unavailable_edges
+      fired       -- edge_id active for this file, and (signal has no
+                      join_hash filter, or the filter matches the row's
+                      source_join_hash or target_join_hash)
+      absent      -- otherwise
+  - Emit a classification row only if at least one required signal fired.
+  - confidence_tier = "Full" if all required signals fired and no signal
+    (required or not) is unavailable; otherwise "Partial".
+  - is_mixed = true when a file has more than one archetype row for the
+    same governance_question.
+
+Usage:
+    python tools/archetype/assign_archetype_classifications.py \\
+        --repo-root . \\
+        --cross-domain-items Fingerprint_Out/archetype_analysis/cross_domain_items.csv \\
+        --archetype-definitions config/archetype/archetype_definitions.json \\
+        --reference-graph Fingerprint_Out/archetype_analysis/reference_graph.json \\
+        --file-metadata results/records/file_metadata.csv \\
+        --out-dir Fingerprint_Out/archetype_analysis \\
+        [--dry-run]
+"""
+from __future__ import annotations
+
+import argparse
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+from _common import (
+    log,
+    atomic_write_csv,
+    atomic_write_json,
+    read_csv_rows,
+    read_json,
+)
+
+STAGE = "assign_archetype_classifications"
+
+CLASSIFICATIONS_FIELDS = [
+    "export_run_id",
+    "archetype_id",
+    "governance_question",
+    "approach_label",
+    "confidence_tier",
+    "is_mixed",
+    "signals_fired",
+    "signals_absent",
+    "signals_null",
+    "n_signals_fired",
+    "n_signals_null",
+    "client_label",
+    "governance_role",
+    "discipline_label",
+    "unit_system",
+]
+
+
+def _evaluate_signal(
+    signal: Dict[str, Any],
+    file_edges: Dict[str, List[Tuple[str, str]]],
+    unavailable_edges: Set[str],
+) -> str:
+    edge_id = signal.get("edge_id", "")
+    if edge_id in unavailable_edges:
+        return "unavailable"
+
+    rows = file_edges.get(edge_id)
+    if not rows:
+        return "absent"
+
+    join_hash_filter = signal.get("join_hash")
+    if join_hash_filter is None:
+        return "fired"
+
+    for source_jh, target_jh in rows:
+        if join_hash_filter == source_jh or join_hash_filter == target_jh:
+            return "fired"
+    return "absent"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
+    ap.add_argument("--cross-domain-items", default=None, help="Path to cross_domain_items.csv")
+    ap.add_argument("--archetype-definitions", default=None, help="Path to archetype_definitions.json")
+    ap.add_argument("--reference-graph", default=None, help="Path to reference_graph.json")
+    ap.add_argument("--file-metadata", default=None, help="Path to file_metadata.csv")
+    ap.add_argument("--out-dir", default=None, help="Output directory")
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+
+    repo_root = Path(args.repo_root).resolve()
+    items_path = Path(args.cross_domain_items) if args.cross_domain_items else repo_root / "Fingerprint_Out" / "archetype_analysis" / "cross_domain_items.csv"
+    definitions_path = Path(args.archetype_definitions) if args.archetype_definitions else repo_root / "config" / "archetype" / "archetype_definitions.json"
+    reference_graph_path = Path(args.reference_graph) if args.reference_graph else repo_root / "Fingerprint_Out" / "archetype_analysis" / "reference_graph.json"
+    file_metadata_path = Path(args.file_metadata) if args.file_metadata else repo_root / "results" / "records" / "file_metadata.csv"
+    out_dir = Path(args.out_dir) if args.out_dir else repo_root / "Fingerprint_Out" / "archetype_analysis"
+
+    items_rows = read_csv_rows(items_path)
+    log(STAGE, f"loaded {len(items_rows)} rows from {items_path}")
+
+    definitions_doc = read_json(definitions_path, default={})
+    all_definitions = definitions_doc.get("archetypes", definitions_doc.get("candidates", [])) if isinstance(definitions_doc, dict) else []
+    if isinstance(definitions_doc, list):
+        all_definitions = definitions_doc
+    archetypes = [a for a in all_definitions if a.get("promoted") is True]
+    log(STAGE, f"loaded {len(all_definitions)} archetype definitions from {definitions_path}; {len(archetypes)} promoted")
+
+    reference_graph = read_json(reference_graph_path, default={})
+    edges = reference_graph.get("edges", []) if isinstance(reference_graph, dict) else []
+    unavailable_edges: Set[str] = {e["edge_id"] for e in edges if "edge_id" in e and not e.get("available")}
+    log(STAGE, f"unavailable_edges={len(unavailable_edges)}")
+
+    file_metadata_rows = read_csv_rows(file_metadata_path)
+    log(STAGE, f"loaded {len(file_metadata_rows)} rows from {file_metadata_path}")
+    file_meta_idx: Dict[str, Dict[str, str]] = {}
+    for r in file_metadata_rows:
+        eid = r.get("export_run_id", "")
+        if eid:
+            file_meta_idx[eid] = {
+                "client_label": r.get("client_label", ""),
+                "governance_role": r.get("governance_role", ""),
+                "discipline_label": r.get("discipline_label", ""),
+                "unit_system": r.get("unit_system", ""),
+            }
+
+    # export_run_id -> edge_id -> [(source_join_hash, target_join_hash), ...]
+    file_edges: Dict[str, Dict[str, List[Tuple[str, str]]]] = defaultdict(lambda: defaultdict(list))
+    # edge_id -> set of export_run_id where it fired
+    fired_files_by_edge: Dict[str, Set[str]] = defaultdict(set)
+    file_universe: Set[str] = set()
+    for row in items_rows:
+        eid = row.get("export_run_id", "")
+        edge_id = row.get("edge_id", "")
+        if not eid or not edge_id:
+            continue
+        file_universe.add(eid)
+        file_edges[eid][edge_id].append((row.get("source_join_hash", ""), row.get("target_join_hash", "")))
+        fired_files_by_edge[edge_id].add(eid)
+    file_universe |= set(file_meta_idx.keys())
+    n_files_total = len(file_universe)
+    log(STAGE, f"file_universe size={n_files_total}")
+
+    classification_rows: List[Dict[str, Any]] = []
+    coverage: Dict[str, Dict[str, Any]] = {}
+
+    for archetype in archetypes:
+        archetype_id = archetype.get("archetype_id", "")
+        governance_question = archetype.get("governance_question", "")
+        approach_label = archetype.get("approach_label", "")
+        signals = archetype.get("signals", []) or []
+        required_signals = [s for s in signals if s.get("required", True)]
+
+        signal_unavailable = {s.get("signal_id", s.get("edge_id", "")): (s.get("edge_id", "") in unavailable_edges) for s in signals}
+        unavailable_signal_ids = sorted(sid for sid, unavail in signal_unavailable.items() if unavail)
+
+        if required_signals and all(s.get("edge_id", "") in unavailable_edges for s in required_signals):
+            coverage[archetype_id] = {
+                "n_files_full": 0,
+                "n_files_partial": 0,
+                "n_files_no_evidence": n_files_total,
+                "unavailable_signal_ids": unavailable_signal_ids,
+                "note": "all_required_signals_unavailable",
+            }
+            log(STAGE, f"archetype={archetype_id}: all required signals unavailable; emitting summary note only")
+            continue
+
+        # Candidate files: union of files where any required signal's edge fired.
+        candidate_files: Set[str] = set()
+        for s in required_signals:
+            candidate_files |= fired_files_by_edge.get(s.get("edge_id", ""), set())
+
+        n_full = 0
+        n_partial = 0
+        for export_run_id in sorted(candidate_files):
+            edges_for_file = file_edges.get(export_run_id, {})
+            statuses: Dict[str, str] = {}
+            for s in signals:
+                signal_id = s.get("signal_id", s.get("edge_id", ""))
+                statuses[signal_id] = _evaluate_signal(s, edges_for_file, unavailable_edges)
+
+            required_ids = [s.get("signal_id", s.get("edge_id", "")) for s in required_signals]
+            any_required_fired = any(statuses[sid] == "fired" for sid in required_ids)
+            if not any_required_fired:
+                continue
+
+            all_required_fired = all(statuses[sid] == "fired" for sid in required_ids)
+            any_unavailable = any(v == "unavailable" for v in statuses.values())
+            confidence_tier = "Full" if (all_required_fired and not any_unavailable) else "Partial"
+            if confidence_tier == "Full":
+                n_full += 1
+            else:
+                n_partial += 1
+
+            signals_fired = sorted(sid for sid, st in statuses.items() if st == "fired")
+            signals_absent = sorted(sid for sid, st in statuses.items() if st == "absent")
+            signals_null = sorted(sid for sid, st in statuses.items() if st == "unavailable")
+
+            meta = file_meta_idx.get(export_run_id, {})
+            classification_rows.append({
+                "export_run_id": export_run_id,
+                "archetype_id": archetype_id,
+                "governance_question": governance_question,
+                "approach_label": approach_label,
+                "confidence_tier": confidence_tier,
+                "is_mixed": "false",
+                "signals_fired": ";".join(signals_fired),
+                "signals_absent": ";".join(signals_absent),
+                "signals_null": ";".join(signals_null),
+                "n_signals_fired": len(signals_fired),
+                "n_signals_null": len(signals_null),
+                "client_label": meta.get("client_label", ""),
+                "governance_role": meta.get("governance_role", ""),
+                "discipline_label": meta.get("discipline_label", ""),
+                "unit_system": meta.get("unit_system", ""),
+            })
+
+        coverage[archetype_id] = {
+            "n_files_full": n_full,
+            "n_files_partial": n_partial,
+            "n_files_no_evidence": n_files_total - n_full - n_partial,
+            "unavailable_signal_ids": unavailable_signal_ids,
+        }
+        log(STAGE, f"archetype={archetype_id}: full={n_full} partial={n_partial} no_evidence={n_files_total - n_full - n_partial}")
+
+    # is_mixed: file has >1 archetype row for the same governance_question
+    by_file_question: Dict[Tuple[str, str], int] = defaultdict(int)
+    for row in classification_rows:
+        by_file_question[(row["export_run_id"], row["governance_question"])] += 1
+    for row in classification_rows:
+        if by_file_question[(row["export_run_id"], row["governance_question"])] > 1:
+            row["is_mixed"] = "true"
+
+    log(STAGE, f"emitted {len(classification_rows)} classification rows for {len(archetypes)} promoted archetypes")
+
+    if args.dry_run:
+        log(STAGE, f"dry-run: would write {len(classification_rows)} rows and coverage for {len(coverage)} archetypes to {out_dir}")
+        return 0
+
+    atomic_write_csv(out_dir / "archetype_classifications.csv", CLASSIFICATIONS_FIELDS, classification_rows)
+    log(STAGE, f"wrote {len(classification_rows)} rows to {out_dir / 'archetype_classifications.csv'}")
+
+    atomic_write_json(out_dir / "archetype_coverage_summary.json", {"archetypes": coverage})
+    log(STAGE, f"wrote coverage summary for {len(coverage)} archetypes to {out_dir / 'archetype_coverage_summary.json'}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

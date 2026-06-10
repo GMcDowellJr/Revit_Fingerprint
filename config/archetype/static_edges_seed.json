@@ -1,0 +1,228 @@
+{
+  "schema_version": "1.0",
+  "description": "Hand-maintained seed list of structural cross-domain edges, mirroring extractor design. The 'available' flag is NOT stored here -- it is computed at runtime by generate_reference_graph.py from identity_items_by_domain/*.csv.",
+  "edges": [
+    {
+      "edge_id": "dimension_types_linear.tick_mark__arrowheads",
+      "source_domain": "dimension_types_linear",
+      "source_field": "dim_type.tick_mark_sig_hash",
+      "target_domain": "arrowheads",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "dimension_types_angular.tick_mark__arrowheads",
+      "source_domain": "dimension_types_angular",
+      "source_field": "dim_type.tick_mark_sig_hash",
+      "target_domain": "arrowheads",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "dimension_types_radial.tick_mark__arrowheads",
+      "source_domain": "dimension_types_radial",
+      "source_field": "dim_type.tick_mark_sig_hash",
+      "target_domain": "arrowheads",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "dimension_types_diameter.tick_mark__arrowheads",
+      "source_domain": "dimension_types_diameter",
+      "source_field": "dim_type.tick_mark_sig_hash",
+      "target_domain": "arrowheads",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "text_types.leader_arrowhead__arrowheads",
+      "source_domain": "text_types",
+      "source_field": "text_type.leader_arrowhead_sig_hash",
+      "target_domain": "arrowheads",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "object_styles_model.pattern_ref__line_patterns",
+      "source_domain": "object_styles_model",
+      "source_field": "obj_style.pattern_ref.sig_hash",
+      "target_domain": "line_patterns",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "object_styles_annotation.pattern_ref__line_patterns",
+      "source_domain": "object_styles_annotation",
+      "source_field": "obj_style.pattern_ref.sig_hash",
+      "target_domain": "line_patterns",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "line_styles.pattern_ref__line_patterns",
+      "source_domain": "line_styles",
+      "source_field": "line_style.pattern_ref.sig_hash",
+      "target_domain": "line_patterns",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "view_filter_applications_view_templates.stack_filter__view_filter_definitions",
+      "source_domain": "view_filter_applications_view_templates",
+      "source_field": "vfa.stack[*].filter_sig_hash",
+      "target_domain": "view_filter_definitions",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "indexed",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "wall_types.coarse_fill_pattern__fill_patterns_drafting",
+      "source_domain": "wall_types",
+      "source_field": "wt.coarse_fill_pattern_sig_hash",
+      "target_domain": "fill_patterns_drafting",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "wall_types.coarse_fill_pattern__fill_patterns_model",
+      "source_domain": "wall_types",
+      "source_field": "wt.coarse_fill_pattern_sig_hash",
+      "target_domain": "fill_patterns_model",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "materials.cut_foreground_pattern__fill_patterns_drafting",
+      "source_domain": "materials",
+      "source_field": "material.sig.cut_foreground_pattern.sig_hash",
+      "target_domain": "fill_patterns_drafting",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "materials.cut_foreground_pattern__fill_patterns_model",
+      "source_domain": "materials",
+      "source_field": "material.sig.cut_foreground_pattern.sig_hash",
+      "target_domain": "fill_patterns_model",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "materials.cut_background_pattern__fill_patterns_drafting",
+      "source_domain": "materials",
+      "source_field": "material.sig.cut_background_pattern.sig_hash",
+      "target_domain": "fill_patterns_drafting",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "materials.cut_background_pattern__fill_patterns_model",
+      "source_domain": "materials",
+      "source_field": "material.sig.cut_background_pattern.sig_hash",
+      "target_domain": "fill_patterns_model",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "materials.surface_foreground_pattern__fill_patterns_drafting",
+      "source_domain": "materials",
+      "source_field": "material.sig.surface_foreground_pattern.sig_hash",
+      "target_domain": "fill_patterns_drafting",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "materials.surface_foreground_pattern__fill_patterns_model",
+      "source_domain": "materials",
+      "source_field": "material.sig.surface_foreground_pattern.sig_hash",
+      "target_domain": "fill_patterns_model",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "materials.surface_background_pattern__fill_patterns_drafting",
+      "source_domain": "materials",
+      "source_field": "material.sig.surface_background_pattern.sig_hash",
+      "target_domain": "fill_patterns_drafting",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "materials.surface_background_pattern__fill_patterns_model",
+      "source_domain": "materials",
+      "source_field": "material.sig.surface_background_pattern.sig_hash",
+      "target_domain": "fill_patterns_model",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "object_styles_model.material__materials",
+      "source_domain": "object_styles_model",
+      "source_field": "obj_style.material_sig_hash",
+      "target_domain": "materials",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": [
+        "materials_hash_space_alignment"
+      ]
+    },
+    {
+      "edge_id": "view_category_overrides_model.baseline__object_styles_model",
+      "source_domain": "view_category_overrides_model",
+      "source_field": "vco.baseline_sig_hash",
+      "target_domain": "object_styles_model",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    },
+    {
+      "edge_id": "view_category_overrides_annotation.baseline__object_styles_annotation",
+      "source_domain": "view_category_overrides_annotation",
+      "source_field": "vco.baseline_sig_hash",
+      "target_domain": "object_styles_annotation",
+      "edge_type": "structural",
+      "direction": "forward",
+      "field_match": "exact",
+      "requires_extraction": []
+    }
+  ]
+}
