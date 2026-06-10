@@ -22,6 +22,9 @@ Processing:
     cross-product per file (distinct source_join_hash values per edge per
     file) and aggregate file_count per
     (edge_id_a, edge_id_b, source_join_hash_a, source_join_hash_b).
+    Only patterns whose own file_count >= --support-min-files are emitted to
+    cross_domain_patterns.csv (keeps one-off join_hash pairs out of
+    candidate generation even when the parent edge pair is common).
     pattern_id = md5 of "{edge_id}|{edge_id}|{join_hash}|{join_hash}" with the
     two (edge_id, join_hash) pairs sorted for order independence.
 
@@ -184,10 +187,12 @@ def main() -> int:
                         "target_domain_b": edge_b.get("target_domain", ""),
                     }
 
-    log(STAGE, f"computed {len(pairs_rows)} edge pairs; {len(pattern_counts)} join_hash-pair patterns above threshold={args.support_min_files}")
+    log(STAGE, f"computed {len(pairs_rows)} edge pairs; {len(pattern_counts)} candidate join_hash-pair patterns")
 
     patterns_rows: List[Dict[str, Any]] = []
     for (edge_id_a, edge_id_b, jh_a, jh_b), file_count in pattern_counts.items():
+        if file_count < args.support_min_files:
+            continue
         meta = pattern_meta[(edge_id_a, edge_id_b, jh_a, jh_b)]
         patterns_rows.append({
             "pattern_id": _pattern_id(edge_id_a, jh_a, edge_id_b, jh_b),
@@ -201,6 +206,8 @@ def main() -> int:
             "target_domain_b": meta["target_domain_b"],
             "file_count": file_count,
         })
+
+    log(STAGE, f"{len(patterns_rows)} join_hash-pair patterns at or above support threshold={args.support_min_files}")
 
     if args.dry_run:
         log(STAGE, f"dry-run: would write {len(pairs_rows)} edge pair rows and {len(patterns_rows)} pattern rows to {out_dir}")
