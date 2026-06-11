@@ -3,7 +3,7 @@
 
 Inputs:
   - config/archetype/static_edges_seed.json   (hand-maintained structural edges)
-  - identity_items_by_domain/*.csv            (per-domain identity item shards)
+  - results/records/identity_items_by_domain/*.csv  (per-domain identity item shards)
   - vfd_dynamic_edges.csv                     (optional; VFD param/category inventory)
   - vfd_param_inventory.csv                   (optional; VFD param occurrence inventory)
   - bip_lookup.json                           (optional; builtin parameter id -> name)
@@ -35,7 +35,7 @@ Processing:
 Usage:
     python tools/archetype/generate_reference_graph.py \\
         --repo-root . \\
-        --identity-items-dir Fingerprint_Out/identity_items_by_domain \\
+        --identity-items-dir results/records/identity_items_by_domain \\
         --static-edges config/archetype/static_edges_seed.json \\
         --out Fingerprint_Out/archetype_analysis/reference_graph.json \\
         [--vfd-dynamic-edges <path>] [--vfd-param-inventory <path>] \\
@@ -226,7 +226,7 @@ def _build_dynamic_edges(
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--repo-root", default=".", help="Repository root (used for default config/output paths)")
-    ap.add_argument("--identity-items-dir", default=None, help="Path to identity_items_by_domain/ (default: <repo-root>/Fingerprint_Out/identity_items_by_domain)")
+    ap.add_argument("--identity-items-dir", default=None, help="Path to identity_items_by_domain/ (default: <repo-root>/results/records/identity_items_by_domain)")
     ap.add_argument("--static-edges", default=None, help="Path to static_edges_seed.json (default: <repo-root>/config/archetype/static_edges_seed.json)")
     ap.add_argument("--out", default=None, help="Output path for reference_graph.json (default: <repo-root>/Fingerprint_Out/archetype_analysis/reference_graph.json)")
     ap.add_argument("--vfd-dynamic-edges", default=None, help="Path to vfd_dynamic_edges.csv")
@@ -238,7 +238,7 @@ def main() -> int:
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
-    identity_items_dir = Path(args.identity_items_dir) if args.identity_items_dir else repo_root / "Fingerprint_Out" / "identity_items_by_domain"
+    identity_items_dir = Path(args.identity_items_dir) if args.identity_items_dir else repo_root / "results" / "records" / "identity_items_by_domain"
     static_edges_path = Path(args.static_edges) if args.static_edges else repo_root / "config" / "archetype" / "static_edges_seed.json"
     out_path = Path(args.out) if args.out else repo_root / "Fingerprint_Out" / "archetype_analysis" / "reference_graph.json"
     vfd_dynamic_edges_path = Path(args.vfd_dynamic_edges) if args.vfd_dynamic_edges else repo_root / "tests" / "output" / "vfd_dynamic_edges.csv"

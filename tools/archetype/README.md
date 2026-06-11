@@ -91,7 +91,7 @@ edges.
 
 **Inputs**
 - `config/archetype/static_edges_seed.json`
-- `Fingerprint_Out/identity_items_by_domain/*.csv`
+- `results/records/identity_items_by_domain/*.csv`
 - Optional: `tests/output/vfd_dynamic_edges.csv`,
   `tests/output/vfd_param_inventory.csv`, `tests/output/bip_lookup.json`,
   `tests/output/shared_param_names.json`
@@ -136,7 +136,7 @@ join hashes needed for downstream co-occurrence and classification.
 **Inputs**
 - `Fingerprint_Out/archetype_analysis/reference_graph.json`
 - `results/records/records.csv`
-- `Fingerprint_Out/identity_items_by_domain/*.csv`
+- `results/records/identity_items_by_domain/*.csv`
 
 **Output**
 - `Fingerprint_Out/archetype_analysis/cross_domain_items.csv`

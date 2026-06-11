@@ -4,7 +4,7 @@
 Inputs:
   - Fingerprint_Out/archetype_analysis/reference_graph.json
   - records.csv
-  - identity_items_by_domain/*.csv
+  - results/records/identity_items_by_domain/*.csv
 
 Output:
   - Fingerprint_Out/archetype_analysis/cross_domain_items.csv
@@ -31,7 +31,7 @@ Usage:
         --repo-root . \\
         --reference-graph Fingerprint_Out/archetype_analysis/reference_graph.json \\
         --records-csv results/records/records.csv \\
-        --identity-items-dir Fingerprint_Out/identity_items_by_domain \\
+        --identity-items-dir results/records/identity_items_by_domain \\
         --out Fingerprint_Out/archetype_analysis/cross_domain_items.csv \\
         [--dry-run]
 """
@@ -182,7 +182,7 @@ def main() -> int:
     ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
     ap.add_argument("--reference-graph", default=None, help="Path to reference_graph.json")
     ap.add_argument("--records-csv", default=None, help="Path to records.csv")
-    ap.add_argument("--identity-items-dir", default=None, help="Path to identity_items_by_domain/")
+    ap.add_argument("--identity-items-dir", default=None, help="Path to identity_items_by_domain/ (default: <repo-root>/results/records/identity_items_by_domain)")
     ap.add_argument("--out", default=None, help="Output path for cross_domain_items.csv")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
@@ -190,7 +190,7 @@ def main() -> int:
     repo_root = Path(args.repo_root).resolve()
     reference_graph_path = Path(args.reference_graph) if args.reference_graph else repo_root / "Fingerprint_Out" / "archetype_analysis" / "reference_graph.json"
     records_csv_path = Path(args.records_csv) if args.records_csv else repo_root / "results" / "records" / "records.csv"
-    identity_items_dir = Path(args.identity_items_dir) if args.identity_items_dir else repo_root / "Fingerprint_Out" / "identity_items_by_domain"
+    identity_items_dir = Path(args.identity_items_dir) if args.identity_items_dir else repo_root / "results" / "records" / "identity_items_by_domain"
     out_path = Path(args.out) if args.out else repo_root / "Fingerprint_Out" / "archetype_analysis" / "cross_domain_items.csv"
 
     reference_graph = read_json(reference_graph_path, default={})
