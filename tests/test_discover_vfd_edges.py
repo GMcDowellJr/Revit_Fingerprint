@@ -58,15 +58,14 @@ def test_discover_vfd_edges_resolves_builtin_and_groups_edge(tmp_path):
     )
 
     edges = read_csv(out_dir / "vfd_dynamic_edges.csv")
-    assert len(edges) == 2
-    assert {edge["category_id"] for edge in edges} == {"-2000032", "-2000011"}
-    file_count_by_category = {edge["category_id"]: int(edge["file_count"]) for edge in edges}
-    assert file_count_by_category == {"-2000032": 1, "-2000011": 2}
-    for edge in edges:
-        assert edge["edge_id"] == "vfd.structural_material_param__materials"
-        assert edge["name_resolved"] == "true"
-        scope = json.loads(edge["scope_conditions"])
-        assert scope == {"param_ids": ["bip:-1005500"], "category_ids": [int(edge["category_id"])]}
+    assert len(edges) == 1
+    edge = edges[0]
+    assert edge["edge_id"] == "vfd.structural_material_param__materials"
+    assert edge["name_resolved"] == "true"
+    scope = json.loads(edge["scope_conditions"])
+    assert scope == {"param_ids": ["bip:-1005500"], "category_ids": [-2000032, -2000011]}
+    assert json.loads(edge["category_file_counts"]) == {"-2000032": 1, "-2000011": 2}
+    assert edge["file_count"] == "2"
 
 
 def test_discover_vfd_edges_without_shared_names_keeps_guid_out_of_edges(tmp_path):
@@ -165,10 +164,10 @@ def test_discover_vfd_edges_filters_hint_comments_and_exact_bip_lookup(tmp_path)
     assert inventory[0]["unrecognized_category_ids"] == ""
 
     edges = read_csv(out_dir / "vfd_dynamic_edges.csv")
-    assert edges
+    assert len(edges) == 1
     assert all(edge["target_domain"] == "materials" for edge in edges)
     assert all(edge["requires_human_review"] == "false" for edge in edges)
-    assert {edge["category_id"] for edge in edges} == {"-2000032", "-2000011"}
+    assert set(json.loads(edges[0]["scope_conditions"])["category_ids"]) == {-2000032, -2000011}
 
 def test_generated_dynamic_edges_include_category_id_for_reference_graph(tmp_path):
     import importlib.util
@@ -289,14 +288,13 @@ def test_discover_vfd_edges_keeps_same_name_param_categories_separate(tmp_path):
     )
 
     edges = read_csv(out_dir / "vfd_dynamic_edges.csv")
-    assert {(edge["param_id"], edge["category_id"]) for edge in edges} == {
-        (guid_a, "-2000011"),
-        (guid_b, "-2000032"),
-    }
+    edges_by_param = {edge["param_id"]: edge for edge in edges}
+    assert set(edges_by_param) == {guid_a, guid_b}
+    assert json.loads(edges_by_param[guid_a]["scope_conditions"])["category_ids"] == [-2000011]
+    assert json.loads(edges_by_param[guid_b]["scope_conditions"])["category_ids"] == [-2000032]
     for edge in edges:
         scope = json.loads(edge["scope_conditions"])
         assert scope["param_ids"] == [edge["param_id"]]
-        assert scope["category_ids"] == [int(edge["category_id"])]
 
 
 def test_discover_vfd_edges_applies_threshold_after_category_aggregation(tmp_path):
@@ -339,9 +337,9 @@ def test_discover_vfd_edges_applies_threshold_after_category_aggregation(tmp_pat
 
     edges = read_csv(out_dir / "vfd_dynamic_edges.csv")
     assert len(edges) == 1
-    assert edges[0]["category_id"] == "-2000011"
     assert edges[0]["file_count"] == "2"
     assert json.loads(edges[0]["scope_conditions"])["category_ids"] == [-2000011]
+    assert json.loads(edges[0]["category_file_counts"]) == {"-2000011": 2}
 
 
 def test_discover_vfd_edges_skips_edges_without_category_scope(tmp_path):
@@ -425,7 +423,7 @@ def test_discover_vfd_edges_ignores_unusable_category_rows(tmp_path):
 
     edges = read_csv(out_dir / "vfd_dynamic_edges.csv")
     assert len(edges) == 1
-    assert edges[0]["category_id"] == "-2000011"
+    assert json.loads(edges[0]["scope_conditions"])["category_ids"] == [-2000011]
 
 
 def test_discover_vfd_edges_ignores_unusable_param_ref_rows_with_item_quality(tmp_path):
@@ -508,10 +506,8 @@ def test_discover_vfd_edges_category_file_count_controls_generator_threshold(tmp
     )
 
     discovered_rows = read_csv(out_dir / "vfd_dynamic_edges.csv")
-    assert {row["category_id"]: row["file_count"] for row in discovered_rows} == {
-        "-2000011": "2",
-        "-2000032": "1",
-    }
+    assert len(discovered_rows) == 1
+    assert json.loads(discovered_rows[0]["category_file_counts"]) == {"-2000011": 2, "-2000032": 1}
 
     spec = importlib.util.spec_from_file_location(
         "generate_reference_graph", Path("tools/archetype/generate_reference_graph.py")

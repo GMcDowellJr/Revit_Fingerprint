@@ -11,9 +11,10 @@ Inputs:
 
 Outputs:
   - vfd_param_inventory.csv
-  - vfd_dynamic_edges.csv, including one category_id row per discovered
-    (edge, param_id, category_id) so generate_reference_graph.py can rebuild
-    dynamic scope_conditions.
+  - vfd_dynamic_edges.csv, one row per discovered (edge, param_id) with
+    scope_conditions.category_ids listing every supported category and
+    category_file_counts giving the per-category file support, so
+    generate_reference_graph.py can rebuild dynamic scope_conditions.
 
 The output CSVs are intended as offline inputs to generate_reference_graph.py.
 All paths are supplied at runtime; the category/domain reference files default
@@ -71,12 +72,12 @@ INVENTORY_FIELDS = [
 EDGE_FIELDS = [
     "edge_id",
     "param_id",
-    "category_id",
     "param_kind",
     "param_name",
     "param_name_normalized",
     "target_domain",
     "scope_conditions",
+    "category_file_counts",
     "file_count",
     "rule_count",
     "name_resolved",
@@ -670,27 +671,36 @@ def build_edge_rows(
             continue
 
         edge_id = f"vfd.{normalized}__{group['edge_domain_component']}"
+        category_file_counts = {
+            str(category_id): len(group["category_files"][category_id])
+            for category_id in supported_category_ids
+        }
+        supported_files: Set[str] = set()
+        total_rule_count = 0
         for category_id in supported_category_ids:
-            scope_conditions = json.dumps(
-                {"param_ids": [param_id], "category_ids": [category_id]},
-                separators=(",", ":"),
-            )
-            rows.append({
-                "edge_id": edge_id,
-                "param_id": param_id,
-                "category_id": category_id,
-                "param_kind": group["param_kind"],
-                "param_name": group["param_name"],
-                "param_name_normalized": normalized,
-                "target_domain": target_domain,
-                "scope_conditions": scope_conditions,
-                "file_count": len(group["category_files"][category_id]),
-                "rule_count": int(group["category_rule_counts"][category_id]),
-                "name_resolved": "true",
-                "target_domain_source": "|".join(group["target_domain_sources"]),
-                "target_domain_verified": bool_s(bool(group["target_domain_verified"])),
-                "requires_human_review": bool_s(bool(group["requires_human_review"])),
-            })
+            supported_files.update(group["category_files"][category_id])
+            total_rule_count += int(group["category_rule_counts"][category_id])
+
+        scope_conditions = json.dumps(
+            {"param_ids": [param_id], "category_ids": supported_category_ids},
+            separators=(",", ":"),
+        )
+        rows.append({
+            "edge_id": edge_id,
+            "param_id": param_id,
+            "param_kind": group["param_kind"],
+            "param_name": group["param_name"],
+            "param_name_normalized": normalized,
+            "target_domain": target_domain,
+            "scope_conditions": scope_conditions,
+            "category_file_counts": json.dumps(category_file_counts, separators=(",", ":")),
+            "file_count": len(supported_files),
+            "rule_count": total_rule_count,
+            "name_resolved": "true",
+            "target_domain_source": "|".join(group["target_domain_sources"]),
+            "target_domain_verified": bool_s(bool(group["target_domain_verified"])),
+            "requires_human_review": bool_s(bool(group["requires_human_review"])),
+        })
     return rows
 
 

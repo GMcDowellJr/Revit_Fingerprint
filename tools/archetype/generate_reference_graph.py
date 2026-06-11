@@ -18,10 +18,12 @@ Processing:
      shard with at least one row carrying a usable value
      (item_value not in {<NONE>, '', ...} and item_value_type == "ok").
      Indexed fields (source_field containing "[*]") use prefix/suffix matching.
-  2. Build dynamic edges from vfd_dynamic_edges.csv: exclude rows with
-     kind == "project", apply support_threshold (file_count >= threshold),
-     group by (param_id, target_domain) to produce scope_conditions with
-     param_ids and category_ids lists. Param names are resolved via
+  2. Build dynamic edges from vfd_dynamic_edges.csv: each row already
+     represents one (param_id, target_domain) edge with
+     scope_conditions.category_ids and category_file_counts; apply
+     support_threshold per category (category_file_counts[category_id] >=
+     threshold) to produce the final scope_conditions with param_ids and
+     category_ids lists. Param names are resolved via
      bip_lookup.json / shared_param_names.json. edge_id slug =
      "vfd__{target_domain}.{param_name_normalized}__{param_id_slug}", where
      param_id_slug is derived from param_id itself (normalized name for
@@ -46,10 +48,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-from collections import defaultdict
+import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 from _common import (
     field_matches,
@@ -155,47 +157,39 @@ def _build_dynamic_edges(
 
     log(STAGE, f"loaded {len(rows)} rows from {vfd_dynamic_edges_path}")
 
-    # group rows by (param_id, target_domain)
-    groups: Dict[Tuple[str, str], List[Dict[str, str]]] = defaultdict(list)
-    skipped_project_kind = 0
-    skipped_below_threshold = 0
-    for row in rows:
-        kind = (row.get("kind") or "").strip().lower()
-        if kind == "project":
-            skipped_project_kind += 1
-            continue
+    edges: List[Dict[str, Any]] = []
+    skipped_no_categories = 0
+    for row in sorted(rows, key=lambda r: ((r.get("param_id") or ""), (r.get("target_domain") or ""))):
         param_id = (row.get("param_id") or "").strip()
         target_domain = (row.get("target_domain") or "").strip()
         if not param_id or not target_domain:
             continue
+
         try:
-            file_count = int(float(row.get("file_count") or 0))
-        except (TypeError, ValueError):
-            file_count = 0
-        if file_count < support_threshold:
-            skipped_below_threshold += 1
-            continue
-        groups[(param_id, target_domain)].append(row)
+            scope = json.loads(row.get("scope_conditions") or "{}")
+        except json.JSONDecodeError:
+            scope = {}
+        try:
+            category_file_counts = json.loads(row.get("category_file_counts") or "{}")
+        except json.JSONDecodeError:
+            category_file_counts = {}
 
-    log(
-        STAGE,
-        f"dynamic edge grouping: {len(groups)} (param_id, target_domain) groups; "
-        f"skipped_project_kind={skipped_project_kind} skipped_below_threshold={skipped_below_threshold}",
-    )
-
-    edges: List[Dict[str, Any]] = []
-    for (param_id, target_domain), group_rows in sorted(groups.items()):
         category_ids: Set[str] = set()
         max_file_count = 0
-        for row in group_rows:
-            cat_id = (row.get("category_id") or "").strip()
-            if cat_id:
-                category_ids.add(cat_id)
+        for category_id in scope.get("category_ids", []) or []:
+            cat_id = str(category_id)
             try:
-                fc = int(float(row.get("file_count") or 0))
+                fc = int(float(category_file_counts.get(cat_id, 0)))
             except (TypeError, ValueError):
                 fc = 0
+            if fc < support_threshold:
+                continue
+            category_ids.add(cat_id)
             max_file_count = max(max_file_count, fc)
+
+        if not category_ids:
+            skipped_no_categories += 1
+            continue
 
         param_name = _resolve_param_name(param_id, bip_lookup, shared_param_names)
         param_name_normalized = _normalize_param_name(param_name)
@@ -220,6 +214,7 @@ def _build_dynamic_edges(
             "param_name": param_name,
         })
 
+    log(STAGE, f"dynamic edges built: {len(edges)}; skipped_no_categories={skipped_no_categories}")
     return edges
 
 
