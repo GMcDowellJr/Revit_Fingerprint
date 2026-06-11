@@ -669,21 +669,12 @@ def build_edge_rows(
         if not supported_category_ids:
             continue
 
-        supported_export_run_ids: Set[str] = set()
-        supported_rule_count = 0
-        for category_id in supported_category_ids:
-            supported_export_run_ids.update(group["category_files"][category_id])
-            supported_rule_count += int(group["category_rule_counts"][category_id])
-
-        category_ids_for_scope = supported_category_ids
-        category_id_values = category_ids_for_scope
         edge_id = f"vfd.{normalized}__{group['edge_domain_component']}"
-        file_count = len(supported_export_run_ids)
-        scope_conditions = json.dumps(
-            {"param_ids": [param_id], "category_ids": category_ids_for_scope},
-            separators=(",", ":"),
-        )
-        for category_id in category_id_values:
+        for category_id in supported_category_ids:
+            scope_conditions = json.dumps(
+                {"param_ids": [param_id], "category_ids": [category_id]},
+                separators=(",", ":"),
+            )
             rows.append({
                 "edge_id": edge_id,
                 "param_id": param_id,
@@ -693,8 +684,8 @@ def build_edge_rows(
                 "param_name_normalized": normalized,
                 "target_domain": target_domain,
                 "scope_conditions": scope_conditions,
-                "file_count": file_count,
-                "rule_count": supported_rule_count,
+                "file_count": len(group["category_files"][category_id]),
+                "rule_count": int(group["category_rule_counts"][category_id]),
                 "name_resolved": "true",
                 "target_domain_source": "|".join(group["target_domain_sources"]),
                 "target_domain_verified": bool_s(bool(group["target_domain_verified"])),
