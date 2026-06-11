@@ -27,10 +27,12 @@ Processing:
     (semicolon-separated signal_ids). For each fired signal, look up the
     cross_domain_items.csv rows for (export_run_id, canonical edge_id) to get
     the (source_domain, source_join_hash, target_join_hash) tuples that fired
-    the signal in that file. If the signal has a non-null join_hash filter,
-    rows are restricted to those whose source_join_hash or target_join_hash
-    matches it -- otherwise unrelated instances of the same edge in a file
-    (e.g. multiple dimension types or materials) would inflate
+    the signal in that file. If the signal has a non-wildcard join_hash
+    filter (i.e. join_hash is neither null nor empty -- same wildcard
+    semantics as Stage 3's _evaluate_signal), rows are restricted to those
+    whose source_join_hash or target_join_hash matches it -- otherwise
+    unrelated instances of the same edge in a file (e.g. multiple dimension
+    types or materials) would inflate
     n_distinct_sig_hashes / n_multi_instance_files.
   - Join records.csv on (export_run_id, domain=source_domain,
     join_hash=source_join_hash) to resolve sig_hash.
@@ -276,7 +278,7 @@ def main() -> int:
             edge_id_by_signal[(archetype_id, signal_id)] = edge_id
 
             pairs = items_idx.get((export_run_id, edge_id), [])
-            if join_hash_filter is not None:
+            if join_hash_filter:
                 pairs = [
                     p for p in pairs
                     if join_hash_filter == p[1] or join_hash_filter == p[2]
