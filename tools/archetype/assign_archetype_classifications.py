@@ -35,6 +35,12 @@ Processing:
   - Emit a classification row only if at least one required signal fired.
   - confidence_tier = "Full" if all required signals fired and no signal
     (required or not) is unavailable; otherwise "Partial".
+  - All-optional archetypes: if every signal on a promoted archetype has
+    required == false (e.g. all signals fell below the candidate generator's
+    low-coverage threshold), candidate_files and the "at least one required
+    signal fired" gate fall back to the union of all signals instead of
+    required signals. confidence_tier is always "Partial" for these rows
+    (an archetype with no required signals can never reach "Full").
   - is_mixed = true when a file has more than one archetype row for the
     same governance_question.
   - Null join_hash guard: for each promoted archetype, any signal whose
@@ -236,8 +242,12 @@ def main() -> int:
             continue
 
         # Candidate files: union of files where any required signal's edge fired.
+        # If no signals are required (e.g. all signals fell below the
+        # low-coverage threshold), fall back to the union over all signals so
+        # all-optional promoted archetypes still get classification rows.
+        gating_signals = required_signals if required_signals else signals
         candidate_files: Set[str] = set()
-        for s in required_signals:
+        for s in gating_signals:
             candidate_files |= fired_files_by_edge.get(s.get("edge_id", ""), set())
 
         n_full = 0
@@ -250,11 +260,18 @@ def main() -> int:
                 statuses[signal_id] = _evaluate_signal(s, edges_for_file, unavailable_edges)
 
             required_ids = [s.get("signal_id", s.get("edge_id", "")) for s in required_signals]
-            any_required_fired = any(statuses[sid] == "fired" for sid in required_ids)
+            if required_ids:
+                any_required_fired = any(statuses[sid] == "fired" for sid in required_ids)
+                all_required_fired = all(statuses[sid] == "fired" for sid in required_ids)
+            else:
+                # All-optional archetype: a row qualifies if any signal fired,
+                # but with no required signals it can never reach "Full".
+                all_signal_ids = [s.get("signal_id", s.get("edge_id", "")) for s in signals]
+                any_required_fired = any(statuses[sid] == "fired" for sid in all_signal_ids)
+                all_required_fired = False
             if not any_required_fired:
                 continue
 
-            all_required_fired = all(statuses[sid] == "fired" for sid in required_ids)
             any_unavailable = any(v == "unavailable" for v in statuses.values())
             confidence_tier = "Full" if (all_required_fired and not any_unavailable) else "Partial"
             if confidence_tier == "Full":
