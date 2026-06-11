@@ -73,6 +73,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from _common import (
     log,
     atomic_write_csv,
+    build_edge_aliases,
     read_csv_rows,
     read_json,
 )
@@ -100,79 +101,10 @@ PATTERNS_FIELDS = [
     "file_count",
 ]
 
-_DIM_TYPE_VARIANTS = ("linear", "angular", "radial", "diameter")
-
-
 def _pattern_id(edge_id_a: str, join_hash_a: str, edge_id_b: str, join_hash_b: str) -> str:
     pair = sorted([(edge_id_a, join_hash_a), (edge_id_b, join_hash_b)])
     raw = f"{pair[0][0]}|{pair[1][0]}|{pair[0][1]}|{pair[1][1]}"
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
-
-
-def _strip_partition_suffix(target_domain: str) -> Optional[str]:
-    """Strip a trailing "_drafting"/"_model" suffix; None if neither present."""
-    for suffix in ("_drafting", "_model"):
-        if target_domain.endswith(suffix):
-            return target_domain[: -len(suffix)]
-    return None
-
-
-def _build_edge_aliases(edges_by_id: Dict[str, Dict[str, Any]]) -> Tuple[Dict[str, str], Dict[str, List[str]]]:
-    """Build edge_id -> canonical_edge_id and canonical -> [collapsed edge_ids].
-
-    Two grouping passes (see module docstring):
-      1. fill_patterns_drafting/_model partition collapse (drafting canonical)
-      2. dimension_types_{linear,angular,radial,diameter} variant collapse
-         (linear canonical)
-    """
-    alias_of: Dict[str, str] = {}
-    collapsed: Dict[str, List[str]] = defaultdict(list)
-
-    # Pass 1: fill_patterns_drafting / fill_patterns_model collapse.
-    fill_groups: Dict[Tuple[str, str, str], List[str]] = defaultdict(list)
-    for edge_id, edge in edges_by_id.items():
-        prefix = _strip_partition_suffix(edge.get("target_domain", ""))
-        if prefix is None:
-            continue
-        fill_groups[(edge.get("source_domain", ""), edge.get("source_field", ""), prefix)].append(edge_id)
-
-    for edge_ids in fill_groups.values():
-        if len(edge_ids) < 2:
-            continue
-        canonical = next(
-            (e for e in edge_ids if edges_by_id[e].get("target_domain", "").endswith("_drafting")),
-            sorted(edge_ids)[0],
-        )
-        for e in edge_ids:
-            if e != canonical:
-                alias_of[e] = canonical
-                collapsed[canonical].append(e)
-
-    # Pass 2: dimension_types_{variant} tick_mark collapse (skip edges already aliased).
-    dim_groups: Dict[Tuple[str, str], List[str]] = defaultdict(list)
-    for edge_id, edge in edges_by_id.items():
-        if edge_id in alias_of:
-            continue
-        source_domain = edge.get("source_domain", "")
-        if any(source_domain == f"dimension_types_{variant}" for variant in _DIM_TYPE_VARIANTS):
-            dim_groups[(edge.get("source_field", ""), edge.get("target_domain", ""))].append(edge_id)
-
-    for edge_ids in dim_groups.values():
-        if len(edge_ids) < 2:
-            continue
-        canonical = next(
-            (e for e in edge_ids if edges_by_id[e].get("source_domain") == "dimension_types_linear"),
-            sorted(edge_ids)[0],
-        )
-        for e in edge_ids:
-            if e != canonical:
-                alias_of[e] = canonical
-                collapsed[canonical].append(e)
-
-    for canonical in collapsed:
-        collapsed[canonical].sort()
-
-    return alias_of, dict(collapsed)
 
 
 def _eligibility_reason(
@@ -219,7 +151,7 @@ def main() -> int:
     edges_by_id: Dict[str, Dict[str, Any]] = {e["edge_id"]: e for e in edges if "edge_id" in e}
     log(STAGE, f"loaded {len(edges_by_id)} edges from {reference_graph_path}")
 
-    alias_of, collapsed = _build_edge_aliases(edges_by_id)
+    alias_of, collapsed = build_edge_aliases(edges_by_id)
     if alias_of:
         log(STAGE, f"collapsed {len(alias_of)} edges onto {len(collapsed)} canonical edges: {alias_of}")
 

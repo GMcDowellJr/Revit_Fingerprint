@@ -5,6 +5,7 @@ Inputs:
   - Fingerprint_Out/archetype_analysis/archetype_classifications.csv
   - Fingerprint_Out/archetype_analysis/cross_domain_items.csv
   - config/archetype/archetype_definitions.json (only promoted == true entries)
+  - Fingerprint_Out/archetype_analysis/reference_graph.json
   - results/records/records.csv
 
 Outputs:
@@ -12,12 +13,22 @@ Outputs:
   - Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv
 
 Processing:
-  - For each promoted archetype, build signal_id -> edge_id from its signals.
+  - Build an edge alias map from reference_graph.json (see
+    compute_cross_domain_cooccurrence.py / _common.build_edge_aliases).
+    Promoted archetype signals reference canonical edge_ids; cross_domain_items.csv
+    rows for edges collapsed onto a canonical edge_id are folded into it when
+    indexing by (export_run_id, edge_id).
+  - For each promoted archetype, build signal_id -> (edge_id, join_hash)
+    from its signals.
   - For each archetype_classifications.csv row, split signals_fired
     (semicolon-separated signal_ids). For each fired signal, look up the
-    cross_domain_items.csv rows for (export_run_id, edge_id) to get the
-    (source_domain, source_join_hash) pairs that fired the signal in that
-    file.
+    cross_domain_items.csv rows for (export_run_id, canonical edge_id) to get
+    the (source_domain, source_join_hash, target_join_hash) tuples that fired
+    the signal in that file. If the signal has a non-null join_hash filter,
+    rows are restricted to those whose source_join_hash or target_join_hash
+    matches it -- otherwise unrelated instances of the same edge in a file
+    (e.g. multiple dimension types or materials) would inflate
+    n_distinct_sig_hashes / n_multi_instance_files.
   - Join records.csv on (export_run_id, domain=source_domain,
     join_hash=source_join_hash) to resolve sig_hash.
   - archetype_validation_detail.csv: one row per
@@ -53,6 +64,7 @@ from typing import Any, Dict, List, Set, Tuple
 from _common import (
     log,
     atomic_write_csv,
+    build_edge_aliases,
     read_csv_rows,
     read_json,
 )
@@ -96,6 +108,7 @@ def main() -> int:
     ap.add_argument("--archetype-classifications", default=None, help="Path to archetype_classifications.csv")
     ap.add_argument("--cross-domain-items", default=None, help="Path to cross_domain_items.csv")
     ap.add_argument("--archetype-definitions", default=None, help="Path to archetype_definitions.json")
+    ap.add_argument("--reference-graph", default=None, help="Path to reference_graph.json")
     ap.add_argument("--records-csv", default=None, help="Path to records.csv")
     ap.add_argument("--out-dir", default=None, help="Output directory")
     ap.add_argument("--dry-run", action="store_true")
@@ -105,6 +118,7 @@ def main() -> int:
     classifications_path = Path(args.archetype_classifications) if args.archetype_classifications else repo_root / "Fingerprint_Out" / "archetype_analysis" / "archetype_classifications.csv"
     items_path = Path(args.cross_domain_items) if args.cross_domain_items else repo_root / "Fingerprint_Out" / "archetype_analysis" / "cross_domain_items.csv"
     definitions_path = Path(args.archetype_definitions) if args.archetype_definitions else repo_root / "config" / "archetype" / "archetype_definitions.json"
+    reference_graph_path = Path(args.reference_graph) if args.reference_graph else repo_root / "Fingerprint_Out" / "archetype_analysis" / "reference_graph.json"
     records_csv_path = Path(args.records_csv) if args.records_csv else repo_root / "results" / "records" / "records.csv"
     out_dir = Path(args.out_dir) if args.out_dir else repo_root / "Fingerprint_Out" / "archetype_analysis"
 
@@ -121,12 +135,19 @@ def main() -> int:
     archetypes = [a for a in all_definitions if a.get("promoted") is True]
     log(STAGE, f"loaded {len(all_definitions)} archetype definitions from {definitions_path}; {len(archetypes)} promoted")
 
-    # archetype_id -> signal_id -> edge_id
-    signal_edge_by_archetype: Dict[str, Dict[str, str]] = {}
+    reference_graph = read_json(reference_graph_path, default={})
+    edges = reference_graph.get("edges", []) if isinstance(reference_graph, dict) else []
+    edges_by_id: Dict[str, Dict[str, Any]] = {e["edge_id"]: e for e in edges if "edge_id" in e}
+    alias_of, collapsed = build_edge_aliases(edges_by_id)
+    if alias_of:
+        log(STAGE, f"collapsed {len(alias_of)} edges onto {len(collapsed)} canonical edges")
+
+    # archetype_id -> signal_id -> (edge_id, join_hash filter or None)
+    signal_meta_by_archetype: Dict[str, Dict[str, Tuple[str, Any]]] = {}
     for archetype in archetypes:
         archetype_id = archetype.get("archetype_id", "")
-        signal_edge_by_archetype[archetype_id] = {
-            s.get("signal_id", s.get("edge_id", "")): s.get("edge_id", "")
+        signal_meta_by_archetype[archetype_id] = {
+            s.get("signal_id", s.get("edge_id", "")): (s.get("edge_id", ""), s.get("join_hash"))
             for s in (archetype.get("signals", []) or [])
         }
 
@@ -142,14 +163,17 @@ def main() -> int:
         if export_run_id and domain and join_hash:
             sig_hash_idx[(export_run_id, domain, join_hash)] = r.get("sig_hash", "")
 
-    # (export_run_id, edge_id) -> [(source_domain, source_join_hash), ...]
-    items_idx: Dict[Tuple[str, str], List[Tuple[str, str]]] = defaultdict(list)
+    # (export_run_id, canonical edge_id) -> [(source_domain, source_join_hash, target_join_hash), ...]
+    items_idx: Dict[Tuple[str, str], List[Tuple[str, str, str]]] = defaultdict(list)
     for row in items_rows:
         export_run_id = row.get("export_run_id", "")
         edge_id = row.get("edge_id", "")
         if not export_run_id or not edge_id:
             continue
-        items_idx[(export_run_id, edge_id)].append((row.get("source_domain", ""), row.get("source_join_hash", "")))
+        canonical_edge_id = alias_of.get(edge_id, edge_id)
+        items_idx[(export_run_id, canonical_edge_id)].append(
+            (row.get("source_domain", ""), row.get("source_join_hash", ""), row.get("target_join_hash", ""))
+        )
 
     detail_rows: List[Dict[str, Any]] = []
     # (archetype_id, signal_id) -> set of export_run_id
@@ -165,14 +189,19 @@ def main() -> int:
         export_run_id = row.get("export_run_id", "")
         archetype_id = row.get("archetype_id", "")
         signals_fired = [s for s in (row.get("signals_fired", "") or "").split(";") if s]
-        signal_edge_map = signal_edge_by_archetype.get(archetype_id, {})
+        signal_meta_map = signal_meta_by_archetype.get(archetype_id, {})
 
         for signal_id in signals_fired:
-            edge_id = signal_edge_map.get(signal_id, signal_id)
+            edge_id, join_hash_filter = signal_meta_map.get(signal_id, (signal_id, None))
             edge_id_by_signal[(archetype_id, signal_id)] = edge_id
 
             pairs = items_idx.get((export_run_id, edge_id), [])
-            distinct_join_hashes = {jh for _, jh in pairs if jh}
+            if join_hash_filter is not None:
+                pairs = [
+                    p for p in pairs
+                    if join_hash_filter == p[1] or join_hash_filter == p[2]
+                ]
+            distinct_join_hashes = {jh for _, jh, _ in pairs if jh}
             n_join_hashes_in_file = len(distinct_join_hashes)
 
             files_by_signal[(archetype_id, signal_id)].add(export_run_id)
@@ -180,7 +209,7 @@ def main() -> int:
                 multi_instance_by_signal[(archetype_id, signal_id)].add(export_run_id)
 
             seen_join_hashes: Set[str] = set()
-            for source_domain, source_join_hash in pairs:
+            for source_domain, source_join_hash, _target_join_hash in pairs:
                 if not source_join_hash or source_join_hash in seen_join_hashes:
                     continue
                 seen_join_hashes.add(source_join_hash)

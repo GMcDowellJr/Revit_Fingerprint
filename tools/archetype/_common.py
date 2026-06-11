@@ -11,11 +11,16 @@ from __future__ import annotations
 import csv
 import json
 import sys
+from collections import defaultdict
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 SCHEMA_VERSION = "1.0"
+
+# dimension_types_* partitions whose tick_mark__arrowheads edge collapses
+# onto dimension_types_linear (see build_edge_aliases).
+DIM_TYPE_VARIANTS = ("linear", "angular", "radial", "diameter")
 
 # item_value / item_value_type (q) markers that indicate "no usable value".
 INVALID_ITEM_VALUES = {"", "<NONE>", "<MISSING>", "<UNREADABLE>", "<NOT_APPLICABLE>"}
@@ -98,6 +103,76 @@ def field_matches(item_key: str, source_field: str, field_match: str) -> bool:
             return item_key == source_field
         return item_key.startswith(prefix) and item_key.endswith(suffix)
     return item_key == source_field
+
+
+def strip_partition_suffix(target_domain: str) -> Optional[str]:
+    """Strip a trailing "_drafting"/"_model" suffix; None if neither present."""
+    for suffix in ("_drafting", "_model"):
+        if target_domain.endswith(suffix):
+            return target_domain[: -len(suffix)]
+    return None
+
+
+def build_edge_aliases(edges_by_id: Dict[str, Dict[str, Any]]) -> Tuple[Dict[str, str], Dict[str, List[str]]]:
+    """Build edge_id -> canonical_edge_id and canonical -> [collapsed edge_ids].
+
+    Two grouping passes:
+      1. fill_patterns_drafting/_model partition collapse: edges sharing
+         (source_domain, source_field) and a target_domain differing only by
+         a "_drafting"/"_model" suffix collapse onto the "_drafting" edge.
+      2. dimension_types_{linear,angular,radial,diameter} tick_mark variant
+         collapse: edges sharing (source_field, target_domain) where
+         source_domain is one of the four dimension_types_* partitions in
+         DIM_TYPE_VARIANTS collapse onto the dimension_types_linear edge.
+    """
+    alias_of: Dict[str, str] = {}
+    collapsed: Dict[str, List[str]] = defaultdict(list)
+
+    # Pass 1: fill_patterns_drafting / fill_patterns_model collapse.
+    fill_groups: Dict[Tuple[str, str, str], List[str]] = defaultdict(list)
+    for edge_id, edge in edges_by_id.items():
+        prefix = strip_partition_suffix(edge.get("target_domain", ""))
+        if prefix is None:
+            continue
+        fill_groups[(edge.get("source_domain", ""), edge.get("source_field", ""), prefix)].append(edge_id)
+
+    for edge_ids in fill_groups.values():
+        if len(edge_ids) < 2:
+            continue
+        canonical = next(
+            (e for e in edge_ids if edges_by_id[e].get("target_domain", "").endswith("_drafting")),
+            sorted(edge_ids)[0],
+        )
+        for e in edge_ids:
+            if e != canonical:
+                alias_of[e] = canonical
+                collapsed[canonical].append(e)
+
+    # Pass 2: dimension_types_{variant} tick_mark collapse (skip edges already aliased).
+    dim_groups: Dict[Tuple[str, str], List[str]] = defaultdict(list)
+    for edge_id, edge in edges_by_id.items():
+        if edge_id in alias_of:
+            continue
+        source_domain = edge.get("source_domain", "")
+        if any(source_domain == f"dimension_types_{variant}" for variant in DIM_TYPE_VARIANTS):
+            dim_groups[(edge.get("source_field", ""), edge.get("target_domain", ""))].append(edge_id)
+
+    for edge_ids in dim_groups.values():
+        if len(edge_ids) < 2:
+            continue
+        canonical = next(
+            (e for e in edge_ids if edges_by_id[e].get("source_domain") == "dimension_types_linear"),
+            sorted(edge_ids)[0],
+        )
+        for e in edge_ids:
+            if e != canonical:
+                alias_of[e] = canonical
+                collapsed[canonical].append(e)
+
+    for canonical in collapsed:
+        collapsed[canonical].sort()
+
+    return alias_of, dict(collapsed)
 
 
 def slugify(value: str) -> str:

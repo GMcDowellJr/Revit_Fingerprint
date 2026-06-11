@@ -12,10 +12,19 @@ Outputs:
   - Fingerprint_Out/archetype_analysis/archetype_coverage_summary.json
 
 Processing:
-  - Build a per-file active_edges set (edge_id -> set of (source_join_hash,
-    target_join_hash) pairs) from cross_domain_items.csv.
-  - Build a corpus-level unavailable_edges set from reference_graph.json
-    entries with available == false.
+  - Build an edge alias map from reference_graph.json (see
+    compute_cross_domain_cooccurrence.py / _common.build_edge_aliases):
+    edges collapsed during co-occurrence analysis (fill_patterns
+    drafting/model partitions, dimension_types_{angular,radial,diameter}
+    tick_mark variants) are remapped onto their canonical edge_id. Promoted
+    archetype signals reference canonical edge_ids, so cross_domain_items.csv
+    rows for collapsed edge_ids are folded into the canonical edge_id when
+    building active_edges/fired_files_by_edge.
+  - Build a per-file active_edges set (canonical edge_id -> set of
+    (source_join_hash, target_join_hash) pairs) from cross_domain_items.csv.
+  - Build a corpus-level unavailable_edges set of canonical edge_ids: a
+    canonical edge is unavailable iff it and every edge collapsed into it
+    have available == false in reference_graph.json.
   - For each (file, promoted archetype), evaluate each signal:
       unavailable -- signal.edge_id in unavailable_edges
       fired       -- edge_id active for this file, and (signal has no
@@ -49,6 +58,7 @@ from _common import (
     log,
     atomic_write_csv,
     atomic_write_json,
+    build_edge_aliases,
     read_csv_rows,
     read_json,
 )
@@ -127,7 +137,19 @@ def main() -> int:
 
     reference_graph = read_json(reference_graph_path, default={})
     edges = reference_graph.get("edges", []) if isinstance(reference_graph, dict) else []
-    unavailable_edges: Set[str] = {e["edge_id"] for e in edges if "edge_id" in e and not e.get("available")}
+    edges_by_id: Dict[str, Dict[str, Any]] = {e["edge_id"]: e for e in edges if "edge_id" in e}
+
+    alias_of, collapsed = build_edge_aliases(edges_by_id)
+    if alias_of:
+        log(STAGE, f"collapsed {len(alias_of)} edges onto {len(collapsed)} canonical edges")
+
+    # A canonical edge is unavailable iff it and every edge collapsed into it are unavailable.
+    canonical_edge_ids = sorted({alias_of.get(e, e) for e in edges_by_id})
+    unavailable_edges: Set[str] = set()
+    for canonical in canonical_edge_ids:
+        members = [canonical] + collapsed.get(canonical, [])
+        if not any(bool(edges_by_id[m].get("available")) for m in members):
+            unavailable_edges.add(canonical)
     log(STAGE, f"unavailable_edges={len(unavailable_edges)}")
 
     file_metadata_rows = read_csv_rows(file_metadata_path)
@@ -153,9 +175,10 @@ def main() -> int:
         edge_id = row.get("edge_id", "")
         if not eid or not edge_id:
             continue
+        canonical_edge_id = alias_of.get(edge_id, edge_id)
         file_universe.add(eid)
-        file_edges[eid][edge_id].append((row.get("source_join_hash", ""), row.get("target_join_hash", "")))
-        fired_files_by_edge[edge_id].add(eid)
+        file_edges[eid][canonical_edge_id].append((row.get("source_join_hash", ""), row.get("target_join_hash", "")))
+        fired_files_by_edge[canonical_edge_id].add(eid)
     file_universe |= set(file_meta_idx.keys())
     n_files_total = len(file_universe)
     log(STAGE, f"file_universe size={n_files_total}")

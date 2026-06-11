@@ -285,8 +285,19 @@ Power BI slicer dimension.
   and `unavailable_signal_ids`.
 
 **What it does**
+- Rebuilds the same edge alias map as Stage 2
+  (`_common.build_edge_aliases`) from `reference_graph.json`. Promoted
+  archetype signals reference **canonical** edge_ids (as emitted by Stage
+  2/2.5); `cross_domain_items.csv` rows for edges collapsed onto a
+  canonical edge_id (e.g. `dimension_types_angular.tick_mark__arrowheads` →
+  `dimension_types_linear.tick_mark__arrowheads`) are folded into the
+  canonical edge_id before evaluating signals, so files whose evidence came
+  only through a collapsed edge are still classified. A canonical edge is
+  `unavailable` only if it and every edge collapsed into it are
+  `available == false`.
+
 For each promoted archetype and each candidate file (any file where a
-required signal's edge fired at least once anywhere):
+required signal's canonical edge fired at least once anywhere):
 - Evaluates every signal as `unavailable` (edge unavailable),
   `fired` (edge active for this file, and `join_hash` filter — if any —
   matches the row's `source_join_hash`/`target_join_hash`), or `absent`.
@@ -316,7 +327,9 @@ configuration actually is across classified files.
 - `Fingerprint_Out/archetype_analysis/archetype_classifications.csv`
 - `Fingerprint_Out/archetype_analysis/cross_domain_items.csv`
 - `config/archetype/archetype_definitions.json` (only `promoted == true`,
-  used to map `signal_id -> edge_id`)
+  used to map `signal_id -> (edge_id, join_hash)`)
+- `Fingerprint_Out/archetype_analysis/reference_graph.json` (edge alias map,
+  same as Stage 2/3)
 - `results/records/records.csv`
 
 **Outputs**
@@ -335,6 +348,15 @@ configuration actually is across classified files.
   `n_join_hashes_in_file`.
 
 **What it does**
+- Indexes `cross_domain_items.csv` by `(export_run_id, canonical edge_id)`
+  using the same alias map as Stage 2/3, so collapsed-edge rows are folded
+  into the canonical edge_id's row set.
+- For signals with a non-null `join_hash` filter, restricts that row set to
+  rows whose `source_join_hash` or `target_join_hash` matches the filter
+  **before** counting `n_distinct_sig_hashes`/`n_multi_instance_files` and
+  resolving `sig_hash` — otherwise an unrelated second instance of the same
+  edge in a file (e.g. another dimension type or material) would inflate
+  those metrics for files that have more than one instance of the edge.
 - Joins `records.csv` on `(export_run_id, domain=source_domain,
   join_hash=source_join_hash)` to resolve `sig_hash`.
 - Low `coherence_score` = files in this archetype tend to share the same
@@ -372,5 +394,9 @@ Internal module (not a CLI entrypoint) shared by all stages:
   for identity_items rows.
 - `field_matches(item_key, source_field, field_match)` — exact or
   `[*]`-indexed item_key matching.
+- `build_edge_aliases(edges_by_id)` / `strip_partition_suffix(target_domain)`
+  / `DIM_TYPE_VARIANTS` — the edge-collapse alias map shared by Stages 2-4
+  (fill_patterns drafting/model partitions, dimension_types tick_mark
+  variants).
 - `slugify(value)` — used to build `CANDIDATE__...` archetype ids.
 - `log(stage, msg)` — `[archetype:<stage>]`-prefixed stderr logging.
