@@ -564,49 +564,59 @@ def build_inventory_rows(
     return rows, stats
 
 
-def build_edge_rows(inventory_rows: Sequence[Dict[str, Any]], include_unresolved: bool) -> List[Dict[str, Any]]:
-    eligible = []
+def build_edge_rows(
+    inventory_rows: Sequence[Dict[str, Any]],
+    include_unresolved: bool,
+    support_min_files: int,
+) -> List[Dict[str, Any]]:
+    edge_groups: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+    name_domain_param_ids: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
+
     for row in inventory_rows:
         name_resolved = row["name_resolved"] == "true"
         target_domain = str(row["target_domain"])
-        if row["meets_threshold"] != "true" or not name_resolved:
+        if not name_resolved:
             continue
         if not target_domain and not include_unresolved:
             continue
-        eligible.append(row)
 
-    edge_groups: Dict[Tuple[str, str], Dict[str, Any]] = {}
-    for row in eligible:
         normalized = normalize_param_name(str(row["param_name"]))
-        target_domain = str(row["target_domain"])
-        edge_domain_component = target_domain or "unresolved"
         if not normalized:
             continue
-        key = (normalized, target_domain)
+
+        param_id = str(row["param_id"])
+        edge_domain_component = target_domain or "unresolved"
+        key = (normalized, target_domain, param_id)
+        name_domain_param_ids[(normalized, target_domain)].add(param_id)
         group = edge_groups.setdefault(
             key,
             {
-                "param_ids": [],
-                "param_kind_by_id": {},
+                "param_id": param_id,
+                "param_kind": row["param_kind"],
                 "param_name": row["param_name"],
+                "normalized": normalized,
                 "target_domain": target_domain,
                 "edge_domain_component": edge_domain_component,
-                "category_ids": set(),
-                "file_count": 0,
+                "category_files": defaultdict(set),
+                "category_rule_counts": defaultdict(int),
+                "all_export_run_ids": set(),
                 "rule_count": 0,
                 "target_domain_sources": [],
                 "target_domain_verified": True,
                 "requires_human_review": False,
-                "export_run_ids": set(),
             },
         )
-        param_id = str(row["param_id"])
-        if param_id not in group["param_ids"]:
-            group["param_ids"].append(param_id)
-            group["param_kind_by_id"][param_id] = row["param_kind"]
-        group["category_ids"].update(parse_category_set(str(row["category_set"])))
-        group["export_run_ids"].update(row.get("_export_run_ids", set()))
+
+        export_run_ids = set(row.get("_export_run_ids", set()))
+        group["all_export_run_ids"].update(export_run_ids)
         group["rule_count"] += int(row["rule_count"])
+
+        category_ids = parse_category_set(str(row["category_set"]))
+        category_values = category_ids or [""]
+        for category_id in category_values:
+            group["category_files"][category_id].update(export_run_ids)
+            group["category_rule_counts"][category_id] += int(row["rule_count"])
+
         source = str(row["target_domain_source"])
         if source not in group["target_domain_sources"]:
             group["target_domain_sources"].append(source)
@@ -615,41 +625,59 @@ def build_edge_rows(inventory_rows: Sequence[Dict[str, Any]], include_unresolved
         if row["requires_human_review"] == "true":
             group["requires_human_review"] = True
 
-    rows: List[Dict[str, Any]] = []
-    for (normalized, target_domain), group in sorted(edge_groups.items()):
-        param_ids = list(group["param_ids"])
-        guid_ids = [param_id for param_id in param_ids if GUID_RE.match(param_id)]
+    for (normalized, target_domain), param_ids in sorted(name_domain_param_ids.items()):
+        guid_ids = [param_id for param_id in sorted(param_ids) if GUID_RE.match(param_id)]
         if len(guid_ids) > 1:
             warn(
                 f'Multiple param_ids resolve to same normalized name "{normalized}" for target_domain '
-                f'"{target_domain or "null"}": {param_ids}. Grouped under single edge. Verify these are the same parameter.'
+                f'"{target_domain or "null"}": {sorted(param_ids)}. Emitting separate param/category scopes; '
+                "verify these are the same parameter before manually grouping them."
             )
+
+    rows: List[Dict[str, Any]] = []
+    for (normalized, target_domain, param_id), group in sorted(edge_groups.items()):
+        supported_category_ids = sorted(
+            (
+                category_id
+                for category_id, files in group["category_files"].items()
+                if len(files) >= support_min_files
+            ),
+            key=lambda category_id: (category_id == "", int(category_id) if category_id != "" else 0),
+        )
+        if not supported_category_ids:
+            continue
+
+        supported_export_run_ids: Set[str] = set()
+        supported_rule_count = 0
+        for category_id in supported_category_ids:
+            supported_export_run_ids.update(group["category_files"][category_id])
+            supported_rule_count += int(group["category_rule_counts"][category_id])
+
+        category_ids_for_scope = [category_id for category_id in supported_category_ids if category_id != ""]
+        category_id_values = category_ids_for_scope or [""]
         edge_id = f"vfd.{normalized}__{group['edge_domain_component']}"
-        category_ids = sorted(group["category_ids"])
-        category_id_values = category_ids or [""]
-        file_count = len(group["export_run_ids"]) if group["export_run_ids"] else group["file_count"]
+        file_count = len(supported_export_run_ids)
         scope_conditions = json.dumps(
-            {"param_ids": param_ids, "category_ids": category_ids},
+            {"param_ids": [param_id], "category_ids": category_ids_for_scope},
             separators=(",", ":"),
         )
-        for param_id in param_ids:
-            for category_id in category_id_values:
-                rows.append({
-                    "edge_id": edge_id,
-                    "param_id": param_id,
-                    "category_id": category_id,
-                    "param_kind": group["param_kind_by_id"].get(param_id, ""),
-                    "param_name": group["param_name"],
-                    "param_name_normalized": normalized,
-                    "target_domain": target_domain,
-                    "scope_conditions": scope_conditions,
-                    "file_count": file_count,
-                    "rule_count": group["rule_count"],
-                    "name_resolved": "true",
-                    "target_domain_source": "|".join(group["target_domain_sources"]),
-                    "target_domain_verified": bool_s(bool(group["target_domain_verified"])),
-                    "requires_human_review": bool_s(bool(group["requires_human_review"])),
-                })
+        for category_id in category_id_values:
+            rows.append({
+                "edge_id": edge_id,
+                "param_id": param_id,
+                "category_id": category_id,
+                "param_kind": group["param_kind"],
+                "param_name": group["param_name"],
+                "param_name_normalized": normalized,
+                "target_domain": target_domain,
+                "scope_conditions": scope_conditions,
+                "file_count": file_count,
+                "rule_count": supported_rule_count,
+                "name_resolved": "true",
+                "target_domain_source": "|".join(group["target_domain_sources"]),
+                "target_domain_verified": bool_s(bool(group["target_domain_verified"])),
+                "requires_human_review": bool_s(bool(group["requires_human_review"])),
+            })
     return rows
 
 
@@ -767,7 +795,7 @@ def main() -> int:
     inventory_rows, category_stats = build_inventory_rows(
         observations, resolved, bip_hints, category_map, args.support_min_files,
     )
-    edge_rows = build_edge_rows(inventory_rows, args.include_unresolved)
+    edge_rows = build_edge_rows(inventory_rows, args.include_unresolved, args.support_min_files)
     verify_outputs(edge_rows, inventory_rows, len(export_run_ids))
 
     atomic_write_csv(out_dir / "vfd_param_inventory.csv", INVENTORY_FIELDS, inventory_rows)

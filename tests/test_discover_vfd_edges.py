@@ -244,3 +244,100 @@ def test_generated_dynamic_edges_include_category_id_for_reference_graph(tmp_pat
 
     assert len(dynamic_rows) == 1
     assert dynamic_rows[0]["source_join_hash"] == "source-join-hash"
+
+
+def test_discover_vfd_edges_keeps_same_name_param_categories_separate(tmp_path):
+    items_dir = tmp_path / "items"
+    out_dir = tmp_path / "out"
+    items_dir.mkdir()
+    guid_a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    guid_b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    (items_dir / "view_filter_definitions.csv").write_text(
+        "export_run_id,record_pk,item_key,item_value,item_value_type\n"
+        f"f1,r1,vf.categories,-2000011,ok\n"
+        f"f1,r1,vf.rule[001].param_ref.kind,shared,ok\n"
+        f"f1,r1,vf.rule[001].param_ref.id,{guid_a},ok\n"
+        f"f2,r2,vf.categories,-2000032,ok\n"
+        f"f2,r2,vf.rule[001].param_ref.kind,shared,ok\n"
+        f"f2,r2,vf.rule[001].param_ref.id,{guid_b},ok\n",
+        encoding="utf-8",
+    )
+    bip_lookup = tmp_path / "bip_lookup.json"
+    bip_lookup.write_text("{}", encoding="utf-8")
+    shared_names = tmp_path / "shared.json"
+    shared_names.write_text(json.dumps({guid_a: "Shared Material", guid_b: "Shared Material"}), encoding="utf-8")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--identity-items-dir",
+            str(items_dir),
+            "--bip-lookup",
+            str(bip_lookup),
+            "--shared-param-names",
+            str(shared_names),
+            "--support-min-files",
+            "1",
+            "--out-dir",
+            str(out_dir),
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    edges = read_csv(out_dir / "vfd_dynamic_edges.csv")
+    assert {(edge["param_id"], edge["category_id"]) for edge in edges} == {
+        (guid_a, "-2000011"),
+        (guid_b, "-2000032"),
+    }
+    for edge in edges:
+        scope = json.loads(edge["scope_conditions"])
+        assert scope["param_ids"] == [edge["param_id"]]
+        assert scope["category_ids"] == [int(edge["category_id"])]
+
+
+def test_discover_vfd_edges_applies_threshold_after_category_aggregation(tmp_path):
+    items_dir = tmp_path / "items"
+    out_dir = tmp_path / "out"
+    items_dir.mkdir()
+    (items_dir / "view_filter_definitions.csv").write_text(
+        "export_run_id,record_pk,item_key,item_value,item_value_type\n"
+        "f1,r1,vf.categories,-2000011,ok\n"
+        "f1,r1,vf.rule[001].param_ref.kind,builtin,ok\n"
+        "f1,r1,vf.rule[001].param_ref.id,bip:-1005500,ok\n"
+        "f2,r2,vf.categories,\"-2000011,-2000032\",ok\n"
+        "f2,r2,vf.rule[001].param_ref.kind,builtin,ok\n"
+        "f2,r2,vf.rule[001].param_ref.id,bip:-1005500,ok\n",
+        encoding="utf-8",
+    )
+    bip_lookup = tmp_path / "bip_lookup.json"
+    bip_lookup.write_text(json.dumps({"bip:-1005500": "STRUCTURAL_MATERIAL_PARAM"}), encoding="utf-8")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--identity-items-dir",
+            str(items_dir),
+            "--bip-lookup",
+            str(bip_lookup),
+            "--support-min-files",
+            "2",
+            "--out-dir",
+            str(out_dir),
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    inventory = read_csv(out_dir / "vfd_param_inventory.csv")
+    assert {row["meets_threshold"] for row in inventory} == {"false"}
+
+    edges = read_csv(out_dir / "vfd_dynamic_edges.csv")
+    assert len(edges) == 1
+    assert edges[0]["category_id"] == "-2000011"
+    assert edges[0]["file_count"] == "2"
+    assert json.loads(edges[0]["scope_conditions"])["category_ids"] == [-2000011]
