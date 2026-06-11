@@ -107,6 +107,68 @@ def test_discover_vfd_edges_without_shared_names_keeps_guid_out_of_edges(tmp_pat
     assert read_csv(out_dir / "vfd_dynamic_edges.csv") == []
 
 
+
+def test_discover_vfd_edges_filters_hint_comments_and_exact_bip_lookup(tmp_path):
+    items_dir = tmp_path / "items"
+    out_dir = tmp_path / "out"
+    items_dir.mkdir()
+    (items_dir / "view_filter_definitions.csv").write_text(
+        "export_run_id,record_pk,item_key,item_value,item_value_type\n"
+        'f1,r1,vf.categories,"[-2000011, ""-2000032""]",ok\n'
+        "f1,r1,vf.rule[001].param_ref.kind,builtin,ok\n"
+        "f1,r1,vf.rule[001].param_ref.id,bip:-1002107,ok\n",
+        encoding="utf-8",
+    )
+    bip_lookup = tmp_path / "bip_lookup.json"
+    bip_lookup.write_text(json.dumps({"bip:-1002107": "MATERIAL_ID_PARAM"}), encoding="utf-8")
+    hints = tmp_path / "hints.json"
+    hints.write_text(
+        json.dumps({
+            "exact_bip_id": {
+                "_comment_materials": "documentation only",
+                "bip:-1002107": {"target_domain": "materials"},
+            },
+            "name_contains": [
+                {"_comment_classification": "documentation only"},
+                {"substring": "MATERIAL", "target_domain": "wrong_domain"},
+            ],
+        }),
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--identity-items-dir",
+            str(items_dir),
+            "--bip-lookup",
+            str(bip_lookup),
+            "--bip-hints",
+            str(hints),
+            "--support-min-files",
+            "1",
+            "--out-dir",
+            str(out_dir),
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    inventory = read_csv(out_dir / "vfd_param_inventory.csv")
+    assert len(inventory) == 1
+    assert inventory[0]["target_domain"] == "materials"
+    assert inventory[0]["target_domain_source"] == "exact_bip_id"
+    assert inventory[0]["category_names"] == "Floors|Walls"
+    assert inventory[0]["unrecognized_category_ids"] == ""
+
+    edges = read_csv(out_dir / "vfd_dynamic_edges.csv")
+    assert edges
+    assert all(edge["target_domain"] == "materials" for edge in edges)
+    assert all(edge["requires_human_review"] == "false" for edge in edges)
+    assert {edge["category_id"] for edge in edges} == {"-2000032", "-2000011"}
+
 def test_generated_dynamic_edges_include_category_id_for_reference_graph(tmp_path):
     import importlib.util
 

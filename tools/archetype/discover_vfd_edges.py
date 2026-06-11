@@ -105,7 +105,7 @@ class DomainHint:
 @dataclass(frozen=True)
 class ParsedCategories:
     category_set: str
-    category_ids: Tuple[int, ...]
+    category_ids: Tuple[str, ...]
     category_names: str
     unrecognized_category_ids: str
     has_unextracted_domain: bool
@@ -285,6 +285,35 @@ def resolve_params(
     return resolved
 
 
+def load_bip_hints(path: Path) -> Dict[str, Any]:
+    hints = read_json_required(path, "vfd_bip_target_domain_hints.json")
+
+    exact = hints.get("exact_bip_id", {})
+    if isinstance(exact, dict):
+        hints["exact_bip_id"] = {
+            str(key): value
+            for key, value in exact.items()
+            if not str(key).startswith("_")
+        }
+
+    name_rules = hints.get("name_contains", [])
+    if isinstance(name_rules, list):
+        filtered_rules = []
+        for rule in name_rules:
+            if isinstance(rule, dict) and any(str(key).startswith("_comment") for key in rule):
+                continue
+            filtered_rules.append(rule)
+        hints["name_contains"] = filtered_rules
+    elif isinstance(name_rules, dict):
+        hints["name_contains"] = {
+            str(key): value
+            for key, value in name_rules.items()
+            if not str(key).startswith("_")
+        }
+
+    return hints
+
+
 def hint_target_and_verify(entry: Any) -> Tuple[Optional[str], bool]:
     if isinstance(entry, str):
         return entry, True
@@ -298,26 +327,26 @@ def iter_name_contains_rules(hints: Dict[str, Any]) -> Iterator[Tuple[str, Any]]
     rules = hints.get("name_contains", [])
     if isinstance(rules, dict):
         for substring, entry in rules.items():
-            if not str(substring).startswith("_comment"):
+            if not str(substring).startswith("_"):
                 yield str(substring), entry
     elif isinstance(rules, list):
         for entry in rules:
             if not isinstance(entry, dict):
                 continue
+            if any(str(key).startswith("_comment") for key in entry):
+                continue
             substring = entry.get("substring") or entry.get("contains") or entry.get("name_contains")
-            if substring and not str(substring).startswith("_comment"):
+            if substring and not str(substring).startswith("_"):
                 yield str(substring), entry
 
 
 def infer_domain(param_id: str, param_name: Optional[str], hints: Dict[str, Any]) -> DomainHint:
     exact = hints.get("exact_bip_id", {})
     if isinstance(exact, dict):
-        for key, entry in exact.items():
-            if str(key).startswith("_comment"):
-                continue
-            if str(key) == param_id:
-                target, verified = hint_target_and_verify(entry)
-                return DomainHint(target, "exact_bip_id", verified)
+        entry = exact.get(param_id)
+        if entry is not None:
+            target, verified = hint_target_and_verify(entry)
+            return DomainHint(target, "exact_bip_id", verified)
 
     if param_name:
         param_name_lower = param_name.lower()
@@ -329,32 +358,46 @@ def infer_domain(param_id: str, param_name: Optional[str], hints: Dict[str, Any]
     return DomainHint(None, "unresolved", True)
 
 
-def parse_category_ints(raw: str) -> Optional[List[int]]:
+def parse_category_tokens(raw: str) -> Optional[List[str]]:
     value = (raw or "").strip()
     if not value:
         return []
-    try:
-        parts = [part.strip() for part in value.split(",")]
-        if parts and all(part and re.fullmatch(r"[-+]?\d+", part) for part in parts):
-            return [int(part) for part in parts]
-    except ValueError:
-        pass
-    try:
-        data = json.loads(value)
-    except json.JSONDecodeError:
-        return None
-    if isinstance(data, list):
-        out: List[int] = []
+
+    if value.startswith("["):
+        try:
+            data = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(data, list):
+            return None
+        tokens: List[str] = []
         for item in data:
             if isinstance(item, int):
-                out.append(item)
-            elif isinstance(item, str) and re.fullmatch(r"[-+]?\d+", item.strip()):
-                out.append(int(item.strip()))
+                tokens.append(str(item))
+            elif isinstance(item, str):
+                token = item.strip()
+                if not re.fullmatch(r"[-+]?\d+", token):
+                    return None
+                tokens.append(token)
             else:
                 return None
-        return out
+        return tokens
+
+    tokens = [part.strip() for part in value.split(",")]
+    if tokens and all(token and re.fullmatch(r"[-+]?\d+", token) for token in tokens):
+        return tokens
     return None
 
+
+def sort_category_tokens(tokens: Iterable[str]) -> Tuple[str, ...]:
+    return tuple(sorted({str(token).strip() for token in tokens}, key=lambda token: int(token)))
+
+
+def parse_category_ints(raw: str) -> Optional[List[int]]:
+    tokens = parse_category_tokens(raw)
+    if tokens is None:
+        return None
+    return [int(token) for token in tokens]
 
 def category_entry_name(entry: Any) -> Optional[str]:
     if isinstance(entry, str):
@@ -372,26 +415,29 @@ def parse_categories(
     recognized_distinct: Set[int],
     unrecognized_distinct: Set[int],
 ) -> ParsedCategories:
-    parsed = parse_category_ints(raw)
+    parsed = parse_category_tokens(raw)
     if parsed is None:
         if raw not in warned_unparseable:
             warn(f"unparseable vf.categories value {raw!r}; category scope will be empty for matching rows.")
             warned_unparseable.add(raw)
         parsed = []
 
-    category_ids = tuple(sorted(set(parsed)))
+    category_ids = sort_category_tokens(parsed)
+    if "-2000011" in category_map and "-2000011" in category_ids:
+        assert "-2000011" in category_map
     names: List[str] = []
     unrecognized: List[int] = []
     has_unextracted = False
     has_unverified = False
 
     for category_id in category_ids:
-        entry = category_map.get(str(category_id)) or category_map.get(category_id)
+        lookup_key = str(category_id).strip()
+        entry = category_map.get(lookup_key)
         if entry is None:
-            unrecognized.append(category_id)
-            unrecognized_distinct.add(category_id)
+            unrecognized.append(int(lookup_key))
+            unrecognized_distinct.add(int(lookup_key))
             continue
-        recognized_distinct.add(category_id)
+        recognized_distinct.add(int(lookup_key))
         name = category_entry_name(entry)
         if name:
             names.append(name)
@@ -402,7 +448,7 @@ def parse_categories(
                 has_unverified = True
 
     return ParsedCategories(
-        category_set="|".join(str(i) for i in category_ids),
+        category_set="|".join(category_ids),
         category_ids=category_ids,
         category_names="|".join(names),
         unrecognized_category_ids="|".join(str(i) for i in unrecognized),
@@ -710,7 +756,7 @@ def main() -> int:
 
     bip_lookup = read_json_required(bip_lookup_path, "bip_lookup.json")
     category_map = read_json_required(category_map_path, "vfd_category_domain_map.json")
-    bip_hints = read_json_required(bip_hints_path, "vfd_bip_target_domain_hints.json")
+    bip_hints = load_bip_hints(bip_hints_path)
     shared_param_names = read_json_optional(shared_param_names_path, "shared_param_names.json")
     bip_name_to_id = {str(name): str(param_id) for param_id, name in bip_lookup.items()}
     if len(bip_name_to_id) != len(bip_lookup):
