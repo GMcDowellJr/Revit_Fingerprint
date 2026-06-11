@@ -549,22 +549,30 @@ def _resolve_target_domain_from_categories(
     category_map: Dict[str, Any],
     support_threshold: int,
 ) -> Tuple[Optional[str], str]:
-    domains: Set[str] = set()
-    for category_id in category_ids:
-        if category_file_counts.get(str(category_id), 0) < support_threshold:
-            continue
-        entry = category_map.get(str(category_id))
-        if not isinstance(entry, dict):
-            continue
-        target = entry.get("target_domain")
-        if target and entry.get("domain_extracted") is True:
-            domains.add(str(target))
+    qualifying = [
+        category_id for category_id in category_ids
+        if category_file_counts.get(str(category_id), 0) >= support_threshold
+    ]
+    if not qualifying:
+        return None, "category_map_no_signal"
 
+    domains: Set[Optional[str]] = set()
+    for category_id in qualifying:
+        entry = category_map.get(str(category_id))
+        target: Optional[str] = None
+        if (
+            isinstance(entry, dict)
+            and entry.get("domain_extracted") is True
+            and entry.get("_verify") is not True
+        ):
+            target = entry.get("target_domain") or None
+        domains.add(target)
+
+    if domains == {None}:
+        return None, "category_map_no_signal"
     if len(domains) == 1:
         return next(iter(domains)), "category_map_consensus"
-    if len(domains) > 1:
-        return None, "category_map_conflict"
-    return None, "category_map_no_signal"
+    return None, "category_map_conflict"
 
 
 def _validate_domain_has_identity_items(target_domain: str, identity_items_dir: Path) -> bool:
@@ -657,10 +665,17 @@ def build_inventory_rows(
                 support_min_files,
             )
             if consensus_source == "category_map_consensus" and consensus_domain:
-                target_domain = consensus_domain
-                target_domain_source = "category_map_consensus"
+                consensus_verified = True
                 if identity_items_dir is not None and identity_items_dir.is_dir():
-                    target_domain_verified = _validate_domain_has_identity_items(target_domain, identity_items_dir)
+                    consensus_verified = _validate_domain_has_identity_items(consensus_domain, identity_items_dir)
+                if consensus_verified:
+                    target_domain = consensus_domain
+                    target_domain_source = "category_map_consensus"
+                    target_domain_verified = True
+                else:
+                    target_domain = ""
+                    target_domain_source = "unresolved"
+                    target_domain_verified = True
             else:
                 target_domain = ""
                 target_domain_source = "unresolved"
