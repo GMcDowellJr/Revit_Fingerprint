@@ -33,6 +33,9 @@ Processing:
     coverage = (distinct export_run_ids in cross_domain_items.csv where this
     edge_id fired with a non-empty target_join_hash, folded through the
     edge alias map) / (distinct export_run_ids in cross_domain_items.csv).
+    Dynamic VFD edges (edge_type == "dynamic" in reference_graph.json)
+    intentionally carry an empty target_join_hash, so any firing of a
+    dynamic edge counts toward coverage regardless of target_join_hash.
     Every signal stub gets "_coverage_pct" (0.0-100.0, two decimals). If
     coverage < --low-coverage-threshold (default 0.10), the signal stub gets
     "required": false and "_low_coverage_flag": true; otherwise
@@ -140,7 +143,9 @@ def main() -> int:
     log(STAGE, f"loaded {len(items_rows)} rows from {items_path}")
 
     # corpus coverage: canonical edge_id -> set of export_run_id where the edge
-    # fired with a non-empty target_join_hash
+    # fired with a non-empty target_join_hash. Dynamic VFD edges intentionally
+    # carry an empty target_join_hash (build_cross_domain_items.py), so a
+    # firing on a dynamic edge counts toward coverage regardless.
     file_universe: Set[str] = set()
     covered_files_by_edge: Dict[str, Set[str]] = defaultdict(set)
     for row in items_rows:
@@ -149,8 +154,11 @@ def main() -> int:
             continue
         file_universe.add(export_run_id)
         edge_id = row.get("edge_id", "")
-        if edge_id and row.get("target_join_hash", ""):
-            canonical_edge_id = alias_of.get(edge_id, edge_id)
+        if not edge_id:
+            continue
+        canonical_edge_id = alias_of.get(edge_id, edge_id)
+        is_dynamic = edges_by_id.get(edge_id, {}).get("edge_type") == "dynamic"
+        if row.get("target_join_hash", "") or is_dynamic:
             covered_files_by_edge[canonical_edge_id].add(export_run_id)
 
     n_files_total = len(file_universe)

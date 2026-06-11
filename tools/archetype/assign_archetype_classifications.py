@@ -28,8 +28,9 @@ Processing:
   - For each (file, promoted archetype), evaluate each signal:
       unavailable -- signal.edge_id in unavailable_edges
       fired       -- edge_id active for this file, and (signal has no
-                      join_hash filter, or the filter matches the row's
-                      source_join_hash or target_join_hash)
+                      join_hash filter -- null or empty string -- or the
+                      filter matches the row's source_join_hash or
+                      target_join_hash)
       absent      -- otherwise
   - Emit a classification row only if at least one required signal fired.
   - confidence_tier = "Full" if all required signals fired and no signal
@@ -38,12 +39,11 @@ Processing:
     same governance_question.
   - Null join_hash guard: for each promoted archetype, any signal whose
     join_hash is null/empty is in "wildcard mode" -- it matches any record
-    on its edge regardless of join_hash. This does not change matching
-    behavior, but a WARNING is written to stderr per wildcard signal, and
-    every classification row for that archetype gets "n_signals_wildcard"
-    (count of wildcard signals) and "scoring_mode": "strict" (no wildcard
-    signals), "partial" (some wildcard), or "wildcard" (all signals
-    wildcard).
+    on its edge regardless of join_hash. A WARNING is written to stderr per
+    wildcard signal, and every classification row for that archetype gets
+    "n_signals_wildcard" (count of wildcard signals) and "scoring_mode":
+    "strict" (no wildcard signals), "partial" (some wildcard), or "wildcard"
+    (all signals wildcard).
 
 Usage:
     python tools/archetype/assign_archetype_classifications.py \\
@@ -109,7 +109,7 @@ def _evaluate_signal(
         return "absent"
 
     join_hash_filter = signal.get("join_hash")
-    if join_hash_filter is None:
+    if not join_hash_filter:
         return "fired"
 
     for source_jh, target_jh in rows:
