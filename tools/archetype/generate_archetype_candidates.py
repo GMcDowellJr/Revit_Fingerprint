@@ -4,6 +4,7 @@
 Inputs:
   - Fingerprint_Out/archetype_analysis/cross_domain_patterns.csv
   - Fingerprint_Out/archetype_analysis/reference_graph.json
+  - Fingerprint_Out/archetype_analysis/cross_domain_items.csv
 
 Output:
   - Fingerprint_Out/archetype_analysis/archetype_definitions_candidates.json
@@ -28,14 +29,26 @@ Processing:
     gets that row's join_hash_a, signal for edge_id_b gets join_hash_b.
     join_hash_populated is true iff that value is non-empty. This is a
     starting point for human review, not a hard filter.
+  - Corpus coverage / required gating: for each signal's (canonical) edge_id,
+    coverage = (distinct export_run_ids in cross_domain_items.csv where this
+    edge_id fired with a non-empty target_join_hash, folded through the
+    edge alias map) / (distinct export_run_ids in cross_domain_items.csv).
+    Every signal stub gets "_coverage_pct" (0.0-100.0, two decimals). If
+    coverage < --low-coverage-threshold (default 0.10), the signal stub gets
+    "required": false and "_low_coverage_flag": true; otherwise
+    "required": true and "_low_coverage_flag": false. The "_"-prefixed
+    fields are human-review annotations only and do not affect downstream
+    scoring. Each candidate also gets a top-level "coverage_pct" equal to
+    the minimum "_coverage_pct" across its signals.
 
 Usage:
     python tools/archetype/generate_archetype_candidates.py \\
         --repo-root . \\
         --cross-domain-patterns Fingerprint_Out/archetype_analysis/cross_domain_patterns.csv \\
         --reference-graph Fingerprint_Out/archetype_analysis/reference_graph.json \\
+        --cross-domain-items Fingerprint_Out/archetype_analysis/cross_domain_items.csv \\
         --out Fingerprint_Out/archetype_analysis/archetype_definitions_candidates.json \\
-        [--top-n-join-hash-pairs 5] [--dry-run]
+        [--top-n-join-hash-pairs 5] [--low-coverage-threshold 0.10] [--dry-run]
 """
 from __future__ import annotations
 
@@ -43,11 +56,12 @@ import argparse
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 from _common import (
     log,
     atomic_write_json,
+    build_edge_aliases,
     read_csv_rows,
     read_json,
     slugify,
@@ -63,6 +77,8 @@ _HINT_PRIORITY: List[Tuple[str, Any]] = [
     ("view_filter_strategy", lambda d: d == "view_filter_definitions"),
 ]
 
+_DEFAULT_LOW_COVERAGE_THRESHOLD = 0.10
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -77,19 +93,35 @@ def _governance_question_hint(target_domain_a: str, target_domain_b: str) -> str
     return "unknown"
 
 
+def _signal_coverage_pct(
+    edge_id: str,
+    alias_of: Dict[str, str],
+    covered_files_by_edge: Dict[str, Set[str]],
+    n_files_total: int,
+) -> float:
+    if n_files_total == 0:
+        return 0.0
+    canonical_edge_id = alias_of.get(edge_id, edge_id)
+    covered = len(covered_files_by_edge.get(canonical_edge_id, set()))
+    return round(covered / n_files_total * 100.0, 2)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
     ap.add_argument("--cross-domain-patterns", default=None, help="Path to cross_domain_patterns.csv")
     ap.add_argument("--reference-graph", default=None, help="Path to reference_graph.json")
+    ap.add_argument("--cross-domain-items", default=None, help="Path to cross_domain_items.csv (used for signal corpus coverage gating)")
     ap.add_argument("--out", default=None, help="Output path for archetype_definitions_candidates.json")
     ap.add_argument("--top-n-join-hash-pairs", type=int, default=5, help="Number of top join_hash pairs to retain per candidate for human review (default: 5)")
+    ap.add_argument("--low-coverage-threshold", type=float, default=_DEFAULT_LOW_COVERAGE_THRESHOLD, help="Coverage fraction below which a signal stub is marked required=false (default: 0.10)")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
     patterns_path = Path(args.cross_domain_patterns) if args.cross_domain_patterns else repo_root / "Fingerprint_Out" / "archetype_analysis" / "cross_domain_patterns.csv"
     reference_graph_path = Path(args.reference_graph) if args.reference_graph else repo_root / "Fingerprint_Out" / "archetype_analysis" / "reference_graph.json"
+    items_path = Path(args.cross_domain_items) if args.cross_domain_items else repo_root / "Fingerprint_Out" / "archetype_analysis" / "cross_domain_items.csv"
     out_path = Path(args.out) if args.out else repo_root / "Fingerprint_Out" / "archetype_analysis" / "archetype_definitions_candidates.json"
 
     patterns_rows = read_csv_rows(patterns_path)
@@ -100,6 +132,30 @@ def main() -> int:
     edges_by_id: Dict[str, Dict[str, Any]] = {e["edge_id"]: e for e in edges if "edge_id" in e}
     log(STAGE, f"loaded {len(edges_by_id)} edges from {reference_graph_path}")
 
+    alias_of, collapsed = build_edge_aliases(edges_by_id)
+    if alias_of:
+        log(STAGE, f"collapsed {len(alias_of)} edges onto {len(collapsed)} canonical edges")
+
+    items_rows = read_csv_rows(items_path)
+    log(STAGE, f"loaded {len(items_rows)} rows from {items_path}")
+
+    # corpus coverage: canonical edge_id -> set of export_run_id where the edge
+    # fired with a non-empty target_join_hash
+    file_universe: Set[str] = set()
+    covered_files_by_edge: Dict[str, Set[str]] = defaultdict(set)
+    for row in items_rows:
+        export_run_id = row.get("export_run_id", "")
+        if not export_run_id:
+            continue
+        file_universe.add(export_run_id)
+        edge_id = row.get("edge_id", "")
+        if edge_id and row.get("target_join_hash", ""):
+            canonical_edge_id = alias_of.get(edge_id, edge_id)
+            covered_files_by_edge[canonical_edge_id].add(export_run_id)
+
+    n_files_total = len(file_universe)
+    log(STAGE, f"file_universe size={n_files_total} (for signal coverage gating)")
+
     # group rows by (edge_id_a, edge_id_b)
     groups: Dict[Tuple[str, str], List[Dict[str, str]]] = defaultdict(list)
     for row in patterns_rows:
@@ -109,6 +165,7 @@ def main() -> int:
 
     candidates: List[Dict[str, Any]] = []
     skipped_unknown_edges = 0
+    n_low_coverage_signals = 0
     for (edge_id_a, edge_id_b), rows in sorted(groups.items()):
         edge_a = edges_by_id.get(edge_id_a)
         edge_b = edges_by_id.get(edge_id_b)
@@ -137,6 +194,15 @@ def main() -> int:
         top_join_hash_a = top_row.get("join_hash_a", "")
         top_join_hash_b = top_row.get("join_hash_b", "")
 
+        coverage_pct_a = _signal_coverage_pct(edge_id_a, alias_of, covered_files_by_edge, n_files_total)
+        coverage_pct_b = _signal_coverage_pct(edge_id_b, alias_of, covered_files_by_edge, n_files_total)
+        low_coverage_a = (coverage_pct_a / 100.0) < args.low_coverage_threshold
+        low_coverage_b = (coverage_pct_b / 100.0) < args.low_coverage_threshold
+        if low_coverage_a:
+            n_low_coverage_signals += 1
+        if low_coverage_b:
+            n_low_coverage_signals += 1
+
         candidates.append({
             "archetype_id": archetype_id,
             "governance_question": hint,
@@ -145,6 +211,7 @@ def main() -> int:
             "auto_generated": True,
             "distinct_pattern_count": len(rows),
             "total_file_count": total_file_count,
+            "coverage_pct": min(coverage_pct_a, coverage_pct_b),
             "top_join_hash_pairs": top_join_hash_pairs,
             "signals": [
                 {
@@ -152,21 +219,28 @@ def main() -> int:
                     "edge_id": edge_id_a,
                     "source_domain": edge_a.get("source_domain", ""),
                     "target_domain": target_domain_a,
-                    "required": True,
+                    "required": not low_coverage_a,
                     "join_hash": top_join_hash_a or None,
                     "join_hash_populated": bool(top_join_hash_a),
+                    "_coverage_pct": coverage_pct_a,
+                    "_low_coverage_flag": low_coverage_a,
                 },
                 {
                     "signal_id": edge_id_b,
                     "edge_id": edge_id_b,
                     "source_domain": edge_b.get("source_domain", ""),
                     "target_domain": target_domain_b,
-                    "required": True,
+                    "required": not low_coverage_b,
                     "join_hash": top_join_hash_b or None,
                     "join_hash_populated": bool(top_join_hash_b),
+                    "_coverage_pct": coverage_pct_b,
+                    "_low_coverage_flag": low_coverage_b,
                 },
             ],
         })
+
+    if n_low_coverage_signals:
+        log(STAGE, f"flagged {n_low_coverage_signals} signal stubs as required=false (coverage below {args.low_coverage_threshold:.2%})")
 
     if skipped_unknown_edges:
         log(STAGE, f"skipped {skipped_unknown_edges} pattern groups referencing edges not present in reference_graph")

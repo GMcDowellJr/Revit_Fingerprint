@@ -36,6 +36,14 @@ Processing:
     (required or not) is unavailable; otherwise "Partial".
   - is_mixed = true when a file has more than one archetype row for the
     same governance_question.
+  - Null join_hash guard: for each promoted archetype, any signal whose
+    join_hash is null/empty is in "wildcard mode" -- it matches any record
+    on its edge regardless of join_hash. This does not change matching
+    behavior, but a WARNING is written to stderr per wildcard signal, and
+    every classification row for that archetype gets "n_signals_wildcard"
+    (count of wildcard signals) and "scoring_mode": "strict" (no wildcard
+    signals), "partial" (some wildcard), or "wildcard" (all signals
+    wildcard).
 
 Usage:
     python tools/archetype/assign_archetype_classifications.py \\
@@ -50,6 +58,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -77,6 +86,8 @@ CLASSIFICATIONS_FIELDS = [
     "signals_null",
     "n_signals_fired",
     "n_signals_null",
+    "n_signals_wildcard",
+    "scoring_mode",
     "client_label",
     "governance_role",
     "discipline_label",
@@ -196,6 +207,23 @@ def main() -> int:
         signal_unavailable = {s.get("signal_id", s.get("edge_id", "")): (s.get("edge_id", "") in unavailable_edges) for s in signals}
         unavailable_signal_ids = sorted(sid for sid, unavail in signal_unavailable.items() if unavail)
 
+        # FIX5: surface signals with no join_hash filter ("wildcard mode") --
+        # they still match, but should be visible to human reviewers.
+        wildcard_signal_ids = [s.get("signal_id", s.get("edge_id", "")) for s in signals if not s.get("join_hash")]
+        for signal_id in wildcard_signal_ids:
+            sys.stderr.write(
+                f"WARNING [score] archetype={archetype_id} signal={signal_id}\n"
+                "  join_hash is null — signal will match any record on this edge\n"
+                "  (wildcard mode). Populate join_hash to enable approach discrimination.\n"
+            )
+        n_signals_wildcard = len(wildcard_signal_ids)
+        if n_signals_wildcard == 0:
+            scoring_mode = "strict"
+        elif n_signals_wildcard == len(signals):
+            scoring_mode = "wildcard"
+        else:
+            scoring_mode = "partial"
+
         if required_signals and all(s.get("edge_id", "") in unavailable_edges for s in required_signals):
             coverage[archetype_id] = {
                 "n_files_full": 0,
@@ -251,6 +279,8 @@ def main() -> int:
                 "signals_null": ";".join(signals_null),
                 "n_signals_fired": len(signals_fired),
                 "n_signals_null": len(signals_null),
+                "n_signals_wildcard": n_signals_wildcard,
+                "scoring_mode": scoring_mode,
                 "client_label": meta.get("client_label", ""),
                 "governance_role": meta.get("governance_role", ""),
                 "discipline_label": meta.get("discipline_label", ""),
