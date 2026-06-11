@@ -1,0 +1,66 @@
+{
+  "_comment": "Seed category-name map for tools/archetype/discover_vfd_edges.py. Keys are BuiltInCategory integer ids serialized as strings. domain_extracted=false means the related category's target domain is not yet exported by this pipeline; _verify=true means the mapping should be reviewed.",
+  "-2000011": {
+    "name": "OST_Walls",
+    "domain_extracted": true
+  },
+  "-2000032": {
+    "name": "OST_Floors",
+    "domain_extracted": true
+  },
+  "-2000023": {
+    "name": "OST_Roofs",
+    "domain_extracted": true,
+    "_verify": true
+  },
+  "-2000038": {
+    "name": "OST_Ceilings",
+    "domain_extracted": true,
+    "_verify": true
+  },
+  "-2000151": {
+    "name": "OST_Doors",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000200": {
+    "name": "OST_Windows",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000240": {
+    "name": "OST_GenericModel",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000220": {
+    "name": "OST_Casework",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000535": {
+    "name": "OST_StructuralFraming",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001100": {
+    "name": "OST_PipeCurves",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001000": {
+    "name": "OST_DuctCurves",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000080": {
+    "name": "OST_Furniture",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000014": {
+    "name": "OST_Columns",
+    "domain_extracted": false,
+    "_verify": true
+  }
+}

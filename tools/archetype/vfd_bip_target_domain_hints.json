@@ -1,0 +1,34 @@
+{
+  "_comment": "Seed target-domain hints for tools/archetype/discover_vfd_edges.py. Exact BIP ids take precedence over name_contains rules. Entries marked _verify=true should be human-reviewed before being treated as authoritative.",
+  "exact_bip_id": {
+    "_comment": "Add high-confidence bip:{int} -> target_domain overrides here as they are validated from corpus evidence."
+  },
+  "name_contains": [
+    {
+      "substring": "MATERIAL",
+      "target_domain": "materials"
+    },
+    {
+      "substring": "LINE_PATTERN",
+      "target_domain": "line_patterns"
+    },
+    {
+      "substring": "LINEPATTERN",
+      "target_domain": "line_patterns"
+    },
+    {
+      "substring": "FILL_PATTERN",
+      "target_domain": "fill_patterns_model",
+      "_verify": true
+    },
+    {
+      "substring": "FILLPATTERN",
+      "target_domain": "fill_patterns_model",
+      "_verify": true
+    },
+    {
+      "substring": "ARROWHEAD",
+      "target_domain": "arrowheads"
+    }
+  ]
+}
