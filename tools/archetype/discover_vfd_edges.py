@@ -11,7 +11,9 @@ Inputs:
 
 Outputs:
   - vfd_param_inventory.csv
-  - vfd_dynamic_edges.csv
+  - vfd_dynamic_edges.csv, including one category_id row per discovered
+    (edge, param_id, category_id) so generate_reference_graph.py can rebuild
+    dynamic scope_conditions.
 
 The output CSVs are intended as offline inputs to generate_reference_graph.py.
 All paths are supplied at runtime; the category/domain reference files default
@@ -61,6 +63,7 @@ INVENTORY_FIELDS = [
 EDGE_FIELDS = [
     "edge_id",
     "param_id",
+    "category_id",
     "param_kind",
     "param_name",
     "param_name_normalized",
@@ -208,10 +211,16 @@ def stream_observations(path: Path) -> Tuple[List[RawObservation], int, Set[str]
 
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
-        required = {"export_run_id", "record_pk", "item_key", "item_value", "item_quality"}
-        missing = required.difference(reader.fieldnames or [])
+        fieldnames = set(reader.fieldnames or [])
+        required = {"export_run_id", "record_pk", "item_key", "item_value"}
+        missing = required.difference(fieldnames)
         if missing:
             raise SystemExit(f"ERROR [{STAGE}] identity_items CSV is missing required columns: {sorted(missing)}")
+        if "item_value_type" not in fieldnames and "item_quality" not in fieldnames:
+            raise SystemExit(
+                f"ERROR [{STAGE}] identity_items CSV is missing required quality column: "
+                "expected item_value_type (preferred) or item_quality"
+            )
 
         for row in reader:
             rows_read += 1
@@ -569,25 +578,32 @@ def build_edge_rows(inventory_rows: Sequence[Dict[str, Any]], include_unresolved
                 f'Multiple param_ids resolve to same normalized name "{normalized}" for target_domain '
                 f'"{target_domain or "null"}": {param_ids}. Grouped under single edge. Verify these are the same parameter.'
             )
-        first_param_id = param_ids[0]
-        rows.append({
-            "edge_id": f"vfd.{normalized}__{group['edge_domain_component']}",
-            "param_id": first_param_id,
-            "param_kind": group["param_kind_by_id"].get(first_param_id, ""),
-            "param_name": group["param_name"],
-            "param_name_normalized": normalized,
-            "target_domain": target_domain,
-            "scope_conditions": json.dumps(
-                {"param_ids": param_ids, "category_ids": sorted(group["category_ids"])},
-                separators=(",", ":"),
-            ),
-            "file_count": len(group["export_run_ids"]) if group["export_run_ids"] else group["file_count"],
-            "rule_count": group["rule_count"],
-            "name_resolved": "true",
-            "target_domain_source": "|".join(group["target_domain_sources"]),
-            "target_domain_verified": bool_s(bool(group["target_domain_verified"])),
-            "requires_human_review": bool_s(bool(group["requires_human_review"])),
-        })
+        edge_id = f"vfd.{normalized}__{group['edge_domain_component']}"
+        category_ids = sorted(group["category_ids"])
+        category_id_values = category_ids or [""]
+        file_count = len(group["export_run_ids"]) if group["export_run_ids"] else group["file_count"]
+        scope_conditions = json.dumps(
+            {"param_ids": param_ids, "category_ids": category_ids},
+            separators=(",", ":"),
+        )
+        for param_id in param_ids:
+            for category_id in category_id_values:
+                rows.append({
+                    "edge_id": edge_id,
+                    "param_id": param_id,
+                    "category_id": category_id,
+                    "param_kind": group["param_kind_by_id"].get(param_id, ""),
+                    "param_name": group["param_name"],
+                    "param_name_normalized": normalized,
+                    "target_domain": target_domain,
+                    "scope_conditions": scope_conditions,
+                    "file_count": file_count,
+                    "rule_count": group["rule_count"],
+                    "name_resolved": "true",
+                    "target_domain_source": "|".join(group["target_domain_sources"]),
+                    "target_domain_verified": bool_s(bool(group["target_domain_verified"])),
+                    "requires_human_review": bool_s(bool(group["requires_human_review"])),
+                })
     return rows
 
 
