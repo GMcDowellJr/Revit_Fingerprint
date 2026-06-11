@@ -382,3 +382,88 @@ def test_discover_vfd_edges_skips_edges_without_category_scope(tmp_path):
     assert inventory
     assert all(row["category_set"] == "" for row in inventory)
     assert read_csv(out_dir / "vfd_dynamic_edges.csv") == []
+
+
+def test_discover_vfd_edges_ignores_unusable_category_rows(tmp_path):
+    items_dir = tmp_path / "items"
+    out_dir = tmp_path / "out"
+    items_dir.mkdir()
+    (items_dir / "view_filter_definitions.csv").write_text(
+        "export_run_id,record_pk,item_key,item_value,item_value_type\n"
+        "f1,r1,vf.categories,-2000011,ok\n"
+        "f1,r1,vf.categories,-2000032,unreadable\n"
+        "f1,r1,vf.rule[001].param_ref.kind,builtin,ok\n"
+        "f1,r1,vf.rule[001].param_ref.id,bip:-1005500,ok\n",
+        encoding="utf-8",
+    )
+    bip_lookup = tmp_path / "bip_lookup.json"
+    bip_lookup.write_text(json.dumps({"bip:-1005500": "STRUCTURAL_MATERIAL_PARAM"}), encoding="utf-8")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--identity-items-dir",
+            str(items_dir),
+            "--bip-lookup",
+            str(bip_lookup),
+            "--support-min-files",
+            "1",
+            "--out-dir",
+            str(out_dir),
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    inventory = read_csv(out_dir / "vfd_param_inventory.csv")
+    assert len(inventory) == 1
+    assert inventory[0]["category_set"] == "-2000011"
+    assert inventory[0]["category_names"] == "Walls"
+
+    edges = read_csv(out_dir / "vfd_dynamic_edges.csv")
+    assert len(edges) == 1
+    assert edges[0]["category_id"] == "-2000011"
+
+
+def test_discover_vfd_edges_ignores_unusable_param_ref_rows_with_item_quality(tmp_path):
+    items_dir = tmp_path / "items"
+    out_dir = tmp_path / "out"
+    items_dir.mkdir()
+    (items_dir / "view_filter_definitions.csv").write_text(
+        "export_run_id,record_pk,item_key,item_value,item_quality\n"
+        "f1,r1,vf.categories,-2000011,ok\n"
+        "f1,r1,vf.rule[001].param_ref.kind,builtin,ok\n"
+        "f1,r1,vf.rule[001].param_ref.id,bip:-1005500,unreadable\n"
+        "f2,r2,vf.categories,-2000011,ok\n"
+        "f2,r2,vf.rule[001].param_ref.kind,builtin,ok\n"
+        "f2,r2,vf.rule[001].param_ref.id,bip:-1005500,ok\n",
+        encoding="utf-8",
+    )
+    bip_lookup = tmp_path / "bip_lookup.json"
+    bip_lookup.write_text(json.dumps({"bip:-1005500": "STRUCTURAL_MATERIAL_PARAM"}), encoding="utf-8")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--identity-items-dir",
+            str(items_dir),
+            "--bip-lookup",
+            str(bip_lookup),
+            "--support-min-files",
+            "2",
+            "--out-dir",
+            str(out_dir),
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    inventory = read_csv(out_dir / "vfd_param_inventory.csv")
+    assert len(inventory) == 1
+    assert inventory[0]["file_count"] == "1"
+    assert inventory[0]["meets_threshold"] == "false"
+    assert read_csv(out_dir / "vfd_dynamic_edges.csv") == []

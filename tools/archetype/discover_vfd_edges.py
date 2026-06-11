@@ -40,6 +40,14 @@ GUID_RE = re.compile(
 )
 EDGE_ID_RE = re.compile(r"^vfd\.[a-z0-9_]+__[A-Za-z0-9_]+$")
 SENTINEL_IDS = {"", "null", "none", "missing", "unreadable", "<none>", "<missing>", "<unreadable>"}
+INVALID_ITEM_VALUES = {"", "<NONE>", "<MISSING>", "<UNREADABLE>", "<NOT_APPLICABLE>"}
+INVALID_ITEM_QUALITIES = {
+    "missing",
+    "unreadable",
+    "unsupported",
+    "unsupported.not_applicable",
+    "unsupported.not_implemented",
+}
 
 INVENTORY_FIELDS = [
     "param_id",
@@ -173,6 +181,19 @@ def is_bad_param_id(value: str) -> bool:
     return stripped.lower() in SENTINEL_IDS or stripped.startswith("<")
 
 
+def row_quality(row: Dict[str, str]) -> str:
+    return (row.get("item_value_type") or row.get("item_quality") or "").strip()
+
+
+def is_usable_identity_item_value(item_value: str, quality: str) -> bool:
+    stripped = (item_value or "").strip()
+    if stripped.upper() in INVALID_ITEM_VALUES:
+        return False
+    if quality.strip().lower() in INVALID_ITEM_QUALITIES:
+        return False
+    return True
+
+
 def canonical_param_kind(param_id: str, raw_kind: str) -> str:
     kind = (raw_kind or "").strip().lower()
     if BIP_RE.match(param_id):
@@ -240,6 +261,8 @@ def stream_observations(path: Path) -> Tuple[List[RawObservation], int, Set[str]
                 record_states[row_key] = {"categories": "", "rules": defaultdict(dict)}
             state = record_states[row_key]
             item_value = (row.get("item_value") or "").strip()
+            if not is_usable_identity_item_value(item_value, row_quality(row)):
+                continue
 
             if item_key == "vf.categories":
                 state["categories"] = item_value
