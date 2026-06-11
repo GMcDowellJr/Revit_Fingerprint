@@ -28,7 +28,8 @@ Processing:
     vf.rule[*].param_ref.id matching scope_conditions.param_ids, requiring
     the same record's vf.categories item to contain at least one
     scope_conditions.category_id (vf.categories may be a comma-separated
-    string of category ids). target_join_hash is null for dynamic edges.
+    string or JSON array of category ids). target_join_hash is null for
+    dynamic edges.
 
 Usage:
     python tools/archetype/build_cross_domain_items.py \\
@@ -42,6 +43,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
@@ -75,6 +77,37 @@ def _load_identity_items(identity_items_dir: Path, domain: str, cache: Dict[str,
         cache[domain] = rows
         log(STAGE, f"loaded {len(rows)} identity_items rows for domain={domain}")
     return cache[domain]
+
+
+def _parse_vf_categories(raw_value: str) -> Set[str]:
+    """Parse a vf.categories value into category-id strings.
+
+    Discovery accepts both the historical comma-separated export shape and a
+    JSON-array shape. Dynamic row building must normalize both shapes the same
+    way or JSON-backed support will produce VFD edges that never fire.
+    """
+    value = (raw_value or "").strip()
+    if not value:
+        return set()
+
+    comma_parts = [part.strip() for part in value.split(",")]
+    if comma_parts and all(part and part.lstrip("+-").isdigit() for part in comma_parts):
+        return set(comma_parts)
+
+    try:
+        data = json.loads(value)
+    except json.JSONDecodeError:
+        return set()
+    if not isinstance(data, list):
+        return set()
+
+    categories: Set[str] = set()
+    for item in data:
+        if isinstance(item, int):
+            categories.add(str(item))
+        elif isinstance(item, str) and item.strip():
+            categories.add(item.strip())
+    return categories
 
 
 def _build_structural_rows(
@@ -130,7 +163,7 @@ def _build_dynamic_rows(
     edge_id = edge["edge_id"]
     scope = edge.get("scope_conditions", {}) or {}
     param_ids: Set[str] = set(scope.get("param_ids", []) or [])
-    category_ids: Set[str] = set(scope.get("category_ids", []) or [])
+    category_ids: Set[str] = {str(category_id) for category_id in (scope.get("category_ids", []) or [])}
 
     # Group rows by (export_run_id, record_pk) so we can evaluate
     # vf.rule[*].param_ref.id and vf.categories together per record.
@@ -160,7 +193,7 @@ def _build_dynamic_rows(
                 continue
             if not is_valid_item(row.get("item_value", ""), row.get("item_value_type", "")):
                 continue
-            record_categories = {c.strip() for c in row.get("item_value", "").split(",") if c.strip()}
+            record_categories = _parse_vf_categories(row.get("item_value", ""))
             if record_categories & category_ids:
                 category_match = True
                 break
