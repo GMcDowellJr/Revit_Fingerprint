@@ -36,13 +36,22 @@ Processing:
     Dynamic VFD edges (edge_type == "dynamic" in reference_graph.json)
     intentionally carry an empty target_join_hash, so any firing of a
     dynamic edge counts toward coverage regardless of target_join_hash.
-    Every signal stub gets "_coverage_pct" (0.0-100.0, two decimals). If
-    coverage < --low-coverage-threshold (default 0.10), the signal stub gets
-    "required": false and "_low_coverage_flag": true; otherwise
+    Every signal stub gets "_coverage_pct" (0.0-100.0, two decimals) and
+    "collapsed_from" (the list of original edge_ids -- from
+    _common.build_edge_aliases -- that were folded onto this signal's
+    edge_id when computing coverage; empty if the edge_id collapsed nothing).
+    If coverage < --low-coverage-threshold (default 0.10), the signal stub
+    gets "required": false and "_low_coverage_flag": true; otherwise
     "required": true and "_low_coverage_flag": false. The "_"-prefixed
     fields are human-review annotations only and do not affect downstream
-    scoring. Each candidate also gets a top-level "coverage_pct" equal to
-    the minimum "_coverage_pct" across its signals.
+    scoring. Each candidate also gets a top-level "min_signal_coverage_pct"
+    equal to the minimum "_coverage_pct" across its signals.
+  - Missing --cross-domain-items: if the path is not provided, or the file
+    does not exist, an ERROR is written to stderr and coverage gating is
+    skipped entirely -- every signal stub gets "_coverage_pct": null,
+    "_low_coverage_flag": false, "required": true (safe default), and
+    every candidate gets "min_signal_coverage_pct": null. The candidates
+    file is still written.
 
 Usage:
     python tools/archetype/generate_archetype_candidates.py \\
@@ -56,6 +65,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -109,6 +119,15 @@ def _signal_coverage_pct(
     return round(covered / n_files_total * 100.0, 2)
 
 
+def _collapsed_from_for_edge(
+    edge_id: str,
+    alias_of: Dict[str, str],
+    collapsed: Dict[str, List[str]],
+) -> List[str]:
+    canonical_edge_id = alias_of.get(edge_id, edge_id)
+    return collapsed.get(canonical_edge_id, [])
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
@@ -138,6 +157,15 @@ def main() -> int:
     alias_of, collapsed = build_edge_aliases(edges_by_id)
     if alias_of:
         log(STAGE, f"collapsed {len(alias_of)} edges onto {len(collapsed)} canonical edges")
+
+    coverage_available = items_path.is_file()
+    if not coverage_available:
+        sys.stderr.write(
+            "ERROR [candidates] --cross-domain-items is required for coverage\n"
+            "computation. All signals will have _coverage_pct: null and\n"
+            "required: true (safe default). Re-run with --cross-domain-items\n"
+            "to enable low-coverage detection.\n"
+        )
 
     items_rows = read_csv_rows(items_path)
     log(STAGE, f"loaded {len(items_rows)} rows from {items_path}")
@@ -202,14 +230,22 @@ def main() -> int:
         top_join_hash_a = top_row.get("join_hash_a", "")
         top_join_hash_b = top_row.get("join_hash_b", "")
 
-        coverage_pct_a = _signal_coverage_pct(edge_id_a, alias_of, covered_files_by_edge, n_files_total)
-        coverage_pct_b = _signal_coverage_pct(edge_id_b, alias_of, covered_files_by_edge, n_files_total)
-        low_coverage_a = (coverage_pct_a / 100.0) < args.low_coverage_threshold
-        low_coverage_b = (coverage_pct_b / 100.0) < args.low_coverage_threshold
-        if low_coverage_a:
-            n_low_coverage_signals += 1
-        if low_coverage_b:
-            n_low_coverage_signals += 1
+        if coverage_available:
+            coverage_pct_a = _signal_coverage_pct(edge_id_a, alias_of, covered_files_by_edge, n_files_total)
+            coverage_pct_b = _signal_coverage_pct(edge_id_b, alias_of, covered_files_by_edge, n_files_total)
+            low_coverage_a = (coverage_pct_a / 100.0) < args.low_coverage_threshold
+            low_coverage_b = (coverage_pct_b / 100.0) < args.low_coverage_threshold
+            if low_coverage_a:
+                n_low_coverage_signals += 1
+            if low_coverage_b:
+                n_low_coverage_signals += 1
+            min_signal_coverage_pct = min(coverage_pct_a, coverage_pct_b)
+        else:
+            coverage_pct_a = None
+            coverage_pct_b = None
+            low_coverage_a = False
+            low_coverage_b = False
+            min_signal_coverage_pct = None
 
         candidates.append({
             "archetype_id": archetype_id,
@@ -219,7 +255,7 @@ def main() -> int:
             "auto_generated": True,
             "distinct_pattern_count": len(rows),
             "total_file_count": total_file_count,
-            "coverage_pct": min(coverage_pct_a, coverage_pct_b),
+            "min_signal_coverage_pct": min_signal_coverage_pct,
             "top_join_hash_pairs": top_join_hash_pairs,
             "signals": [
                 {
@@ -232,6 +268,7 @@ def main() -> int:
                     "join_hash_populated": bool(top_join_hash_a),
                     "_coverage_pct": coverage_pct_a,
                     "_low_coverage_flag": low_coverage_a,
+                    "collapsed_from": _collapsed_from_for_edge(edge_id_a, alias_of, collapsed),
                 },
                 {
                     "signal_id": edge_id_b,
@@ -243,6 +280,7 @@ def main() -> int:
                     "join_hash_populated": bool(top_join_hash_b),
                     "_coverage_pct": coverage_pct_b,
                     "_low_coverage_flag": low_coverage_b,
+                    "collapsed_from": _collapsed_from_for_edge(edge_id_b, alias_of, collapsed),
                 },
             ],
         })
