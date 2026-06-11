@@ -152,7 +152,7 @@ join hashes needed for downstream co-occurrence and classification.
   for `target_join_hash`.
 - **Dynamic VFD edges**: per record, requires a `vf.rule[*].param_ref.id`
   item matching `scope_conditions.param_ids` AND a `vf.categories` item
-  (comma-separated category ids) intersecting `scope_conditions.category_ids`.
+  (comma-separated or JSON-array category ids) intersecting `scope_conditions.category_ids`.
   `target_join_hash` is empty for dynamic edges.
 
 **Typical command**

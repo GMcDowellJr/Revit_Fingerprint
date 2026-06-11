@@ -115,7 +115,7 @@ def test_generated_dynamic_edges_include_category_id_for_reference_graph(tmp_pat
     items_dir.mkdir()
     (items_dir / "view_filter_definitions.csv").write_text(
         "export_run_id,record_pk,item_key,item_value,item_value_type\n"
-        "f1,r1,vf.categories,\"-2000011,-2000032\",ok\n"
+        "f1,r1,vf.categories,\"[-2000011,-2000032]\",ok\n"
         "f1,r1,vf.rule[001].param_ref.kind,builtin,ok\n"
         "f1,r1,vf.rule[001].param_ref.id,bip:-1005500,ok\n",
         encoding="utf-8",
@@ -160,3 +160,25 @@ def test_generated_dynamic_edges_include_category_id_for_reference_graph(tmp_pat
 
     assert len(ref_edges) == 1
     assert ref_edges[0]["scope_conditions"]["category_ids"] == ["-2000011", "-2000032"]
+
+    build_spec = importlib.util.spec_from_file_location(
+        "build_cross_domain_items", Path("tools/archetype/build_cross_domain_items.py")
+    )
+    build_module = importlib.util.module_from_spec(build_spec)
+    sys.path.insert(0, str(Path("tools/archetype").resolve()))
+    try:
+        build_spec.loader.exec_module(build_module)
+    finally:
+        sys.path.pop(0)
+
+    assert build_module._parse_vf_categories('["-2000011"]') == {"-2000011"}
+
+    dynamic_rows = build_module._build_dynamic_rows(
+        ref_edges[0],
+        items_dir,
+        {},
+        {("f1", "view_filter_definitions", "r1"): "source-join-hash"},
+    )
+
+    assert len(dynamic_rows) == 1
+    assert dynamic_rows[0]["source_join_hash"] == "source-join-hash"
