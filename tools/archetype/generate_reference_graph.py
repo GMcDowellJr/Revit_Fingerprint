@@ -23,7 +23,12 @@ Processing:
      group by (param_id, target_domain) to produce scope_conditions with
      param_ids and category_ids lists. Param names are resolved via
      bip_lookup.json / shared_param_names.json. edge_id slug =
-     "vfd__{target_domain}.{param_name_normalized}".
+     "vfd__{target_domain}.{param_name_normalized}__{param_id_slug}", where
+     param_id_slug is derived from param_id itself (normalized name for
+     "bip:"-prefixed ids, else the first 8 hex chars of md5(param_id) for
+     shared-parameter GUIDs). This guarantees edge_id stays unique per
+     (param_id, target_domain) group even when two distinct param_ids
+     resolve to the same display name.
   3. Merge static (with computed available flags) + dynamic edges and write
      reference_graph.json.
 
@@ -40,6 +45,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -125,6 +131,17 @@ def _resolve_param_name(param_id: str, bip_lookup: Dict[str, Any], shared_param_
     return name or param_id
 
 
+def _param_id_slug(param_id: str) -> str:
+    """Stable slug derived from param_id (not its resolved display name).
+
+    Used to disambiguate edge_ids when two distinct param_ids resolve to the
+    same display name within the same target_domain.
+    """
+    if param_id.startswith("bip:"):
+        return _normalize_param_name(param_id[len("bip:"):])
+    return hashlib.md5(param_id.encode("utf-8")).hexdigest()[:8]
+
+
 def _build_dynamic_edges(
     vfd_dynamic_edges_path: Path,
     bip_lookup: Dict[str, Any],
@@ -182,7 +199,8 @@ def _build_dynamic_edges(
 
         param_name = _resolve_param_name(param_id, bip_lookup, shared_param_names)
         param_name_normalized = _normalize_param_name(param_name)
-        edge_id = f"vfd__{target_domain}.{param_name_normalized}"
+        param_id_slug = _param_id_slug(param_id)
+        edge_id = f"vfd__{target_domain}.{param_name_normalized}__{param_id_slug}"
 
         edges.append({
             "edge_id": edge_id,

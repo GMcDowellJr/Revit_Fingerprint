@@ -111,7 +111,12 @@ edges.
   `file_count`, groups by `(param_id, target_domain)` into
   `scope_conditions.{param_ids, category_ids}`. Param names resolve via
   `bip_lookup.json` (for `bip:`-prefixed ids) or `shared_param_names.json`,
-  normalized into `edge_id = "vfd__{target_domain}.{param_name_normalized}"`.
+  normalized into
+  `edge_id = "vfd__{target_domain}.{param_name_normalized}__{param_id_slug}"`,
+  where `param_id_slug` is derived from `param_id` itself (normalized name
+  for `bip:`-prefixed ids, else the first 8 hex chars of `md5(param_id)` for
+  shared-parameter GUIDs) so two distinct `param_id`s that resolve to the
+  same display name in the same `target_domain` never collide on `edge_id`.
 
 **Typical command**
 ```
