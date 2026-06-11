@@ -2,11 +2,13 @@
   "_comment": "Seed category-name map for tools/archetype/discover_vfd_edges.py. Keys are BuiltInCategory integer ids serialized as strings. domain_extracted=false means the related category's target domain is not yet exported by this pipeline; _verify=true means the mapping should be reviewed.",
   "-2000011": {
     "name": "Walls",
-    "domain_extracted": true
+    "domain_extracted": true,
+    "target_domain": "wall_types"
   },
   "-2000032": {
     "name": "Floors",
-    "domain_extracted": true
+    "domain_extracted": true,
+    "target_domain": "floor_types"
   },
   "-2000023": {
     "name": "OST_Roofs",
@@ -16,7 +18,8 @@
   "-2000038": {
     "name": "Ceilings",
     "domain_extracted": true,
-    "_verify": true
+    "_verify": true,
+    "target_domain": "ceiling_types"
   },
   "-2000151": {
     "name": "OST_Doors",
@@ -66,6 +69,7 @@
   "-2000035": {
     "name": "Roofs",
     "domain_extracted": true,
-    "_verify": true
+    "_verify": true,
+    "target_domain": "roof_types"
   }
 }
