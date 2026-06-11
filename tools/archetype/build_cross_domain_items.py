@@ -19,7 +19,11 @@ Processing:
     (not a sentinel, item_value_type == "ok"). Join records.csv on
     (export_run_id, domain=source_domain, record_pk=record_pk) for
     source_join_hash. Join records.csv again on
-    (domain=target_domain, sig_hash=item_value) for target_join_hash.
+    (export_run_id, domain=target_domain, sig_hash=item_value) for
+    target_join_hash -- the target record must exist in the SAME
+    export_run_id; a sig_hash that only matches a record in a different
+    export_run_id leaves target_join_hash empty (a structural edge is not
+    "resolved" for a file based on cross-file evidence).
   - Dynamic VFD edges: filter identity_items on
     vf.rule[*].param_ref.id matching scope_conditions.param_ids, requiring
     the same record's vf.categories item to contain at least one
@@ -78,7 +82,7 @@ def _build_structural_rows(
     identity_items_dir: Path,
     item_cache: Dict[str, List[Dict[str, str]]],
     source_join_hash_idx: Dict[Tuple[str, str, str], str],
-    target_join_hash_idx: Dict[Tuple[str, str], str],
+    target_join_hash_idx: Dict[Tuple[str, str, str], str],
 ) -> List[Dict[str, str]]:
     source_domain = edge["source_domain"]
     target_domain = edge["target_domain"]
@@ -98,7 +102,7 @@ def _build_structural_rows(
         export_run_id = row.get("export_run_id", "")
         record_pk = row.get("record_pk", "")
         source_join_hash = source_join_hash_idx.get((export_run_id, source_domain, record_pk), "")
-        target_join_hash = target_join_hash_idx.get((target_domain, item_value), "")
+        target_join_hash = target_join_hash_idx.get((export_run_id, target_domain, item_value), "")
 
         out_rows.append({
             "export_run_id": export_run_id,
@@ -206,8 +210,12 @@ def main() -> int:
 
     # (export_run_id, domain, record_pk) -> join_hash
     source_join_hash_idx: Dict[Tuple[str, str, str], str] = {}
-    # (domain, sig_hash) -> join_hash  (first occurrence wins; sig_hash is content-addressed)
-    target_join_hash_idx: Dict[Tuple[str, str], str] = {}
+    # (export_run_id, domain, sig_hash) -> join_hash  (first occurrence wins within
+    # an export; sig_hash is content-addressed but a target reference only counts
+    # as resolved if the target record exists in the SAME export_run_id -- a
+    # cross-file match would make a structural edge look resolved for a file that
+    # never actually carried that target).
+    target_join_hash_idx: Dict[Tuple[str, str, str], str] = {}
     for r in records_rows:
         export_run_id = r.get("export_run_id", "")
         domain = r.get("domain", "")
@@ -216,8 +224,8 @@ def main() -> int:
         sig_hash = r.get("sig_hash", "")
         if export_run_id and domain and record_pk:
             source_join_hash_idx[(export_run_id, domain, record_pk)] = join_hash
-        if domain and sig_hash and (domain, sig_hash) not in target_join_hash_idx:
-            target_join_hash_idx[(domain, sig_hash)] = join_hash
+        if export_run_id and domain and sig_hash and (export_run_id, domain, sig_hash) not in target_join_hash_idx:
+            target_join_hash_idx[(export_run_id, domain, sig_hash)] = join_hash
 
     item_cache: Dict[str, List[Dict[str, str]]] = {}
     out_rows: List[Dict[str, str]] = []
