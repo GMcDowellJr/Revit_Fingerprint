@@ -8,6 +8,9 @@ Inputs:
   - vfd_category_domain_map.json
   - vfd_bip_target_domain_hints.json
   - shared_param_names.json (optional)
+  - file_metadata.csv (optional; required when --dump-unresolved-files is
+    set), keyed by export_run_id with client_label, governance_role,
+    unit_system columns.
 
 Outputs:
   - vfd_param_inventory.csv
@@ -15,6 +18,10 @@ Outputs:
     scope_conditions.category_ids listing every supported category and
     category_file_counts giving the per-category file support, so
     generate_reference_graph.py can rebuild dynamic scope_conditions.
+  - vfd_unresolved_files.csv (optional; written when --dump-unresolved-files
+    is set), one row per (unresolved shared-parameter GUID, export_run_id)
+    joined to file_metadata.csv, to help locate source files for resolving
+    shared_param_names.json.
 
 The output CSVs are intended as offline inputs to generate_reference_graph.py.
 All paths are supplied at runtime; the category/domain reference files default
@@ -84,6 +91,15 @@ EDGE_FIELDS = [
     "target_domain_source",
     "target_domain_verified",
     "requires_human_review",
+]
+
+UNRESOLVED_FILE_FIELDS = [
+    "param_id",
+    "export_run_id",
+    "client_label",
+    "governance_role",
+    "unit_system",
+    "rule_count",
 ]
 
 
@@ -157,6 +173,29 @@ def atomic_write_csv(path: Path, fieldnames: Sequence[str], rows: Iterable[Dict[
         for row in rows:
             writer.writerow({name: row.get(name, "") for name in fieldnames})
     tmp_path.replace(path)
+
+
+def load_file_metadata(path: Path) -> Dict[str, Dict[str, str]]:
+    if not path.is_file():
+        raise SystemExit(f"ERROR [{STAGE}] required file_metadata.csv not found: {path}")
+    metadata: Dict[str, Dict[str, str]] = {}
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = set(reader.fieldnames or [])
+        required = {"export_run_id", "client_label", "governance_role", "unit_system"}
+        missing = required.difference(fieldnames)
+        if missing:
+            raise SystemExit(f"ERROR [{STAGE}] file_metadata.csv is missing required columns: {sorted(missing)}")
+        for row in reader:
+            export_run_id = (row.get("export_run_id") or "").strip()
+            if not export_run_id:
+                continue
+            metadata[export_run_id] = {
+                "client_label": (row.get("client_label") or "").strip(),
+                "governance_role": (row.get("governance_role") or "").strip(),
+                "unit_system": (row.get("unit_system") or "").strip(),
+            }
+    return metadata
 
 
 def bool_s(value: bool) -> str:
@@ -778,6 +817,90 @@ def print_summary(
     print(f"  {out_dir / 'vfd_dynamic_edges.csv'}")
 
 
+def build_unresolved_file_rows(
+    observations: Sequence[RawObservation],
+    resolved: Dict[str, ResolvedParam],
+    file_metadata: Dict[str, Dict[str, str]],
+) -> List[Dict[str, Any]]:
+    rule_counts: Dict[Tuple[str, str], int] = defaultdict(int)
+    files_by_param: Dict[str, Set[str]] = defaultdict(set)
+
+    for obs in observations:
+        if not GUID_RE.match(obs.param_id):
+            continue
+        param = resolved.get(obs.param_id)
+        if param is None or param.name_resolved:
+            continue
+        rule_counts[(obs.param_id, obs.export_run_id)] += 1
+        files_by_param[obs.param_id].add(obs.export_run_id)
+
+    warned_missing: Set[str] = set()
+    rows: List[Dict[str, Any]] = []
+    for (param_id, export_run_id), rule_count in rule_counts.items():
+        meta = file_metadata.get(export_run_id)
+        if meta is None:
+            if export_run_id not in warned_missing:
+                warn(f"export_run_id {export_run_id} not found in file_metadata.csv")
+                warned_missing.add(export_run_id)
+            client_label = "unknown"
+            governance_role = "unknown"
+            unit_system = "unknown"
+        else:
+            client_label = meta["client_label"] or "unknown"
+            governance_role = meta["governance_role"] or "unknown"
+            unit_system = meta["unit_system"] or "unknown"
+
+        rows.append({
+            "param_id": param_id,
+            "export_run_id": export_run_id,
+            "client_label": client_label,
+            "governance_role": governance_role,
+            "unit_system": unit_system,
+            "rule_count": rule_count,
+        })
+
+    rows.sort(key=lambda r: (r["param_id"], -len(files_by_param[r["param_id"]]), r["export_run_id"]))
+    return rows
+
+
+def print_unresolved_summary(rows: Sequence[Dict[str, Any]]) -> None:
+    distinct_guids: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        distinct_guids[str(row["param_id"])].append(row)
+
+    print("Unresolved GUID file mapping")
+    print("----------------------------")
+    print(f"Distinct unresolved GUIDs:  {len(distinct_guids)}")
+    print(f"Total file×GUID rows:       {len(rows)}")
+    print()
+
+    print("Top GUIDs by file count:")
+    top_guids = sorted(distinct_guids.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:10]
+    for param_id, guid_rows in top_guids:
+        clients = sorted({str(r["client_label"]) for r in guid_rows})
+        print(f"  {param_id}  {len(guid_rows)} files  clients: {', '.join(clients)}")
+    print()
+
+    print("Recommended source files (Template role, highest GUID coverage):")
+    rows_by_client: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        rows_by_client[str(row["client_label"])].append(row)
+
+    for client_label in sorted(rows_by_client):
+        client_rows = rows_by_client[client_label]
+        guids_by_file: Dict[str, Set[str]] = defaultdict(set)
+        role_by_file: Dict[str, str] = {}
+        for row in client_rows:
+            export_run_id = str(row["export_run_id"])
+            guids_by_file[export_run_id].add(str(row["param_id"]))
+            role_by_file[export_run_id] = str(row["governance_role"])
+
+        template_files = [f for f in guids_by_file if role_by_file[f].lower() == "template"]
+        candidates = template_files or list(guids_by_file)
+        best_file = max(candidates, key=lambda f: (len(guids_by_file[f]), f))
+        print(f"  client={client_label}  file={best_file}  resolves {len(guids_by_file[best_file])} distinct GUIDs")
+
+
 def parse_args() -> argparse.Namespace:
     script_dir = Path(__file__).resolve().parent
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -789,9 +912,13 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--shared-param-names", default=None, help="Optional path to shared_param_names.json")
     ap.add_argument("--support-min-files", type=int, default=10, help="Minimum distinct export_run_ids for edge candidates")
     ap.add_argument("--include-unresolved", action="store_true", help="Include target_domain=null rows in vfd_dynamic_edges.csv for review")
+    ap.add_argument("--dump-unresolved-files", default=None, help="Optional path for unresolved-GUID file-mapping CSV (vfd_unresolved_files.csv)")
+    ap.add_argument("--file-metadata", default=None, help="Path to file_metadata.csv (required when --dump-unresolved-files is set)")
     args = ap.parse_args()
     if args.support_min_files < 1:
         raise SystemExit("ERROR [vfd_discover] --support-min-files must be >= 1")
+    if args.dump_unresolved_files and not args.file_metadata:
+        raise SystemExit("ERROR [vfd_discover] --file-metadata is required when --dump-unresolved-files is set")
     return args
 
 
@@ -827,6 +954,14 @@ def main() -> int:
         rows_read, export_run_ids, observations, resolved, inventory_rows, edge_rows,
         category_stats, args.support_min_files, out_dir,
     )
+
+    if args.dump_unresolved_files:
+        file_metadata = load_file_metadata(Path(args.file_metadata))
+        unresolved_rows = build_unresolved_file_rows(observations, resolved, file_metadata)
+        atomic_write_csv(Path(args.dump_unresolved_files), UNRESOLVED_FILE_FIELDS, unresolved_rows)
+        print()
+        print_unresolved_summary(unresolved_rows)
+
     return 0
 
 

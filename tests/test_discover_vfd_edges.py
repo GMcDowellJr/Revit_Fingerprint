@@ -528,3 +528,220 @@ def test_discover_vfd_edges_category_file_count_controls_generator_threshold(tmp
 
     assert len(ref_edges) == 1
     assert ref_edges[0]["scope_conditions"]["category_ids"] == ["-2000011"]
+
+
+def _write_unresolved_guid_inputs(items_dir):
+    guid_a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    guid_b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    (items_dir / "view_filter_definitions.csv").write_text(
+        "export_run_id,record_pk,item_key,item_value,item_value_type\n"
+        f"f1,r1,vf.categories,-2000011,ok\n"
+        f"f1,r1,vf.rule[001].param_ref.kind,shared,ok\n"
+        f"f1,r1,vf.rule[001].param_ref.id,{guid_a},ok\n"
+        f"f1,r2,vf.categories,-2000011,ok\n"
+        f"f1,r2,vf.rule[001].param_ref.kind,shared,ok\n"
+        f"f1,r2,vf.rule[001].param_ref.id,{guid_a},ok\n"
+        f"f2,r3,vf.categories,-2000011,ok\n"
+        f"f2,r3,vf.rule[001].param_ref.kind,shared,ok\n"
+        f"f2,r3,vf.rule[001].param_ref.id,{guid_a},ok\n"
+        f"f2,r4,vf.categories,-2000032,ok\n"
+        f"f2,r4,vf.rule[001].param_ref.kind,shared,ok\n"
+        f"f2,r4,vf.rule[001].param_ref.id,{guid_b},ok\n"
+        f"f3,r5,vf.categories,-2000032,ok\n"
+        f"f3,r5,vf.rule[001].param_ref.kind,shared,ok\n"
+        f"f3,r5,vf.rule[001].param_ref.id,{guid_b},ok\n",
+        encoding="utf-8",
+    )
+    return guid_a, guid_b
+
+
+def test_dump_unresolved_files_writes_csv_and_summary(tmp_path):
+    items_dir = tmp_path / "items"
+    out_dir = tmp_path / "out"
+    items_dir.mkdir()
+    guid_a, guid_b = _write_unresolved_guid_inputs(items_dir)
+
+    bip_lookup = tmp_path / "bip_lookup.json"
+    bip_lookup.write_text("{}", encoding="utf-8")
+
+    file_metadata = tmp_path / "file_metadata.csv"
+    file_metadata.write_text(
+        "export_run_id,client_label,governance_role,unit_system\n"
+        "f1,Acme,Template,imperial\n"
+        "f2,Acme,Project,imperial\n"
+        # f3 intentionally omitted to test "unknown" fallback
+        ,
+        encoding="utf-8",
+    )
+
+    unresolved_out = out_dir / "vfd_unresolved_files.csv"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--identity-items-dir",
+            str(items_dir),
+            "--bip-lookup",
+            str(bip_lookup),
+            "--support-min-files",
+            "1",
+            "--out-dir",
+            str(out_dir),
+            "--file-metadata",
+            str(file_metadata),
+            "--dump-unresolved-files",
+            str(unresolved_out),
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    rows = read_csv(unresolved_out)
+    assert {tuple(r) for r in rows[:1]}  # ensure non-empty read works
+    assert set(rows[0].keys()) == {
+        "param_id", "export_run_id", "client_label", "governance_role", "unit_system", "rule_count",
+    }
+
+    # Verification 2: every row has a GUID param_id (no bip:-prefixed rows)
+    for row in rows:
+        assert row["param_id"] in (guid_a, guid_b)
+
+    by_param_file = {(r["param_id"], r["export_run_id"]): r for r in rows}
+    assert by_param_file[(guid_a, "f1")]["rule_count"] == "2"
+    assert by_param_file[(guid_a, "f1")]["client_label"] == "Acme"
+    assert by_param_file[(guid_a, "f1")]["governance_role"] == "Template"
+    assert by_param_file[(guid_a, "f1")]["unit_system"] == "imperial"
+    assert by_param_file[(guid_a, "f2")]["rule_count"] == "1"
+    assert by_param_file[(guid_b, "f3")]["client_label"] == "unknown"
+    assert by_param_file[(guid_b, "f3")]["governance_role"] == "unknown"
+    assert by_param_file[(guid_b, "f3")]["unit_system"] == "unknown"
+
+    # f3 missing from file_metadata.csv -> WARNING logged
+    assert "f3" in result.stderr
+    assert "file_metadata.csv" in result.stderr
+
+    # Verification 3: summary printed and grouped by client
+    assert "Unresolved GUID file mapping" in result.stdout
+    assert "Distinct unresolved GUIDs:  2" in result.stdout
+    assert "Total file×GUID rows:       4" in result.stdout
+    assert "Recommended source files (Template role, highest GUID coverage):" in result.stdout
+    assert "client=Acme" in result.stdout
+    assert "client=unknown" in result.stdout
+
+
+def test_dump_unresolved_files_sort_order(tmp_path):
+    items_dir = tmp_path / "items"
+    out_dir = tmp_path / "out"
+    items_dir.mkdir()
+    guid_a, guid_b = _write_unresolved_guid_inputs(items_dir)
+
+    bip_lookup = tmp_path / "bip_lookup.json"
+    bip_lookup.write_text("{}", encoding="utf-8")
+
+    file_metadata = tmp_path / "file_metadata.csv"
+    file_metadata.write_text(
+        "export_run_id,client_label,governance_role,unit_system\n"
+        "f1,Acme,Template,imperial\n"
+        "f2,Acme,Project,imperial\n"
+        "f3,Beta,Project,metric\n",
+        encoding="utf-8",
+    )
+
+    unresolved_out = out_dir / "vfd_unresolved_files.csv"
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--identity-items-dir",
+            str(items_dir),
+            "--bip-lookup",
+            str(bip_lookup),
+            "--support-min-files",
+            "1",
+            "--out-dir",
+            str(out_dir),
+            "--file-metadata",
+            str(file_metadata),
+            "--dump-unresolved-files",
+            str(unresolved_out),
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    rows = read_csv(unresolved_out)
+    # guid_a appears in 2 files (f1, f2), guid_b appears in 2 files (f2, f3)
+    # param_id asc first: guid_a rows precede guid_b rows
+    param_ids = [r["param_id"] for r in rows]
+    assert param_ids == sorted(param_ids)
+    # within guid_a, export_run_id asc
+    guid_a_files = [r["export_run_id"] for r in rows if r["param_id"] == guid_a]
+    assert guid_a_files == sorted(guid_a_files)
+
+
+def test_dump_unresolved_files_requires_file_metadata(tmp_path):
+    items_dir = tmp_path / "items"
+    out_dir = tmp_path / "out"
+    items_dir.mkdir()
+    _write_unresolved_guid_inputs(items_dir)
+
+    bip_lookup = tmp_path / "bip_lookup.json"
+    bip_lookup.write_text("{}", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--identity-items-dir",
+            str(items_dir),
+            "--bip-lookup",
+            str(bip_lookup),
+            "--support-min-files",
+            "1",
+            "--out-dir",
+            str(out_dir),
+            "--dump-unresolved-files",
+            str(out_dir / "vfd_unresolved_files.csv"),
+        ],
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "--file-metadata" in result.stderr
+
+
+def test_without_dump_unresolved_files_behavior_unchanged(tmp_path):
+    items_dir = tmp_path / "items"
+    out_dir = tmp_path / "out"
+    items_dir.mkdir()
+    _write_unresolved_guid_inputs(items_dir)
+
+    bip_lookup = tmp_path / "bip_lookup.json"
+    bip_lookup.write_text("{}", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--identity-items-dir",
+            str(items_dir),
+            "--bip-lookup",
+            str(bip_lookup),
+            "--support-min-files",
+            "1",
+            "--out-dir",
+            str(out_dir),
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    assert not (out_dir / "vfd_unresolved_files.csv").exists()
+    assert "Unresolved GUID file mapping" not in result.stdout
+    assert "VFD Edge Discovery Summary" in result.stdout
