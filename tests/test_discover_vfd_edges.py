@@ -341,3 +341,44 @@ def test_discover_vfd_edges_applies_threshold_after_category_aggregation(tmp_pat
     assert edges[0]["category_id"] == "-2000011"
     assert edges[0]["file_count"] == "2"
     assert json.loads(edges[0]["scope_conditions"])["category_ids"] == [-2000011]
+
+
+def test_discover_vfd_edges_skips_edges_without_category_scope(tmp_path):
+    items_dir = tmp_path / "items"
+    out_dir = tmp_path / "out"
+    items_dir.mkdir()
+    (items_dir / "view_filter_definitions.csv").write_text(
+        "export_run_id,record_pk,item_key,item_value,item_value_type\n"
+        "f1,r1,vf.categories,,ok\n"
+        "f1,r1,vf.rule[001].param_ref.kind,builtin,ok\n"
+        "f1,r1,vf.rule[001].param_ref.id,bip:-1005500,ok\n"
+        "f2,r2,vf.categories,not-a-category-list,ok\n"
+        "f2,r2,vf.rule[001].param_ref.kind,builtin,ok\n"
+        "f2,r2,vf.rule[001].param_ref.id,bip:-1005500,ok\n",
+        encoding="utf-8",
+    )
+    bip_lookup = tmp_path / "bip_lookup.json"
+    bip_lookup.write_text(json.dumps({"bip:-1005500": "STRUCTURAL_MATERIAL_PARAM"}), encoding="utf-8")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--identity-items-dir",
+            str(items_dir),
+            "--bip-lookup",
+            str(bip_lookup),
+            "--support-min-files",
+            "1",
+            "--out-dir",
+            str(out_dir),
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    inventory = read_csv(out_dir / "vfd_param_inventory.csv")
+    assert inventory
+    assert all(row["category_set"] == "" for row in inventory)
+    assert read_csv(out_dir / "vfd_dynamic_edges.csv") == []

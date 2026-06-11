@@ -612,8 +612,7 @@ def build_edge_rows(
         group["rule_count"] += int(row["rule_count"])
 
         category_ids = parse_category_set(str(row["category_set"]))
-        category_values = category_ids or [""]
-        for category_id in category_values:
+        for category_id in category_ids:
             group["category_files"][category_id].update(export_run_ids)
             group["category_rule_counts"][category_id] += int(row["rule_count"])
 
@@ -640,9 +639,9 @@ def build_edge_rows(
             (
                 category_id
                 for category_id, files in group["category_files"].items()
-                if len(files) >= support_min_files
+                if category_id != "" and len(files) >= support_min_files
             ),
-            key=lambda category_id: (category_id == "", int(category_id) if category_id != "" else 0),
+            key=lambda category_id: int(category_id),
         )
         if not supported_category_ids:
             continue
@@ -653,8 +652,8 @@ def build_edge_rows(
             supported_export_run_ids.update(group["category_files"][category_id])
             supported_rule_count += int(group["category_rule_counts"][category_id])
 
-        category_ids_for_scope = [category_id for category_id in supported_category_ids if category_id != ""]
-        category_id_values = category_ids_for_scope or [""]
+        category_ids_for_scope = supported_category_ids
+        category_id_values = category_ids_for_scope
         edge_id = f"vfd.{normalized}__{group['edge_domain_component']}"
         file_count = len(supported_export_run_ids)
         scope_conditions = json.dumps(
