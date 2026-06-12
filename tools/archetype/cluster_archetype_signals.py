@@ -17,11 +17,18 @@ Processing:
   clusters signals that structurally travel together into composite groups,
   then rolls up file classifications to the cluster grain.
 
-  Stage 1: For each governance_question (the second "__"-delimited token of
-    archetype_id), build a weighted undirected signal graph: nodes are
-    unique signal_id values from archetype_validation.csv; edges are unique
+  Stage 1: For each governance_question, build a weighted undirected signal
+    graph: nodes are unique edge_id values from archetype_validation.csv
+    (signal_id is mapped to its edge_id via that row's signal_id -> edge_id
+    pairing, since curated definitions may give a signal a human-friendly
+    signal_id distinct from its canonical edge_id); edges are unique
     (edge_id_a, edge_id_b) pairs from archetype_validation_pairs.csv, weighted
     by the maximum top_pair_containment observed across archetype_ids.
+    governance_question is normally the second "__"-delimited token of
+    archetype_id (e.g. CANDIDATE__wall_graphics__... -> wall_graphics), but
+    archetype_classifications.csv's governance_question column -- which may
+    have been edited during human curation -- takes precedence wherever an
+    archetype_id appears there.
 
   Stage 2: Derive a global coupling threshold via Jenks natural breaks
     (n_classes=2, threshold = breaks[0]) over all unique pairwise containment
@@ -39,7 +46,10 @@ Processing:
     before any other output).
 
   Stage 6: Roll up archetype_classifications.csv to file x governance_question
-    x cluster grain in archetype_cluster_classifications.csv.
+    x cluster grain in archetype_cluster_classifications.csv. Fired signal_ids
+    are mapped to their edge_id (Stage 1's signal_id -> edge_id pairing)
+    before cluster lookup, and rows are grouped under the curated
+    governance_question (see Stage 1).
 
   Stage 7: Write cluster_coverage_summary.json (per governance_question x
     cluster adoption counts) to drive approach_label promotion decisions.
@@ -111,6 +121,26 @@ def _governance_question_from_archetype_id(archetype_id: str) -> str:
     return parts[1] if len(parts) > 1 else ""
 
 
+def _build_curated_gq_map(classification_rows: List[Dict[str, str]]) -> Dict[str, str]:
+    """archetype_id -> governance_question, from archetype_classifications.csv.
+
+    Human curation can re-assign a promoted archetype to a different
+    governance_question without changing its (CANDIDATE-derived) archetype_id,
+    so this column is the source of truth wherever it is populated.
+    """
+    curated: Dict[str, str] = {}
+    for row in classification_rows:
+        archetype_id = row.get("archetype_id", "")
+        gq = row.get("governance_question", "")
+        if archetype_id and gq:
+            curated[archetype_id] = gq
+    return curated
+
+
+def _resolve_governance_question(archetype_id: str, curated_gq_map: Dict[str, str]) -> str:
+    return curated_gq_map.get(archetype_id) or _governance_question_from_archetype_id(archetype_id)
+
+
 def _bare_signal_name(signal_id: str) -> str:
     """Strip a "<domain prefix>." prefix and a trailing "__<hash>" suffix."""
     name = signal_id.split(".", 1)[1] if "." in signal_id else signal_id
@@ -154,17 +184,22 @@ class UnionFind:
 def _build_signal_graph(
     validation_rows: List[Dict[str, str]],
     pairs_rows: List[Dict[str, str]],
-) -> Tuple[Dict[str, Set[str]], Dict[str, Dict[Tuple[str, str], float]]]:
+    curated_gq_map: Dict[str, str],
+) -> Tuple[Dict[str, Set[str]], Dict[str, Dict[Tuple[str, str], float]], Dict[str, Dict[str, str]]]:
     nodes_by_gq: Dict[str, Set[str]] = defaultdict(set)
+    signal_to_edge_by_gq: Dict[str, Dict[str, str]] = defaultdict(dict)
     for row in validation_rows:
-        gq = _governance_question_from_archetype_id(row.get("archetype_id", ""))
+        gq = _resolve_governance_question(row.get("archetype_id", ""), curated_gq_map)
         signal_id = row.get("signal_id", "")
+        edge_id = row.get("edge_id", "") or signal_id
+        if edge_id:
+            nodes_by_gq[gq].add(edge_id)
         if signal_id:
-            nodes_by_gq[gq].add(signal_id)
+            signal_to_edge_by_gq[gq][signal_id] = edge_id
 
     edges_by_gq: Dict[str, Dict[Tuple[str, str], float]] = defaultdict(dict)
     for row in pairs_rows:
-        gq = _governance_question_from_archetype_id(row.get("archetype_id", ""))
+        gq = _resolve_governance_question(row.get("archetype_id", ""), curated_gq_map)
         edge_a = row.get("edge_id_a", "")
         edge_b = row.get("edge_id_b", "")
         if not edge_a or not edge_b:
@@ -182,7 +217,11 @@ def _build_signal_graph(
         nodes_by_gq[gq].add(edge_a)
         nodes_by_gq[gq].add(edge_b)
 
-    return dict(nodes_by_gq), dict(edges_by_gq)
+    return (
+        dict(nodes_by_gq),
+        dict(edges_by_gq),
+        {gq: dict(m) for gq, m in signal_to_edge_by_gq.items()},
+    )
 
 
 def _derive_coupling_threshold(
@@ -290,24 +329,28 @@ def _build_signal_cluster_map(
 def _rollup_classifications(
     classification_rows: List[Dict[str, str]],
     signal_cluster_map: Dict[str, Dict[str, Tuple[str, str, int]]],
+    signal_to_edge_by_gq: Dict[str, Dict[str, str]],
+    curated_gq_map: Dict[str, str],
 ) -> List[Dict[str, Any]]:
     # (export_run_id, governance_question, cluster_id) -> accumulator
     agg: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
 
     for row in classification_rows:
         archetype_id = row.get("archetype_id", "")
-        gq = _governance_question_from_archetype_id(archetype_id)
+        gq = _resolve_governance_question(archetype_id, curated_gq_map)
         export_run_id = row.get("export_run_id", "")
         confidence_tier = row.get("confidence_tier", "")
         signals_fired = [s for s in (row.get("signals_fired", "") or "").split(";") if s]
         cluster_map = signal_cluster_map.get(gq, {})
+        signal_to_edge_map = signal_to_edge_by_gq.get(gq, {})
 
         for signal_id in signals_fired:
-            info = cluster_map.get(signal_id)
+            edge_id = signal_to_edge_map.get(signal_id, signal_id)
+            info = cluster_map.get(edge_id)
             if info is None:
                 log(
                     STAGE,
-                    f"WARNING: signal_id={signal_id} (archetype_id={archetype_id}, "
+                    f"WARNING: signal_id={signal_id} (edge_id={edge_id}, archetype_id={archetype_id}, "
                     f"governance_question={gq}) not found in signal cluster map; skipping",
                 )
                 continue
@@ -323,7 +366,7 @@ def _rollup_classifications(
                 "discipline_label": row.get("discipline_label", ""),
                 "unit_system": row.get("unit_system", ""),
             })
-            entry["fired_signals"].add(signal_id)
+            entry["fired_signals"].add(edge_id)
             if confidence_tier == "Full":
                 entry["has_full"] = True
 
@@ -416,8 +459,10 @@ def main() -> int:
     classification_rows = read_csv_rows(classifications_path)
     log(STAGE, f"loaded {len(classification_rows)} rows from {classifications_path}")
 
+    curated_gq_map = _build_curated_gq_map(classification_rows)
+
     # Stage 1: signal graph per governance_question
-    nodes_by_gq, edges_by_gq = _build_signal_graph(validation_rows, pairs_rows)
+    nodes_by_gq, edges_by_gq, signal_to_edge_by_gq = _build_signal_graph(validation_rows, pairs_rows, curated_gq_map)
 
     # Stage 2: coupling threshold + apply
     coupling_threshold = _derive_coupling_threshold(edges_by_gq, args.coupling_threshold)
@@ -435,7 +480,7 @@ def main() -> int:
 
     # Stage 6: rollup
     signal_cluster_map = _build_signal_cluster_map(clusters_by_gq)
-    cluster_rows = _rollup_classifications(classification_rows, signal_cluster_map)
+    cluster_rows = _rollup_classifications(classification_rows, signal_cluster_map, signal_to_edge_by_gq, curated_gq_map)
     log(STAGE, f"emitted {len(cluster_rows)} archetype_cluster_classifications rows")
 
     # Stage 7: coverage summary
