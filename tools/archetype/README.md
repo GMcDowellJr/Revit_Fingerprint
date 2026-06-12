@@ -393,6 +393,11 @@ isolation.
 - `Fingerprint_Out/archetype_analysis/archetype_validation_pairs.csv`
 - `Fingerprint_Out/archetype_analysis/archetype_validation.csv`
 - `Fingerprint_Out/archetype_analysis/archetype_classifications.csv`
+- `Fingerprint_Out/archetype_analysis/cross_domain_items.csv` and
+  `results/records/file_metadata.csv` — used only to compute the
+  corpus-wide file universe for `cluster_coverage_summary.json`'s
+  `total_files`/`pct_files_all_signals` (same file universe as Stage 3's
+  `n_files_total`)
 
 **Outputs**
 - `Fingerprint_Out/archetype_analysis/signal_clusters.json` (recovery
@@ -448,7 +453,15 @@ isolation.
   and rows are grouped under the curated `governance_question` (see
   Stage 1).
 - Stage 7: aggregates the cluster rows into
-  `cluster_coverage_summary.json`.
+  `cluster_coverage_summary.json`. `total_files` (the denominator for
+  `pct_files_all_signals`) is the size of the same file universe Stage 3
+  uses for `n_files_total` -- every file with at least one
+  `cross_domain_items.csv` edge observation, unioned with every file in
+  `file_metadata.csv` -- not the count of distinct `export_run_id`s in
+  `archetype_classifications.csv`. Stage 3 only emits classification rows
+  for files with at least one fired required signal, so using it directly
+  as the denominator would overstate adoption for files with zero
+  promoted-archetype evidence.
 
 **Typical command**
 ```

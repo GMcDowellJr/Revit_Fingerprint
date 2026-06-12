@@ -5,6 +5,8 @@ Inputs:
   - Fingerprint_Out/archetype_analysis/archetype_validation_pairs.csv
   - Fingerprint_Out/archetype_analysis/archetype_validation.csv
   - Fingerprint_Out/archetype_analysis/archetype_classifications.csv
+  - Fingerprint_Out/archetype_analysis/cross_domain_items.csv
+  - results/records/file_metadata.csv
 
 Outputs:
   - Fingerprint_Out/archetype_analysis/signal_clusters.json
@@ -53,12 +55,20 @@ Processing:
 
   Stage 7: Write cluster_coverage_summary.json (per governance_question x
     cluster adoption counts) to drive approach_label promotion decisions.
+    pct_files_all_signals is computed against total_files, the size of the
+    same file universe assign_archetype_classifications.py uses (every file
+    with at least one cross_domain_items.csv edge observation, unioned with
+    every file in file_metadata.csv) -- not the count of distinct
+    export_run_ids in archetype_classifications.csv, which omits files with
+    zero promoted-archetype evidence and would understate the denominator.
 
 Usage:
     python tools/archetype/cluster_archetype_signals.py \\
         --pairs Fingerprint_Out/archetype_analysis/archetype_validation_pairs.csv \\
         --validation Fingerprint_Out/archetype_analysis/archetype_validation.csv \\
         --classifications Fingerprint_Out/archetype_analysis/archetype_classifications.csv \\
+        --cross-domain-items Fingerprint_Out/archetype_analysis/cross_domain_items.csv \\
+        --file-metadata results/records/file_metadata.csv \\
         --out-clusters Fingerprint_Out/archetype_analysis/signal_clusters.json \\
         --out-classifications Fingerprint_Out/archetype_analysis/archetype_cluster_classifications.csv \\
         --out-summary Fingerprint_Out/archetype_analysis/cluster_coverage_summary.json \\
@@ -400,6 +410,28 @@ def _rollup_classifications(
     return cluster_rows
 
 
+def _compute_file_universe(
+    cross_domain_items_rows: List[Dict[str, str]],
+    file_metadata_rows: List[Dict[str, str]],
+) -> Set[str]:
+    """The same file universe assign_archetype_classifications.py uses: every
+    file with at least one cross_domain_items.csv edge observation, unioned
+    with every file in file_metadata.csv. archetype_classifications.csv only
+    contains files with at least one fired required signal, so it is not a
+    safe source for the corpus-wide denominator."""
+    universe: Set[str] = set()
+    for row in cross_domain_items_rows:
+        eid = row.get("export_run_id", "")
+        edge_id = row.get("edge_id", "")
+        if eid and edge_id:
+            universe.add(eid)
+    for row in file_metadata_rows:
+        eid = row.get("export_run_id", "")
+        if eid:
+            universe.add(eid)
+    return universe
+
+
 def _build_coverage_summary(
     clusters_by_gq: Dict[str, List[Dict[str, Any]]],
     cluster_rows: List[Dict[str, Any]],
@@ -434,6 +466,8 @@ def main() -> int:
     ap.add_argument("--pairs", default=None, help="Path to archetype_validation_pairs.csv")
     ap.add_argument("--validation", default=None, help="Path to archetype_validation.csv")
     ap.add_argument("--classifications", default=None, help="Path to archetype_classifications.csv")
+    ap.add_argument("--cross-domain-items", default=None, help="Path to cross_domain_items.csv (file universe for coverage denominators)")
+    ap.add_argument("--file-metadata", default=None, help="Path to file_metadata.csv (file universe for coverage denominators)")
     ap.add_argument("--out-clusters", default=None, help="Output path for signal_clusters.json")
     ap.add_argument("--out-classifications", default=None, help="Output path for archetype_cluster_classifications.csv")
     ap.add_argument("--out-summary", default=None, help="Output path for cluster_coverage_summary.json")
@@ -446,6 +480,8 @@ def main() -> int:
     pairs_path = Path(args.pairs) if args.pairs else analysis_dir / "archetype_validation_pairs.csv"
     validation_path = Path(args.validation) if args.validation else analysis_dir / "archetype_validation.csv"
     classifications_path = Path(args.classifications) if args.classifications else analysis_dir / "archetype_classifications.csv"
+    cross_domain_items_path = Path(args.cross_domain_items) if args.cross_domain_items else analysis_dir / "cross_domain_items.csv"
+    file_metadata_path = Path(args.file_metadata) if args.file_metadata else repo_root / "results" / "records" / "file_metadata.csv"
     out_clusters_path = Path(args.out_clusters) if args.out_clusters else analysis_dir / "signal_clusters.json"
     out_classifications_path = Path(args.out_classifications) if args.out_classifications else analysis_dir / "archetype_cluster_classifications.csv"
     out_summary_path = Path(args.out_summary) if args.out_summary else analysis_dir / "cluster_coverage_summary.json"
@@ -458,6 +494,12 @@ def main() -> int:
 
     classification_rows = read_csv_rows(classifications_path)
     log(STAGE, f"loaded {len(classification_rows)} rows from {classifications_path}")
+
+    cross_domain_items_rows = read_csv_rows(cross_domain_items_path)
+    log(STAGE, f"loaded {len(cross_domain_items_rows)} rows from {cross_domain_items_path}")
+
+    file_metadata_rows = read_csv_rows(file_metadata_path)
+    log(STAGE, f"loaded {len(file_metadata_rows)} rows from {file_metadata_path}")
 
     curated_gq_map = _build_curated_gq_map(classification_rows)
 
@@ -484,7 +526,8 @@ def main() -> int:
     log(STAGE, f"emitted {len(cluster_rows)} archetype_cluster_classifications rows")
 
     # Stage 7: coverage summary
-    total_files = len({r.get("export_run_id", "") for r in classification_rows if r.get("export_run_id")})
+    total_files = len(_compute_file_universe(cross_domain_items_rows, file_metadata_rows))
+    log(STAGE, f"file_universe size={total_files}")
     coverage_summary_doc = {
         "schema_version": SCHEMA_VERSION,
         "generated_utc": _utc_now_iso(),
