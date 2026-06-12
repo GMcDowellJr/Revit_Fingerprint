@@ -433,15 +433,30 @@ isolation.
   Stage 2.5 -- takes precedence wherever an `archetype_id` appears
   there, so a promoted archetype's signals are graphed and rolled up
   under its curated question rather than its original candidate hint.
-- Stage 2: derives a global `coupling_threshold` via Jenks natural
-  breaks (`tools/jenks_utils.py`, `n_classes=2`, `threshold = breaks[0]`)
-  over all unique pairwise `top_pair_containment` values (falls back to
-  `0.8` with a warning if fewer than 4 distinct values exist; override
-  with `--coupling-threshold`). Edges below the threshold are dropped.
-- Stage 3: finds connected components per `governance_question` on the
-  thresholded graph via union-find (pure Python, no external graph
-  libraries). Each component becomes a signal cluster; unconnected nodes
-  become singleton clusters.
+- Stage 2: each candidate edge is weighted by Jaccard similarity
+  (`n_both / (count_a + count_b - n_both)`, maximum across
+  `archetype_id`s), where `n_both` is `top_pair_file_count` and
+  `count_a`/`count_b` are each edge's `n_files_classified` from
+  `archetype_validation.csv`. Jaccard avoids the asymmetric-containment
+  problem where a rare signal that is a strict subset of a common signal
+  scores a perfect `top_pair_containment` despite being a poor coupling
+  indicator. A global `coupling_threshold` is then derived via Jenks
+  natural breaks (`tools/jenks_utils.py`, `n_classes=2`,
+  `threshold = breaks[0]`) over all unique pairwise Jaccard values
+  (falls back to `0.8` with a warning if fewer than 4 distinct values
+  exist; override with `--coupling-threshold`, applied directly to
+  Jaccard values). The legacy `top_pair_containment`-based threshold is
+  also computed and logged for comparison but no longer used.
+- Stage 3: builds complete-linkage clusters per `governance_question`
+  (pure Python, no external graph libraries). Starting from singleton
+  clusters, candidate pairs are considered in (Jaccard desc, `edge_id_a`
+  asc, `edge_id_b` asc) order; two clusters are merged only if every
+  pairwise Jaccard within the merged cluster -- including pairs absent
+  from `archetype_validation_pairs.csv`, treated as Jaccard `0.0` -- is
+  `>= coupling_threshold`. This avoids single-linkage chain bridging,
+  where a rare signal transitively connects two otherwise-unrelated
+  groups through a single shared edge. Unmerged nodes remain singleton
+  clusters.
 - Stage 4: generates a stable `cluster_label_stub` per cluster
   (`{governance_question}__{bare param names joined by _x_}`, truncated
   to 60 chars).

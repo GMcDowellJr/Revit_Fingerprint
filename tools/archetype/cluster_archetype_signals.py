@@ -46,9 +46,16 @@ Processing:
     logged (for visibility into the effect of the Jaccard switch) but is not
     used for thresholding.
 
-  Stage 3: Find connected components on the thresholded graph per
-    governance_question using union-find. Each component is a signal
-    cluster; unconnected signals form singleton clusters.
+  Stage 3: Build complete-linkage clusters per governance_question: starting
+    from singleton clusters, repeatedly consider the pair (a, b) with the
+    highest Jaccard among pairs whose clusters differ (ties broken by
+    edge_id_a asc, then edge_id_b asc); merge cluster(a) and cluster(b) only
+    if every pairwise Jaccard within the merged cluster (including pairs not
+    present in archetype_validation_pairs.csv, treated as Jaccard 0.0) is
+    >= the coupling threshold. This prevents chain bridging: a signal only
+    joins a cluster if it is directly similar (above threshold) to every
+    existing member, not merely transitively connected to one of them via a
+    chain of pairwise edges. Unmerged signals form singleton clusters.
 
   Stage 4: Generate a stable cluster_label_stub per cluster from the bare
     parameter names of its member signals.
@@ -176,28 +183,57 @@ def _cluster_label_stub(governance_question: str, signal_ids: List[str]) -> str:
     return f"{governance_question}__{combo}"
 
 
-class UnionFind:
-    """Disjoint-set forest for finding connected components."""
+def _complete_linkage_clusters(
+    nodes: Set[str],
+    pair_jaccard: Dict[Tuple[str, str], float],
+    threshold: float,
+) -> List[Set[str]]:
+    """Group nodes into clusters such that every pairwise Jaccard within a
+    cluster meets ``threshold`` (complete linkage).
 
-    def __init__(self, items: Set[str]) -> None:
-        self.parent: Dict[str, str] = {x: x for x in items}
+    Pairs absent from ``pair_jaccard`` are treated as Jaccard 0.0 (no
+    observed co-occurrence), never as high similarity. Candidate pairs are
+    processed in (Jaccard desc, edge_id_a asc, edge_id_b asc) order; a merge
+    is applied only if it does not push any pairwise Jaccard within the
+    resulting cluster below ``threshold``. This is deterministic and avoids
+    single-linkage chain bridging.
+    """
 
-    def find(self, x: str) -> str:
-        if x not in self.parent:
-            self.parent[x] = x
-        while self.parent[x] != x:
-            self.parent[x] = self.parent[self.parent[x]]
-            x = self.parent[x]
-        return x
+    def pair_value(a: str, b: str) -> float:
+        if a == b:
+            return 1.0
+        return pair_jaccard.get(tuple(sorted((a, b))), 0.0)
 
-    def union(self, a: str, b: str) -> None:
-        ra, rb = self.find(a), self.find(b)
-        if ra == rb:
-            return
-        if ra < rb:
-            self.parent[rb] = ra
-        else:
-            self.parent[ra] = rb
+    clusters: Dict[str, Set[str]] = {n: {n} for n in nodes}
+
+    ordered_pairs = sorted(
+        ((k, v) for k, v in pair_jaccard.items() if k[0] in nodes and k[1] in nodes),
+        key=lambda kv: (-kv[1], kv[0][0], kv[0][1]),
+    )
+
+    for (edge_a, edge_b), _jaccard in ordered_pairs:
+        cluster_a = clusters[edge_a]
+        cluster_b = clusters[edge_b]
+        if cluster_a is cluster_b:
+            continue
+        candidate = cluster_a | cluster_b
+        if all(
+            pair_value(x, y) >= threshold
+            for x in candidate
+            for y in candidate
+            if x != y
+        ):
+            for node in candidate:
+                clusters[node] = candidate
+
+    seen_ids: Set[int] = set()
+    result: List[Set[str]] = []
+    for node in nodes:
+        cluster = clusters[node]
+        if id(cluster) not in seen_ids:
+            seen_ids.add(id(cluster))
+            result.append(cluster)
+    return result
 
 
 def _build_n_files_classified_lookup(validation_rows: List[Dict[str, str]]) -> Dict[str, float]:
@@ -356,36 +392,33 @@ def _apply_threshold(
 
 def _build_clusters(
     nodes_by_gq: Dict[str, Set[str]],
-    edges_by_gq: Dict[str, Dict[Tuple[str, str], float]],
+    jaccard_edges_by_gq: Dict[str, Dict[Tuple[str, str], float]],
+    threshold: float,
 ) -> Dict[str, List[Dict[str, Any]]]:
     clusters_by_gq: Dict[str, List[Dict[str, Any]]] = {}
 
     for gq in sorted(nodes_by_gq):
         nodes = nodes_by_gq[gq]
-        uf = UnionFind(nodes)
-        kept_edges = edges_by_gq.get(gq, {})
-        for edge_a, edge_b in kept_edges:
-            uf.union(edge_a, edge_b)
+        pair_jaccard = jaccard_edges_by_gq.get(gq, {})
 
-        members_by_root: Dict[str, List[str]] = defaultdict(list)
-        for node in nodes:
-            members_by_root[uf.find(node)].append(node)
-
-        min_containment_by_root: Dict[str, float] = {}
-        for (edge_a, edge_b), containment in kept_edges.items():
-            root = uf.find(edge_a)
-            if root not in min_containment_by_root or containment < min_containment_by_root[root]:
-                min_containment_by_root[root] = containment
+        member_groups = _complete_linkage_clusters(nodes, pair_jaccard, threshold)
 
         cluster_defs: List[Dict[str, Any]] = []
-        for root, members in members_by_root.items():
+        for members in member_groups:
             signal_ids = sorted(members)
+            min_jaccard = None
+            if len(signal_ids) > 1:
+                min_jaccard = min(
+                    pair_jaccard.get(tuple(sorted((x, y))), 0.0)
+                    for i, x in enumerate(signal_ids)
+                    for y in signal_ids[i + 1:]
+                )
             cluster_defs.append({
                 "cluster_label_stub": _cluster_label_stub(gq, signal_ids),
                 "governance_question": gq,
                 "n_signals": len(signal_ids),
                 "signal_ids": signal_ids,
-                "min_containment": min_containment_by_root.get(root),
+                "min_containment": min_jaccard,
                 "is_singleton": len(signal_ids) == 1,
             })
 
@@ -593,12 +626,12 @@ def main() -> int:
         validation_rows, pairs_rows, curated_gq_map, n_files_classified,
     )
 
-    # Stage 2: coupling threshold + apply (Jaccard-based; legacy containment-based threshold logged for comparison)
+    # Stage 2: coupling threshold (Jaccard-based; legacy containment-based threshold logged for comparison)
     coupling_threshold = _derive_coupling_threshold(jaccard_edges_by_gq, containment_edges_by_gq, args.coupling_threshold)
-    thresholded_edges_by_gq = _apply_threshold(jaccard_edges_by_gq, coupling_threshold)
+    _apply_threshold(jaccard_edges_by_gq, coupling_threshold)  # diagnostic: pairwise edges meeting threshold, before complete-linkage
 
-    # Stage 3 + 4: connected components -> clusters + labels
-    clusters_by_gq = _build_clusters(nodes_by_gq, thresholded_edges_by_gq)
+    # Stage 3 + 4: complete-linkage clusters + labels
+    clusters_by_gq = _build_clusters(nodes_by_gq, jaccard_edges_by_gq, coupling_threshold)
 
     signal_clusters_doc = {
         "schema_version": SCHEMA_VERSION,
