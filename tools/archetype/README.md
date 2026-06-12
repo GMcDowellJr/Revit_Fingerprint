@@ -435,18 +435,30 @@ isolation.
   under its curated question rather than its original candidate hint.
 - Stage 2: each candidate edge is weighted by Jaccard similarity
   (`n_both / (count_a + count_b - n_both)`, maximum across
-  `archetype_id`s), where `n_both` is `top_pair_file_count` and
-  `count_a`/`count_b` are each edge's `n_files_classified` from
-  `archetype_validation.csv`. Jaccard avoids the asymmetric-containment
-  problem where a rare signal that is a strict subset of a common signal
-  scores a perfect `top_pair_containment` despite being a poor coupling
-  indicator. A global `coupling_threshold` is then derived via Jenks
-  natural breaks (`tools/jenks_utils.py`, `n_classes=2`,
-  `threshold = breaks[0]`) over all unique pairwise Jaccard values
-  (falls back to `0.8` with a warning if fewer than 4 distinct values
-  exist; override with `--coupling-threshold`, applied directly to
-  Jaccard values). The legacy `top_pair_containment`-based threshold is
-  also computed and logged for comparison but no longer used.
+  `archetype_id`s). `count_a`/`count_b` are looked up by
+  `(archetype_id, edge_id)` from `archetype_validation.csv`'s
+  `n_files_classified` -- `n_files_classified` is emitted at
+  `(archetype_id, signal_id)` grain *after* that signal's `join_hash`
+  filter is applied, so the same `edge_id` can carry different counts
+  under different `archetype_id`s; keying by `edge_id` alone would let
+  one archetype's count silently overwrite another's. `n_both` is
+  `top_pair_file_count` clamped to `min(top_pair_file_count, count_a,
+  count_b)`: `top_pair_file_count` is the max co-occurrence count across
+  *any* `join_hash` pair on the two edges (unfiltered), which can exceed
+  either signal's own filtered file count when a promoted archetype's
+  `join_hash` filters were edited away from that top pattern; without the
+  clamp this can produce Jaccard `> 1` and let an unrelated `join_hash`
+  configuration for the same edge pair drive the threshold and
+  complete-linkage merges. Jaccard (vs. raw containment) avoids the
+  asymmetric problem where a rare signal that is a strict subset of a
+  common signal scores a perfect `top_pair_containment` despite being a
+  poor coupling indicator. A global `coupling_threshold` is then derived
+  via Jenks natural breaks (`tools/jenks_utils.py`, `n_classes=2`,
+  `threshold = breaks[0]`) over all unique pairwise Jaccard values (falls
+  back to `0.8` with a warning if fewer than 4 distinct values exist;
+  override with `--coupling-threshold`, applied directly to Jaccard
+  values). The legacy `top_pair_containment`-based threshold is also
+  computed and logged for comparison but no longer used.
 - Stage 3: builds complete-linkage clusters per `governance_question`
   (pure Python, no external graph libraries). Starting from singleton
   clusters, candidate pairs are considered in (Jaccard desc, `edge_id_a`

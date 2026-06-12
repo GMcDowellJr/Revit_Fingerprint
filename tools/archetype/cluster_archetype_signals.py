@@ -26,12 +26,24 @@ Processing:
     signal_id distinct from its canonical edge_id); edges are unique
     (edge_id_a, edge_id_b) pairs from archetype_validation_pairs.csv, weighted
     by Jaccard similarity (n_both / (count_a + count_b - n_both), maximum
-    across archetype_ids), where n_both is top_pair_file_count and count_a /
-    count_b are each edge's n_files_classified from archetype_validation.csv.
-    Jaccard avoids the asymmetric-containment problem where a rare signal
-    that is a strict subset of a common signal scores a perfect
-    top_pair_containment despite being a poor coupling indicator. Pairs whose
-    edge_id_a or edge_id_b has no n_files_classified entry are logged and
+    across archetype_ids), where count_a / count_b are looked up by
+    (archetype_id, edge_id) from archetype_validation.csv's
+    n_files_classified -- n_files_classified is emitted at (archetype_id,
+    signal_id) grain after that signal's join_hash filter is applied, so the
+    same edge_id can carry different counts under different archetype_ids;
+    keying by edge_id alone would let one archetype's count silently
+    overwrite another's. n_both is top_pair_file_count clamped to
+    min(top_pair_file_count, count_a, count_b): top_pair_file_count is the
+    max co-occurrence count across *any* join_hash pair on the two edges
+    (unfiltered), which can exceed either signal's own filtered file count
+    when a promoted archetype's join_hash filters were edited away from that
+    top pattern; without the clamp this can produce Jaccard > 1 and let an
+    unrelated join_hash configuration for the same edge pair drive the
+    threshold and complete-linkage merges. Jaccard (vs. raw containment)
+    avoids the asymmetric problem where a rare signal that is a strict subset
+    of a common signal scores a perfect top_pair_containment despite being a
+    poor coupling indicator. Pairs whose (archetype_id, edge_id_a) or
+    (archetype_id, edge_id_b) has no n_files_classified entry are logged and
     skipped. governance_question is normally the second "__"-delimited token
     of archetype_id (e.g. CANDIDATE__wall_graphics__... -> wall_graphics), but
     archetype_classifications.csv's governance_question column -- which may
@@ -236,23 +248,37 @@ def _complete_linkage_clusters(
     return result
 
 
-def _build_n_files_classified_lookup(validation_rows: List[Dict[str, str]]) -> Dict[str, float]:
-    """edge_id -> n_files_classified, from archetype_validation.csv.
+def _build_n_files_classified_lookup(validation_rows: List[Dict[str, str]]) -> Dict[Tuple[str, str], float]:
+    """(archetype_id, edge_id) -> n_files_classified, from archetype_validation.csv.
 
-    n_files_classified is a property of the edge_id (the count of files where
-    that edge fired), so the same edge_id appearing under multiple
-    archetype_ids/signal_ids yields the same value; a single dict built once
-    covers all governance_questions.
+    n_files_classified is emitted at (archetype_id, signal_id) grain *after*
+    applying that signal's join_hash filter (see
+    validate_archetype_signals.py), so the same edge_id can carry different
+    counts under different archetype_ids whose signals filter it
+    differently. Keying by edge_id alone would let one archetype's count
+    silently overwrite another's. archetype_validation_pairs.csv rows carry
+    archetype_id, so callers look up by (archetype_id, edge_id).
     """
-    lookup: Dict[str, float] = {}
+    lookup: Dict[Tuple[str, str], float] = {}
     for row in validation_rows:
+        archetype_id = row.get("archetype_id", "")
         edge_id = row.get("edge_id", "")
         if not edge_id:
             continue
         try:
-            lookup[edge_id] = float(row.get("n_files_classified") or 0.0)
+            value = float(row.get("n_files_classified") or 0.0)
         except ValueError:
             continue
+        key = (archetype_id, edge_id)
+        existing = lookup.get(key)
+        if existing is not None and existing != value:
+            log(
+                STAGE,
+                f"WARNING: archetype_id={archetype_id} edge_id={edge_id} has multiple "
+                f"n_files_classified values ({existing}, {value}) across its signals; "
+                f"using {value}",
+            )
+        lookup[key] = value
     return lookup
 
 
@@ -281,7 +307,8 @@ def _build_signal_graph(
     jaccard_edges_by_gq: Dict[str, Dict[Tuple[str, str], float]] = defaultdict(dict)
     containment_edges_by_gq: Dict[str, Dict[Tuple[str, str], float]] = defaultdict(dict)
     for row in pairs_rows:
-        gq = _resolve_governance_question(row.get("archetype_id", ""), curated_gq_map)
+        archetype_id = row.get("archetype_id", "")
+        gq = _resolve_governance_question(archetype_id, curated_gq_map)
         edge_a = row.get("edge_id_a", "")
         edge_b = row.get("edge_id_b", "")
         if not edge_a or not edge_b:
@@ -291,21 +318,37 @@ def _build_signal_graph(
         except ValueError:
             containment = 0.0
         try:
-            n_both = float(row.get("top_pair_file_count") or 0.0)
+            top_pair_file_count = float(row.get("top_pair_file_count") or 0.0)
         except ValueError:
-            n_both = 0.0
+            top_pair_file_count = 0.0
 
-        count_a = n_files_classified.get(edge_a)
-        count_b = n_files_classified.get(edge_b)
+        count_a = n_files_classified.get((archetype_id, edge_a))
+        count_b = n_files_classified.get((archetype_id, edge_b))
         if count_a is None or count_b is None:
             missing = edge_a if count_a is None else edge_b
             log(
                 STAGE,
-                f"WARNING: edge_id={missing} not found in archetype_validation.csv "
-                f"n_files_classified lookup for pair ({edge_a}, {edge_b}), "
-                f"governance_question={gq}; skipping pair",
+                f"WARNING: (archetype_id={archetype_id}, edge_id={missing}) not found in "
+                f"archetype_validation.csv n_files_classified lookup for pair "
+                f"({edge_a}, {edge_b}), governance_question={gq}; skipping pair",
             )
             continue
+
+        # top_pair_file_count is the max co-occurrence count across *any*
+        # join_hash pair on these edges (unfiltered), not necessarily the
+        # count for this archetype's specific (filtered) signal pair. The
+        # true filtered intersection can be no larger than either signal's
+        # own filtered file count, so clamp to that bound -- this keeps
+        # Jaccard in [0, 1] and avoids an unrelated join_hash configuration
+        # for the same edge pair inflating the similarity.
+        n_both = min(top_pair_file_count, count_a, count_b)
+        if n_both < top_pair_file_count:
+            log(
+                STAGE,
+                f"archetype_id={archetype_id}: clamped top_pair_file_count="
+                f"{top_pair_file_count:g} to n_both={n_both:g} (count_a={count_a:g}, "
+                f"count_b={count_b:g}) for pair ({edge_a}, {edge_b})",
+            )
 
         denom = count_a + count_b - n_both
         jaccard = (n_both / denom) if denom > 0 else 0.0
