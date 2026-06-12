@@ -1,0 +1,462 @@
+#!/usr/bin/env python3
+"""Build a human-reviewable drill-down table for one archetype signal cluster.
+
+Inputs:
+  - Fingerprint_Out/archetype_analysis/signal_clusters.json
+  - Fingerprint_Out/archetype_analysis/archetype_cluster_classifications.csv
+  - Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv
+  - results/records/records.csv
+  - results/records/file_metadata.csv
+  - results/records/identity_items_by_domain/view_filter_definitions.csv (optional)
+  - tools/archetype/bip_lookup.json (optional)
+  - tools/archetype/shared_param_names.json (optional)
+  - tools/archetype/vfd_category_domain_map.json
+
+Output:
+  - Fingerprint_Out/archetype_analysis/review_{cluster_id}.csv
+
+Processing:
+  Given a cluster_id, assemble one row per (export_run_id, signal_id) carrying
+  the file path, the human-readable Revit element name, and (for
+  view_filter_definitions-sourced signals) resolved parameter and category
+  names -- everything a reviewer needs to open a specific file and navigate
+  directly to the named filter.
+
+  Stage 1: Resolve the target cluster from signal_clusters.json (clusters are
+    keyed by governance_question; cluster_id is unique across the document).
+  Stage 2: Find qualifying files from archetype_cluster_classifications.csv
+    (rows where cluster_id == target).
+  Stage 3: Get (export_run_id, signal_id) -> sig_hash/source_domain from
+    archetype_validation_detail.csv, restricted to qualifying files and the
+    cluster's signal_ids.
+  Stage 4: Stream records.csv to resolve sig_hash -> label_display
+    (element_name), restricted to the source_domains and export_run_ids seen
+    in Stage 3.
+  Stage 5: For view_filter_definitions-sourced signals, resolve parameter
+    names (via vf.rule[*].param_ref.id + bip_lookup.json /
+    shared_param_names.json) and category names (via vf.categories +
+    vfd_category_domain_map.json) from the identity_items shard.
+  Stage 6: Resolve export_run_id -> file_path from file_metadata.csv.
+  Stage 7: Join everything, sort (templates first, most-signals-fired first,
+    all-signals-fired first, export_run_id as tiebreak), and apply --top-n by
+    unique export_run_id.
+  Stage 8: Write review_{cluster_id}.csv and print a console summary.
+
+Usage:
+    python tools/archetype/prepare_archetype_review.py \\
+        --repo-root . \\
+        --cluster-id wall_graphics__cluster_003 \\
+        [--signal-clusters Fingerprint_Out/archetype_analysis/signal_clusters.json] \\
+        [--cluster-classifications Fingerprint_Out/archetype_analysis/archetype_cluster_classifications.csv] \\
+        [--validation-detail Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv] \\
+        [--records results/records/records.csv] \\
+        [--file-metadata results/records/file_metadata.csv] \\
+        [--identity-items-dir results/records/identity_items_by_domain] \\
+        [--bip-lookup tools/archetype/bip_lookup.json] \\
+        [--shared-param-names tools/archetype/shared_param_names.json] \\
+        [--vfd-category-map tools/archetype/vfd_category_domain_map.json] \\
+        [--out Fingerprint_Out/archetype_analysis/review_{cluster_id}.csv] \\
+        [--top-n 20] [--dry-run]
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import sys
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _common import (  # noqa: E402
+    log,
+    atomic_write_csv,
+    field_matches,
+    is_valid_item,
+    read_csv_rows,
+    read_json,
+)
+
+STAGE = "prepare_archetype_review"
+
+GOVERNANCE_ROLE_ORDER = {"Template": 0, "Container": 1, "Project": 2}
+
+OUT_FIELDS = [
+    "file_path",
+    "export_run_id",
+    "governance_role",
+    "discipline_label",
+    "unit_system",
+    "client_label",
+    "n_signals_fired",
+    "all_signals_fired",
+    "signal_id",
+    "source_domain",
+    "element_name",
+    "sig_hash",
+    "param_names",
+    "category_names",
+]
+
+_PATH_COLUMN_CANDIDATES = ("doc_path", "file_path", "source_path")
+
+_VFD_PARAM_REF_SOURCE_FIELD = "vf.rule[*].param_ref.id"
+_VFD_CATEGORIES_KEY = "vf.categories"
+
+
+def _find_cluster(signal_clusters: Dict[str, Any], cluster_id: str) -> Optional[Dict[str, Any]]:
+    clusters_by_gq = signal_clusters.get("clusters", {}) if isinstance(signal_clusters, dict) else {}
+    for gq, cluster_defs in clusters_by_gq.items():
+        for c in cluster_defs:
+            if c.get("cluster_id") == cluster_id:
+                return c
+    return None
+
+
+def _all_cluster_ids(signal_clusters: Dict[str, Any]) -> List[str]:
+    clusters_by_gq = signal_clusters.get("clusters", {}) if isinstance(signal_clusters, dict) else {}
+    ids: List[str] = []
+    for cluster_defs in clusters_by_gq.values():
+        for c in cluster_defs:
+            cid = c.get("cluster_id")
+            if cid:
+                ids.append(cid)
+    return sorted(ids)
+
+
+def _resolve_param_name(param_id: str, bip_lookup: Dict[str, Any], shared_param_names: Dict[str, Any]) -> str:
+    if param_id.startswith("bip:"):
+        name = bip_lookup.get(param_id) or bip_lookup.get(param_id[len("bip:"):])
+        return name or param_id
+    name = shared_param_names.get(param_id)
+    return name or param_id
+
+
+def _parse_category_ids(raw_value: str) -> List[str]:
+    """Parse a vf.categories value into an ordered list of category-id strings.
+
+    Accepts both the historical comma-separated shape and a JSON-array shape
+    (see build_cross_domain_items.py._parse_vf_categories).
+    """
+    value = (raw_value or "").strip()
+    if not value:
+        return []
+
+    comma_parts = [part.strip() for part in value.split(",")]
+    if comma_parts and all(part and part.lstrip("+-").isdigit() for part in comma_parts):
+        return comma_parts
+
+    try:
+        data = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+
+    out: List[str] = []
+    for item in data:
+        if isinstance(item, int):
+            out.append(str(item))
+        elif isinstance(item, str) and item.strip():
+            out.append(item.strip())
+    return out
+
+
+def _resolve_category_name(category_id: str, vfd_category_map: Dict[str, Any]) -> str:
+    entry = vfd_category_map.get(category_id)
+    if isinstance(entry, dict):
+        name = entry.get("name")
+        if name:
+            return str(name)
+    return f"{category_id}[?]"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
+    ap.add_argument("--cluster-id", required=True, help="Target cluster_id from signal_clusters.json")
+    ap.add_argument("--signal-clusters", default=None, help="Path to signal_clusters.json")
+    ap.add_argument("--cluster-classifications", default=None, help="Path to archetype_cluster_classifications.csv")
+    ap.add_argument("--validation-detail", default=None, help="Path to archetype_validation_detail.csv")
+    ap.add_argument("--records", default=None, help="Path to records.csv")
+    ap.add_argument("--file-metadata", default=None, help="Path to file_metadata.csv")
+    ap.add_argument("--identity-items-dir", default=None, help="Path to identity_items_by_domain/")
+    ap.add_argument("--bip-lookup", default=None, help="Path to bip_lookup.json")
+    ap.add_argument("--shared-param-names", default=None, help="Path to shared_param_names.json")
+    ap.add_argument("--vfd-category-map", default=None, help="Path to vfd_category_domain_map.json")
+    ap.add_argument("--out", default=None, help="Output path (may contain {cluster_id})")
+    ap.add_argument("--top-n", type=int, default=20, help="Limit to top N files in the output; 0 = all")
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+
+    repo_root = Path(args.repo_root).resolve()
+    analysis_dir = repo_root / "Fingerprint_Out" / "archetype_analysis"
+
+    signal_clusters_path = Path(args.signal_clusters) if args.signal_clusters else analysis_dir / "signal_clusters.json"
+    cluster_classifications_path = Path(args.cluster_classifications) if args.cluster_classifications else analysis_dir / "archetype_cluster_classifications.csv"
+    validation_detail_path = Path(args.validation_detail) if args.validation_detail else analysis_dir / "archetype_validation_detail.csv"
+    records_path = Path(args.records) if args.records else repo_root / "results" / "records" / "records.csv"
+    file_metadata_path = Path(args.file_metadata) if args.file_metadata else repo_root / "results" / "records" / "file_metadata.csv"
+    identity_items_dir = Path(args.identity_items_dir) if args.identity_items_dir else repo_root / "results" / "records" / "identity_items_by_domain"
+    bip_lookup_path = Path(args.bip_lookup) if args.bip_lookup else repo_root / "tools" / "archetype" / "bip_lookup.json"
+    shared_param_names_path = Path(args.shared_param_names) if args.shared_param_names else repo_root / "tools" / "archetype" / "shared_param_names.json"
+    vfd_category_map_path = Path(args.vfd_category_map) if args.vfd_category_map else repo_root / "tools" / "archetype" / "vfd_category_domain_map.json"
+
+    out_template = args.out if args.out else str(analysis_dir / "review_{cluster_id}.csv")
+    out_path = Path(out_template.format(cluster_id=args.cluster_id))
+    if not out_path.is_absolute():
+        out_path = repo_root / out_path
+
+    # Stage 1: resolve cluster membership.
+    signal_clusters = read_json(signal_clusters_path, default={}) or {}
+    cluster = _find_cluster(signal_clusters, args.cluster_id)
+    if cluster is None:
+        available = _all_cluster_ids(signal_clusters)
+        log(STAGE, f"ERROR: cluster_id={args.cluster_id!r} not found in {signal_clusters_path}")
+        log(STAGE, f"available cluster_ids ({len(available)}): {', '.join(available)}")
+        return 1
+
+    signal_ids: List[str] = list(cluster.get("signal_ids", []) or [])
+    governance_question = cluster.get("governance_question", "")
+    cluster_label_stub = cluster.get("cluster_label_stub", "")
+    log(STAGE, f"cluster_label_stub={cluster_label_stub} n_signals={len(signal_ids)} signal_ids={signal_ids}")
+
+    # Stage 2: find qualifying files.
+    cluster_classification_rows = read_csv_rows(cluster_classifications_path)
+    log(STAGE, f"loaded {len(cluster_classification_rows)} rows from {cluster_classifications_path}")
+
+    classification_by_file: Dict[str, Dict[str, str]] = {}
+    for row in cluster_classification_rows:
+        if row.get("cluster_id") != args.cluster_id:
+            continue
+        export_run_id = row.get("export_run_id", "")
+        if export_run_id:
+            classification_by_file[export_run_id] = row
+
+    qualifying_files: Set[str] = set(classification_by_file.keys())
+    log(STAGE, f"qualifying files for cluster_id={args.cluster_id}: {len(qualifying_files)}")
+
+    # Stage 3: get sig_hashes per file per signal.
+    validation_detail_rows = read_csv_rows(validation_detail_path)
+    log(STAGE, f"loaded {len(validation_detail_rows)} rows from {validation_detail_path}")
+
+    signal_id_set = set(signal_ids)
+    detail_by_file_signal: Dict[Tuple[str, str], Dict[str, str]] = {}
+    files_with_detail: Set[str] = set()
+    for row in validation_detail_rows:
+        export_run_id = row.get("export_run_id", "")
+        signal_id = row.get("signal_id", "")
+        if export_run_id not in qualifying_files or signal_id not in signal_id_set:
+            continue
+        key = (export_run_id, signal_id)
+        if key not in detail_by_file_signal:
+            detail_by_file_signal[key] = row
+        files_with_detail.add(export_run_id)
+
+    for export_run_id in sorted(qualifying_files - files_with_detail):
+        log(STAGE, f"WARNING: qualifying file export_run_id={export_run_id} has no matching rows in {validation_detail_path}")
+
+    log(STAGE, f"resolved {len(detail_by_file_signal)} (export_run_id, signal_id) detail rows")
+
+    source_domains: Set[str] = {row.get("source_domain", "") for row in detail_by_file_signal.values() if row.get("source_domain")}
+
+    # Stage 4: resolve filter names from records.csv (streamed).
+    label_lookup: Dict[Tuple[str, str], Tuple[str, str]] = {}
+    vfd_sig_to_record_pk: Dict[Tuple[str, str], str] = {}
+    if records_path.is_file():
+        with records_path.open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                export_run_id = row.get("export_run_id", "")
+                domain = row.get("domain", "")
+                if export_run_id not in qualifying_files or domain not in source_domains:
+                    continue
+                sig_hash = row.get("sig_hash", "")
+                if not sig_hash:
+                    continue
+                label_lookup[(export_run_id, sig_hash)] = (
+                    row.get("label_display", ""),
+                    row.get("label_quality", ""),
+                )
+                if domain == "view_filter_definitions":
+                    vfd_sig_to_record_pk[(export_run_id, sig_hash)] = row.get("record_pk", "")
+    else:
+        log(STAGE, f"WARNING: records file not found at {records_path}; element_name will be empty")
+    log(STAGE, f"resolved {len(label_lookup)} (export_run_id, sig_hash) label rows from {records_path}")
+
+    # Stage 5: resolve parameter names and category names (VFD only).
+    bip_lookup = read_json(bip_lookup_path, default={}) or {}
+    shared_param_names = read_json(shared_param_names_path, default={}) or {}
+    vfd_category_map = read_json(vfd_category_map_path, default={}) or {}
+    log(STAGE, f"loaded bip_lookup ({len(bip_lookup)} entries) from {bip_lookup_path}")
+    log(STAGE, f"loaded shared_param_names ({len(shared_param_names)} entries) from {shared_param_names_path}")
+
+    vfd_resolution: Dict[Tuple[str, str], Tuple[str, str]] = {}
+    if "view_filter_definitions" in source_domains:
+        vfd_identity_items_path = identity_items_dir / "view_filter_definitions.csv"
+        vfd_identity_rows = read_csv_rows(vfd_identity_items_path)
+        if not vfd_identity_rows:
+            log(STAGE, f"WARNING: {vfd_identity_items_path} not found or empty; param_names/category_names will be empty for VFD rows")
+        else:
+            grouped: Dict[Tuple[str, str], List[Dict[str, str]]] = defaultdict(list)
+            for row in vfd_identity_rows:
+                export_run_id = row.get("export_run_id", "")
+                if export_run_id not in qualifying_files:
+                    continue
+                grouped[(export_run_id, row.get("record_pk", ""))].append(row)
+
+            for key, rows in grouped.items():
+                param_tokens: List[Tuple[str, str]] = []  # (item_key, item_value)
+                categories_raw: Optional[str] = None
+                for row in rows:
+                    item_key = row.get("item_key", "")
+                    item_value = row.get("item_value", "")
+                    item_value_type = row.get("item_value_type", "")
+                    if not is_valid_item(item_value, item_value_type):
+                        continue
+                    if field_matches(item_key, _VFD_PARAM_REF_SOURCE_FIELD, "indexed"):
+                        param_tokens.append((item_key, item_value))
+                    elif item_key == _VFD_CATEGORIES_KEY:
+                        categories_raw = item_value
+
+                param_names = " | ".join(
+                    _resolve_param_name(value, bip_lookup, shared_param_names)
+                    for _, value in sorted(param_tokens)
+                )
+                category_names = " | ".join(
+                    _resolve_category_name(cid, vfd_category_map)
+                    for cid in _parse_category_ids(categories_raw or "")
+                )
+                vfd_resolution[key] = (param_names, category_names)
+            log(STAGE, f"resolved param/category names for {len(vfd_resolution)} VFD records")
+
+    # Stage 6: resolve file paths.
+    file_metadata_rows = read_csv_rows(file_metadata_path)
+    log(STAGE, f"loaded {len(file_metadata_rows)} rows from {file_metadata_path}")
+    path_column = None
+    if file_metadata_rows:
+        header_keys = file_metadata_rows[0].keys()
+        for candidate in _PATH_COLUMN_CANDIDATES:
+            if candidate in header_keys:
+                path_column = candidate
+                break
+        if path_column is None:
+            log(STAGE, f"WARNING: no path column ({', '.join(_PATH_COLUMN_CANDIDATES)}) found in {file_metadata_path}; falling back to export_run_id")
+
+    file_path_lookup: Dict[str, str] = {}
+    for row in file_metadata_rows:
+        export_run_id = row.get("export_run_id", "")
+        if not export_run_id:
+            continue
+        file_path_lookup[export_run_id] = row.get(path_column, "") if path_column else ""
+
+    # Stage 7: assemble and sort the review table.
+    review_rows: List[Dict[str, str]] = []
+    for (export_run_id, signal_id), detail in detail_by_file_signal.items():
+        cls = classification_by_file.get(export_run_id, {})
+        source_domain = detail.get("source_domain", "")
+        sig_hash = detail.get("sig_hash", "")
+
+        label_display, label_quality = label_lookup.get((export_run_id, sig_hash), ("", ""))
+        if label_display:
+            element_name = label_display
+        else:
+            element_name = f"{label_quality}_{sig_hash[:8]}"
+
+        param_names = ""
+        category_names = ""
+        if source_domain == "view_filter_definitions":
+            record_pk = vfd_sig_to_record_pk.get((export_run_id, sig_hash), "")
+            param_names, category_names = vfd_resolution.get((export_run_id, record_pk), ("", ""))
+
+        file_path = file_path_lookup.get(export_run_id) or export_run_id
+
+        review_rows.append({
+            "file_path": file_path,
+            "export_run_id": export_run_id,
+            "governance_role": cls.get("governance_role", ""),
+            "discipline_label": cls.get("discipline_label", ""),
+            "unit_system": cls.get("unit_system", ""),
+            "client_label": cls.get("client_label", ""),
+            "n_signals_fired": cls.get("n_signals_fired", ""),
+            "all_signals_fired": cls.get("all_signals_fired", ""),
+            "signal_id": signal_id,
+            "source_domain": source_domain,
+            "element_name": element_name,
+            "sig_hash": sig_hash,
+            "param_names": param_names,
+            "category_names": category_names,
+        })
+
+    def _sort_key(row: Dict[str, str]) -> Tuple[int, int, int, str]:
+        governance_role_rank = GOVERNANCE_ROLE_ORDER.get(row["governance_role"], 3)
+        try:
+            n_signals_fired = int(row["n_signals_fired"])
+        except (TypeError, ValueError):
+            n_signals_fired = 0
+        all_signals_fired = 1 if row["all_signals_fired"] == "true" else 0
+        return (governance_role_rank, -n_signals_fired, -all_signals_fired, row["export_run_id"])
+
+    review_rows.sort(key=_sort_key)
+
+    # Apply --top-n: keep only the first N unique export_run_id values.
+    ordered_export_run_ids: List[str] = []
+    seen_export_run_ids: Set[str] = set()
+    for row in review_rows:
+        eid = row["export_run_id"]
+        if eid not in seen_export_run_ids:
+            seen_export_run_ids.add(eid)
+            ordered_export_run_ids.append(eid)
+
+    if args.top_n > 0:
+        selected_export_run_ids = ordered_export_run_ids[: args.top_n]
+    else:
+        selected_export_run_ids = ordered_export_run_ids
+    selected_set = set(selected_export_run_ids)
+
+    output_rows = [row for row in review_rows if row["export_run_id"] in selected_set]
+
+    # Stage 8: write output and print summary.
+    if args.dry_run:
+        log(STAGE, f"dry-run: would write {len(output_rows)} rows to {out_path}")
+    else:
+        atomic_write_csv(out_path, OUT_FIELDS, output_rows)
+        log(STAGE, f"wrote {len(output_rows)} rows to {out_path}")
+
+    total_files = len(qualifying_files)
+    n_all_signals_fired = sum(1 for row in classification_by_file.values() if row.get("all_signals_fired") == "true")
+    pct_all = (n_all_signals_fired / total_files * 100.0) if total_files else 0.0
+
+    print(f"Cluster: {args.cluster_id}")
+    print(f"Signals: {' | '.join(signal_ids)}")
+    print(f"Total files: {total_files}  |  All signals fired: {n_all_signals_fired} ({pct_all:.1f}%)  |  Top-N shown: {len(selected_export_run_ids)}")
+    print("Top example files (templates first):")
+
+    rows_by_file: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+    for row in output_rows:
+        rows_by_file[row["export_run_id"]].append(row)
+
+    _MAX_CONSOLE_EXAMPLES = 5
+    for eid in selected_export_run_ids[:_MAX_CONSOLE_EXAMPLES]:
+        rows_for_file = rows_by_file.get(eid, [])
+        governance_role = rows_for_file[0]["governance_role"] if rows_for_file else ""
+        file_label = f"[{governance_role}] " if governance_role else ""
+        print(f"  {file_label}{Path(rows_for_file[0]['file_path']).name if rows_for_file else eid}")
+        for row in rows_for_file:
+            kind = row["signal_id"].split("__")[0]
+            if row["source_domain"] == "view_filter_definitions":
+                suffix = f" filter → categories: {row['category_names']}" if row["category_names"] else " filter"
+            else:
+                suffix = f" ({row['source_domain']})"
+            print(f"    {kind}: \"{row['element_name']}\"{suffix}")
+
+    if len(selected_export_run_ids) > _MAX_CONSOLE_EXAMPLES:
+        print(f"  ... ({len(selected_export_run_ids) - _MAX_CONSOLE_EXAMPLES} more in CSV)")
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
