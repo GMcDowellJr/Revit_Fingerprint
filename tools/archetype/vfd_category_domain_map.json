@@ -1,30 +1,812 @@
 {
-  "_comment": "Seed category-name map for tools/archetype/discover_vfd_edges.py. Keys are BuiltInCategory integer ids serialized as strings. domain_extracted=false means the related category's target domain is not yet exported by this pipeline; _verify=true means the mapping should be reviewed.",
-  "-2000011": {
-    "name": "Walls",
-    "domain_extracted": true
-  },
-  "-2000032": {
-    "name": "Floors",
-    "domain_extracted": true
-  },
-  "-2000023": {
-    "name": "OST_Roofs",
-    "domain_extracted": true,
-    "_verify": true
-  },
-  "-2000038": {
-    "name": "Ceilings",
-    "domain_extracted": true,
-    "_verify": true
-  },
-  "-2000151": {
-    "name": "OST_Doors",
+  "_comment": "Seed category-name map for tools/archetype/discover_vfd_edges.py. Keys are BuiltInCategory integer ids serialized as strings. domain_extracted=false means the related category's target domain is not yet exported by this pipeline; _verify=true means the mapping (and any target_domain) should be reviewed. target_domain (when present) names the domain that owns this category's behavioral definition for category-consensus resolution.",
+  "-2009665": {
+    "name": "OST_AnalyticalOpening",
     "domain_extracted": false,
     "_verify": true
   },
-  "-2000200": {
-    "name": "OST_Windows",
+  "-2009664": {
+    "name": "OST_AnalyticalPanel",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009662": {
+    "name": "OST_AnalyticalMember",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009657": {
+    "name": "OST_LinksAnalytical",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009645": {
+    "name": "OST_AnalyticalNodes",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009060": {
+    "name": "OST_Coupler",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009047": {
+    "name": "OST_StructConnectionModifiers",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009046": {
+    "name": "OST_StructConnectionWelds",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009045": {
+    "name": "OST_StructConnectionHoles",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009044": {
+    "name": "OST_StructConnectionShearStuds",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009042": {
+    "name": "OST_StructConnectionOthers",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009041": {
+    "name": "OST_StructConnectionBolts",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009039": {
+    "name": "OST_StructConnectionAnchors",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009038": {
+    "name": "OST_StructConnectionPlates",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009037": {
+    "name": "OST_StructConnectionProfiles",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009033": {
+    "name": "OST_StructConnectionSymbol",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009030": {
+    "name": "OST_StructConnections",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009017": {
+    "name": "OST_FabricAreas",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009016": {
+    "name": "OST_FabricReinforcement",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009009": {
+    "name": "OST_PathRein",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009003": {
+    "name": "OST_AreaRein",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2009000": {
+    "name": "OST_Rebar",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008234": {
+    "name": "OST_PlumbingEquipment",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008232": {
+    "name": "OST_MechanicalControlDevices",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008231": {
+    "name": "OST_MEPAncillaryFraming",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008228": {
+    "name": "OST_FabricationDuctworkStiffeners",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008221": {
+    "name": "OST_FabricationPipeworkInsulation",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008220": {
+    "name": "OST_FabricationDuctworkLining",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008212": {
+    "name": "OST_FabricationContainment",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008208": {
+    "name": "OST_FabricationPipework",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008203": {
+    "name": "OST_FabricationHangers",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008198": {
+    "name": "OST_FabricationDuctworkTags",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008193": {
+    "name": "OST_FabricationDuctwork",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008186": {
+    "name": "OST_AnalyticSurfaces",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008185": {
+    "name": "OST_AnalyticSpaces",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008161": {
+    "name": "OST_PlaceHolderPipes",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008160": {
+    "name": "OST_PlaceHolderDucts",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008132": {
+    "name": "OST_Conduit",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008130": {
+    "name": "OST_CableTray",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008128": {
+    "name": "OST_ConduitFitting",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008126": {
+    "name": "OST_CableTrayFitting",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008124": {
+    "name": "OST_DuctLinings",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008123": {
+    "name": "OST_DuctInsulations",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008122": {
+    "name": "OST_PipeInsulations",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008107": {
+    "name": "OST_HVAC_Zones",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008101": {
+    "name": "OST_SwitchSystem",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008099": {
+    "name": "OST_Sprinklers",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008087": {
+    "name": "OST_LightingDevices",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008085": {
+    "name": "OST_FireAlarmDevices",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008083": {
+    "name": "OST_DataDevices",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008081": {
+    "name": "OST_CommunicationDevices",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008079": {
+    "name": "OST_SecurityDevices",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008077": {
+    "name": "OST_NurseCallDevices",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008075": {
+    "name": "OST_TelephoneDevices",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008055": {
+    "name": "OST_PipeAccessory",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008050": {
+    "name": "OST_FlexPipeCurves",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008049": {
+    "name": "OST_PipeFitting",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008044": {
+    "name": "OST_PipeCurves",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008043": {
+    "name": "OST_PipingSystem",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008039": {
+    "name": "OST_Wire",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008020": {
+    "name": "OST_FlexDuctCurves",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008016": {
+    "name": "OST_DuctAccessory",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008015": {
+    "name": "OST_DuctSystem",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008013": {
+    "name": "OST_DuctTerminal",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008010": {
+    "name": "OST_DuctFitting",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2008000": {
+    "name": "OST_DuctCurves",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006274": {
+    "name": "OST_StructuralTendons",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006271": {
+    "name": "OST_ExpansionJoints",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006265": {
+    "name": "OST_VibrationIsolators",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006263": {
+    "name": "OST_VibrationDampers",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006261": {
+    "name": "OST_VibrationManagement",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006248": {
+    "name": "OST_BridgeFramingTrusses",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006246": {
+    "name": "OST_BridgeFramingDiaphragms",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006245": {
+    "name": "OST_BridgeFramingCrossBracing",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006241": {
+    "name": "OST_BridgeFraming",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006229": {
+    "name": "OST_PierWalls",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006225": {
+    "name": "OST_PierPiles",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006221": {
+    "name": "OST_PierColumns",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006219": {
+    "name": "OST_PierCaps",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006205": {
+    "name": "OST_ApproachSlabs",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006204": {
+    "name": "OST_AbutmentWalls",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006203": {
+    "name": "OST_AbutmentPiles",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006202": {
+    "name": "OST_AbutmentFoundations",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006138": {
+    "name": "OST_BridgeBearings",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006137": {
+    "name": "OST_BridgeGirders",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006136": {
+    "name": "OST_BridgeFoundations",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006135": {
+    "name": "OST_BridgeDecks",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006134": {
+    "name": "OST_BridgeArches",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006133": {
+    "name": "OST_BridgeCables",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006132": {
+    "name": "OST_BridgeTowers",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006131": {
+    "name": "OST_BridgePiers",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2006130": {
+    "name": "OST_BridgeAbutments",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2005207": {
+    "name": "OST_InternalAreaLoads",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2005206": {
+    "name": "OST_InternalLineLoads",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2005205": {
+    "name": "OST_InternalPointLoads",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2005203": {
+    "name": "OST_AreaLoads",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2005202": {
+    "name": "OST_LineLoads",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2005201": {
+    "name": "OST_PointLoads",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2003600": {
+    "name": "OST_MEPSpaces",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2003417": {
+    "name": "OST_MassOpening",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2003416": {
+    "name": "OST_MassShade",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2003415": {
+    "name": "OST_MassGlazing",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2003414": {
+    "name": "OST_MassRoof",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2003413": {
+    "name": "OST_MassExteriorWall",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2003412": {
+    "name": "OST_MassInteriorWall",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2003411": {
+    "name": "OST_MassZone",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2003403": {
+    "name": "OST_MassFloor",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2003400": {
+    "name": "OST_Mass",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2003200": {
+    "name": "OST_Areas",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2002000": {
+    "name": "OST_DetailComponents",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001393": {
+    "name": "OST_RoofSoffit",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001392": {
+    "name": "OST_EdgeSlab",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001391": {
+    "name": "OST_Gutter",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001390": {
+    "name": "OST_Fascia",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001370": {
+    "name": "OST_Entourage",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001360": {
+    "name": "OST_Planting",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001354": {
+    "name": "OST_StructuralStiffener",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001350": {
+    "name": "OST_SpecialityEquipment",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001340": {
+    "name": "OST_Topography",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001336": {
+    "name": "OST_StructuralTruss",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001330": {
+    "name": "OST_StructuralColumns",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001327": {
+    "name": "OST_StructuralFramingSystem",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001320": {
+    "name": "OST_StructuralFraming",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001300": {
+    "name": "OST_StructuralFoundation",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001265": {
+    "name": "OST_SiteProperty",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001263": {
+    "name": "OST_BuildingPad",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001260": {
+    "name": "OST_Site",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001220": {
+    "name": "OST_Roads",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001180": {
+    "name": "OST_Parking",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001160": {
+    "name": "OST_PlumbingFixtures",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001140": {
+    "name": "OST_MechanicalEquipment",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001120": {
+    "name": "OST_LightingFixtures",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001100": {
+    "name": "OST_PipeCurves",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001079": {
+    "name": "OST_Toposolid",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001060": {
+    "name": "OST_ElectricalFixtures",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001058": {
+    "name": "OST_Signage",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001055": {
+    "name": "OST_AudioVisualDevices",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001052": {
+    "name": "OST_VerticalCirculation",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001049": {
+    "name": "OST_FireProtection",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001046": {
+    "name": "OST_MedicalEquipment",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001043": {
+    "name": "OST_FoodServiceEquipment",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001040": {
+    "name": "OST_ElectricalEquipment",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001039": {
+    "name": "OST_TemporaryStructure",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001036": {
+    "name": "OST_Hardscape",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001033": {
+    "name": "OST_MEPLoadAreaSeparationLines",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001020": {
+    "name": "OST_ElectricalLoadZoneInstance",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001012": {
+    "name": "OST_Alignments",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001001": {
+    "name": "OST_MEPSystemZone",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2001000": {
+    "name": "OST_DuctCurves",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000996": {
+    "name": "OST_ShaftOpening",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000983": {
+    "name": "OST_AnalyticalPipeConnections",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000949": {
+    "name": "OST_RailingTermination",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000948": {
+    "name": "OST_RailingSupport",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000947": {
+    "name": "OST_RailingHandRail",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000946": {
+    "name": "OST_RailingTopRail",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000833": {
+    "name": "OST_PathOfTravelLines",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000537": {
+    "name": "OST_Callouts",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000535": {
+    "name": "OST_StructuralFraming",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000530": {
+    "name": "OST_CLines",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000340": {
+    "name": "OST_CurtaSystem",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000269": {
+    "name": "OST_Parts",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000267": {
+    "name": "OST_Assemblies",
     "domain_extracted": false,
     "_verify": true
   },
@@ -38,18 +820,68 @@
     "domain_extracted": false,
     "_verify": true
   },
-  "-2000535": {
-    "name": "OST_StructuralFraming",
+  "-2000200": {
+    "name": "OST_Windows",
     "domain_extracted": false,
     "_verify": true
   },
-  "-2001100": {
-    "name": "OST_PipeCurves",
+  "-2000198": {
+    "name": "OST_ReferenceViewer",
     "domain_extracted": false,
     "_verify": true
   },
-  "-2001000": {
-    "name": "OST_DuctCurves",
+  "-2000181": {
+    "name": "OST_Cornices",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000180": {
+    "name": "OST_Ramps",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000171": {
+    "name": "OST_CurtainWallMullions",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000170": {
+    "name": "OST_CurtainWallPanels",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000160": {
+    "name": "OST_Rooms",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000151": {
+    "name": "OST_Doors",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000127": {
+    "name": "OST_StairsRailingBaluster",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000126": {
+    "name": "OST_StairsRailing",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000120": {
+    "name": "OST_Stairs",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000100": {
+    "name": "OST_Columns",
+    "domain_extracted": false,
+    "_verify": true
+  },
+  "-2000083": {
+    "name": "OST_ReferenceLines",
     "domain_extracted": false,
     "_verify": true
   },
@@ -58,14 +890,37 @@
     "domain_extracted": false,
     "_verify": true
   },
+  "-2000038": {
+    "name": "Ceilings",
+    "domain_extracted": true,
+    "_verify": true,
+    "target_domain": "ceiling_types"
+  },
+  "-2000035": {
+    "name": "Roofs",
+    "domain_extracted": true,
+    "_verify": true,
+    "target_domain": "roof_types"
+  },
+  "-2000032": {
+    "name": "Floors",
+    "domain_extracted": true,
+    "target_domain": "floor_types"
+  },
+  "-2000023": {
+    "name": "OST_Roofs",
+    "domain_extracted": true,
+    "_verify": true,
+    "target_domain": "roof_types"
+  },
   "-2000014": {
     "name": "OST_Columns",
     "domain_extracted": false,
     "_verify": true
   },
-  "-2000035": {
-    "name": "Roofs",
+  "-2000011": {
+    "name": "Walls",
     "domain_extracted": true,
-    "_verify": true
+    "target_domain": "wall_types"
   }
 }

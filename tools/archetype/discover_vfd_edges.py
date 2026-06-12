@@ -416,7 +416,7 @@ def infer_domain(param_id: str, param_name: Optional[str], hints: Dict[str, Any]
         for substring, entry in iter_name_contains_rules(hints):
             if substring.lower() in param_name_lower:
                 target, verified = hint_target_and_verify(entry)
-                return DomainHint(target, f"name_contains:{substring}", verified)
+                return DomainHint(target, "name_contains", verified)
 
     return DomainHint(None, "unresolved", True)
 
@@ -543,22 +543,69 @@ def parse_category_set(category_set: str) -> List[int]:
     return out
 
 
+def _resolve_target_domain_from_categories(
+    category_ids: Sequence[int],
+    category_file_counts: Dict[str, int],
+    category_map: Dict[str, Any],
+    support_threshold: int,
+) -> Tuple[Optional[str], str]:
+    qualifying = [
+        category_id for category_id in category_ids
+        if category_file_counts.get(str(category_id), 0) >= support_threshold
+    ]
+    if not qualifying:
+        return None, "category_map_no_signal"
+
+    domains: Set[Optional[str]] = set()
+    for category_id in qualifying:
+        entry = category_map.get(str(category_id))
+        target: Optional[str] = None
+        if (
+            isinstance(entry, dict)
+            and entry.get("domain_extracted") is True
+            and entry.get("_verify") is not True
+        ):
+            target = entry.get("target_domain") or None
+        domains.add(target)
+
+    if domains == {None}:
+        return None, "category_map_no_signal"
+    if len(domains) == 1:
+        return next(iter(domains)), "category_map_consensus"
+    return None, "category_map_conflict"
+
+
+def _validate_domain_has_identity_items(target_domain: str, identity_items_dir: Path) -> bool:
+    shard_path = identity_items_dir / f"{target_domain}.csv"
+    if not shard_path.is_file():
+        return False
+    with shard_path.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.reader(f)
+        try:
+            next(reader)
+        except StopIteration:
+            return False
+        for _ in reader:
+            return True
+    return False
+
+
 def build_inventory_rows(
     observations: Sequence[RawObservation],
     resolved: Dict[str, ResolvedParam],
     hints: Dict[str, Any],
     category_map: Dict[str, Any],
     support_min_files: int,
+    identity_items_dir: Optional[Path] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     warned_unparseable: Set[str] = set()
     recognized_distinct: Set[int] = set()
     unrecognized_distinct: Set[int] = set()
     category_cache: Dict[str, ParsedCategories] = {}
-    groups: Dict[Tuple[str, str, str, str, str], Dict[str, Any]] = {}
+    groups: Dict[Tuple[str, str, str, str], Dict[str, Any]] = {}
 
     for obs in observations:
         param = resolved[obs.param_id]
-        hint = infer_domain(obs.param_id, param.param_name, hints)
         if obs.categories_raw not in category_cache:
             category_cache[obs.categories_raw] = parse_categories(
                 obs.categories_raw, category_map, warned_unparseable, recognized_distinct, unrecognized_distinct,
@@ -568,7 +615,6 @@ def build_inventory_rows(
             obs.param_id,
             param.param_kind,
             param.param_name or "",
-            hint.target_domain or "",
             cats.category_set,
         )
         group = groups.setdefault(
@@ -578,10 +624,8 @@ def build_inventory_rows(
                 "param_kind": param.param_kind,
                 "param_name": param.param_name or "",
                 "name_resolved": param.name_resolved,
-                "target_domain": hint.target_domain or "",
-                "target_domain_source": hint.source,
-                "target_domain_verified": hint.verified,
                 "category_set": cats.category_set,
+                "category_ids": cats.category_ids,
                 "category_names": cats.category_names,
                 "unrecognized_category_ids": cats.unrecognized_category_ids,
                 "has_unextracted_domain": cats.has_unextracted_domain,
@@ -593,21 +637,62 @@ def build_inventory_rows(
         group["export_run_ids"].add(obs.export_run_id)
         group["rule_count"] += 1
 
+    # Per-param category file support, aggregated across every category_set
+    # this param_id was observed under, for category-consensus resolution.
+    category_files_by_param: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
+    for group in groups.values():
+        for category_id in group["category_ids"]:
+            category_files_by_param[group["param_id"]][category_id].update(group["export_run_ids"])
+    category_file_counts_by_param: Dict[str, Dict[str, int]] = {
+        param_id: {cat_id: len(files) for cat_id, files in cat_counts.items()}
+        for param_id, cat_counts in category_files_by_param.items()
+    }
+
     rows: List[Dict[str, Any]] = []
     for group in groups.values():
+        param_id = group["param_id"]
+        hint = infer_domain(param_id, group["param_name"] or None, hints)
+        target_domain = hint.target_domain or ""
+        target_domain_source = hint.source
+        target_domain_verified = bool(hint.verified)
+
+        if not target_domain:
+            category_ids_int = [int(cat_id) for cat_id in group["category_ids"]]
+            consensus_domain, consensus_source = _resolve_target_domain_from_categories(
+                category_ids_int,
+                category_file_counts_by_param.get(param_id, {}),
+                category_map,
+                support_min_files,
+            )
+            if consensus_source == "category_map_consensus" and consensus_domain:
+                consensus_verified = True
+                if identity_items_dir is not None and identity_items_dir.is_dir():
+                    consensus_verified = _validate_domain_has_identity_items(consensus_domain, identity_items_dir)
+                if consensus_verified:
+                    target_domain = consensus_domain
+                    target_domain_source = "category_map_consensus"
+                    target_domain_verified = True
+                else:
+                    target_domain = ""
+                    target_domain_source = "unresolved"
+                    target_domain_verified = True
+            else:
+                target_domain = ""
+                target_domain_source = "unresolved"
+                target_domain_verified = True
+
         file_count = len(group["export_run_ids"])
         meets_threshold = file_count >= support_min_files
-        target_domain = group["target_domain"]
         name_resolved = bool(group["name_resolved"])
         rows.append({
             "_export_run_ids": set(group["export_run_ids"]),
-            "param_id": group["param_id"],
+            "param_id": param_id,
             "param_kind": group["param_kind"],
             "param_name": group["param_name"],
             "name_resolved": bool_s(name_resolved),
             "target_domain": target_domain,
-            "target_domain_source": group["target_domain_source"],
-            "target_domain_verified": bool_s(bool(group["target_domain_verified"])),
+            "target_domain_source": target_domain_source,
+            "target_domain_verified": bool_s(target_domain_verified),
             "category_set": group["category_set"],
             "category_names": group["category_names"],
             "unrecognized_category_ids": group["unrecognized_category_ids"],
@@ -944,6 +1029,7 @@ def main() -> int:
     resolved = resolve_params(observations, bip_lookup, shared_param_names)
     inventory_rows, category_stats = build_inventory_rows(
         observations, resolved, bip_hints, category_map, args.support_min_files,
+        identity_items_dir=identity_items_dir,
     )
     edge_rows = build_edge_rows(inventory_rows, args.include_unresolved, args.support_min_files)
     verify_outputs(edge_rows, inventory_rows, len(export_run_ids))
