@@ -4,6 +4,7 @@
 Inputs:
   - Fingerprint_Out/archetype_analysis/archetype_validation_pairs.csv
   - Fingerprint_Out/archetype_analysis/archetype_validation.csv
+  - Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv
   - Fingerprint_Out/archetype_analysis/archetype_classifications.csv
   - Fingerprint_Out/archetype_analysis/cross_domain_items.csv
   - results/records/file_metadata.csv
@@ -25,21 +26,58 @@ Processing:
     pairing, since curated definitions may give a signal a human-friendly
     signal_id distinct from its canonical edge_id); edges are unique
     (edge_id_a, edge_id_b) pairs from archetype_validation_pairs.csv, weighted
-    by the maximum top_pair_containment observed across archetype_ids.
-    governance_question is normally the second "__"-delimited token of
-    archetype_id (e.g. CANDIDATE__wall_graphics__... -> wall_graphics), but
+    by Jaccard similarity (n_both / (count_a + count_b - n_both), maximum
+    across archetype_ids), where count_a / count_b are looked up by
+    (archetype_id, edge_id) from archetype_validation.csv's
+    n_files_classified -- n_files_classified is emitted at (archetype_id,
+    signal_id) grain after that signal's join_hash filter is applied, so the
+    same edge_id can carry different counts under different archetype_ids;
+    keying by edge_id alone would let one archetype's count silently
+    overwrite another's. n_both (the filtered intersection) is taken from
+    archetype_validation_detail.csv when available: that file lists, per
+    (export_run_id, archetype_id, signal_id), the files where each signal
+    produced cross_domain_items evidence after its own join_hash filter was
+    applied, keyed by the same raw edge_id as archetype_validation.csv; the
+    intersection of the two signals' file sets is the true filtered
+    co-occurrence count for this archetype's specific pair. If detail rows
+    are unavailable for either edge (e.g. a raw-vs-aliased edge_id mismatch,
+    or no cross_domain_items evidence at all), n_both falls back to
+    top_pair_file_count clamped to min(top_pair_file_count, count_a,
+    count_b): top_pair_file_count is the max co-occurrence count across *any*
+    join_hash pair on the two edges (unfiltered), which can exceed either
+    signal's own filtered file count when a promoted archetype's join_hash
+    filters were edited away from that top pattern; without the clamp this
+    can produce Jaccard > 1 and let an unrelated join_hash configuration for
+    the same edge pair drive the threshold and complete-linkage merges.
+    Jaccard (vs. raw containment)
+    avoids the asymmetric problem where a rare signal that is a strict subset
+    of a common signal scores a perfect top_pair_containment despite being a
+    poor coupling indicator. Pairs whose (archetype_id, edge_id_a) or
+    (archetype_id, edge_id_b) has no n_files_classified entry are logged and
+    skipped. governance_question is normally the second "__"-delimited token
+    of archetype_id (e.g. CANDIDATE__wall_graphics__... -> wall_graphics), but
     archetype_classifications.csv's governance_question column -- which may
     have been edited during human curation -- takes precedence wherever an
     archetype_id appears there.
 
   Stage 2: Derive a global coupling threshold via Jenks natural breaks
-    (n_classes=2, threshold = breaks[0]) over all unique pairwise containment
-    values. Falls back to 0.8 (with a warning) if fewer than 4 distinct
-    values exist. Retain only edges with max_containment >= threshold.
+    (n_classes=2, threshold = breaks[0]) over all unique pairwise Jaccard
+    similarity values. Falls back to 0.8 (with a warning) if fewer than 4
+    distinct values exist. Retain only edges with max_jaccard >= threshold.
+    The legacy top_pair_containment-based threshold is also computed and
+    logged (for visibility into the effect of the Jaccard switch) but is not
+    used for thresholding.
 
-  Stage 3: Find connected components on the thresholded graph per
-    governance_question using union-find. Each component is a signal
-    cluster; unconnected signals form singleton clusters.
+  Stage 3: Build complete-linkage clusters per governance_question: starting
+    from singleton clusters, repeatedly consider the pair (a, b) with the
+    highest Jaccard among pairs whose clusters differ (ties broken by
+    edge_id_a asc, then edge_id_b asc); merge cluster(a) and cluster(b) only
+    if every pairwise Jaccard within the merged cluster (including pairs not
+    present in archetype_validation_pairs.csv, treated as Jaccard 0.0) is
+    >= the coupling threshold. This prevents chain bridging: a signal only
+    joins a cluster if it is directly similar (above threshold) to every
+    existing member, not merely transitively connected to one of them via a
+    chain of pairwise edges. Unmerged signals form singleton clusters.
 
   Stage 4: Generate a stable cluster_label_stub per cluster from the bare
     parameter names of its member signals.
@@ -66,6 +104,7 @@ Usage:
     python tools/archetype/cluster_archetype_signals.py \\
         --pairs Fingerprint_Out/archetype_analysis/archetype_validation_pairs.csv \\
         --validation Fingerprint_Out/archetype_analysis/archetype_validation.csv \\
+        --validation-detail Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv \\
         --classifications Fingerprint_Out/archetype_analysis/archetype_classifications.csv \\
         --cross-domain-items Fingerprint_Out/archetype_analysis/cross_domain_items.csv \\
         --file-metadata results/records/file_metadata.csv \\
@@ -167,35 +206,134 @@ def _cluster_label_stub(governance_question: str, signal_ids: List[str]) -> str:
     return f"{governance_question}__{combo}"
 
 
-class UnionFind:
-    """Disjoint-set forest for finding connected components."""
+def _complete_linkage_clusters(
+    nodes: Set[str],
+    pair_jaccard: Dict[Tuple[str, str], float],
+    threshold: float,
+) -> List[Set[str]]:
+    """Group nodes into clusters such that every pairwise Jaccard within a
+    cluster meets ``threshold`` (complete linkage).
 
-    def __init__(self, items: Set[str]) -> None:
-        self.parent: Dict[str, str] = {x: x for x in items}
+    Pairs absent from ``pair_jaccard`` are treated as Jaccard 0.0 (no
+    observed co-occurrence), never as high similarity. Candidate pairs are
+    processed in (Jaccard desc, edge_id_a asc, edge_id_b asc) order; a merge
+    is applied only if it does not push any pairwise Jaccard within the
+    resulting cluster below ``threshold``. This is deterministic and avoids
+    single-linkage chain bridging.
+    """
 
-    def find(self, x: str) -> str:
-        if x not in self.parent:
-            self.parent[x] = x
-        while self.parent[x] != x:
-            self.parent[x] = self.parent[self.parent[x]]
-            x = self.parent[x]
-        return x
+    def pair_value(a: str, b: str) -> float:
+        if a == b:
+            return 1.0
+        return pair_jaccard.get(tuple(sorted((a, b))), 0.0)
 
-    def union(self, a: str, b: str) -> None:
-        ra, rb = self.find(a), self.find(b)
-        if ra == rb:
-            return
-        if ra < rb:
-            self.parent[rb] = ra
-        else:
-            self.parent[ra] = rb
+    clusters: Dict[str, Set[str]] = {n: {n} for n in nodes}
+
+    ordered_pairs = sorted(
+        ((k, v) for k, v in pair_jaccard.items() if k[0] in nodes and k[1] in nodes),
+        key=lambda kv: (-kv[1], kv[0][0], kv[0][1]),
+    )
+
+    for (edge_a, edge_b), _jaccard in ordered_pairs:
+        cluster_a = clusters[edge_a]
+        cluster_b = clusters[edge_b]
+        if cluster_a is cluster_b:
+            continue
+        candidate = cluster_a | cluster_b
+        if all(
+            pair_value(x, y) >= threshold
+            for x in candidate
+            for y in candidate
+            if x != y
+        ):
+            for node in candidate:
+                clusters[node] = candidate
+
+    seen_ids: Set[int] = set()
+    result: List[Set[str]] = []
+    for node in nodes:
+        cluster = clusters[node]
+        if id(cluster) not in seen_ids:
+            seen_ids.add(id(cluster))
+            result.append(cluster)
+    return result
+
+
+def _build_n_files_classified_lookup(validation_rows: List[Dict[str, str]]) -> Dict[Tuple[str, str], float]:
+    """(archetype_id, edge_id) -> n_files_classified, from archetype_validation.csv.
+
+    n_files_classified is emitted at (archetype_id, signal_id) grain *after*
+    applying that signal's join_hash filter (see
+    validate_archetype_signals.py), so the same edge_id can carry different
+    counts under different archetype_ids whose signals filter it
+    differently. Keying by edge_id alone would let one archetype's count
+    silently overwrite another's. archetype_validation_pairs.csv rows carry
+    archetype_id, so callers look up by (archetype_id, edge_id).
+    """
+    lookup: Dict[Tuple[str, str], float] = {}
+    for row in validation_rows:
+        archetype_id = row.get("archetype_id", "")
+        edge_id = row.get("edge_id", "")
+        if not edge_id:
+            continue
+        try:
+            value = float(row.get("n_files_classified") or 0.0)
+        except ValueError:
+            continue
+        key = (archetype_id, edge_id)
+        existing = lookup.get(key)
+        if existing is not None and existing != value:
+            log(
+                STAGE,
+                f"WARNING: archetype_id={archetype_id} edge_id={edge_id} has multiple "
+                f"n_files_classified values ({existing}, {value}) across its signals; "
+                f"using {value}",
+            )
+        lookup[key] = value
+    return lookup
+
+
+def _build_detail_files_lookup(detail_rows: List[Dict[str, str]]) -> Dict[Tuple[str, str], Set[str]]:
+    """(archetype_id, edge_id) -> set of export_run_id, from
+    archetype_validation_detail.csv.
+
+    Each row is one (export_run_id, archetype_id, signal_id, source_join_hash)
+    observation with resolved cross_domain_items evidence for that signal's
+    join_hash-filtered edge, so the set of export_run_id values per
+    (archetype_id, edge_id) is the files where this archetype's signal
+    produced *filtered* evidence -- a more direct measure of co-occurrence
+    than top_pair_file_count (which is the max count across any join_hash
+    pair on the edges, unfiltered). detail.csv's edge_id is raw (pre-alias),
+    the same value space as archetype_validation.csv's edge_id; the pairs
+    loop in _build_signal_graph only uses this lookup when
+    archetype_validation_pairs.csv's (aliased) edge_id_a/edge_id_b happen to
+    match a raw edge_id here (the common case where no edge collapsing
+    applies to either signal), falling back to the top_pair_file_count clamp
+    otherwise.
+    """
+    lookup: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
+    for row in detail_rows:
+        archetype_id = row.get("archetype_id", "")
+        edge_id = row.get("edge_id", "")
+        export_run_id = row.get("export_run_id", "")
+        if not edge_id or not export_run_id:
+            continue
+        lookup[(archetype_id, edge_id)].add(export_run_id)
+    return dict(lookup)
 
 
 def _build_signal_graph(
     validation_rows: List[Dict[str, str]],
     pairs_rows: List[Dict[str, str]],
     curated_gq_map: Dict[str, str],
-) -> Tuple[Dict[str, Set[str]], Dict[str, Dict[Tuple[str, str], float]], Dict[str, Dict[str, str]]]:
+    n_files_classified: Dict[str, float],
+    detail_files: Dict[Tuple[str, str], Set[str]],
+) -> Tuple[
+    Dict[str, Set[str]],
+    Dict[str, Dict[Tuple[str, str], float]],
+    Dict[str, Dict[Tuple[str, str], float]],
+    Dict[str, Dict[str, str]],
+]:
     nodes_by_gq: Dict[str, Set[str]] = defaultdict(set)
     signal_to_edge_by_gq: Dict[str, Dict[str, str]] = defaultdict(dict)
     for row in validation_rows:
@@ -207,9 +345,13 @@ def _build_signal_graph(
         if signal_id:
             signal_to_edge_by_gq[gq][signal_id] = edge_id
 
-    edges_by_gq: Dict[str, Dict[Tuple[str, str], float]] = defaultdict(dict)
+    jaccard_edges_by_gq: Dict[str, Dict[Tuple[str, str], float]] = defaultdict(dict)
+    containment_edges_by_gq: Dict[str, Dict[Tuple[str, str], float]] = defaultdict(dict)
+    n_both_from_detail = 0
+    n_both_from_clamp = 0
     for row in pairs_rows:
-        gq = _resolve_governance_question(row.get("archetype_id", ""), curated_gq_map)
+        archetype_id = row.get("archetype_id", "")
+        gq = _resolve_governance_question(archetype_id, curated_gq_map)
         edge_a = row.get("edge_id_a", "")
         edge_b = row.get("edge_id_b", "")
         if not edge_a or not edge_b:
@@ -218,50 +360,126 @@ def _build_signal_graph(
             containment = float(row.get("top_pair_containment") or 0.0)
         except ValueError:
             containment = 0.0
+        try:
+            top_pair_file_count = float(row.get("top_pair_file_count") or 0.0)
+        except ValueError:
+            top_pair_file_count = 0.0
+
+        count_a = n_files_classified.get((archetype_id, edge_a))
+        count_b = n_files_classified.get((archetype_id, edge_b))
+        if count_a is None or count_b is None:
+            missing = edge_a if count_a is None else edge_b
+            log(
+                STAGE,
+                f"WARNING: (archetype_id={archetype_id}, edge_id={missing}) not found in "
+                f"archetype_validation.csv n_files_classified lookup for pair "
+                f"({edge_a}, {edge_b}), governance_question={gq}; skipping pair",
+            )
+            continue
+
+        files_a = detail_files.get((archetype_id, edge_a))
+        files_b = detail_files.get((archetype_id, edge_b))
+        if files_a is not None and files_b is not None:
+            # archetype_validation_detail.csv gives the actual files where
+            # each of this archetype's (filtered) signals produced
+            # cross_domain_items evidence; their intersection is the true
+            # filtered co-occurrence count for this specific pair.
+            n_both = float(len(files_a & files_b))
+            n_both_from_detail += 1
+        else:
+            # No detail-based file sets for one or both edges (e.g. raw vs.
+            # aliased edge_id mismatch, or no cross_domain_items evidence for
+            # this signal). Fall back to the top_pair_file_count clamp:
+            # top_pair_file_count is the max co-occurrence count across *any*
+            # join_hash pair on these edges (unfiltered), not necessarily the
+            # count for this archetype's specific (filtered) signal pair. The
+            # true filtered intersection can be no larger than either signal's
+            # own filtered file count, so clamp to that bound -- this keeps
+            # Jaccard in [0, 1] and avoids an unrelated join_hash configuration
+            # for the same edge pair inflating the similarity.
+            n_both = min(top_pair_file_count, count_a, count_b)
+            n_both_from_clamp += 1
+            if n_both < top_pair_file_count:
+                log(
+                    STAGE,
+                    f"archetype_id={archetype_id}: clamped top_pair_file_count="
+                    f"{top_pair_file_count:g} to n_both={n_both:g} (count_a={count_a:g}, "
+                    f"count_b={count_b:g}) for pair ({edge_a}, {edge_b})",
+                )
+
+        denom = count_a + count_b - n_both
+        jaccard = (n_both / denom) if denom > 0 else 0.0
 
         key = tuple(sorted((edge_a, edge_b)))
-        existing = edges_by_gq[gq].get(key)
-        if existing is None or containment > existing:
-            edges_by_gq[gq][key] = containment
+
+        existing_jaccard = jaccard_edges_by_gq[gq].get(key)
+        if existing_jaccard is None or jaccard > existing_jaccard:
+            jaccard_edges_by_gq[gq][key] = jaccard
+
+        existing_containment = containment_edges_by_gq[gq].get(key)
+        if existing_containment is None or containment > existing_containment:
+            containment_edges_by_gq[gq][key] = containment
 
         nodes_by_gq[gq].add(edge_a)
         nodes_by_gq[gq].add(edge_b)
 
+    log(
+        STAGE,
+        f"n_both source: {n_both_from_detail} pair(s) from archetype_validation_detail.csv "
+        f"file-set intersection, {n_both_from_clamp} pair(s) from top_pair_file_count clamp",
+    )
+
     return (
         dict(nodes_by_gq),
-        dict(edges_by_gq),
+        dict(jaccard_edges_by_gq),
+        dict(containment_edges_by_gq),
         {gq: dict(m) for gq, m in signal_to_edge_by_gq.items()},
     )
 
 
-def _derive_coupling_threshold(
-    edges_by_gq: Dict[str, Dict[Tuple[str, str], float]],
-    override: Optional[float],
-) -> float:
-    if override is not None:
-        log(STAGE, f"coupling_threshold={override:.4f} (CLI override)")
-        return override
-
-    all_containments: List[float] = []
-    for edges in edges_by_gq.values():
-        all_containments.extend(edges.values())
-
-    distinct = sorted(set(all_containments))
+def _jenks_threshold_for_values(values: List[float], label: str) -> float:
+    distinct = sorted(set(values))
     if len(distinct) < _MIN_DISTINCT_FOR_JENKS:
         log(
             STAGE,
-            f"WARNING: only {len(distinct)} distinct pairwise containment value(s) "
-            f"(<{_MIN_DISTINCT_FOR_JENKS}); falling back to coupling_threshold={_FALLBACK_THRESHOLD}",
+            f"WARNING: only {len(distinct)} distinct pairwise {label} value(s) "
+            f"(<{_MIN_DISTINCT_FOR_JENKS}); falling back to {label}-based threshold={_FALLBACK_THRESHOLD}",
         )
         return _FALLBACK_THRESHOLD
 
-    breaks = jenks_breaks(all_containments, n_classes=2)
+    breaks = jenks_breaks(values, n_classes=2)
     threshold = breaks[0]
     log(
         STAGE,
-        f"coupling_threshold={threshold:.4f} (Jenks natural breaks over "
-        f"{len(all_containments)} pairs, {len(distinct)} distinct values)",
+        f"{label}-based threshold={threshold:.4f} (Jenks natural breaks over "
+        f"{len(values)} pairs, {len(distinct)} distinct values)",
     )
+    return threshold
+
+
+def _derive_coupling_threshold(
+    jaccard_edges_by_gq: Dict[str, Dict[Tuple[str, str], float]],
+    containment_edges_by_gq: Dict[str, Dict[Tuple[str, str], float]],
+    override: Optional[float],
+) -> float:
+    # Always compute and log the legacy top_pair_containment-based threshold
+    # for visibility into the effect of switching to Jaccard, even though it
+    # is no longer used for thresholding.
+    all_containments: List[float] = []
+    for edges in containment_edges_by_gq.values():
+        all_containments.extend(edges.values())
+    _jenks_threshold_for_values(all_containments, "top_pair_containment")
+
+    all_jaccards: List[float] = []
+    for edges in jaccard_edges_by_gq.values():
+        all_jaccards.extend(edges.values())
+
+    if override is not None:
+        log(STAGE, f"coupling_threshold={override:.4f} (CLI override, applied to Jaccard values)")
+        return override
+
+    threshold = _jenks_threshold_for_values(all_jaccards, "jaccard")
+    log(STAGE, f"coupling_threshold={threshold:.4f} (jaccard-based)")
     return threshold
 
 
@@ -280,36 +498,33 @@ def _apply_threshold(
 
 def _build_clusters(
     nodes_by_gq: Dict[str, Set[str]],
-    edges_by_gq: Dict[str, Dict[Tuple[str, str], float]],
+    jaccard_edges_by_gq: Dict[str, Dict[Tuple[str, str], float]],
+    threshold: float,
 ) -> Dict[str, List[Dict[str, Any]]]:
     clusters_by_gq: Dict[str, List[Dict[str, Any]]] = {}
 
     for gq in sorted(nodes_by_gq):
         nodes = nodes_by_gq[gq]
-        uf = UnionFind(nodes)
-        kept_edges = edges_by_gq.get(gq, {})
-        for edge_a, edge_b in kept_edges:
-            uf.union(edge_a, edge_b)
+        pair_jaccard = jaccard_edges_by_gq.get(gq, {})
 
-        members_by_root: Dict[str, List[str]] = defaultdict(list)
-        for node in nodes:
-            members_by_root[uf.find(node)].append(node)
-
-        min_containment_by_root: Dict[str, float] = {}
-        for (edge_a, edge_b), containment in kept_edges.items():
-            root = uf.find(edge_a)
-            if root not in min_containment_by_root or containment < min_containment_by_root[root]:
-                min_containment_by_root[root] = containment
+        member_groups = _complete_linkage_clusters(nodes, pair_jaccard, threshold)
 
         cluster_defs: List[Dict[str, Any]] = []
-        for root, members in members_by_root.items():
+        for members in member_groups:
             signal_ids = sorted(members)
+            min_jaccard = None
+            if len(signal_ids) > 1:
+                min_jaccard = min(
+                    pair_jaccard.get(tuple(sorted((x, y))), 0.0)
+                    for i, x in enumerate(signal_ids)
+                    for y in signal_ids[i + 1:]
+                )
             cluster_defs.append({
                 "cluster_label_stub": _cluster_label_stub(gq, signal_ids),
                 "governance_question": gq,
                 "n_signals": len(signal_ids),
                 "signal_ids": signal_ids,
-                "min_containment": min_containment_by_root.get(root),
+                "min_containment": min_jaccard,
                 "is_singleton": len(signal_ids) == 1,
             })
 
@@ -371,14 +586,22 @@ def _rollup_classifications(
                 "n_signals_in_cluster": n_signals_in_cluster,
                 "fired_signals": set(),
                 "has_full": False,
-                "client_label": row.get("client_label", ""),
-                "governance_role": row.get("governance_role", ""),
-                "discipline_label": row.get("discipline_label", ""),
-                "unit_system": row.get("unit_system", ""),
+                "client_label": "",
+                "governance_role": "",
+                "discipline_label": "",
+                "unit_system": "",
             })
             entry["fired_signals"].add(edge_id)
             if confidence_tier == "Full":
                 entry["has_full"] = True
+            # client_label/governance_role/discipline_label/unit_system are
+            # pass-through metadata, not dedup keys: take the first
+            # non-empty value seen across all rows in this group.
+            for field in ("client_label", "governance_role", "discipline_label", "unit_system"):
+                if not entry[field]:
+                    value = row.get(field, "")
+                    if value:
+                        entry[field] = value
 
     # is_mixed_cluster: file fired on >1 cluster for the same governance_question
     clusters_by_file_gq: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
@@ -465,6 +688,7 @@ def main() -> int:
     ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
     ap.add_argument("--pairs", default=None, help="Path to archetype_validation_pairs.csv")
     ap.add_argument("--validation", default=None, help="Path to archetype_validation.csv")
+    ap.add_argument("--validation-detail", default=None, help="Path to archetype_validation_detail.csv")
     ap.add_argument("--classifications", default=None, help="Path to archetype_classifications.csv")
     ap.add_argument("--cross-domain-items", default=None, help="Path to cross_domain_items.csv (file universe for coverage denominators)")
     ap.add_argument("--file-metadata", default=None, help="Path to file_metadata.csv (file universe for coverage denominators)")
@@ -479,6 +703,7 @@ def main() -> int:
     analysis_dir = repo_root / "Fingerprint_Out" / "archetype_analysis"
     pairs_path = Path(args.pairs) if args.pairs else analysis_dir / "archetype_validation_pairs.csv"
     validation_path = Path(args.validation) if args.validation else analysis_dir / "archetype_validation.csv"
+    validation_detail_path = Path(args.validation_detail) if args.validation_detail else analysis_dir / "archetype_validation_detail.csv"
     classifications_path = Path(args.classifications) if args.classifications else analysis_dir / "archetype_classifications.csv"
     cross_domain_items_path = Path(args.cross_domain_items) if args.cross_domain_items else analysis_dir / "cross_domain_items.csv"
     file_metadata_path = Path(args.file_metadata) if args.file_metadata else repo_root / "results" / "records" / "file_metadata.csv"
@@ -488,6 +713,11 @@ def main() -> int:
 
     validation_rows = read_csv_rows(validation_path)
     log(STAGE, f"loaded {len(validation_rows)} rows from {validation_path}")
+
+    validation_detail_rows = read_csv_rows(validation_detail_path)
+    log(STAGE, f"loaded {len(validation_detail_rows)} rows from {validation_detail_path}")
+    if not validation_detail_rows:
+        log(STAGE, "WARNING: archetype_validation_detail.csv is empty or missing; Jaccard n_both will fall back to the top_pair_file_count clamp for all pairs")
 
     pairs_rows = read_csv_rows(pairs_path)
     log(STAGE, f"loaded {len(pairs_rows)} rows from {pairs_path}")
@@ -502,16 +732,20 @@ def main() -> int:
     log(STAGE, f"loaded {len(file_metadata_rows)} rows from {file_metadata_path}")
 
     curated_gq_map = _build_curated_gq_map(classification_rows)
+    n_files_classified = _build_n_files_classified_lookup(validation_rows)
+    detail_files = _build_detail_files_lookup(validation_detail_rows)
 
     # Stage 1: signal graph per governance_question
-    nodes_by_gq, edges_by_gq, signal_to_edge_by_gq = _build_signal_graph(validation_rows, pairs_rows, curated_gq_map)
+    nodes_by_gq, jaccard_edges_by_gq, containment_edges_by_gq, signal_to_edge_by_gq = _build_signal_graph(
+        validation_rows, pairs_rows, curated_gq_map, n_files_classified, detail_files,
+    )
 
-    # Stage 2: coupling threshold + apply
-    coupling_threshold = _derive_coupling_threshold(edges_by_gq, args.coupling_threshold)
-    thresholded_edges_by_gq = _apply_threshold(edges_by_gq, coupling_threshold)
+    # Stage 2: coupling threshold (Jaccard-based; legacy containment-based threshold logged for comparison)
+    coupling_threshold = _derive_coupling_threshold(jaccard_edges_by_gq, containment_edges_by_gq, args.coupling_threshold)
+    _apply_threshold(jaccard_edges_by_gq, coupling_threshold)  # diagnostic: pairwise edges meeting threshold, before complete-linkage
 
-    # Stage 3 + 4: connected components -> clusters + labels
-    clusters_by_gq = _build_clusters(nodes_by_gq, thresholded_edges_by_gq)
+    # Stage 3 + 4: complete-linkage clusters + labels
+    clusters_by_gq = _build_clusters(nodes_by_gq, jaccard_edges_by_gq, coupling_threshold)
 
     signal_clusters_doc = {
         "schema_version": SCHEMA_VERSION,

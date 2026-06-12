@@ -392,6 +392,7 @@ isolation.
 **Inputs**
 - `Fingerprint_Out/archetype_analysis/archetype_validation_pairs.csv`
 - `Fingerprint_Out/archetype_analysis/archetype_validation.csv`
+- `Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv`
 - `Fingerprint_Out/archetype_analysis/archetype_classifications.csv`
 - `Fingerprint_Out/archetype_analysis/cross_domain_items.csv` and
   `results/records/file_metadata.csv` — used only to compute the
@@ -433,15 +434,54 @@ isolation.
   Stage 2.5 -- takes precedence wherever an `archetype_id` appears
   there, so a promoted archetype's signals are graphed and rolled up
   under its curated question rather than its original candidate hint.
-- Stage 2: derives a global `coupling_threshold` via Jenks natural
-  breaks (`tools/jenks_utils.py`, `n_classes=2`, `threshold = breaks[0]`)
-  over all unique pairwise `top_pair_containment` values (falls back to
-  `0.8` with a warning if fewer than 4 distinct values exist; override
-  with `--coupling-threshold`). Edges below the threshold are dropped.
-- Stage 3: finds connected components per `governance_question` on the
-  thresholded graph via union-find (pure Python, no external graph
-  libraries). Each component becomes a signal cluster; unconnected nodes
-  become singleton clusters.
+- Stage 2: each candidate edge is weighted by Jaccard similarity
+  (`n_both / (count_a + count_b - n_both)`, maximum across
+  `archetype_id`s). `count_a`/`count_b` are looked up by
+  `(archetype_id, edge_id)` from `archetype_validation.csv`'s
+  `n_files_classified` -- `n_files_classified` is emitted at
+  `(archetype_id, signal_id)` grain *after* that signal's `join_hash`
+  filter is applied, so the same `edge_id` can carry different counts
+  under different `archetype_id`s; keying by `edge_id` alone would let
+  one archetype's count silently overwrite another's. `n_both` (the
+  filtered intersection) is preferentially taken from
+  `archetype_validation_detail.csv`: that file lists, per `(export_run_id,
+  archetype_id, signal_id)`, the files where each signal produced
+  `cross_domain_items.csv` evidence after its own `join_hash` filter was
+  applied, keyed by the same raw `edge_id` as `archetype_validation.csv`;
+  intersecting the two signals' file sets gives the true filtered
+  co-occurrence count for that specific pair. If detail rows are
+  unavailable for either edge (e.g. a raw-vs-aliased `edge_id` mismatch
+  between `archetype_validation_detail.csv`'s raw `edge_id` and
+  `archetype_validation_pairs.csv`'s aliased `edge_id_a`/`edge_id_b`, or no
+  `cross_domain_items.csv` evidence at all for a signal), `n_both` falls
+  back to `top_pair_file_count` clamped to `min(top_pair_file_count,
+  count_a, count_b)`: `top_pair_file_count` is the max co-occurrence count
+  across *any* `join_hash` pair on the two edges (unfiltered), which can
+  exceed either signal's own filtered file count when a promoted
+  archetype's `join_hash` filters were edited away from that top pattern;
+  without the clamp this can produce Jaccard `> 1` and let an unrelated
+  `join_hash` configuration for the same edge pair drive the threshold and
+  complete-linkage merges. The number of pairs resolved via each path is
+  logged. Jaccard (vs. raw containment) avoids the
+  asymmetric problem where a rare signal that is a strict subset of a
+  common signal scores a perfect `top_pair_containment` despite being a
+  poor coupling indicator. A global `coupling_threshold` is then derived
+  via Jenks natural breaks (`tools/jenks_utils.py`, `n_classes=2`,
+  `threshold = breaks[0]`) over all unique pairwise Jaccard values (falls
+  back to `0.8` with a warning if fewer than 4 distinct values exist;
+  override with `--coupling-threshold`, applied directly to Jaccard
+  values). The legacy `top_pair_containment`-based threshold is also
+  computed and logged for comparison but no longer used.
+- Stage 3: builds complete-linkage clusters per `governance_question`
+  (pure Python, no external graph libraries). Starting from singleton
+  clusters, candidate pairs are considered in (Jaccard desc, `edge_id_a`
+  asc, `edge_id_b` asc) order; two clusters are merged only if every
+  pairwise Jaccard within the merged cluster -- including pairs absent
+  from `archetype_validation_pairs.csv`, treated as Jaccard `0.0` -- is
+  `>= coupling_threshold`. This avoids single-linkage chain bridging,
+  where a rare signal transitively connects two otherwise-unrelated
+  groups through a single shared edge. Unmerged nodes remain singleton
+  clusters.
 - Stage 4: generates a stable `cluster_label_stub` per cluster
   (`{governance_question}__{bare param names joined by _x_}`, truncated
   to 60 chars).
