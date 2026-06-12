@@ -4,6 +4,7 @@
 Inputs:
   - Fingerprint_Out/archetype_analysis/archetype_validation_pairs.csv
   - Fingerprint_Out/archetype_analysis/archetype_validation.csv
+  - Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv
   - Fingerprint_Out/archetype_analysis/archetype_classifications.csv
   - Fingerprint_Out/archetype_analysis/cross_domain_items.csv
   - results/records/file_metadata.csv
@@ -32,14 +33,23 @@ Processing:
     signal_id) grain after that signal's join_hash filter is applied, so the
     same edge_id can carry different counts under different archetype_ids;
     keying by edge_id alone would let one archetype's count silently
-    overwrite another's. n_both is top_pair_file_count clamped to
-    min(top_pair_file_count, count_a, count_b): top_pair_file_count is the
-    max co-occurrence count across *any* join_hash pair on the two edges
-    (unfiltered), which can exceed either signal's own filtered file count
-    when a promoted archetype's join_hash filters were edited away from that
-    top pattern; without the clamp this can produce Jaccard > 1 and let an
-    unrelated join_hash configuration for the same edge pair drive the
-    threshold and complete-linkage merges. Jaccard (vs. raw containment)
+    overwrite another's. n_both (the filtered intersection) is taken from
+    archetype_validation_detail.csv when available: that file lists, per
+    (export_run_id, archetype_id, signal_id), the files where each signal
+    produced cross_domain_items evidence after its own join_hash filter was
+    applied, keyed by the same raw edge_id as archetype_validation.csv; the
+    intersection of the two signals' file sets is the true filtered
+    co-occurrence count for this archetype's specific pair. If detail rows
+    are unavailable for either edge (e.g. a raw-vs-aliased edge_id mismatch,
+    or no cross_domain_items evidence at all), n_both falls back to
+    top_pair_file_count clamped to min(top_pair_file_count, count_a,
+    count_b): top_pair_file_count is the max co-occurrence count across *any*
+    join_hash pair on the two edges (unfiltered), which can exceed either
+    signal's own filtered file count when a promoted archetype's join_hash
+    filters were edited away from that top pattern; without the clamp this
+    can produce Jaccard > 1 and let an unrelated join_hash configuration for
+    the same edge pair drive the threshold and complete-linkage merges.
+    Jaccard (vs. raw containment)
     avoids the asymmetric problem where a rare signal that is a strict subset
     of a common signal scores a perfect top_pair_containment despite being a
     poor coupling indicator. Pairs whose (archetype_id, edge_id_a) or
@@ -94,6 +104,7 @@ Usage:
     python tools/archetype/cluster_archetype_signals.py \\
         --pairs Fingerprint_Out/archetype_analysis/archetype_validation_pairs.csv \\
         --validation Fingerprint_Out/archetype_analysis/archetype_validation.csv \\
+        --validation-detail Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv \\
         --classifications Fingerprint_Out/archetype_analysis/archetype_classifications.csv \\
         --cross-domain-items Fingerprint_Out/archetype_analysis/cross_domain_items.csv \\
         --file-metadata results/records/file_metadata.csv \\
@@ -282,11 +293,41 @@ def _build_n_files_classified_lookup(validation_rows: List[Dict[str, str]]) -> D
     return lookup
 
 
+def _build_detail_files_lookup(detail_rows: List[Dict[str, str]]) -> Dict[Tuple[str, str], Set[str]]:
+    """(archetype_id, edge_id) -> set of export_run_id, from
+    archetype_validation_detail.csv.
+
+    Each row is one (export_run_id, archetype_id, signal_id, source_join_hash)
+    observation with resolved cross_domain_items evidence for that signal's
+    join_hash-filtered edge, so the set of export_run_id values per
+    (archetype_id, edge_id) is the files where this archetype's signal
+    produced *filtered* evidence -- a more direct measure of co-occurrence
+    than top_pair_file_count (which is the max count across any join_hash
+    pair on the edges, unfiltered). detail.csv's edge_id is raw (pre-alias),
+    the same value space as archetype_validation.csv's edge_id; the pairs
+    loop in _build_signal_graph only uses this lookup when
+    archetype_validation_pairs.csv's (aliased) edge_id_a/edge_id_b happen to
+    match a raw edge_id here (the common case where no edge collapsing
+    applies to either signal), falling back to the top_pair_file_count clamp
+    otherwise.
+    """
+    lookup: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
+    for row in detail_rows:
+        archetype_id = row.get("archetype_id", "")
+        edge_id = row.get("edge_id", "")
+        export_run_id = row.get("export_run_id", "")
+        if not edge_id or not export_run_id:
+            continue
+        lookup[(archetype_id, edge_id)].add(export_run_id)
+    return dict(lookup)
+
+
 def _build_signal_graph(
     validation_rows: List[Dict[str, str]],
     pairs_rows: List[Dict[str, str]],
     curated_gq_map: Dict[str, str],
     n_files_classified: Dict[str, float],
+    detail_files: Dict[Tuple[str, str], Set[str]],
 ) -> Tuple[
     Dict[str, Set[str]],
     Dict[str, Dict[Tuple[str, str], float]],
@@ -306,6 +347,8 @@ def _build_signal_graph(
 
     jaccard_edges_by_gq: Dict[str, Dict[Tuple[str, str], float]] = defaultdict(dict)
     containment_edges_by_gq: Dict[str, Dict[Tuple[str, str], float]] = defaultdict(dict)
+    n_both_from_detail = 0
+    n_both_from_clamp = 0
     for row in pairs_rows:
         archetype_id = row.get("archetype_id", "")
         gq = _resolve_governance_question(archetype_id, curated_gq_map)
@@ -334,21 +377,35 @@ def _build_signal_graph(
             )
             continue
 
-        # top_pair_file_count is the max co-occurrence count across *any*
-        # join_hash pair on these edges (unfiltered), not necessarily the
-        # count for this archetype's specific (filtered) signal pair. The
-        # true filtered intersection can be no larger than either signal's
-        # own filtered file count, so clamp to that bound -- this keeps
-        # Jaccard in [0, 1] and avoids an unrelated join_hash configuration
-        # for the same edge pair inflating the similarity.
-        n_both = min(top_pair_file_count, count_a, count_b)
-        if n_both < top_pair_file_count:
-            log(
-                STAGE,
-                f"archetype_id={archetype_id}: clamped top_pair_file_count="
-                f"{top_pair_file_count:g} to n_both={n_both:g} (count_a={count_a:g}, "
-                f"count_b={count_b:g}) for pair ({edge_a}, {edge_b})",
-            )
+        files_a = detail_files.get((archetype_id, edge_a))
+        files_b = detail_files.get((archetype_id, edge_b))
+        if files_a is not None and files_b is not None:
+            # archetype_validation_detail.csv gives the actual files where
+            # each of this archetype's (filtered) signals produced
+            # cross_domain_items evidence; their intersection is the true
+            # filtered co-occurrence count for this specific pair.
+            n_both = float(len(files_a & files_b))
+            n_both_from_detail += 1
+        else:
+            # No detail-based file sets for one or both edges (e.g. raw vs.
+            # aliased edge_id mismatch, or no cross_domain_items evidence for
+            # this signal). Fall back to the top_pair_file_count clamp:
+            # top_pair_file_count is the max co-occurrence count across *any*
+            # join_hash pair on these edges (unfiltered), not necessarily the
+            # count for this archetype's specific (filtered) signal pair. The
+            # true filtered intersection can be no larger than either signal's
+            # own filtered file count, so clamp to that bound -- this keeps
+            # Jaccard in [0, 1] and avoids an unrelated join_hash configuration
+            # for the same edge pair inflating the similarity.
+            n_both = min(top_pair_file_count, count_a, count_b)
+            n_both_from_clamp += 1
+            if n_both < top_pair_file_count:
+                log(
+                    STAGE,
+                    f"archetype_id={archetype_id}: clamped top_pair_file_count="
+                    f"{top_pair_file_count:g} to n_both={n_both:g} (count_a={count_a:g}, "
+                    f"count_b={count_b:g}) for pair ({edge_a}, {edge_b})",
+                )
 
         denom = count_a + count_b - n_both
         jaccard = (n_both / denom) if denom > 0 else 0.0
@@ -365,6 +422,12 @@ def _build_signal_graph(
 
         nodes_by_gq[gq].add(edge_a)
         nodes_by_gq[gq].add(edge_b)
+
+    log(
+        STAGE,
+        f"n_both source: {n_both_from_detail} pair(s) from archetype_validation_detail.csv "
+        f"file-set intersection, {n_both_from_clamp} pair(s) from top_pair_file_count clamp",
+    )
 
     return (
         dict(nodes_by_gq),
@@ -625,6 +688,7 @@ def main() -> int:
     ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
     ap.add_argument("--pairs", default=None, help="Path to archetype_validation_pairs.csv")
     ap.add_argument("--validation", default=None, help="Path to archetype_validation.csv")
+    ap.add_argument("--validation-detail", default=None, help="Path to archetype_validation_detail.csv")
     ap.add_argument("--classifications", default=None, help="Path to archetype_classifications.csv")
     ap.add_argument("--cross-domain-items", default=None, help="Path to cross_domain_items.csv (file universe for coverage denominators)")
     ap.add_argument("--file-metadata", default=None, help="Path to file_metadata.csv (file universe for coverage denominators)")
@@ -639,6 +703,7 @@ def main() -> int:
     analysis_dir = repo_root / "Fingerprint_Out" / "archetype_analysis"
     pairs_path = Path(args.pairs) if args.pairs else analysis_dir / "archetype_validation_pairs.csv"
     validation_path = Path(args.validation) if args.validation else analysis_dir / "archetype_validation.csv"
+    validation_detail_path = Path(args.validation_detail) if args.validation_detail else analysis_dir / "archetype_validation_detail.csv"
     classifications_path = Path(args.classifications) if args.classifications else analysis_dir / "archetype_classifications.csv"
     cross_domain_items_path = Path(args.cross_domain_items) if args.cross_domain_items else analysis_dir / "cross_domain_items.csv"
     file_metadata_path = Path(args.file_metadata) if args.file_metadata else repo_root / "results" / "records" / "file_metadata.csv"
@@ -648,6 +713,11 @@ def main() -> int:
 
     validation_rows = read_csv_rows(validation_path)
     log(STAGE, f"loaded {len(validation_rows)} rows from {validation_path}")
+
+    validation_detail_rows = read_csv_rows(validation_detail_path)
+    log(STAGE, f"loaded {len(validation_detail_rows)} rows from {validation_detail_path}")
+    if not validation_detail_rows:
+        log(STAGE, "WARNING: archetype_validation_detail.csv is empty or missing; Jaccard n_both will fall back to the top_pair_file_count clamp for all pairs")
 
     pairs_rows = read_csv_rows(pairs_path)
     log(STAGE, f"loaded {len(pairs_rows)} rows from {pairs_path}")
@@ -663,10 +733,11 @@ def main() -> int:
 
     curated_gq_map = _build_curated_gq_map(classification_rows)
     n_files_classified = _build_n_files_classified_lookup(validation_rows)
+    detail_files = _build_detail_files_lookup(validation_detail_rows)
 
     # Stage 1: signal graph per governance_question
     nodes_by_gq, jaccard_edges_by_gq, containment_edges_by_gq, signal_to_edge_by_gq = _build_signal_graph(
-        validation_rows, pairs_rows, curated_gq_map, n_files_classified,
+        validation_rows, pairs_rows, curated_gq_map, n_files_classified, detail_files,
     )
 
     # Stage 2: coupling threshold (Jaccard-based; legacy containment-based threshold logged for comparison)

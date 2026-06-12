@@ -392,6 +392,7 @@ isolation.
 **Inputs**
 - `Fingerprint_Out/archetype_analysis/archetype_validation_pairs.csv`
 - `Fingerprint_Out/archetype_analysis/archetype_validation.csv`
+- `Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv`
 - `Fingerprint_Out/archetype_analysis/archetype_classifications.csv`
 - `Fingerprint_Out/archetype_analysis/cross_domain_items.csv` and
   `results/records/file_metadata.csv` — used only to compute the
@@ -441,15 +442,27 @@ isolation.
   `(archetype_id, signal_id)` grain *after* that signal's `join_hash`
   filter is applied, so the same `edge_id` can carry different counts
   under different `archetype_id`s; keying by `edge_id` alone would let
-  one archetype's count silently overwrite another's. `n_both` is
-  `top_pair_file_count` clamped to `min(top_pair_file_count, count_a,
-  count_b)`: `top_pair_file_count` is the max co-occurrence count across
-  *any* `join_hash` pair on the two edges (unfiltered), which can exceed
-  either signal's own filtered file count when a promoted archetype's
-  `join_hash` filters were edited away from that top pattern; without the
-  clamp this can produce Jaccard `> 1` and let an unrelated `join_hash`
-  configuration for the same edge pair drive the threshold and
-  complete-linkage merges. Jaccard (vs. raw containment) avoids the
+  one archetype's count silently overwrite another's. `n_both` (the
+  filtered intersection) is preferentially taken from
+  `archetype_validation_detail.csv`: that file lists, per `(export_run_id,
+  archetype_id, signal_id)`, the files where each signal produced
+  `cross_domain_items.csv` evidence after its own `join_hash` filter was
+  applied, keyed by the same raw `edge_id` as `archetype_validation.csv`;
+  intersecting the two signals' file sets gives the true filtered
+  co-occurrence count for that specific pair. If detail rows are
+  unavailable for either edge (e.g. a raw-vs-aliased `edge_id` mismatch
+  between `archetype_validation_detail.csv`'s raw `edge_id` and
+  `archetype_validation_pairs.csv`'s aliased `edge_id_a`/`edge_id_b`, or no
+  `cross_domain_items.csv` evidence at all for a signal), `n_both` falls
+  back to `top_pair_file_count` clamped to `min(top_pair_file_count,
+  count_a, count_b)`: `top_pair_file_count` is the max co-occurrence count
+  across *any* `join_hash` pair on the two edges (unfiltered), which can
+  exceed either signal's own filtered file count when a promoted
+  archetype's `join_hash` filters were edited away from that top pattern;
+  without the clamp this can produce Jaccard `> 1` and let an unrelated
+  `join_hash` configuration for the same edge pair drive the threshold and
+  complete-linkage merges. The number of pairs resolved via each path is
+  logged. Jaccard (vs. raw containment) avoids the
   asymmetric problem where a rare signal that is a strict subset of a
   common signal scores a perfect `top_pair_containment` despite being a
   poor coupling indicator. A global `coupling_threshold` is then derived
