@@ -1,6 +1,6 @@
 # Cross-Domain Archetype Discovery Pipeline (`tools/archetype/`)
 
-Status date: 2026-06-10
+Status date: 2026-06-12
 Scope: `tools/archetype/*.py` + `config/archetype/`
 Audience: Phase-2+ analysis users building the Power BI archetype slicer
 
@@ -376,6 +376,87 @@ python tools/archetype/validate_archetype_signals.py --repo-root .
 
 ---
 
+## Stage 5 — Cluster co-varying signals
+
+### `cluster_archetype_signals.py`
+
+**Purpose**
+Sits between join_hash-grain classification (Stage 3) and human
+`approach_label` promotion. Detects signals that structurally travel
+together (e.g. a wall type's `fire_rating_in_hours` and `smoke`
+parameters) and groups them into composite clusters, then rolls up file
+classifications to the cluster grain so promotion decisions are made
+against a *cluster* of co-varying signals rather than each signal in
+isolation.
+
+**Inputs**
+- `Fingerprint_Out/archetype_analysis/archetype_validation_pairs.csv`
+- `Fingerprint_Out/archetype_analysis/archetype_validation.csv`
+- `Fingerprint_Out/archetype_analysis/archetype_classifications.csv`
+
+**Outputs**
+- `Fingerprint_Out/archetype_analysis/signal_clusters.json` (recovery
+  artifact, written first) — per-`governance_question` cluster
+  definitions: `cluster_id`, `cluster_label_stub`, `signal_ids`,
+  `n_signals`, `min_containment`, `is_singleton`, plus the global
+  `coupling_threshold`.
+- `Fingerprint_Out/archetype_analysis/archetype_cluster_classifications.csv`
+  — `archetype_classifications.csv` rolled up to
+  `(export_run_id, governance_question, cluster_id)` grain:
+  `n_signals_in_cluster`, `n_signals_fired`, `all_signals_fired`,
+  `any_signal_fired`, `max_confidence_tier`, `is_mixed_cluster`, plus
+  `client_label` / `governance_role` / `discipline_label` /
+  `unit_system`.
+- `Fingerprint_Out/archetype_analysis/cluster_coverage_summary.json` —
+  per `governance_question` x `cluster_id` adoption counts
+  (`n_files_any_signal`, `n_files_all_signals`, `n_files_mixed`,
+  `pct_files_all_signals`) to drive `approach_label` promotion decisions.
+
+**What it does**
+- Stage 1: builds a weighted undirected signal graph per
+  `governance_question`. Graph nodes are `edge_id` values from
+  `archetype_validation.csv`, **not** `signal_id` -- curated archetype
+  definitions may give a signal a human-friendly `signal_id` distinct
+  from its canonical `edge_id`, but `archetype_validation_pairs.csv`'s
+  `edge_id_a`/`edge_id_b` columns (the edges) are always keyed by
+  `edge_id`. Each row's `signal_id -> edge_id` pairing is recorded for
+  the rollup in Stage 6. `governance_question` is normally the second
+  `__`-delimited token of `archetype_id` (e.g.
+  `CANDIDATE__wall_graphics__... -> wall_graphics`), but
+  `archetype_classifications.csv`'s `governance_question` column --
+  which may have been reassigned during the human curation step after
+  Stage 2.5 -- takes precedence wherever an `archetype_id` appears
+  there, so a promoted archetype's signals are graphed and rolled up
+  under its curated question rather than its original candidate hint.
+- Stage 2: derives a global `coupling_threshold` via Jenks natural
+  breaks (`tools/jenks_utils.py`, `n_classes=2`, `threshold = breaks[0]`)
+  over all unique pairwise `top_pair_containment` values (falls back to
+  `0.8` with a warning if fewer than 4 distinct values exist; override
+  with `--coupling-threshold`). Edges below the threshold are dropped.
+- Stage 3: finds connected components per `governance_question` on the
+  thresholded graph via union-find (pure Python, no external graph
+  libraries). Each component becomes a signal cluster; unconnected nodes
+  become singleton clusters.
+- Stage 4: generates a stable `cluster_label_stub` per cluster
+  (`{governance_question}__{bare param names joined by _x_}`, truncated
+  to 60 chars).
+- Stage 6: rolls up `archetype_classifications.csv` to the cluster
+  grain. Each row's fired `signal_id`s are translated to `edge_id` via
+  Stage 1's mapping before cluster lookup -- otherwise a curated
+  signal whose `signal_id` differs from its `edge_id` would land in a
+  disconnected singleton cluster instead of its covariation cluster --
+  and rows are grouped under the curated `governance_question` (see
+  Stage 1).
+- Stage 7: aggregates the cluster rows into
+  `cluster_coverage_summary.json`.
+
+**Typical command**
+```
+python tools/archetype/cluster_archetype_signals.py --repo-root .
+```
+
+---
+
 ## Running the full pipeline
 
 ```bash
@@ -386,6 +467,9 @@ python tools/archetype/generate_archetype_candidates.py --repo-root .
 # --- human review/promotion of config/archetype/archetype_definitions.json ---
 python tools/archetype/assign_archetype_classifications.py --repo-root .
 python tools/archetype/validate_archetype_signals.py --repo-root .
+python tools/archetype/cluster_archetype_signals.py --repo-root .
+# --- human review of signal_clusters.json / cluster_coverage_summary.json,
+#     then approach_label promotion in config/archetype/archetype_definitions.json ---
 ```
 
 ## Shared helpers
