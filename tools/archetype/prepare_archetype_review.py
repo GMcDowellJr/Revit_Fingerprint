@@ -13,8 +13,9 @@ Inputs:
   - tools/archetype/vfd_category_domain_map.json
 
 Output:
-  - <out>/<cluster_id>/review.csv -- one subfolder per cluster processed.
-    <out> defaults to Fingerprint_Out/archetype_analysis/archetype_review.
+  - <out>/review_<cluster_id>.csv -- one file per cluster processed, all in
+    a single directory. <out> defaults to
+    Fingerprint_Out/archetype_analysis/archetype_review.
 
 Processing:
   For each target cluster, assemble one row per (export_run_id, signal_id)
@@ -24,10 +25,10 @@ Processing:
   directly to the named filter.
 
   If --cluster-id is omitted, every cluster in signal_clusters.json is
-  processed and written to its own <out>/<cluster_id>/review.csv subfolder;
-  a condensed one-line-per-cluster summary is printed. If --cluster-id is
-  given, only that cluster is processed and a verbose per-file summary is
-  printed.
+  processed and written to its own <out>/review_<cluster_id>.csv file
+  (all in the same directory); a condensed one-line-per-cluster summary is
+  printed. If --cluster-id is given, only that cluster is processed and a
+  verbose per-file summary is printed.
 
   Stage 1: Resolve target cluster(s) from signal_clusters.json (clusters are
     keyed by governance_question; cluster_id is unique across the document).
@@ -46,7 +47,7 @@ Processing:
   Stage 7: Join everything, sort (templates first, most-signals-fired first,
     all-signals-fired first, export_run_id as tiebreak), and apply --top-n by
     unique export_run_id.
-  Stage 8: Write <out>/<cluster_id>/review.csv and print a console summary.
+  Stage 8: Write <out>/review_<cluster_id>.csv and print a console summary.
 
 Usage:
     python tools/archetype/prepare_archetype_review.py \\
@@ -426,7 +427,7 @@ def _process_cluster(
     output_rows = [row for row in review_rows if row["export_run_id"] in selected_set]
 
     # Stage 8: write output.
-    out_path = out_dir / ctx.cluster_id / "review.csv"
+    out_path = out_dir / f"review_{ctx.cluster_id}.csv"
     if dry_run:
         log(STAGE, f"dry-run: would write {len(output_rows)} rows to {out_path}")
     else:
@@ -488,7 +489,7 @@ def main() -> int:
     ap.add_argument("--bip-lookup", default=None, help="Path to bip_lookup.json")
     ap.add_argument("--shared-param-names", default=None, help="Path to shared_param_names.json")
     ap.add_argument("--vfd-category-map", default=None, help="Path to vfd_category_domain_map.json")
-    ap.add_argument("--out", default=None, help="Output directory; each cluster is written to <out>/<cluster_id>/review.csv")
+    ap.add_argument("--out", default=None, help="Output directory; each cluster is written to <out>/review_<cluster_id>.csv")
     ap.add_argument("--top-n", type=int, default=20, help="Limit to top N files per cluster; 0 = all")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
