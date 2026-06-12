@@ -242,14 +242,20 @@ def main() -> int:
     validation_detail_rows = read_csv_rows(validation_detail_path)
     log(STAGE, f"loaded {len(validation_detail_rows)} rows from {validation_detail_path}")
 
+    # signal_ids in signal_clusters.json are edge_id nodes (see
+    # cluster_archetype_signals.py Stage 1), while archetype_validation_detail.csv's
+    # signal_id column may be a curated, human-friendly id distinct from its
+    # edge_id. Membership in the cluster is therefore tested against edge_id;
+    # the curated signal_id is preserved as the row's display id.
     signal_id_set = set(signal_ids)
     detail_by_file_signal: Dict[Tuple[str, str], Dict[str, str]] = {}
     files_with_detail: Set[str] = set()
     for row in validation_detail_rows:
         export_run_id = row.get("export_run_id", "")
-        signal_id = row.get("signal_id", "")
-        if export_run_id not in qualifying_files or signal_id not in signal_id_set:
+        edge_id = row.get("edge_id", "")
+        if export_run_id not in qualifying_files or edge_id not in signal_id_set:
             continue
+        signal_id = row.get("signal_id", "") or edge_id
         key = (export_run_id, signal_id)
         if key not in detail_by_file_signal:
             detail_by_file_signal[key] = row
