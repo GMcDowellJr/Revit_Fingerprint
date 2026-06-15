@@ -623,7 +623,7 @@ def _find_verify_blocked_candidate(
 
     if not candidates:
         return "", ""
-    return sorted(candidates)[0], "category_map_verify_blocked"
+    return "|".join(sorted(candidates)), "category_map_verify_blocked"
 
 
 def _validate_domain_has_identity_items(target_domain: str, identity_items_dir: Path) -> bool:
@@ -804,32 +804,37 @@ def build_domain_gap_rows(
 ) -> List[Dict[str, Any]]:
     groups: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for row in inventory_rows:
-        candidate_domain = str(row.get("candidate_domain") or "")
-        if not candidate_domain:
+        candidate_domains = [
+            candidate_domain
+            for candidate_domain in str(row.get("candidate_domain") or "").split("|")
+            if candidate_domain
+        ]
+        if not candidate_domains:
             continue
         blocked_reason = str(row.get("candidate_domain_blocked_reason") or "")
-        key = (candidate_domain, blocked_reason)
-        group = groups.setdefault(
-            key,
-            {
-                "candidate_domain": candidate_domain,
-                "domain_extracted": _category_map_domain_extracted(candidate_domain, category_map),
-                "identity_items_present": "false" if blocked_reason == "identity_items_missing" else "N/A",
-                "blocked_reason": blocked_reason,
-                "file_count_demand": 0,
-                "param_ids": set(),
-                "category_ids": set(),
-                "category_names": set(),
-            },
-        )
-        group["file_count_demand"] += int(row.get("file_count") or 0)
-        group["param_ids"].add(str(row.get("param_id") or ""))
-        for category_id in str(row.get("category_set") or "").split("|"):
-            if category_id:
-                group["category_ids"].add(category_id)
-        for category_name in str(row.get("category_names") or "").split("|"):
-            if category_name:
-                group["category_names"].add(category_name)
+        for candidate_domain in candidate_domains:
+            key = (candidate_domain, blocked_reason)
+            group = groups.setdefault(
+                key,
+                {
+                    "candidate_domain": candidate_domain,
+                    "domain_extracted": _category_map_domain_extracted(candidate_domain, category_map),
+                    "identity_items_present": "false" if blocked_reason == "identity_items_missing" else "N/A",
+                    "blocked_reason": blocked_reason,
+                    "file_count_demand": 0,
+                    "param_ids": set(),
+                    "category_ids": set(),
+                    "category_names": set(),
+                },
+            )
+            group["file_count_demand"] += int(row.get("file_count") or 0)
+            group["param_ids"].add(str(row.get("param_id") or ""))
+            for category_id in str(row.get("category_set") or "").split("|"):
+                if category_id:
+                    group["category_ids"].add(category_id)
+            for category_name in str(row.get("category_names") or "").split("|"):
+                if category_name:
+                    group["category_names"].add(category_name)
 
     rows: List[Dict[str, Any]] = []
     for group in groups.values():
