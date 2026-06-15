@@ -588,6 +588,63 @@ def _resolve_target_domain_from_categories(
     return None, "category_map_conflict"
 
 
+def _decompose_conflict_to_domains(
+    category_ids: Sequence[int],
+    category_file_counts: Dict[str, int],
+    category_map: Dict[str, Any],
+    support_threshold: int,
+) -> Dict[str, List[int]]:
+    """
+    For conflict cases where qualifying categories span multiple domains,
+    group category IDs by their resolved target_domain.
+    Only includes categories that:
+      - meet support_threshold file count
+      - have domain_extracted=True in the category map
+      - do NOT have _verify=True
+      - have a non-empty target_domain
+    Returns {target_domain: [category_ids]} — may be empty if no categories qualify.
+    """
+    domains: Dict[str, List[int]] = defaultdict(list)
+    for category_id in category_ids:
+        if category_file_counts.get(str(category_id), 0) < support_threshold:
+            continue
+        entry = category_map.get(str(category_id))
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("domain_extracted") is not True or entry.get("_verify") is True:
+            continue
+        target_domain = entry.get("target_domain")
+        if target_domain in (None, ""):
+            continue
+        domains[str(target_domain)].append(category_id)
+    return {domain: sorted(cat_ids) for domain, cat_ids in sorted(domains.items())}
+
+
+def _category_names_for_ids(category_ids: Sequence[int], category_map: Dict[str, Any]) -> str:
+    names: List[str] = []
+    for category_id in category_ids:
+        entry = category_map.get(str(category_id))
+        if isinstance(entry, dict):
+            name = category_entry_name(entry)
+            if name:
+                names.append(name)
+    return "|".join(names)
+
+
+def _category_flags_for_ids(category_ids: Sequence[int], category_map: Dict[str, Any]) -> Tuple[bool, bool]:
+    has_unextracted = False
+    has_unverified = False
+    for category_id in category_ids:
+        entry = category_map.get(str(category_id))
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("domain_extracted") is False:
+            has_unextracted = True
+        if entry.get("_verify") is True:
+            has_unverified = True
+    return has_unextracted, has_unverified
+
+
 
 def _find_verify_blocked_candidate(
     category_ids: Sequence[int],
@@ -709,9 +766,53 @@ def build_inventory_rows(
 
         candidate_domain = ""
         candidate_domain_blocked_reason = ""
+        category_ids_int = [int(cat_id) for cat_id in group["category_ids"]]
+
+        def append_inventory_row(
+            row_target_domain: str,
+            row_target_domain_source: str,
+            row_target_domain_verified: bool,
+            row_category_ids: Sequence[int],
+            row_candidate_domain: str = "",
+            row_candidate_domain_blocked_reason: str = "",
+        ) -> None:
+            row_category_set = "|".join(str(category_id) for category_id in sorted(row_category_ids))
+            row_category_names = (
+                _category_names_for_ids(row_category_ids, category_map)
+                if row_category_ids
+                else str(group["category_names"])
+            )
+            row_has_unextracted, row_has_unverified = (
+                _category_flags_for_ids(row_category_ids, category_map)
+                if row_category_ids
+                else (bool(group["has_unextracted_domain"]), bool(group["has_unverified_category_mapping"]))
+            )
+            file_count = len(group["export_run_ids"])
+            meets_threshold = file_count >= support_min_files
+            name_resolved = bool(group["name_resolved"])
+            rows.append({
+                "_export_run_ids": set(group["export_run_ids"]),
+                "param_id": param_id,
+                "param_kind": group["param_kind"],
+                "param_name": group["param_name"],
+                "name_resolved": bool_s(name_resolved),
+                "target_domain": row_target_domain,
+                "target_domain_source": row_target_domain_source,
+                "target_domain_verified": bool_s(row_target_domain_verified),
+                "category_set": row_category_set,
+                "category_names": row_category_names,
+                "unrecognized_category_ids": "" if row_category_ids else group["unrecognized_category_ids"],
+                "has_unextracted_domain": bool_s(row_has_unextracted),
+                "has_unverified_category_mapping": bool_s(row_has_unverified),
+                "file_count": file_count,
+                "rule_count": group["rule_count"],
+                "meets_threshold": bool_s(meets_threshold),
+                "requires_human_review": bool_s(row_target_domain == "" and name_resolved),
+                "candidate_domain": row_candidate_domain,
+                "candidate_domain_blocked_reason": row_candidate_domain_blocked_reason,
+            })
 
         if not target_domain:
-            category_ids_int = [int(cat_id) for cat_id in group["category_ids"]]
             consensus_domain, consensus_source = _resolve_target_domain_from_categories(
                 category_ids_int,
                 category_file_counts_by_param.get(param_id, {}),
@@ -732,7 +833,47 @@ def build_inventory_rows(
                     target_domain_verified = True
                     candidate_domain = consensus_domain
                     candidate_domain_blocked_reason = "identity_items_missing"
-            elif consensus_source in {"category_map_no_signal", "category_map_conflict"}:
+            elif consensus_source == "category_map_conflict":
+                domain_to_cats = _decompose_conflict_to_domains(
+                    category_ids_int,
+                    category_file_counts_by_param.get(param_id, {}),
+                    category_map,
+                    support_min_files,
+                )
+                if domain_to_cats:
+                    for resolved_domain, contributing_cat_ids in domain_to_cats.items():
+                        domain_verified = True
+                        if identity_items_dir is not None and identity_items_dir.is_dir():
+                            domain_verified = _validate_domain_has_identity_items(resolved_domain, identity_items_dir)
+                        if domain_verified:
+                            append_inventory_row(
+                                resolved_domain,
+                                "category_map_multi_domain",
+                                True,
+                                contributing_cat_ids,
+                            )
+                        else:
+                            append_inventory_row(
+                                "",
+                                "unresolved",
+                                True,
+                                contributing_cat_ids,
+                                resolved_domain,
+                                "identity_items_missing",
+                            )
+                    continue
+                candidate_domain, candidate_domain_blocked_reason = _find_verify_blocked_candidate(
+                    category_ids_int,
+                    category_file_counts_by_param.get(param_id, {}),
+                    category_map,
+                    support_min_files,
+                )
+                target_domain = ""
+                target_domain_source = "unresolved"
+                target_domain_verified = True
+                if not candidate_domain:
+                    candidate_domain_blocked_reason = "category_map_conflict_all_blocked"
+            elif consensus_source == "category_map_no_signal":
                 candidate_domain, candidate_domain_blocked_reason = _find_verify_blocked_candidate(
                     category_ids_int,
                     category_file_counts_by_param.get(param_id, {}),
@@ -747,30 +888,14 @@ def build_inventory_rows(
                 target_domain_source = "unresolved"
                 target_domain_verified = True
 
-        file_count = len(group["export_run_ids"])
-        meets_threshold = file_count >= support_min_files
-        name_resolved = bool(group["name_resolved"])
-        rows.append({
-            "_export_run_ids": set(group["export_run_ids"]),
-            "param_id": param_id,
-            "param_kind": group["param_kind"],
-            "param_name": group["param_name"],
-            "name_resolved": bool_s(name_resolved),
-            "target_domain": target_domain,
-            "target_domain_source": target_domain_source,
-            "target_domain_verified": bool_s(target_domain_verified),
-            "category_set": group["category_set"],
-            "category_names": group["category_names"],
-            "unrecognized_category_ids": group["unrecognized_category_ids"],
-            "has_unextracted_domain": bool_s(bool(group["has_unextracted_domain"])),
-            "has_unverified_category_mapping": bool_s(bool(group["has_unverified_category_mapping"])),
-            "file_count": file_count,
-            "rule_count": group["rule_count"],
-            "meets_threshold": bool_s(meets_threshold),
-            "requires_human_review": bool_s(target_domain == "" and name_resolved),
-            "candidate_domain": candidate_domain,
-            "candidate_domain_blocked_reason": candidate_domain_blocked_reason,
-        })
+        append_inventory_row(
+            target_domain,
+            target_domain_source,
+            target_domain_verified,
+            category_ids_int,
+            candidate_domain,
+            candidate_domain_blocked_reason,
+        )
 
     rows.sort(key=lambda r: (r["param_kind"], r["param_id"], r["target_domain"], r["category_set"]))
     stats = {
@@ -831,9 +956,11 @@ def build_domain_gap_rows(
             for candidate_domain in str(row.get("candidate_domain") or "").split("|")
             if candidate_domain
         ]
-        if not candidate_domains:
-            continue
         blocked_reason = str(row.get("candidate_domain_blocked_reason") or "")
+        if not candidate_domains:
+            if blocked_reason != "category_map_conflict_all_blocked":
+                continue
+            candidate_domains = ["unknown"]
         for candidate_domain in candidate_domains:
             key = (candidate_domain, blocked_reason)
             group = groups.setdefault(
