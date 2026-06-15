@@ -74,6 +74,19 @@ INVENTORY_FIELDS = [
     "rule_count",
     "meets_threshold",
     "requires_human_review",
+    "candidate_domain",
+    "candidate_domain_blocked_reason",
+]
+
+DOMAIN_GAP_FIELDS = [
+    "candidate_domain",
+    "domain_extracted",
+    "identity_items_present",
+    "blocked_reason",
+    "file_count_demand",
+    "param_count",
+    "category_ids",
+    "category_names",
 ]
 
 EDGE_FIELDS = [
@@ -575,6 +588,44 @@ def _resolve_target_domain_from_categories(
     return None, "category_map_conflict"
 
 
+
+def _find_verify_blocked_candidate(
+    category_ids: Sequence[int],
+    category_file_counts: Dict[str, int],
+    category_map: Dict[str, Any],
+    support_threshold: int,
+) -> Tuple[str, str]:
+    """Return a category-map candidate blocked by explicit verification.
+
+    This intentionally mirrors the qualifying-category portion of
+    _resolve_target_domain_from_categories() without changing that gate. It
+    only surfaces entries that category consensus would otherwise skip because
+    they are marked _verify=true.
+    """
+    qualifying = [
+        category_id for category_id in category_ids
+        if category_file_counts.get(str(category_id), 0) >= support_threshold
+    ]
+    if not qualifying:
+        return "", ""
+
+    candidates: Set[str] = set()
+    for category_id in qualifying:
+        entry = category_map.get(str(category_id))
+        if (
+            isinstance(entry, dict)
+            and entry.get("domain_extracted") is True
+            and entry.get("_verify") is True
+        ):
+            target = entry.get("target_domain")
+            if target not in (None, ""):
+                candidates.add(str(target))
+
+    if not candidates:
+        return "", ""
+    return "|".join(sorted(candidates)), "category_map_verify_blocked"
+
+
 def _validate_domain_has_identity_items(target_domain: str, identity_items_dir: Path) -> bool:
     shard_path = identity_items_dir / f"{target_domain}.csv"
     if not shard_path.is_file():
@@ -656,6 +707,9 @@ def build_inventory_rows(
         target_domain_source = hint.source
         target_domain_verified = bool(hint.verified)
 
+        candidate_domain = ""
+        candidate_domain_blocked_reason = ""
+
         if not target_domain:
             category_ids_int = [int(cat_id) for cat_id in group["category_ids"]]
             consensus_domain, consensus_source = _resolve_target_domain_from_categories(
@@ -676,6 +730,18 @@ def build_inventory_rows(
                     target_domain = ""
                     target_domain_source = "unresolved"
                     target_domain_verified = True
+                    candidate_domain = consensus_domain
+                    candidate_domain_blocked_reason = "identity_items_missing"
+            elif consensus_source in {"category_map_no_signal", "category_map_conflict"}:
+                candidate_domain, candidate_domain_blocked_reason = _find_verify_blocked_candidate(
+                    category_ids_int,
+                    category_file_counts_by_param.get(param_id, {}),
+                    category_map,
+                    support_min_files,
+                )
+                target_domain = ""
+                target_domain_source = "unresolved"
+                target_domain_verified = True
             else:
                 target_domain = ""
                 target_domain_source = "unresolved"
@@ -702,6 +768,8 @@ def build_inventory_rows(
             "rule_count": group["rule_count"],
             "meets_threshold": bool_s(meets_threshold),
             "requires_human_review": bool_s(target_domain == "" and name_resolved),
+            "candidate_domain": candidate_domain,
+            "candidate_domain_blocked_reason": candidate_domain_blocked_reason,
         })
 
     rows.sort(key=lambda r: (r["param_kind"], r["param_id"], r["target_domain"], r["category_set"]))
@@ -710,6 +778,106 @@ def build_inventory_rows(
         "unrecognized_distinct": unrecognized_distinct,
     }
     return rows, stats
+
+
+
+def _category_map_domain_extracted(candidate_domain: str, category_map: Dict[str, Any]) -> str:
+    values: Set[str] = set()
+    for entry in category_map.values():
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("target_domain") or "") != candidate_domain:
+            continue
+        value = entry.get("domain_extracted")
+        if isinstance(value, bool):
+            values.add(bool_s(value))
+    if not values:
+        return ""
+    if len(values) == 1:
+        return next(iter(values))
+    return "|".join(sorted(values))
+
+
+def _candidate_category_details(
+    candidate_domain: str,
+    category_set: str,
+    category_map: Dict[str, Any],
+) -> Tuple[Set[str], Set[str]]:
+    category_ids: Set[str] = set()
+    category_names: Set[str] = set()
+    for category_id in str(category_set or "").split("|"):
+        if not category_id:
+            continue
+        entry = category_map.get(category_id)
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("target_domain") or "") != candidate_domain:
+            continue
+        category_ids.add(category_id)
+        name = category_entry_name(entry)
+        if name:
+            category_names.add(name)
+    return category_ids, category_names
+
+
+def build_domain_gap_rows(
+    inventory_rows: Sequence[Dict[str, Any]],
+    category_map: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    groups: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for row in inventory_rows:
+        candidate_domains = [
+            candidate_domain
+            for candidate_domain in str(row.get("candidate_domain") or "").split("|")
+            if candidate_domain
+        ]
+        if not candidate_domains:
+            continue
+        blocked_reason = str(row.get("candidate_domain_blocked_reason") or "")
+        for candidate_domain in candidate_domains:
+            key = (candidate_domain, blocked_reason)
+            group = groups.setdefault(
+                key,
+                {
+                    "candidate_domain": candidate_domain,
+                    "domain_extracted": _category_map_domain_extracted(candidate_domain, category_map),
+                    "identity_items_present": "false" if blocked_reason == "identity_items_missing" else "N/A",
+                    "blocked_reason": blocked_reason,
+                    "export_run_ids": set(),
+                    "file_count_fallback": 0,
+                    "param_ids": set(),
+                    "category_ids": set(),
+                    "category_names": set(),
+                },
+            )
+            category_ids, category_names = _candidate_category_details(
+                candidate_domain,
+                str(row.get("category_set") or ""),
+                category_map,
+            )
+            export_run_ids = row.get("_export_run_ids")
+            if export_run_ids is None:
+                group["file_count_fallback"] += int(row.get("file_count") or 0)
+            else:
+                group["export_run_ids"].update(str(export_run_id) for export_run_id in export_run_ids)
+            group["param_ids"].add(str(row.get("param_id") or ""))
+            group["category_ids"].update(category_ids)
+            group["category_names"].update(category_names)
+
+    rows: List[Dict[str, Any]] = []
+    for group in groups.values():
+        rows.append({
+            "candidate_domain": group["candidate_domain"],
+            "domain_extracted": group["domain_extracted"],
+            "identity_items_present": group["identity_items_present"],
+            "blocked_reason": group["blocked_reason"],
+            "file_count_demand": len(group["export_run_ids"]) + int(group["file_count_fallback"]),
+            "param_count": len(group["param_ids"]),
+            "category_ids": "|".join(sorted(group["category_ids"], key=lambda value: int(value))),
+            "category_names": "|".join(sorted(group["category_names"])),
+        })
+    rows.sort(key=lambda r: (-int(r["file_count_demand"]), str(r["candidate_domain"]), str(r["blocked_reason"])))
+    return rows
 
 
 def build_edge_rows(
@@ -900,6 +1068,7 @@ def print_summary(
     print("Output:")
     print(f"  {out_dir / 'vfd_param_inventory.csv'}")
     print(f"  {out_dir / 'vfd_dynamic_edges.csv'}")
+    print(f"  {out_dir / 'vfd_domain_gaps.csv'}")
 
 
 def build_unresolved_file_rows(
@@ -1032,10 +1201,12 @@ def main() -> int:
         identity_items_dir=identity_items_dir,
     )
     edge_rows = build_edge_rows(inventory_rows, args.include_unresolved, args.support_min_files)
+    domain_gap_rows = build_domain_gap_rows(inventory_rows, category_map)
     verify_outputs(edge_rows, inventory_rows, len(export_run_ids))
 
     atomic_write_csv(out_dir / "vfd_param_inventory.csv", INVENTORY_FIELDS, inventory_rows)
     atomic_write_csv(out_dir / "vfd_dynamic_edges.csv", EDGE_FIELDS, edge_rows)
+    atomic_write_csv(out_dir / "vfd_domain_gaps.csv", DOMAIN_GAP_FIELDS, domain_gap_rows)
     print_summary(
         rows_read, export_run_ids, observations, resolved, inventory_rows, edge_rows,
         category_stats, args.support_min_files, out_dir,
