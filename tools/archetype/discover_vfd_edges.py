@@ -843,7 +843,8 @@ def build_domain_gap_rows(
                     "domain_extracted": _category_map_domain_extracted(candidate_domain, category_map),
                     "identity_items_present": "false" if blocked_reason == "identity_items_missing" else "N/A",
                     "blocked_reason": blocked_reason,
-                    "file_count_demand": 0,
+                    "export_run_ids": set(),
+                    "file_count_fallback": 0,
                     "param_ids": set(),
                     "category_ids": set(),
                     "category_names": set(),
@@ -854,7 +855,11 @@ def build_domain_gap_rows(
                 str(row.get("category_set") or ""),
                 category_map,
             )
-            group["file_count_demand"] += int(row.get("file_count") or 0)
+            export_run_ids = row.get("_export_run_ids")
+            if export_run_ids is None:
+                group["file_count_fallback"] += int(row.get("file_count") or 0)
+            else:
+                group["export_run_ids"].update(str(export_run_id) for export_run_id in export_run_ids)
             group["param_ids"].add(str(row.get("param_id") or ""))
             group["category_ids"].update(category_ids)
             group["category_names"].update(category_names)
@@ -866,7 +871,7 @@ def build_domain_gap_rows(
             "domain_extracted": group["domain_extracted"],
             "identity_items_present": group["identity_items_present"],
             "blocked_reason": group["blocked_reason"],
-            "file_count_demand": group["file_count_demand"],
+            "file_count_demand": len(group["export_run_ids"]) + int(group["file_count_fallback"]),
             "param_count": len(group["param_ids"]),
             "category_ids": "|".join(sorted(group["category_ids"], key=lambda value: int(value))),
             "category_names": "|".join(sorted(group["category_names"])),
