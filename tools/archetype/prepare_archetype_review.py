@@ -101,13 +101,14 @@ OUT_FIELDS = [
     "all_signals_fired",
     "signal_id",
     "source_domain",
+    "source_join_hash",
     "element_name",
     "sig_hash",
     "param_names",
     "category_names",
 ]
 
-_PATH_COLUMN_CANDIDATES = ("doc_path", "file_path", "source_path")
+_PATH_COLUMN_CANDIDATES = ("central_path", "central_path_norm")
 
 _VFD_PARAM_REF_SOURCE_FIELD = "vf.rule[*].param_ref.id"
 _VFD_CATEGORIES_KEY = "vf.categories"
@@ -192,7 +193,7 @@ class ClusterContext:
         self.signal_ids: List[str] = list(cluster.get("signal_ids", []) or [])
         self.cluster_label_stub: str = cluster.get("cluster_label_stub", "")
         self.classification_by_file: Dict[str, Dict[str, str]] = {}
-        self.detail_by_file_signal: Dict[Tuple[str, str], Dict[str, str]] = {}
+        self.detail_by_file_signal: Dict[Tuple[str, str, str], Dict[str, str]] = {}
         self.qualifying_files: Set[str] = set()
         self.source_domains: Set[str] = set()
 
@@ -217,6 +218,12 @@ def _build_cluster_context(
     # signal_id column may be a curated, human-friendly id distinct from its
     # edge_id. Membership in the cluster is therefore tested against edge_id;
     # the curated signal_id is preserved as the row's display id.
+    #
+    # A file can fire the same signal on multiple source records (one
+    # archetype_validation_detail.csv row per source_join_hash; see
+    # n_join_hashes_in_file). source_join_hash is included in the dedup key
+    # so every matching element/instance is preserved for review, not just
+    # the first one.
     signal_id_set = set(ctx.signal_ids)
     files_with_detail: Set[str] = set()
     for export_run_id in ctx.qualifying_files:
@@ -225,7 +232,8 @@ def _build_cluster_context(
             if edge_id not in signal_id_set:
                 continue
             signal_id = row.get("signal_id", "") or edge_id
-            key = (export_run_id, signal_id)
+            source_join_hash = row.get("source_join_hash", "")
+            key = (export_run_id, signal_id, source_join_hash)
             if key not in ctx.detail_by_file_signal:
                 ctx.detail_by_file_signal[key] = row
             files_with_detail.add(export_run_id)
@@ -371,7 +379,7 @@ def _process_cluster(
 ) -> Dict[str, Any]:
     # Stage 7: assemble and sort the review table.
     review_rows: List[Dict[str, str]] = []
-    for (export_run_id, signal_id), detail in ctx.detail_by_file_signal.items():
+    for (export_run_id, signal_id, source_join_hash), detail in ctx.detail_by_file_signal.items():
         cls = ctx.classification_by_file.get(export_run_id, {})
         source_domain = detail.get("source_domain", "")
         sig_hash = detail.get("sig_hash", "")
@@ -401,6 +409,7 @@ def _process_cluster(
             "all_signals_fired": cls.get("all_signals_fired", ""),
             "signal_id": signal_id,
             "source_domain": source_domain,
+            "source_join_hash": source_join_hash,
             "element_name": element_name,
             "sig_hash": sig_hash,
             "param_names": param_names,
