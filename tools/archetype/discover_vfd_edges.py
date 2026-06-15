@@ -732,7 +732,7 @@ def build_inventory_rows(
                     target_domain_verified = True
                     candidate_domain = consensus_domain
                     candidate_domain_blocked_reason = "identity_items_missing"
-            elif consensus_source == "category_map_no_signal":
+            elif consensus_source in {"category_map_no_signal", "category_map_conflict"}:
                 candidate_domain, candidate_domain_blocked_reason = _find_verify_blocked_candidate(
                     category_ids_int,
                     category_file_counts_by_param.get(param_id, {}),
@@ -798,6 +798,28 @@ def _category_map_domain_extracted(candidate_domain: str, category_map: Dict[str
     return "|".join(sorted(values))
 
 
+def _candidate_category_details(
+    candidate_domain: str,
+    category_set: str,
+    category_map: Dict[str, Any],
+) -> Tuple[Set[str], Set[str]]:
+    category_ids: Set[str] = set()
+    category_names: Set[str] = set()
+    for category_id in str(category_set or "").split("|"):
+        if not category_id:
+            continue
+        entry = category_map.get(category_id)
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("target_domain") or "") != candidate_domain:
+            continue
+        category_ids.add(category_id)
+        name = category_entry_name(entry)
+        if name:
+            category_names.add(name)
+    return category_ids, category_names
+
+
 def build_domain_gap_rows(
     inventory_rows: Sequence[Dict[str, Any]],
     category_map: Dict[str, Any],
@@ -827,14 +849,15 @@ def build_domain_gap_rows(
                     "category_names": set(),
                 },
             )
+            category_ids, category_names = _candidate_category_details(
+                candidate_domain,
+                str(row.get("category_set") or ""),
+                category_map,
+            )
             group["file_count_demand"] += int(row.get("file_count") or 0)
             group["param_ids"].add(str(row.get("param_id") or ""))
-            for category_id in str(row.get("category_set") or "").split("|"):
-                if category_id:
-                    group["category_ids"].add(category_id)
-            for category_name in str(row.get("category_names") or "").split("|"):
-                if category_name:
-                    group["category_names"].add(category_name)
+            group["category_ids"].update(category_ids)
+            group["category_names"].update(category_names)
 
     rows: List[Dict[str, Any]] = []
     for group in groups.values():
