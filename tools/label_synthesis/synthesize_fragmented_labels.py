@@ -50,6 +50,89 @@ from .label_resolver import (
 )
 
 
+def _collect_union_bundle_join_hashes(
+    *,
+    domain: str,
+    segments_root: str,
+    registry_file: str,
+) -> set:
+    """Collect bundle member join_hashes across active segments and purge views."""
+    eligible_jhs: set = set()
+    segments_checked = 0
+    root = Path(segments_root)
+
+    with Path(registry_file).open(newline="", encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            run_type = (row.get("run_type") or "").strip()
+            status = (row.get("status") or "").strip()
+            if run_type not in {"bundle", "reference"}:
+                continue
+            if status in {"skip", "registration"}:
+                continue
+
+            output_folder = (row.get("output_folder") or "").strip()
+            if not output_folder:
+                print(
+                    "[union_discovery] WARN missing output_folder "
+                    f"for segment_id={row.get('segment_id', '')}; skipping segment."
+                )
+                continue
+
+            segments_checked += 1
+            seg_out = root / output_folder
+            patterns_path = seg_out / "results" / "analysis" / "domain_patterns.csv"
+            if not patterns_path.exists():
+                print(
+                    "[union_discovery] WARN domain_patterns.csv not found "
+                    f"at {patterns_path}; skipping segment."
+                )
+                continue
+
+            pid_to_jh: dict = {}
+            with patterns_path.open(newline="", encoding="utf-8-sig") as pf:
+                for pattern_row in csv.DictReader(pf):
+                    if pattern_row.get("domain") != domain:
+                        continue
+                    pid = (pattern_row.get("pattern_id") or "").strip()
+                    raw_src = (pattern_row.get("source_cluster_id") or "").strip()
+                    join_hash = raw_src.split("|")[-1] if raw_src else ""
+                    if pid and join_hash:
+                        pid_to_jh[pid] = join_hash
+
+            for purge_view in ("all", "used"):
+                membership_path = (
+                    seg_out
+                    / "results"
+                    / "bundle_analysis"
+                    / purge_view
+                    / domain
+                    / "bundle_membership.csv"
+                )
+                if not membership_path.exists():
+                    continue
+                with membership_path.open(newline="", encoding="utf-8-sig") as mf:
+                    for membership_row in csv.DictReader(mf):
+                        pid = (membership_row.get("pattern_id") or "").strip()
+                        if not pid:
+                            continue
+                        join_hash = pid_to_jh.get(pid)
+                        if join_hash:
+                            eligible_jhs.add(join_hash)
+                        else:
+                            print(
+                                "[union_discovery] WARN pattern_id "
+                                f"{pid!r} from {membership_path} not found in "
+                                f"{patterns_path}; skipping row."
+                            )
+
+    print(
+        f"[union_discovery] domain={domain} "
+        f"segments_checked={segments_checked} "
+        f"join_hashes_eligible={len(eligible_jhs)}"
+    )
+    return eligible_jhs
+
+
 def _load_governance_join_hashes(
     *,
     domain: str,
@@ -57,6 +140,8 @@ def _load_governance_join_hashes(
     analysis_dir: str,
     domain_patterns_csv: Optional[str] = None,
     bundle_dir: Optional[str] = None,
+    segments_root: Optional[str] = None,
+    registry_file: Optional[str] = None,
 ) -> Optional[set]:
     """
     Return the set of join_hashes eligible for synthesis under filter_mode.
@@ -74,61 +159,79 @@ def _load_governance_join_hashes(
     if filter_mode == "all":
         return None
 
-    analysis_path = Path(analysis_dir)
-    candidate_paths = []
-    if domain_patterns_csv:
-        candidate_paths.append(Path(domain_patterns_csv))
-    else:
-        candidate_paths.extend([
-            analysis_path / "domain_patterns.csv",
-            analysis_path.parent / "analysis_v21" / "domain_patterns.csv",
-        ])
-    dp_path = next((p for p in candidate_paths if p.exists()), candidate_paths[0])
-    if not dp_path.exists():
-        searched_paths = ", ".join(str(p) for p in candidate_paths)
-        raise FileNotFoundError(
-            f"domain_patterns.csv is required for --filter-mode {filter_mode!r} "
-            f"but was not found. Looked at: {searched_paths}"
-        )
+    union_bundle_mode = (
+        filter_mode in ("bundles", "governance")
+        and bool(segments_root)
+        and bool(registry_file)
+    )
+    needs_corpus_patterns = (
+        filter_mode in ("candidates", "governance")
+        or (filter_mode == "bundles" and not union_bundle_mode)
+    )
 
     candidate_jhs: set = set()
     jh_to_pid: dict = {}
     pid_to_jh: dict = {}
 
-    with dp_path.open(newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            if row.get("domain") != domain:
-                continue
-            pid = row.get("pattern_id", "").strip()
-            raw_src = row.get("source_cluster_id", "").strip()
-            jh = raw_src.split("|")[-1] if raw_src else ""
-            is_cand = row.get("is_candidate_standard", "").strip().lower()
-            if pid and jh:
-                jh_to_pid[jh] = pid
-                pid_to_jh[pid] = jh
-            if is_cand == "true" and jh:
-                candidate_jhs.add(jh)
+    if needs_corpus_patterns:
+        analysis_path = Path(analysis_dir)
+        candidate_paths = []
+        if domain_patterns_csv:
+            candidate_paths.append(Path(domain_patterns_csv))
+        else:
+            candidate_paths.extend([
+                analysis_path / "domain_patterns.csv",
+                analysis_path.parent / "analysis_v21" / "domain_patterns.csv",
+            ])
+        dp_path = next((p for p in candidate_paths if p.exists()), candidate_paths[0])
+        if not dp_path.exists():
+            searched_paths = ", ".join(str(p) for p in candidate_paths)
+            raise FileNotFoundError(
+                f"domain_patterns.csv is required for --filter-mode {filter_mode!r} "
+                f"but was not found. Looked at: {searched_paths}"
+            )
+
+        with dp_path.open(newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                if row.get("domain") != domain:
+                    continue
+                pid = row.get("pattern_id", "").strip()
+                raw_src = row.get("source_cluster_id", "").strip()
+                jh = raw_src.split("|")[-1] if raw_src else ""
+                is_cand = row.get("is_candidate_standard", "").strip().lower()
+                if pid and jh:
+                    jh_to_pid[jh] = pid
+                    pid_to_jh[pid] = jh
+                if is_cand == "true" and jh:
+                    candidate_jhs.add(jh)
 
     bundle_jhs: set = set()
-    if filter_mode in ("bundles", "governance") and bundle_dir is None:
-        raise ValueError(
-            f"--bundle-dir is required when --filter-mode is {filter_mode!r}"
-        )
-    if filter_mode in ("bundles", "governance") and bundle_dir is not None:
-        bm_path = Path(bundle_dir) / "bundle_membership.csv"
-        if bm_path.exists():
-            with bm_path.open(newline="", encoding="utf-8") as f:
-                for row in csv.DictReader(f):
-                    if row.get("domain") != domain:
-                        continue
-                    pid = row.get("pattern_id", "").strip()
-                    if pid and pid in pid_to_jh:
-                        bundle_jhs.add(pid_to_jh[pid])
-        else:
-            print(
-                f"  WARN: bundle_membership.csv not found at {bm_path}. "
-                f"Bundle filter will match nothing."
+    if filter_mode in ("bundles", "governance"):
+        if union_bundle_mode:
+            bundle_jhs = _collect_union_bundle_join_hashes(
+                domain=domain,
+                segments_root=segments_root,
+                registry_file=registry_file,
             )
+        elif bundle_dir is None:
+            raise ValueError(
+                f"--bundle-dir is required when --filter-mode is {filter_mode!r}"
+            )
+        else:
+            bm_path = Path(bundle_dir) / "bundle_membership.csv"
+            if bm_path.exists():
+                with bm_path.open(newline="", encoding="utf-8") as f:
+                    for row in csv.DictReader(f):
+                        if row.get("domain") != domain:
+                            continue
+                        pid = row.get("pattern_id", "").strip()
+                        if pid and pid in pid_to_jh:
+                            bundle_jhs.add(pid_to_jh[pid])
+            else:
+                print(
+                    f"  WARN: bundle_membership.csv not found at {bm_path}. "
+                    f"Bundle filter will match nothing."
+                )
 
     if filter_mode == "candidates":
         result = candidate_jhs
@@ -482,6 +585,8 @@ def synthesize(
     filter_mode: str = "all",
     domain_patterns_csv: Optional[str] = None,
     bundle_dir: Optional[str] = None,
+    segments_root: Optional[str] = None,
+    registry_file: Optional[str] = None,
     items_lookup_csv: Optional[str] = None,
 ) -> None:
     print(f"\n=== Label Synthesis: {domain} ===")
@@ -580,6 +685,8 @@ def synthesize(
             analysis_dir=analysis_dir,
             domain_patterns_csv=domain_patterns_csv,
             bundle_dir=bundle_dir,
+            segments_root=segments_root,
+            registry_file=registry_file,
         )
         if eligible_jhs is not None:
             before = len(to_process)
@@ -823,7 +930,30 @@ def main():
         metavar="PATH",
         help=(
             "Directory containing bundle_membership.csv "
-            "(required when --filter-mode is 'bundles' or 'governance')."
+            "(required when --filter-mode is 'bundles' or 'governance' unless "
+            "union mode is enabled with --segments-root and --registry-file)."
+        ),
+    )
+    ap.add_argument(
+        "--segments-root",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Root directory containing one subfolder per segment "
+            "(e.g. C:\\Fingerprint_Out\\segments). When provided together with "
+            "--registry-file and --filter-mode bundles/governance, activates "
+            "union bundle discovery across all active segments and both purge "
+            "views (all + used). Replaces --bundle-dir for multi-segment corpora."
+        ),
+    )
+    ap.add_argument(
+        "--registry-file",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path to run_registry.csv. Required when --segments-root is provided. "
+            "Used to enumerate active segments (run_type=bundle|reference, "
+            "status!=skip|registration) for union bundle discovery."
         ),
     )
     ap.add_argument(
@@ -853,8 +983,19 @@ def main():
         ap.error("--export-prompts and --import-results are mutually exclusive.")
     if args.dry_run and (args.export_prompts or args.import_results):
         ap.error("--dry-run cannot be combined with --export-prompts or --import-results.")
-    if args.filter_mode in ("bundles", "governance") and not args.bundle_dir:
-        ap.error("--bundle-dir is required when --filter-mode is 'bundles' or 'governance'.")
+    if args.filter_mode in ("bundles", "governance"):
+        has_single = bool(args.bundle_dir)
+        has_union = bool(args.segments_root) and bool(args.registry_file)
+        if not has_single and not has_union:
+            ap.error(
+                "--filter-mode bundles/governance requires either --bundle-dir "
+                "(single directory) or both --segments-root and --registry-file "
+                "(union mode across all segments)."
+            )
+        if args.segments_root and not args.registry_file:
+            ap.error("--registry-file is required when --segments-root is provided.")
+        if args.registry_file and not args.segments_root:
+            ap.error("--segments-root is required when --registry-file is provided.")
 
     synthesize(
         exports_dir=args.exports_dir,
@@ -873,6 +1014,8 @@ def main():
         filter_mode=args.filter_mode,
         domain_patterns_csv=args.domain_patterns_csv,
         bundle_dir=args.bundle_dir,
+        segments_root=args.segments_root,
+        registry_file=args.registry_file,
         items_lookup_csv=args.identity_items_lookup,
     )
 
