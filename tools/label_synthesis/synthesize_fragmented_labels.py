@@ -159,44 +159,55 @@ def _load_governance_join_hashes(
     if filter_mode == "all":
         return None
 
-    analysis_path = Path(analysis_dir)
-    candidate_paths = []
-    if domain_patterns_csv:
-        candidate_paths.append(Path(domain_patterns_csv))
-    else:
-        candidate_paths.extend([
-            analysis_path / "domain_patterns.csv",
-            analysis_path.parent / "analysis_v21" / "domain_patterns.csv",
-        ])
-    dp_path = next((p for p in candidate_paths if p.exists()), candidate_paths[0])
-    if not dp_path.exists():
-        searched_paths = ", ".join(str(p) for p in candidate_paths)
-        raise FileNotFoundError(
-            f"domain_patterns.csv is required for --filter-mode {filter_mode!r} "
-            f"but was not found. Looked at: {searched_paths}"
-        )
+    union_bundle_mode = (
+        filter_mode in ("bundles", "governance")
+        and bool(segments_root)
+        and bool(registry_file)
+    )
+    needs_corpus_patterns = (
+        filter_mode in ("candidates", "governance")
+        or (filter_mode == "bundles" and not union_bundle_mode)
+    )
 
     candidate_jhs: set = set()
     jh_to_pid: dict = {}
     pid_to_jh: dict = {}
 
-    with dp_path.open(newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            if row.get("domain") != domain:
-                continue
-            pid = row.get("pattern_id", "").strip()
-            raw_src = row.get("source_cluster_id", "").strip()
-            jh = raw_src.split("|")[-1] if raw_src else ""
-            is_cand = row.get("is_candidate_standard", "").strip().lower()
-            if pid and jh:
-                jh_to_pid[jh] = pid
-                pid_to_jh[pid] = jh
-            if is_cand == "true" and jh:
-                candidate_jhs.add(jh)
+    if needs_corpus_patterns:
+        analysis_path = Path(analysis_dir)
+        candidate_paths = []
+        if domain_patterns_csv:
+            candidate_paths.append(Path(domain_patterns_csv))
+        else:
+            candidate_paths.extend([
+                analysis_path / "domain_patterns.csv",
+                analysis_path.parent / "analysis_v21" / "domain_patterns.csv",
+            ])
+        dp_path = next((p for p in candidate_paths if p.exists()), candidate_paths[0])
+        if not dp_path.exists():
+            searched_paths = ", ".join(str(p) for p in candidate_paths)
+            raise FileNotFoundError(
+                f"domain_patterns.csv is required for --filter-mode {filter_mode!r} "
+                f"but was not found. Looked at: {searched_paths}"
+            )
+
+        with dp_path.open(newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                if row.get("domain") != domain:
+                    continue
+                pid = row.get("pattern_id", "").strip()
+                raw_src = row.get("source_cluster_id", "").strip()
+                jh = raw_src.split("|")[-1] if raw_src else ""
+                is_cand = row.get("is_candidate_standard", "").strip().lower()
+                if pid and jh:
+                    jh_to_pid[jh] = pid
+                    pid_to_jh[pid] = jh
+                if is_cand == "true" and jh:
+                    candidate_jhs.add(jh)
 
     bundle_jhs: set = set()
     if filter_mode in ("bundles", "governance"):
-        if segments_root and registry_file:
+        if union_bundle_mode:
             bundle_jhs = _collect_union_bundle_join_hashes(
                 domain=domain,
                 segments_root=segments_root,
