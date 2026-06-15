@@ -4,6 +4,7 @@
 Inputs:
   - Fingerprint_Out/archetype_analysis/signal_clusters.json
   - Fingerprint_Out/archetype_analysis/archetype_cluster_classifications.csv
+  - Fingerprint_Out/archetype_analysis/archetype_classifications.csv
   - Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv
   - results/records/records.csv
   - results/records/file_metadata.csv
@@ -35,8 +36,14 @@ Processing:
   Stage 2: Find qualifying files from archetype_cluster_classifications.csv
     (rows where cluster_id == target).
   Stage 3: Get (export_run_id, signal_id) -> sig_hash/source_domain from
-    archetype_validation_detail.csv, restricted to qualifying files and the
-    cluster's signal_ids (matched by edge_id; see Stage 3 below).
+    archetype_validation_detail.csv, restricted to qualifying files, the
+    cluster's signal_ids (matched by edge_id; see Stage 3 below), and the
+    archetype_ids that belong to the cluster's governance_question (resolved
+    via archetype_classifications.csv / archetype_id naming, the same way
+    cluster_archetype_signals.py does). This prevents an edge_id that is
+    promoted under more than one governance question/archetype -- each with
+    its own join_hash filter -- from leaking unrelated detail rows into this
+    cluster's review.
   Stage 4: Stream records.csv (once, across all clusters being processed) to
     resolve sig_hash -> label_display (element_name).
   Stage 5: For view_filter_definitions-sourced signals, resolve parameter
@@ -55,6 +62,7 @@ Usage:
         [--cluster-id wall_graphics__cluster_003] \\
         [--signal-clusters Fingerprint_Out/archetype_analysis/signal_clusters.json] \\
         [--cluster-classifications Fingerprint_Out/archetype_analysis/archetype_cluster_classifications.csv] \\
+        [--archetype-classifications Fingerprint_Out/archetype_analysis/archetype_classifications.csv] \\
         [--validation-detail Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv] \\
         [--records results/records/records.csv] \\
         [--file-metadata results/records/file_metadata.csv] \\
@@ -185,11 +193,44 @@ def _resolve_category_name(category_id: str, vfd_category_map: Dict[str, Any]) -
     return f"{category_id}[?]"
 
 
+def _governance_question_from_archetype_id(archetype_id: str) -> str:
+    """archetype_id encodes governance_question as the second "__"-delimited
+    token, e.g. CANDIDATE__wall_graphics__... -> wall_graphics.
+
+    Mirrors cluster_archetype_signals.py's
+    _governance_question_from_archetype_id().
+    """
+    parts = archetype_id.split("__")
+    return parts[1] if len(parts) > 1 else ""
+
+
+def _build_curated_gq_map(classification_rows: List[Dict[str, str]]) -> Dict[str, str]:
+    """archetype_id -> governance_question, from archetype_classifications.csv.
+
+    Human curation can re-assign a promoted archetype to a different
+    governance_question without changing its (CANDIDATE-derived) archetype_id,
+    so this column is the source of truth wherever it is populated. Mirrors
+    cluster_archetype_signals.py's _build_curated_gq_map().
+    """
+    curated: Dict[str, str] = {}
+    for row in classification_rows:
+        archetype_id = row.get("archetype_id", "")
+        gq = row.get("governance_question", "")
+        if archetype_id and gq:
+            curated[archetype_id] = gq
+    return curated
+
+
+def _resolve_governance_question(archetype_id: str, curated_gq_map: Dict[str, str]) -> str:
+    return curated_gq_map.get(archetype_id) or _governance_question_from_archetype_id(archetype_id)
+
+
 class ClusterContext:
     """Per-cluster Stage 2/3 results."""
 
     def __init__(self, cluster: Dict[str, Any]):
         self.cluster_id: str = cluster.get("cluster_id", "")
+        self.governance_question: str = cluster.get("governance_question", "")
         self.signal_ids: List[str] = list(cluster.get("signal_ids", []) or [])
         self.cluster_label_stub: str = cluster.get("cluster_label_stub", "")
         self.classification_by_file: Dict[str, Dict[str, str]] = {}
@@ -202,6 +243,7 @@ def _build_cluster_context(
     cluster: Dict[str, Any],
     rows_by_cluster_id: Dict[str, List[Dict[str, str]]],
     detail_rows_by_export: Dict[str, List[Dict[str, str]]],
+    archetype_ids_by_gq: Dict[str, Set[str]],
 ) -> ClusterContext:
     ctx = ClusterContext(cluster)
 
@@ -219,17 +261,27 @@ def _build_cluster_context(
     # edge_id. Membership in the cluster is therefore tested against edge_id;
     # the curated signal_id is preserved as the row's display id.
     #
+    # The same edge_id can be promoted under more than one governance
+    # question/archetype, each with its own join_hash filter, producing
+    # separate archetype_validation_detail.csv rows at the (export_run_id,
+    # archetype_id, signal_id) grain. Restrict to archetype_ids that belong
+    # to this cluster's governance_question so a shared edge_id doesn't pull
+    # in elements/signals from an unrelated archetype.
+    #
     # A file can fire the same signal on multiple source records (one
     # archetype_validation_detail.csv row per source_join_hash; see
     # n_join_hashes_in_file). source_join_hash is included in the dedup key
     # so every matching element/instance is preserved for review, not just
     # the first one.
     signal_id_set = set(ctx.signal_ids)
+    valid_archetype_ids = archetype_ids_by_gq.get(ctx.governance_question, set())
     files_with_detail: Set[str] = set()
     for export_run_id in ctx.qualifying_files:
         for row in detail_rows_by_export.get(export_run_id, []):
             edge_id = row.get("edge_id", "")
             if edge_id not in signal_id_set:
+                continue
+            if row.get("archetype_id", "") not in valid_archetype_ids:
                 continue
             signal_id = row.get("signal_id", "") or edge_id
             source_join_hash = row.get("source_join_hash", "")
@@ -491,6 +543,7 @@ def main() -> int:
     ap.add_argument("--cluster-id", default=None, help="Target cluster_id from signal_clusters.json; if omitted, process all clusters")
     ap.add_argument("--signal-clusters", default=None, help="Path to signal_clusters.json")
     ap.add_argument("--cluster-classifications", default=None, help="Path to archetype_cluster_classifications.csv")
+    ap.add_argument("--archetype-classifications", default=None, help="Path to archetype_classifications.csv")
     ap.add_argument("--validation-detail", default=None, help="Path to archetype_validation_detail.csv")
     ap.add_argument("--records", default=None, help="Path to records.csv")
     ap.add_argument("--file-metadata", default=None, help="Path to file_metadata.csv")
@@ -508,6 +561,7 @@ def main() -> int:
 
     signal_clusters_path = Path(args.signal_clusters) if args.signal_clusters else analysis_dir / "signal_clusters.json"
     cluster_classifications_path = Path(args.cluster_classifications) if args.cluster_classifications else analysis_dir / "archetype_cluster_classifications.csv"
+    archetype_classifications_path = Path(args.archetype_classifications) if args.archetype_classifications else analysis_dir / "archetype_classifications.csv"
     validation_detail_path = Path(args.validation_detail) if args.validation_detail else analysis_dir / "archetype_validation_detail.csv"
     records_path = Path(args.records) if args.records else repo_root / "results" / "records" / "records.csv"
     file_metadata_path = Path(args.file_metadata) if args.file_metadata else repo_root / "results" / "records" / "file_metadata.csv"
@@ -562,11 +616,22 @@ def main() -> int:
         if export_run_id:
             detail_rows_by_export[export_run_id].append(row)
 
+    # archetype_id -> governance_question, for restricting Stage 3 detail
+    # rows to the cluster's own governance_question (see _build_cluster_context).
+    archetype_classification_rows = read_csv_rows(archetype_classifications_path)
+    log(STAGE, f"loaded {len(archetype_classification_rows)} rows from {archetype_classifications_path}")
+    curated_gq_map = _build_curated_gq_map(archetype_classification_rows)
+    archetype_ids_by_gq: Dict[str, Set[str]] = defaultdict(set)
+    for row in validation_detail_rows:
+        archetype_id = row.get("archetype_id", "")
+        if archetype_id:
+            archetype_ids_by_gq[_resolve_governance_question(archetype_id, curated_gq_map)].add(archetype_id)
+
     contexts: List[ClusterContext] = []
     union_qualifying_files: Set[str] = set()
     union_source_domains: Set[str] = set()
     for cluster in clusters:
-        ctx = _build_cluster_context(cluster, rows_by_cluster_id, detail_rows_by_export)
+        ctx = _build_cluster_context(cluster, rows_by_cluster_id, detail_rows_by_export, archetype_ids_by_gq)
         log(STAGE, f"cluster_id={ctx.cluster_id} cluster_label_stub={ctx.cluster_label_stub} n_signals={len(ctx.signal_ids)} qualifying_files={len(ctx.qualifying_files)} detail_rows={len(ctx.detail_by_file_signal)}")
         contexts.append(ctx)
         union_qualifying_files |= ctx.qualifying_files
