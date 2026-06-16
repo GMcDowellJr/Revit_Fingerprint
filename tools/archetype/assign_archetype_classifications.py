@@ -113,7 +113,6 @@ class DomainPatternLabelCache:
         self.domain_patterns_dir = domain_patterns_dir
         self._label_cache: Dict[Tuple[str, str], str] = {}
         self._loaded_domains: Set[str] = set()
-        self.has_pattern_source = domain_patterns_dir.is_dir()
 
     def get(self, domain: str, join_hash: str) -> str:
         if not domain or not join_hash:
@@ -389,12 +388,11 @@ def main() -> int:
             signals_fired_sources: Dict[str, Tuple[str, str]] = {
                 sid: _signal_fired_source(signals_by_id[sid], edges_for_file)
                 for sid in signals_fired
-            } if label_cache.has_pattern_source else {}
+            }
             signals_fired_labels: Dict[str, str] = {}
-            if label_cache.has_pattern_source:
-                for sid in signals_fired:
-                    source_join_hash, source_domain = signals_fired_sources[sid]
-                    signals_fired_labels[sid] = label_cache.get(source_domain, source_join_hash)
+            for sid in signals_fired:
+                source_join_hash, source_domain = signals_fired_sources[sid]
+                signals_fired_labels[sid] = label_cache.get(source_domain, source_join_hash)
 
             meta = file_meta_idx.get(export_run_id, {})
             classification_rows.append({
@@ -415,8 +413,8 @@ def main() -> int:
                 "governance_role": meta.get("governance_role", ""),
                 "discipline_label": meta.get("discipline_label", ""),
                 "unit_system": meta.get("unit_system", ""),
-                "signals_fired_join_hashes": SIGNAL_LIST_SEPARATOR.join(signals_fired_sources[sid][0] for sid in signals_fired) if label_cache.has_pattern_source else "",
-                "signals_fired_labels": SIGNAL_LIST_SEPARATOR.join(signals_fired_labels[sid] for sid in signals_fired) if label_cache.has_pattern_source else "",
+                "signals_fired_join_hashes": SIGNAL_LIST_SEPARATOR.join(signals_fired_sources[sid][0] for sid in signals_fired),
+                "signals_fired_labels": SIGNAL_LIST_SEPARATOR.join(signals_fired_labels[sid] for sid in signals_fired),
             })
 
         coverage[archetype_id] = {
