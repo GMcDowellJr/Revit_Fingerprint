@@ -278,11 +278,16 @@ Power BI slicer dimension.
 - `config/archetype/archetype_definitions.json` (only `promoted == true`)
 - `Fingerprint_Out/archetype_analysis/reference_graph.json`
 - `results/records/file_metadata.csv`
+- `results/analysis/domain_patterns.csv` (or `{domain}_patterns.csv` under
+  `--domain-patterns-dir`, optional) to resolve fired signal
+  `source_join_hash` values to human-readable labels.
 
 **Outputs**
 - `Fingerprint_Out/archetype_analysis/archetype_classifications.csv` —
   one row per `(export_run_id, archetype_id)` with `confidence_tier`,
   `is_mixed`, `signals_fired`/`signals_absent`/`signals_null`,
+  `signals_fired_join_hashes`/`signals_fired_labels` parallel to
+  `signals_fired`,
   plus `client_label`, `governance_role`, `discipline_label`,
   `unit_system` from `file_metadata.csv`.
 - `Fingerprint_Out/archetype_analysis/archetype_coverage_summary.json` —
@@ -306,6 +311,11 @@ required signal's canonical edge fired at least once anywhere):
 - Evaluates every signal as `unavailable` (edge unavailable),
   `fired` (edge active for this file, and `join_hash` filter — if any —
   matches the row's `source_join_hash`/`target_join_hash`), or `absent`.
+- For fired signals, records the selected `source_join_hash` and resolves a
+  label from `domain_patterns.csv` by `(source_domain, join_hash)`. When
+  multiple item rows fire the same signal in one file, the row with the
+  highest `file_count` wins, with input order breaking ties. Missing pattern
+  files or labels emit empty label strings without failing the classification.
 - Emits a row only if **at least one required signal fired**.
 - `confidence_tier = "Full"` if **all** required signals fired and
   **no** signal is unavailable; otherwise `"Partial"`.
