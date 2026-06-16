@@ -136,6 +136,10 @@ class DomainPatternLabelCache:
                     continue
                 join_hash = row.get("join_hash", "").strip()
                 if not join_hash:
+                    source_cluster_id = row.get("source_cluster_id", "").strip()
+                    if source_cluster_id:
+                        join_hash = source_cluster_id.split("|")[-1]
+                if not join_hash:
                     continue
                 label = (
                     row.get("human_label", "")

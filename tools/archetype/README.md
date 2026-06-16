@@ -312,7 +312,10 @@ required signal's canonical edge fired at least once anywhere):
   `fired` (edge active for this file, and `join_hash` filter — if any —
   matches the row's `source_join_hash`/`target_join_hash`), or `absent`.
 - For fired signals, records the selected `source_join_hash` and resolves a
-  label from `domain_patterns.csv` by `(source_domain, join_hash)`. When
+  label from `domain_patterns.csv` by `(source_domain, join_hash)`. Current
+  `domain_patterns.csv` files may carry that hash directly in `join_hash` or
+  embedded as the last `|`-delimited token of `source_cluster_id`; both forms
+  are supported. When
   multiple item rows fire the same signal in one file, the
   `source_join_hash` with the highest corpus support in
   `cross_domain_items.csv` wins, with input order breaking ties. Label lookup
