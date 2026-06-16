@@ -11,10 +11,22 @@ $DP_CSV   = "$RESULTS\analysis\domain_patterns.csv"
 
 Set-Location $REPO
 
+function Assert-NativeSuccess {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Step
+    )
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Step failed with exit code $LASTEXITCODE"
+    }
+}
+
 Write-Host "--- L1: identity_items lookup (corpus-level, always rebuild) ---" -ForegroundColor Cyan
 python tools\label_synthesis\build_identity_items_lookup.py `
     --records-dir $RECORDS `
     --out-dir "$RESULTS\label_synthesis"
+Assert-NativeSuccess "L1 identity_items lookup"
 
 if (-not $env:OPENROUTER_API_KEY) {
     $env:OPENROUTER_API_KEY = Read-Host "Enter OPENROUTER_API_KEY"
@@ -45,6 +57,7 @@ foreach ($dom in @(
         "--workers",               "8"
     )
     python -m tools.label_synthesis.synthesize_fragmented_labels @params
+    Assert-NativeSuccess "L2 LLM synthesis for $dom"
     # Interim fallback (--filter-mode candidates) until union mode is confirmed:
     # "--filter-mode",  "candidates"
     # Remove --segments-root and --registry-file when using candidates mode.
@@ -54,6 +67,7 @@ Write-Host "--- L3: patch all domain_patterns (corpus + all segments) ---" -Fore
 python tools\label_synthesis\patch_all_domain_patterns.py `
     --results-root $RESULTS `
     --segments-root $SEGMENTS
+Assert-NativeSuccess "L3 patch all domain_patterns"
 
 Write-Host "--- L4: export bundle pattern detail (completed bundle segments x all/used) ---" -ForegroundColor Cyan
 $registry = Import-Csv "$RECORDS\run_registry.csv"
@@ -80,6 +94,7 @@ foreach ($seg in $active) {
             --records-dir   $RECORDS `
             --purge-view    $view `
             --out-dir       $outDir
+        Assert-NativeSuccess "L4 export bundle pattern detail for $($seg.output_folder) $view"
     }
 }
 
@@ -97,6 +112,7 @@ Write-Host "Refresh Power BI: open Fingerprint_Segmented_Bundles.pbix and hit Re
 # Incremental behaviour:
 #   L1 (lookup)    - always rebuild, fast ~2 min
 #   L2 (synthesis) - skips join_hashes already in cache; only new patterns cost tokens
+#                    stops immediately on any failed domain synthesis command
 #   L3 (patch)     - skips rows with authoritative sources (curator/synopsis/modal)
 #   L4 (export)    - overwrites BI export CSVs in bundle_analysis view folders for completed bundle runs; fast, no API calls
 #
