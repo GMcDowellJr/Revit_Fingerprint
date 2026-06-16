@@ -103,6 +103,7 @@ CLASSIFICATIONS_FIELDS = [
 ]
 
 SIGNAL_LIST_SEPARATOR = ";"
+FiredEdgeRow = Tuple[str, str, str, str, int]
 
 
 class DomainPatternLabelCache:
@@ -146,19 +147,9 @@ class DomainPatternLabelCache:
             return
 
 
-def _safe_int(value: str) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        try:
-            return int(float(value))
-        except (TypeError, ValueError):
-            return 0
-
-
 def _evaluate_signal(
     signal: Dict[str, Any],
-    file_edges: Dict[str, List[Tuple[str, str, int]]],
+    file_edges: Dict[str, List[FiredEdgeRow]],
     unavailable_edges: Set[str],
 ) -> str:
     edge_id = signal.get("edge_id", "")
@@ -173,34 +164,36 @@ def _evaluate_signal(
     if not join_hash_filter:
         return "fired"
 
-    for source_jh, target_jh, _file_count in rows:
+    for _source_domain, _target_domain, source_jh, target_jh, _support_count in rows:
         if join_hash_filter == source_jh or join_hash_filter == target_jh:
             return "fired"
     return "absent"
 
 
-def _signal_fired_join_hash(
+def _signal_fired_source(
     signal: Dict[str, Any],
-    file_edges: Dict[str, List[Tuple[str, str, int]]],
-) -> str:
-    """Return the best source_join_hash for a fired signal.
+    file_edges: Dict[str, List[FiredEdgeRow]],
+) -> Tuple[str, str]:
+    """Return the best `(source_join_hash, source_domain)` for a fired signal.
 
     The signal must already have evaluated to "fired". If several rows fired,
-    choose the source_join_hash from the row with the highest file_count, with
-    stable input order breaking ties.
+    choose the source_join_hash with the highest corpus support count computed
+    from cross_domain_items.csv, with stable input order breaking ties.
     """
     edge_id = signal.get("edge_id", "")
     rows = file_edges.get(edge_id) or []
     join_hash_filter = signal.get("join_hash")
     best_source_join_hash = ""
-    best_file_count = -1
-    for source_jh, target_jh, file_count in rows:
+    best_source_domain = ""
+    best_support_count = -1
+    for source_domain, _target_domain, source_jh, target_jh, support_count in rows:
         if join_hash_filter and join_hash_filter not in {source_jh, target_jh}:
             continue
-        if file_count > best_file_count:
+        if support_count > best_support_count:
             best_source_join_hash = source_jh
-            best_file_count = file_count
-    return best_source_join_hash
+            best_source_domain = source_domain
+            best_support_count = support_count
+    return best_source_join_hash, best_source_domain
 
 
 def main() -> int:
@@ -264,8 +257,25 @@ def main() -> int:
                 "unit_system": r.get("unit_system", ""),
             }
 
-    # export_run_id -> edge_id -> [(source_join_hash, target_join_hash, file_count), ...]
-    file_edges: Dict[str, Dict[str, List[Tuple[str, str, int]]]] = defaultdict(lambda: defaultdict(list))
+    # (canonical_edge_id, source_domain, source_join_hash) -> export_run_ids.
+    # cross_domain_items.csv does not carry a file_count column, so compute the
+    # support count directly from the rows this script consumes.
+    source_support_files: Dict[Tuple[str, str, str], Set[str]] = defaultdict(set)
+    for row in items_rows:
+        eid = row.get("export_run_id", "")
+        edge_id = row.get("edge_id", "")
+        source_join_hash = row.get("source_join_hash", "")
+        if not eid or not edge_id or not source_join_hash:
+            continue
+        canonical_edge_id = alias_of.get(edge_id, edge_id)
+        edge = edges_by_id.get(edge_id, {})
+        source_domain = row.get("source_domain", "") or edge.get("source_domain", "")
+        source_support_files[(canonical_edge_id, source_domain, source_join_hash)].add(eid)
+
+    # export_run_id -> edge_id -> [
+    #   (source_domain, target_domain, source_join_hash, target_join_hash, source_support_count), ...
+    # ]
+    file_edges: Dict[str, Dict[str, List[FiredEdgeRow]]] = defaultdict(lambda: defaultdict(list))
     # edge_id -> set of export_run_id where it fired
     fired_files_by_edge: Dict[str, Set[str]] = defaultdict(set)
     file_universe: Set[str] = set()
@@ -275,11 +285,17 @@ def main() -> int:
         if not eid or not edge_id:
             continue
         canonical_edge_id = alias_of.get(edge_id, edge_id)
+        edge = edges_by_id.get(edge_id, {})
+        source_domain = row.get("source_domain", "") or edge.get("source_domain", "")
+        target_domain = row.get("target_domain", "") or edge.get("target_domain", "")
+        source_join_hash = row.get("source_join_hash", "")
         file_universe.add(eid)
         file_edges[eid][canonical_edge_id].append((
-            row.get("source_join_hash", ""),
+            source_domain,
+            target_domain,
+            source_join_hash,
             row.get("target_join_hash", ""),
-            _safe_int(row.get("file_count", "")),
+            len(source_support_files.get((canonical_edge_id, source_domain, source_join_hash), set())),
         ))
         fired_files_by_edge[canonical_edge_id].add(eid)
     file_universe |= set(file_meta_idx.keys())
@@ -370,17 +386,15 @@ def main() -> int:
             signals_fired = sorted(sid for sid, st in statuses.items() if st == "fired")
             signals_absent = sorted(sid for sid, st in statuses.items() if st == "absent")
             signals_null = sorted(sid for sid, st in statuses.items() if st == "unavailable")
-            signals_fired_jh: Dict[str, str] = {
-                sid: _signal_fired_join_hash(signals_by_id[sid], edges_for_file)
+            signals_fired_sources: Dict[str, Tuple[str, str]] = {
+                sid: _signal_fired_source(signals_by_id[sid], edges_for_file)
                 for sid in signals_fired
             } if label_cache.has_pattern_source else {}
             signals_fired_labels: Dict[str, str] = {}
             if label_cache.has_pattern_source:
                 for sid in signals_fired:
-                    signal = signals_by_id[sid]
-                    edge = edges_by_id.get(signal.get("edge_id", ""), {})
-                    source_domain = signal.get("source_domain", "") or edge.get("source_domain", "")
-                    signals_fired_labels[sid] = label_cache.get(source_domain, signals_fired_jh[sid])
+                    source_join_hash, source_domain = signals_fired_sources[sid]
+                    signals_fired_labels[sid] = label_cache.get(source_domain, source_join_hash)
 
             meta = file_meta_idx.get(export_run_id, {})
             classification_rows.append({
@@ -401,7 +415,7 @@ def main() -> int:
                 "governance_role": meta.get("governance_role", ""),
                 "discipline_label": meta.get("discipline_label", ""),
                 "unit_system": meta.get("unit_system", ""),
-                "signals_fired_join_hashes": SIGNAL_LIST_SEPARATOR.join(signals_fired_jh[sid] for sid in signals_fired) if label_cache.has_pattern_source else "",
+                "signals_fired_join_hashes": SIGNAL_LIST_SEPARATOR.join(signals_fired_sources[sid][0] for sid in signals_fired) if label_cache.has_pattern_source else "",
                 "signals_fired_labels": SIGNAL_LIST_SEPARATOR.join(signals_fired_labels[sid] for sid in signals_fired) if label_cache.has_pattern_source else "",
             })
 

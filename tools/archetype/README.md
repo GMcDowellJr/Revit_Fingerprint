@@ -313,9 +313,13 @@ required signal's canonical edge fired at least once anywhere):
   matches the row's `source_join_hash`/`target_join_hash`), or `absent`.
 - For fired signals, records the selected `source_join_hash` and resolves a
   label from `domain_patterns.csv` by `(source_domain, join_hash)`. When
-  multiple item rows fire the same signal in one file, the row with the
-  highest `file_count` wins, with input order breaking ties. Missing pattern
-  files or labels emit empty label strings without failing the classification.
+  multiple item rows fire the same signal in one file, the
+  `source_join_hash` with the highest corpus support in
+  `cross_domain_items.csv` wins, with input order breaking ties. Label lookup
+  uses the firing row's original `source_domain`, so evidence folded through
+  collapsed alias edges still resolves against the correct pattern domain.
+  Missing pattern files or labels emit empty label strings without failing the
+  classification.
 - Emits a row only if **at least one required signal fired**.
 - `confidence_tier = "Full"` if **all** required signals fired and
   **no** signal is unavailable; otherwise `"Partial"`.
