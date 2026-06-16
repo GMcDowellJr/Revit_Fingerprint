@@ -55,13 +55,23 @@ python tools\label_synthesis\patch_all_domain_patterns.py `
     --results-root $RESULTS `
     --segments-root $SEGMENTS
 
-Write-Host "--- L4: export bundle pattern detail (all active segments x all/used) ---" -ForegroundColor Cyan
+Write-Host "--- L4: export bundle pattern detail (completed bundle segments x all/used) ---" -ForegroundColor Cyan
 $registry = Import-Csv "$RECORDS\run_registry.csv"
 $active = $registry | Where-Object {
-    $_.run_type -in @("bundle", "reference") -and $_.status -eq "complete"
+    $_.run_type -eq "bundle" -and $_.status -eq "complete"
 }
 foreach ($seg in $active) {
     foreach ($view in @("all", "used")) {
+        $bundleViewDir = "$SEGMENTS\$($seg.output_folder)\results\bundle_analysis\$view"
+        $bundleFiles = @()
+        if (Test-Path $bundleViewDir) {
+            $bundleFiles = @(Get-ChildItem $bundleViewDir -Recurse -Filter "bundles.csv" -File -ErrorAction SilentlyContinue)
+        }
+        if ($bundleFiles.Count -eq 0) {
+            Write-Host "  skipping segment=$($seg.output_folder)  view=$view (no bundle_analysis/$view/*/bundles.csv)" -ForegroundColor Yellow
+            continue
+        }
+
         $outDir = "$SEGMENTS\$($seg.output_folder)\results\bi_export\$view"
         Write-Host "  segment=$($seg.output_folder)  view=$view" -ForegroundColor Cyan
         python tools\export_bundle_pattern_detail.py `
@@ -88,7 +98,7 @@ Write-Host "Refresh Power BI: open Fingerprint_Segmented_Bundles.pbix and hit Re
 #   L1 (lookup)    - always rebuild, fast ~2 min
 #   L2 (synthesis) - skips join_hashes already in cache; only new patterns cost tokens
 #   L3 (patch)     - skips rows with authoritative sources (curator/synopsis/modal)
-#   L4 (export)    - overwrites BI export CSVs; fast, no API calls
+#   L4 (export)    - overwrites BI export CSVs for completed bundle runs; fast, no API calls
 #
 # Adding domains to L2:
 #   Add the domain name to the $dom array in the foreach loop.
