@@ -113,12 +113,14 @@
   "-2008234": {
     "name": "OST_PlumbingEquipment",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008232": {
     "name": "OST_MechanicalControlDevices",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008231": {
     "name": "OST_MEPAncillaryFraming",
@@ -198,12 +200,14 @@
   "-2008128": {
     "name": "OST_ConduitFitting",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008126": {
     "name": "OST_CableTrayFitting",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008124": {
     "name": "OST_DuctLinings",
@@ -233,47 +237,56 @@
   "-2008099": {
     "name": "OST_Sprinklers",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008087": {
     "name": "OST_LightingDevices",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008085": {
     "name": "OST_FireAlarmDevices",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008083": {
     "name": "OST_DataDevices",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008081": {
     "name": "OST_CommunicationDevices",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008079": {
     "name": "OST_SecurityDevices",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008077": {
     "name": "OST_NurseCallDevices",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008075": {
     "name": "OST_TelephoneDevices",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008055": {
     "name": "OST_PipeAccessory",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008050": {
     "name": "OST_FlexPipeCurves",
@@ -283,7 +296,8 @@
   "-2008049": {
     "name": "OST_PipeFitting",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008044": {
     "name": "OST_PipeCurves",
@@ -308,7 +322,8 @@
   "-2008016": {
     "name": "OST_DuctAccessory",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008015": {
     "name": "OST_DuctSystem",
@@ -318,7 +333,8 @@
   "-2008013": {
     "name": "OST_DuctTerminal",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2008010": {
     "name": "OST_DuctFitting",
@@ -338,7 +354,8 @@
   "-2006271": {
     "name": "OST_ExpansionJoints",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2006265": {
     "name": "OST_VibrationIsolators",
@@ -548,7 +565,8 @@
   "-2002000": {
     "name": "OST_DetailComponents",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001393": {
     "name": "OST_RoofSoffit",
@@ -573,12 +591,14 @@
   "-2001370": {
     "name": "OST_Entourage",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001360": {
     "name": "OST_Planting",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001354": {
     "name": "OST_StructuralStiffener",
@@ -603,7 +623,8 @@
   "-2001330": {
     "name": "OST_StructuralColumns",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001327": {
     "name": "OST_StructuralFramingSystem",
@@ -613,7 +634,8 @@
   "-2001320": {
     "name": "OST_StructuralFraming",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001300": {
     "name": "OST_StructuralFoundation",
@@ -633,7 +655,8 @@
   "-2001260": {
     "name": "OST_Site",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001220": {
     "name": "OST_Roads",
@@ -643,22 +666,26 @@
   "-2001180": {
     "name": "OST_Parking",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001160": {
     "name": "OST_PlumbingFixtures",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001140": {
     "name": "OST_MechanicalEquipment",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001120": {
     "name": "OST_LightingFixtures",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001100": {
     "name": "OST_PipeCurves",
@@ -673,12 +700,14 @@
   "-2001060": {
     "name": "OST_ElectricalFixtures",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001058": {
     "name": "OST_Signage",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001055": {
     "name": "OST_AudioVisualDevices",
@@ -688,12 +717,14 @@
   "-2001052": {
     "name": "OST_VerticalCirculation",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001049": {
     "name": "OST_FireProtection",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001046": {
     "name": "OST_MedicalEquipment",
@@ -703,12 +734,14 @@
   "-2001043": {
     "name": "OST_FoodServiceEquipment",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001040": {
     "name": "OST_ElectricalEquipment",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001039": {
     "name": "OST_TemporaryStructure",
@@ -718,7 +751,8 @@
   "-2001036": {
     "name": "OST_Hardscape",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2001033": {
     "name": "OST_MEPLoadAreaSeparationLines",
@@ -758,12 +792,14 @@
   "-2000949": {
     "name": "OST_RailingTermination",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2000948": {
     "name": "OST_RailingSupport",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2000947": {
     "name": "OST_RailingHandRail",
@@ -788,7 +824,8 @@
   "-2000535": {
     "name": "OST_StructuralFraming",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2000530": {
     "name": "OST_CLines",
@@ -813,17 +850,20 @@
   "-2000240": {
     "name": "OST_GenericModel",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2000220": {
     "name": "OST_Casework",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2000200": {
     "name": "OST_Windows",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2000198": {
     "name": "OST_ReferenceViewer",
@@ -858,7 +898,8 @@
   "-2000151": {
     "name": "OST_Doors",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2000127": {
     "name": "OST_StairsRailingBaluster",
@@ -878,7 +919,8 @@
   "-2000100": {
     "name": "OST_Columns",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2000083": {
     "name": "OST_ReferenceLines",
@@ -888,18 +930,19 @@
   "-2000080": {
     "name": "OST_Furniture",
     "domain_extracted": false,
-    "_verify": true
+    "_verify": true,
+	"target_domain": "loaded_family_types"
   },
   "-2000038": {
     "name": "Ceilings",
     "domain_extracted": true,
-    "_verify": true,
+    "_verify": false,
     "target_domain": "ceiling_types"
   },
   "-2000035": {
     "name": "Roofs",
     "domain_extracted": true,
-    "_verify": true,
+    "_verify": false,
     "target_domain": "roof_types"
   },
   "-2000032": {
@@ -910,7 +953,7 @@
   "-2000023": {
     "name": "OST_Roofs",
     "domain_extracted": true,
-    "_verify": true,
+    "_verify": false,
     "target_domain": "roof_types"
   },
   "-2000014": {
