@@ -72,7 +72,7 @@ foreach ($seg in $active) {
             continue
         }
 
-        $outDir = "$SEGMENTS\$($seg.output_folder)\results\bi_export\$view"
+        $outDir = $bundleViewDir
         Write-Host "  segment=$($seg.output_folder)  view=$view" -ForegroundColor Cyan
         python tools\export_bundle_pattern_detail.py `
             --output-folder $seg.output_folder `
@@ -98,7 +98,7 @@ Write-Host "Refresh Power BI: open Fingerprint_Segmented_Bundles.pbix and hit Re
 #   L1 (lookup)    - always rebuild, fast ~2 min
 #   L2 (synthesis) - skips join_hashes already in cache; only new patterns cost tokens
 #   L3 (patch)     - skips rows with authoritative sources (curator/synopsis/modal)
-#   L4 (export)    - overwrites BI export CSVs for completed bundle runs; fast, no API calls
+#   L4 (export)    - overwrites BI export CSVs in bundle_analysis view folders for completed bundle runs; fast, no API calls
 #
 # Adding domains to L2:
 #   Add the domain name to the $dom array in the foreach loop.
