@@ -142,8 +142,8 @@ class DomainPatternLabelCache:
                 if not join_hash:
                     continue
                 label = (
-                    row.get("human_label", "")
-                    or row.get("pattern_label_human", "")
+                    row.get("pattern_label_human", "")
+                    or row.get("human_label", "")
                     or row.get("pattern_label", "")
                 )
                 self._label_cache[(domain, join_hash)] = label
