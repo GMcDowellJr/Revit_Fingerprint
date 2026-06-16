@@ -12,11 +12,7 @@ $SEGMENTS = "$EXPORTS\segments"
 $RECORDS  = "$RESULTS\records"
 $SIG_POL  = "$REPO\policies\domain_sig_hash_policies.json"
 $JOIN_POL = "$REPO\policies\domain_join_key_policies.json"
-$CACHE    = "$RESULTS\label_synthesis\llm_name_cache.json"
-$LOOKUP   = "$RESULTS\label_synthesis\identity_items_by_joinhash.csv"
-$DP_CSV   = "$RESULTS\analysis\domain_patterns.csv"
 
-# $env:OPENROUTER_API_KEY = "sk-or-v1-..."
 
 Set-Location $REPO
 
@@ -24,7 +20,7 @@ if ($Run -eq "") {
     Write-Host ""
     Write-Host "Usage:"
     Write-Host "  .\corpus_update_runbook.ps1 -Run A    # flatten + apply + placeholders"
-    Write-Host "  .\corpus_update_runbook.ps1 -Run B    # authority + patterns + synthesis + patch"
+    Write-Host "  .\corpus_update_runbook.ps1 -Run B    # authority + patterns + patch"
     Write-Host "  .\corpus_update_runbook.ps1 -Run C    # segments + all/used bundle analysis (use compare_cross_segment.py for cross-segment comparison)"
     Write-Host ""
     Write-Host "MANDATORY PAUSE between Run A and Run B:"
@@ -58,47 +54,14 @@ if ($Run -eq "A") {
 }
 
 if ($Run -eq "B") {
-    Write-Host "=== RUN B: Authority / Patterns / Synthesis / Patch ===" -ForegroundColor Green
-
-    # Set API key for synthesis — edit this line or set before running
-    if (-not $env:OPENROUTER_API_KEY) {
-        $env:OPENROUTER_API_KEY = Read-Host "Enter OPENROUTER_API_KEY"
-    }
+    Write-Host "=== RUN B: Authority / Patterns / Patch ===" -ForegroundColor Green
 
     Write-Host "--- B1: authority + patterns ---" -ForegroundColor Cyan
     python tools/run_extract_all.py $EXPORTS `
         --out-root $EXPORTS `
         --stages authority,patterns
 
-    Write-Host "--- B2: identity_items lookup ---" -ForegroundColor Cyan
-    python tools\label_synthesis\build_identity_items_lookup.py `
-        --records-dir $RECORDS `
-        --out-dir "$RESULTS\label_synthesis"
-
-    Write-Host "--- B3: LLM synthesis ---" -ForegroundColor Cyan
-    foreach ($dom in @(
-        "fill_patterns_drafting",
-        "fill_patterns_model",
-        "line_patterns",
-        "arrowheads",
-        "line_styles"
-    )) {
-        Write-Host "  synthesizing: $dom" -ForegroundColor Cyan
-        $params = @(
-            "--exports-dir",           $EXPORTS,
-            "--analysis-dir",          "$RESULTS\label_synthesis",
-            "--domain",                $dom,
-            "--cache",                 $CACHE,
-            "--identity-items-lookup", $LOOKUP,
-            "--provider",              "openrouter",
-            "--filter-mode",           "candidates",
-            "--domain-patterns-csv",   $DP_CSV,
-            "--workers",               "3"
-        )
-        python -m tools.label_synthesis.synthesize_fragmented_labels @params
-    }
-
-    Write-Host "--- B4: patch corpus domain_patterns ---" -ForegroundColor Cyan
+    Write-Host "--- B2: patch corpus domain_patterns ---" -ForegroundColor Cyan
     python tools\label_synthesis\patch_all_domain_patterns.py `
         --results-root $RESULTS `
         --segments-root $SEGMENTS
@@ -147,20 +110,17 @@ if ($Run -eq "C") {
 
 # NOTES
 # Incremental behaviour:
-#   B2 (lookup)    - always rebuild, fast ~2 min
-#   B3 (synthesis) - skips cached join_hashes, only new patterns cost tokens
-#   B4/C3 (patch)  - skips synopsis/modal/curator/llm sources
+#   B2/C3 (patch)  - skips synopsis/modal/curator/llm sources
+#   Label synthesis is a separate on-demand step.
+#   Run: .\tools\label_refresh_runbook.ps1
+#   Synthesizes fragmented labels, patches all domain_patterns.csv files,
+#   and exports bundle pattern detail CSVs for Power BI.
 #   C2 (segments)  - --force re-runs all; use --segment <id> for one segment
 #                    emits both all-view (full configured vocabulary) and used-view
 #                    (excluding conclusively purgeable records) bundle analysis.
 #                    Used/purge interpretation is meaningful primarily for Project
 #                    targets, not Template/Generic standards stock.
 #
-# After major synthesis additions (new prompt modules or --force-refresh):
-#   Replace B4 with full patterns re-emit:
-#   python tools/run_extract_all.py $EXPORTS --out-root $EXPORTS --stages patterns
-#
 # Known deferred items:
 #   - build_semantic_groups.py column name fix (item_key/item_value vs k/v/q)
 #   - is_cad_import: lp.is_import not flowing into domain_patterns.csv
-#   - Bundle-filtered synthesis: --filter-mode bundles --bundle-dir per segment
