@@ -381,15 +381,75 @@ Assign a semantic group for this line style. Examples of valid group labels:
 Respond with ONLY the JSON object."""
 
 
+def _normalise_fill_angle(deg: float) -> float:
+    return deg % 180.0
+
+
+def _is_fill_angle_close(value: float, target: float, tol: float = 5.0) -> bool:
+    value_n = _normalise_fill_angle(value)
+    target_n = _normalise_fill_angle(target)
+    diff = abs(value_n - target_n)
+    circular_diff = min(diff, 180.0 - diff)
+    return circular_diff <= tol
+
+
+def _infer_fill_geometry_description(grid_count: Optional[int], angles: List[float]) -> str:
+    """Derive an orientation description from grid count + angle, only ever
+    using fields actually present in props (grid_count, grid_angles)."""
+    if not angles:
+        return "geometry unknown (no angle data available)"
+    if grid_count == 1 or (grid_count is None and len(angles) == 1):
+        a0 = _normalise_fill_angle(angles[0])
+        if _is_fill_angle_close(a0, 0):
+            return "single-grid horizontal lines"
+        if _is_fill_angle_close(a0, 90):
+            return "single-grid vertical lines"
+        if _is_fill_angle_close(a0, 45):
+            return "single-grid diagonal lines (45°)"
+        if _is_fill_angle_close(a0, 135):
+            return "single-grid diagonal lines (135°/-45°)"
+        return f"single-grid lines at {a0:.1f}°"
+    if grid_count == 2 or (grid_count is None and len(angles) == 2):
+        if len(angles) < 2:
+            return "two-grid pattern, second angle unknown"
+        a0, a1 = _normalise_fill_angle(angles[0]), _normalise_fill_angle(angles[1])
+        diag_pair = (_is_fill_angle_close(a0, 45) and _is_fill_angle_close(a1, 135)) or (
+            _is_fill_angle_close(a1, 45) and _is_fill_angle_close(a0, 135)
+        )
+        if diag_pair:
+            return "two-grid crosshatch (opposing diagonals)"
+        hv_pair = (_is_fill_angle_close(a0, 0) and _is_fill_angle_close(a1, 90)) or (
+            _is_fill_angle_close(a1, 0) and _is_fill_angle_close(a0, 90)
+        )
+        if hv_pair:
+            return "two-grid net (horizontal + vertical)"
+        return f"two-grid pattern ({a0:.1f}° + {a1:.1f}°)"
+    if grid_count and grid_count > 2:
+        return f"complex pattern ({grid_count} grids, angle data incomplete)"
+    return "geometry undetermined from available fields"
+
+
 def _prompt_fill_patterns(domain: str, label: str, props: dict[str, str], peers: list[str]) -> str:
     grid_count_raw = props.get("grid_count", "")
     spacing_raw = props.get("spacing_in", "")
+    grid_angles_raw = props.get("grid_angles", "")
     target = "Drafting" if "drafting" in domain else "Model"
 
     try:
         gc = int(grid_count_raw)
     except (ValueError, TypeError):
         gc = None
+
+    grid_angles: List[float] = []
+    for tok in grid_angles_raw.split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        try:
+            grid_angles.append(float(tok))
+        except ValueError:
+            continue
+    geometry_desc = _infer_fill_geometry_description(gc, grid_angles)
 
     is_solid = gc == 0 or (gc is None and not spacing_raw)
 
@@ -448,10 +508,28 @@ Known fill pattern naming conventions:
 
 LABEL: {label}
 COMPLEXITY: {complexity}
+GEOMETRY: {geometry_desc}
 {spacing_note}{label_note}
 CONTEXT:
 {name_context}
-Fill patterns are applied to cut or surface regions of building materials in Revit sections and plans. The semantic group should reflect the material or drawing convention the fill represents.
+Fill patterns are applied to cut or surface regions of building materials in Revit sections and plans.
+
+Group by geometric identity first: the orientation/structure in the GEOMETRY line
+above (derived from grid count and grid angle) plus density from the spacing note
+is the anchor for the group label. Use geometric descriptors — "Diagonal Hatch",
+"Cross-Hatch", "Horizontal Ruled", "Vertical Ruled" — as the primary group name
+when the GEOMETRY line supports them. Do not infer geometric descriptors (e.g.
+masonry coursing) that the GEOMETRY/COMPLEXITY fields above do not support.
+
+Material names (Concrete, Sand, Earth, Wood) may annotate a group as a secondary
+label but must not replace a geometry-derived name. A pattern named "Concrete" with
+diagonal hatch geometry belongs in "Diagonal Hatch", annotated with "(Concrete-like)"
+— not in a "Concrete" group that would also capture geometrically unrelated patterns.
+
+Exception: when multiple patterns share identical geometry (undifferentiated simple
+hatch) and differ only in material names, or when GEOMETRY is "unknown"/"undetermined",
+use the material name as the group differentiator since geometry alone cannot
+distinguish them.
 
 {_peer_block(peers)}
 
@@ -752,6 +830,16 @@ def _extract_behavioral_props(domain: str, items: Dict[str, str]) -> Dict[str, s
                 props["spacing_in"] = str(abs(float(offset)) * 12.0)
             except ValueError:
                 props["spacing_in"] = offset
+        angle_pattern = re.compile(r"^fill_pattern\.grid\[(\d+)\]\.angle$")
+        angles_by_idx: Dict[int, str] = {}
+        for k, v in items.items():
+            m = angle_pattern.match(k)
+            if m and v:
+                angles_by_idx[int(m.group(1))] = v
+        if angles_by_idx:
+            props["grid_angles"] = ",".join(
+                angles_by_idx[i] for i in sorted(angles_by_idx.keys())
+            )
     return props
 
 
