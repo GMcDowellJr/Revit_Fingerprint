@@ -258,10 +258,26 @@ def test_sig_basis_keys_used_reproduces_sig_hash(monkeypatch):
     result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG"), 12: _FillPatternElem("fp-12", "BG"), 13: _FillPatternElem("fp-13", "CFG"), 14: _FillPatternElem("fp-14", "CBG")}), ctx=_make_ctx_with_fill_patterns(m))
 
     rec = result["records"][0]
-    items = (((rec or {}).get("identity_basis", {}) or {}).get("items", [])) or []
     keys_used = (((rec or {}).get("sig_basis", {}) or {}).get("keys_used", [])) or []
+    assert keys_used == ["material.name", "material.class"]
+    # sig_hash basis is md5(name|class), aligned with obj_style.material_sig_hash —
+    # NOT the generic sorted k=/q=/v= serialization (that basis is documented
+    # under graphics_sig_basis instead).
+    material = rec.get("material", {})
+    assert make_hash([material.get("name"), material.get("class")]) == rec["sig_hash"]
+
+
+def test_graphics_sig_basis_keys_used_reproduces_graphics_sig_hash_v2(monkeypatch):
+    m = importlib.import_module("domains.materials")
+    monkeypatch.setattr(m, "Material", object)
+    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [_Mat(uid="uid-sig")])
+    result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG"), 12: _FillPatternElem("fp-12", "BG"), 13: _FillPatternElem("fp-13", "CFG"), 14: _FillPatternElem("fp-14", "CBG")}), ctx=_make_ctx_with_fill_patterns(m))
+
+    rec = result["records"][0]
+    items = (((rec or {}).get("identity_basis", {}) or {}).get("items", [])) or []
+    keys_used = (((rec or {}).get("graphics_sig_basis", {}) or {}).get("keys_used", [])) or []
     preimage = serialize_identity_items([it for it in items if it.get("k") in set(keys_used)])
-    assert make_hash(preimage) == rec["sig_hash"]
+    assert make_hash(preimage) == rec["graphics_sig_hash_v2"]
 
 
 def test_label_uses_contract_provenance_token(monkeypatch):

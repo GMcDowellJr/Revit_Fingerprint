@@ -2,13 +2,15 @@
 """
 migrate_materials_identity_items.py
 
-Migrates existing fingerprint JSON exports to inject material.graphics_sig_hash_v2
-as an identity item on every materials record.
+Migrates existing fingerprint JSON exports to inject material.graphics_sig_hash_v2,
+material.class, and material.name_class_hash as identity items on every
+materials record.
 
-This avoids a full Dynamo re-extraction. The value already exists on each record
-as rec["graphics_sig_hash_v2"] — this script surfaces it into
-rec["identity_basis"]["items"] so the apply/discover pipeline can use it as a
-join key.
+This avoids a full Dynamo re-extraction. graphics_sig_hash_v2 already exists on
+each record as rec["graphics_sig_hash_v2"]; class and name are already present
+under rec["material"]["class"] / rec["material"]["name"]. This script surfaces
+them into rec["identity_basis"]["items"] so the apply/discover pipeline can use
+them as sig/join key basis.
 
 Input format: compact (production) or indented (dev) JSON — both handled.
 Output format: compact production JSON (separators=(',',':'), sort_keys=True),
@@ -17,6 +19,9 @@ Output format: compact production JSON (separators=(',',':'), sort_keys=True),
 Changes made per materials record:
   - Adds {"k": "material.graphics_sig_hash_v2", "v": <value>, "q": "ok"} to
     identity_basis.items if not already present.
+  - Adds {"k": "material.class", "v": <value>, "q": "ok"} if not already present.
+  - Adds {"k": "material.name_class_hash", "v": md5(name|class), "q": "ok"}
+    if not already present and both name and class are available.
   - Does NOT modify any other field (sig_hash, record_id, etc.).
   - Does NOT remove material.uid from identity_basis.items.
 
@@ -38,6 +43,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import sys
@@ -112,22 +118,35 @@ _INJECT_KEY = "material.graphics_sig_hash_v2"
 
 def _migrate_record(rec: Dict[str, Any]) -> bool:
     """
-    Inject material.graphics_sig_hash_v2 into identity_basis.items.
-    Returns True if a change was made.
+    Inject material.graphics_sig_hash_v2, material.class, and
+    material.name_class_hash into identity_basis.items.
+    Returns True if any change was made.
     """
-    sig_value = rec.get("graphics_sig_hash_v2") or rec.get("sig_hash")
-    if not sig_value:
-        return False
-
+    injected = False
     items = _get_identity_items(rec)
 
-    for item in items:
-        if isinstance(item, dict) and item.get("k") == _INJECT_KEY:
-            return False  # Already migrated
+    sig_value = rec.get("graphics_sig_hash_v2") or rec.get("sig_hash")
+    if sig_value and not any(it.get("k") == _INJECT_KEY for it in items if isinstance(it, dict)):
+        items.append({"k": _INJECT_KEY, "q": "ok", "v": str(sig_value)})
+        injected = True
 
-    items.append({"k": _INJECT_KEY, "q": "ok", "v": str(sig_value)})
-    items.sort(key=lambda it: str(it.get("k", "")))
-    return True
+    # Inject material.class if not already present
+    mat_class_val = rec.get("material", {}).get("class", "") or ""
+    if mat_class_val and not any(it.get("k") == "material.class" for it in items):
+        items.append({"k": "material.class", "q": "ok", "v": str(mat_class_val)})
+        injected = True
+
+    # Inject material.name_class_hash (md5 of name|class) if both present
+    mat_name_val = rec.get("material", {}).get("name", "") or ""
+    if mat_name_val and mat_class_val:
+        _name_class_hash = hashlib.md5(f"{mat_name_val}|{mat_class_val}".encode()).hexdigest()
+        if not any(it.get("k") == "material.name_class_hash" for it in items):
+            items.append({"k": "material.name_class_hash", "q": "ok", "v": _name_class_hash})
+            injected = True
+
+    if injected:
+        items.sort(key=lambda it: str(it.get("k", "")))
+    return injected
 
 
 # ---------------------------------------------------------------------------

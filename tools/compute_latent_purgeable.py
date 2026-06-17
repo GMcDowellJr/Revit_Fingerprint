@@ -53,10 +53,6 @@ _OUTPUT_FIELDS = [
 # item_key(s) in the consumer's identity_items shard that carry those refs.
 #
 # ref_item_keys=None signals wildcard matching via _build_matcher().
-#
-# Deferred (not implemented): materials ← object_styles_model
-# The obj_style.material_sig_hash and materials sig_hash live in different
-# hash spaces; fix requires ctx lookup in object_styles + re-extraction.
 # ---------------------------------------------------------------------------
 
 CHAINS: List[dict] = [
@@ -123,6 +119,15 @@ CHAINS: List[dict] = [
         # the conservative rule treats non-true as non-purgeable, so any
         # VFD referenced by a VFA record is counted as in-use.
         "ref_item_keys": None,
+    },
+    {
+        "target_domain": "materials",
+        "consumer_domains": [
+            "object_styles_model",
+        ],
+        "ref_item_keys": [
+            "obj_style.material_sig_hash",
+        ],
     },
 ]
 
