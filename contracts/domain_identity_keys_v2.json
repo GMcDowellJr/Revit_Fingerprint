@@ -518,18 +518,29 @@
       "domain_family": "materials",
       "allowed_keys": [
         "material.graphics_sig_hash_v2",
-        "material.uid"
+        "material.uid",
+        "material.class",
+        "material.keynote",
+        "material.name_class_hash"
       ],
       "required_keys": [
-        "material.graphics_sig_hash_v2"
+        "material.graphics_sig_hash_v2",
+        "material.name_class_hash"
       ],
+      "sig_hash_schema": "materials.sig_hash.v2",
+      "sig_hash_keys": [
+        "material.name_class_hash"
+      ],
+      "sig_hash_key_prefixes": [],
       "minima": {
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "sig_hash anchors on material.graphics_sig_hash_v2 (visual/material properties).",
-        "material.uid is for record traceability only \u2014 not a sig or join anchor.",
-        "Consistent with domain_join_key_policies.json which requires graphics_sig_hash_v2."
+        "sig_hash basis: md5(material.name | material.class). Answers semantic identity.",
+        "join_hash basis: md5(material.graphics_sig_hash_v2 | material.keynote). Answers governance equivalence.",
+        "material.graphics_sig_hash_v2 retained as identity_item for visual consolidation analysis.",
+        "material.uid retained for record traceability only \u2014 not a sig or join anchor.",
+        "material.name_class_hash = md5(name | class), emitted by migration script and extractor."
       ]
     },
     "object_styles_analytical": {

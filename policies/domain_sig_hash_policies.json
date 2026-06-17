@@ -528,8 +528,7 @@
     "materials": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "material.graphics_sig_hash_v2",
-        "material.uid"
+        "material.name_class_hash"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -537,12 +536,16 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash_keys pinned to material.name_class_hash so the post-extraction",
+        "policy stage preserves the md5(name|class) identity basis instead of",
+        "falling back to allowed_keys (which would re-anchor on graphics_sig_hash_v2).",
         "sig_hash is computed post-extraction from canonical identity_basis.items."
       ],
       "required_items": [
-        "material.graphics_sig_hash_v2"
+        "material.graphics_sig_hash_v2",
+        "material.name_class_hash"
       ],
-      "sig_hash_schema": "materials.sig_hash.v1"
+      "sig_hash_schema": "materials.sig_hash.v2"
     },
     "object_styles_analytical": {
       "allowed_item_prefixes": [],

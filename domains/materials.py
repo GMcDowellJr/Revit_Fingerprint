@@ -230,6 +230,11 @@ def _mk_item(k, v):
 
 
 _MATERIAL_SIG_KEYS = [
+    "material.name",
+    "material.class",
+]
+
+_MATERIAL_GRAPHICS_SIG_KEYS = [
     "material.sig.shading_color_rgb",
     "material.sig.shading_transparency",
     "material.sig.surface_foreground_pattern.sig_hash",
@@ -393,7 +398,7 @@ def extract(doc, ctx=None):
         )
         cut_bg_color = _rgb_sig(_read_prop(m, "CutBackgroundPatternColor"))
 
-        sig_basis_items = [
+        graphics_basis_items = [
             _mk_item("material.sig.shading_color_rgb", shading_color_rgb),
             _mk_item("material.sig.shading_transparency", shading_transparency),
             _mk_item("material.sig.surface_foreground_pattern.sig_hash", surface_fg["sig_hash"]),
@@ -409,7 +414,7 @@ def extract(doc, ctx=None):
         identity_items = [
             _mk_item("material.uid", uid),
             make_identity_item("material.name", name_v, name_q),
-        ] + sig_basis_items
+        ] + graphics_basis_items
 
         material_payload = {
             "uid": uid,
@@ -440,15 +445,32 @@ def extract(doc, ctx=None):
             "physical_asset_capture_status": "deferred",
             "thermal_asset_capture_status": "deferred",
         }
-        sig_basis_items_sorted = sorted(sig_basis_items, key=lambda it: safe_str(it.get("k", "")))
-        graphics_sig_hash_v2 = make_hash(serialize_identity_items(sig_basis_items_sorted))
+        graphics_basis_items_sorted = sorted(graphics_basis_items, key=lambda it: safe_str(it.get("k", "")))
+        graphics_sig_hash_v2 = make_hash(serialize_identity_items(graphics_basis_items_sorted))
 
-        # Inject graphics_sig_hash_v2 as an identity item so the policy apply
-        # stage can select it as the join key basis (v2 policy).
+        # sig_hash: md5(name | class) — semantic identity, aligns with obj_style.material_sig_hash
+        material_sig_hash = make_hash([safe_str(name), safe_str(mat_class)])
+
+        # Inject graphics_sig_hash_v2, class, name_class_hash, and keynote as
+        # identity items so the policy apply stage can select them as join
+        # key / sig basis (v2 policy).
         # Re-sort identity_items after injection to maintain canonical order.
         identity_items.append(
             make_identity_item("material.graphics_sig_hash_v2", graphics_sig_hash_v2, ITEM_Q_OK)
         )
+        identity_items.append(
+            _mk_item("material.class", mat_class)
+        )
+        # name_class_hash: md5(name|class) — same basis as sig_hash, explicit as identity_item
+        name_class_hash = material_sig_hash
+        if name not in (S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE) and mat_class not in (S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE):
+            identity_items.append(
+                make_identity_item("material.name_class_hash", name_class_hash, ITEM_Q_OK)
+            )
+        if keynote and keynote[0]:
+            identity_items.append(
+                make_identity_item("material.keynote", keynote[0], ITEM_Q_OK)
+            )
         identity_items_sorted = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
 
         status_v2 = STATUS_OK
@@ -481,7 +503,7 @@ def extract(doc, ctx=None):
             record_id="uid:{}".format(uid),
             status=status_v2,
             status_reasons=sorted(set(status_reasons)),
-            sig_hash=graphics_sig_hash_v2,
+            sig_hash=material_sig_hash,
             identity_items=identity_items_sorted,
             required_qs=[ITEM_Q_OK],
             label={
@@ -501,6 +523,10 @@ def extract(doc, ctx=None):
         rec["sig_basis"] = {
             "schema": "materials.sig_basis.v1",
             "keys_used": list(_MATERIAL_SIG_KEYS),
+        }
+        rec["graphics_sig_basis"] = {
+            "schema": "materials.graphics_sig_basis.v1",
+            "keys_used": list(_MATERIAL_GRAPHICS_SIG_KEYS),
         }
 
         info["records"].append(rec)

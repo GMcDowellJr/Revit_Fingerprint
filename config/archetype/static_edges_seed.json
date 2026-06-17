@@ -200,9 +200,7 @@
       "edge_type": "structural",
       "direction": "forward",
       "field_match": "exact",
-      "requires_extraction": [
-        "materials_hash_space_alignment"
-      ]
+      "requires_extraction": []
     },
     {
       "edge_id": "view_category_overrides_model.baseline__object_styles_model",
