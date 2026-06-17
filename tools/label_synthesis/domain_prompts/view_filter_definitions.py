@@ -194,9 +194,10 @@ def _format_rule_summary(rules: List[Dict[str, Optional[str]]]) -> List[str]:
         kind = r.get("kind") or "?"
         value = r.get("value")
         param_kind = r.get("param_ref.kind") or "?"
+        param_id = r.get("param_ref.id") or "?"
         value_part = f" = {value}" if value is not None else ""
         lines.append(
-            f"  Rule {i}: {prefix}param({param_kind}) {op} [{kind}]{value_part}"
+            f"  Rule {i}: {prefix}param({param_kind}:{param_id}) {op} [{kind}]{value_part}"
         )
     if len(rules) > 10:
         lines.append(f"  ... and {len(rules) - 10} more rules")
