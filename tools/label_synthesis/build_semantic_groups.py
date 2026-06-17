@@ -451,7 +451,21 @@ COMPLEXITY: {complexity}
 {spacing_note}{label_note}
 CONTEXT:
 {name_context}
-Fill patterns are applied to cut or surface regions of building materials in Revit sections and plans. The semantic group should reflect the material or drawing convention the fill represents.
+Fill patterns are applied to cut or surface regions of building materials in Revit sections and plans.
+
+Group by geometric identity first: the pattern's visual form (hatch angle,
+density, line character) is the anchor for the group label. Use geometric
+descriptors — "Diagonal Hatch", "Cross-Hatch", "Brick Course", "Horizontal Ruled" —
+as the primary group name when the geometry is distinctive.
+
+Material names (Concrete, Sand, Earth, Wood) may annotate a group as a secondary
+label but must not replace a geometry-derived name. A pattern named "Concrete" with
+diagonal hatch geometry belongs in "Diagonal Hatch", annotated with "(Concrete-like)"
+— not in a "Concrete" group that would also capture geometrically unrelated patterns.
+
+Exception: when multiple patterns share identical geometry (undifferentiated simple
+hatch) and differ only in material names, use the material name as the group
+differentiator since geometry alone cannot distinguish them.
 
 {_peer_block(peers)}
 
