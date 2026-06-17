@@ -527,6 +527,11 @@
         "material.graphics_sig_hash_v2",
         "material.name_class_hash"
       ],
+      "sig_hash_schema": "materials.sig_hash.v2",
+      "sig_hash_keys": [
+        "material.name_class_hash"
+      ],
+      "sig_hash_key_prefixes": [],
       "minima": {
         "block_if_any_required_not_ok": true
       },
