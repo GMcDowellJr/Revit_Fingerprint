@@ -52,17 +52,35 @@ Directed pairs use containment metrics; symmetric pairs use Jaccard. Both are al
 
 ---
 
-## 3. Mode Switching: Bundle vs File
+## 3. Measurement Architecture
 
-For each (segment_a, segment_b, domain) triple:
+All comparisons use a single measurement path: file-grain join_hash inventories
+loaded from `membership_matrix.csv` per segment. There is no bundle-mode /
+file-mode branch. All set operations (Jaccard, containment) operate on the full
+join_hash inventories.
 
-1. **Bundle mode** — used when `bundle_membership.csv` exists and is non-empty in the bundle analysis directory for **both** segments. Bundle mode groups patterns by their bundle assignment, enabling bundle-to-bundle comparisons rather than file-to-file.
+**Two views are scored independently:**
 
-2. **File mode** — fallback when bundle analysis has not completed for one or both segments. Uses `membership_matrix.csv` to build per-file join_hash sets.
+- **All-view** (`all_jaccard_*`, `all_containment_*`) — full configured pattern
+  vocabulary per segment.
+- **Used-view** (`used_jaccard_*`, `used_containment_*`) — patterns present in
+  active view/sheet assignments only (excluding conclusively purgeable records).
 
-The `comparison_mode` column in the output records which was used. Mixing modes across domains within the same pair is expected and normal — domains complete bundle analysis at different times.
+The delta between all-view and used-view scores quantifies passive inheritance:
+patterns configured but never rendered in delivery. `recommended_primary_view`
+and `comparison_role_semantics` provide guidance on which view is meaningful for
+each comparison type.
 
-Segments with `run_type = "skip"` or `"registration"` in the registry have no bundle output by design. They are treated as file-mode-only when `membership_matrix.csv` happens to exist; otherwise they are skipped with a warning.
+**Bundle membership is a post-hoc annotation**, not a scoring input. After scores
+are computed, `bundle_membership.csv` is consulted to split `n_shared_join_hash`
+into three buckets: `n_shared_bundle_both`, `n_shared_bundle_a_only`,
+`n_shared_bundle_b_only`. This surfaces how much of the overlap is formally
+institutionalised vs. informally shared. Separate `all_*` and `used_*` buckets
+are emitted for both views.
+
+Segments with `run_type = "skip"` or `"registration"` in the registry have no
+bundle output by design; they participate using `membership_matrix.csv` when
+present and are otherwise skipped with a warning.
 
 ---
 
@@ -134,21 +152,39 @@ One row per (segment_id_a, segment_id_b, domain, comparison_type).
 | `discipline_label_a/b` | Discipline annotation (may be blank) |
 | `unit_system` | Unit system; always matches between a and b |
 | `comparison_type` | One of the 9 type values |
-| `comparison_mode` | `bundle` or `file` |
 | `domain` | Domain name |
-| `n_patterns_a` | Distinct join_hashes in segment A (union across all bundles/files) |
+| `n_patterns_a` | Distinct join_hashes in segment A (union across all files) |
 | `n_patterns_b` | Distinct join_hashes in segment B |
 | `n_shared_join_hash` | Intersection size |
-| `containment_a_in_b_mean` | Mean fraction of A's patterns found in each B unit (directed only) |
-| `containment_a_in_b_min` | Min across B units |
-| `containment_b_in_a_mean` | Mean fraction of B's mandate covered by each A unit (directed only) |
-| `containment_b_in_a_min` | Min across A units |
-| `jaccard_mean` | Mean pairwise Jaccard (symmetric only) |
-| `jaccard_p10` | P10 pairwise Jaccard (symmetric only) |
-| `jaccard_p90` | P90 pairwise Jaccard (symmetric only) |
-| `n_bundles_a/b` | Bundle count for each side (bundle mode only) |
-| `n_files_a/b` | File count for each side (file mode only) |
+| `n_unique_patterns_a/b` | Deduplicated population-level join_hash counts per side |
+| `signal_spread` | `(n_shared/min(a,b)) − (n_shared/max(a,b))` — score sensitivity to size asymmetry |
+| `score_ambiguity_band` | One of: Unambiguous (≤0.1), Low (≤0.3), Moderate (≤0.6), High (>0.6) |
+| `all_containment_a_in_b_mean` | Mean all-view fraction of A's patterns found in each B unit (directed only) |
+| `all_containment_a_in_b_min` | Min across B units |
+| `all_containment_b_in_a_mean` | Mean all-view fraction of B's mandate covered by each A unit (directed only) |
+| `all_containment_b_in_a_min` | Min across A units |
+| `all_jaccard_mean` | Mean pairwise Jaccard from all-view inventories (symmetric only) |
+| `all_jaccard_p10` | P10 pairwise Jaccard, all-view (symmetric only) |
+| `all_jaccard_p90` | P90 pairwise Jaccard, all-view (symmetric only) |
+| `used_jaccard_mean` | Mean pairwise Jaccard from used-view inventories (symmetric only) |
+| `used_jaccard_p10` | P10 pairwise Jaccard, used-view (symmetric only) |
+| `used_jaccard_p90` | P90 pairwise Jaccard, used-view (symmetric only) |
+| `used_containment_a_in_b_mean` | Mean used-view containment (directed only) |
+| `used_containment_a_in_b_min` | Min across B units, used-view |
+| `used_containment_b_in_a_mean` | Mean used-view containment (directed only) |
+| `used_containment_b_in_a_min` | Min across A units, used-view |
+| `used_n_shared_join_hash` | Count of join_hashes shared in both segments' used-view inventories |
+| `all_has_bundles_a/b` | Whether all-view bundle analysis produced output for each side |
+| `all_n_shared_bundle_both/a_only/b_only` | All-view bundle overlap annotation buckets |
+| `used_has_bundles_a/b` | Whether used-view bundle analysis produced output for each side |
+| `used_n_shared_bundle_both/a_only/b_only` | Used-view bundle overlap annotation buckets |
+| `n_files_a/b` | File count for each side |
 | `n_pairs` | Number of unit pairs that produced Jaccard values, or number of target units for directed |
+| `data_sufficient` | `"true"` only when both sides have `n_files >= 5` |
+| `reference_usage_interpretable` | Whether used-view is an active-practice signal for the A-side role |
+| `target_usage_interpretable` | Whether used-view is an active-practice signal for the B-side role |
+| `recommended_primary_view` | `all` or `used` — pipeline guidance on which view to use for this comparison type |
+| `comparison_role_semantics` | Plain-language description of what the comparison is measuring |
 | `executed_utc` | ISO-8601 UTC timestamp of the comparison run |
 
 Columns that do not apply to a comparison direction are emitted as blank strings. For directed pairs: `jaccard_*` columns are blank. For symmetric pairs: `containment_*` columns are blank. Semantic columns (`reference_usage_interpretable`, `target_usage_interpretable`, `recommended_primary_view`, `comparison_role_semantics`) clarify when used-view scores are active-practice signals versus annotations.
@@ -166,9 +202,15 @@ Written only for (segment_a, segment_b, domain) triples where `n_pairs ≤ 50`.
 | `project_label_a/b` | Project label from file_metadata.csv (may be blank) |
 | `n_patterns_a/b` | Join_hash count for each file |
 | `n_shared` | Intersection count |
-| `jaccard` | Pairwise Jaccard score |
-| `containment_a_in_b` | Fraction of A's patterns in B |
-| `containment_b_in_a` | Fraction of B's patterns in A |
+| `all_jaccard` | Pairwise Jaccard score, all-view |
+| `all_containment_a_in_b` | Fraction of A's patterns in B, all-view |
+| `all_containment_b_in_a` | Fraction of B's patterns in A, all-view |
+| `used_n_shared` | Intersection count, used-view |
+| `used_jaccard` | Pairwise Jaccard score, used-view |
+| `used_containment_a_in_b` | Fraction of A's patterns in B, used-view |
+| `used_containment_b_in_a` | Fraction of B's patterns in A, used-view |
+| `all_n_shared_bundle_both/a_only/b_only` | All-view bundle overlap annotation buckets |
+| `used_n_shared_bundle_both/a_only/b_only` | Used-view bundle overlap annotation buckets |
 
 ### cross_segment_governance_states.csv
 
@@ -376,9 +418,9 @@ When `--no-delta` is set, `cross_segment_delta.csv` is not written and no role j
 
 ## 10. Known Limitations
 
-### Small-N caveats (file mode)
+### Small-N caveats
 
-File-mode Jaccard is noisy when either segment has fewer than ~5 files. The `--min-patterns` flag helps suppress the noisiest cases, but the threshold applies to join_hash count, not file count. A single file with 50 join_hashes passes the filter; two files with 3 join_hashes each also pass. Interpret file-mode results for segments with fewer than 5 files cautiously.
+Jaccard is noisy when either segment has fewer than ~5 files. The `--min-patterns` flag helps suppress the noisiest cases, but the threshold applies to join_hash count, not file count. A single file with 50 join_hashes passes the filter; two files with 3 join_hashes each also pass. Interpret results for segments with fewer than 5 files cautiously; `data_sufficient` flags this directly.
 
 ### discipline_label sparsity
 
@@ -390,7 +432,7 @@ Mode D groups files by `project_label` from `file_metadata.csv`. `project_label`
 
 ### Bundle analysis prerequisite
 
-Bundle mode requires that the segment orchestrator has completed step 6 (bundle_membership.csv production) for both segments. Segments where only step 1 ran will fall through to file mode silently. Check `comparison_mode` in the output to confirm which mode was used.
+Bundle overlap annotation (`all_n_shared_bundle_*`, `used_n_shared_bundle_*`) requires that the segment orchestrator has completed step 6 (`bundle_membership.csv` production) for a segment. Segments where only step 1 ran will have `all_has_bundles_a/b` and `used_has_bundles_a/b` reported as `"false"` and the bundle-overlap buckets reported as zero; Jaccard and containment scores are unaffected since they are computed from `membership_matrix.csv` regardless of bundle-analysis completion.
 
 ### No cross-unit-system pairs
 
