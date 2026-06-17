@@ -143,6 +143,7 @@ SUMMARY_FIELDS: List[str] = [
     "domain",
     "n_patterns_a", "n_patterns_b", "n_shared_join_hash",
     "n_unique_patterns_a", "n_unique_patterns_b",
+    "signal_spread", "score_ambiguity_band",
     "all_containment_a_in_b_mean", "all_containment_a_in_b_min",
     "all_containment_b_in_a_mean", "all_containment_b_in_a_min",
     "all_jaccard_mean", "all_jaccard_p10", "all_jaccard_p90",
@@ -1677,6 +1678,24 @@ def _build_summary_row(
 ) -> Dict[str, str]:
     ma = manifest.get(seg_a, {})
     mb = manifest.get(seg_b, {})
+
+    # score_ambiguity_band: sensitivity of scores to segment size asymmetry
+    _n_shared_ss = int(float(metrics.get("n_shared_join_hash") or 0))
+    _n_a_ss = int(n_unique_patterns_a) if n_unique_patterns_a else 0
+    _n_b_ss = int(n_unique_patterns_b) if n_unique_patterns_b else 0
+    _min_ss = min(_n_a_ss, _n_b_ss)
+    _max_ss = max(_n_a_ss, _n_b_ss)
+    if _min_ss > 0:
+        _signal_spread = (_n_shared_ss / _min_ss) - (_n_shared_ss / _max_ss if _max_ss > 0 else 0.0)
+        _bands = [(0.1, "Unambiguous"), (0.3, "Low"), (0.6, "Moderate")]
+        _score_ambiguity_band = next(
+            (label for threshold, label in _bands if _signal_spread <= threshold), "High"
+        )
+        _signal_spread_str = f"{_signal_spread:.4f}"
+    else:
+        _signal_spread_str = ""
+        _score_ambiguity_band = ""
+
     return {
         "comparison_run_id": crid,
         "segment_id_a": seg_a,
@@ -1697,6 +1716,8 @@ def _build_summary_row(
         "n_shared_join_hash": metrics.get("n_shared_join_hash", ""),
         "n_unique_patterns_a": str(n_unique_patterns_a),
         "n_unique_patterns_b": str(n_unique_patterns_b),
+        "signal_spread": _signal_spread_str,
+        "score_ambiguity_band": _score_ambiguity_band,
         "all_containment_a_in_b_mean": metrics.get("all_containment_a_in_b_mean", ""),
         "all_containment_a_in_b_min": metrics.get("all_containment_a_in_b_min", ""),
         "all_containment_b_in_a_mean": metrics.get("all_containment_b_in_a_mean", ""),

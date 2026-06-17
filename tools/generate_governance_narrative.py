@@ -190,6 +190,9 @@ def normalise_summary_schema(rows: list) -> None:
     # has_bundles
     alias("has_bundles_a", "all_has_bundles_a", "has_bundles_a")
     alias("has_bundles_b", "all_has_bundles_b", "has_bundles_b")
+    # Signal ambiguity
+    alias("signal_spread",        "signal_spread",        "signal_spread")
+    alias("score_ambiguity_band", "score_ambiguity_band", "score_ambiguity_band")
 
 
 def _col(row: dict, canonical: str) -> str:
