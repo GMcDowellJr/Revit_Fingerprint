@@ -6,7 +6,7 @@
     "Add high-confidence bip:{int} -> target_domain overrides to exact_bip_id as they are validated from corpus evidence."
   ],
   "exact_bip_id": {
-    "bip:-1001007": "wall_types"
+    "bip:-1001006": "wall_types"
   },
   "name_contains": [
     {

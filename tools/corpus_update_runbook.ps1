@@ -83,6 +83,16 @@ if ($Run -eq "C") {
         --out-dir $RECORDS `
         --enable-parent-bundle-runs
 
+    # C1.5: latent_purgeable.csv is created once and cached forever by
+    # _ensure_latent_purgeable() in run_bundle_analysis.py — it does NOT
+    # refresh on its own when upstream records/identity_items change.
+    # Since Run C already fully reprocesses every segment, force a clean
+    # rebuild here rather than silently reusing stale purgeability data.
+    Write-Host "--- C1.5: clear stale latent_purgeable.csv ---" -ForegroundColor Cyan
+    Get-ChildItem -Path $SEGMENTS -Recurse -Filter "latent_purgeable.csv" -ErrorAction SilentlyContinue | Remove-Item -Force
+    $corpusLatentPurgeable = "$RECORDS\latent_purgeable.csv"
+    if (Test-Path $corpusLatentPurgeable) { Remove-Item $corpusLatentPurgeable -Force }
+	
     # The orchestrator invokes run_bundle_analysis.py with --purge-view both,
     # producing results/bundle_analysis/all/... and results/bundle_analysis/used/...
     # for downstream governance comparisons.
