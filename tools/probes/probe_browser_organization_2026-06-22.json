@@ -1,153 +1,328 @@
 [
   {
-  "doc_is_family": false,
-  "errors": [],
-  "filter_probe": {
-    "Filter_param": {
-      "HasValue": false,
-      "StorageType_int": 0
-    },
-    "filter_related_methods": [
-      "AreFiltersSatisfied"
-    ]
-  },
-  "folder_trees": {
-    "schedules": {
-      "eid": 266872,
-      "items": [
-        {
-          "eid_int": 4261,
-          "element_name": "View Classification",
-          "element_type": "ParameterElement",
-          "kind": "element",
-          "name": "???",
-          "skip": false,
-          "subtree": {
-            "eid": 4261,
-            "items": [
-              {
-                "eid_int": 4261,
-                "element_name": "View Classification",
-                "element_type": "ParameterElement",
-                "kind": "element",
-                "name": "???",
-                "skip": false
-              }
-            ]
-          }
-        }
+    "doc_is_family": false,
+    "errors": [],
+    "filter_probe": {
+      "Filter_param": {
+        "HasValue": false,
+        "StorageType_int": 0
+      },
+      "filter_related_methods": [
+        "AreFiltersSatisfied"
       ]
     },
-    "sheets": {
-      "eid": 16276,
-      "items": [
-        {
-          "eid_int": 2617,
-          "element_name": "Sheet Classification",
-          "element_type": "ParameterElement",
-          "kind": "element",
-          "name": "???",
-          "skip": false,
-          "subtree": {
-            "eid": 2617,
-            "items": [
+    "folder_trees": {
+      "schedules": {
+        "eid": 266872,
+        "items": [
+          {
+            "definition_built_in_parameter": "-1",
+            "definition_name": "View Classification",
+            "definition_type": "InternalDefinition",
+            "display_name": "View Classification",
+            "display_name_source": "definition_name",
+            "eid_int": 4261,
+            "element_name": "View Classification",
+            "element_type": "ParameterElement",
+            "folder_item_name": "???",
+            "kind": "element",
+            "name_candidates": [
               {
-                "eid_int": 2617,
-                "element_name": "Sheet Classification",
-                "element_type": "ParameterElement",
-                "kind": "element",
-                "name": "???",
-                "skip": false
-              }
-            ]
-          }
-        }
-      ]
-    },
-    "views": {
-      "eid": 16278,
-      "items": [
-        {
-          "bip_int": -1005163,
-          "bip_name": "VIEW_DISCIPLINE",
-          "eid_int": -1005163,
-          "kind": "builtin_parameter",
-          "name": "???"
-        },
-        {
-          "eid_int": 4261,
-          "element_name": "View Classification",
-          "element_type": "ParameterElement",
-          "kind": "element",
-          "name": "???",
-          "skip": false,
-          "subtree": {
-            "eid": 4261,
-            "items": [
-              {
-                "bip_int": -1005163,
-                "bip_name": "VIEW_DISCIPLINE",
-                "eid_int": -1005163,
-                "kind": "builtin_parameter",
-                "name": "???"
+                "source": "definition_name",
+                "value": "View Classification"
               },
               {
-                "eid_int": 4261,
-                "element_name": "View Classification",
-                "element_type": "ParameterElement",
-                "kind": "element",
-                "name": "???",
-                "skip": false
+                "source": "element_name",
+                "value": "View Classification"
+              }
+            ],
+            "skip": false,
+            "subtree": {
+              "eid": 4261,
+              "items": [
+                {
+                  "definition_built_in_parameter": "-1",
+                  "definition_name": "View Classification",
+                  "definition_type": "InternalDefinition",
+                  "display_name": "View Classification",
+                  "display_name_source": "definition_name",
+                  "eid_int": 4261,
+                  "element_name": "View Classification",
+                  "element_type": "ParameterElement",
+                  "folder_item_name": "???",
+                  "kind": "cycle_reference",
+                  "name_candidates": [
+                    {
+                      "source": "definition_name",
+                      "value": "View Classification"
+                    },
+                    {
+                      "source": "element_name",
+                      "value": "View Classification"
+                    }
+                  ],
+                  "skip": true
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "sheets": {
+        "eid": 16276,
+        "items": [
+          {
+            "definition_built_in_parameter": "-1",
+            "definition_name": "Sheet Classification",
+            "definition_type": "InternalDefinition",
+            "display_name": "Sheet Classification",
+            "display_name_source": "definition_name",
+            "eid_int": 2617,
+            "element_name": "Sheet Classification",
+            "element_type": "ParameterElement",
+            "folder_item_name": "???",
+            "kind": "element",
+            "name_candidates": [
+              {
+                "source": "definition_name",
+                "value": "Sheet Classification"
               },
               {
-                "bip_int": -1012106,
-                "bip_name": "VIEW_TYPE",
-                "eid_int": -1012106,
-                "kind": "builtin_parameter",
-                "name": "???"
+                "source": "element_name",
+                "value": "Sheet Classification"
+              }
+            ],
+            "skip": false,
+            "subtree": {
+              "eid": 2617,
+              "items": [
+                {
+                  "definition_built_in_parameter": "-1",
+                  "definition_name": "Sheet Classification",
+                  "definition_type": "InternalDefinition",
+                  "display_name": "Sheet Classification",
+                  "display_name_source": "definition_name",
+                  "eid_int": 2617,
+                  "element_name": "Sheet Classification",
+                  "element_type": "ParameterElement",
+                  "folder_item_name": "???",
+                  "kind": "cycle_reference",
+                  "name_candidates": [
+                    {
+                      "source": "definition_name",
+                      "value": "Sheet Classification"
+                    },
+                    {
+                      "source": "element_name",
+                      "value": "Sheet Classification"
+                    }
+                  ],
+                  "skip": true
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "views": {
+        "eid": 16278,
+        "items": [
+          {
+            "bip_int": -1005163,
+            "bip_label": "Discipline",
+            "bip_name": "VIEW_DISCIPLINE",
+            "display_name": "Discipline",
+            "display_name_source": "bip_label",
+            "eid_int": -1005163,
+            "folder_item_name": "???",
+            "kind": "builtin_parameter",
+            "name_candidates": [
+              {
+                "source": "bip_label",
+                "value": "Discipline"
+              },
+              {
+                "source": "bip_name",
+                "value": "VIEW_DISCIPLINE"
+              }
+            ]
+          },
+          {
+            "definition_built_in_parameter": "-1",
+            "definition_name": "View Classification",
+            "definition_type": "InternalDefinition",
+            "display_name": "View Classification",
+            "display_name_source": "definition_name",
+            "eid_int": 4261,
+            "element_name": "View Classification",
+            "element_type": "ParameterElement",
+            "folder_item_name": "???",
+            "kind": "element",
+            "name_candidates": [
+              {
+                "source": "definition_name",
+                "value": "View Classification"
+              },
+              {
+                "source": "element_name",
+                "value": "View Classification"
+              }
+            ],
+            "skip": false,
+            "subtree": {
+              "eid": 4261,
+              "items": [
+                {
+                  "bip_int": -1005163,
+                  "bip_label": "Discipline",
+                  "bip_name": "VIEW_DISCIPLINE",
+                  "display_name": "Discipline",
+                  "display_name_source": "bip_label",
+                  "eid_int": -1005163,
+                  "folder_item_name": "???",
+                  "kind": "builtin_parameter",
+                  "name_candidates": [
+                    {
+                      "source": "bip_label",
+                      "value": "Discipline"
+                    },
+                    {
+                      "source": "bip_name",
+                      "value": "VIEW_DISCIPLINE"
+                    }
+                  ]
+                },
+                {
+                  "definition_built_in_parameter": "-1",
+                  "definition_name": "View Classification",
+                  "definition_type": "InternalDefinition",
+                  "display_name": "View Classification",
+                  "display_name_source": "definition_name",
+                  "eid_int": 4261,
+                  "element_name": "View Classification",
+                  "element_type": "ParameterElement",
+                  "folder_item_name": "???",
+                  "kind": "cycle_reference",
+                  "name_candidates": [
+                    {
+                      "source": "definition_name",
+                      "value": "View Classification"
+                    },
+                    {
+                      "source": "element_name",
+                      "value": "View Classification"
+                    }
+                  ],
+                  "skip": true
+                },
+                {
+                  "bip_int": -1012106,
+                  "bip_label": "Family and Type",
+                  "bip_name": "VIEW_TYPE",
+                  "display_name": "Family and Type",
+                  "display_name_source": "bip_label",
+                  "eid_int": -1012106,
+                  "folder_item_name": "???",
+                  "kind": "builtin_parameter",
+                  "name_candidates": [
+                    {
+                      "source": "bip_label",
+                      "value": "Family and Type"
+                    },
+                    {
+                      "source": "bip_name",
+                      "value": "VIEW_TYPE"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "bip_int": -1012106,
+            "bip_label": "Family and Type",
+            "bip_name": "VIEW_TYPE",
+            "display_name": "Family and Type",
+            "display_name_source": "bip_label",
+            "eid_int": -1012106,
+            "folder_item_name": "???",
+            "kind": "builtin_parameter",
+            "name_candidates": [
+              {
+                "source": "bip_label",
+                "value": "Family and Type"
+              },
+              {
+                "source": "bip_name",
+                "value": "VIEW_TYPE"
               }
             ]
           }
-        },
-        {
-          "bip_int": -1012106,
-          "bip_name": "VIEW_TYPE",
-          "eid_int": -1012106,
-          "kind": "builtin_parameter",
-          "name": "???"
+        ]
+      }
+    },
+    "imports": {
+      "BrowserOrganization": "ok",
+      "System": "ok"
+    },
+    "name_probe": {
+      "conclusions": [
+        "FolderItemInfo exposes only ElementId and Name; Name returned ??? in the observed template, so canonical names must be resolved from ElementId.",
+        "Name fallback is expected: built-ins resolve through LabelUtils.GetLabelFor/BuiltInParameter, and positive ids resolve through ParameterElement.GetDefinition().Name."
+      ],
+      "folder_item_member_samples": {
+        "Autodesk.Revit.DB.FolderItemInfo": {
+          "clr_methods_name_related": [
+            "get_Name"
+          ],
+          "clr_properties": [
+            "ElementId",
+            "IsValidObject",
+            "Name"
+          ],
+          "python_dir_name_members": [
+            "Name",
+            "get_Name"
+          ]
         }
-      ]
-    }
-  },
-  "imports": {
-    "BrowserOrganization": "ok"
-  },
-  "notes": [
-    "bip_lookup_size: 3628"
-  ],
-  "org_ids": {
-    "schedules": 266872,
-    "sheets": 16276,
-    "views": 16278
-  },
-  "probe": "browser_organization_v6",
-  "sort_by_probe": {
-    "schedules": {
-      "SortingOrder_int": 1,
-      "SortingParameterId_bip_name": "VIEW_NAME",
-      "SortingParameterId_int": -1005112
+      },
+      "folder_item_type_names": [
+        "Autodesk.Revit.DB.FolderItemInfo"
+      ],
+      "reference": "reference/revit_lookup uses Element.Name for elements, Parameter.Definition.Name for parameters, and Definition.Name/BuiltInParameter.ToString() for definitions.",
+      "warning_counts": {
+        "FolderItemInfo.Name returned ??? for -1005163; using bip_label instead.": 2,
+        "FolderItemInfo.Name returned ??? for -1012106; using bip_label instead.": 2,
+        "FolderItemInfo.Name returned ??? for 2617; using definition_name instead.": 2,
+        "FolderItemInfo.Name returned ??? for 4261; using definition_name instead.": 4
+      }
     },
-    "sheets": {
-      "SortingOrder_int": 1,
-      "SortingParameterId_bip_name": "SHEET_NUMBER",
-      "SortingParameterId_int": -1007401
+    "notes": [
+      "bip_lookup_size: 3628"
+    ],
+    "org_ids": {
+      "schedules": 266872,
+      "sheets": 16276,
+      "views": 16278
     },
-    "views": {
-      "SortingOrder_int": 1,
-      "SortingParameterId_bip_name": "VIEW_NAME",
-      "SortingParameterId_int": -1005112
-    }
-  },
-  "status": "ok"
-}
+    "probe": "browser_organization_v8",
+    "sort_by_probe": {
+      "schedules": {
+        "SortingOrder_int": 1,
+        "SortingParameterId_bip_name": "VIEW_NAME",
+        "SortingParameterId_int": -1005112
+      },
+      "sheets": {
+        "SortingOrder_int": 1,
+        "SortingParameterId_bip_name": "SHEET_NUMBER",
+        "SortingParameterId_int": -1007401
+      },
+      "views": {
+        "SortingOrder_int": 1,
+        "SortingParameterId_bip_name": "VIEW_NAME",
+        "SortingParameterId_int": -1005112
+      }
+    },
+    "status": "ok"
+  }
 ]
