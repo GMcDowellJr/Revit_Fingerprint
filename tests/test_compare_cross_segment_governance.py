@@ -1098,6 +1098,43 @@ def test_mean_file_pair_matrix_adds_synthetic_diagonal_cells():
     assert diagonal["self_comparison"] == "true"
 
 
+def test_mean_file_pair_diagonals_limited_to_project_observed_domains():
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    summary = [
+        {"governance_role_a": "Project", "governance_role_b": "Project", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d1", "all_jaccard_mean": "0.250000"},
+        {"governance_role_a": "Project", "governance_role_b": "Project", "segment_label_a": "Project C", "segment_label_b": "Project D", "domain": "d2", "all_jaccard_mean": "0.500000"},
+    ]
+
+    matrices, _, _ = build_explicit_matrix_outputs(summary, [], [], "2026-06-22T00:00:00Z")
+    rows = matrices["project_mean_file_pair_jaccard_matrix.csv"]
+
+    assert [r for r in rows if r["row_id"] == "Project A" and r["column_id"] == "Project A" and r["domain"] == "d1"]
+    assert not [r for r in rows if r["row_id"] == "Project A" and r["column_id"] == "Project A" and r["domain"] == "d2"]
+    assert [r for r in rows if r["row_id"] == "Project C" and r["column_id"] == "Project C" and r["domain"] == "d2"]
+    assert not [r for r in rows if r["row_id"] == "Project C" and r["column_id"] == "Project C" and r["domain"] == "d1"]
+
+
+def test_mean_file_pair_matrix_emits_symmetric_cells():
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    summary = [{
+        "governance_role_a": "Project",
+        "governance_role_b": "Project",
+        "segment_label_a": "Project A",
+        "segment_label_b": "Project B",
+        "domain": "d",
+        "all_jaccard_mean": "0.250000",
+    }]
+
+    matrices, _, _ = build_explicit_matrix_outputs(summary, [], [], "2026-06-22T00:00:00Z")
+    rows = matrices["project_mean_file_pair_jaccard_matrix.csv"]
+
+    forward = [r for r in rows if r["row_id"] == "Project A" and r["column_id"] == "Project B" and r["domain"] == "ALL_DOMAINS"][0]
+    reverse = [r for r in rows if r["row_id"] == "Project B" and r["column_id"] == "Project A" and r["domain"] == "ALL_DOMAINS"][0]
+    assert forward["value"] == reverse["value"] == "0.250000"
+
+
 def test_missing_union_inventory_blocks_union_matrix_with_explicit_status():
     from compare_cross_segment import build_explicit_matrix_outputs
 

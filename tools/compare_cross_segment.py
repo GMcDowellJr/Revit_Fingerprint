@@ -2695,7 +2695,7 @@ def build_explicit_matrix_outputs(
     project_summary = [r for r in summary_rows if _role_key(r.get("governance_role_a", "")) == "project" and _role_key(r.get("governance_role_b", "")) == "project"]
     file_pair_values: Dict[Tuple[str, str, str], List[Tuple[str, float]]] = defaultdict(list)
     file_pair_ids_by_view: Dict[str, Set[str]] = defaultdict(set)
-    file_pair_domains_by_view: Dict[str, Set[str]] = defaultdict(set)
+    file_pair_domains_by_id_view: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
     for r in sorted(project_summary, key=lambda x: (
         x.get("segment_label_a") or x.get("segment_id_a", ""),
         x.get("segment_label_b") or x.get("segment_id_b", ""),
@@ -2705,14 +2705,22 @@ def build_explicit_matrix_outputs(
         col_id = r.get("segment_label_b") or r.get("segment_id_b", "")
         for view, col in [("all", "all_jaccard_mean"), ("used", "used_jaccard_mean")]:
             raw = r.get(col, "")
+            value = float(raw) if raw else None
+            status = "ok" if raw else "unavailable"
             add_matrix("project_mean_file_pair_jaccard_matrix.csv", row_id, col_id, view, r.get("domain", ""),
-                       "mean_file_pair_jaccard", float(raw) if raw else None, "ok" if raw else "unavailable",
+                       "mean_file_pair_jaccard", value, status,
                        "Mean of pairwise file Jaccard comparisons; answers whether individual files are typically similar across groups.")
+            if row_id != col_id:
+                add_matrix("project_mean_file_pair_jaccard_matrix.csv", col_id, row_id, view, r.get("domain", ""),
+                           "mean_file_pair_jaccard", value, status,
+                           "Symmetric mean file-pair Jaccard cell mirrored from the observed unordered project pair.")
             if raw:
-                file_pair_values[(row_id, col_id, view)].append((r.get("domain", ""), float(raw)))
+                for a_id, b_id in [(row_id, col_id), (col_id, row_id)]:
+                    file_pair_values[(a_id, b_id, view)].append((r.get("domain", ""), float(raw)))
                 file_pair_ids_by_view[view].update([row_id, col_id])
                 if r.get("domain", ""):
-                    file_pair_domains_by_view[view].add(r.get("domain", ""))
+                    file_pair_domains_by_id_view[(row_id, view)].add(r.get("domain", ""))
+                    file_pair_domains_by_id_view[(col_id, view)].add(r.get("domain", ""))
     for (row_id, col_id, view), values in sorted(file_pair_values.items()):
         if values:
             aggregate = sum(v for _domain, v in sorted(values)) / len(values)
@@ -2725,7 +2733,8 @@ def build_explicit_matrix_outputs(
     }
     for view, ids in sorted(file_pair_ids_by_view.items()):
         for row_id in sorted(ids):
-            for domain in sorted(file_pair_domains_by_view.get(view, set()) | {"ALL_DOMAINS"}):
+            observed_domains = file_pair_domains_by_id_view.get((row_id, view), set())
+            for domain in sorted(observed_domains | ({"ALL_DOMAINS"} if observed_domains else set())):
                 key = (row_id, row_id, view, domain)
                 if key in existing_pair_keys:
                     continue
