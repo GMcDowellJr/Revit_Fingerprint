@@ -1190,6 +1190,22 @@ def run_orchestrator(args: argparse.Namespace) -> int:
     n_failed = counters["failed"]
     failed_ids = counters["failed_ids"]
 
+    results_registry_failed = False
+    try:
+        rows_written = write_results_registry(
+            manifest_file=manifest_file,
+            registry_file=registry_file,
+            output_file=results_registry_file,
+        )
+        print(
+            f"[orchestrator] results_registry written to {results_registry_file} "
+            f"({rows_written} row(s))",
+            flush=True,
+        )
+    except Exception as exc:
+        results_registry_failed = True
+        print(f"[WARN orchestrator] results_registry write failed: {exc}", flush=True)
+
     # ── Final summary ─────────────────────────────────────────────────────────
     # Count non-bundle rows as additional skips
     non_bundle = [r for r in registry if r.get("run_type", "").strip() not in {"bundle", "reference"}]
@@ -1231,7 +1247,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         except Exception as _sum_exc:
             print(f"[WARN orchestrator] run_summary write failed: {_sum_exc}", flush=True)
 
-    return 1 if n_failed > 0 else 0
+    return 1 if n_failed > 0 or results_registry_failed else 0
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
