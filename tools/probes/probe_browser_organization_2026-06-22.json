@@ -1,0 +1,153 @@
+[
+  {
+  "doc_is_family": false,
+  "errors": [],
+  "filter_probe": {
+    "Filter_param": {
+      "HasValue": false,
+      "StorageType_int": 0
+    },
+    "filter_related_methods": [
+      "AreFiltersSatisfied"
+    ]
+  },
+  "folder_trees": {
+    "schedules": {
+      "eid": 266872,
+      "items": [
+        {
+          "eid_int": 4261,
+          "element_name": "View Classification",
+          "element_type": "ParameterElement",
+          "kind": "element",
+          "name": "???",
+          "skip": false,
+          "subtree": {
+            "eid": 4261,
+            "items": [
+              {
+                "eid_int": 4261,
+                "element_name": "View Classification",
+                "element_type": "ParameterElement",
+                "kind": "element",
+                "name": "???",
+                "skip": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "sheets": {
+      "eid": 16276,
+      "items": [
+        {
+          "eid_int": 2617,
+          "element_name": "Sheet Classification",
+          "element_type": "ParameterElement",
+          "kind": "element",
+          "name": "???",
+          "skip": false,
+          "subtree": {
+            "eid": 2617,
+            "items": [
+              {
+                "eid_int": 2617,
+                "element_name": "Sheet Classification",
+                "element_type": "ParameterElement",
+                "kind": "element",
+                "name": "???",
+                "skip": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "views": {
+      "eid": 16278,
+      "items": [
+        {
+          "bip_int": -1005163,
+          "bip_name": "VIEW_DISCIPLINE",
+          "eid_int": -1005163,
+          "kind": "builtin_parameter",
+          "name": "???"
+        },
+        {
+          "eid_int": 4261,
+          "element_name": "View Classification",
+          "element_type": "ParameterElement",
+          "kind": "element",
+          "name": "???",
+          "skip": false,
+          "subtree": {
+            "eid": 4261,
+            "items": [
+              {
+                "bip_int": -1005163,
+                "bip_name": "VIEW_DISCIPLINE",
+                "eid_int": -1005163,
+                "kind": "builtin_parameter",
+                "name": "???"
+              },
+              {
+                "eid_int": 4261,
+                "element_name": "View Classification",
+                "element_type": "ParameterElement",
+                "kind": "element",
+                "name": "???",
+                "skip": false
+              },
+              {
+                "bip_int": -1012106,
+                "bip_name": "VIEW_TYPE",
+                "eid_int": -1012106,
+                "kind": "builtin_parameter",
+                "name": "???"
+              }
+            ]
+          }
+        },
+        {
+          "bip_int": -1012106,
+          "bip_name": "VIEW_TYPE",
+          "eid_int": -1012106,
+          "kind": "builtin_parameter",
+          "name": "???"
+        }
+      ]
+    }
+  },
+  "imports": {
+    "BrowserOrganization": "ok"
+  },
+  "notes": [
+    "bip_lookup_size: 3628"
+  ],
+  "org_ids": {
+    "schedules": 266872,
+    "sheets": 16276,
+    "views": 16278
+  },
+  "probe": "browser_organization_v6",
+  "sort_by_probe": {
+    "schedules": {
+      "SortingOrder_int": 1,
+      "SortingParameterId_bip_name": "VIEW_NAME",
+      "SortingParameterId_int": -1005112
+    },
+    "sheets": {
+      "SortingOrder_int": 1,
+      "SortingParameterId_bip_name": "SHEET_NUMBER",
+      "SortingParameterId_int": -1007401
+    },
+    "views": {
+      "SortingOrder_int": 1,
+      "SortingParameterId_bip_name": "VIEW_NAME",
+      "SortingParameterId_int": -1005112
+    }
+  },
+  "status": "ok"
+}
+]
