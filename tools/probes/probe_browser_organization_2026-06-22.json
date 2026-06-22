@@ -41,10 +41,26 @@
               "eid": 4261,
               "items": [
                 {
+                  "definition_built_in_parameter": "-1",
+                  "definition_name": "View Classification",
+                  "definition_type": "InternalDefinition",
+                  "display_name": "View Classification",
+                  "display_name_source": "definition_name",
                   "eid_int": 4261,
+                  "element_name": "View Classification",
+                  "element_type": "ParameterElement",
                   "folder_item_name": "???",
                   "kind": "cycle_reference",
-                  "name_candidates": [],
+                  "name_candidates": [
+                    {
+                      "source": "definition_name",
+                      "value": "View Classification"
+                    },
+                    {
+                      "source": "element_name",
+                      "value": "View Classification"
+                    }
+                  ],
                   "skip": true
                 }
               ]
@@ -81,10 +97,26 @@
               "eid": 2617,
               "items": [
                 {
+                  "definition_built_in_parameter": "-1",
+                  "definition_name": "Sheet Classification",
+                  "definition_type": "InternalDefinition",
+                  "display_name": "Sheet Classification",
+                  "display_name_source": "definition_name",
                   "eid_int": 2617,
+                  "element_name": "Sheet Classification",
+                  "element_type": "ParameterElement",
                   "folder_item_name": "???",
                   "kind": "cycle_reference",
-                  "name_candidates": [],
+                  "name_candidates": [
+                    {
+                      "source": "definition_name",
+                      "value": "Sheet Classification"
+                    },
+                    {
+                      "source": "element_name",
+                      "value": "Sheet Classification"
+                    }
+                  ],
                   "skip": true
                 }
               ]
@@ -161,10 +193,26 @@
                   ]
                 },
                 {
+                  "definition_built_in_parameter": "-1",
+                  "definition_name": "View Classification",
+                  "definition_type": "InternalDefinition",
+                  "display_name": "View Classification",
+                  "display_name_source": "definition_name",
                   "eid_int": 4261,
+                  "element_name": "View Classification",
+                  "element_type": "ParameterElement",
                   "folder_item_name": "???",
                   "kind": "cycle_reference",
-                  "name_candidates": [],
+                  "name_candidates": [
+                    {
+                      "source": "definition_name",
+                      "value": "View Classification"
+                    },
+                    {
+                      "source": "element_name",
+                      "value": "View Classification"
+                    }
+                  ],
                   "skip": true
                 },
                 {
@@ -245,8 +293,8 @@
       "warning_counts": {
         "FolderItemInfo.Name returned ??? for -1005163; using bip_label instead.": 2,
         "FolderItemInfo.Name returned ??? for -1012106; using bip_label instead.": 2,
-        "FolderItemInfo.Name returned ??? for 2617; using definition_name instead.": 1,
-        "FolderItemInfo.Name returned ??? for 4261; using definition_name instead.": 2
+        "FolderItemInfo.Name returned ??? for 2617; using definition_name instead.": 2,
+        "FolderItemInfo.Name returned ??? for 4261; using definition_name instead.": 4
       }
     },
     "notes": [

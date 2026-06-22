@@ -108,7 +108,7 @@ def _builtin_label(bip_value):
         return None
 
 def _best_name(rec, item_name=None):
-    """Pick the most stable display name using the same priority as RevitLookup descriptors."""
+    """Pick display name, preserving real folder names before descriptor fallbacks."""
     candidates = []
     if item_name:
         candidates.append(("folder_item_name", item_name))
@@ -126,18 +126,13 @@ def _best_name(rec, item_name=None):
         for source, value in candidates
         if _clean_name(value)
     ]
-    for candidate in rec["name_candidates"]:
-        source = candidate["source"]
-        value = candidate["value"]
-        # FolderItemInfo.Name has been observed as "???"; prefer actual API
-        # descriptors over it unless it is the only usable value.
-        if source != "folder_item_name":
-            rec["display_name"] = value
-            rec["display_name_source"] = source
-            return
     if rec["name_candidates"]:
-        rec["display_name"] = rec["name_candidates"][0]["value"]
-        rec["display_name_source"] = rec["name_candidates"][0]["source"]
+        # FolderItemInfo.Name is the actual folder label when Revit provides a
+        # real value. Only fall back to the grouping parameter descriptor when
+        # FolderItemInfo.Name is missing/placeholder (for example "???").
+        first = rec["name_candidates"][0]
+        rec["display_name"] = first["value"]
+        rec["display_name_source"] = first["source"]
 
 def _record_name_warning(eid_int, source):
     key = "FolderItemInfo.Name returned ??? for {}; using {} instead.".format(
@@ -148,13 +143,10 @@ def _record_name_warning(eid_int, source):
 def _resolve_folder_item(item_eid_int, org_id_int, current_seed_eid_int, doc, bip_lookup):
     """Classify and resolve a FolderItemInfo.ElementId."""
     rec = {"eid_int": item_eid_int}
-    if item_eid_int == current_seed_eid_int:
-        rec["kind"] = "cycle_reference"
-        rec["skip"] = True
-    elif item_eid_int == org_id_int:
-        rec["kind"] = "self_reference"
-        rec["skip"] = True
-    elif item_eid_int < 0:
+    is_cycle_reference = item_eid_int == current_seed_eid_int
+    is_self_reference = item_eid_int == org_id_int and not is_cycle_reference
+
+    if item_eid_int < 0:
         rec["kind"] = "builtin_parameter"
         rec["bip_int"] = item_eid_int
         rec["bip_name"] = bip_lookup.get(item_eid_int, "UNKNOWN")
@@ -181,6 +173,13 @@ def _resolve_folder_item(item_eid_int, org_id_int, current_seed_eid_int, doc, bi
                 rec["element_type"] = "null"
         except Exception as e:
             rec["element_resolve_error"] = str(e)
+
+    if is_cycle_reference:
+        rec["kind"] = "cycle_reference"
+        rec["skip"] = True
+    elif is_self_reference:
+        rec["kind"] = "self_reference"
+        rec["skip"] = True
     return rec
 
 def _record_folder_item_shape(item):
