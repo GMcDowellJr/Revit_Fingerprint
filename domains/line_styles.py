@@ -63,6 +63,62 @@ except ImportError:
     GraphicsStyleType = None
     ElementId = None
 
+
+_LINE_PATTERN_SEG_KIND_NAME = {0: "Dash", 1: "Space", 2: "Dot"}
+
+
+def _line_pattern_segment_kind_id(seg):
+    try:
+        if hasattr(seg, "Type"):
+            return int(getattr(seg, "Type", None))
+    except Exception:
+        pass
+    try:
+        if hasattr(seg, "SegmentType"):
+            return int(getattr(seg, "SegmentType", None))
+    except Exception:
+        pass
+    return None
+
+
+def _line_pattern_synopsis_from_segments(segments):
+    if segments is None:
+        return None, ITEM_Q_UNREADABLE
+    try:
+        kind_names = []
+        for seg in segments:
+            kind_id = _line_pattern_segment_kind_id(seg)
+            if kind_id is None:
+                return "{} seg".format(len(segments)), ITEM_Q_OK
+            kind_names.append(_LINE_PATTERN_SEG_KIND_NAME.get(kind_id, "k{}".format(kind_id)))
+        if not kind_names:
+            return "0 seg", ITEM_Q_OK
+        pattern_str = "-".join(kind_names)
+        if len(pattern_str) > 40:
+            return "{} seg".format(len(kind_names)), ITEM_Q_OK
+        return "{} | {} seg".format(pattern_str, len(kind_names)), ITEM_Q_OK
+    except Exception:
+        return None, ITEM_Q_UNREADABLE
+
+
+def _line_pattern_synopsis_from_element(lp_elem):
+    if lp_elem is None:
+        return None, ITEM_Q_MISSING
+    try:
+        lp = lp_elem.GetLinePattern()
+    except Exception:
+        lp = None
+    if lp is None:
+        return None, ITEM_Q_UNREADABLE
+    try:
+        if hasattr(lp, "GetSegments"):
+            segments = list(lp.GetSegments() or [])
+        else:
+            segments = list(getattr(lp, "Segments", None) or [])
+    except Exception:
+        return None, ITEM_Q_UNREADABLE
+    return _line_pattern_synopsis_from_segments(segments)
+
 LINE_STYLE_SEMANTIC_KEYS = sorted([
     "line_style.pattern_ref.kind",
     "line_style.pattern_ref.sig_hash",
@@ -106,6 +162,8 @@ def extract(doc, ctx=None):
     # Dependency map: LinePatternElement.UniqueId -> line_patterns record.v2 sig_hash
     lp_uid_to_sig_hash_v2 = None
     lp_id_to_value = {}
+    lp_uid_to_synopsis = {}
+    lp_id_to_synopsis = {}
     lp_special_values = {}
     try:
         lp_uid_to_sig_hash_v2 = (ctx or {}).get("line_pattern_uid_to_hash", None) if ctx is not None else None
@@ -119,6 +177,18 @@ def extract(doc, ctx=None):
             lp_id_to_value = {}
     except Exception:
         lp_id_to_value = {}
+    try:
+        lp_uid_to_synopsis = (ctx or {}).get("line_pattern_uid_to_synopsis", {}) if ctx is not None else {}
+        if not isinstance(lp_uid_to_synopsis, dict):
+            lp_uid_to_synopsis = {}
+    except Exception:
+        lp_uid_to_synopsis = {}
+    try:
+        lp_id_to_synopsis = (ctx or {}).get("line_pattern_id_to_synopsis", {}) if ctx is not None else {}
+        if not isinstance(lp_id_to_synopsis, dict):
+            lp_id_to_synopsis = {}
+    except Exception:
+        lp_id_to_synopsis = {}
     try:
         lp_special_values = (ctx or {}).get("line_pattern_special_values", {}) if ctx is not None else {}
         if not isinstance(lp_special_values, dict):
@@ -213,6 +283,8 @@ def extract(doc, ctx=None):
             lp_kind_v = None
             lp_sig_hash_v = None
             lp_sig_hash_q = ITEM_Q_MISSING
+            lp_synopsis_v = None
+            lp_synopsis_q = ITEM_Q_MISSING
 
             lp_id = None
             try:
@@ -254,11 +326,14 @@ def extract(doc, ctx=None):
             if is_solid:
                 lp_kind_v = "solid"
                 lp_sig_hash_v, lp_sig_hash_q = canonicalize_str(lp_special_values.get("solid", None))
+                lp_synopsis_v, lp_synopsis_q = canonicalize_str("[solid]")
             else:
                 lp_kind_v = "ref"
                 pid_key = safe_str(getattr(lp_id, "IntegerValue", ""))
                 if pid_key in lp_id_to_value:
                     lp_sig_hash_v, lp_sig_hash_q = canonicalize_str(lp_id_to_value.get(pid_key))
+                if pid_key in lp_id_to_synopsis:
+                    lp_synopsis_v, lp_synopsis_q = canonicalize_str(lp_id_to_synopsis.get(pid_key))
                 elif lp_uid_to_sig_hash_v2 is None:
                     status_v2 = STATUS_DEGRADED
                     status_reasons.append("dependency_missing_line_patterns_v2_sig_hash")
@@ -270,6 +345,8 @@ def extract(doc, ctx=None):
 
                     if lp_uid:
                         lp_sig_hash_v = lp_uid_to_sig_hash_v2.get(lp_uid, None)
+                        if lp_uid in lp_uid_to_synopsis:
+                            lp_synopsis_v, lp_synopsis_q = canonicalize_str(lp_uid_to_synopsis.get(lp_uid))
                         if lp_sig_hash_v:
                             lp_sig_hash_q = ITEM_Q_OK
                         else:
@@ -279,6 +356,9 @@ def extract(doc, ctx=None):
                         # If we have an element but it has no UID, that's unusual; degrade explicitly.
                         status_v2 = STATUS_DEGRADED
                         status_reasons.append("line_pattern_uid_missing")
+
+            if lp_synopsis_q != ITEM_Q_OK and lp_elem is not None:
+                lp_synopsis_v, lp_synopsis_q = _line_pattern_synopsis_from_element(lp_elem)
 
             # kind always present (stable surface)
             kind_v, kind_q = canonicalize_str(lp_kind_v)
@@ -349,6 +429,7 @@ def extract(doc, ctx=None):
             # No heuristics; these are emitted for empirical clustering and attribute stability analysis.
             p2_cosmetic = []
             p2_unknown = []
+            p2_coordination = []
 
             # color is cosmetic (visual only; excluded from join-key candidates)
             rgb_p2_v, rgb_p2_q = phase2_qv_from_legacy_sentinel_str(rgb_sig, allow_empty=False)
@@ -359,6 +440,8 @@ def extract(doc, ctx=None):
 
             # cut weight is not surfaced for line styles; keep explicit as unknown partition for analysis.
             # p2_unknown.append(make_identity_item("line_style.weight.cut", wcut_v, wcut_q))
+
+            p2_coordination.append(make_identity_item("line_style.pattern_ref.synopsis", lp_synopsis_v, lp_synopsis_q))
 
             # Traceability fields (metadata only — never in hash/sig/join)
             try:
@@ -380,7 +463,7 @@ def extract(doc, ctx=None):
                 # Semantic selector references canonical identity_basis.items.
                 # Deprecated direction: semantic_items should not duplicate canonical evidence.
                 "cosmetic_items": phase2_sorted_items(p2_cosmetic),
-                "coordination_items": phase2_sorted_items([]),
+                "coordination_items": phase2_sorted_items(p2_coordination),
                 "unknown_items": phase2_sorted_items(p2_unknown),
             }
             rec_v2["sig_basis"] = {

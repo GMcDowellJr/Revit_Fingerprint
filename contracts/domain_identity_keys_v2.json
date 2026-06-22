@@ -331,7 +331,8 @@
       "allowed_keys": [
         "fill_pattern.target",
         "fill_pattern.grid_count",
-        "fill_pattern.grids_def_hash"
+        "fill_pattern.grids_def_hash",
+        "fill_pattern.is_import"
       ],
       "allowed_key_prefixes": [
         "fill_pattern.grid["
@@ -357,7 +358,8 @@
       "allowed_keys": [
         "fill_pattern.target",
         "fill_pattern.grid_count",
-        "fill_pattern.grids_def_hash"
+        "fill_pattern.grids_def_hash",
+        "fill_pattern.is_import"
       ],
       "allowed_key_prefixes": [
         "fill_pattern.grid["
@@ -463,7 +465,8 @@
         "line_style.weight.projection",
         "line_style.color.rgb",
         "line_style.weight.cut",
-        "line_style.pattern_ref.sig_hash"
+        "line_style.pattern_ref.sig_hash",
+        "line_style.pattern_ref.synopsis"
       ],
       "required_keys": [
         "line_style.weight.projection",

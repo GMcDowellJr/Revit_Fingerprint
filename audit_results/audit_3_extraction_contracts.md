@@ -244,50 +244,40 @@ not for `FilterInverseRule`.
 
 ### I5 — fill_patterns is_import flag
 
-**Status: NOT IMPLEMENTED.**
+**Status: IMPLEMENTED (deferred until next Dynamo re-extraction).**
 
-Contract (`contracts/domain_identity_keys_v2.json:329-379`, both
-`fill_patterns_drafting` and `fill_patterns_model`): `allowed_keys` is
-`["fill_pattern.target", "fill_pattern.grid_count", "fill_pattern.grids_def_hash"]`
-plus the `fill_pattern.grid[` prefix — no import/source field.
+Contract (`contracts/domain_identity_keys_v2.json`, both
+`fill_patterns_drafting` and `fill_patterns_model`): `allowed_keys` now
+includes `fill_pattern.is_import` alongside target, grid count, and grid
+definition hash fields, plus the `fill_pattern.grid[` prefix.
 
-Extractor (`domains/fill_patterns.py`, both `extract_drafting` lines 84-963
-and `extract_model` lines 965-1844, which are structurally identical): the
-`_phase2_build_phase2()` payload builder (lines 357-551 / 1238-1432)
-constructs `semantic`, `cosmetic`, `coordination`, and `unknown` item
-buckets — the only coordination item is `fill_pattern.is_solid` (lines
-393-394 / 1274-1275). No reference anywhere to `is_import`,
-`IsSourceFile`, `FillPatternSource`, `from_file`, `origin`, or any field
-distinguishing PAT-file-imported patterns from dialog-defined ones.
+Extractor (`domains/fill_patterns.py`, both `extract_drafting`
+and `extract_model`): the `_phase2_build_phase2()` payload builder constructs
+`semantic`, `cosmetic`, `coordination`, and `unknown` item buckets. The extractor now emits `fill_pattern.is_import` as a coordination
+item for both drafting and model fill patterns, using any direct API flag that
+is exposed and otherwise falling back to common PAT-style name/category
+heuristics. Existing materialized corpora require the next Dynamo
+re-extraction cycle to populate this field.
 
 ### I6 — line_styles pattern synopsis as coordination_item
 
-**Status: NOT IMPLEMENTED.**
+**Status: IMPLEMENTED (deferred until next Dynamo re-extraction).**
 
-Contract (`contracts/domain_identity_keys_v2.json:460-475`): `allowed_keys`
-is `["line_style.weight.projection", "line_style.color.rgb", "line_style.weight.cut", "line_style.pattern_ref.sig_hash"]`
-— only a raw sig_hash reference, no synopsis field.
+Contract (`contracts/domain_identity_keys_v2.json`): `allowed_keys` now
+includes `line_style.pattern_ref.synopsis` alongside the existing projection
+weight, color, cut-weight, and pattern sig-hash fields.
 
-Extractor (`domains/line_styles.py:212-297`): pattern reference resolution
-reads only `pattern_ref.kind` ("solid"/"ref") and `pattern_ref.sig_hash`
-(resolved via `lp_uid_to_sig_hash_v2` lookup) — it never reads the
-referenced line pattern element's name or segment sequence to build a
-synopsis. Confirmed by the phase2 payload at line 383:
+Extractor (`domains/line_styles.py`): pattern reference resolution still
+records `pattern_ref.kind` ("solid"/"ref") and `pattern_ref.sig_hash`, and now
+also resolves a human-readable segment-sequence synopsis for the referenced
+line pattern.
 
-```python
-rec_v2["phase2"] = {
-    "schema": "phase2.line_styles.v1",
-    "grouping_basis": "phase2.hypothesis",
-    "cosmetic_items": phase2_sorted_items(p2_cosmetic),
-    "coordination_items": phase2_sorted_items([]),  # always empty
-    "unknown_items": phase2_sorted_items(p2_unknown),
-}
-```
-
-`coordination_items` is hard-coded to an empty list — the long-term
-"Option B" approach (emitting a resolved synopsis as a coordination_item
-at extraction time, instead of doing a runtime cross-domain join in
-`build_semantic_groups.py`) has not been implemented.
+`coordination_items` now emits `line_style.pattern_ref.synopsis` at extraction
+time. The extractor prefers context-provided line pattern synopsis maps when
+available and falls back to reading the referenced pattern element's segment
+sequence directly, preserving the "Option B" approach instead of relying on a
+runtime cross-domain join. Existing materialized corpora require the next
+Dynamo re-extraction cycle to populate this field.
 
 ### migrate_materials_identity_items.py
 

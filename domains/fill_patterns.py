@@ -3,6 +3,7 @@
 """Fill Patterns domain family extractor."""
 
 import os
+import re
 import sys
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -18,6 +19,7 @@ from core.record_v2 import (
     STATUS_OK,
     STATUS_BLOCKED,
     ITEM_Q_OK,
+    ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
     canonicalize_str,
     canonicalize_int,
@@ -44,6 +46,47 @@ CTX_FILL_PATTERN_ID_TO_VALUE = "fill_pattern_id_to_value"
 CTX_FILL_PATTERN_SPECIAL_VALUES = "fill_pattern_special_values"
 FILL_PATTERN_SYMBOLIC_NO_PATTERN = "<No Pattern>"
 FILL_PATTERN_SYMBOLIC_SOLID = "<" + "Solid>"
+
+_FILL_PATTERN_IMPORT_NAME_RE = re.compile(r"^(?:AR|ANSI|ISO|IMPORT)[-_ ]", re.IGNORECASE)
+_FILL_PATTERN_IMPORT_CATEGORY_MARKERS = ("IMPORT", "IMPORTED")
+
+
+def _phase2_fill_pattern_is_import(elem, name):
+    """Best-effort PAT-import flag for FillPatternElement extraction."""
+    direct_attrs = (
+        "IsImported",
+        "IsImport",
+        "Imported",
+        "FromFile",
+        "IsFromFile",
+        "IsExternal",
+        "IsFromExternalResource",
+    )
+    for attr in direct_attrs:
+        try:
+            if hasattr(elem, attr):
+                v = getattr(elem, attr)
+                if callable(v):
+                    v = v()
+                return bool(v), ITEM_Q_OK
+        except Exception:
+            continue
+
+    try:
+        cat = getattr(elem, "Category", None)
+        cat_name = safe_str(getattr(cat, "Name", "")).upper() if cat is not None else ""
+        if any(marker in cat_name for marker in _FILL_PATTERN_IMPORT_CATEGORY_MARKERS):
+            return True, ITEM_Q_OK
+    except Exception:
+        pass
+
+    try:
+        nm = safe_str(name).strip()
+        if nm:
+            return bool(_FILL_PATTERN_IMPORT_NAME_RE.match(nm)), ITEM_Q_OK
+        return None, ITEM_Q_MISSING
+    except Exception:
+        return None, ITEM_Q_UNREADABLE
 
 
 def _export_fill_pattern_ctx(ctx, uid_to_hash_v2, id_to_value):
@@ -392,6 +435,7 @@ def extract_drafting(doc, ctx=None):
             _phase2_add_int(semantic, "fill_pattern.grid_count", None, unreadable=True)
             # is_solid in coordination only (filter criterion, not identity)
             _phase2_add_bool(coordination, "fill_pattern.is_solid", None, unreadable=True)
+            coordination.append(make_identity_item("fill_pattern.is_import", None, ITEM_Q_UNREADABLE))
         else:
             # is_solid goes to coordination_items only — it is a filter criterion, not identity
             try:
@@ -400,6 +444,9 @@ def extract_drafting(doc, ctx=None):
                 _phase2_add_bool(coordination, "fill_pattern.is_solid", None, unreadable=True)
             else:
                 _phase2_add_bool(coordination, "fill_pattern.is_solid", bool(is_solid))
+
+            is_import_v, is_import_q = _phase2_fill_pattern_is_import(elem, name)
+            coordination.append(make_identity_item("fill_pattern.is_import", is_import_v, is_import_q))
 
             # grid_count
             try:
@@ -1273,6 +1320,7 @@ def extract_model(doc, ctx=None):
             _phase2_add_int(semantic, "fill_pattern.grid_count", None, unreadable=True)
             # is_solid in coordination only (filter criterion, not identity)
             _phase2_add_bool(coordination, "fill_pattern.is_solid", None, unreadable=True)
+            coordination.append(make_identity_item("fill_pattern.is_import", None, ITEM_Q_UNREADABLE))
         else:
             # is_solid goes to coordination_items only — it is a filter criterion, not identity
             try:
@@ -1281,6 +1329,9 @@ def extract_model(doc, ctx=None):
                 _phase2_add_bool(coordination, "fill_pattern.is_solid", None, unreadable=True)
             else:
                 _phase2_add_bool(coordination, "fill_pattern.is_solid", bool(is_solid))
+
+            is_import_v, is_import_q = _phase2_fill_pattern_is_import(elem, name)
+            coordination.append(make_identity_item("fill_pattern.is_import", is_import_v, is_import_q))
 
             # grid_count
             try:
