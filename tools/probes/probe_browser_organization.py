@@ -1,7 +1,7 @@
 import json
 import traceback
 
-# probe_browser_organization_v6
+# probe_browser_organization_v7
 # Run against the TEMPLATE file (not a project file).
 # The template should have "Discipline - View Classification" active.
 #
@@ -11,6 +11,9 @@ import traceback
 #   3. doc.GetElement(positive_eid) resolves to a named shared parameter element
 #   4. Multi-level grouping: GetFolderItems(shared_param_eid) returns next level's items
 #   5. Filter tab data lives somewhere in the org's parameter set
+#   6. FolderItemInfo.Name is not reliable enough for canonical names; compare it
+#      against RevitLookup-style sources (Element.Name, Definition.Name, and
+#      LabelUtils.GetLabelFor for built-ins).
 #
 # Extraction model:
 #   FolderItemInfo.ElementId < 0  → BIP (built-in parameter)
@@ -18,13 +21,19 @@ import traceback
 #   FolderItemInfo.ElementId > 0, != org.Id → shared parameter element
 
 findings = {
-    "probe": "browser_organization_v6",
+    "probe": "browser_organization_v7",
     "status": "ok",
     "imports": {},
     "doc_is_family": None,
     "org_ids": {},
     "folder_trees": {},
     "filter_probe": {},
+    "name_probe": {
+        "reference": "reference/revit_lookup uses Element.Name for elements, Parameter.Definition.Name for parameters, and Definition.Name/BuiltInParameter.ToString() for definitions.",
+        "folder_item_type_names": [],
+        "folder_item_member_samples": {},
+        "warnings": [],
+    },
     "sort_by_probe": {},
     "errors": [],
     "notes": [],
@@ -42,6 +51,87 @@ def _int_enum(val):
     except Exception:
         return None
 
+def _append_unique(seq, value):
+    if value not in seq:
+        seq.append(value)
+
+def _clean_name(value):
+    text = _safe(value)
+    if text in ("", "None", "<error>", "???"):
+        return None
+    return text
+
+def _try_get_definition_record(elem):
+    """Return RevitLookup-style definition name/GUID data for ParameterElement-like values."""
+    rec = {}
+    try:
+        get_definition = getattr(elem, "GetDefinition", None)
+        if get_definition and callable(get_definition):
+            definition = get_definition()
+            if definition is not None:
+                rec["definition_type"] = type(definition).__name__
+                definition_name = _clean_name(getattr(definition, "Name", None))
+                if definition_name:
+                    rec["definition_name"] = definition_name
+                try:
+                    bip = getattr(definition, "BuiltInParameter", None)
+                    if bip is not None:
+                        rec["definition_built_in_parameter"] = _safe(bip)
+                except Exception:
+                    pass
+                try:
+                    guid = getattr(definition, "GUID", None)
+                    if guid:
+                        rec["guid"] = _safe(guid)
+                        rec["is_shared_param"] = True
+                except Exception:
+                    pass
+    except Exception as e:
+        rec["definition_error"] = str(e)
+    return rec
+
+def _builtin_label(bip_value):
+    """Resolve a built-in parameter label when Revit exposes one."""
+    try:
+        from Autodesk.Revit.DB import BuiltInParameter, LabelUtils
+        bip = System.Enum.ToObject(BuiltInParameter, bip_value)
+        label = _clean_name(LabelUtils.GetLabelFor(bip))
+        return label
+    except Exception as e:
+        return None
+
+def _best_name(rec, item_name=None):
+    """Pick the most stable display name using the same priority as RevitLookup descriptors."""
+    candidates = []
+    if item_name:
+        candidates.append(("folder_item_name", item_name))
+    if rec.get("definition_name"):
+        candidates.append(("definition_name", rec["definition_name"]))
+    if rec.get("element_name"):
+        candidates.append(("element_name", rec["element_name"]))
+    if rec.get("bip_label"):
+        candidates.append(("bip_label", rec["bip_label"]))
+    if rec.get("bip_name"):
+        candidates.append(("bip_name", rec["bip_name"]))
+
+    rec["name_candidates"] = [
+        {"source": source, "value": value}
+        for source, value in candidates
+        if _clean_name(value)
+    ]
+    for candidate in rec["name_candidates"]:
+        source = candidate["source"]
+        value = candidate["value"]
+        # FolderItemInfo.Name has been observed as "???"; prefer actual API
+        # descriptors over it unless it is the only usable value.
+        if source != "folder_item_name":
+            rec["display_name"] = value
+            rec["display_name_source"] = source
+            return
+    if rec["name_candidates"]:
+        rec["display_name"] = rec["name_candidates"][0]["value"]
+        rec["display_name_source"] = rec["name_candidates"][0]["source"]
+
 def _resolve_folder_item(item_eid_int, org_id_int, doc, bip_lookup):
     """Classify and resolve a FolderItemInfo.ElementId."""
     rec = {"eid_int": item_eid_int}
@@ -52,6 +142,7 @@ def _resolve_folder_item(item_eid_int, org_id_int, doc, bip_lookup):
         rec["kind"] = "builtin_parameter"
         rec["bip_int"] = item_eid_int
         rec["bip_name"] = bip_lookup.get(item_eid_int, "UNKNOWN")
+        rec["bip_label"] = _builtin_label(item_eid_int)
     else:
         rec["kind"] = "element"
         rec["skip"] = False
@@ -61,17 +152,7 @@ def _resolve_folder_item(item_eid_int, org_id_int, doc, bip_lookup):
             if elem is not None:
                 rec["element_type"] = type(elem).__name__
                 rec["element_name"] = _safe(getattr(elem, "Name", None))
-                # Check if it has a GUID (shared parameter)
-                try:
-                    defn = getattr(elem, "GetDefinition", None)
-                    if defn and callable(defn):
-                        d = defn()
-                        guid = getattr(d, "GUID", None)
-                        if guid:
-                            rec["is_shared_param"] = True
-                            rec["guid"] = _safe(guid)
-                except Exception:
-                    pass
+                rec.update(_try_get_definition_record(elem))
                 # Try direct GUID attribute (InternalDefinition)
                 try:
                     guid = getattr(elem, "GUID", None)
@@ -85,6 +166,35 @@ def _resolve_folder_item(item_eid_int, org_id_int, doc, bip_lookup):
         except Exception as e:
             rec["element_resolve_error"] = str(e)
     return rec
+
+def _record_folder_item_shape(item):
+    """Capture limited reflection data so the next probe can target name APIs precisely."""
+    try:
+        type_name = "{}.{}".format(type(item).__module__, type(item).__name__)
+        _append_unique(findings["name_probe"]["folder_item_type_names"], type_name)
+    except Exception:
+        type_name = "<unknown>"
+
+    if type_name in findings["name_probe"]["folder_item_member_samples"]:
+        return
+
+    sample = {"python_dir_name_members": []}
+    try:
+        sample["python_dir_name_members"] = sorted(
+            [name for name in dir(item) if "name" in name.lower()]
+        )[:25]
+    except Exception:
+        pass
+    try:
+        import clr
+        clr_type = clr.GetClrType(type(item))
+        sample["clr_properties"] = sorted(set(p.Name for p in clr_type.GetProperties()))[:80]
+        sample["clr_methods_name_related"] = sorted(
+            set(m.Name for m in clr_type.GetMethods() if "name" in m.Name.lower())
+        )[:80]
+    except Exception as e:
+        sample["clr_reflect_error"] = str(e)
+    findings["name_probe"]["folder_item_member_samples"][type_name] = sample
 
 
 def _walk_tree(org, org_id_int, doc, bip_lookup, seed_eid_int, depth=0, visited=None):
@@ -103,12 +213,21 @@ def _walk_tree(org, org_id_int, doc, bip_lookup, seed_eid_int, depth=0, visited=
 
     result = {"eid": seed_eid_int, "items": []}
     for item in items[:6]:
+        _record_folder_item_shape(item)
         try:
             eid_int = item.ElementId.IntegerValue
         except Exception:
             continue
         resolved = _resolve_folder_item(eid_int, org_id_int, doc, bip_lookup)
-        resolved["name"] = _safe(item.Name)
+        item_name = _safe(item.Name)
+        resolved["folder_item_name"] = item_name
+        _best_name(resolved, item_name)
+        if item_name == "???" and resolved.get("display_name"):
+            findings["name_probe"]["warnings"].append(
+                "FolderItemInfo.Name returned ??? for {}; using {} instead.".format(
+                    eid_int, resolved.get("display_name_source")
+                )
+            )
 
         # Recurse into non-self, non-BIP, non-visited items
         if not resolved.get("skip") and resolved.get("kind") == "element" and eid_int not in visited:
@@ -139,6 +258,11 @@ try:
         raise RuntimeError("BrowserOrganization import failed")
 
     from Autodesk.Revit.DB import ElementId, BuiltInParameter
+    try:
+        import System
+        findings["imports"]["System"] = "ok"
+    except Exception as e:
+        findings["imports"]["System"] = "FAILED: " + str(e)
 
     # Build a compact BIP reverse lookup from dir() — keyed by int
     # (In the real extractor, use bip_lookup.json instead)
