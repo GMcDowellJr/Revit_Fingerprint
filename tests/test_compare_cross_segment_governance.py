@@ -978,18 +978,42 @@ def test_explicit_matrices_union_jaccard_differs_from_mean_file_pair():
     ]
     summary = [{
         "governance_role_a": "Project", "governance_role_b": "Project",
-        "segment_label_a": "Project|A|Arch|imperial", "segment_label_b": "Project|B|Arch|imperial",
+        "client_label_a": "A", "client_label_b": "B",
+        "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial",
+        "segment_label_a": "Project A", "segment_label_b": "Project B",
         "domain": "d", "all_jaccard_mean": "0.000000", "used_jaccard_mean": "",
     }]
 
     matrices, frag, manifest = build_explicit_matrix_outputs(summary, [], union_rows, "2026-06-22T00:00:00Z")
 
-    union_ab = [r for r in matrices["project_union_jaccard_matrix.csv"] if r["row_id"] == "Project|A|Arch|imperial" and r["column_id"] == "Project|B|Arch|imperial"][0]
+    union_ab = [r for r in matrices["project_union_jaccard_matrix.csv"] if r["row_id"] == "Project A" and r["column_id"] == "Project B"][0]
     pair_ab = matrices["project_mean_file_pair_jaccard_matrix.csv"][0]
     assert union_ab["value"] == "1.000000"
     assert pair_ab["value"] == "0.000000"
     assert frag[0]["fragmentation_diagnostic"] == "1.000000"
+    assert frag[0]["domain"] == "ALL_DOMAINS"
     assert [m["matrix_name"] for m in manifest] == sorted(m["matrix_name"] for m in manifest)
+
+
+def test_fragmentation_diagnostic_uses_all_domains_file_pair_aggregate():
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    union_rows = []
+    for client in ("A", "B"):
+        for domain, hashes in {"d1": ["shared"], "d2": [f"{client}_unique"]}.items():
+            for jh in hashes:
+                union_rows.append({"governance_role": "Project", "client_label": client, "discipline_label": "Arch", "unit_system": "imperial", "domain": domain, "view_scope": "all", "join_hash": jh, "inventory_status": "ok"})
+    summary = [
+        {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d2", "all_jaccard_mean": "0.000000"},
+        {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d1", "all_jaccard_mean": "1.000000"},
+    ]
+
+    matrices, frag, _ = build_explicit_matrix_outputs(summary, [], union_rows, "2026-06-22T00:00:00Z")
+
+    aggregate = [r for r in matrices["project_mean_file_pair_jaccard_matrix.csv"] if r["row_id"] == "Project A" and r["column_id"] == "Project B" and r["domain"] == "ALL_DOMAINS"][0]
+    assert aggregate["value"] == "0.500000"
+    assert frag[0]["domain"] == "ALL_DOMAINS"
+    assert frag[0]["exact_identity_overlap"] == "0.500000"
 
 
 def test_density_similarity_uses_domain_density_vectors_not_containment():

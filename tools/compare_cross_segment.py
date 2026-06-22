@@ -2551,11 +2551,40 @@ def run_pooled_comparison(
 # Explicit matrix/reporting outputs
 # ---------------------------------------------------------------------------
 
+def _matrix_group_id_from_values(
+    role: str,
+    client: str,
+    discipline: str,
+    unit_system: str,
+) -> str:
+    return "|".join([role, client, discipline, unit_system])
+
+
 def _matrix_group_id(row: Dict[str, str]) -> str:
-    return "|".join([
-        row.get("governance_role", ""), row.get("client_label", ""),
-        row.get("discipline_label", ""), row.get("unit_system", ""),
-    ])
+    return _matrix_group_id_from_values(
+        row.get("governance_role", ""),
+        row.get("client_label", ""),
+        row.get("discipline_label", ""),
+        row.get("unit_system", ""),
+    )
+
+
+def _label_by_project_group(summary_rows: List[Dict[str, str]]) -> Dict[str, str]:
+    labels: Dict[str, Set[str]] = defaultdict(set)
+    for row in summary_rows:
+        for suffix in ("a", "b"):
+            if _role_key(row.get(f"governance_role_{suffix}", "")) != "project":
+                continue
+            group_id = _matrix_group_id_from_values(
+                row.get(f"governance_role_{suffix}", ""),
+                row.get(f"client_label_{suffix}", ""),
+                row.get(f"discipline_label_{suffix}", ""),
+                row.get("unit_system", ""),
+            )
+            label = row.get(f"segment_label_{suffix}", "").strip() or row.get(f"segment_id_{suffix}", "").strip()
+            if group_id and label:
+                labels[group_id].add(label)
+    return {group_id: next(iter(values)) for group_id, values in labels.items() if len(values) == 1}
 
 
 def _jaccard_sets(a: Set[str], b: Set[str]) -> Optional[float]:
@@ -2591,6 +2620,7 @@ def build_explicit_matrix_outputs(
     """
     outputs: Dict[str, List[Dict[str, str]]] = defaultdict(list)
     manifests: List[Dict[str, str]] = []
+    label_by_group = _label_by_project_group(summary_rows)
 
     def add_manifest(name: str, role: str, view: str, source: str, grain: str,
                      metric: str, identity: str, agg: str, interp: str, limits: str) -> None:
@@ -2627,7 +2657,8 @@ def build_explicit_matrix_outputs(
         for r in ok_union:
             if _role_key(r.get("governance_role", "")) != "project":
                 continue
-            gid = _matrix_group_id(r)
+            raw_gid = _matrix_group_id(r)
+            gid = label_by_group.get(raw_gid, raw_gid)
             view = r.get("view_scope", "")
             domain = r.get("domain", "")
             jh = r.get("join_hash", "")
@@ -2653,9 +2684,17 @@ def build_explicit_matrix_outputs(
     add_manifest("project_union_jaccard_matrix.csv", "Project", "all,used", "cross_segment_union_inventory.csv", "role/client/discipline/unit/domain/view/join_hash", "union_jaccard", "normalized join_hash", "Jaccard on system-level unions", "Do these project scopes contain/use the same canonical patterns?", "Requires PR 1 union inventory; not a file-to-file similarity score.")
     add_manifest("project_density_similarity_matrix.csv", "Project", "all,used", "cross_segment_union_inventory.csv", "role/client/discipline/unit/domain/view/join_hash", "density_similarity", "domain pattern count", "Cosine similarity over domain occupancy counts", "Are domains populated to similar degrees?", "Treats absent domains as zero occupancy; does not measure exact identity overlap.")
 
-    # Existing file-pair mean Jaccard preserved under explicit name.
+    # Existing file-pair mean Jaccard preserved under explicit name. Domain rows
+    # remain available, and an explicit ALL_DOMAINS aggregate is added so
+    # fragmentation diagnostics never collapse an arbitrary domain into an
+    # all-domain union comparison.
     project_summary = [r for r in summary_rows if _role_key(r.get("governance_role_a", "")) == "project" and _role_key(r.get("governance_role_b", "")) == "project"]
-    for r in project_summary:
+    file_pair_values: Dict[Tuple[str, str, str], List[Tuple[str, float]]] = defaultdict(list)
+    for r in sorted(project_summary, key=lambda x: (
+        x.get("segment_label_a") or x.get("segment_id_a", ""),
+        x.get("segment_label_b") or x.get("segment_id_b", ""),
+        x.get("domain", ""),
+    )):
         row_id = r.get("segment_label_a") or r.get("segment_id_a", "")
         col_id = r.get("segment_label_b") or r.get("segment_id_b", "")
         for view, col in [("all", "all_jaccard_mean"), ("used", "used_jaccard_mean")]:
@@ -2663,7 +2702,15 @@ def build_explicit_matrix_outputs(
             add_matrix("project_mean_file_pair_jaccard_matrix.csv", row_id, col_id, view, r.get("domain", ""),
                        "mean_file_pair_jaccard", float(raw) if raw else None, "ok" if raw else "unavailable",
                        "Mean of pairwise file Jaccard comparisons; answers whether individual files are typically similar across groups.")
-    add_manifest("project_mean_file_pair_jaccard_matrix.csv", "Project", "all,used", "cross_segment_summary.csv", "segment_pair/domain", "mean_file_pair_jaccard", "file join_hash set", "Mean of file-pair Jaccard values", "Are individual files typically similar across project groups?", "Not equivalent to union_jaccard; can diverge when file inventories are partitioned differently.")
+            if raw:
+                file_pair_values[(row_id, col_id, view)].append((r.get("domain", ""), float(raw)))
+    for (row_id, col_id, view), values in sorted(file_pair_values.items()):
+        if values:
+            aggregate = sum(v for _domain, v in sorted(values)) / len(values)
+            add_matrix("project_mean_file_pair_jaccard_matrix.csv", row_id, col_id, view, "ALL_DOMAINS",
+                       "mean_file_pair_jaccard", aggregate, "ok",
+                       "Mean of domain-level mean file-pair Jaccard values; aligned to all-domain union_jaccard for diagnostics.")
+    add_manifest("project_mean_file_pair_jaccard_matrix.csv", "Project", "all,used", "cross_segment_summary.csv", "segment_pair/domain plus deterministic ALL_DOMAINS aggregate", "mean_file_pair_jaccard", "file join_hash set", "Mean of file-pair Jaccard values; ALL_DOMAINS is the mean across available domain means", "Are individual files typically similar across project groups?", "Not equivalent to union_jaccard; can diverge when file inventories are partitioned differently.")
 
     for r in pooled_rows:
         if _role_key(r.get("governance_role", "")) != "project":
@@ -2678,15 +2725,15 @@ def build_explicit_matrix_outputs(
     add_manifest("project_pool_containment_similarity_matrix.csv", "Project", "all,used", "cross_segment_pooled.csv", "focal_segment/domain/peer_pool", "pool_containment_similarity", "normalized join_hash", "Focal union contained in sibling pool union", "How much does each project system align with its peer pool?", "Peer pools derive only from existing manifest sibling grain; no new authority taxonomy is inferred.")
 
     # Diagnostic: union footprint minus exact mean identity overlap, only when both inputs are available.
-    union_index = {(r["row_id"], r["column_id"], r["view_scope"]): r for r in outputs.get("project_union_jaccard_matrix.csv", []) if r.get("value_status") == "ok" and r.get("domain") == "ALL_DOMAINS"}
-    pair_index = {(r["row_id"], r["column_id"], r["view_scope"]): r for r in outputs.get("project_mean_file_pair_jaccard_matrix.csv", []) if r.get("value_status") == "ok"}
+    union_index = {(r["row_id"], r["column_id"], r["view_scope"], r["domain"]): r for r in outputs.get("project_union_jaccard_matrix.csv", []) if r.get("value_status") == "ok" and r.get("domain") == "ALL_DOMAINS"}
+    pair_index = {(r["row_id"], r["column_id"], r["view_scope"], r["domain"]): r for r in outputs.get("project_mean_file_pair_jaccard_matrix.csv", []) if r.get("value_status") == "ok" and r.get("domain") == "ALL_DOMAINS"}
     frag_rows: List[Dict[str, str]] = []
     for key in sorted(set(union_index) & set(pair_index)):
         u = float(union_index[key]["value"])
         p = float(pair_index[key]["value"])
         frag_rows.append({
             "matrix_name": "project_fragmentation_diagnostic.csv",
-            "row_id": key[0], "column_id": key[1], "view_scope": key[2], "domain": "ALL_DOMAINS",
+            "row_id": key[0], "column_id": key[1], "view_scope": key[2], "domain": key[3],
             "footprint_similarity": _fmt(u), "exact_identity_overlap": _fmt(p),
             "fragmentation_diagnostic": _fmt(u - p), "value_status": "diagnostic",
             "interpretation": "Diagnostic difference between union footprint similarity and mean exact file identity overlap; not a mathematically authoritative index.",
