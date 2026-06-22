@@ -950,7 +950,7 @@ def build_union_inventory_rows(
                     "pct_projects_present": "0.000000",
                     "usage_interpretable": _bool_str(usage_ok),
                     "inventory_status": inventory_status,
-                    "source_status": source_status if source_status != "ok" else inventory_status,
+                    "source_status": source_status,
                     "executed_utc": executed_utc,
                 })
                 continue

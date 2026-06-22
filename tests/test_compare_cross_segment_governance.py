@@ -761,3 +761,54 @@ def test_union_inventory_output_order_is_deterministic(tmp_path):
         ("used", "join_a"),
         ("used", "join_b"),
     ]
+
+
+def test_union_inventory_used_view_unavailable_keeps_source_status_ok(tmp_path):
+    domain = "line_patterns"
+    base = tmp_path / "segments" / "project" / "results"
+    _write_csv(
+        base / "analysis" / "domain_patterns.csv",
+        [{"domain": domain, "pattern_id": "p1", "source_cluster_id": "src|join_a", "pattern_label_human": "A", "pattern_label": "A"}],
+    )
+    _write_csv(
+        base / "bundle_analysis" / "all" / domain / "membership_matrix.csv",
+        [{"export_run_id": "file_1", "pattern_id": "p1"}],
+    )
+    manifest = {"project": {**_seg("Project"), "segment_label": "Project"}}
+    registry = {"project": {"output_folder": "project", "run_type": "bundle"}}
+
+    rows = [r for r in _union_rows_for(tmp_path, manifest, registry, domain) if r["view_scope"] == "used"]
+
+    assert rows == [
+        {
+            "governance_role": "Project",
+            "client_label": "Acme",
+            "discipline_label": "Arch",
+            "unit_system": "imperial",
+            "domain": domain,
+            "view_scope": "used",
+            "join_hash": "",
+            "pattern_label": "",
+            "n_segments_present": "0",
+            "n_files_present": "0",
+            "pct_files_present": "0.000000",
+            "n_projects_present": "0",
+            "pct_projects_present": "0.000000",
+            "usage_interpretable": "true",
+            "inventory_status": "used_view_unavailable",
+            "source_status": "ok",
+            "executed_utc": "2026-06-22T00:00:00Z",
+        }
+    ]
+
+
+def test_union_inventory_missing_domain_patterns_keeps_source_status_ok(tmp_path):
+    domain = "line_patterns"
+    (tmp_path / "segments" / "project").mkdir(parents=True)
+    manifest = {"project": {**_seg("Project"), "segment_label": "Project"}}
+    registry = {"project": {"output_folder": "project", "run_type": "bundle"}}
+
+    rows = _union_rows_for(tmp_path, manifest, registry, domain)
+
+    assert {row["inventory_status"] for row in rows} == {"missing_domain_patterns"}
+    assert {row["source_status"] for row in rows} == {"ok"}
