@@ -343,6 +343,7 @@ def test_discover_vfd_edges_applies_threshold_after_category_aggregation(tmp_pat
 
 
 def test_discover_vfd_edges_emits_multi_domain_conflict_rows(tmp_path):
+    param_id = "bip:-1001007"  # not present in default exact_bip_id hints; exercises category conflict fallback
     items_dir = tmp_path / "items"
     out_dir = tmp_path / "out"
     items_dir.mkdir()
@@ -350,13 +351,13 @@ def test_discover_vfd_edges_emits_multi_domain_conflict_rows(tmp_path):
         "export_run_id,record_pk,item_key,item_value,item_value_type\n"
         "f1,r1,vf.categories,\"-2000011,-2000032\",ok\n"
         "f1,r1,vf.rule[001].param_ref.kind,builtin,ok\n"
-        "f1,r1,vf.rule[001].param_ref.id,bip:-1001006,ok\n",
+        f"f1,r1,vf.rule[001].param_ref.id,{param_id},ok\n",
         encoding="utf-8",
     )
     (items_dir / "wall_types.csv").write_text("id\nw1\n", encoding="utf-8")
     (items_dir / "floor_types.csv").write_text("id\nf1\n", encoding="utf-8")
     bip_lookup = tmp_path / "bip_lookup.json"
-    bip_lookup.write_text(json.dumps({"bip:-1001006": "FUNCTION_PARAM"}), encoding="utf-8")
+    bip_lookup.write_text(json.dumps({param_id: "FUNCTION_PARAM"}), encoding="utf-8")
 
     subprocess.run(
         [
@@ -377,7 +378,7 @@ def test_discover_vfd_edges_emits_multi_domain_conflict_rows(tmp_path):
     )
 
     inventory = read_csv(out_dir / "vfd_param_inventory.csv")
-    multi_rows = [row for row in inventory if row["param_id"] == "bip:-1001006"]
+    multi_rows = [row for row in inventory if row["param_id"] == param_id]
     assert [(row["target_domain"], row["category_set"]) for row in multi_rows] == [
         ("floor_types", "-2000032"),
         ("wall_types", "-2000011"),
@@ -396,6 +397,7 @@ def test_discover_vfd_edges_emits_multi_domain_conflict_rows(tmp_path):
 
 
 def test_discover_vfd_edges_gaps_multi_domain_identity_items_missing(tmp_path):
+    param_id = "bip:-1001007"  # not present in default exact_bip_id hints; exercises category conflict fallback
     items_dir = tmp_path / "items"
     out_dir = tmp_path / "out"
     items_dir.mkdir()
@@ -403,12 +405,12 @@ def test_discover_vfd_edges_gaps_multi_domain_identity_items_missing(tmp_path):
         "export_run_id,record_pk,item_key,item_value,item_value_type\n"
         "f1,r1,vf.categories,\"-2000011,-2000032\",ok\n"
         "f1,r1,vf.rule[001].param_ref.kind,builtin,ok\n"
-        "f1,r1,vf.rule[001].param_ref.id,bip:-1001006,ok\n",
+        f"f1,r1,vf.rule[001].param_ref.id,{param_id},ok\n",
         encoding="utf-8",
     )
     (items_dir / "wall_types.csv").write_text("id\nw1\n", encoding="utf-8")
     bip_lookup = tmp_path / "bip_lookup.json"
-    bip_lookup.write_text(json.dumps({"bip:-1001006": "FUNCTION_PARAM"}), encoding="utf-8")
+    bip_lookup.write_text(json.dumps({param_id: "FUNCTION_PARAM"}), encoding="utf-8")
 
     subprocess.run(
         [

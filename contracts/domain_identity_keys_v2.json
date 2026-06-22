@@ -331,7 +331,8 @@
       "allowed_keys": [
         "fill_pattern.target",
         "fill_pattern.grid_count",
-        "fill_pattern.grids_def_hash"
+        "fill_pattern.grids_def_hash",
+        "fill_pattern.is_import"
       ],
       "allowed_key_prefixes": [
         "fill_pattern.grid["
@@ -357,7 +358,8 @@
       "allowed_keys": [
         "fill_pattern.target",
         "fill_pattern.grid_count",
-        "fill_pattern.grids_def_hash"
+        "fill_pattern.grids_def_hash",
+        "fill_pattern.is_import"
       ],
       "allowed_key_prefixes": [
         "fill_pattern.grid["
@@ -463,7 +465,8 @@
         "line_style.weight.projection",
         "line_style.color.rgb",
         "line_style.weight.cut",
-        "line_style.pattern_ref.sig_hash"
+        "line_style.pattern_ref.sig_hash",
+        "line_style.pattern_ref.synopsis"
       ],
       "required_keys": [
         "line_style.weight.projection",
@@ -503,7 +506,7 @@
       },
       "notes": [
         "Records are emitted at family granularity (one record per Family element, not per FamilySymbol).",
-        "lft.family_name is label-only \u2014 excluded from identity_basis so sig_hash is name-independent.",
+        "lft.family_name is label-only — excluded from identity_basis so sig_hash is name-independent.",
         "lft.type_name removed: replaced by lft.type_count (count of collected types per family).",
         "lft.family_symbol_count: API-reported total types; may differ from lft.type_count if types were filtered.",
         "lft.type_parameter_schema_hash is the primary behavioral anchor for sig_hash.",
@@ -521,7 +524,9 @@
         "material.uid",
         "material.class",
         "material.keynote",
-        "material.name_class_hash"
+        "material.name_class_hash",
+        "material.manufacturer",
+        "material.model"
       ],
       "required_keys": [
         "material.graphics_sig_hash_v2",
@@ -539,8 +544,10 @@
         "sig_hash basis: md5(material.name | material.class). Answers semantic identity.",
         "join_hash basis: md5(material.graphics_sig_hash_v2 | material.keynote). Answers governance equivalence.",
         "material.graphics_sig_hash_v2 retained as identity_item for visual consolidation analysis.",
-        "material.uid retained for record traceability only \u2014 not a sig or join anchor.",
-        "material.name_class_hash = md5(name | class), emitted by migration script and extractor."
+        "material.uid retained for record traceability only — not a sig or join anchor.",
+        "material.name_class_hash = md5(name | class), emitted by migration script and extractor.",
+        "material.manufacturer and material.model are allowed optional discovery candidates emitted by the migration script when present.",
+        "Subset policy decision: recognized exception; materials sig_hash and join_hash use intentionally disjoint preimages."
       ]
     },
     "object_styles_analytical": {
@@ -754,7 +761,7 @@
       },
       "notes": [
         "Domain family: view_category_overrides. Annotation category partition.",
-        "Cut properties not applicable to annotation categories \u2014 omitted from allowed_keys."
+        "Cut properties not applicable to annotation categories — omitted from allowed_keys."
       ]
     },
     "view_category_overrides_model": {

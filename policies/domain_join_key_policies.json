@@ -444,25 +444,27 @@
       ]
     },
     "materials": {
-      "join_key_schema": "materials.join_key.v2",
+      "join_key_schema": "materials.join_key.v3",
       "hash_alg": "md5_utf8_join_pipe",
       "required_items": [
-        "material.graphics_sig_hash_v2"
+        "material.graphics_sig_hash_v2",
+        "material.keynote"
       ],
-      "optional_items": [],
+      "optional_items": [
+        "material.class",
+        "material.name_class_hash",
+        "material.manufacturer",
+        "material.model"
+      ],
       "explicitly_excluded_items": [
         "material.uid",
         "material.id_local",
         "material.name",
-        "material.class",
         "material.description",
         "material.comments",
         "material.keywords",
-        "material.manufacturer",
-        "material.model",
         "material.cost",
         "material.url",
-        "material.keynote",
         "material.mark",
         "material.use_render_appearance",
         "material.shading_color_rgb",
@@ -481,11 +483,13 @@
       ],
       "notes": [
         "Domain family: materials.",
-        "identity_basis is minimal and identity-only (material.uid).",
-        "v1 sig_hash is computed from graphics payload fields in domains/materials.py.",
-        "Identity tab fields and graphics payload are captured as record content (not identity_items).",
+        "join_hash basis: md5(material.graphics_sig_hash_v2 | material.keynote). Keynote is the governance anchor for join equivalence; graphics_sig_hash_v2 remains the visual/rendering anchor.",
+        "Subset policy decision: recognized exception. materials.sig_hash.v2 is pinned to material.name_class_hash while materials.join_key.v3 intentionally uses a disjoint governance/graphics preimage.",
+        "material.class and material.name_class_hash are available as identity items for discovery and diagnostics, but are not required join anchors in v3.",
+        "material.manufacturer and material.model are over-captured as optional discovery candidates; they are not required join anchors.",
+        "material.uid remains traceability-only and excluded from join equivalence.",
         "use_render_appearance is recorded for diagnostics/context but excluded from default signature.",
-        "Appearance/Physical/Thermal assets are explicitly deferred in v1."
+        "Appearance/Physical/Thermal assets are explicitly deferred."
       ]
     },
     "object_styles_analytical": {

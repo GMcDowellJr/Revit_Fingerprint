@@ -3,8 +3,8 @@
 migrate_materials_identity_items.py
 
 Migrates existing fingerprint JSON exports to inject material.graphics_sig_hash_v2,
-material.class, and material.name_class_hash as identity items on every
-materials record.
+material.class, material.keynote, material.name_class_hash, and optional
+discovery candidates as identity items on every materials record.
 
 This avoids a full Dynamo re-extraction. graphics_sig_hash_v2 already exists on
 each record as rec["graphics_sig_hash_v2"]; class and name are already present
@@ -22,6 +22,8 @@ Changes made per materials record:
   - Adds {"k": "material.class", "v": <value>, "q": "ok"} if not already present.
   - Adds {"k": "material.name_class_hash", "v": md5(name|class), "q": "ok"}
     if not already present and both name and class are available.
+  - Adds material.keynote, material.manufacturer, and material.model when present
+    so discovery can empirically evaluate governance and product metadata fields.
   - Does NOT modify any other field (sig_hash, record_id, etc.).
   - Does NOT remove material.uid from identity_basis.items.
 
@@ -31,13 +33,13 @@ Output:
 
 Usage:
   # Write to a new directory (safe default)
-  python tools/migrate_materials_identity_items.py --exports-dir C:/Exports --out-dir C:/Exports_migrated
+  python tools/migration/migrate_materials_identity_items.py --exports-dir C:/Exports --out-dir C:/Exports_migrated
 
   # In-place with backup
-  python tools/migrate_materials_identity_items.py --exports-dir C:/Exports --in-place
+  python tools/migration/migrate_materials_identity_items.py --exports-dir C:/Exports --in-place
 
   # Dry run (report what would change, write nothing)
-  python tools/migrate_materials_identity_items.py --exports-dir C:/Exports --out-dir C:/Exports_migrated --dry-run
+  python tools/migration/migrate_materials_identity_items.py --exports-dir C:/Exports --out-dir C:/Exports_migrated --dry-run
 """
 
 from __future__ import annotations
@@ -118,8 +120,8 @@ _INJECT_KEY = "material.graphics_sig_hash_v2"
 
 def _migrate_record(rec: Dict[str, Any]) -> bool:
     """
-    Inject material.graphics_sig_hash_v2, material.class, and
-    material.name_class_hash into identity_basis.items.
+    Inject material.graphics_sig_hash_v2, material.class, material.keynote,
+    material.name_class_hash, and optional discovery candidates into identity_basis.items.
     Returns True if any change was made.
     """
     injected = False
@@ -131,17 +133,30 @@ def _migrate_record(rec: Dict[str, Any]) -> bool:
         injected = True
 
     # Inject material.class if not already present
-    mat_class_val = rec.get("material", {}).get("class", "") or ""
+    material = rec.get("material") if isinstance(rec.get("material"), dict) else {}
+    mat_class_val = material.get("class", "") or ""
     if mat_class_val and not any(it.get("k") == "material.class" for it in items):
         items.append({"k": "material.class", "q": "ok", "v": str(mat_class_val)})
         injected = True
 
+
     # Inject material.name_class_hash (md5 of name|class) if both present
-    mat_name_val = rec.get("material", {}).get("name", "") or ""
+    mat_name_val = material.get("name", "") or ""
     if mat_name_val and mat_class_val:
         _name_class_hash = hashlib.md5(f"{mat_name_val}|{mat_class_val}".encode()).hexdigest()
         if not any(it.get("k") == "material.name_class_hash" for it in items):
             items.append({"k": "material.name_class_hash", "q": "ok", "v": _name_class_hash})
+            injected = True
+
+    # Over-capture governance/product metadata so discovery can evaluate them.
+    for source_key, item_key in (
+        ("keynote", "material.keynote"),
+        ("manufacturer", "material.manufacturer"),
+        ("model", "material.model"),
+    ):
+        value = material.get(source_key, "") or ""
+        if value and not any(it.get("k") == item_key for it in items):
+            items.append({"k": item_key, "q": "ok", "v": str(value)})
             injected = True
 
     if injected:
@@ -226,8 +241,8 @@ def _find_json_files(exports_dir: Path) -> List[Path]:
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=(
-            "Migrate fingerprint JSON exports to inject material.graphics_sig_hash_v2 "
-            "as an identity item. Reads compact or indented JSON; always writes compact "
+            "Migrate fingerprint JSON exports to inject material graphics, class, "
+            "keynote, and discovery metadata as identity items. Reads compact or indented JSON; always writes compact "
             "production JSON (separators=(',',':'), sort_keys=True)."
         )
     )
@@ -309,7 +324,7 @@ def main() -> None:
     print()
     print("NEXT STEPS after migration:")
     print("  1. Update domain_join_key_policies.json — set materials required_items")
-    print('     to ["material.graphics_sig_hash_v2"], move material.uid to optional_items')
+    print('     to ["material.graphics_sig_hash_v2", "material.keynote"] and keep metadata candidates non-excluded')
     print("  2. Re-run flatten + apply stages against the migrated exports directory")
     print("  3. Re-run analyze1/analyze2 to rebuild domain_patterns.csv")
     print()
