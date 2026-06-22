@@ -987,11 +987,12 @@ def test_explicit_matrices_union_jaccard_differs_from_mean_file_pair():
     matrices, frag, manifest = build_explicit_matrix_outputs(summary, [], union_rows, "2026-06-22T00:00:00Z")
 
     union_ab = [r for r in matrices["project_union_jaccard_matrix.csv"] if r["row_id"] == "Project A" and r["column_id"] == "Project B"][0]
-    pair_ab = matrices["project_mean_file_pair_jaccard_matrix.csv"][0]
+    pair_ab = [r for r in matrices["project_mean_file_pair_jaccard_matrix.csv"] if r["row_id"] == "Project A" and r["column_id"] == "Project B" and r["domain"] == "d"][0]
     assert union_ab["value"] == "1.000000"
     assert pair_ab["value"] == "0.000000"
-    assert frag[0]["fragmentation_diagnostic"] == "1.000000"
-    assert frag[0]["domain"] == "ALL_DOMAINS"
+    frag_ab = [r for r in frag if r["row_id"] == "Project A" and r["column_id"] == "Project B"][0]
+    assert frag_ab["fragmentation_diagnostic"] == "1.000000"
+    assert frag_ab["domain"] == "ALL_DOMAINS"
     assert [m["matrix_name"] for m in manifest] == sorted(m["matrix_name"] for m in manifest)
 
 
@@ -1012,8 +1013,9 @@ def test_fragmentation_diagnostic_uses_all_domains_file_pair_aggregate():
 
     aggregate = [r for r in matrices["project_mean_file_pair_jaccard_matrix.csv"] if r["row_id"] == "Project A" and r["column_id"] == "Project B" and r["domain"] == "ALL_DOMAINS"][0]
     assert aggregate["value"] == "0.500000"
-    assert frag[0]["domain"] == "ALL_DOMAINS"
-    assert frag[0]["exact_identity_overlap"] == "0.500000"
+    frag_ab = [r for r in frag if r["row_id"] == "Project A" and r["column_id"] == "Project B"][0]
+    assert frag_ab["domain"] == "ALL_DOMAINS"
+    assert frag_ab["exact_identity_overlap"] == "0.500000"
 
 
 def test_density_similarity_uses_domain_density_vectors_not_containment():
@@ -1053,6 +1055,47 @@ def test_fragmentation_diagnostic_unavailable_without_required_inputs():
         "interpretation": "Requires both union_jaccard and mean_file_pair_jaccard inputs.",
         "executed_utc": "2026-06-22T00:00:00Z",
     }]
+
+
+def test_non_project_union_inventory_blocks_project_union_matrices():
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    union_rows = [{
+        "governance_role": "Template",
+        "client_label": "A",
+        "discipline_label": "Arch",
+        "unit_system": "imperial",
+        "domain": "d",
+        "view_scope": "all",
+        "join_hash": "template_only",
+        "inventory_status": "ok",
+    }]
+
+    matrices, _, _ = build_explicit_matrix_outputs([], [], union_rows, "2026-06-22T00:00:00Z")
+
+    assert matrices["project_union_jaccard_matrix.csv"][0]["value_status"] == "blocked_no_ok_project_union_inventory"
+    assert matrices["project_density_similarity_matrix.csv"][0]["value_status"] == "blocked_no_ok_project_union_inventory"
+
+
+def test_mean_file_pair_matrix_adds_synthetic_diagonal_cells():
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    summary = [{
+        "governance_role_a": "Project",
+        "governance_role_b": "Project",
+        "segment_label_a": "Project A",
+        "segment_label_b": "Project B",
+        "domain": "d",
+        "all_jaccard_mean": "0.250000",
+    }]
+
+    matrices, _, _ = build_explicit_matrix_outputs(summary, [], [], "2026-06-22T00:00:00Z")
+    rows = matrices["project_mean_file_pair_jaccard_matrix.csv"]
+
+    diagonal = [r for r in rows if r["row_id"] == "Project A" and r["column_id"] == "Project A" and r["domain"] == "ALL_DOMAINS"][0]
+    assert diagonal["value"] == "1.000000"
+    assert diagonal["value_status"] == "synthetic_self_comparison"
+    assert diagonal["self_comparison"] == "true"
 
 
 def test_missing_union_inventory_blocks_union_matrix_with_explicit_status():

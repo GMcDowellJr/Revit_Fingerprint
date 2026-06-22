@@ -2643,20 +2643,24 @@ def build_explicit_matrix_outputs(
         })
 
     ok_union = [r for r in union_inventory_rows if r.get("inventory_status") == "ok" and r.get("join_hash", "").strip()]
-    if not union_inventory_rows or not ok_union:
-        status = "blocked_missing_union_inventory" if not union_inventory_rows else "blocked_no_ok_union_inventory"
+    project_ok_union = [r for r in ok_union if _role_key(r.get("governance_role", "")) == "project"]
+    if not union_inventory_rows or not ok_union or not project_ok_union:
+        if not union_inventory_rows:
+            status = "blocked_missing_union_inventory"
+        elif not ok_union:
+            status = "blocked_no_ok_union_inventory"
+        else:
+            status = "blocked_no_ok_project_union_inventory"
         for filename, metric in [
             ("project_union_jaccard_matrix.csv", "union_jaccard"),
             ("project_density_similarity_matrix.csv", "density_similarity"),
         ]:
             add_matrix(filename, "unavailable", "unavailable", "unavailable", "", metric, None, status,
-                       "Union-derived matrix blocked because normalized union inventory is unavailable.")
+                       "Union-derived matrix blocked because normalized project union inventory is unavailable.")
     else:
         by_group_view: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
         by_group_view_domain: Dict[Tuple[str, str, str], Set[str]] = defaultdict(set)
-        for r in ok_union:
-            if _role_key(r.get("governance_role", "")) != "project":
-                continue
+        for r in project_ok_union:
             raw_gid = _matrix_group_id(r)
             gid = label_by_group.get(raw_gid, raw_gid)
             view = r.get("view_scope", "")
@@ -2690,6 +2694,8 @@ def build_explicit_matrix_outputs(
     # all-domain union comparison.
     project_summary = [r for r in summary_rows if _role_key(r.get("governance_role_a", "")) == "project" and _role_key(r.get("governance_role_b", "")) == "project"]
     file_pair_values: Dict[Tuple[str, str, str], List[Tuple[str, float]]] = defaultdict(list)
+    file_pair_ids_by_view: Dict[str, Set[str]] = defaultdict(set)
+    file_pair_domains_by_view: Dict[str, Set[str]] = defaultdict(set)
     for r in sorted(project_summary, key=lambda x: (
         x.get("segment_label_a") or x.get("segment_id_a", ""),
         x.get("segment_label_b") or x.get("segment_id_b", ""),
@@ -2704,12 +2710,29 @@ def build_explicit_matrix_outputs(
                        "Mean of pairwise file Jaccard comparisons; answers whether individual files are typically similar across groups.")
             if raw:
                 file_pair_values[(row_id, col_id, view)].append((r.get("domain", ""), float(raw)))
+                file_pair_ids_by_view[view].update([row_id, col_id])
+                if r.get("domain", ""):
+                    file_pair_domains_by_view[view].add(r.get("domain", ""))
     for (row_id, col_id, view), values in sorted(file_pair_values.items()):
         if values:
             aggregate = sum(v for _domain, v in sorted(values)) / len(values)
             add_matrix("project_mean_file_pair_jaccard_matrix.csv", row_id, col_id, view, "ALL_DOMAINS",
                        "mean_file_pair_jaccard", aggregate, "ok",
                        "Mean of domain-level mean file-pair Jaccard values; aligned to all-domain union_jaccard for diagnostics.")
+    existing_pair_keys = {
+        (r["row_id"], r["column_id"], r["view_scope"], r["domain"])
+        for r in outputs.get("project_mean_file_pair_jaccard_matrix.csv", [])
+    }
+    for view, ids in sorted(file_pair_ids_by_view.items()):
+        for row_id in sorted(ids):
+            for domain in sorted(file_pair_domains_by_view.get(view, set()) | {"ALL_DOMAINS"}):
+                key = (row_id, row_id, view, domain)
+                if key in existing_pair_keys:
+                    continue
+                add_matrix("project_mean_file_pair_jaccard_matrix.csv", row_id, row_id, view, domain,
+                           "mean_file_pair_jaccard", 1.0, "synthetic_self_comparison",
+                           "Synthetic deterministic self-comparison cell for square matrix pivots; not an observed file-pair comparison.")
+                existing_pair_keys.add(key)
     add_manifest("project_mean_file_pair_jaccard_matrix.csv", "Project", "all,used", "cross_segment_summary.csv", "segment_pair/domain plus deterministic ALL_DOMAINS aggregate", "mean_file_pair_jaccard", "file join_hash set", "Mean of file-pair Jaccard values; ALL_DOMAINS is the mean across available domain means", "Are individual files typically similar across project groups?", "Not equivalent to union_jaccard; can diverge when file inventories are partitioned differently.")
 
     for r in pooled_rows:
