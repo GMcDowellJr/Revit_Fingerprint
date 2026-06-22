@@ -11,7 +11,10 @@ from compare_cross_segment import (  # noqa: E402
     _comparison_role_semantics,
     _recommended_primary_view,
     _usage_interpretable_for_role,
+    REUSE_BUCKET_THRESHOLDS,
+    _reuse_bucket_for,
     build_pair_domain_work_items,
+    build_pattern_reuse_distribution_rows,
     build_union_inventory_rows,
     discover_domains_for_segment,
     discover_governance_chain,
@@ -812,3 +815,114 @@ def test_union_inventory_missing_domain_patterns_keeps_source_status_ok(tmp_path
 
     assert {row["inventory_status"] for row in rows} == {"missing_domain_patterns"}
     assert {row["source_status"] for row in rows} == {"ok"}
+
+
+def test_pattern_reuse_many_files_gets_broad_classification():
+    rows = [
+        {
+            "view_scope": "used", "governance_role": "Project", "client_label": "Acme",
+            "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
+            "join_hash": "broad", "pattern_label": "Broad", "n_files_present": "4",
+            "n_files_denominator": "5", "n_projects_present": "2", "n_projects_denominator": "2",
+            "usage_interpretable": "true", "inventory_status": "ok",
+        }
+    ]
+
+    out = build_pattern_reuse_distribution_rows(rows, "2026-06-22T00:00:00Z")
+
+    assert out[0]["reuse_bucket"] == "client_wide"
+    assert out[0]["bucket_basis"] == "files_in_role_client_domain"
+    assert out[0]["pct_files_present"] == "0.800000"
+
+
+def test_pattern_reuse_one_file_gets_single_file_classification():
+    rows = [
+        {
+            "view_scope": "all", "governance_role": "Project", "client_label": "Acme",
+            "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
+            "join_hash": "one", "pattern_label": "One", "n_files_present": "1",
+            "n_files_denominator": "3", "n_projects_present": "1", "n_projects_denominator": "2",
+            "usage_interpretable": "true", "inventory_status": "ok",
+        }
+    ]
+
+    out = build_pattern_reuse_distribution_rows(rows, "2026-06-22T00:00:00Z")
+
+    assert out[0]["reuse_bucket"] == "single_file"
+    assert out[0]["bucket_basis"] == "files_in_role_client_domain"
+
+
+def test_project_used_view_uses_project_and_file_denominators():
+    rows = [
+        {
+            "view_scope": "used", "governance_role": "Project", "client_label": "Acme",
+            "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
+            "join_hash": "multi", "pattern_label": "Multi", "n_files_present": "2",
+            "n_files_denominator": "5", "n_projects_present": "2", "n_projects_denominator": "3",
+            "usage_interpretable": "true", "inventory_status": "ok",
+        }
+    ]
+
+    out = build_pattern_reuse_distribution_rows(rows, "2026-06-22T00:00:00Z")
+
+    assert out[0]["reuse_bucket"] == "multi_project"
+    assert out[0]["bucket_basis"] == "projects_in_client_domain"
+    assert out[0]["pct_files_present"] == "0.400000"
+    assert out[0]["pct_projects_present"] == "0.666667"
+
+
+def test_template_all_view_is_not_interpreted_as_active_usage():
+    rows = [
+        {
+            "view_scope": "all", "governance_role": "Template", "client_label": "Acme",
+            "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
+            "join_hash": "stock", "pattern_label": "Stock", "n_files_present": "1",
+            "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1",
+            "usage_interpretable": "false", "inventory_status": "ok",
+        }
+    ]
+
+    out = build_pattern_reuse_distribution_rows(rows, "2026-06-22T00:00:00Z")
+
+    assert out[0]["usage_interpretable"] == "false"
+    assert out[0]["reuse_bucket"] == "client_wide"
+
+
+def test_reuse_zero_denominator_is_degraded_unclassified():
+    bucket, basis, status = _reuse_bucket_for(
+        n_files=0, n_files_den=0, n_projects=0, n_projects_den=0, n_clients=0, n_clients_den=0
+    )
+
+    assert bucket == "unclassified"
+    assert basis == "denominator_unavailable"
+    assert status == "degraded_zero_denominator"
+
+
+def test_reuse_distribution_order_is_deterministic():
+    rows = [
+        {
+            "view_scope": "all", "governance_role": "Project", "client_label": "Acme",
+            "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
+            "join_hash": jh, "pattern_label": jh, "n_files_present": "1",
+            "n_files_denominator": "2", "n_projects_present": "1", "n_projects_denominator": "1",
+            "usage_interpretable": "true", "inventory_status": "ok",
+        }
+        for jh in ["b", "a"]
+    ]
+
+    first = build_pattern_reuse_distribution_rows(rows, "2026-06-22T00:00:00Z")
+    second = build_pattern_reuse_distribution_rows(rows, "2026-06-22T00:00:00Z")
+
+    assert first == second
+    assert [r["join_hash"] for r in first] == ["a", "b"]
+
+
+def test_reuse_thresholds_are_centralized_and_used():
+    assert "client_wide_min_pct_files" in REUSE_BUCKET_THRESHOLDS
+    bucket, basis, status = _reuse_bucket_for(
+        n_files=4, n_files_den=5, n_projects=1, n_projects_den=2, n_clients=1, n_clients_den=1
+    )
+
+    assert bucket == "client_wide"
+    assert basis == "files_in_role_client_domain"
+    assert status == "ok"

@@ -263,6 +263,57 @@ UNION_INVENTORY_FIELDS: List[str] = [
     "executed_utc",
 ]
 
+
+REUSE_DISTRIBUTION_FIELDS: List[str] = [
+    "view_scope",
+    "governance_role",
+    "client_label",
+    "discipline_label",
+    "unit_system",
+    "domain",
+    "join_hash",
+    "pattern_label",
+    "n_files_present",
+    "n_files_denominator",
+    "pct_files_present",
+    "n_projects_present",
+    "n_projects_denominator",
+    "pct_projects_present",
+    "n_clients_present",
+    "n_clients_denominator",
+    "pct_clients_present",
+    "reuse_bucket",
+    "bucket_basis",
+    "usage_interpretable",
+    "inventory_status",
+    "classification_status",
+    "executed_utc",
+]
+
+REUSE_SUMMARY_FIELDS: List[str] = [
+    "view_scope",
+    "governance_role",
+    "client_label",
+    "discipline_label",
+    "unit_system",
+    "domain",
+    "reuse_bucket",
+    "bucket_basis",
+    "n_patterns",
+    "usage_interpretable",
+    "classification_status",
+    "executed_utc",
+]
+
+# Centralized neutral reporting thresholds for reuse breadth. These are
+# classifications for governance reporting, not correctness judgments.
+REUSE_BUCKET_THRESHOLDS = {
+    "corpus_wide_min_pct_clients": 0.80,
+    "client_wide_min_pct_files": 0.80,
+    "multi_project_min_projects": 2,
+    "emerging_min_files": 2,
+}
+
 GOVERNANCE_STATE_SUMMARY_FIELDS: List[str] = [
     "comparison_run_id",
     "comparison_type",
@@ -972,9 +1023,11 @@ def build_union_inventory_rows(
                     "pattern_label": labels.get(join_hash, ""),
                     "n_segments_present": str(len(entry["segments"])),
                     "n_files_present": str(n_files),
-                    "pct_files_present": _fmt(n_files / file_den) if file_den else "0.000000",
+                    "_n_files_denominator": str(file_den),
+                    "pct_files_present": _safe_pct(n_files, file_den) or "0.000000",
                     "n_projects_present": str(n_projects),
-                    "pct_projects_present": _fmt(n_projects / project_den) if project_den else "0.000000",
+                    "_n_projects_denominator": str(project_den),
+                    "pct_projects_present": _safe_pct(n_projects, project_den) or "0.000000",
                     "usage_interpretable": _bool_str(usage_ok),
                     "inventory_status": inventory_status,
                     "source_status": source_status,
@@ -987,6 +1040,173 @@ def build_union_inventory_rows(
     ))
     return rows
 
+
+def _safe_pct(numerator: int, denominator: int) -> str:
+    return _fmt(numerator / denominator) if denominator else ""
+
+
+def _reuse_bucket_for(
+    *,
+    n_files: int,
+    n_files_den: int,
+    n_projects: int,
+    n_projects_den: int,
+    n_clients: int,
+    n_clients_den: int,
+) -> Tuple[str, str, str]:
+    """Classify reuse breadth with explicit denominator basis.
+
+    Buckets are neutral reporting classes, not approval or correctness claims.
+    Returns (reuse_bucket, bucket_basis, classification_status).
+    """
+    if n_files_den <= 0 or n_projects_den <= 0 or n_clients_den <= 0:
+        return "unclassified", "denominator_unavailable", "degraded_zero_denominator"
+
+    pct_clients = n_clients / n_clients_den
+    pct_files = n_files / n_files_den
+    if pct_clients >= REUSE_BUCKET_THRESHOLDS["corpus_wide_min_pct_clients"] and n_clients_den > 1:
+        return "corpus_wide", "clients_in_corpus_domain", "ok"
+    if pct_files >= REUSE_BUCKET_THRESHOLDS["client_wide_min_pct_files"]:
+        return "client_wide", "files_in_role_client_domain", "ok"
+    if n_projects >= REUSE_BUCKET_THRESHOLDS["multi_project_min_projects"] and n_projects_den > 1:
+        return "multi_project", "projects_in_client_domain", "ok"
+    if n_files >= REUSE_BUCKET_THRESHOLDS["emerging_min_files"]:
+        return "emerging", "files_in_role_client_domain", "ok"
+    if n_files == 1:
+        return "single_file", "files_in_role_client_domain", "ok"
+    if n_projects == 1:
+        return "single_project", "projects_in_client_domain", "ok"
+    return "unclassified", "files_in_role_client_domain", "ok"
+
+
+def build_pattern_reuse_distribution_rows(
+    union_rows: List[Dict[str, str]],
+    executed_utc: str,
+) -> List[Dict[str, str]]:
+    """Build reuse distribution rows from normalized union-inventory join_hash rows."""
+    candidate_rows = [
+        r for r in union_rows
+        if r.get("join_hash", "").strip() or r.get("inventory_status", "") != "ok"
+    ]
+    positive = [r for r in candidate_rows if r.get("join_hash", "").strip()]
+    file_den_by_group: Dict[Tuple[str, str, str, str, str, str], int] = {}
+    project_den_by_group: Dict[Tuple[str, str, str, str, str, str], int] = {}
+    clients_by_group: Dict[Tuple[str, str, str, str, str], Set[str]] = defaultdict(set)
+    clients_by_pattern: Dict[Tuple[str, str, str, str, str, str], Set[str]] = defaultdict(set)
+
+    for r in candidate_rows:
+        key = (
+            r.get("view_scope", ""), r.get("governance_role", ""),
+            r.get("client_label", ""), r.get("discipline_label", ""),
+            r.get("unit_system", ""), r.get("domain", ""),
+        )
+        file_den_by_group[key] = max(
+            file_den_by_group.get(key, 0),
+            int(r.get("_n_files_denominator") or r.get("n_files_denominator") or r.get("n_files_present") or "0"),
+        )
+        project_den_by_group[key] = max(
+            project_den_by_group.get(key, 0),
+            int(r.get("_n_projects_denominator") or r.get("n_projects_denominator") or r.get("n_projects_present") or "0"),
+        )
+        clients_by_group[(key[0], key[1], key[3], key[4], key[5])].add(key[2])
+        clients_by_pattern[(
+            key[0], key[1], key[3], key[4], key[5], r.get("join_hash", "")
+        )].add(key[2])
+
+    rows: List[Dict[str, str]] = []
+    for r in candidate_rows:
+        key = (
+            r.get("view_scope", ""), r.get("governance_role", ""),
+            r.get("client_label", ""), r.get("discipline_label", ""),
+            r.get("unit_system", ""), r.get("domain", ""),
+        )
+        client_group = (key[0], key[1], key[3], key[4], key[5])
+        n_files = int(r.get("n_files_present") or "0")
+        n_projects = int(r.get("n_projects_present") or "0")
+        n_files_den = file_den_by_group.get(key, 0)
+        n_projects_den = project_den_by_group.get(key, 0)
+        n_clients = len(clients_by_pattern.get((
+            key[0], key[1], key[3], key[4], key[5], r.get("join_hash", "")
+        ), set()))
+        n_clients_den = len(clients_by_group.get(client_group, set()))
+        if r.get("inventory_status") != "ok":
+            bucket, basis, status = (
+                "unclassified", "inventory_status",
+                "blocked_" + r.get("inventory_status", "unknown"),
+            )
+        else:
+            bucket, basis, status = _reuse_bucket_for(
+                n_files=n_files, n_files_den=n_files_den,
+                n_projects=n_projects, n_projects_den=n_projects_den,
+                n_clients=n_clients, n_clients_den=n_clients_den,
+            )
+        rows.append({
+            "view_scope": r.get("view_scope", ""),
+            "governance_role": r.get("governance_role", ""),
+            "client_label": r.get("client_label", ""),
+            "discipline_label": r.get("discipline_label", ""),
+            "unit_system": r.get("unit_system", ""),
+            "domain": r.get("domain", ""),
+            "join_hash": r.get("join_hash", ""),
+            "pattern_label": r.get("pattern_label", ""),
+            "n_files_present": str(n_files),
+            "n_files_denominator": str(n_files_den),
+            "pct_files_present": _safe_pct(n_files, n_files_den),
+            "n_projects_present": str(n_projects),
+            "n_projects_denominator": str(n_projects_den),
+            "pct_projects_present": _safe_pct(n_projects, n_projects_den),
+            "n_clients_present": str(n_clients),
+            "n_clients_denominator": str(n_clients_den),
+            "pct_clients_present": _safe_pct(n_clients, n_clients_den),
+            "reuse_bucket": bucket,
+            "bucket_basis": basis,
+            "usage_interpretable": r.get("usage_interpretable", ""),
+            "inventory_status": r.get("inventory_status", ""),
+            "classification_status": status,
+            "executed_utc": executed_utc,
+        })
+    rows.sort(key=lambda r: (
+        r["view_scope"], r["governance_role"], r["client_label"],
+        r["discipline_label"], r["unit_system"], r["domain"], r["join_hash"],
+    ))
+    return rows
+
+
+def build_pattern_reuse_summary_rows(
+    distribution_rows: List[Dict[str, str]],
+    *,
+    by_client: bool,
+) -> List[Dict[str, str]]:
+    grouped: Dict[Tuple[str, ...], Dict[str, str]] = {}
+    counts: Dict[Tuple[str, ...], int] = defaultdict(int)
+    for r in distribution_rows:
+        key = (
+            r["view_scope"], r["governance_role"],
+            r["client_label"] if by_client else "",
+            r["discipline_label"], r["unit_system"], r["domain"],
+            r["reuse_bucket"], r["bucket_basis"], r["usage_interpretable"],
+            r["classification_status"], r["executed_utc"],
+        )
+        counts[key] += 1
+        grouped[key] = r
+    rows = []
+    for key in sorted(counts):
+        r = grouped[key]
+        rows.append({
+            "view_scope": r["view_scope"],
+            "governance_role": r["governance_role"],
+            "client_label": r["client_label"] if by_client else "",
+            "discipline_label": r["discipline_label"],
+            "unit_system": r["unit_system"],
+            "domain": r["domain"],
+            "reuse_bucket": r["reuse_bucket"],
+            "bucket_basis": r["bucket_basis"],
+            "n_patterns": str(counts[key]),
+            "usage_interpretable": r["usage_interpretable"],
+            "classification_status": r["classification_status"],
+            "executed_utc": r["executed_utc"],
+        })
+    return rows
 
 def load_segment_join_hash_union(
     segments_root: Path,
@@ -2687,6 +2907,15 @@ def main() -> int:
         manifest, registry, file_metadata, segments_root, executed_utc,
         domain_filter=args.domain,
     )
+    reuse_distribution_rows = build_pattern_reuse_distribution_rows(
+        union_inventory_rows, executed_utc
+    )
+    reuse_summary_by_domain_rows = build_pattern_reuse_summary_rows(
+        reuse_distribution_rows, by_client=False
+    )
+    reuse_summary_by_client_rows = build_pattern_reuse_summary_rows(
+        reuse_distribution_rows, by_client=True
+    )
 
     # Write outputs
     if summary_rows:
@@ -2771,6 +3000,28 @@ def main() -> int:
         print(
             f"[compare] wrote {len(union_inventory_rows)} rows → "
             f"{out_dir / 'cross_segment_union_inventory.csv'}"
+        )
+
+    if reuse_distribution_rows:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        atomic_write_csv(
+            out_dir / "pattern_reuse_distribution.csv",
+            REUSE_DISTRIBUTION_FIELDS,
+            reuse_distribution_rows,
+        )
+        atomic_write_csv(
+            out_dir / "pattern_reuse_summary_by_domain.csv",
+            REUSE_SUMMARY_FIELDS,
+            reuse_summary_by_domain_rows,
+        )
+        atomic_write_csv(
+            out_dir / "pattern_reuse_summary_by_client.csv",
+            REUSE_SUMMARY_FIELDS,
+            reuse_summary_by_client_rows,
+        )
+        print(
+            f"[compare] wrote {len(reuse_distribution_rows)} rows → "
+            f"{out_dir / 'pattern_reuse_distribution.csv'}"
         )
 
     if not summary_rows and not pooled_rows and not governance_state_rows and not union_inventory_rows:
