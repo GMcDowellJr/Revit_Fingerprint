@@ -29,11 +29,12 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 # Allow import of bundle_analysis package from the same tools/ directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bundle_analysis.common import atomic_write_csv
+from build_results_registry import write_results_registry
 
 # Maximum destination file handles open simultaneously during preshard.
 # Keeps fd usage well below typical OS limits (1024) regardless of segment count.
@@ -720,6 +721,8 @@ def _run_one_segment(
     registry: List[dict],
     reg_index: Dict[str, int],
     registry_file: Path,
+    manifest_file: Path,
+    results_registry_file: Path,
     registry_lock: threading.Lock,
     counters: Dict[str, object],
     counters_lock: threading.Lock,
@@ -912,6 +915,11 @@ def _run_one_segment(
                 registry[ri]["last_run_utc"] = utc_now_iso()
                 registry[ri]["notes"] = failure_notes[:500]
         write_registry_atomic(registry_file, registry)
+        write_results_registry(
+            manifest_file=manifest_file,
+            registry_file=registry_file,
+            output_file=results_registry_file,
+        )
 
     # Update counters and read progress snapshot under lock
     with counters_lock:
@@ -957,6 +965,7 @@ def _run_one_segment(
 def run_orchestrator(args: argparse.Namespace) -> int:
     manifest_file = Path(args.manifest_file).resolve()
     registry_file = Path(args.registry_file).resolve()
+    results_registry_file = Path(args.results_registry_file).resolve()
     records_dir = Path(args.records_dir).resolve()
     exports_dir = Path(args.exports_dir).resolve()
     segments_root = Path(args.segments_root).resolve()
@@ -1143,6 +1152,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 records_dir, exports_dir, segments_root, repo_root,
                 join_policy, args.skip_bi_merge,
                 registry, reg_index, registry_file,
+                manifest_file, results_registry_file,
                 registry_lock, counters, counters_lock,
                 worker_id=(i % args.workers) + 1,
             ): reg_row.get("segment_id", "")
@@ -1236,6 +1246,11 @@ def main() -> None:
         help="Path to run_registry.csv (updated in-place after each segment)",
     )
     ap.add_argument(
+        "--results-registry-file",
+        default=None,
+        help="Path to results_registry.csv (default: sibling of run_registry.csv)",
+    )
+    ap.add_argument(
         "--records-dir", required=True,
         help="Path to corpus-level results/records/ directory",
     )
@@ -1275,6 +1290,8 @@ def main() -> None:
         help="Force preshard even if corpus marker exists",
     )
     args = ap.parse_args()
+    if args.results_registry_file is None:
+        args.results_registry_file = str(Path(args.registry_file).resolve().with_name("results_registry.csv"))
     sys.exit(run_orchestrator(args))
 
 

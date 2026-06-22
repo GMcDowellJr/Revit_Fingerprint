@@ -100,12 +100,19 @@ if ($Run -eq "C") {
     python tools/run_segment_orchestrator.py `
         --manifest-file "$RECORDS\segment_manifest.csv" `
         --registry-file "$RECORDS\run_registry.csv" `
+        --results-registry-file "$RECORDS\results_registry.csv" `
         --records-dir $RECORDS `
         --exports-dir $EXPORTS `
         --segments-root $SEGMENTS `
         --repo-root $REPO `
         --force `
         --join-policy $JOIN_POL
+
+    Write-Host "--- C2.5: rebuild BI results registry ---" -ForegroundColor Cyan
+    python tools\build_results_registry.py `
+        --manifest-file "$RECORDS\segment_manifest.csv" `
+        --registry-file "$RECORDS\run_registry.csv" `
+        --output-file "$RECORDS\results_registry.csv"
 
     Write-Host "--- C3: re-patch all segment domain_patterns ---" -ForegroundColor Cyan
     python tools\label_synthesis\patch_all_domain_patterns.py `
