@@ -492,14 +492,14 @@ The distribution grain is one row per `(view_scope, governance_role, client_labe
 - `corpus_wide` — the pattern appears across at least the centralized client-share threshold for the corpus/domain pool.
 - `client_wide` — the pattern appears across at least the centralized file-share threshold inside a client/domain pool.
 - `multi_project` — the pattern appears in at least the centralized multi-project count threshold inside a client/domain pool.
-- `emerging` — the pattern appears in more than one file but does not meet broader thresholds.
-- `single_project` — the pattern is limited to one project denominator context.
+- `single_project` — the pattern is limited to one project denominator context, even when it appears in multiple files in that project.
+- `emerging` — the pattern appears in more than one file across a classified pool but does not meet broader or single-project thresholds.
 - `single_file` — the pattern appears in exactly one file.
 - `unclassified` — denominators are unavailable/zero or source inventory status blocks classification.
 
 Thresholds are centralized in `tools/compare_cross_segment.py` as `REUSE_BUCKET_THRESHOLDS`. The current defaults are `corpus_wide_min_pct_clients=0.80`, `client_wide_min_pct_files=0.80`, `multi_project_min_projects=2`, and `emerging_min_files=2`.
 
-Role interpretation follows the union inventory semantics. Project used-view rows can support active delivery practice reporting. Template, Generic, and most Container all-view rows are configured/published inventory, not active usage claims; their `usage_interpretable` field remains `false` where appropriate. Rows with zero or unavailable denominators are emitted with explicit degraded/unclassified status rather than false zero percentages.
+Role interpretation follows the union inventory semantics. Project used-view rows can support active delivery practice reporting. Template, Generic, and most Container all-view rows are configured/published inventory, not active usage claims; their `usage_interpretable` field remains `false` where appropriate. Rows with zero or unavailable denominators are emitted with explicit degraded/unclassified status rather than false zero percentages. Rows with missing source identities (`source_status != ok`) are also degraded/unclassified, even when some valid `join_hash` values remain, because the observed denominators may exclude unresolved source rows.
 
 Two additive summaries are also written from the distribution rows:
 

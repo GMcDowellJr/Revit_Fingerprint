@@ -871,6 +871,44 @@ def test_project_used_view_uses_project_and_file_denominators():
     assert out[0]["pct_projects_present"] == "0.666667"
 
 
+def test_single_project_reuse_takes_precedence_over_emerging():
+    rows = [
+        {
+            "view_scope": "used", "governance_role": "Project", "client_label": "Acme",
+            "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
+            "join_hash": "single_project", "pattern_label": "Single Project",
+            "n_files_present": "2", "n_files_denominator": "5",
+            "n_projects_present": "1", "n_projects_denominator": "3",
+            "usage_interpretable": "true", "inventory_status": "ok",
+        }
+    ]
+
+    out = build_pattern_reuse_distribution_rows(rows, "2026-06-22T00:00:00Z")
+
+    assert out[0]["reuse_bucket"] == "single_project"
+    assert out[0]["bucket_basis"] == "projects_in_client_domain"
+
+
+def test_missing_source_identity_degrades_reuse_classification():
+    rows = [
+        {
+            "view_scope": "all", "governance_role": "Project", "client_label": "Acme",
+            "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
+            "join_hash": "partial", "pattern_label": "Partial",
+            "n_files_present": "4", "n_files_denominator": "4",
+            "n_projects_present": "2", "n_projects_denominator": "2",
+            "usage_interpretable": "true", "inventory_status": "ok",
+            "source_status": "missing_source_cluster_id",
+        }
+    ]
+
+    out = build_pattern_reuse_distribution_rows(rows, "2026-06-22T00:00:00Z")
+
+    assert out[0]["reuse_bucket"] == "unclassified"
+    assert out[0]["bucket_basis"] == "source_status"
+    assert out[0]["classification_status"] == "degraded_missing_source_cluster_id"
+
+
 def test_template_all_view_is_not_interpreted_as_active_usage():
     rows = [
         {

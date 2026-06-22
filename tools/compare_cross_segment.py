@@ -1070,12 +1070,12 @@ def _reuse_bucket_for(
         return "client_wide", "files_in_role_client_domain", "ok"
     if n_projects >= REUSE_BUCKET_THRESHOLDS["multi_project_min_projects"] and n_projects_den > 1:
         return "multi_project", "projects_in_client_domain", "ok"
-    if n_files >= REUSE_BUCKET_THRESHOLDS["emerging_min_files"]:
-        return "emerging", "files_in_role_client_domain", "ok"
     if n_files == 1:
         return "single_file", "files_in_role_client_domain", "ok"
     if n_projects == 1:
         return "single_project", "projects_in_client_domain", "ok"
+    if n_files >= REUSE_BUCKET_THRESHOLDS["emerging_min_files"]:
+        return "emerging", "files_in_role_client_domain", "ok"
     return "unclassified", "files_in_role_client_domain", "ok"
 
 
@@ -1129,7 +1129,12 @@ def build_pattern_reuse_distribution_rows(
             key[0], key[1], key[3], key[4], key[5], r.get("join_hash", "")
         ), set()))
         n_clients_den = len(clients_by_group.get(client_group, set()))
-        if r.get("inventory_status") != "ok":
+        if r.get("source_status", "ok") != "ok":
+            bucket, basis, status = (
+                "unclassified", "source_status",
+                "degraded_" + r.get("source_status", "unknown"),
+            )
+        elif r.get("inventory_status") != "ok":
             bucket, basis, status = (
                 "unclassified", "inventory_status",
                 "blocked_" + r.get("inventory_status", "unknown"),
