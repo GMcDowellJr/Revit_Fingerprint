@@ -12,6 +12,7 @@ from compare_cross_segment import (  # noqa: E402
     _recommended_primary_view,
     _usage_interpretable_for_role,
     build_pair_domain_work_items,
+    build_union_inventory_rows,
     discover_domains_for_segment,
     discover_governance_chain,
     load_file_join_hashes,
@@ -542,3 +543,272 @@ def test_main_emits_governance_states_when_pair_skipped_by_min_patterns(tmp_path
         summary_rows = list(csv.DictReader(f))
     assert summary_rows[0]["provided_but_missing_count"] == "2"
     assert summary_rows[0]["provided_missing_share"] == "1.000000"
+
+
+
+def _union_rows_for(tmp_path, manifest, registry, domain="line_patterns"):
+    import compare_cross_segment as ccs
+
+    ccs._jh_cache.clear()
+    ccs._pattern_label_cache.clear()
+    return build_union_inventory_rows(
+        manifest,
+        registry,
+        {},
+        tmp_path / "segments",
+        "2026-06-22T00:00:00Z",
+        domain_filter=domain,
+    )
+
+
+def test_union_inventory_project_all_view_normalized_union(tmp_path):
+    domain = "line_patterns"
+    segments_root = tmp_path / "segments"
+    _write_segment(
+        segments_root,
+        "project",
+        domain,
+        [("p1", "join_a", "Join A"), ("p2", "join_b", "Join B")],
+        [
+            {"export_run_id": "file_1", "pattern_id": "p1"},
+            {"export_run_id": "file_2", "pattern_id": "p2"},
+        ],
+        [{"export_run_id": "file_1", "pattern_id": "p1"}],
+        ["p1", "p2"],
+    )
+    manifest = {"project": {**_seg("Project"), "segment_label": "Project"}}
+    registry = {"project": {"output_folder": "project", "run_type": "bundle"}}
+
+    rows = [r for r in _union_rows_for(tmp_path, manifest, registry, domain) if r["view_scope"] == "all"]
+
+    assert [r["join_hash"] for r in rows] == ["join_a", "join_b"]
+    assert {r["inventory_status"] for r in rows} == {"ok"}
+    assert rows[0]["usage_interpretable"] == "true"
+
+
+def test_union_inventory_project_used_view_normalized_union(tmp_path):
+    domain = "line_patterns"
+    segments_root = tmp_path / "segments"
+    _write_segment(
+        segments_root,
+        "project",
+        domain,
+        [("p1", "join_a", "Join A"), ("p2", "join_b", "Join B")],
+        [
+            {"export_run_id": "file_1", "pattern_id": "p1"},
+            {"export_run_id": "file_2", "pattern_id": "p2"},
+        ],
+        [{"export_run_id": "file_1", "pattern_id": "p1"}],
+        ["p1", "p2"],
+    )
+    manifest = {"project": {**_seg("Project"), "segment_label": "Project"}}
+    registry = {"project": {"output_folder": "project", "run_type": "bundle"}}
+
+    rows = [r for r in _union_rows_for(tmp_path, manifest, registry, domain) if r["view_scope"] == "used"]
+
+    assert len(rows) == 1
+    assert rows[0]["join_hash"] == "join_a"
+    assert rows[0]["n_files_present"] == "1"
+    assert rows[0]["pct_files_present"] == "1.000000"
+
+
+def test_union_inventory_non_project_used_view_not_active_usage(tmp_path):
+    domain = "line_patterns"
+    segments_root = tmp_path / "segments"
+    _write_segment(
+        segments_root,
+        "template",
+        domain,
+        [("t1", "join_a", "Join A")],
+        [{"export_run_id": "template_file", "pattern_id": "t1"}],
+        [{"export_run_id": "template_file", "pattern_id": "t1"}],
+        ["t1"],
+    )
+    manifest = {"template": {**_seg("Template"), "segment_label": "Template"}}
+    registry = {"template": {"output_folder": "template", "run_type": "bundle"}}
+
+    used_rows = [r for r in _union_rows_for(tmp_path, manifest, registry, domain) if r["view_scope"] == "used"]
+
+    assert used_rows[0]["usage_interpretable"] == "false"
+    assert used_rows[0]["inventory_status"] == "not_interpretable"
+
+
+def test_union_inventory_duplicate_join_hash_collapses_counts(tmp_path):
+    domain = "line_patterns"
+    segments_root = tmp_path / "segments"
+    _write_segment(
+        segments_root,
+        "project_a",
+        domain,
+        [("p1", "same_join", "Same"), ("p2", "same_join", "Same")],
+        [
+            {"export_run_id": "file_1", "pattern_id": "p1"},
+            {"export_run_id": "file_2", "pattern_id": "p2"},
+        ],
+        [{"export_run_id": "file_1", "pattern_id": "p1"}],
+        ["p1", "p2"],
+    )
+    _write_segment(
+        segments_root,
+        "project_b",
+        domain,
+        [("x1", "same_join", "Same")],
+        [{"export_run_id": "file_3", "pattern_id": "x1"}],
+        [{"export_run_id": "file_3", "pattern_id": "x1"}],
+        ["x1"],
+    )
+    manifest = {
+        "project_a": {**_seg("Project"), "segment_label": "Project A"},
+        "project_b": {**_seg("Project"), "segment_label": "Project B"},
+    }
+    registry = {
+        "project_a": {"output_folder": "project_a", "run_type": "bundle"},
+        "project_b": {"output_folder": "project_b", "run_type": "bundle"},
+    }
+
+    rows = [r for r in _union_rows_for(tmp_path, manifest, registry, domain) if r["view_scope"] == "all"]
+
+    assert len(rows) == 1
+    assert rows[0]["join_hash"] == "same_join"
+    assert rows[0]["n_segments_present"] == "2"
+    assert rows[0]["n_files_present"] == "3"
+
+
+def test_union_inventory_pattern_id_not_cross_segment_identity(tmp_path):
+    domain = "line_patterns"
+    segments_root = tmp_path / "segments"
+    _write_segment(
+        segments_root,
+        "project_a",
+        domain,
+        [("same_pid", "join_a", "A")],
+        [{"export_run_id": "file_1", "pattern_id": "same_pid"}],
+        [{"export_run_id": "file_1", "pattern_id": "same_pid"}],
+        ["same_pid"],
+    )
+    _write_segment(
+        segments_root,
+        "project_b",
+        domain,
+        [("same_pid", "join_b", "B")],
+        [{"export_run_id": "file_2", "pattern_id": "same_pid"}],
+        [{"export_run_id": "file_2", "pattern_id": "same_pid"}],
+        ["same_pid"],
+    )
+    manifest = {
+        "project_a": {**_seg("Project"), "segment_label": "Project A"},
+        "project_b": {**_seg("Project"), "segment_label": "Project B"},
+    }
+    registry = {
+        "project_a": {"output_folder": "project_a", "run_type": "bundle"},
+        "project_b": {"output_folder": "project_b", "run_type": "bundle"},
+    }
+
+    rows = [r for r in _union_rows_for(tmp_path, manifest, registry, domain) if r["view_scope"] == "all"]
+
+    assert [r["join_hash"] for r in rows] == ["join_a", "join_b"]
+
+
+def test_union_inventory_missing_source_cluster_status_no_synthetic_pattern(tmp_path):
+    domain = "line_patterns"
+    base = tmp_path / "segments" / "project" / "results"
+    _write_csv(
+        base / "analysis" / "domain_patterns.csv",
+        [{"domain": domain, "pattern_id": "p1", "source_cluster_id": "", "pattern_label_human": "", "pattern_label": ""}],
+    )
+    _write_csv(
+        base / "bundle_analysis" / "all" / domain / "membership_matrix.csv",
+        [{"export_run_id": "file_1", "pattern_id": "p1"}],
+    )
+    manifest = {"project": {**_seg("Project"), "segment_label": "Project"}}
+    registry = {"project": {"output_folder": "project", "run_type": "bundle"}}
+
+    rows = _union_rows_for(tmp_path, manifest, registry, domain)
+
+    assert all(row["join_hash"] == "" for row in rows)
+    assert {row["source_status"] for row in rows} == {"missing_source_cluster_id"}
+    assert "no_patterns" in {row["inventory_status"] for row in rows}
+
+
+def test_union_inventory_output_order_is_deterministic(tmp_path):
+    domain = "line_patterns"
+    segments_root = tmp_path / "segments"
+    _write_segment(
+        segments_root,
+        "project",
+        domain,
+        [("p2", "join_b", "B"), ("p1", "join_a", "A")],
+        [
+            {"export_run_id": "file_2", "pattern_id": "p2"},
+            {"export_run_id": "file_1", "pattern_id": "p1"},
+        ],
+        [
+            {"export_run_id": "file_2", "pattern_id": "p2"},
+            {"export_run_id": "file_1", "pattern_id": "p1"},
+        ],
+        ["p2", "p1"],
+    )
+    manifest = {"project": {**_seg("Project"), "segment_label": "Project"}}
+    registry = {"project": {"output_folder": "project", "run_type": "bundle"}}
+
+    first = _union_rows_for(tmp_path, manifest, registry, domain)
+    second = _union_rows_for(tmp_path, manifest, registry, domain)
+
+    assert first == second
+    assert [(r["view_scope"], r["join_hash"]) for r in first] == [
+        ("all", "join_a"),
+        ("all", "join_b"),
+        ("used", "join_a"),
+        ("used", "join_b"),
+    ]
+
+
+def test_union_inventory_used_view_unavailable_keeps_source_status_ok(tmp_path):
+    domain = "line_patterns"
+    base = tmp_path / "segments" / "project" / "results"
+    _write_csv(
+        base / "analysis" / "domain_patterns.csv",
+        [{"domain": domain, "pattern_id": "p1", "source_cluster_id": "src|join_a", "pattern_label_human": "A", "pattern_label": "A"}],
+    )
+    _write_csv(
+        base / "bundle_analysis" / "all" / domain / "membership_matrix.csv",
+        [{"export_run_id": "file_1", "pattern_id": "p1"}],
+    )
+    manifest = {"project": {**_seg("Project"), "segment_label": "Project"}}
+    registry = {"project": {"output_folder": "project", "run_type": "bundle"}}
+
+    rows = [r for r in _union_rows_for(tmp_path, manifest, registry, domain) if r["view_scope"] == "used"]
+
+    assert rows == [
+        {
+            "governance_role": "Project",
+            "client_label": "Acme",
+            "discipline_label": "Arch",
+            "unit_system": "imperial",
+            "domain": domain,
+            "view_scope": "used",
+            "join_hash": "",
+            "pattern_label": "",
+            "n_segments_present": "0",
+            "n_files_present": "0",
+            "pct_files_present": "0.000000",
+            "n_projects_present": "0",
+            "pct_projects_present": "0.000000",
+            "usage_interpretable": "true",
+            "inventory_status": "used_view_unavailable",
+            "source_status": "ok",
+            "executed_utc": "2026-06-22T00:00:00Z",
+        }
+    ]
+
+
+def test_union_inventory_missing_domain_patterns_keeps_source_status_ok(tmp_path):
+    domain = "line_patterns"
+    (tmp_path / "segments" / "project").mkdir(parents=True)
+    manifest = {"project": {**_seg("Project"), "segment_label": "Project"}}
+    registry = {"project": {"output_folder": "project", "run_type": "bundle"}}
+
+    rows = _union_rows_for(tmp_path, manifest, registry, domain)
+
+    assert {row["inventory_status"] for row in rows} == {"missing_domain_patterns"}
+    assert {row["source_status"] for row in rows} == {"ok"}

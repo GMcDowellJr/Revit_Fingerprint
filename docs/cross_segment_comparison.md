@@ -438,3 +438,41 @@ Bundle overlap annotation (`all_n_shared_bundle_*`, `used_n_shared_bundle_*`) re
 ### No cross-unit-system pairs
 
 All pair discovery rules enforce matching `unit_system`. Imperial and metric segments are never compared. This is intentional — join_hashes for the same logical pattern differ between unit systems because behavioral hashes include unit-bearing values.
+
+### cross_segment_union_inventory.csv
+
+`cross_segment_union_inventory.csv` is an additive cross-segment output that makes the normalized union inventory explicit. It is emitted alongside the existing cross-segment comparison outputs and does not change `cross_segment_summary.csv`, `cross_segment_file_pairs.csv`, `cross_segment_pooled.csv`, governance-state outputs, fingerprints, hashes, or existing schemas.
+
+#### Grain and identity
+
+The file has one row per `(governance_role, client_label, discipline_label, unit_system, domain, view_scope, join_hash)`.
+
+`join_hash` is the identity unit. The loader follows the existing normalized identity path:
+
+`membership_matrix.csv.pattern_id → domain_patterns.csv.source_cluster_id.split("|")[-1] → join_hash`
+
+Raw local `pattern_id` values are not used as cross-segment identities. Multiple files, segments, or local pattern ids that resolve to the same `join_hash` collapse into one union row for the same inventory grain.
+
+#### Views
+
+`view_scope=all` reports the configured/provided normalized inventory. `view_scope=used` reports rows only when a used-view membership source is available. Used-view is an active-practice signal primarily for `Project` role rows. When used-view rows exist for non-Project roles, `usage_interpretable=false` and `inventory_status=not_interpretable`; these rows must not be read as unused-bloat findings.
+
+#### Count fields
+
+- `n_segments_present`: number of runnable segments in the grain that contain the `join_hash`.
+- `n_files_present`: number of files in the grain/view that contain the `join_hash`.
+- `pct_files_present`: `n_files_present` divided by files with any inventory in that grain/view.
+- `n_projects_present`: number of project labels represented by files containing the `join_hash`; when file metadata has no project label, the export run id is used as a stable fallback label for counting.
+- `pct_projects_present`: `n_projects_present` divided by projects represented by files with any inventory in that grain/view.
+
+#### Status fields
+
+- `inventory_status=ok`: normalized union rows were emitted and the view is interpretable for the role.
+- `inventory_status=no_patterns`: domain pattern rows exist but no valid normalized `join_hash` inventory can be produced.
+- `inventory_status=missing_domain_patterns`: the segment/domain is missing `domain_patterns.csv` input.
+- `inventory_status=missing_membership_matrix`: reserved status for membership-required future producers.
+- `inventory_status=used_view_unavailable`: used-view rows cannot be produced from available inputs without inference.
+- `inventory_status=not_interpretable`: rows exist, but the role's used-view semantics are not active-practice semantics.
+- `source_status=ok`: source rows resolved to canonical `join_hash` identities.
+- `source_status=missing_source_cluster_id`: one or more source rows lacked `source_cluster_id`; no synthetic `join_hash` is invented.
+
