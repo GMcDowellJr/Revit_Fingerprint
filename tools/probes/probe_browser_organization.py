@@ -1,12 +1,13 @@
 import json
 import traceback
 
-# probe_browser_organization_v7
+# probe_browser_organization_v8
 # Run against the TEMPLATE file (not a project file).
 # The template should have "Discipline - View Classification" active.
 #
 # Hypotheses to test:
-#   1. org.Id.IntegerValue == 4261 (self-reference was the circularity cause)
+#   1. BrowserOrganization.Id is the tree root seed, not the grouping parameter id
+#      (the observed 4261/2617 values are ParameterElement ids).
 #   2. Positive FolderItemInfo.ElementIds != org.Id are shared param definition elements
 #   3. doc.GetElement(positive_eid) resolves to a named shared parameter element
 #   4. Multi-level grouping: GetFolderItems(shared_param_eid) returns next level's items
@@ -14,14 +15,16 @@ import traceback
 #   6. FolderItemInfo.Name is not reliable enough for canonical names; compare it
 #      against RevitLookup-style sources (Element.Name, Definition.Name, and
 #      LabelUtils.GetLabelFor for built-ins).
+#   7. Repeated FolderItemInfo.ElementId values during recursion are cycle
+#      references to the current grouping parameter and must not become children.
 #
 # Extraction model:
 #   FolderItemInfo.ElementId < 0  → BIP (built-in parameter)
-#   FolderItemInfo.ElementId == org.Id → self-reference, skip
+#   FolderItemInfo.ElementId == current tree seed or org.Id → cycle/self-reference, skip
 #   FolderItemInfo.ElementId > 0, != org.Id → shared parameter element
 
 findings = {
-    "probe": "browser_organization_v7",
+    "probe": "browser_organization_v8",
     "status": "ok",
     "imports": {},
     "doc_is_family": None,
@@ -32,7 +35,8 @@ findings = {
         "reference": "reference/revit_lookup uses Element.Name for elements, Parameter.Definition.Name for parameters, and Definition.Name/BuiltInParameter.ToString() for definitions.",
         "folder_item_type_names": [],
         "folder_item_member_samples": {},
-        "warnings": [],
+        "conclusions": [],
+        "warning_counts": {},
     },
     "sort_by_probe": {},
     "errors": [],
@@ -54,6 +58,9 @@ def _int_enum(val):
 def _append_unique(seq, value):
     if value not in seq:
         seq.append(value)
+
+def _increment_count(mapping, key):
+    mapping[key] = mapping.get(key, 0) + 1
 
 def _clean_name(value):
     text = _safe(value)
@@ -132,10 +139,19 @@ def _best_name(rec, item_name=None):
         rec["display_name"] = rec["name_candidates"][0]["value"]
         rec["display_name_source"] = rec["name_candidates"][0]["source"]
 
-def _resolve_folder_item(item_eid_int, org_id_int, doc, bip_lookup):
+def _record_name_warning(eid_int, source):
+    key = "FolderItemInfo.Name returned ??? for {}; using {} instead.".format(
+        eid_int, source
+    )
+    _increment_count(findings["name_probe"]["warning_counts"], key)
+
+def _resolve_folder_item(item_eid_int, org_id_int, current_seed_eid_int, doc, bip_lookup):
     """Classify and resolve a FolderItemInfo.ElementId."""
     rec = {"eid_int": item_eid_int}
-    if item_eid_int == org_id_int:
+    if item_eid_int == current_seed_eid_int:
+        rec["kind"] = "cycle_reference"
+        rec["skip"] = True
+    elif item_eid_int == org_id_int:
         rec["kind"] = "self_reference"
         rec["skip"] = True
     elif item_eid_int < 0:
@@ -218,16 +234,12 @@ def _walk_tree(org, org_id_int, doc, bip_lookup, seed_eid_int, depth=0, visited=
             eid_int = item.ElementId.IntegerValue
         except Exception:
             continue
-        resolved = _resolve_folder_item(eid_int, org_id_int, doc, bip_lookup)
+        resolved = _resolve_folder_item(eid_int, org_id_int, seed_eid_int, doc, bip_lookup)
         item_name = _safe(item.Name)
         resolved["folder_item_name"] = item_name
         _best_name(resolved, item_name)
         if item_name == "???" and resolved.get("display_name"):
-            findings["name_probe"]["warnings"].append(
-                "FolderItemInfo.Name returned ??? for {}; using {} instead.".format(
-                    eid_int, resolved.get("display_name_source")
-                )
-            )
+            _record_name_warning(eid_int, resolved.get("display_name_source"))
 
         # Recurse into non-self, non-BIP, non-visited items
         if not resolved.get("skip") and resolved.get("kind") == "element" and eid_int not in visited:
@@ -353,6 +365,15 @@ try:
                     findings["filter_probe"]["Filter_param"]["AsInteger"] = p.AsInteger()
     except Exception as e:
         findings["filter_probe"]["Filter_param_error"] = str(e)
+
+    if findings["name_probe"]["folder_item_member_samples"]:
+        findings["name_probe"]["conclusions"].append(
+            "FolderItemInfo exposes only ElementId and Name; Name returned ??? in the observed template, so canonical names must be resolved from ElementId."
+        )
+    if findings["name_probe"]["warning_counts"]:
+        findings["name_probe"]["conclusions"].append(
+            "Name fallback is expected: built-ins resolve through LabelUtils.GetLabelFor/BuiltInParameter, and positive ids resolve through ParameterElement.GetDefinition().Name."
+        )
 
 except Exception as e:
     findings["status"] = "failed"
