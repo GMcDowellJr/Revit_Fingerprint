@@ -290,6 +290,25 @@ REUSE_DISTRIBUTION_FIELDS: List[str] = [
     "executed_utc",
 ]
 
+
+
+MATRIX_OUTPUT_FIELDS: List[str] = [
+    "matrix_name", "row_id", "column_id", "view_scope", "domain", "metric",
+    "value", "value_status", "self_comparison", "interpretation", "executed_utc",
+]
+
+FRAGMENTATION_DIAGNOSTIC_FIELDS: List[str] = [
+    "matrix_name", "row_id", "column_id", "view_scope", "domain",
+    "footprint_similarity", "exact_identity_overlap", "fragmentation_diagnostic",
+    "value_status", "interpretation", "executed_utc",
+]
+
+MATRIX_MANIFEST_FIELDS: List[str] = [
+    "matrix_name", "governance_role", "view_scope", "source_file",
+    "source_grain", "metric", "identity_unit", "aggregation_method",
+    "interpretation", "known_limitations", "executed_utc",
+]
+
 REUSE_SUMMARY_FIELDS: List[str] = [
     "view_scope",
     "governance_role",
@@ -2527,6 +2546,246 @@ def run_pooled_comparison(
     return rows
 
 
+
+# ---------------------------------------------------------------------------
+# Explicit matrix/reporting outputs
+# ---------------------------------------------------------------------------
+
+def _matrix_group_id_from_values(
+    role: str,
+    client: str,
+    discipline: str,
+    unit_system: str,
+) -> str:
+    return "|".join([role, client, discipline, unit_system])
+
+
+def _matrix_group_id(row: Dict[str, str]) -> str:
+    return _matrix_group_id_from_values(
+        row.get("governance_role", ""),
+        row.get("client_label", ""),
+        row.get("discipline_label", ""),
+        row.get("unit_system", ""),
+    )
+
+
+def _label_by_project_group(summary_rows: List[Dict[str, str]]) -> Dict[str, str]:
+    labels: Dict[str, Set[str]] = defaultdict(set)
+    for row in summary_rows:
+        for suffix in ("a", "b"):
+            if _role_key(row.get(f"governance_role_{suffix}", "")) != "project":
+                continue
+            group_id = _matrix_group_id_from_values(
+                row.get(f"governance_role_{suffix}", ""),
+                row.get(f"client_label_{suffix}", ""),
+                row.get(f"discipline_label_{suffix}", ""),
+                row.get("unit_system", ""),
+            )
+            label = row.get(f"segment_label_{suffix}", "").strip() or row.get(f"segment_id_{suffix}", "").strip()
+            if group_id and label:
+                labels[group_id].add(label)
+    return {group_id: next(iter(values)) for group_id, values in labels.items() if len(values) == 1}
+
+
+def _jaccard_sets(a: Set[str], b: Set[str]) -> Optional[float]:
+    union = a | b
+    if not union:
+        return None
+    return len(a & b) / len(union)
+
+
+def _cosine_similarity(a: Dict[str, float], b: Dict[str, float]) -> Optional[float]:
+    keys = set(a) | set(b)
+    if not keys:
+        return None
+    dot = sum(a.get(k, 0.0) * b.get(k, 0.0) for k in keys)
+    na = sum(a.get(k, 0.0) ** 2 for k in keys) ** 0.5
+    nb = sum(b.get(k, 0.0) ** 2 for k in keys) ** 0.5
+    if na == 0.0 or nb == 0.0:
+        return None
+    return dot / (na * nb)
+
+
+def build_explicit_matrix_outputs(
+    summary_rows: List[Dict[str, str]],
+    pooled_rows: List[Dict[str, str]],
+    union_inventory_rows: List[Dict[str, str]],
+    executed_utc: str,
+) -> Tuple[Dict[str, List[Dict[str, str]]], List[Dict[str, str]], List[Dict[str, str]]]:
+    """Build metric-specific matrix outputs with explicit semantics.
+
+    Returns (matrix_rows_by_filename, fragmentation_rows, manifest_rows). Missing
+    union inventory blocks union/density matrices by emitting unavailable-status
+    rows in their named outputs rather than falling back to file-pair signals.
+    """
+    outputs: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+    manifests: List[Dict[str, str]] = []
+    label_by_group = _label_by_project_group(summary_rows)
+
+    def add_manifest(name: str, role: str, view: str, source: str, grain: str,
+                     metric: str, identity: str, agg: str, interp: str, limits: str) -> None:
+        manifests.append({
+            "matrix_name": name, "governance_role": role, "view_scope": view,
+            "source_file": source, "source_grain": grain, "metric": metric,
+            "identity_unit": identity, "aggregation_method": agg,
+            "interpretation": interp, "known_limitations": limits,
+            "executed_utc": executed_utc,
+        })
+
+    def add_matrix(filename: str, row_id: str, col_id: str, view: str, domain: str,
+                   metric: str, value: Optional[float], status: str, interp: str) -> None:
+        outputs[filename].append({
+            "matrix_name": filename, "row_id": row_id, "column_id": col_id,
+            "view_scope": view, "domain": domain, "metric": metric,
+            "value": _fmt(value) if isinstance(value, float) else "",
+            "value_status": status, "self_comparison": _bool_str(row_id == col_id),
+            "interpretation": interp, "executed_utc": executed_utc,
+        })
+
+    ok_union = [r for r in union_inventory_rows if r.get("inventory_status") == "ok" and r.get("join_hash", "").strip()]
+    project_ok_union = [r for r in ok_union if _role_key(r.get("governance_role", "")) == "project"]
+    if not union_inventory_rows or not ok_union or not project_ok_union:
+        if not union_inventory_rows:
+            status = "blocked_missing_union_inventory"
+        elif not ok_union:
+            status = "blocked_no_ok_union_inventory"
+        else:
+            status = "blocked_no_ok_project_union_inventory"
+        for filename, metric in [
+            ("project_union_jaccard_matrix.csv", "union_jaccard"),
+            ("project_density_similarity_matrix.csv", "density_similarity"),
+        ]:
+            add_matrix(filename, "unavailable", "unavailable", "unavailable", "", metric, None, status,
+                       "Union-derived matrix blocked because normalized project union inventory is unavailable.")
+    else:
+        by_group_view: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
+        by_group_view_domain: Dict[Tuple[str, str, str], Set[str]] = defaultdict(set)
+        for r in project_ok_union:
+            raw_gid = _matrix_group_id(r)
+            gid = label_by_group.get(raw_gid, raw_gid)
+            view = r.get("view_scope", "")
+            domain = r.get("domain", "")
+            jh = r.get("join_hash", "")
+            by_group_view[(gid, view)].add(jh)
+            by_group_view_domain[(gid, view, domain)].add(jh)
+        for view in sorted({v for _, v in by_group_view}):
+            ids = sorted(g for g, v in by_group_view if v == view)
+            for a in ids:
+                for b in ids:
+                    value = 1.0 if a == b else _jaccard_sets(by_group_view[(a, view)], by_group_view[(b, view)])
+                    add_matrix("project_union_jaccard_matrix.csv", a, b, view, "ALL_DOMAINS", "union_jaccard", value, "ok",
+                               "Jaccard between normalized project-level join_hash unions; answers whether systems contain the same canonical patterns.")
+        vectors: Dict[Tuple[str, str], Dict[str, float]] = defaultdict(dict)
+        for (gid, view, domain), jhs in by_group_view_domain.items():
+            vectors[(gid, view)][domain] = float(len(jhs))
+        for view in sorted({v for _, v in vectors}):
+            ids = sorted(g for g, v in vectors if v == view)
+            for a in ids:
+                for b in ids:
+                    value = 1.0 if a == b else _cosine_similarity(vectors[(a, view)], vectors[(b, view)])
+                    add_matrix("project_density_similarity_matrix.csv", a, b, view, "ALL_DOMAINS", "density_similarity", value, "ok",
+                               "Cosine similarity of domain pattern-density vectors; absent domains are treated as zero occupancy by definition.")
+    add_manifest("project_union_jaccard_matrix.csv", "Project", "all,used", "cross_segment_union_inventory.csv", "role/client/discipline/unit/domain/view/join_hash", "union_jaccard", "normalized join_hash", "Jaccard on system-level unions", "Do these project scopes contain/use the same canonical patterns?", "Requires PR 1 union inventory; not a file-to-file similarity score.")
+    add_manifest("project_density_similarity_matrix.csv", "Project", "all,used", "cross_segment_union_inventory.csv", "role/client/discipline/unit/domain/view/join_hash", "density_similarity", "domain pattern count", "Cosine similarity over domain occupancy counts", "Are domains populated to similar degrees?", "Treats absent domains as zero occupancy; does not measure exact identity overlap.")
+
+    # Existing file-pair mean Jaccard preserved under explicit name. Domain rows
+    # remain available, and an explicit ALL_DOMAINS aggregate is added so
+    # fragmentation diagnostics never collapse an arbitrary domain into an
+    # all-domain union comparison.
+    project_summary = [r for r in summary_rows if _role_key(r.get("governance_role_a", "")) == "project" and _role_key(r.get("governance_role_b", "")) == "project"]
+    file_pair_values: Dict[Tuple[str, str, str], List[Tuple[str, float]]] = defaultdict(list)
+    file_pair_ids_by_view: Dict[str, Set[str]] = defaultdict(set)
+    file_pair_domains_by_id_view: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
+    for r in sorted(project_summary, key=lambda x: (
+        x.get("segment_label_a") or x.get("segment_id_a", ""),
+        x.get("segment_label_b") or x.get("segment_id_b", ""),
+        x.get("domain", ""),
+    )):
+        row_id = r.get("segment_label_a") or r.get("segment_id_a", "")
+        col_id = r.get("segment_label_b") or r.get("segment_id_b", "")
+        for view, col in [("all", "all_jaccard_mean"), ("used", "used_jaccard_mean")]:
+            raw = r.get(col, "")
+            value = float(raw) if raw else None
+            status = "ok" if raw else "unavailable"
+            add_matrix("project_mean_file_pair_jaccard_matrix.csv", row_id, col_id, view, r.get("domain", ""),
+                       "mean_file_pair_jaccard", value, status,
+                       "Mean of pairwise file Jaccard comparisons; answers whether individual files are typically similar across groups.")
+            if row_id != col_id:
+                add_matrix("project_mean_file_pair_jaccard_matrix.csv", col_id, row_id, view, r.get("domain", ""),
+                           "mean_file_pair_jaccard", value, status,
+                           "Symmetric mean file-pair Jaccard cell mirrored from the observed unordered project pair.")
+            if raw:
+                for a_id, b_id in [(row_id, col_id), (col_id, row_id)]:
+                    file_pair_values[(a_id, b_id, view)].append((r.get("domain", ""), float(raw)))
+                file_pair_ids_by_view[view].update([row_id, col_id])
+                if r.get("domain", ""):
+                    file_pair_domains_by_id_view[(row_id, view)].add(r.get("domain", ""))
+                    file_pair_domains_by_id_view[(col_id, view)].add(r.get("domain", ""))
+    for (row_id, col_id, view), values in sorted(file_pair_values.items()):
+        if values:
+            aggregate = sum(v for _domain, v in sorted(values)) / len(values)
+            add_matrix("project_mean_file_pair_jaccard_matrix.csv", row_id, col_id, view, "ALL_DOMAINS",
+                       "mean_file_pair_jaccard", aggregate, "ok",
+                       "Mean of domain-level mean file-pair Jaccard values; aligned to all-domain union_jaccard for diagnostics.")
+    existing_pair_keys = {
+        (r["row_id"], r["column_id"], r["view_scope"], r["domain"])
+        for r in outputs.get("project_mean_file_pair_jaccard_matrix.csv", [])
+    }
+    for view, ids in sorted(file_pair_ids_by_view.items()):
+        for row_id in sorted(ids):
+            observed_domains = file_pair_domains_by_id_view.get((row_id, view), set())
+            for domain in sorted(observed_domains | ({"ALL_DOMAINS"} if observed_domains else set())):
+                key = (row_id, row_id, view, domain)
+                if key in existing_pair_keys:
+                    continue
+                add_matrix("project_mean_file_pair_jaccard_matrix.csv", row_id, row_id, view, domain,
+                           "mean_file_pair_jaccard", 1.0, "synthetic_self_comparison",
+                           "Synthetic deterministic self-comparison cell for square matrix pivots; not an observed file-pair comparison.")
+                existing_pair_keys.add(key)
+    add_manifest("project_mean_file_pair_jaccard_matrix.csv", "Project", "all,used", "cross_segment_summary.csv", "segment_pair/domain plus deterministic ALL_DOMAINS aggregate", "mean_file_pair_jaccard", "file join_hash set", "Mean of file-pair Jaccard values; ALL_DOMAINS is the mean across available domain means", "Are individual files typically similar across project groups?", "Not equivalent to union_jaccard; can diverge when file inventories are partitioned differently.")
+
+    for r in pooled_rows:
+        if _role_key(r.get("governance_role", "")) != "project":
+            continue
+        row_id = r.get("segment_label") or r.get("segment_id", "")
+        col_id = f"peer_pool:{row_id}"
+        for view, col in [("all", "all_containment_focal_in_pool"), ("used", "used_containment_focal_in_pool")]:
+            raw = r.get(col, "")
+            add_matrix("project_pool_containment_similarity_matrix.csv", row_id, col_id, view, r.get("domain", ""),
+                       "pool_containment_similarity", float(raw) if raw else None, "ok" if raw else "unavailable",
+                       "Focal-in-peer-pool containment; answers how much each system aligns with its peer pool.")
+    add_manifest("project_pool_containment_similarity_matrix.csv", "Project", "all,used", "cross_segment_pooled.csv", "focal_segment/domain/peer_pool", "pool_containment_similarity", "normalized join_hash", "Focal union contained in sibling pool union", "How much does each project system align with its peer pool?", "Peer pools derive only from existing manifest sibling grain; no new authority taxonomy is inferred.")
+
+    # Diagnostic: union footprint minus exact mean identity overlap, only when both inputs are available.
+    union_index = {(r["row_id"], r["column_id"], r["view_scope"], r["domain"]): r for r in outputs.get("project_union_jaccard_matrix.csv", []) if r.get("value_status") == "ok" and r.get("domain") == "ALL_DOMAINS"}
+    pair_index = {(r["row_id"], r["column_id"], r["view_scope"], r["domain"]): r for r in outputs.get("project_mean_file_pair_jaccard_matrix.csv", []) if r.get("value_status") == "ok" and r.get("domain") == "ALL_DOMAINS"}
+    frag_rows: List[Dict[str, str]] = []
+    for key in sorted(set(union_index) & set(pair_index)):
+        u = float(union_index[key]["value"])
+        p = float(pair_index[key]["value"])
+        frag_rows.append({
+            "matrix_name": "project_fragmentation_diagnostic.csv",
+            "row_id": key[0], "column_id": key[1], "view_scope": key[2], "domain": key[3],
+            "footprint_similarity": _fmt(u), "exact_identity_overlap": _fmt(p),
+            "fragmentation_diagnostic": _fmt(u - p), "value_status": "diagnostic",
+            "interpretation": "Diagnostic difference between union footprint similarity and mean exact file identity overlap; not a mathematically authoritative index.",
+            "executed_utc": executed_utc,
+        })
+    if not frag_rows:
+        frag_rows.append({
+            "matrix_name": "project_fragmentation_diagnostic.csv", "row_id": "unavailable",
+            "column_id": "unavailable", "view_scope": "unavailable", "domain": "ALL_DOMAINS",
+            "footprint_similarity": "", "exact_identity_overlap": "", "fragmentation_diagnostic": "",
+            "value_status": "unavailable_required_inputs", "interpretation": "Requires both union_jaccard and mean_file_pair_jaccard inputs.",
+            "executed_utc": executed_utc,
+        })
+    add_manifest("project_fragmentation_diagnostic.csv", "Project", "all,used", "project_union_jaccard_matrix.csv + project_mean_file_pair_jaccard_matrix.csv", "matrix cell", "fragmentation_diagnostic", "normalized join_hash", "union_jaccard minus mean_file_pair_jaccard when both are available", "Highlights divergence between footprint overlap and exact per-file identity overlap.", "Diagnostic only; do not treat as an authoritative governance index.")
+
+    for rows in outputs.values():
+        rows.sort(key=lambda r: (r["matrix_name"], r["row_id"], r["column_id"], r["view_scope"], r["domain"], r["metric"]))
+    manifests.sort(key=lambda r: (r["matrix_name"], r["governance_role"], r["view_scope"]))
+    return dict(outputs), frag_rows, manifests
+
 # ---------------------------------------------------------------------------
 # Segment validation
 # ---------------------------------------------------------------------------
@@ -2921,6 +3180,9 @@ def main() -> int:
     reuse_summary_by_client_rows = build_pattern_reuse_summary_rows(
         reuse_distribution_rows, by_client=True
     )
+    matrix_outputs, fragmentation_rows, matrix_manifest_rows = build_explicit_matrix_outputs(
+        summary_rows, pooled_rows, union_inventory_rows, executed_utc
+    )
 
     # Write outputs
     if summary_rows:
@@ -3028,6 +3290,23 @@ def main() -> int:
             f"[compare] wrote {len(reuse_distribution_rows)} rows → "
             f"{out_dir / 'pattern_reuse_distribution.csv'}"
         )
+
+    if matrix_outputs or fragmentation_rows or matrix_manifest_rows:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for filename, rows in sorted(matrix_outputs.items()):
+            atomic_write_csv(out_dir / filename, MATRIX_OUTPUT_FIELDS, rows)
+            print(f"[compare] wrote {len(rows)} rows → {out_dir / filename}")
+        atomic_write_csv(
+            out_dir / "project_fragmentation_diagnostic.csv",
+            FRAGMENTATION_DIAGNOSTIC_FIELDS,
+            fragmentation_rows,
+        )
+        atomic_write_csv(
+            out_dir / "matrix_output_manifest.csv",
+            MATRIX_MANIFEST_FIELDS,
+            matrix_manifest_rows,
+        )
+        print(f"[compare] wrote {len(matrix_manifest_rows)} rows → {out_dir / 'matrix_output_manifest.csv'}")
 
     if not summary_rows and not pooled_rows and not governance_state_rows and not union_inventory_rows:
         print("[compare] no comparison rows produced — check segment data and min-patterns threshold")
