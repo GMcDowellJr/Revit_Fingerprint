@@ -242,6 +242,27 @@ GOVERNANCE_STATE_FIELDS: List[str] = [
     "executed_utc",
 ]
 
+
+UNION_INVENTORY_FIELDS: List[str] = [
+    "governance_role",
+    "client_label",
+    "discipline_label",
+    "unit_system",
+    "domain",
+    "view_scope",
+    "join_hash",
+    "pattern_label",
+    "n_segments_present",
+    "n_files_present",
+    "pct_files_present",
+    "n_projects_present",
+    "pct_projects_present",
+    "usage_interpretable",
+    "inventory_status",
+    "source_status",
+    "executed_utc",
+]
+
 GOVERNANCE_STATE_SUMMARY_FIELDS: List[str] = [
     "comparison_run_id",
     "comparison_type",
@@ -768,6 +789,203 @@ def load_file_join_hashes(
     if single_export_run_id:
         result[single_export_run_id] = set(pattern_join_hashes.values())
     return dict(result)
+
+
+
+def _segment_domain_source_status(
+    segments_root: Path,
+    registry: Dict[str, Dict[str, str]],
+    segment_id: str,
+    domain: str,
+) -> Tuple[str, int]:
+    """Return (source_status, missing_source_cluster_count) for a segment/domain."""
+    seg_out = segment_output_dir(segments_root, registry, segment_id)
+    if seg_out is None:
+        return "missing_domain_patterns", 0
+    dp_path = domain_patterns_path(seg_out)
+    if not dp_path.exists():
+        return "missing_domain_patterns", 0
+    domain_rows = [
+        row for row in read_csv_rows(dp_path)
+        if row.get("domain", "").strip() == domain
+    ]
+    if not domain_rows:
+        return "no_patterns", 0
+    missing = sum(
+        1 for row in domain_rows
+        if row.get("pattern_id", "").strip()
+        and not row.get("source_cluster_id", "").strip()
+    )
+    valid = any(
+        row.get("pattern_id", "").strip()
+        and row.get("source_cluster_id", "").strip()
+        for row in domain_rows
+    )
+    if not valid:
+        return "no_patterns", missing
+    return "ok", missing
+
+
+def _load_segment_file_join_hashes_with_status(
+    segments_root: Path,
+    registry: Dict[str, Dict[str, str]],
+    segment_id: str,
+    domain: str,
+    view_scope: str,
+) -> Tuple[Dict[str, Set[str]], str, int]:
+    """Load file join_hashes plus explicit status for union inventory output."""
+    source_status, missing_scid = _segment_domain_source_status(
+        segments_root, registry, segment_id, domain
+    )
+    if source_status == "missing_domain_patterns":
+        return {}, "missing_domain_patterns", missing_scid
+    if source_status == "no_patterns":
+        return {}, "no_patterns", missing_scid
+
+    seg_out = segment_output_dir(segments_root, registry, segment_id)
+    if seg_out is None:
+        return {}, "missing_domain_patterns", missing_scid
+    mm_path = bundle_analysis_dir(seg_out, domain, view_scope) / "membership_matrix.csv"
+    if view_scope == "used" and not mm_path.exists():
+        return {}, "used_view_unavailable", missing_scid
+
+    files = load_file_join_hashes(segments_root, registry, segment_id, domain, view_scope)
+    if files:
+        return files, "ok", missing_scid
+    if view_scope == "all":
+        return {}, "no_patterns", missing_scid
+    return {}, "used_view_unavailable", missing_scid
+
+
+def _project_label_for_file(file_metadata: Dict[str, Dict[str, str]], export_run_id: str) -> str:
+    return file_metadata.get(export_run_id, {}).get("project_label", "").strip() or export_run_id
+
+
+def build_union_inventory_rows(
+    manifest: Dict[str, Dict[str, str]],
+    registry: Dict[str, Dict[str, str]],
+    file_metadata: Dict[str, Dict[str, str]],
+    segments_root: Path,
+    executed_utc: str,
+    domain_filter: Optional[str] = None,
+) -> List[Dict[str, str]]:
+    """Build normalized union inventory rows at governance/client/discipline/unit/domain/view/join_hash grain."""
+    groups: Dict[Tuple[str, str, str, str, str], List[str]] = defaultdict(list)
+    for segment_id, mrow in manifest.items():
+        if not segment_is_runnable(registry, segment_id):
+            continue
+        domains = {domain_filter} if domain_filter else discover_domains_for_segment(
+            segments_root, registry, segment_id
+        )
+        for domain in sorted(d for d in domains if d):
+            groups[(
+                mrow.get("governance_role", "").strip(),
+                mrow.get("client_label", "").strip(),
+                mrow.get("discipline_label", "").strip(),
+                mrow.get("unit_system", "").strip(),
+                domain,
+            )].append(segment_id)
+
+    rows: List[Dict[str, str]] = []
+    for (role, client, discipline, unit_system, domain), segment_ids in sorted(groups.items()):
+        for view_scope in ("all", "used"):
+            usage_ok = _usage_interpretable_for_role(role)
+            by_jh: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: {
+                "segments": set(), "files": set(), "projects": set()
+            })
+            labels: Dict[str, str] = {}
+            statuses: Set[str] = set()
+            missing_scid_total = 0
+            denominator_files: Set[str] = set()
+            denominator_projects: Set[str] = set()
+
+            for segment_id in sorted(segment_ids):
+                files, status, missing_scid = _load_segment_file_join_hashes_with_status(
+                    segments_root, registry, segment_id, domain, view_scope
+                )
+                statuses.add(status)
+                missing_scid_total += missing_scid
+                for jh, label in load_pattern_labels(segments_root, registry, segment_id, domain).items():
+                    labels.setdefault(jh, label)
+                for export_run_id, join_hashes in files.items():
+                    if join_hashes:
+                        denominator_files.add(export_run_id)
+                        denominator_projects.add(_project_label_for_file(file_metadata, export_run_id))
+                    for join_hash in join_hashes:
+                        entry = by_jh[join_hash]
+                        entry["segments"].add(segment_id)
+                        entry["files"].add(export_run_id)
+                        entry["projects"].add(_project_label_for_file(file_metadata, export_run_id))
+
+            if view_scope == "used" and not usage_ok and by_jh:
+                inventory_status = "not_interpretable"
+            elif by_jh:
+                inventory_status = "ok"
+            elif "missing_domain_patterns" in statuses:
+                inventory_status = "missing_domain_patterns"
+            elif view_scope == "used" and "used_view_unavailable" in statuses:
+                inventory_status = "used_view_unavailable"
+            elif statuses == {"no_patterns"} or "no_patterns" in statuses:
+                inventory_status = "no_patterns"
+            else:
+                inventory_status = "ok"
+
+            source_status = "ok" if missing_scid_total == 0 else "missing_source_cluster_id"
+            if not by_jh:
+                if inventory_status in {"ok", "not_interpretable"}:
+                    continue
+                rows.append({
+                    "governance_role": role,
+                    "client_label": client,
+                    "discipline_label": discipline,
+                    "unit_system": unit_system,
+                    "domain": domain,
+                    "view_scope": view_scope,
+                    "join_hash": "",
+                    "pattern_label": "",
+                    "n_segments_present": "0",
+                    "n_files_present": "0",
+                    "pct_files_present": "0.000000",
+                    "n_projects_present": "0",
+                    "pct_projects_present": "0.000000",
+                    "usage_interpretable": _bool_str(usage_ok),
+                    "inventory_status": inventory_status,
+                    "source_status": source_status if source_status != "ok" else inventory_status,
+                    "executed_utc": executed_utc,
+                })
+                continue
+
+            file_den = len(denominator_files)
+            project_den = len(denominator_projects)
+            for join_hash in sorted(by_jh):
+                entry = by_jh[join_hash]
+                n_files = len(entry["files"])
+                n_projects = len(entry["projects"])
+                rows.append({
+                    "governance_role": role,
+                    "client_label": client,
+                    "discipline_label": discipline,
+                    "unit_system": unit_system,
+                    "domain": domain,
+                    "view_scope": view_scope,
+                    "join_hash": join_hash,
+                    "pattern_label": labels.get(join_hash, ""),
+                    "n_segments_present": str(len(entry["segments"])),
+                    "n_files_present": str(n_files),
+                    "pct_files_present": _fmt(n_files / file_den) if file_den else "0.000000",
+                    "n_projects_present": str(n_projects),
+                    "pct_projects_present": _fmt(n_projects / project_den) if project_den else "0.000000",
+                    "usage_interpretable": _bool_str(usage_ok),
+                    "inventory_status": inventory_status,
+                    "source_status": source_status,
+                    "executed_utc": executed_utc,
+                })
+
+    rows.sort(key=lambda r: (
+        r["governance_role"], r["client_label"], r["discipline_label"],
+        r["unit_system"], r["domain"], r["view_scope"], r["join_hash"],
+    ))
+    return rows
 
 
 def load_segment_join_hash_union(
@@ -2465,6 +2683,11 @@ def main() -> int:
         focal_segment_ids=focal_filter,
     )
 
+    union_inventory_rows = build_union_inventory_rows(
+        manifest, registry, file_metadata, segments_root, executed_utc,
+        domain_filter=args.domain,
+    )
+
     # Write outputs
     if summary_rows:
         sort_summary_rows(summary_rows)
@@ -2538,7 +2761,19 @@ def main() -> int:
         atomic_write_csv(out_dir / "cross_segment_pooled.csv", POOLED_FIELDS, pooled_rows)
         print(f"[compare] wrote {len(pooled_rows)} rows → {out_dir / 'cross_segment_pooled.csv'}")
 
-    if not summary_rows and not pooled_rows and not governance_state_rows:
+    if union_inventory_rows:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        atomic_write_csv(
+            out_dir / "cross_segment_union_inventory.csv",
+            UNION_INVENTORY_FIELDS,
+            union_inventory_rows,
+        )
+        print(
+            f"[compare] wrote {len(union_inventory_rows)} rows → "
+            f"{out_dir / 'cross_segment_union_inventory.csv'}"
+        )
+
+    if not summary_rows and not pooled_rows and not governance_state_rows and not union_inventory_rows:
         print("[compare] no comparison rows produced — check segment data and min-patterns threshold")
 
     return 0
