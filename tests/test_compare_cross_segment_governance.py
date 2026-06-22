@@ -964,3 +964,94 @@ def test_reuse_thresholds_are_centralized_and_used():
     assert bucket == "client_wide"
     assert basis == "files_in_role_client_domain"
     assert status == "ok"
+
+
+def test_explicit_matrices_union_jaccard_differs_from_mean_file_pair():
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    union_rows = [
+        {"governance_role": "Project", "client_label": "A", "discipline_label": "Arch", "unit_system": "imperial", "domain": "d", "view_scope": "all", "join_hash": j, "inventory_status": "ok"}
+        for j in ("x", "y")
+    ] + [
+        {"governance_role": "Project", "client_label": "B", "discipline_label": "Arch", "unit_system": "imperial", "domain": "d", "view_scope": "all", "join_hash": j, "inventory_status": "ok"}
+        for j in ("x", "y")
+    ]
+    summary = [{
+        "governance_role_a": "Project", "governance_role_b": "Project",
+        "segment_label_a": "Project|A|Arch|imperial", "segment_label_b": "Project|B|Arch|imperial",
+        "domain": "d", "all_jaccard_mean": "0.000000", "used_jaccard_mean": "",
+    }]
+
+    matrices, frag, manifest = build_explicit_matrix_outputs(summary, [], union_rows, "2026-06-22T00:00:00Z")
+
+    union_ab = [r for r in matrices["project_union_jaccard_matrix.csv"] if r["row_id"] == "Project|A|Arch|imperial" and r["column_id"] == "Project|B|Arch|imperial"][0]
+    pair_ab = matrices["project_mean_file_pair_jaccard_matrix.csv"][0]
+    assert union_ab["value"] == "1.000000"
+    assert pair_ab["value"] == "0.000000"
+    assert frag[0]["fragmentation_diagnostic"] == "1.000000"
+    assert [m["matrix_name"] for m in manifest] == sorted(m["matrix_name"] for m in manifest)
+
+
+def test_density_similarity_uses_domain_density_vectors_not_containment():
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    union_rows = []
+    for client, domains in {"A": {"d1": ["a"], "d2": ["b", "c"]}, "B": {"d1": ["x"], "d2": ["y", "z"]}}.items():
+        for domain, hashes in domains.items():
+            for jh in hashes:
+                union_rows.append({"governance_role": "Project", "client_label": client, "discipline_label": "Arch", "unit_system": "imperial", "domain": domain, "view_scope": "all", "join_hash": jh, "inventory_status": "ok"})
+    pooled = [{"governance_role": "Project", "segment_label": "A", "domain": "d1", "all_containment_focal_in_pool": "0.123456"}]
+
+    matrices, _, _ = build_explicit_matrix_outputs([], pooled, union_rows, "2026-06-22T00:00:00Z")
+    density_ab = [r for r in matrices["project_density_similarity_matrix.csv"] if r["row_id"] == "Project|A|Arch|imperial" and r["column_id"] == "Project|B|Arch|imperial"][0]
+    pool_row = matrices["project_pool_containment_similarity_matrix.csv"][0]
+    assert density_ab["metric"] == "density_similarity"
+    assert density_ab["value"] == "1.000000"
+    assert pool_row["metric"] == "pool_containment_similarity"
+    assert pool_row["value"] == "0.123456"
+
+
+def test_fragmentation_diagnostic_unavailable_without_required_inputs():
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    _, frag, _ = build_explicit_matrix_outputs([], [], [], "2026-06-22T00:00:00Z")
+
+    assert frag == [{
+        "matrix_name": "project_fragmentation_diagnostic.csv",
+        "row_id": "unavailable",
+        "column_id": "unavailable",
+        "view_scope": "unavailable",
+        "domain": "ALL_DOMAINS",
+        "footprint_similarity": "",
+        "exact_identity_overlap": "",
+        "fragmentation_diagnostic": "",
+        "value_status": "unavailable_required_inputs",
+        "interpretation": "Requires both union_jaccard and mean_file_pair_jaccard inputs.",
+        "executed_utc": "2026-06-22T00:00:00Z",
+    }]
+
+
+def test_missing_union_inventory_blocks_union_matrix_with_explicit_status():
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    matrices, _, _ = build_explicit_matrix_outputs([], [], [], "2026-06-22T00:00:00Z")
+
+    row = matrices["project_union_jaccard_matrix.csv"][0]
+    assert row["value_status"] == "blocked_missing_union_inventory"
+    assert row["value"] == ""
+
+
+def test_matrix_manifest_and_diagonal_are_deterministic():
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    union_rows = [{"governance_role": "Project", "client_label": "A", "discipline_label": "Arch", "unit_system": "imperial", "domain": "d", "view_scope": "all", "join_hash": "x", "inventory_status": "ok"}]
+
+    first = build_explicit_matrix_outputs([], [], union_rows, "2026-06-22T00:00:00Z")
+    second = build_explicit_matrix_outputs([], [], union_rows, "2026-06-22T00:00:00Z")
+
+    assert first == second
+    diagonal = first[0]["project_union_jaccard_matrix.csv"][0]
+    assert diagonal["row_id"] == diagonal["column_id"]
+    assert diagonal["self_comparison"] == "true"
+    assert diagonal["value"] == "1.000000"
+    assert {"matrix_name", "governance_role", "view_scope", "source_file", "source_grain", "metric", "identity_unit", "aggregation_method", "interpretation", "known_limitations", "executed_utc"} == set(first[2][0])
