@@ -1786,6 +1786,9 @@ def render_union_reuse_summary(
             "single_file",
             "unclassified",
         ]
+        bucket_priority = {bucket: i for i, bucket in enumerate(bucket_order)}
+        pattern_buckets = {}
+        pattern_domains = {}
         domain_counts = defaultdict(lambda: {bucket: 0 for bucket in bucket_order})
         for row in reuse_distribution_rows:
             if row.get("classification_status") != "ok":
@@ -1793,10 +1796,23 @@ def render_union_reuse_summary(
             if row.get("inventory_status") != "ok":
                 continue
             domain = row.get("domain", "")
+            join_hash = row.get("join_hash", "")
+            if not join_hash:
+                continue
             bucket = row.get("reuse_bucket", "unclassified") or "unclassified"
             if bucket not in bucket_order:
                 bucket = "unclassified"
-            domain_counts[domain][bucket] += 1
+            pattern_key = (domain, join_hash)
+            previous_bucket = pattern_buckets.get(pattern_key)
+            if (
+                previous_bucket is None
+                or bucket_priority[bucket] < bucket_priority[previous_bucket]
+            ):
+                pattern_buckets[pattern_key] = bucket
+                pattern_domains[pattern_key] = domain
+
+        for pattern_key, bucket in pattern_buckets.items():
+            domain_counts[pattern_domains[pattern_key]][bucket] += 1
 
         sorted_domains = sorted(
             domain_counts.items(),
