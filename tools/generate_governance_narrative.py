@@ -1802,7 +1802,14 @@ def render_union_reuse_summary(
             bucket = row.get("reuse_bucket", "unclassified") or "unclassified"
             if bucket not in bucket_order:
                 bucket = "unclassified"
-            pattern_key = (domain, join_hash)
+            pattern_key = (
+                row.get("view_scope", ""),
+                row.get("governance_role", ""),
+                row.get("discipline_label", ""),
+                row.get("unit_system", ""),
+                domain,
+                join_hash,
+            )
             previous_bucket = pattern_buckets.get(pattern_key)
             if (
                 previous_bucket is None
