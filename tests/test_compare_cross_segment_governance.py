@@ -810,6 +810,48 @@ def test_union_inventory_used_view_unavailable_keeps_source_status_ok(tmp_path):
     ]
 
 
+
+def test_union_inventory_client_denominator_includes_status_rows_used_by_reuse(tmp_path):
+    domain = "line_patterns"
+    segments_root = tmp_path / "segments"
+    _write_segment(
+        segments_root,
+        "project_a",
+        domain,
+        [("p1", "shared", "Shared")],
+        [{"export_run_id": "file_a", "pattern_id": "p1"}],
+        [{"export_run_id": "file_a", "pattern_id": "p1"}],
+        ["p1"],
+    )
+    base_b = segments_root / "project_b" / "results"
+    _write_csv(
+        base_b / "analysis" / "domain_patterns.csv",
+        [{"domain": domain, "pattern_id": "p1", "source_cluster_id": "src|shared", "pattern_label_human": "Shared", "pattern_label": "Shared"}],
+    )
+    _write_csv(
+        base_b / "bundle_analysis" / "all" / domain / "membership_matrix.csv",
+        [{"export_run_id": "file_b", "pattern_id": "p1"}],
+    )
+    manifest = {
+        "project_a": {**_seg("Project", client="A"), "segment_label": "Project A"},
+        "project_b": {**_seg("Project", client="B"), "segment_label": "Project B"},
+    }
+    registry = {
+        "project_a": {"output_folder": "project_a", "run_type": "bundle"},
+        "project_b": {"output_folder": "project_b", "run_type": "bundle"},
+    }
+
+    union_rows = _union_rows_for(tmp_path, manifest, registry, domain)
+    shared = [r for r in union_rows if r["view_scope"] == "used" and r["join_hash"] == "shared"][0]
+    reuse = build_pattern_reuse_distribution_rows(union_rows, "2026-06-22T00:00:00Z")
+    reuse_shared = [r for r in reuse if r["view_scope"] == "used" and r["join_hash"] == "shared"][0]
+
+    assert shared["n_clients_present"] == "1"
+    assert shared["n_clients_denominator"] == "2"
+    assert shared["pct_clients_present"] == "0.500000"
+    assert reuse_shared["n_clients_denominator"] == shared["n_clients_denominator"]
+    assert reuse_shared["pct_clients_present"] == shared["pct_clients_present"]
+
 def test_union_inventory_missing_domain_patterns_keeps_source_status_ok(tmp_path):
     domain = "line_patterns"
     (tmp_path / "segments" / "project").mkdir(parents=True)
