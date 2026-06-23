@@ -254,8 +254,13 @@ UNION_INVENTORY_FIELDS: List[str] = [
     "pattern_label",
     "n_segments_present",
     "n_files_present",
+    "n_files_denominator",
     "pct_files_present",
     "n_projects_present",
+    "n_projects_denominator",
+    "n_clients_present",
+    "n_clients_denominator",
+    "pct_clients_present",
     "pct_projects_present",
     "usage_interpretable",
     "inventory_status",
@@ -968,6 +973,7 @@ def build_union_inventory_rows(
             missing_scid_total = 0
             denominator_files: Set[str] = set()
             denominator_projects: Set[str] = set()
+            client_has_inventory = False
 
             for segment_id in sorted(segment_ids):
                 files, status, missing_scid = _load_segment_file_join_hashes_with_status(
@@ -979,6 +985,7 @@ def build_union_inventory_rows(
                     labels.setdefault(jh, label)
                 for export_run_id, join_hashes in files.items():
                     if join_hashes:
+                        client_has_inventory = True
                         denominator_files.add(export_run_id)
                         denominator_projects.add(_project_label_for_file(file_metadata, export_run_id))
                     for join_hash in join_hashes:
@@ -1015,8 +1022,13 @@ def build_union_inventory_rows(
                     "pattern_label": "",
                     "n_segments_present": "0",
                     "n_files_present": "0",
+                    "n_files_denominator": "0",
                     "pct_files_present": "0.000000",
                     "n_projects_present": "0",
+                    "n_projects_denominator": "0",
+                    "n_clients_present": "0",
+                    "n_clients_denominator": "1" if client_has_inventory else "0",
+                    "pct_clients_present": "0.000000",
                     "pct_projects_present": "0.000000",
                     "usage_interpretable": _bool_str(usage_ok),
                     "inventory_status": inventory_status,
@@ -1042,16 +1054,50 @@ def build_union_inventory_rows(
                     "pattern_label": labels.get(join_hash, ""),
                     "n_segments_present": str(len(entry["segments"])),
                     "n_files_present": str(n_files),
-                    "_n_files_denominator": str(file_den),
+                    "n_files_denominator": str(file_den),
                     "pct_files_present": _safe_pct(n_files, file_den) or "0.000000",
                     "n_projects_present": str(n_projects),
-                    "_n_projects_denominator": str(project_den),
+                    "n_projects_denominator": str(project_den),
+                    "n_clients_present": "1",
+                    "n_clients_denominator": "1",
+                    "pct_clients_present": "1.000000",
                     "pct_projects_present": _safe_pct(n_projects, project_den) or "0.000000",
                     "usage_interpretable": _bool_str(usage_ok),
                     "inventory_status": inventory_status,
                     "source_status": source_status,
                     "executed_utc": executed_utc,
                 })
+
+    clients_by_group: Dict[Tuple[str, str, str, str, str], Set[str]] = defaultdict(set)
+    clients_by_pattern: Dict[Tuple[str, str, str, str, str, str], Set[str]] = defaultdict(set)
+    for row in rows:
+        if not row.get("join_hash", "").strip() and row.get("inventory_status", "") == "ok":
+            continue
+        group_key = (
+            row.get("view_scope", ""),
+            row.get("governance_role", ""),
+            row.get("discipline_label", ""),
+            row.get("unit_system", ""),
+            row.get("domain", ""),
+        )
+        clients_by_group[group_key].add(row.get("client_label", ""))
+        clients_by_pattern[(*group_key, row.get("join_hash", ""))].add(row.get("client_label", ""))
+
+    for row in rows:
+        if not row.get("join_hash", "").strip() and row.get("inventory_status", "") == "ok":
+            continue
+        group_key = (
+            row.get("view_scope", ""),
+            row.get("governance_role", ""),
+            row.get("discipline_label", ""),
+            row.get("unit_system", ""),
+            row.get("domain", ""),
+        )
+        n_clients_present = len(clients_by_pattern.get((*group_key, row.get("join_hash", "")), set()))
+        n_clients_denominator = len(clients_by_group.get(group_key, set()))
+        row["n_clients_present"] = str(n_clients_present)
+        row["n_clients_denominator"] = str(n_clients_denominator)
+        row["pct_clients_present"] = _safe_pct(n_clients_present, n_clients_denominator) or "0.000000"
 
     rows.sort(key=lambda r: (
         r["governance_role"], r["client_label"], r["discipline_label"],
@@ -1121,11 +1167,11 @@ def build_pattern_reuse_distribution_rows(
         )
         file_den_by_group[key] = max(
             file_den_by_group.get(key, 0),
-            int(r.get("_n_files_denominator") or r.get("n_files_denominator") or r.get("n_files_present") or "0"),
+            int(r.get("n_files_denominator") or r.get("n_files_present") or "0"),
         )
         project_den_by_group[key] = max(
             project_den_by_group.get(key, 0),
-            int(r.get("_n_projects_denominator") or r.get("n_projects_denominator") or r.get("n_projects_present") or "0"),
+            int(r.get("n_projects_denominator") or r.get("n_projects_present") or "0"),
         )
         clients_by_group[(key[0], key[1], key[3], key[4], key[5])].add(key[2])
         clients_by_pattern[(
