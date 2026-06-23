@@ -1766,6 +1766,114 @@ def render_delta_section(delta_summary: dict) -> str:
     return "\n".join(lines)
 
 
+def render_union_reuse_summary(
+    union_inventory_rows: list,
+    reuse_distribution_rows: list,
+    matrix_manifest_rows: list,
+) -> Optional[str]:
+    if not union_inventory_rows and not reuse_distribution_rows and not matrix_manifest_rows:
+        return None
+
+    lines = ["## Union Inventory Reuse Summary\n"]
+
+    if reuse_distribution_rows:
+        bucket_order = [
+            "corpus_wide",
+            "client_wide",
+            "multi_project",
+            "single_project",
+            "emerging",
+            "single_file",
+            "unclassified",
+        ]
+        bucket_priority = {bucket: i for i, bucket in enumerate(bucket_order)}
+        pattern_buckets = {}
+        pattern_domains = {}
+        domain_counts = defaultdict(lambda: {bucket: 0 for bucket in bucket_order})
+        for row in reuse_distribution_rows:
+            if row.get("classification_status") != "ok":
+                continue
+            if row.get("inventory_status") != "ok":
+                continue
+            domain = row.get("domain", "")
+            join_hash = row.get("join_hash", "")
+            if not join_hash:
+                continue
+            bucket = row.get("reuse_bucket", "unclassified") or "unclassified"
+            if bucket not in bucket_order:
+                bucket = "unclassified"
+            pattern_key = (
+                row.get("view_scope", ""),
+                row.get("governance_role", ""),
+                row.get("discipline_label", ""),
+                row.get("unit_system", ""),
+                domain,
+                join_hash,
+            )
+            previous_bucket = pattern_buckets.get(pattern_key)
+            if (
+                previous_bucket is None
+                or bucket_priority[bucket] < bucket_priority[previous_bucket]
+            ):
+                pattern_buckets[pattern_key] = bucket
+                pattern_domains[pattern_key] = domain
+
+        for pattern_key, bucket in pattern_buckets.items():
+            domain_counts[pattern_domains[pattern_key]][bucket] += 1
+
+        sorted_domains = sorted(
+            domain_counts.items(),
+            key=lambda item: (-item[1]["corpus_wide"], item[0]),
+        )
+
+        lines.append("**Reuse breadth summary**\n")
+        lines.append("| domain | corpus_wide | client_wide | multi_project | single_project | emerging | single_file | unclassified |")
+        lines.append("|---|---:|---:|---:|---:|---:|---:|---:|")
+        for domain, counts in sorted_domains[:20]:
+            lines.append(
+                f"| {domain} "
+                f"| {counts['corpus_wide']} "
+                f"| {counts['client_wide']} "
+                f"| {counts['multi_project']} "
+                f"| {counts['single_project']} "
+                f"| {counts['emerging']} "
+                f"| {counts['single_file']} "
+                f"| {counts['unclassified']} |"
+            )
+        if len(sorted_domains) > 20:
+            lines.append(f"\nTable limited to 20 domains; {len(sorted_domains) - 20} domains not shown.")
+        lines.append("")
+
+    if matrix_manifest_rows:
+        lines.append("**Matrix manifest metadata**\n")
+        lines.append("Matrix availability is determined by each matrix CSV `value_status`; manifest rows are descriptive metadata.\n")
+        for row in matrix_manifest_rows:
+            interpretation = row.get("interpretation", "")
+            if len(interpretation) > 120:
+                interpretation = interpretation[:120].rstrip()
+            lines.append(
+                f"- {row.get('matrix_name', '')}: {row.get('metric', '')} ({interpretation})"
+            )
+        blocking_statuses = {
+            "no_patterns",
+            "missing_domain_patterns",
+            "missing_membership_matrix",
+            "used_view_unavailable",
+        }
+        blocked_domains = {
+            row.get("domain", "")
+            for row in union_inventory_rows
+            if row.get("governance_role") == "Project"
+            and row.get("inventory_status") in blocking_statuses
+        }
+        if blocked_domains:
+            lines.append(f"- Project union inventory domains with blocking status: {len(blocked_domains)}")
+    elif union_inventory_rows or reuse_distribution_rows:
+        lines.append("Matrix manifest not provided; matrix availability unknown.")
+
+    return "\n".join(lines)
+
+
 
 def render_findings_and_recommendations(cascade: dict, client_rows: list[dict], state_summary: Optional[dict] = None) -> str:
     state_summary = state_summary or {}
@@ -1915,6 +2023,12 @@ def main():
     parser.add_argument("--governance-state-summary", help="cross_segment_governance_state_summary.csv (optional)")
     parser.add_argument("--delta", help="cross_segment_delta.csv (optional legacy fallback)")
     parser.add_argument("--file-meta", help="file_metadata.csv (optional)")
+    parser.add_argument("--union-inventory",
+                        help="cross_segment_union_inventory.csv (optional)")
+    parser.add_argument("--reuse-distribution",
+                        help="pattern_reuse_distribution.csv (optional)")
+    parser.add_argument("--matrix-manifest",
+                        help="matrix_output_manifest.csv (optional)")
     parser.add_argument("--out", default="governance_narrative_context.md")
     parser.add_argument("--date", default=str(date.today()),
                         help="Analysis date string (default: today)")
@@ -1944,6 +2058,21 @@ def main():
     if args.file_meta:
         print(f"Loading {args.file_meta}...")
         file_meta_rows = read_csv(Path(args.file_meta))
+
+    union_inventory_rows = []
+    if args.union_inventory:
+        print(f"Loading {args.union_inventory}...")
+        union_inventory_rows = read_csv(Path(args.union_inventory))
+
+    reuse_distribution_rows = []
+    if args.reuse_distribution:
+        print(f"Loading {args.reuse_distribution}...")
+        reuse_distribution_rows = read_csv(Path(args.reuse_distribution))
+
+    matrix_manifest_rows = []
+    if args.matrix_manifest:
+        print(f"Loading {args.matrix_manifest}...")
+        matrix_manifest_rows = read_csv(Path(args.matrix_manifest))
 
     normalise_summary_schema(summary_rows)
     print("Computing cascade scores...")
@@ -2091,6 +2220,11 @@ def main():
         sections.append(render_governance_state_section(governance_state_summary))
     elif delta_summary:
         sections.append(render_delta_section(delta_summary))
+    union_reuse_section = render_union_reuse_summary(
+        union_inventory_rows, reuse_distribution_rows, matrix_manifest_rows
+    )
+    if union_reuse_section:
+        sections.append(union_reuse_section)
     sections += [
         render_findings_and_recommendations(cascade, client_rows, governance_state_summary),
         render_limitations(corpus, used_view_falls_back_to_legacy(), bool(governance_state_summary)),
