@@ -260,6 +260,7 @@ UNION_INVENTORY_FIELDS: List[str] = [
     "n_projects_denominator",
     "n_clients_present",
     "n_clients_denominator",
+    "pct_clients_present",
     "pct_projects_present",
     "usage_interpretable",
     "inventory_status",
@@ -1027,6 +1028,7 @@ def build_union_inventory_rows(
                     "n_projects_denominator": "0",
                     "n_clients_present": "0",
                     "n_clients_denominator": "1" if client_has_inventory else "0",
+                    "pct_clients_present": "0.000000",
                     "pct_projects_present": "0.000000",
                     "usage_interpretable": _bool_str(usage_ok),
                     "inventory_status": inventory_status,
@@ -1058,6 +1060,7 @@ def build_union_inventory_rows(
                     "n_projects_denominator": str(project_den),
                     "n_clients_present": "1",
                     "n_clients_denominator": "1",
+                    "pct_clients_present": "1.000000",
                     "pct_projects_present": _safe_pct(n_projects, project_den) or "0.000000",
                     "usage_interpretable": _bool_str(usage_ok),
                     "inventory_status": inventory_status,
@@ -1090,8 +1093,11 @@ def build_union_inventory_rows(
             row.get("unit_system", ""),
             row.get("domain", ""),
         )
-        row["n_clients_present"] = str(len(clients_by_pattern.get((*group_key, row.get("join_hash", "")), set())))
-        row["n_clients_denominator"] = str(len(clients_by_group.get(group_key, set())))
+        n_clients_present = len(clients_by_pattern.get((*group_key, row.get("join_hash", "")), set()))
+        n_clients_denominator = len(clients_by_group.get(group_key, set()))
+        row["n_clients_present"] = str(n_clients_present)
+        row["n_clients_denominator"] = str(n_clients_denominator)
+        row["pct_clients_present"] = _safe_pct(n_clients_present, n_clients_denominator) or "0.000000"
 
     rows.sort(key=lambda r: (
         r["governance_role"], r["client_label"], r["discipline_label"],

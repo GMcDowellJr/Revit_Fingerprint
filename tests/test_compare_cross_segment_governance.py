@@ -800,6 +800,7 @@ def test_union_inventory_used_view_unavailable_keeps_source_status_ok(tmp_path):
             "n_projects_denominator": "0",
             "n_clients_present": "0",
             "n_clients_denominator": "0",
+            "pct_clients_present": "0.000000",
             "pct_projects_present": "0.000000",
             "usage_interpretable": "true",
             "inventory_status": "used_view_unavailable",
@@ -828,7 +829,7 @@ def test_pattern_reuse_many_files_gets_broad_classification():
             "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
             "join_hash": "broad", "pattern_label": "Broad", "n_files_present": "4",
             "n_files_denominator": "5", "n_projects_present": "2", "n_projects_denominator": "2",
-            "n_clients_present": "1", "n_clients_denominator": "1",
+            "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000",
             "usage_interpretable": "true", "inventory_status": "ok",
         }
     ]
@@ -847,7 +848,7 @@ def test_pattern_reuse_one_file_gets_single_file_classification():
             "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
             "join_hash": "one", "pattern_label": "One", "n_files_present": "1",
             "n_files_denominator": "3", "n_projects_present": "1", "n_projects_denominator": "2",
-            "n_clients_present": "1", "n_clients_denominator": "1",
+            "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000",
             "usage_interpretable": "true", "inventory_status": "ok",
         }
     ]
@@ -865,7 +866,7 @@ def test_project_used_view_uses_project_and_file_denominators():
             "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
             "join_hash": "multi", "pattern_label": "Multi", "n_files_present": "2",
             "n_files_denominator": "5", "n_projects_present": "2", "n_projects_denominator": "3",
-            "n_clients_present": "1", "n_clients_denominator": "1",
+            "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000",
             "usage_interpretable": "true", "inventory_status": "ok",
         }
     ]
@@ -886,7 +887,7 @@ def test_single_project_reuse_takes_precedence_over_emerging():
             "join_hash": "single_project", "pattern_label": "Single Project",
             "n_files_present": "2", "n_files_denominator": "5",
             "n_projects_present": "1", "n_projects_denominator": "3",
-            "n_clients_present": "1", "n_clients_denominator": "1",
+            "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000",
             "usage_interpretable": "true", "inventory_status": "ok",
         }
     ]
@@ -905,7 +906,7 @@ def test_missing_source_identity_degrades_reuse_classification():
             "join_hash": "partial", "pattern_label": "Partial",
             "n_files_present": "4", "n_files_denominator": "4",
             "n_projects_present": "2", "n_projects_denominator": "2",
-            "n_clients_present": "1", "n_clients_denominator": "1",
+            "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000",
             "usage_interpretable": "true", "inventory_status": "ok",
             "source_status": "missing_source_cluster_id",
         }
@@ -925,7 +926,7 @@ def test_template_all_view_is_not_interpreted_as_active_usage():
             "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
             "join_hash": "stock", "pattern_label": "Stock", "n_files_present": "1",
             "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1",
-            "n_clients_present": "1", "n_clients_denominator": "1",
+            "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000",
             "usage_interpretable": "false", "inventory_status": "ok",
         }
     ]
@@ -953,7 +954,7 @@ def test_reuse_distribution_order_is_deterministic():
             "discipline_label": "Arch", "unit_system": "imperial", "domain": "line_patterns",
             "join_hash": jh, "pattern_label": jh, "n_files_present": "1",
             "n_files_denominator": "2", "n_projects_present": "1", "n_projects_denominator": "1",
-            "n_clients_present": "1", "n_clients_denominator": "1",
+            "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000",
             "usage_interpretable": "true", "inventory_status": "ok",
         }
         for jh in ["b", "a"]
@@ -981,10 +982,10 @@ def test_explicit_matrices_union_jaccard_differs_from_mean_file_pair():
     from compare_cross_segment import build_explicit_matrix_outputs
 
     union_rows = [
-        {"governance_role": "Project", "client_label": "A", "discipline_label": "Arch", "unit_system": "imperial", "domain": "d", "view_scope": "all", "join_hash": j, "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "inventory_status": "ok"}
+        {"governance_role": "Project", "client_label": "A", "discipline_label": "Arch", "unit_system": "imperial", "domain": "d", "view_scope": "all", "join_hash": j, "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000", "inventory_status": "ok"}
         for j in ("x", "y")
     ] + [
-        {"governance_role": "Project", "client_label": "B", "discipline_label": "Arch", "unit_system": "imperial", "domain": "d", "view_scope": "all", "join_hash": j, "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "inventory_status": "ok"}
+        {"governance_role": "Project", "client_label": "B", "discipline_label": "Arch", "unit_system": "imperial", "domain": "d", "view_scope": "all", "join_hash": j, "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000", "inventory_status": "ok"}
         for j in ("x", "y")
     ]
     summary = [{
@@ -1014,7 +1015,7 @@ def test_fragmentation_diagnostic_uses_all_domains_file_pair_aggregate():
     for client in ("A", "B"):
         for domain, hashes in {"d1": ["shared"], "d2": [f"{client}_unique"]}.items():
             for jh in hashes:
-                union_rows.append({"governance_role": "Project", "client_label": client, "discipline_label": "Arch", "unit_system": "imperial", "domain": domain, "view_scope": "all", "join_hash": jh, "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "inventory_status": "ok"})
+                union_rows.append({"governance_role": "Project", "client_label": client, "discipline_label": "Arch", "unit_system": "imperial", "domain": domain, "view_scope": "all", "join_hash": jh, "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000", "inventory_status": "ok"})
     summary = [
         {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d2", "all_jaccard_mean": "0.000000"},
         {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d1", "all_jaccard_mean": "1.000000"},
@@ -1036,7 +1037,7 @@ def test_density_similarity_uses_domain_density_vectors_not_containment():
     for client, domains in {"A": {"d1": ["a"], "d2": ["b", "c"]}, "B": {"d1": ["x"], "d2": ["y", "z"]}}.items():
         for domain, hashes in domains.items():
             for jh in hashes:
-                union_rows.append({"governance_role": "Project", "client_label": client, "discipline_label": "Arch", "unit_system": "imperial", "domain": domain, "view_scope": "all", "join_hash": jh, "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "inventory_status": "ok"})
+                union_rows.append({"governance_role": "Project", "client_label": client, "discipline_label": "Arch", "unit_system": "imperial", "domain": domain, "view_scope": "all", "join_hash": jh, "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000", "inventory_status": "ok"})
     pooled = [{"governance_role": "Project", "segment_label": "A", "domain": "d1", "all_containment_focal_in_pool": "0.123456"}]
 
     matrices, _, _ = build_explicit_matrix_outputs([], pooled, union_rows, "2026-06-22T00:00:00Z")
@@ -1085,6 +1086,7 @@ def test_non_project_union_inventory_blocks_project_union_matrices():
         "n_projects_denominator": "1",
         "n_clients_present": "1",
         "n_clients_denominator": "1",
+        "pct_clients_present": "1.000000",
         "inventory_status": "ok",
     }]
 
@@ -1165,7 +1167,7 @@ def test_missing_union_inventory_blocks_union_matrix_with_explicit_status():
 def test_matrix_manifest_and_diagonal_are_deterministic():
     from compare_cross_segment import build_explicit_matrix_outputs
 
-    union_rows = [{"governance_role": "Project", "client_label": "A", "discipline_label": "Arch", "unit_system": "imperial", "domain": "d", "view_scope": "all", "join_hash": "x", "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "inventory_status": "ok"}]
+    union_rows = [{"governance_role": "Project", "client_label": "A", "discipline_label": "Arch", "unit_system": "imperial", "domain": "d", "view_scope": "all", "join_hash": "x", "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000", "inventory_status": "ok"}]
 
     first = build_explicit_matrix_outputs([], [], union_rows, "2026-06-22T00:00:00Z")
     second = build_explicit_matrix_outputs([], [], union_rows, "2026-06-22T00:00:00Z")

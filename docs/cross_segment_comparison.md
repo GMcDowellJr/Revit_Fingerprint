@@ -467,6 +467,7 @@ Raw local `pattern_id` values are not used as cross-segment identities. Multiple
 - `n_projects_denominator`: total projects with any pattern in the same role/client/discipline/unit/domain/view pool used as denominator for `pct_projects_present`.
 - `n_clients_present`: number of clients containing the `join_hash` in the same role/discipline/unit/domain/view pool.
 - `n_clients_denominator`: total clients with any pattern in the same role/discipline/unit/domain/view pool used as denominator for `pct_clients_present`.
+- `pct_clients_present`: `n_clients_present` divided by clients with any inventory in that role/discipline/unit/domain/view pool.
 - `pct_projects_present`: `n_projects_present` divided by projects represented by files with any inventory in that grain/view.
 
 #### Status fields
