@@ -334,7 +334,7 @@ REUSE_SUMMARY_FIELDS: List[str] = [
 REUSE_BUCKET_THRESHOLDS = {
     "corpus_wide_min_pct_clients": 0.80,
     "client_wide_min_pct_files": 0.80,
-    "multi_project_min_projects": 2,
+    "multi_project_min_projects": 3,
     "emerging_min_files": 2,
 }
 
