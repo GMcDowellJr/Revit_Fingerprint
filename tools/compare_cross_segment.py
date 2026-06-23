@@ -1081,11 +1081,10 @@ def build_union_inventory_rows(
             row.get("domain", ""),
         )
         clients_by_group[group_key].add(row.get("client_label", ""))
-        if row.get("join_hash", "").strip():
-            clients_by_pattern[(*group_key, row.get("join_hash", ""))].add(row.get("client_label", ""))
+        clients_by_pattern[(*group_key, row.get("join_hash", ""))].add(row.get("client_label", ""))
 
     for row in rows:
-        if not row.get("join_hash", "").strip():
+        if not row.get("join_hash", "").strip() and row.get("inventory_status", "") == "ok":
             continue
         group_key = (
             row.get("view_scope", ""),

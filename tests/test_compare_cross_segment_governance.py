@@ -798,9 +798,9 @@ def test_union_inventory_used_view_unavailable_keeps_source_status_ok(tmp_path):
             "pct_files_present": "0.000000",
             "n_projects_present": "0",
             "n_projects_denominator": "0",
-            "n_clients_present": "0",
-            "n_clients_denominator": "0",
-            "pct_clients_present": "0.000000",
+            "n_clients_present": "1",
+            "n_clients_denominator": "1",
+            "pct_clients_present": "1.000000",
             "pct_projects_present": "0.000000",
             "usage_interpretable": "true",
             "inventory_status": "used_view_unavailable",
@@ -849,8 +849,17 @@ def test_union_inventory_client_denominator_includes_status_rows_used_by_reuse(t
     assert shared["n_clients_present"] == "1"
     assert shared["n_clients_denominator"] == "2"
     assert shared["pct_clients_present"] == "0.500000"
+    status_row = [r for r in union_rows if r["view_scope"] == "used" and r["inventory_status"] == "used_view_unavailable"][0]
+    reuse_status = [r for r in reuse if r["view_scope"] == "used" and r["inventory_status"] == "used_view_unavailable"][0]
+
     assert reuse_shared["n_clients_denominator"] == shared["n_clients_denominator"]
     assert reuse_shared["pct_clients_present"] == shared["pct_clients_present"]
+    assert status_row["n_clients_present"] == "1"
+    assert status_row["n_clients_denominator"] == "2"
+    assert status_row["pct_clients_present"] == "0.500000"
+    assert reuse_status["n_clients_present"] == status_row["n_clients_present"]
+    assert reuse_status["n_clients_denominator"] == status_row["n_clients_denominator"]
+    assert reuse_status["pct_clients_present"] == status_row["pct_clients_present"]
 
 def test_union_inventory_missing_domain_patterns_keeps_source_status_ok(tmp_path):
     domain = "line_patterns"
