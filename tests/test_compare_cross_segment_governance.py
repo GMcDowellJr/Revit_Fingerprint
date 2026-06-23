@@ -910,7 +910,7 @@ def test_pattern_reuse_one_file_gets_single_file_classification():
     assert out[0]["bucket_basis"] == "files_in_role_client_domain"
 
 
-def test_project_used_view_uses_project_and_file_denominators():
+def test_project_used_view_uses_project_and_file_denominators_for_emerging_bucket():
     rows = [
         {
             "view_scope": "used", "governance_role": "Project", "client_label": "Acme",
@@ -924,8 +924,8 @@ def test_project_used_view_uses_project_and_file_denominators():
 
     out = build_pattern_reuse_distribution_rows(rows, "2026-06-22T00:00:00Z")
 
-    assert out[0]["reuse_bucket"] == "multi_project"
-    assert out[0]["bucket_basis"] == "projects_in_client_domain"
+    assert out[0]["reuse_bucket"] == "emerging"
+    assert out[0]["bucket_basis"] == "files_in_role_client_domain"
     assert out[0]["pct_files_present"] == "0.400000"
     assert out[0]["pct_projects_present"] == "0.666667"
 
