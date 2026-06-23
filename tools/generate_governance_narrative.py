@@ -1822,7 +1822,8 @@ def render_union_reuse_summary(
         lines.append("")
 
     if matrix_manifest_rows:
-        lines.append("**Matrix availability**\n")
+        lines.append("**Matrix manifest metadata**\n")
+        lines.append("Matrix availability is determined by each matrix CSV `value_status`; manifest rows are descriptive metadata.\n")
         for row in matrix_manifest_rows:
             interpretation = row.get("interpretation", "")
             if len(interpretation) > 120:
@@ -1830,13 +1831,20 @@ def render_union_reuse_summary(
             lines.append(
                 f"- {row.get('matrix_name', '')}: {row.get('metric', '')} ({interpretation})"
             )
+        blocking_statuses = {
+            "no_patterns",
+            "missing_domain_patterns",
+            "missing_membership_matrix",
+            "used_view_unavailable",
+        }
         blocked_domains = {
             row.get("domain", "")
             for row in union_inventory_rows
-            if row.get("inventory_status") != "ok"
+            if row.get("governance_role") == "Project"
+            and row.get("inventory_status") in blocking_statuses
         }
         if blocked_domains:
-            lines.append(f"- Blocked/unavailable union inventory domains: {len(blocked_domains)}")
+            lines.append(f"- Project union inventory domains with blocking status: {len(blocked_domains)}")
     elif union_inventory_rows or reuse_distribution_rows:
         lines.append("Matrix manifest not provided; matrix availability unknown.")
 
