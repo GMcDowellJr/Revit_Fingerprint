@@ -57,8 +57,8 @@ Processing:
     vfd_category_domain_map.json) from the identity_items shard.
   Stage 6: Resolve export_run_id -> file_path from file_metadata.csv.
   Stage 7: Join everything, sort (templates first, most-signals-fired first,
-    all-signals-fired first, export_run_id as tiebreak), and apply --top-n by
-    unique export_run_id.
+    all-signals-fired first, export_run_id as tiebreak), and optionally apply
+    --top-n by unique export_run_id when a positive value is provided.
   Stage 8: Write <out>/review_<cluster_id>.csv and print a console summary.
   Stage 9: Build archetype_review_schedule.csv and archetype_review_gaps.csv.
     The schedule can select Project files for manual review even when they are
@@ -80,7 +80,7 @@ Usage:
         [--shared-param-names tools/archetype/shared_param_names.json] \\
         [--vfd-category-map tools/archetype/vfd_category_domain_map.json] \\
         [--out Fingerprint_Out/archetype_analysis/archetype_review] \\
-        [--top-n 20] [--dry-run] [--verbose]
+        [--top-n N] [--dry-run] [--verbose]
 """
 from __future__ import annotations
 
@@ -903,7 +903,7 @@ def main() -> int:
     ap.add_argument("--shared-param-names", default=None, help="Path to shared_param_names.json")
     ap.add_argument("--vfd-category-map", default=None, help="Path to vfd_category_domain_map.json")
     ap.add_argument("--out", default=None, help="Output directory; each cluster is written to <out>/review_<cluster_id>.csv")
-    ap.add_argument("--top-n", type=int, default=20, help="Limit to top N files per cluster; 0 = all")
+    ap.add_argument("--top-n", type=int, default=0, help="Limit to top N files per cluster; default 0 = all")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--verbose", action="store_true", help="Print per-cluster verbose summaries and fallback diagnostics")
     args = ap.parse_args()

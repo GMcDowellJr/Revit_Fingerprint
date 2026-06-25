@@ -577,12 +577,14 @@ python tools/archetype/cluster_archetype_signals.py \
 
 python tools/archetype/prepare_archetype_review.py \
   --repo-root /path/to/Revit_Fingerprint \
-  --assigned-root /path/to/Fingerprint_Out/Exports \
-  --top-n 20
+  --assigned-root /path/to/Fingerprint_Out/Exports
 ```
 
 `prepare_archetype_review.py` writes one `review_<cluster_id>.csv` per cluster,
 then builds `archetype_review_schedule.csv` and `archetype_review_gaps.csv`.
+By default review generation includes all qualifying files; `--top-n N` is
+optional and should be used only when you intentionally want to cap each
+cluster's review CSV to the first N sorted files.
 The per-cluster review CSVs remain evidence examples sorted toward
 Template/Container rows for label ratification; the schedule is a manual
 file-open list and may select Project files outside the top-N review sample
