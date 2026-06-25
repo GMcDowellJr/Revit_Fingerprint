@@ -468,6 +468,43 @@ def _process_cluster(
             "category_names": category_names,
         })
 
+    # Fallback: detail join produced no rows.
+    #
+    # This happens when archetype_validation_detail.csv has no entries that
+    # match the cluster's signal_ids for the qualifying files -- most commonly
+    # seen on VFD clusters where the detail rows don't propagate through the
+    # governance_question reclassification join. Rather than silently writing
+    # a header-only CSV, emit one stub row per (file, signal_id) so the output
+    # is always non-empty and the element_name field makes the situation clear.
+    if not review_rows and ctx.classification_by_file:
+        if verbose:
+            log(
+                STAGE,
+                f"WARNING: cluster_id={ctx.cluster_id} detail_by_file_signal is empty "
+                f"but {len(ctx.classification_by_file)} qualifying files exist; "
+                f"emitting classification-only stub rows",
+            )
+        for export_run_id, cls in ctx.classification_by_file.items():
+            file_path = file_path_lookup.get(export_run_id) or export_run_id
+            for signal_id in ctx.signal_ids:
+                review_rows.append({
+                    "file_path": file_path,
+                    "export_run_id": export_run_id,
+                    "governance_role": cls.get("governance_role", ""),
+                    "discipline_label": cls.get("discipline_label", ""),
+                    "unit_system": cls.get("unit_system", ""),
+                    "client_label": cls.get("client_label", ""),
+                    "n_signals_fired": cls.get("n_signals_fired", ""),
+                    "all_signals_fired": cls.get("all_signals_fired", ""),
+                    "signal_id": signal_id,
+                    "source_domain": "",
+                    "source_join_hash": "",
+                    "element_name": "(unresolved — validation detail missing)",
+                    "sig_hash": "",
+                    "param_names": "",
+                    "category_names": "",
+                })
+
     review_rows.sort(key=_sort_key)
 
     # Apply --top-n: keep only the first N unique export_run_id values.
