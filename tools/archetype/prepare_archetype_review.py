@@ -97,6 +97,7 @@ from _common import (  # noqa: E402
 STAGE = "prepare_archetype_review"
 
 GOVERNANCE_ROLE_ORDER = {"Template": 0, "Container": 1, "Project": 2}
+FILE_LEVEL_SENTINEL_SIGNAL_ID = "(file-level sentinel — fired signals unresolved)"
 
 OUT_FIELDS = [
     "file_path",
@@ -408,14 +409,18 @@ def _load_file_path_lookup(file_metadata_path: Path) -> Dict[str, str]:
     return file_path_lookup
 
 
-def _sort_key(row: Dict[str, str]) -> Tuple[int, int, int, str]:
+def _sort_key(row: Dict[str, str]) -> Tuple[int, int, int, int, str]:
+    # Detail-backed rows should consume --top-n slots before unresolved
+    # file-level sentinels, even when the sentinel file has stronger
+    # classification ranking metadata.
+    sentinel_rank = 1 if row["signal_id"] == FILE_LEVEL_SENTINEL_SIGNAL_ID else 0
     governance_role_rank = GOVERNANCE_ROLE_ORDER.get(row["governance_role"], 3)
     try:
         n_signals_fired = int(row["n_signals_fired"])
     except (TypeError, ValueError):
         n_signals_fired = 0
     all_signals_fired = 1 if row["all_signals_fired"] == "true" else 0
-    return (governance_role_rank, -n_signals_fired, -all_signals_fired, row["export_run_id"])
+    return (sentinel_rank, governance_role_rank, -n_signals_fired, -all_signals_fired, row["export_run_id"])
 
 
 def _process_cluster(
@@ -508,7 +513,7 @@ def _process_cluster(
                 "client_label": cls.get("client_label", ""),
                 "n_signals_fired": cls.get("n_signals_fired", ""),
                 "all_signals_fired": cls.get("all_signals_fired", ""),
-                "signal_id": "(file-level sentinel — fired signals unresolved)",
+                "signal_id": FILE_LEVEL_SENTINEL_SIGNAL_ID,
                 "source_domain": "",
                 "source_join_hash": "",
                 "element_name": "(unresolved — validation detail missing)",
