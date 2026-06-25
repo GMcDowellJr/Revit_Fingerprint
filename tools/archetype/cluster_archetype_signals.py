@@ -685,7 +685,8 @@ def _build_coverage_summary(
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
+    ap.add_argument("--repo-root", default=".", help="Repository root (code/config root; retained for compatibility)")
+    ap.add_argument("--assigned-root", default=None, help="Assigned/export root containing archetype_analysis/ and results/; omitted preserves legacy repo-local defaults")
     ap.add_argument("--pairs", default=None, help="Path to archetype_validation_pairs.csv")
     ap.add_argument("--validation", default=None, help="Path to archetype_validation.csv")
     ap.add_argument("--validation-detail", default=None, help="Path to archetype_validation_detail.csv")
@@ -700,13 +701,18 @@ def main() -> int:
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
-    analysis_dir = repo_root / "Fingerprint_Out" / "archetype_analysis"
+    assigned_root = Path(args.assigned_root).resolve() if args.assigned_root else repo_root / "Fingerprint_Out"
+    analysis_dir = assigned_root / "archetype_analysis"
+    records_root = assigned_root / "results" if args.assigned_root else repo_root / "results"
+    log(STAGE, f"repo_root={repo_root}")
+    log(STAGE, f"assigned_root={assigned_root}")
+
     pairs_path = Path(args.pairs) if args.pairs else analysis_dir / "archetype_validation_pairs.csv"
     validation_path = Path(args.validation) if args.validation else analysis_dir / "archetype_validation.csv"
     validation_detail_path = Path(args.validation_detail) if args.validation_detail else analysis_dir / "archetype_validation_detail.csv"
     classifications_path = Path(args.classifications) if args.classifications else analysis_dir / "archetype_classifications.csv"
     cross_domain_items_path = Path(args.cross_domain_items) if args.cross_domain_items else analysis_dir / "cross_domain_items.csv"
-    file_metadata_path = Path(args.file_metadata) if args.file_metadata else repo_root / "results" / "records" / "file_metadata.csv"
+    file_metadata_path = Path(args.file_metadata) if args.file_metadata else records_root / "records" / "file_metadata.csv"
     out_clusters_path = Path(args.out_clusters) if args.out_clusters else analysis_dir / "signal_clusters.json"
     out_classifications_path = Path(args.out_classifications) if args.out_classifications else analysis_dir / "archetype_cluster_classifications.csv"
     out_summary_path = Path(args.out_summary) if args.out_summary else analysis_dir / "cluster_coverage_summary.json"

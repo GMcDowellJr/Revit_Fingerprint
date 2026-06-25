@@ -11,11 +11,17 @@ filter definitions) to detect recurring cross-domain configurations, turns
 those configurations into named **archetypes**, and classifies every file
 against the promoted archetypes for use as a Power BI slicer dimension.
 
-All outputs land under `Fingerprint_Out/archetype_analysis/`. All scripts
-take `--repo-root` plus explicit `--<input>`/`--out*` overrides, support
-`--dry-run`, and write CSV/JSON atomically (temp file + `os.replace`). Every
-stage logs row counts and skip/availability counts to stderr with a
-`[archetype:<stage>]` prefix.
+Durable code/config lives in the repository; export/run data lives in an
+assigned root. In the newer CLI shape, `--repo-root` points at this repository
+(for `tools/archetype/...` and durable `config/archetype/...` files), while
+`--assigned-root` points at the export/run folder containing
+`archetype_analysis/`, `results/records/`, and `results/analysis/`. Analysis
+outputs land under `<assigned_root>/archetype_analysis/`. Explicit
+`--<input>`/`--out*` path arguments still override these defaults, and omitting
+`--assigned-root` preserves the legacy repo-local `Fingerprint_Out` behavior.
+All stages support `--dry-run` and write CSV/JSON atomically (temp file +
+`os.replace`). Every stage logs row counts and skip/availability counts to
+stderr with a `[archetype:<stage>]` prefix.
 
 ---
 
@@ -347,13 +353,14 @@ signals to `sig_hash` and measuring how consistent the underlying
 configuration actually is across classified files.
 
 **Inputs**
-- `Fingerprint_Out/archetype_analysis/archetype_classifications.csv`
-- `Fingerprint_Out/archetype_analysis/cross_domain_items.csv`
-- `config/archetype/archetype_definitions.json` (only `promoted == true`,
-  used to map `signal_id -> (edge_id, join_hash)`)
-- `Fingerprint_Out/archetype_analysis/reference_graph.json` (edge alias map,
+- `<assigned_root>/archetype_analysis/archetype_classifications.csv`
+- `<assigned_root>/archetype_analysis/cross_domain_items.csv`
+- `<repo_root>/config/archetype/archetype_definitions.json` (only
+  `promoted == true`, used to map `signal_id -> (edge_id, join_hash)`;
+  override with `--archetype-definitions`)
+- `<assigned_root>/archetype_analysis/reference_graph.json` (edge alias map,
   same as Stage 2/3)
-- `results/records/records.csv`
+- `<assigned_root>/results/records/records.csv`
 
 **Outputs**
 - `Fingerprint_Out/archetype_analysis/archetype_validation.csv` — one row
@@ -367,7 +374,7 @@ configuration actually is across classified files.
     than one distinct `join_hash`
 - `Fingerprint_Out/archetype_analysis/archetype_validation_detail.csv` —
   forensic detail, one row per `(export_run_id, archetype_id, signal_id,
-  source_join_hash)` with the resolved `sig_hash` and
+  source_join_hash)` with `source_record_pk`, the resolved `sig_hash`, and
   `n_join_hashes_in_file`.
 
 **What it does**
@@ -380,8 +387,11 @@ configuration actually is across classified files.
   resolving `sig_hash` — otherwise an unrelated second instance of the same
   edge in a file (e.g. another dimension type or material) would inflate
   those metrics for files that have more than one instance of the edge.
-- Joins `records.csv` on `(export_run_id, domain=source_domain,
-  join_hash=source_join_hash)` to resolve `sig_hash`.
+- Carries `source_record_pk` forward from `cross_domain_items.csv`, fills
+  blank source/target domains from `reference_graph.json` edge metadata, and
+  resolves `sig_hash` from `records.csv` by `(export_run_id, source_domain,
+  source_record_pk)` first, falling back to `(export_run_id, source_domain,
+  source_join_hash)` for older or sparse data.
 - Low `coherence_score` = files in this archetype tend to share the same
   underlying signal configuration (good for a "standard" archetype). High
   scores indicate the signal varies a lot even among files classified the
@@ -389,7 +399,7 @@ configuration actually is across classified files.
 
 **Typical command**
 ```
-python tools/archetype/validate_archetype_signals.py --repo-root .
+python tools/archetype/validate_archetype_signals.py --repo-root . --assigned-root /path/to/Fingerprint_Out/Exports
 ```
 
 ---
@@ -523,7 +533,7 @@ isolation.
 
 **Typical command**
 ```
-python tools/archetype/cluster_archetype_signals.py --repo-root .
+python tools/archetype/cluster_archetype_signals.py --repo-root . --assigned-root /path/to/Fingerprint_Out/Exports
 ```
 
 ---
@@ -537,11 +547,59 @@ python tools/archetype/compute_cross_domain_cooccurrence.py --repo-root .
 python tools/archetype/generate_archetype_candidates.py --repo-root .
 # --- human review/promotion of config/archetype/archetype_definitions.json ---
 python tools/archetype/assign_archetype_classifications.py --repo-root .
-python tools/archetype/validate_archetype_signals.py --repo-root .
-python tools/archetype/cluster_archetype_signals.py --repo-root .
+python tools/archetype/validate_archetype_signals.py --repo-root . --assigned-root /path/to/Fingerprint_Out/Exports
+python tools/archetype/cluster_archetype_signals.py --repo-root . --assigned-root /path/to/Fingerprint_Out/Exports
 # --- human review of signal_clusters.json / cluster_coverage_summary.json,
 #     then approach_label promotion in config/archetype/archetype_definitions.json ---
 ```
+
+## Path model examples for stages 3-5 and review
+
+Use `--repo-root` for code and durable configuration, not as the data root. Use
+`--assigned-root` for the current export/run folder; downstream defaults read
+from and write to `<assigned_root>/archetype_analysis/` and
+`<assigned_root>/results/...`. Durable config such as
+`config/archetype/archetype_definitions.json` stays under the repo unless an
+explicit path is supplied.
+
+```bash
+python tools/archetype/assign_archetype_classifications.py \
+  --repo-root /path/to/Revit_Fingerprint \
+  --assigned-root /path/to/Fingerprint_Out/Exports
+
+python tools/archetype/validate_archetype_signals.py \
+  --repo-root /path/to/Revit_Fingerprint \
+  --assigned-root /path/to/Fingerprint_Out/Exports
+
+python tools/archetype/cluster_archetype_signals.py \
+  --repo-root /path/to/Revit_Fingerprint \
+  --assigned-root /path/to/Fingerprint_Out/Exports
+
+python tools/archetype/prepare_archetype_review.py \
+  --repo-root /path/to/Revit_Fingerprint \
+  --assigned-root /path/to/Fingerprint_Out/Exports \
+  --top-n 20
+```
+
+`prepare_archetype_review.py` writes one `review_<cluster_id>.csv` per cluster,
+then builds `archetype_review_schedule.csv` and `archetype_review_gaps.csv`.
+The per-cluster review CSVs remain evidence examples sorted toward
+Template/Container rows for label ratification; the schedule is a manual
+file-open list and may select Project files outside the top-N review sample
+when enriched validation-detail rows are available. Schedule diagnostics
+separate cluster-level and selected-file name status:
+`cluster_has_named_review_examples`, `selected_file_has_named_examples`,
+`selected_file_is_in_review_sample`, `selected_file_name_status`,
+`selected_project_file_unresolved_but_cluster_has_named_examples`, and
+`schedule_name_regression`. This makes an unresolved selected Project file a
+selection-scope diagnostic, not automatically a cluster-level name-resolution
+failure. `selected_file_name_status` records enrichment failure reasons such as
+`not_in_review_sample`, `missing_validation_detail_for_selected_file`,
+`missing_sig_hash`, `no_records_match`, or
+`unresolved_materials_pending_hash_policy`. `archetype_review_gaps.csv` is
+reserved for clusters with no usable detail-backed candidate rows; clusters
+with named review examples are not treated as gaps merely because the selected
+Project file is unresolved.
 
 ## Shared helpers
 

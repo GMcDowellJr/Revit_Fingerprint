@@ -17,6 +17,11 @@ Output:
   - <out>/review_<cluster_id>.csv -- one file per cluster processed, all in
     a single directory. <out> defaults to
     Fingerprint_Out/archetype_analysis/archetype_review.
+  - <out>/archetype_review_schedule.csv -- manual file-open schedule rows,
+    using final review_<cluster_id>.csv files for cluster-level name diagnostics
+    and enriched candidate rows for Project-file selection when available.
+  - <out>/archetype_review_gaps.csv -- clusters with no usable
+    detail-backed review rows.
 
 Processing:
   For each target cluster, assemble one row per (export_run_id, signal_id)
@@ -55,6 +60,10 @@ Processing:
     all-signals-fired first, export_run_id as tiebreak), and apply --top-n by
     unique export_run_id.
   Stage 8: Write <out>/review_<cluster_id>.csv and print a console summary.
+  Stage 9: Build archetype_review_schedule.csv and archetype_review_gaps.csv.
+    The schedule can select Project files for manual review even when they are
+    outside the top-N review sample; final review_<cluster_id>.csv files remain
+    the source of cluster-level name diagnostics.
 
 Usage:
     python tools/archetype/prepare_archetype_review.py \\
@@ -96,7 +105,7 @@ from _common import (  # noqa: E402
 
 STAGE = "prepare_archetype_review"
 
-GOVERNANCE_ROLE_ORDER = {"Template": 0, "Container": 1, "Project": 2}
+GOVERNANCE_ROLE_ORDER = {"Template": 0, "Container": 1, "Project": 2, "Generic": 3}
 FILE_LEVEL_SENTINEL_SIGNAL_ID = "(file-level sentinel — fired signals unresolved)"
 
 OUT_FIELDS = [
@@ -115,6 +124,50 @@ OUT_FIELDS = [
     "sig_hash",
     "param_names",
     "category_names",
+]
+
+SCHEDULE_FIELDS = [
+    "cluster_id",
+    "cluster_label_stub",
+    "signal_id",
+    "representative_source",
+    "file_path",
+    "export_run_id",
+    "governance_role",
+    "n_signals_fired",
+    "all_signals_fired",
+    "source_domain",
+    "source_join_hash",
+    "element_name",
+    "sig_hash",
+    "param_names",
+    "category_names",
+    "review_rows",
+    "review_named_rows",
+    "schedule_rows",
+    "schedule_named_rows",
+    "cluster_has_named_review_examples",
+    "selected_file_has_named_examples",
+    "selected_file_is_in_review_sample",
+    "selected_file_name_status",
+    "selected_project_file_unresolved_but_cluster_has_named_examples",
+    "schedule_name_regression",
+]
+
+GAPS_FIELDS = [
+    "cluster_id",
+    "cluster_label_stub",
+    "reason",
+    "review_rows",
+    "review_named_rows",
+    "schedule_rows",
+    "schedule_named_rows",
+    "cluster_has_named_review_examples",
+    "selected_file_has_named_examples",
+    "selected_file_is_in_review_sample",
+    "selected_file_name_status",
+    "selected_project_file_unresolved_but_cluster_has_named_examples",
+    "schedule_name_regression",
 ]
 
 _PATH_COLUMN_CANDIDATES = ("central_path", "central_path_norm")
@@ -271,9 +324,10 @@ def _build_cluster_context(
     #
     # A file can fire the same signal on multiple source records (one
     # archetype_validation_detail.csv row per source_join_hash; see
-    # n_join_hashes_in_file). source_join_hash is included in the dedup key
-    # so every matching element/instance is preserved for review, not just
-    # the first one.
+    # n_join_hashes_in_file). source_record_pk is preferred for the internal
+    # dedupe key when available because it is the most precise source-record
+    # identity; source_join_hash remains on the detail row and is written to
+    # review CSVs unchanged for reviewer forensics.
     signal_id_set = set(ctx.signal_ids)
     valid_archetype_ids = archetype_ids_by_gq.get(ctx.governance_question, set())
     files_with_detail: Set[str] = set()
@@ -286,7 +340,8 @@ def _build_cluster_context(
                 continue
             signal_id = row.get("signal_id", "") or edge_id
             source_join_hash = row.get("source_join_hash", "")
-            key = (export_run_id, signal_id, source_join_hash)
+            source_record_pk = row.get("source_record_pk", "")
+            key = (export_run_id, signal_id, source_record_pk or source_join_hash)
             if key not in ctx.detail_by_file_signal:
                 ctx.detail_by_file_signal[key] = row
             files_with_detail.add(export_run_id)
@@ -302,33 +357,48 @@ def _load_label_lookup(
     records_path: Path,
     qualifying_files: Set[str],
     source_domains: Set[str],
-) -> Tuple[Dict[Tuple[str, str], Tuple[str, str]], Dict[Tuple[str, str], str]]:
-    """Stage 4: stream records.csv to resolve sig_hash -> (label_display, label_quality)."""
-    label_lookup: Dict[Tuple[str, str], Tuple[str, str]] = {}
-    vfd_sig_to_record_pk: Dict[Tuple[str, str], str] = {}
+) -> Tuple[
+    Dict[Tuple[str, str, str], Tuple[str, str]],
+    Dict[Tuple[str, str], Tuple[str, str]],
+    Dict[Tuple[str, str, str], Tuple[str, str]],
+    Dict[Tuple[str, str, str], str],
+]:
+    """Stage 4: stream records.csv to resolve records to labels.
+
+    Returns domain+sig_hash, legacy export+sig_hash, and record_pk keyed label
+    lookups, plus a VFD record_pk helper for param/category resolution.
+    """
+    label_by_domain_sig: Dict[Tuple[str, str, str], Tuple[str, str]] = {}
+    label_by_sig: Dict[Tuple[str, str], Tuple[str, str]] = {}
+    label_by_record_pk: Dict[Tuple[str, str, str], Tuple[str, str]] = {}
+    vfd_sig_to_record_pk: Dict[Tuple[str, str, str], str] = {}
     if not records_path.is_file():
-        log(STAGE, f"WARNING: records file not found at {records_path}; element_name will be empty")
-        return label_lookup, vfd_sig_to_record_pk
+        log(STAGE, f"WARNING: records file not found at {records_path}; element_name will be unresolved")
+        return label_by_domain_sig, label_by_sig, label_by_record_pk, vfd_sig_to_record_pk
 
     with records_path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
             export_run_id = row.get("export_run_id", "")
             domain = row.get("domain", "")
-            if export_run_id not in qualifying_files or domain not in source_domains:
+            if export_run_id not in qualifying_files:
+                continue
+            if source_domains and domain not in source_domains:
                 continue
             sig_hash = row.get("sig_hash", "")
             if not sig_hash:
                 continue
-            label_lookup[(export_run_id, sig_hash)] = (
-                row.get("label_display", ""),
-                row.get("label_quality", ""),
-            )
+            label = (row.get("label_display", ""), row.get("label_quality", ""))
+            label_by_domain_sig[(export_run_id, domain, sig_hash)] = label
+            label_by_sig[(export_run_id, sig_hash)] = label
+            record_pk = row.get("record_pk", "")
+            if record_pk:
+                label_by_record_pk[(export_run_id, domain, record_pk)] = label
             if domain == "view_filter_definitions":
-                vfd_sig_to_record_pk[(export_run_id, sig_hash)] = row.get("record_pk", "")
+                vfd_sig_to_record_pk[(export_run_id, domain, sig_hash)] = record_pk
 
-    log(STAGE, f"resolved {len(label_lookup)} (export_run_id, sig_hash) label rows from {records_path}")
-    return label_lookup, vfd_sig_to_record_pk
+    log(STAGE, f"resolved {len(label_by_domain_sig)} (export_run_id, domain, sig_hash) label rows from {records_path}")
+    return label_by_domain_sig, label_by_sig, label_by_record_pk, vfd_sig_to_record_pk
 
 
 def _load_vfd_resolution(
@@ -409,6 +479,215 @@ def _load_file_path_lookup(file_metadata_path: Path) -> Dict[str, str]:
     return file_path_lookup
 
 
+def _is_named_element(element_name: str) -> bool:
+    value = (element_name or "").strip()
+    if not value or value == "_":
+        return False
+    return not value.lower().startswith("(unresolved")
+
+
+def _schedule_file_sort_key(rows_for_file: List[Dict[str, str]]) -> Tuple[int, int, int, str]:
+    role_order = {"Project": 0, "Template": 1, "Container": 2, "Generic": 3}
+    first = rows_for_file[0] if rows_for_file else {}
+    role_rank = role_order.get(first.get("governance_role", ""), 4)
+    max_signals = 0
+    any_all_signals = 0
+    for row in rows_for_file:
+        try:
+            max_signals = max(max_signals, int(row.get("n_signals_fired") or 0))
+        except (TypeError, ValueError):
+            pass
+        if row.get("all_signals_fired") == "true":
+            any_all_signals = 1
+    return (role_rank, -max_signals, -any_all_signals, first.get("export_run_id", ""))
+
+
+def _schedule_row_sort_key(row: Dict[str, str]) -> Tuple[str, int, str]:
+    named_rank = 0 if _is_named_element(row.get("element_name", "")) else 1
+    return (row.get("signal_id", ""), named_rank, row.get("source_join_hash", ""))
+
+
+def _selected_file_name_status(selected_rows: List[Dict[str, str]], selected_file_is_in_review_sample: bool) -> str:
+    if not selected_rows:
+        return "missing_validation_detail_for_selected_file"
+    if any(_is_named_element(r.get("element_name", "")) for r in selected_rows):
+        return "named"
+
+    reasons: List[str] = []
+    if not selected_file_is_in_review_sample:
+        reasons.append("not_in_review_sample")
+    if all(not r.get("sig_hash", "") for r in selected_rows):
+        if any("material" in (r.get("source_domain", "").lower()) for r in selected_rows):
+            reasons.append("unresolved_materials_pending_hash_policy")
+        else:
+            reasons.append("missing_sig_hash")
+    else:
+        reasons.append("no_records_match")
+    return "|".join(dict.fromkeys(reasons))
+
+
+def _select_schedule_rows_for_cluster(
+    cluster_id: str,
+    cluster_label_stub: str,
+    review_rows: List[Dict[str, str]],
+    candidate_rows: Optional[List[Dict[str, str]]] = None,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Select manual file-open schedule rows.
+
+    ``review_rows`` are the final review_<cluster>.csv sample and are used for
+    cluster-level name diagnostics. ``candidate_rows`` may include enriched
+    rows outside the top-N review sample so Project files can still be selected
+    for manual file-open review.
+    """
+    cluster_has_named_review_examples = any(_is_named_element(r.get("element_name", "")) for r in review_rows)
+    candidates = candidate_rows if candidate_rows is not None else review_rows
+    usable_candidates = [r for r in candidates if r.get("signal_id", "") != FILE_LEVEL_SENTINEL_SIGNAL_ID]
+
+    selected_export_run_id = ""
+    selected_rows: List[Dict[str, str]] = []
+    if usable_candidates:
+        rows_by_file: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+        for row in usable_candidates:
+            rows_by_file[row.get("export_run_id", "")].append(row)
+        selected_export_run_id, selected_rows = sorted(
+            rows_by_file.items(),
+            key=lambda kv: _schedule_file_sort_key(kv[1]),
+        )[0]
+
+    review_export_run_ids = {r.get("export_run_id", "") for r in review_rows}
+    selected_file_is_in_review_sample = bool(selected_export_run_id and selected_export_run_id in review_export_run_ids)
+    selected_file_has_named_examples = any(_is_named_element(r.get("element_name", "")) for r in selected_rows)
+    selected_file_name_status = _selected_file_name_status(selected_rows, selected_file_is_in_review_sample)
+    selected_project_file_unresolved_but_cluster_has_named_examples = bool(
+        cluster_has_named_review_examples
+        and selected_rows
+        and selected_rows[0].get("governance_role", "") == "Project"
+        and not selected_file_has_named_examples
+    )
+
+    schedule_rows: List[Dict[str, Any]] = []
+    for row in sorted(selected_rows, key=_schedule_row_sort_key):
+        schedule_rows.append({
+            "cluster_id": cluster_id,
+            "cluster_label_stub": cluster_label_stub,
+            "signal_id": row.get("signal_id", ""),
+            "representative_source": "review_file" if selected_file_is_in_review_sample else "classification_only",
+            "file_path": row.get("file_path", ""),
+            "export_run_id": row.get("export_run_id", ""),
+            "governance_role": row.get("governance_role", ""),
+            "n_signals_fired": row.get("n_signals_fired", ""),
+            "all_signals_fired": row.get("all_signals_fired", ""),
+            "source_domain": row.get("source_domain", ""),
+            "source_join_hash": row.get("source_join_hash", ""),
+            "element_name": row.get("element_name", ""),
+            "sig_hash": row.get("sig_hash", ""),
+            "param_names": row.get("param_names", ""),
+            "category_names": row.get("category_names", ""),
+        })
+
+    schedule_named_rows = sum(1 for r in schedule_rows if _is_named_element(str(r.get("element_name", ""))))
+    schedule_name_regression = bool(
+        not selected_project_file_unresolved_but_cluster_has_named_examples
+        and cluster_has_named_review_examples
+        and schedule_rows
+        and schedule_named_rows == 0
+    )
+    diagnostics = {
+        "review_rows": len(review_rows),
+        "review_named_rows": sum(1 for r in review_rows if _is_named_element(r.get("element_name", ""))),
+        "schedule_rows": len(schedule_rows),
+        "schedule_named_rows": schedule_named_rows,
+        "cluster_has_named_review_examples": cluster_has_named_review_examples,
+        "selected_file_has_named_examples": selected_file_has_named_examples,
+        "selected_file_is_in_review_sample": selected_file_is_in_review_sample,
+        "selected_file_name_status": selected_file_name_status,
+        "selected_project_file_unresolved_but_cluster_has_named_examples": selected_project_file_unresolved_but_cluster_has_named_examples,
+        "schedule_name_regression": schedule_name_regression,
+        "has_usable_review_rows": bool(usable_candidates),
+    }
+    for row in schedule_rows:
+        row.update({
+            "review_rows": diagnostics["review_rows"],
+            "review_named_rows": diagnostics["review_named_rows"],
+            "schedule_rows": diagnostics["schedule_rows"],
+            "schedule_named_rows": diagnostics["schedule_named_rows"],
+            "cluster_has_named_review_examples": "true" if cluster_has_named_review_examples else "false",
+            "selected_file_has_named_examples": "true" if selected_file_has_named_examples else "false",
+            "selected_file_is_in_review_sample": "true" if selected_file_is_in_review_sample else "false",
+            "selected_file_name_status": selected_file_name_status,
+            "selected_project_file_unresolved_but_cluster_has_named_examples": "true" if selected_project_file_unresolved_but_cluster_has_named_examples else "false",
+            "schedule_name_regression": "true" if schedule_name_regression else "false",
+        })
+    return schedule_rows, diagnostics
+
+
+def _write_review_schedule_outputs(
+    out_dir: Path,
+    results: List[Dict[str, Any]],
+    dry_run: bool,
+) -> None:
+    """Build review schedule/gap CSVs from review files plus enriched candidates."""
+    schedule_rows: List[Dict[str, Any]] = []
+    gap_rows: List[Dict[str, Any]] = []
+
+    for result in results:
+        cluster_id = str(result.get("cluster_id", ""))
+        cluster_label_stub = str(result.get("cluster_label_stub", ""))
+        out_path = Path(result.get("out_path", out_dir / f"review_{cluster_id}.csv"))
+        review_rows = read_csv_rows(out_path) if out_path.is_file() else []
+        candidate_rows = result.get("schedule_candidate_rows")
+        cluster_schedule_rows, diagnostics = _select_schedule_rows_for_cluster(
+            cluster_id,
+            cluster_label_stub,
+            review_rows,
+            candidate_rows if isinstance(candidate_rows, list) else None,
+        )
+        schedule_rows.extend(cluster_schedule_rows)
+
+        log(
+            STAGE,
+            f"cluster_id={cluster_id}: review_rows={diagnostics['review_rows']} "
+            f"review_named_rows={diagnostics['review_named_rows']} "
+            f"schedule_rows={diagnostics['schedule_rows']} "
+            f"schedule_named_rows={diagnostics['schedule_named_rows']} "
+            f"cluster_has_named_review_examples={str(diagnostics['cluster_has_named_review_examples']).lower()} "
+            f"selected_file_has_named_examples={str(diagnostics['selected_file_has_named_examples']).lower()} "
+            f"selected_file_is_in_review_sample={str(diagnostics['selected_file_is_in_review_sample']).lower()} "
+            f"selected_file_name_status={diagnostics['selected_file_name_status']} "
+            f"selected_project_file_unresolved_but_cluster_has_named_examples={str(diagnostics['selected_project_file_unresolved_but_cluster_has_named_examples']).lower()} "
+            f"schedule_name_regression={str(diagnostics['schedule_name_regression']).lower()}",
+        )
+
+        if not diagnostics["has_usable_review_rows"]:
+            gap_rows.append({
+                "cluster_id": cluster_id,
+                "cluster_label_stub": cluster_label_stub,
+                "reason": "no_usable_review_rows",
+                "review_rows": diagnostics["review_rows"],
+                "review_named_rows": diagnostics["review_named_rows"],
+                "schedule_rows": diagnostics["schedule_rows"],
+                "schedule_named_rows": diagnostics["schedule_named_rows"],
+                "cluster_has_named_review_examples": "true" if diagnostics["cluster_has_named_review_examples"] else "false",
+                "selected_file_has_named_examples": "true" if diagnostics["selected_file_has_named_examples"] else "false",
+                "selected_file_is_in_review_sample": "true" if diagnostics["selected_file_is_in_review_sample"] else "false",
+                "selected_file_name_status": diagnostics["selected_file_name_status"],
+                "selected_project_file_unresolved_but_cluster_has_named_examples": "true" if diagnostics["selected_project_file_unresolved_but_cluster_has_named_examples"] else "false",
+                "schedule_name_regression": "true" if diagnostics["schedule_name_regression"] else "false",
+            })
+
+    schedule_path = out_dir / "archetype_review_schedule.csv"
+    gaps_path = out_dir / "archetype_review_gaps.csv"
+    if dry_run:
+        log(STAGE, f"dry-run: would write {len(schedule_rows)} rows to {schedule_path}")
+        log(STAGE, f"dry-run: would write {len(gap_rows)} rows to {gaps_path}")
+        return
+
+    atomic_write_csv(schedule_path, SCHEDULE_FIELDS, schedule_rows)
+    log(STAGE, f"wrote {len(schedule_rows)} rows to {schedule_path}")
+    atomic_write_csv(gaps_path, GAPS_FIELDS, gap_rows)
+    log(STAGE, f"wrote {len(gap_rows)} rows to {gaps_path}")
+
+
 def _sort_key(row: Dict[str, str]) -> Tuple[int, int, int, int, str]:
     # Detail-backed rows should consume --top-n slots before unresolved
     # file-level sentinels, even when the sentinel file has stronger
@@ -425,8 +704,10 @@ def _sort_key(row: Dict[str, str]) -> Tuple[int, int, int, int, str]:
 
 def _process_cluster(
     ctx: ClusterContext,
-    label_lookup: Dict[Tuple[str, str], Tuple[str, str]],
-    vfd_sig_to_record_pk: Dict[Tuple[str, str], str],
+    label_by_domain_sig: Dict[Tuple[str, str, str], Tuple[str, str]],
+    label_by_sig: Dict[Tuple[str, str], Tuple[str, str]],
+    label_by_record_pk: Dict[Tuple[str, str, str], Tuple[str, str]],
+    vfd_sig_to_record_pk: Dict[Tuple[str, str, str], str],
     vfd_resolution: Dict[Tuple[str, str], Tuple[str, str]],
     file_path_lookup: Dict[str, str],
     out_dir: Path,
@@ -436,21 +717,35 @@ def _process_cluster(
 ) -> Dict[str, Any]:
     # Stage 7: assemble and sort the review table.
     review_rows: List[Dict[str, str]] = []
-    for (export_run_id, signal_id, source_join_hash), detail in ctx.detail_by_file_signal.items():
+    for detail in ctx.detail_by_file_signal.values():
+        export_run_id = detail.get("export_run_id", "")
+        signal_id = detail.get("signal_id", "") or detail.get("edge_id", "")
+        source_join_hash = detail.get("source_join_hash", "")
         cls = ctx.classification_by_file.get(export_run_id, {})
         source_domain = detail.get("source_domain", "")
         sig_hash = detail.get("sig_hash", "")
+        source_record_pk = detail.get("source_record_pk", "")
 
-        label_display, label_quality = label_lookup.get((export_run_id, sig_hash), ("", ""))
+        label_display, label_quality = ("", "")
+        if source_domain and source_record_pk:
+            label_display, label_quality = label_by_record_pk.get((export_run_id, source_domain, source_record_pk), ("", ""))
+        if not label_display and source_domain and sig_hash:
+            label_display, label_quality = label_by_domain_sig.get((export_run_id, source_domain, sig_hash), ("", ""))
+        if not label_display and sig_hash:
+            label_display, label_quality = label_by_sig.get((export_run_id, sig_hash), ("", ""))
+
         if label_display:
             element_name = label_display
+        elif not sig_hash:
+            element_name = "(unresolved — missing sig_hash)"
         else:
-            element_name = f"{label_quality}_{sig_hash[:8]}"
+            quality_suffix = f"; label_quality={label_quality}" if label_quality else ""
+            element_name = f"(unresolved — no records.csv label match for sig_hash {sig_hash[:8]}{quality_suffix})"
 
         param_names = ""
         category_names = ""
         if source_domain == "view_filter_definitions":
-            record_pk = vfd_sig_to_record_pk.get((export_run_id, sig_hash), "")
+            record_pk = source_record_pk or vfd_sig_to_record_pk.get((export_run_id, source_domain, sig_hash), "")
             param_names, category_names = vfd_resolution.get((export_run_id, record_pk), ("", ""))
 
         file_path = file_path_lookup.get(export_run_id) or export_run_id
@@ -588,12 +883,14 @@ def _process_cluster(
         "top_n_shown": len(selected_export_run_ids),
         "n_rows": len(output_rows),
         "out_path": out_path,
+        "schedule_candidate_rows": review_rows,
     }
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
+    ap.add_argument("--repo-root", default=".", help="Repository root (code/config root; durable tool/config defaults live here)")
+    ap.add_argument("--assigned-root", default=None, help="Assigned/export root containing archetype_analysis/ and results/; omitted preserves legacy repo-local defaults")
     ap.add_argument("--cluster-id", default=None, help="Target cluster_id from signal_clusters.json; if omitted, process all clusters")
     ap.add_argument("--signal-clusters", default=None, help="Path to signal_clusters.json")
     ap.add_argument("--cluster-classifications", default=None, help="Path to archetype_cluster_classifications.csv")
@@ -612,15 +909,19 @@ def main() -> int:
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
-    analysis_dir = repo_root / "Fingerprint_Out" / "archetype_analysis"
+    assigned_root = Path(args.assigned_root).resolve() if args.assigned_root else repo_root / "Fingerprint_Out"
+    analysis_dir = assigned_root / "archetype_analysis"
+    records_root = assigned_root / "results" if args.assigned_root else repo_root / "results"
+    log(STAGE, f"repo_root={repo_root}")
+    log(STAGE, f"assigned_root={assigned_root}")
 
     signal_clusters_path = Path(args.signal_clusters) if args.signal_clusters else analysis_dir / "signal_clusters.json"
     cluster_classifications_path = Path(args.cluster_classifications) if args.cluster_classifications else analysis_dir / "archetype_cluster_classifications.csv"
     archetype_classifications_path = Path(args.archetype_classifications) if args.archetype_classifications else analysis_dir / "archetype_classifications.csv"
     validation_detail_path = Path(args.validation_detail) if args.validation_detail else analysis_dir / "archetype_validation_detail.csv"
-    records_path = Path(args.records) if args.records else repo_root / "results" / "records" / "records.csv"
-    file_metadata_path = Path(args.file_metadata) if args.file_metadata else repo_root / "results" / "records" / "file_metadata.csv"
-    identity_items_dir = Path(args.identity_items_dir) if args.identity_items_dir else repo_root / "results" / "records" / "identity_items_by_domain"
+    records_path = Path(args.records) if args.records else records_root / "records" / "records.csv"
+    file_metadata_path = Path(args.file_metadata) if args.file_metadata else records_root / "records" / "file_metadata.csv"
+    identity_items_dir = Path(args.identity_items_dir) if args.identity_items_dir else records_root / "records" / "identity_items_by_domain"
     bip_lookup_path = Path(args.bip_lookup) if args.bip_lookup else repo_root / "tools" / "archetype" / "bip_lookup.json"
     shared_param_names_path = Path(args.shared_param_names) if args.shared_param_names else repo_root / "tools" / "archetype" / "shared_param_names.json"
     vfd_category_map_path = Path(args.vfd_category_map) if args.vfd_category_map else repo_root / "tools" / "archetype" / "vfd_category_domain_map.json"
@@ -693,7 +994,7 @@ def main() -> int:
         union_source_domains |= ctx.source_domains
 
     # Stage 4 (shared, single pass over records.csv).
-    label_lookup, vfd_sig_to_record_pk = _load_label_lookup(records_path, union_qualifying_files, union_source_domains)
+    label_by_domain_sig, label_by_sig, label_by_record_pk, vfd_sig_to_record_pk = _load_label_lookup(records_path, union_qualifying_files, union_source_domains)
 
     # Stage 5 (shared).
     bip_lookup = read_json(bip_lookup_path, default={}) or {}
@@ -713,10 +1014,12 @@ def main() -> int:
     results: List[Dict[str, Any]] = []
     for ctx in contexts:
         result = _process_cluster(
-            ctx, label_lookup, vfd_sig_to_record_pk, vfd_resolution, file_path_lookup,
+            ctx, label_by_domain_sig, label_by_sig, label_by_record_pk, vfd_sig_to_record_pk, vfd_resolution, file_path_lookup,
             out_dir, args.top_n, args.dry_run, verbose=verbose,
         )
         results.append(result)
+
+    _write_review_schedule_outputs(out_dir, results, args.dry_run)
 
     if not verbose:
         print(f"Processed {len(results)} clusters -> {out_dir}")
