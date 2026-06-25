@@ -130,6 +130,7 @@ DETAIL_FIELDS = [
     "signal_id",
     "edge_id",
     "source_domain",
+    "source_record_pk",
     "source_join_hash",
     "sig_hash",
     "n_join_hashes_in_file",
@@ -159,7 +160,8 @@ def _coherence_tier(score: float) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
+    ap.add_argument("--repo-root", default=".", help="Repository root (code/config root; durable config defaults live here)")
+    ap.add_argument("--assigned-root", default=None, help="Assigned/export root containing archetype_analysis/ and results/; omitted preserves legacy repo-local defaults")
     ap.add_argument("--archetype-classifications", default=None, help="Path to archetype_classifications.csv")
     ap.add_argument("--cross-domain-items", default=None, help="Path to cross_domain_items.csv")
     ap.add_argument("--archetype-definitions", default=None, help="Path to archetype_definitions.json")
@@ -171,13 +173,19 @@ def main() -> int:
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
-    classifications_path = Path(args.archetype_classifications) if args.archetype_classifications else repo_root / "Fingerprint_Out" / "archetype_analysis" / "archetype_classifications.csv"
-    items_path = Path(args.cross_domain_items) if args.cross_domain_items else repo_root / "Fingerprint_Out" / "archetype_analysis" / "cross_domain_items.csv"
+    assigned_root = Path(args.assigned_root).resolve() if args.assigned_root else repo_root / "Fingerprint_Out"
+    analysis_dir = assigned_root / "archetype_analysis"
+    records_root = assigned_root / "results" if args.assigned_root else repo_root / "results"
+    log(STAGE, f"repo_root={repo_root}")
+    log(STAGE, f"assigned_root={assigned_root}")
+
+    classifications_path = Path(args.archetype_classifications) if args.archetype_classifications else analysis_dir / "archetype_classifications.csv"
+    items_path = Path(args.cross_domain_items) if args.cross_domain_items else analysis_dir / "cross_domain_items.csv"
     definitions_path = Path(args.archetype_definitions) if args.archetype_definitions else repo_root / "config" / "archetype" / "archetype_definitions.json"
-    reference_graph_path = Path(args.reference_graph) if args.reference_graph else repo_root / "Fingerprint_Out" / "archetype_analysis" / "reference_graph.json"
-    records_csv_path = Path(args.records_csv) if args.records_csv else repo_root / "results" / "records" / "records.csv"
-    patterns_path = Path(args.cross_domain_patterns) if args.cross_domain_patterns else repo_root / "Fingerprint_Out" / "archetype_analysis" / "cross_domain_patterns.csv"
-    out_dir = Path(args.out_dir) if args.out_dir else repo_root / "Fingerprint_Out" / "archetype_analysis"
+    reference_graph_path = Path(args.reference_graph) if args.reference_graph else analysis_dir / "reference_graph.json"
+    records_csv_path = Path(args.records_csv) if args.records_csv else records_root / "records" / "records.csv"
+    patterns_path = Path(args.cross_domain_patterns) if args.cross_domain_patterns else analysis_dir / "cross_domain_patterns.csv"
+    out_dir = Path(args.out_dir) if args.out_dir else analysis_dir
 
     classification_rows = read_csv_rows(classifications_path)
     log(STAGE, f"loaded {len(classification_rows)} rows from {classifications_path}")
@@ -218,17 +226,26 @@ def main() -> int:
     records_rows = read_csv_rows(records_csv_path)
     log(STAGE, f"loaded {len(records_rows)} rows from {records_csv_path}")
 
-    # (export_run_id, domain, join_hash) -> sig_hash
-    sig_hash_idx: Dict[Tuple[str, str, str], str] = {}
+    # (export_run_id, domain, record_pk) -> sig_hash; record_pk is the most
+    # precise identity carried by cross_domain_items.csv and avoids ambiguous
+    # join_hash-only lookups for set-like domains.
+    sig_hash_by_record_pk: Dict[Tuple[str, str, str], str] = {}
+    # (export_run_id, domain, join_hash) -> sig_hash fallback for older
+    # cross_domain_items.csv files or rows without source_record_pk.
+    sig_hash_by_join_hash: Dict[Tuple[str, str, str], str] = {}
     for r in records_rows:
         export_run_id = r.get("export_run_id", "")
         domain = r.get("domain", "")
+        record_pk = r.get("record_pk", "")
         join_hash = r.get("join_hash", "")
+        sig_hash = r.get("sig_hash", "")
+        if export_run_id and domain and record_pk:
+            sig_hash_by_record_pk[(export_run_id, domain, record_pk)] = sig_hash
         if export_run_id and domain and join_hash:
-            sig_hash_idx[(export_run_id, domain, join_hash)] = r.get("sig_hash", "")
+            sig_hash_by_join_hash[(export_run_id, domain, join_hash)] = sig_hash
 
-    # (export_run_id, canonical edge_id) -> [(source_domain, source_join_hash, target_join_hash), ...]
-    items_idx: Dict[Tuple[str, str], List[Tuple[str, str, str]]] = defaultdict(list)
+    # (export_run_id, canonical edge_id) -> [(source_domain, source_record_pk, source_join_hash, target_join_hash), ...]
+    items_idx: Dict[Tuple[str, str], List[Tuple[str, str, str, str]]] = defaultdict(list)
     # canonical edge_id -> Counter of source_join_hash -> record count (across all files)
     edge_join_hash_counts: Dict[str, "Counter[str]"] = defaultdict(Counter)
     # canonical edge_id -> set of export_run_id with at least one record
@@ -239,8 +256,14 @@ def main() -> int:
         if not export_run_id or not edge_id:
             continue
         canonical_edge_id = alias_of.get(edge_id, edge_id)
+        edge_meta = edges_by_id.get(edge_id) or edges_by_id.get(canonical_edge_id) or {}
+        source_domain = row.get("source_domain", "") or edge_meta.get("source_domain", "")
+        target_domain = row.get("target_domain", "") or edge_meta.get("target_domain", "")
+        # target_domain is resolved here as a diagnostic/compatibility fallback
+        # for sparse cross_domain_items rows; current detail output is source-grain.
+        _ = target_domain
         items_idx[(export_run_id, canonical_edge_id)].append(
-            (row.get("source_domain", ""), row.get("source_join_hash", ""), row.get("target_join_hash", ""))
+            (source_domain, row.get("source_record_pk", ""), row.get("source_join_hash", ""), row.get("target_join_hash", ""))
         )
         files_by_canonical_edge[canonical_edge_id].add(export_run_id)
         source_join_hash = row.get("source_join_hash", "")
@@ -275,15 +298,16 @@ def main() -> int:
 
         for signal_id in signals_fired:
             edge_id, join_hash_filter = signal_meta_map.get(signal_id, (signal_id, None))
-            edge_id_by_signal[(archetype_id, signal_id)] = edge_id
+            canonical_edge_id = alias_of.get(edge_id, edge_id)
+            edge_id_by_signal[(archetype_id, signal_id)] = canonical_edge_id
 
-            pairs = items_idx.get((export_run_id, edge_id), [])
+            pairs = items_idx.get((export_run_id, canonical_edge_id), [])
             if join_hash_filter:
                 pairs = [
                     p for p in pairs
-                    if join_hash_filter == p[1] or join_hash_filter == p[2]
+                    if join_hash_filter == p[2] or join_hash_filter == p[3]
                 ]
-            distinct_join_hashes = {jh for _, jh, _ in pairs if jh}
+            distinct_join_hashes = {jh for _, _, jh, _ in pairs if jh}
             n_join_hashes_in_file = len(distinct_join_hashes)
 
             files_by_signal[(archetype_id, signal_id)].add(export_run_id)
@@ -291,11 +315,16 @@ def main() -> int:
                 multi_instance_by_signal[(archetype_id, signal_id)].add(export_run_id)
 
             seen_join_hashes: Set[str] = set()
-            for source_domain, source_join_hash, _target_join_hash in pairs:
-                if not source_join_hash or source_join_hash in seen_join_hashes:
+            for source_domain, source_record_pk, source_join_hash, _target_join_hash in pairs:
+                dedupe_key = source_record_pk or source_join_hash
+                if not dedupe_key or dedupe_key in seen_join_hashes:
                     continue
-                seen_join_hashes.add(source_join_hash)
-                sig_hash = sig_hash_idx.get((export_run_id, source_domain, source_join_hash), "")
+                seen_join_hashes.add(dedupe_key)
+                sig_hash = ""
+                if source_record_pk:
+                    sig_hash = sig_hash_by_record_pk.get((export_run_id, source_domain, source_record_pk), "")
+                if not sig_hash and source_join_hash:
+                    sig_hash = sig_hash_by_join_hash.get((export_run_id, source_domain, source_join_hash), "")
                 if sig_hash:
                     sig_hashes_by_signal[(archetype_id, signal_id)].add(sig_hash)
 
@@ -305,12 +334,16 @@ def main() -> int:
                     "signal_id": signal_id,
                     "edge_id": edge_id,
                     "source_domain": source_domain,
+                    "source_record_pk": source_record_pk,
                     "source_join_hash": source_join_hash,
                     "sig_hash": sig_hash,
                     "n_join_hashes_in_file": n_join_hashes_in_file,
                 })
 
     log(STAGE, f"emitted {len(detail_rows)} detail rows")
+    log(STAGE, f"detail rows with blank source_domain={sum(1 for r in detail_rows if not r.get('source_domain'))}")
+    log(STAGE, f"detail rows with blank source_record_pk={sum(1 for r in detail_rows if not r.get('source_record_pk'))}")
+    log(STAGE, f"detail rows with blank sig_hash={sum(1 for r in detail_rows if not r.get('sig_hash'))}")
 
     validation_rows: List[Dict[str, Any]] = []
     for (archetype_id, signal_id), files in sorted(files_by_signal.items()):

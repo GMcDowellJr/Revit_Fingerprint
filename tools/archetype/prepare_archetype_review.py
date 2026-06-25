@@ -286,7 +286,8 @@ def _build_cluster_context(
                 continue
             signal_id = row.get("signal_id", "") or edge_id
             source_join_hash = row.get("source_join_hash", "")
-            key = (export_run_id, signal_id, source_join_hash)
+            source_record_pk = row.get("source_record_pk", "")
+            key = (export_run_id, signal_id, source_record_pk or source_join_hash)
             if key not in ctx.detail_by_file_signal:
                 ctx.detail_by_file_signal[key] = row
             files_with_detail.add(export_run_id)
@@ -302,33 +303,48 @@ def _load_label_lookup(
     records_path: Path,
     qualifying_files: Set[str],
     source_domains: Set[str],
-) -> Tuple[Dict[Tuple[str, str], Tuple[str, str]], Dict[Tuple[str, str], str]]:
-    """Stage 4: stream records.csv to resolve sig_hash -> (label_display, label_quality)."""
-    label_lookup: Dict[Tuple[str, str], Tuple[str, str]] = {}
-    vfd_sig_to_record_pk: Dict[Tuple[str, str], str] = {}
+) -> Tuple[
+    Dict[Tuple[str, str, str], Tuple[str, str]],
+    Dict[Tuple[str, str], Tuple[str, str]],
+    Dict[Tuple[str, str, str], Tuple[str, str]],
+    Dict[Tuple[str, str, str], str],
+]:
+    """Stage 4: stream records.csv to resolve records to labels.
+
+    Returns domain+sig_hash, legacy export+sig_hash, and record_pk keyed label
+    lookups, plus a VFD record_pk helper for param/category resolution.
+    """
+    label_by_domain_sig: Dict[Tuple[str, str, str], Tuple[str, str]] = {}
+    label_by_sig: Dict[Tuple[str, str], Tuple[str, str]] = {}
+    label_by_record_pk: Dict[Tuple[str, str, str], Tuple[str, str]] = {}
+    vfd_sig_to_record_pk: Dict[Tuple[str, str, str], str] = {}
     if not records_path.is_file():
-        log(STAGE, f"WARNING: records file not found at {records_path}; element_name will be empty")
-        return label_lookup, vfd_sig_to_record_pk
+        log(STAGE, f"WARNING: records file not found at {records_path}; element_name will be unresolved")
+        return label_by_domain_sig, label_by_sig, label_by_record_pk, vfd_sig_to_record_pk
 
     with records_path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
             export_run_id = row.get("export_run_id", "")
             domain = row.get("domain", "")
-            if export_run_id not in qualifying_files or domain not in source_domains:
+            if export_run_id not in qualifying_files:
+                continue
+            if source_domains and domain not in source_domains:
                 continue
             sig_hash = row.get("sig_hash", "")
             if not sig_hash:
                 continue
-            label_lookup[(export_run_id, sig_hash)] = (
-                row.get("label_display", ""),
-                row.get("label_quality", ""),
-            )
+            label = (row.get("label_display", ""), row.get("label_quality", ""))
+            label_by_domain_sig[(export_run_id, domain, sig_hash)] = label
+            label_by_sig[(export_run_id, sig_hash)] = label
+            record_pk = row.get("record_pk", "")
+            if record_pk:
+                label_by_record_pk[(export_run_id, domain, record_pk)] = label
             if domain == "view_filter_definitions":
-                vfd_sig_to_record_pk[(export_run_id, sig_hash)] = row.get("record_pk", "")
+                vfd_sig_to_record_pk[(export_run_id, domain, sig_hash)] = record_pk
 
-    log(STAGE, f"resolved {len(label_lookup)} (export_run_id, sig_hash) label rows from {records_path}")
-    return label_lookup, vfd_sig_to_record_pk
+    log(STAGE, f"resolved {len(label_by_domain_sig)} (export_run_id, domain, sig_hash) label rows from {records_path}")
+    return label_by_domain_sig, label_by_sig, label_by_record_pk, vfd_sig_to_record_pk
 
 
 def _load_vfd_resolution(
@@ -425,8 +441,10 @@ def _sort_key(row: Dict[str, str]) -> Tuple[int, int, int, int, str]:
 
 def _process_cluster(
     ctx: ClusterContext,
-    label_lookup: Dict[Tuple[str, str], Tuple[str, str]],
-    vfd_sig_to_record_pk: Dict[Tuple[str, str], str],
+    label_by_domain_sig: Dict[Tuple[str, str, str], Tuple[str, str]],
+    label_by_sig: Dict[Tuple[str, str], Tuple[str, str]],
+    label_by_record_pk: Dict[Tuple[str, str, str], Tuple[str, str]],
+    vfd_sig_to_record_pk: Dict[Tuple[str, str, str], str],
     vfd_resolution: Dict[Tuple[str, str], Tuple[str, str]],
     file_path_lookup: Dict[str, str],
     out_dir: Path,
@@ -440,17 +458,28 @@ def _process_cluster(
         cls = ctx.classification_by_file.get(export_run_id, {})
         source_domain = detail.get("source_domain", "")
         sig_hash = detail.get("sig_hash", "")
+        source_record_pk = detail.get("source_record_pk", "")
 
-        label_display, label_quality = label_lookup.get((export_run_id, sig_hash), ("", ""))
+        label_display, label_quality = ("", "")
+        if source_domain and source_record_pk:
+            label_display, label_quality = label_by_record_pk.get((export_run_id, source_domain, source_record_pk), ("", ""))
+        if not label_display and source_domain and sig_hash:
+            label_display, label_quality = label_by_domain_sig.get((export_run_id, source_domain, sig_hash), ("", ""))
+        if not label_display and sig_hash:
+            label_display, label_quality = label_by_sig.get((export_run_id, sig_hash), ("", ""))
+
         if label_display:
             element_name = label_display
+        elif not sig_hash:
+            element_name = "(unresolved — missing sig_hash)"
         else:
-            element_name = f"{label_quality}_{sig_hash[:8]}"
+            quality_suffix = f"; label_quality={label_quality}" if label_quality else ""
+            element_name = f"(unresolved — no records.csv label match for sig_hash {sig_hash[:8]}{quality_suffix})"
 
         param_names = ""
         category_names = ""
         if source_domain == "view_filter_definitions":
-            record_pk = vfd_sig_to_record_pk.get((export_run_id, sig_hash), "")
+            record_pk = source_record_pk or vfd_sig_to_record_pk.get((export_run_id, source_domain, sig_hash), "")
             param_names, category_names = vfd_resolution.get((export_run_id, record_pk), ("", ""))
 
         file_path = file_path_lookup.get(export_run_id) or export_run_id
@@ -593,7 +622,8 @@ def _process_cluster(
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
+    ap.add_argument("--repo-root", default=".", help="Repository root (code/config root; durable tool/config defaults live here)")
+    ap.add_argument("--assigned-root", default=None, help="Assigned/export root containing archetype_analysis/ and results/; omitted preserves legacy repo-local defaults")
     ap.add_argument("--cluster-id", default=None, help="Target cluster_id from signal_clusters.json; if omitted, process all clusters")
     ap.add_argument("--signal-clusters", default=None, help="Path to signal_clusters.json")
     ap.add_argument("--cluster-classifications", default=None, help="Path to archetype_cluster_classifications.csv")
@@ -612,15 +642,19 @@ def main() -> int:
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
-    analysis_dir = repo_root / "Fingerprint_Out" / "archetype_analysis"
+    assigned_root = Path(args.assigned_root).resolve() if args.assigned_root else repo_root / "Fingerprint_Out"
+    analysis_dir = assigned_root / "archetype_analysis"
+    records_root = assigned_root / "results" if args.assigned_root else repo_root / "results"
+    log(STAGE, f"repo_root={repo_root}")
+    log(STAGE, f"assigned_root={assigned_root}")
 
     signal_clusters_path = Path(args.signal_clusters) if args.signal_clusters else analysis_dir / "signal_clusters.json"
     cluster_classifications_path = Path(args.cluster_classifications) if args.cluster_classifications else analysis_dir / "archetype_cluster_classifications.csv"
     archetype_classifications_path = Path(args.archetype_classifications) if args.archetype_classifications else analysis_dir / "archetype_classifications.csv"
     validation_detail_path = Path(args.validation_detail) if args.validation_detail else analysis_dir / "archetype_validation_detail.csv"
-    records_path = Path(args.records) if args.records else repo_root / "results" / "records" / "records.csv"
-    file_metadata_path = Path(args.file_metadata) if args.file_metadata else repo_root / "results" / "records" / "file_metadata.csv"
-    identity_items_dir = Path(args.identity_items_dir) if args.identity_items_dir else repo_root / "results" / "records" / "identity_items_by_domain"
+    records_path = Path(args.records) if args.records else records_root / "records" / "records.csv"
+    file_metadata_path = Path(args.file_metadata) if args.file_metadata else records_root / "records" / "file_metadata.csv"
+    identity_items_dir = Path(args.identity_items_dir) if args.identity_items_dir else records_root / "records" / "identity_items_by_domain"
     bip_lookup_path = Path(args.bip_lookup) if args.bip_lookup else repo_root / "tools" / "archetype" / "bip_lookup.json"
     shared_param_names_path = Path(args.shared_param_names) if args.shared_param_names else repo_root / "tools" / "archetype" / "shared_param_names.json"
     vfd_category_map_path = Path(args.vfd_category_map) if args.vfd_category_map else repo_root / "tools" / "archetype" / "vfd_category_domain_map.json"
@@ -693,7 +727,7 @@ def main() -> int:
         union_source_domains |= ctx.source_domains
 
     # Stage 4 (shared, single pass over records.csv).
-    label_lookup, vfd_sig_to_record_pk = _load_label_lookup(records_path, union_qualifying_files, union_source_domains)
+    label_by_domain_sig, label_by_sig, label_by_record_pk, vfd_sig_to_record_pk = _load_label_lookup(records_path, union_qualifying_files, union_source_domains)
 
     # Stage 5 (shared).
     bip_lookup = read_json(bip_lookup_path, default={}) or {}
@@ -713,7 +747,7 @@ def main() -> int:
     results: List[Dict[str, Any]] = []
     for ctx in contexts:
         result = _process_cluster(
-            ctx, label_lookup, vfd_sig_to_record_pk, vfd_resolution, file_path_lookup,
+            ctx, label_by_domain_sig, label_by_sig, label_by_record_pk, vfd_sig_to_record_pk, vfd_resolution, file_path_lookup,
             out_dir, args.top_n, args.dry_run, verbose=verbose,
         )
         results.append(result)
