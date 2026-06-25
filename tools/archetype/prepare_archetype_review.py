@@ -28,8 +28,8 @@ Processing:
   If --cluster-id is omitted, every cluster in signal_clusters.json is
   processed and written to its own <out>/review_<cluster_id>.csv file
   (all in the same directory); a condensed one-line-per-cluster summary is
-  printed. If --cluster-id is given, only that cluster is processed and a
-  verbose per-file summary is printed.
+  printed unless --verbose is given. If --cluster-id is given, only that
+  cluster is processed and a verbose per-file summary is printed.
 
   Stage 1: Resolve target cluster(s) from signal_clusters.json (clusters are
     keyed by governance_question; cluster_id is unique across the document).
@@ -71,7 +71,7 @@ Usage:
         [--shared-param-names tools/archetype/shared_param_names.json] \\
         [--vfd-category-map tools/archetype/vfd_category_domain_map.json] \\
         [--out Fingerprint_Out/archetype_analysis/archetype_review] \\
-        [--top-n 20] [--dry-run]
+        [--top-n 20] [--dry-run] [--verbose]
 """
 from __future__ import annotations
 
@@ -97,6 +97,7 @@ from _common import (  # noqa: E402
 STAGE = "prepare_archetype_review"
 
 GOVERNANCE_ROLE_ORDER = {"Template": 0, "Container": 1, "Project": 2}
+FILE_LEVEL_SENTINEL_SIGNAL_ID = "(file-level sentinel — fired signals unresolved)"
 
 OUT_FIELDS = [
     "file_path",
@@ -408,14 +409,18 @@ def _load_file_path_lookup(file_metadata_path: Path) -> Dict[str, str]:
     return file_path_lookup
 
 
-def _sort_key(row: Dict[str, str]) -> Tuple[int, int, int, str]:
+def _sort_key(row: Dict[str, str]) -> Tuple[int, int, int, int, str]:
+    # Detail-backed rows should consume --top-n slots before unresolved
+    # file-level sentinels, even when the sentinel file has stronger
+    # classification ranking metadata.
+    sentinel_rank = 1 if row["signal_id"] == FILE_LEVEL_SENTINEL_SIGNAL_ID else 0
     governance_role_rank = GOVERNANCE_ROLE_ORDER.get(row["governance_role"], 3)
     try:
         n_signals_fired = int(row["n_signals_fired"])
     except (TypeError, ValueError):
         n_signals_fired = 0
     all_signals_fired = 1 if row["all_signals_fired"] == "true" else 0
-    return (governance_role_rank, -n_signals_fired, -all_signals_fired, row["export_run_id"])
+    return (sentinel_rank, governance_role_rank, -n_signals_fired, -all_signals_fired, row["export_run_id"])
 
 
 def _process_cluster(
@@ -467,6 +472,55 @@ def _process_cluster(
             "param_names": param_names,
             "category_names": category_names,
         })
+
+    # Fallback: detail join missed some qualifying files.
+    #
+    # This happens when archetype_validation_detail.csv has no entries that
+    # match the cluster's signal_ids for the qualifying files -- most commonly
+    # seen on VFD clusters where the detail rows don't propagate through the
+    # governance_question reclassification join. Rather than silently writing
+    # a header-only CSV, or dropping partially unresolved qualifying files from
+    # a mixed-detail cluster, emit one file-level sentinel row per qualifying
+    # file that has no assembled detail-driven review rows.
+    # Do not expand ctx.signal_ids here: archetype_cluster_classifications.csv
+    # only carries the fired count/all-fired flag at this grain, not the
+    # per-file fired signal IDs, so expanding the whole cluster would create
+    # false-positive signal rows for partially matching files.
+    files_with_review_rows = {row["export_run_id"] for row in review_rows}
+    missing_detail_export_run_ids = [
+        export_run_id
+        for export_run_id in ctx.classification_by_file
+        if export_run_id not in files_with_review_rows
+    ]
+    if missing_detail_export_run_ids:
+        if verbose:
+            log(
+                STAGE,
+                f"WARNING: cluster_id={ctx.cluster_id} has "
+                f"{len(missing_detail_export_run_ids)} qualifying files without "
+                f"assembled validation detail rows; emitting classification-only "
+                f"file-level sentinel rows",
+            )
+        for export_run_id in missing_detail_export_run_ids:
+            cls = ctx.classification_by_file[export_run_id]
+            file_path = file_path_lookup.get(export_run_id) or export_run_id
+            review_rows.append({
+                "file_path": file_path,
+                "export_run_id": export_run_id,
+                "governance_role": cls.get("governance_role", ""),
+                "discipline_label": cls.get("discipline_label", ""),
+                "unit_system": cls.get("unit_system", ""),
+                "client_label": cls.get("client_label", ""),
+                "n_signals_fired": cls.get("n_signals_fired", ""),
+                "all_signals_fired": cls.get("all_signals_fired", ""),
+                "signal_id": FILE_LEVEL_SENTINEL_SIGNAL_ID,
+                "source_domain": "",
+                "source_join_hash": "",
+                "element_name": "(unresolved — validation detail missing)",
+                "sig_hash": "",
+                "param_names": "",
+                "category_names": "",
+            })
 
     review_rows.sort(key=_sort_key)
 
@@ -554,6 +608,7 @@ def main() -> int:
     ap.add_argument("--out", default=None, help="Output directory; each cluster is written to <out>/review_<cluster_id>.csv")
     ap.add_argument("--top-n", type=int, default=20, help="Limit to top N files per cluster; 0 = all")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--verbose", action="store_true", help="Print per-cluster verbose summaries and fallback diagnostics")
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -597,7 +652,7 @@ def main() -> int:
             log(STAGE, f"no clusters found in {signal_clusters_path}")
             return 0
         log(STAGE, f"--cluster-id not given; processing all {len(clusters)} clusters from {signal_clusters_path}")
-        verbose = False
+        verbose = args.verbose
 
     # Stage 2/3 inputs (shared across clusters).
     cluster_classification_rows = read_csv_rows(cluster_classifications_path)
