@@ -28,8 +28,8 @@ Processing:
   If --cluster-id is omitted, every cluster in signal_clusters.json is
   processed and written to its own <out>/review_<cluster_id>.csv file
   (all in the same directory); a condensed one-line-per-cluster summary is
-  printed. If --cluster-id is given, only that cluster is processed and a
-  verbose per-file summary is printed.
+  printed unless --verbose is given. If --cluster-id is given, only that
+  cluster is processed and a verbose per-file summary is printed.
 
   Stage 1: Resolve target cluster(s) from signal_clusters.json (clusters are
     keyed by governance_question; cluster_id is unique across the document).
@@ -71,7 +71,7 @@ Usage:
         [--shared-param-names tools/archetype/shared_param_names.json] \\
         [--vfd-category-map tools/archetype/vfd_category_domain_map.json] \\
         [--out Fingerprint_Out/archetype_analysis/archetype_review] \\
-        [--top-n 20] [--dry-run]
+        [--top-n 20] [--dry-run] [--verbose]
 """
 from __future__ import annotations
 
@@ -591,6 +591,7 @@ def main() -> int:
     ap.add_argument("--out", default=None, help="Output directory; each cluster is written to <out>/review_<cluster_id>.csv")
     ap.add_argument("--top-n", type=int, default=20, help="Limit to top N files per cluster; 0 = all")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--verbose", action="store_true", help="Print per-cluster verbose summaries and fallback diagnostics")
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -634,7 +635,7 @@ def main() -> int:
             log(STAGE, f"no clusters found in {signal_clusters_path}")
             return 0
         log(STAGE, f"--cluster-id not given; processing all {len(clusters)} clusters from {signal_clusters_path}")
-        verbose = False
+        verbose = args.verbose
 
     # Stage 2/3 inputs (shared across clusters).
     cluster_classification_rows = read_csv_rows(cluster_classifications_path)
