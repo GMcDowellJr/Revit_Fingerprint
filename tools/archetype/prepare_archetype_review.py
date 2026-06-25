@@ -247,6 +247,17 @@ def _resolve_category_name(category_id: str, vfd_category_map: Dict[str, Any]) -
     return f"{category_id}[?]"
 
 
+def _governance_question_from_cluster_id(cluster_id: str) -> str:
+    """Resolve governance_question from a cluster_id such as
+    view_filter_strategy__cluster_008 when older signal_clusters.json files do
+    not carry a governance_question field on each cluster object.
+    """
+    marker = "__cluster_"
+    if marker in cluster_id:
+        return cluster_id.split(marker, 1)[0]
+    return ""
+
+
 def _governance_question_from_archetype_id(archetype_id: str) -> str:
     """archetype_id encodes governance_question as the second "__"-delimited
     token, e.g. CANDIDATE__wall_graphics__... -> wall_graphics.
@@ -284,7 +295,7 @@ class ClusterContext:
 
     def __init__(self, cluster: Dict[str, Any]):
         self.cluster_id: str = cluster.get("cluster_id", "")
-        self.governance_question: str = cluster.get("governance_question", "")
+        self.governance_question: str = cluster.get("governance_question", "") or _governance_question_from_cluster_id(self.cluster_id)
         self.signal_ids: List[str] = list(cluster.get("signal_ids", []) or [])
         self.cluster_label_stub: str = cluster.get("cluster_label_stub", "")
         self.classification_by_file: Dict[str, Dict[str, str]] = {}
