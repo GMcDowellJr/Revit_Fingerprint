@@ -321,9 +321,13 @@ def main() -> int:
                     continue
                 seen_join_hashes.add(dedupe_key)
                 sig_hash = ""
-                if source_record_pk:
-                    sig_hash = sig_hash_by_record_pk.get((export_run_id, source_domain, source_record_pk), "")
-                if not sig_hash and source_join_hash:
+                record_pk_key = (export_run_id, source_domain, source_record_pk)
+                if source_record_pk and record_pk_key in sig_hash_by_record_pk:
+                    # Empty sig_hash is meaningful for an exact record_pk hit
+                    # (e.g. deferred/blocked hash policy). Do not fall back to
+                    # join_hash and risk borrowing a sibling record's sig_hash.
+                    sig_hash = sig_hash_by_record_pk[record_pk_key]
+                elif source_join_hash:
                     sig_hash = sig_hash_by_join_hash.get((export_run_id, source_domain, source_join_hash), "")
                 if sig_hash:
                     sig_hashes_by_signal[(archetype_id, signal_id)].add(sig_hash)
@@ -332,7 +336,7 @@ def main() -> int:
                     "export_run_id": export_run_id,
                     "archetype_id": archetype_id,
                     "signal_id": signal_id,
-                    "edge_id": edge_id,
+                    "edge_id": canonical_edge_id,
                     "source_domain": source_domain,
                     "source_record_pk": source_record_pk,
                     "source_join_hash": source_join_hash,

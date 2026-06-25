@@ -397,14 +397,14 @@ def _load_label_lookup(
             if source_domains and domain not in source_domains:
                 continue
             sig_hash = row.get("sig_hash", "")
-            if not sig_hash:
-                continue
             label = (row.get("label_display", ""), row.get("label_quality", ""))
-            label_by_domain_sig[(export_run_id, domain, sig_hash)] = label
-            label_by_sig[(export_run_id, sig_hash)] = label
             record_pk = row.get("record_pk", "")
             if record_pk:
                 label_by_record_pk[(export_run_id, domain, record_pk)] = label
+            if not sig_hash:
+                continue
+            label_by_domain_sig[(export_run_id, domain, sig_hash)] = label
+            label_by_sig[(export_run_id, sig_hash)] = label
             if domain == "view_filter_definitions":
                 vfd_sig_to_record_pk[(export_run_id, domain, sig_hash)] = record_pk
 
