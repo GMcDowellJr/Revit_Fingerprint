@@ -2,14 +2,18 @@
 """Assign per-file archetype classifications based on cross-domain signals.
 
 Inputs:
-  - Fingerprint_Out/archetype_analysis/cross_domain_items.csv
-  - config/archetype/archetype_definitions.json (only promoted == true entries)
-  - Fingerprint_Out/archetype_analysis/reference_graph.json
-  - file_metadata.csv
+  - <assigned-root>/archetype_analysis/cross_domain_items.csv
+  - <repo-root>/config/archetype/archetype_definitions.json (only promoted == true entries)
+  - <assigned-root>/archetype_analysis/reference_graph.json
+  - <assigned-root>/results/records/file_metadata.csv
 
 Outputs:
-  - Fingerprint_Out/archetype_analysis/archetype_classifications.csv
-  - Fingerprint_Out/archetype_analysis/archetype_coverage_summary.json
+  - <assigned-root>/archetype_analysis/archetype_classifications.csv
+  - <assigned-root>/archetype_analysis/archetype_coverage_summary.json
+
+Path model:
+  - repo_root is for code and durable configuration.
+  - assigned_root is for run-specific data and analysis artifacts.
 
 Processing:
   - Build an edge alias map from reference_graph.json (see
@@ -201,7 +205,15 @@ def _signal_fired_source(
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--repo-root", default=".", help="Repository root (used for default paths)")
+    ap.add_argument("--repo-root", default=".", help="Repository root for code and durable config")
+    ap.add_argument(
+        "--assigned-root",
+        default=None,
+        help=(
+            "Root of the assigned/export data folder containing archetype_analysis/ "
+            "and results/records/. Defaults to --repo-root for backward compatibility."
+        ),
+    )
     ap.add_argument("--cross-domain-items", default=None, help="Path to cross_domain_items.csv")
     ap.add_argument("--archetype-definitions", default=None, help="Path to archetype_definitions.json")
     ap.add_argument("--reference-graph", default=None, help="Path to reference_graph.json")
@@ -212,13 +224,20 @@ def main() -> int:
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
-    items_path = Path(args.cross_domain_items) if args.cross_domain_items else repo_root / "Fingerprint_Out" / "archetype_analysis" / "cross_domain_items.csv"
+    assigned_root = Path(args.assigned_root).resolve() if args.assigned_root else repo_root
+
+    # repo_root intentionally owns durable configuration. assigned_root owns
+    # run-specific data, intermediate analysis artifacts, and generated outputs.
+    items_path = Path(args.cross_domain_items) if args.cross_domain_items else assigned_root / "archetype_analysis" / "cross_domain_items.csv"
     definitions_path = Path(args.archetype_definitions) if args.archetype_definitions else repo_root / "config" / "archetype" / "archetype_definitions.json"
-    reference_graph_path = Path(args.reference_graph) if args.reference_graph else repo_root / "Fingerprint_Out" / "archetype_analysis" / "reference_graph.json"
-    file_metadata_path = Path(args.file_metadata) if args.file_metadata else repo_root / "results" / "records" / "file_metadata.csv"
-    domain_patterns_dir = Path(args.domain_patterns_dir) if args.domain_patterns_dir else repo_root / "results" / "analysis"
-    out_dir = Path(args.out_dir) if args.out_dir else repo_root / "Fingerprint_Out" / "archetype_analysis"
+    reference_graph_path = Path(args.reference_graph) if args.reference_graph else assigned_root / "archetype_analysis" / "reference_graph.json"
+    file_metadata_path = Path(args.file_metadata) if args.file_metadata else assigned_root / "results" / "records" / "file_metadata.csv"
+    domain_patterns_dir = Path(args.domain_patterns_dir) if args.domain_patterns_dir else assigned_root / "results" / "analysis"
+    out_dir = Path(args.out_dir) if args.out_dir else assigned_root / "archetype_analysis"
     label_cache = DomainPatternLabelCache(domain_patterns_dir)
+
+    log(STAGE, f"repo_root={repo_root}")
+    log(STAGE, f"assigned_root={assigned_root}")
 
     items_rows = read_csv_rows(items_path)
     log(STAGE, f"loaded {len(items_rows)} rows from {items_path}")
