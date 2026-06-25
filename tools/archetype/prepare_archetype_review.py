@@ -468,26 +468,36 @@ def _process_cluster(
             "category_names": category_names,
         })
 
-    # Fallback: detail join produced no rows.
+    # Fallback: detail join missed some qualifying files.
     #
     # This happens when archetype_validation_detail.csv has no entries that
     # match the cluster's signal_ids for the qualifying files -- most commonly
     # seen on VFD clusters where the detail rows don't propagate through the
     # governance_question reclassification join. Rather than silently writing
-    # a header-only CSV, emit one file-level sentinel row per qualifying file.
+    # a header-only CSV, or dropping partially unresolved qualifying files from
+    # a mixed-detail cluster, emit one file-level sentinel row per qualifying
+    # file that has no assembled detail-driven review rows.
     # Do not expand ctx.signal_ids here: archetype_cluster_classifications.csv
     # only carries the fired count/all-fired flag at this grain, not the
     # per-file fired signal IDs, so expanding the whole cluster would create
     # false-positive signal rows for partially matching files.
-    if not review_rows and ctx.classification_by_file:
+    files_with_review_rows = {row["export_run_id"] for row in review_rows}
+    missing_detail_export_run_ids = [
+        export_run_id
+        for export_run_id in ctx.classification_by_file
+        if export_run_id not in files_with_review_rows
+    ]
+    if missing_detail_export_run_ids:
         if verbose:
             log(
                 STAGE,
-                f"WARNING: cluster_id={ctx.cluster_id} detail_by_file_signal is empty "
-                f"but {len(ctx.classification_by_file)} qualifying files exist; "
-                f"emitting classification-only file-level sentinel rows",
+                f"WARNING: cluster_id={ctx.cluster_id} has "
+                f"{len(missing_detail_export_run_ids)} qualifying files without "
+                f"assembled validation detail rows; emitting classification-only "
+                f"file-level sentinel rows",
             )
-        for export_run_id, cls in ctx.classification_by_file.items():
+        for export_run_id in missing_detail_export_run_ids:
+            cls = ctx.classification_by_file[export_run_id]
             file_path = file_path_lookup.get(export_run_id) or export_run_id
             review_rows.append({
                 "file_path": file_path,
