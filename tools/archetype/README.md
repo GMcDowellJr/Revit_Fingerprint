@@ -581,6 +581,18 @@ python tools/archetype/prepare_archetype_review.py \
   --top-n 20
 ```
 
+`prepare_archetype_review.py` writes one `review_<cluster_id>.csv` per cluster,
+then builds `archetype_review_schedule.csv` and `archetype_review_gaps.csv` from
+those final review files. Schedule representatives prefer named `element_name`
+rows over unresolved rows, then `Template`, `Container`, `Project`, `Generic`,
+then higher `n_signals_fired`, then `all_signals_fired == true`. The schedule
+includes diagnostics (`review_rows`, `review_named_rows`, `schedule_rows`,
+`schedule_named_rows`, `schedule_name_regression`) so a cluster whose review
+file has names but whose schedule representatives do not is flagged instead of
+silently regressing to `(unresolved)`. Clusters with named review rows are not
+emitted as gaps; `archetype_review_gaps.csv` is reserved for clusters with no
+usable detail-backed review rows.
+
 ## Shared helpers
 
 ### `_common.py`

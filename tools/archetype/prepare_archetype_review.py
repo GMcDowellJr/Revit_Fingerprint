@@ -17,6 +17,10 @@ Output:
   - <out>/review_<cluster_id>.csv -- one file per cluster processed, all in
     a single directory. <out> defaults to
     Fingerprint_Out/archetype_analysis/archetype_review.
+  - <out>/archetype_review_schedule.csv -- representative named examples
+    selected from the final review_<cluster_id>.csv files.
+  - <out>/archetype_review_gaps.csv -- clusters with no usable
+    detail-backed review rows.
 
 Processing:
   For each target cluster, assemble one row per (export_run_id, signal_id)
@@ -55,6 +59,9 @@ Processing:
     all-signals-fired first, export_run_id as tiebreak), and apply --top-n by
     unique export_run_id.
   Stage 8: Write <out>/review_<cluster_id>.csv and print a console summary.
+  Stage 9: Build archetype_review_schedule.csv and archetype_review_gaps.csv
+    from the final review_<cluster_id>.csv files, preferring named rows before
+    unresolved rows and logging per-cluster schedule diagnostics.
 
 Usage:
     python tools/archetype/prepare_archetype_review.py \\
@@ -96,7 +103,7 @@ from _common import (  # noqa: E402
 
 STAGE = "prepare_archetype_review"
 
-GOVERNANCE_ROLE_ORDER = {"Template": 0, "Container": 1, "Project": 2}
+GOVERNANCE_ROLE_ORDER = {"Template": 0, "Container": 1, "Project": 2, "Generic": 3}
 FILE_LEVEL_SENTINEL_SIGNAL_ID = "(file-level sentinel — fired signals unresolved)"
 
 OUT_FIELDS = [
@@ -115,6 +122,40 @@ OUT_FIELDS = [
     "sig_hash",
     "param_names",
     "category_names",
+]
+
+SCHEDULE_FIELDS = [
+    "cluster_id",
+    "cluster_label_stub",
+    "signal_id",
+    "representative_source",
+    "file_path",
+    "export_run_id",
+    "governance_role",
+    "n_signals_fired",
+    "all_signals_fired",
+    "source_domain",
+    "source_join_hash",
+    "element_name",
+    "sig_hash",
+    "param_names",
+    "category_names",
+    "review_rows",
+    "review_named_rows",
+    "schedule_rows",
+    "schedule_named_rows",
+    "schedule_name_regression",
+]
+
+GAPS_FIELDS = [
+    "cluster_id",
+    "cluster_label_stub",
+    "reason",
+    "review_rows",
+    "review_named_rows",
+    "schedule_rows",
+    "schedule_named_rows",
+    "schedule_name_regression",
 ]
 
 _PATH_COLUMN_CANDIDATES = ("central_path", "central_path_norm")
@@ -424,6 +465,136 @@ def _load_file_path_lookup(file_metadata_path: Path) -> Dict[str, str]:
             continue
         file_path_lookup[export_run_id] = row.get(path_column, "") if path_column else ""
     return file_path_lookup
+
+
+def _is_named_element(element_name: str) -> bool:
+    value = (element_name or "").strip()
+    if not value or value == "_":
+        return False
+    return not value.lower().startswith("(unresolved")
+
+
+def _review_schedule_sort_key(row: Dict[str, str]) -> Tuple[int, int, int, int, str, str]:
+    named_rank = 0 if _is_named_element(row.get("element_name", "")) else 1
+    role_rank = GOVERNANCE_ROLE_ORDER.get(row.get("governance_role", ""), 4)
+    try:
+        n_signals_fired = int(row.get("n_signals_fired") or 0)
+    except (TypeError, ValueError):
+        n_signals_fired = 0
+    all_signals_rank = 0 if row.get("all_signals_fired") == "true" else 1
+    return (
+        named_rank,
+        role_rank,
+        -n_signals_fired,
+        all_signals_rank,
+        row.get("export_run_id", ""),
+        row.get("signal_id", ""),
+    )
+
+
+def _select_schedule_rows_for_cluster(
+    cluster_id: str,
+    cluster_label_stub: str,
+    review_rows: List[Dict[str, str]],
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    named_rows = [r for r in review_rows if _is_named_element(r.get("element_name", ""))]
+    usable_rows = [r for r in review_rows if r.get("signal_id", "") != FILE_LEVEL_SENTINEL_SIGNAL_ID]
+
+    schedule_rows: List[Dict[str, Any]] = []
+    if usable_rows:
+        rows_by_signal: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+        for row in usable_rows:
+            rows_by_signal[row.get("signal_id", "")].append(row)
+        for signal_id in sorted(rows_by_signal):
+            row = sorted(rows_by_signal[signal_id], key=_review_schedule_sort_key)[0]
+            schedule_rows.append({
+                "cluster_id": cluster_id,
+                "cluster_label_stub": cluster_label_stub,
+                "signal_id": row.get("signal_id", ""),
+                "representative_source": "review_file",
+                "file_path": row.get("file_path", ""),
+                "export_run_id": row.get("export_run_id", ""),
+                "governance_role": row.get("governance_role", ""),
+                "n_signals_fired": row.get("n_signals_fired", ""),
+                "all_signals_fired": row.get("all_signals_fired", ""),
+                "source_domain": row.get("source_domain", ""),
+                "source_join_hash": row.get("source_join_hash", ""),
+                "element_name": row.get("element_name", ""),
+                "sig_hash": row.get("sig_hash", ""),
+                "param_names": row.get("param_names", ""),
+                "category_names": row.get("category_names", ""),
+            })
+
+    schedule_named_rows = sum(1 for r in schedule_rows if _is_named_element(str(r.get("element_name", ""))))
+    schedule_name_regression = bool(named_rows and schedule_named_rows == 0)
+    diagnostics = {
+        "review_rows": len(review_rows),
+        "review_named_rows": len(named_rows),
+        "schedule_rows": len(schedule_rows),
+        "schedule_named_rows": schedule_named_rows,
+        "schedule_name_regression": schedule_name_regression,
+        "has_usable_review_rows": bool(usable_rows),
+    }
+    for row in schedule_rows:
+        row.update({
+            "review_rows": diagnostics["review_rows"],
+            "review_named_rows": diagnostics["review_named_rows"],
+            "schedule_rows": diagnostics["schedule_rows"],
+            "schedule_named_rows": diagnostics["schedule_named_rows"],
+            "schedule_name_regression": "true" if schedule_name_regression else "false",
+        })
+    return schedule_rows, diagnostics
+
+
+def _write_review_schedule_outputs(
+    out_dir: Path,
+    results: List[Dict[str, Any]],
+    dry_run: bool,
+) -> None:
+    """Build review schedule/gap CSVs from final review_<cluster>.csv files."""
+    schedule_rows: List[Dict[str, Any]] = []
+    gap_rows: List[Dict[str, Any]] = []
+
+    for result in results:
+        cluster_id = str(result.get("cluster_id", ""))
+        cluster_label_stub = str(result.get("cluster_label_stub", ""))
+        out_path = Path(result.get("out_path", out_dir / f"review_{cluster_id}.csv"))
+        review_rows = read_csv_rows(out_path) if out_path.is_file() else []
+        cluster_schedule_rows, diagnostics = _select_schedule_rows_for_cluster(cluster_id, cluster_label_stub, review_rows)
+        schedule_rows.extend(cluster_schedule_rows)
+
+        log(
+            STAGE,
+            f"cluster_id={cluster_id}: review_rows={diagnostics['review_rows']} "
+            f"review_named_rows={diagnostics['review_named_rows']} "
+            f"schedule_rows={diagnostics['schedule_rows']} "
+            f"schedule_named_rows={diagnostics['schedule_named_rows']} "
+            f"schedule_name_regression={str(diagnostics['schedule_name_regression']).lower()}",
+        )
+
+        if not diagnostics["has_usable_review_rows"]:
+            gap_rows.append({
+                "cluster_id": cluster_id,
+                "cluster_label_stub": cluster_label_stub,
+                "reason": "no_usable_review_rows",
+                "review_rows": diagnostics["review_rows"],
+                "review_named_rows": diagnostics["review_named_rows"],
+                "schedule_rows": diagnostics["schedule_rows"],
+                "schedule_named_rows": diagnostics["schedule_named_rows"],
+                "schedule_name_regression": "true" if diagnostics["schedule_name_regression"] else "false",
+            })
+
+    schedule_path = out_dir / "archetype_review_schedule.csv"
+    gaps_path = out_dir / "archetype_review_gaps.csv"
+    if dry_run:
+        log(STAGE, f"dry-run: would write {len(schedule_rows)} rows to {schedule_path}")
+        log(STAGE, f"dry-run: would write {len(gap_rows)} rows to {gaps_path}")
+        return
+
+    atomic_write_csv(schedule_path, SCHEDULE_FIELDS, schedule_rows)
+    log(STAGE, f"wrote {len(schedule_rows)} rows to {schedule_path}")
+    atomic_write_csv(gaps_path, GAPS_FIELDS, gap_rows)
+    log(STAGE, f"wrote {len(gap_rows)} rows to {gaps_path}")
 
 
 def _sort_key(row: Dict[str, str]) -> Tuple[int, int, int, int, str]:
@@ -755,6 +926,8 @@ def main() -> int:
             out_dir, args.top_n, args.dry_run, verbose=verbose,
         )
         results.append(result)
+
+    _write_review_schedule_outputs(out_dir, results, args.dry_run)
 
     if not verbose:
         print(f"Processed {len(results)} clusters -> {out_dir}")
