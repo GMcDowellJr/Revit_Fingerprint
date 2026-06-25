@@ -271,9 +271,10 @@ def _build_cluster_context(
     #
     # A file can fire the same signal on multiple source records (one
     # archetype_validation_detail.csv row per source_join_hash; see
-    # n_join_hashes_in_file). source_join_hash is included in the dedup key
-    # so every matching element/instance is preserved for review, not just
-    # the first one.
+    # n_join_hashes_in_file). source_record_pk is preferred for the internal
+    # dedupe key when available because it is the most precise source-record
+    # identity; source_join_hash remains on the detail row and is written to
+    # review CSVs unchanged for reviewer forensics.
     signal_id_set = set(ctx.signal_ids)
     valid_archetype_ids = archetype_ids_by_gq.get(ctx.governance_question, set())
     files_with_detail: Set[str] = set()
@@ -454,7 +455,10 @@ def _process_cluster(
 ) -> Dict[str, Any]:
     # Stage 7: assemble and sort the review table.
     review_rows: List[Dict[str, str]] = []
-    for (export_run_id, signal_id, source_join_hash), detail in ctx.detail_by_file_signal.items():
+    for detail in ctx.detail_by_file_signal.values():
+        export_run_id = detail.get("export_run_id", "")
+        signal_id = detail.get("signal_id", "") or detail.get("edge_id", "")
+        source_join_hash = detail.get("source_join_hash", "")
         cls = ctx.classification_by_file.get(export_run_id, {})
         source_domain = detail.get("source_domain", "")
         sig_hash = detail.get("sig_hash", "")
