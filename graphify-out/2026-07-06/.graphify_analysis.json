@@ -878,6 +878,7 @@
       "core_vg_sig",
       "core_vg_sig_canonical_identity_items_from_signature",
       "core_vg_sig_phase2_items_from_def_signature",
+      "core_vg_sig_rationale_286",
       "core_vg_sig_rationale_336",
       "domains_identity",
       "domains_identity_extract",
@@ -898,6 +899,7 @@
       "domains_text_types_phase2_build_payload",
       "domains_text_types_phase2_item",
       "domains_text_types_read_instance_and_sole_flags",
+      "domains_view_templates_phase2_items_from_def_signature",
       "migration_role_policy_phase_filters_phase_filter_id_int",
       "migration_role_policy_phase_filters_phase_filter_name",
       "migration_role_policy_phase_filters_phase_filter_source_element_id",
@@ -1349,7 +1351,6 @@
       "core_vg_sig_rationale_169",
       "core_vg_sig_rationale_212",
       "core_vg_sig_rationale_275",
-      "core_vg_sig_rationale_286",
       "core_vg_sig_rationale_408",
       "core_vg_sig_read_bip_int",
       "core_vg_sig_traceability_unknown_items",
@@ -1372,7 +1373,6 @@
       "domains_view_templates_is_schedule_view",
       "domains_view_templates_is_template_param_included",
       "domains_view_templates_non_ctrl_bips_from_view",
-      "domains_view_templates_phase2_items_from_def_signature",
       "domains_view_templates_rationale_1219",
       "domains_view_templates_rationale_1639",
       "domains_view_templates_rationale_2036",
@@ -4412,7 +4412,7 @@
     "6": 0.05220288781932617,
     "7": 0.0578386605783866,
     "8": 0.06316590563165905,
-    "9": 0.0574400723654455,
+    "9": 0.05583972719522592,
     "10": 0.06448412698412699,
     "11": 0.055811571940604196,
     "12": 0.07005649717514124,
@@ -4420,7 +4420,7 @@
     "14": 0.08636363636363636,
     "15": 0.11180992313067785,
     "16": 0.06748911465892599,
-    "17": 0.09158249158249158,
+    "17": 0.0965166908563135,
     "18": 0.0602322206095791,
     "19": 0.08446455505279035,
     "20": 0.09728506787330317,
@@ -4733,41 +4733,8 @@
       "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `test_blank_unit_system_excluded()` unexpectedly reaches hub `_build_segments()`"
     }
   ],
-  "questions": [
-    {
-      "type": "bridge_node",
-      "question": "Why does `_phase2_item()` connect `Element ID Canonicalization` to `Domain Indexing`?",
-      "why": "High betweenness centrality (0.063) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `load_exports()` connect `Export Loading` to `Domain Indexing`, `Join Key Extraction`, `Intradomain Summary Building`, `Join Hash Parameter Extraction`, `Attribute Stability Analysis`, `Export File Loading`, `Signature Hash Policies`, `Cluster Detection`, `Domain Identity Contract`, `Typography Features Extraction`, `Collision Differencing`, `Join Key Derivation`?",
-      "why": "High betweenness centrality (0.044) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `make_hash()` connect `Hashing and Join Keys` to `Line Style Extraction`, `Value Canonicalization`, `Boolean Canonicalization`, `Element ID Canonicalization`, `Dependency Management`, `Hashing Incremental Testing`, `Timing Data Collection`, `Structural Hash Canonicalization`, `Record Identity Quality`, `Subcategory ID Management`?",
-      "why": "High betweenness centrality (0.044) - this node is a cross-community bridge."
-    },
-    {
-      "type": "isolated_nodes",
-      "question": "What connects `PreToolUse`, `PreToolUse`, `version` to the rest of the system?",
-      "why": "941 weakly-connected nodes found - possible documentation gaps or missing edges."
-    },
-    {
-      "type": "low_cohesion",
-      "question": "Should `Line Style Extraction` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.055239236839476576 - nodes in this community are weakly interconnected."
-    },
-    {
-      "type": "low_cohesion",
-      "question": "Should `Hashing and Join Keys` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.06732186732186732 - nodes in this community are weakly interconnected."
-    },
-    {
-      "type": "low_cohesion",
-      "question": "Should `Value Canonicalization` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.07643467643467644 - nodes in this community are weakly interconnected."
-    }
-  ]
+  "tokens": {
+    "input": 147069,
+    "output": 5404
+  }
 }
