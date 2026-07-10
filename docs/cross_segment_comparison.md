@@ -527,3 +527,28 @@ Two additive summaries are also written from the distribution rows:
 The explicit matrix outputs distinguish `missing`, `unavailable`, `not applicable`, synthetic self-comparisons, and true zero-valued scores through `value_status` and blank values. Diagonal cells are synthetic self-comparisons (`self_comparison=true`) and are deterministic (`1.000000` for applicable similarity matrices), including added file-pair diagonal cells when only observed A→B project summary rows exist. File-pair diagonal cells are emitted only for domains observed for that project in the summary input, plus that project's `ALL_DOMAINS` aggregate; sparse domains are not filled with false available diagonals. Observed project file-pair cells are mirrored as B→A because mean Jaccard is symmetric and sibling discovery emits unordered pairs once. When a project union group can be mapped unambiguously to a human-readable project `segment_label` already present in project summary comparisons, union and density matrix row IDs use that label so matrix outputs can be joined across metrics; otherwise they fall back to the explicit `governance_role|client_label|discipline_label|unit_system` group key. Fragmentation diagnostics compare `ALL_DOMAINS` union Jaccard only to the deterministic `ALL_DOMAINS` aggregate of available domain-level mean file-pair Jaccard rows, rather than selecting an arbitrary domain row.
 
 Container caution: this reporting layer does not introduce container authority rules. Container-specific matrices should only be added where existing metadata provides a defensible grain, and category-specific container libraries must not be interpreted as governance divergence solely from low file-to-file overlap.
+
+---
+
+## 11. comparison_registry.csv — staleness tracking (not a cache)
+
+`tools/compare_cross_segment.py` has no cached results of its own: every invocation recomputes every discovered pair from whatever is currently on disk under `segments/`. `comparison_registry.csv` exists purely so a caller can tell *which* pairs are worth recomputing before spending the time, and to make the segment-staleness model's parent-dependency propagation ("a Template re-runs and produces new bundle output → any Project whose conformance comparison reads it is stale, even though the Project's own file population is unchanged") visible somewhere concrete. It is written unconditionally at the end of every non-dry-run invocation (never during `--dry-run`) and is never consulted to skip computation.
+
+One row per discovered `(segment_id_a, segment_id_b, comparison_type)` pair:
+
+| Column | Description |
+|---|---|
+| `segment_id_a` / `segment_id_b` | The pair, in the same orientation as `cross_segment_summary.csv`. |
+| `comparison_type` | One of the comparison_type values from section 2. |
+| `population_hash_a` / `population_hash_b` | Each side's `population_hash` from `run_registry.csv`, captured at the moment this pair was last actually computed. |
+| `last_run_utc_a` / `last_run_utc_b` | Each side's `last_run_utc` from `run_registry.csv`, captured at the same moment. Present in addition to `population_hash` because a `--force` segment re-run (e.g. after a sig_hash/join_hash policy change) can regenerate bundle output without the population itself changing. |
+| `conformance_reference_mode` | Copied from segment_a's `run_registry.csv` row at compute time. Currently always `"latest"` — see section below. |
+| `computed_utc` | When this pair was last actually computed by `compare_cross_segment.py`. |
+
+A pair not recomputed by the current invocation (e.g. a `--segment-a`/`--domain`-filtered run) keeps its prior row untouched rather than being dropped, mirroring how `_build_registry()` in `build_segment_manifest.py` carries over segments it didn't touch.
+
+`--dry-run` looks up every discovered pair against this registry and labels it `stale` (no prior row, or either side's `population_hash`/`last_run_utc` has moved since) or `current`. This is the run-plan view of propagated staleness for comparisons specifically — it is intentionally separate from `run_segment_orchestrator.py --dry-run`, which shows which *segments* need to re-run their own patterns/bundle stage. The two are different questions: a segment's own patterns/bundle output is self-contained and never depends on another segment's output, so a Template re-running never obligates a Project to re-run its patterns/bundle stage — it only obligates the *comparison* between them to be recomputed.
+
+### conformance_reference_mode
+
+Only one value is implemented today: `"latest"`, meaning a comparison always reads whichever segment output is currently on disk — this is simply how `compare_cross_segment.py` already works, made explicit and persisted. A pinned/snapshot mode (comparing against a fixed reference captured at a specific date, analogous to the existing `reference_bundle.json` sidecar pattern used for seed-baseline comparisons) is a plausible future addition but is deliberately not built: it requires accepted Phase-2 baseline authority, which this project is not yet operating under (see `CLAUDE.md`, "current operating mode").

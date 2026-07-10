@@ -9,7 +9,7 @@ from typing import Dict,Iterable,List,Sequence
 SEED_ROLES={"Template","Container"}
 REQUIRED_COLUMNS={"export_run_id","unit_system","client_label","governance_role"}
 MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","discipline_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","export_run_ids","has_seed_file","seed_export_run_ids","population_hash","notes","segment_purpose","segment_label"]
-REGISTRY_FIELDNAMES=["segment_id","parent_segment_id","run_type","population_hash","output_folder","status","last_run_utc","notes","segment_purpose","segment_label"]
+REGISTRY_FIELDNAMES=["segment_id","parent_segment_id","run_type","population_hash","export_run_ids","conformance_reference_mode","output_folder","status","last_run_utc","notes","segment_purpose","segment_label"]
 DIMENSION_CONFIG = [
     {"field": "unit_system", "type": "root"},
     {"field": "governance_role", "type": "governance"},
@@ -322,6 +322,14 @@ def _build_registry(
     also reset status, since population_hash alone would miss it and the
     orchestrator would keep skipping a segment that now needs a different
     analysis to be produced.
+
+    When population_hash changes, the reason is diffed against the prior run's
+    export_run_ids (also persisted in the registry) and recorded as new_files
+    and/or removed_files counts alongside the population_changed marker, so the
+    run plan states why a segment went stale rather than just that it did.
+    conformance_reference_mode is carried over verbatim (defaulting to "latest"
+    for new segments and for older registries written before this field
+    existed); no other mode is implemented yet.
     """
     existing_by_id: Dict[str, Dict[str, str]] = {}
     if existing_registry:
@@ -357,6 +365,13 @@ def _build_registry(
                 "parent_segment_id": row["parent_segment_id"],
                 "run_type": row["run_type"],
                 "population_hash": row["population_hash"],
+                "export_run_ids": row.get("export_run_ids", ""),
+                # "latest" is the only mode implemented: conformance comparisons
+                # (tools/compare_cross_segment.py) always resolve reference segments
+                # dynamically against current output. A pinned/snapshot mode is
+                # deferred until Phase-2 baseline authority is established (see
+                # CLAUDE.md "current operating mode").
+                "conformance_reference_mode": old.get("conformance_reference_mode", "") or "latest",
                 "output_folder": folder,
                 "status": old.get("status", "pending"),
                 "last_run_utc": old.get("last_run_utc", ""),
@@ -372,6 +387,21 @@ def _build_registry(
                 reg_row["notes"] = row.get("notes", "")
                 if population_changed:
                     _append_note(reg_row, "population_changed")
+                    old_ids = {x for x in old.get("export_run_ids", "").split("|") if x}
+                    new_ids = {x for x in row.get("export_run_ids", "").split("|") if x}
+                    added = new_ids - old_ids
+                    removed = old_ids - new_ids
+                    # A population_hash change is purely a function of the
+                    # export_run_id set, so at least one of added/removed is always
+                    # non-empty here — this also covers a metadata edit that moves a
+                    # file between segments (e.g. a corrected client_label): it
+                    # surfaces as removed_files on the file's old segment and
+                    # new_files on its new segment, with no separate detection path
+                    # needed for "metadata change" as its own reason.
+                    if added:
+                        _append_note(reg_row, "new_files", str(len(added)))
+                    if removed:
+                        _append_note(reg_row, "removed_files", str(len(removed)))
                 if run_type_changed:
                     _append_note(reg_row, "run_type_changed", f"{old.get('run_type', '')}->{row['run_type']}")
         else:
@@ -387,6 +417,8 @@ def _build_registry(
                 "parent_segment_id": row["parent_segment_id"],
                 "run_type": row["run_type"],
                 "population_hash": row["population_hash"],
+                "export_run_ids": row.get("export_run_ids", ""),
+                "conformance_reference_mode": "latest",
                 "output_folder": folder,
                 "status": "pending",
                 "last_run_utc": "",

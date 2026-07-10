@@ -195,6 +195,14 @@ DELTA_FIELDS: List[str] = [
     "executed_utc",
 ]
 
+COMPARISON_REGISTRY_FIELDS: List[str] = [
+    "segment_id_a", "segment_id_b", "comparison_type",
+    "population_hash_a", "population_hash_b",
+    "last_run_utc_a", "last_run_utc_b",
+    "conformance_reference_mode",
+    "computed_utc",
+]
+
 POOLED_FIELDS: List[str] = [
     "comparison_run_id",
     "segment_id", "segment_label",
@@ -535,6 +543,88 @@ def load_file_metadata(records_dir: Path) -> Dict[str, Dict[str, str]]:
         print(f"[warn] file_metadata.csv not found at {path}", file=sys.stderr)
         return {}
     return {row["export_run_id"]: row for row in read_csv_rows(path)}
+
+
+# ---------------------------------------------------------------------------
+# Comparison staleness registry
+#
+# compare_cross_segment.py has no cached results of its own — every invocation
+# recomputes every discovered pair from whatever is currently on disk under
+# segments/. comparison_registry.csv exists purely to let a run-plan preview
+# (--dry-run below) tell a caller *which* pairs are worth recomputing, by
+# recording each side's population_hash/last_run_utc (from run_registry.csv)
+# at the moment a pair was last actually computed. It is not consulted to skip
+# computation — a live run always recomputes every pair it discovers.
+# ---------------------------------------------------------------------------
+
+def load_comparison_registry(out_dir: Path) -> Dict[Tuple[str, str, str], Dict[str, str]]:
+    path = out_dir / "comparison_registry.csv"
+    if not path.exists():
+        return {}
+    result: Dict[Tuple[str, str, str], Dict[str, str]] = {}
+    for row in read_csv_rows(path):
+        key = (row.get("segment_id_a", ""), row.get("segment_id_b", ""), row.get("comparison_type", ""))
+        result[key] = row
+    return result
+
+
+def build_comparison_registry_rows(
+    pairs: Sequence[ComparisonPair],
+    registry: Dict[str, Dict[str, str]],
+    existing: Dict[Tuple[str, str, str], Dict[str, str]],
+    computed_utc: str,
+) -> List[Dict[str, str]]:
+    """Return comparison_registry.csv rows: a fresh stamp for every pair in
+    `pairs` (the set actually computed this run), plus untouched carryover for
+    any previously recorded pair not recomputed this run (e.g. a --segment-a /
+    --domain-filtered invocation)."""
+    computed_keys = {(a, b, ct) for a, b, ct in pairs}
+    rows: List[Dict[str, str]] = []
+    for a, b, ctype in pairs:
+        rec_a = registry.get(a, {})
+        rec_b = registry.get(b, {})
+        rows.append({
+            "segment_id_a": a,
+            "segment_id_b": b,
+            "comparison_type": ctype,
+            "population_hash_a": rec_a.get("population_hash", ""),
+            "population_hash_b": rec_b.get("population_hash", ""),
+            "last_run_utc_a": rec_a.get("last_run_utc", ""),
+            "last_run_utc_b": rec_b.get("last_run_utc", ""),
+            "conformance_reference_mode": rec_a.get("conformance_reference_mode", "") or "latest",
+            "computed_utc": computed_utc,
+        })
+    for key, old_row in existing.items():
+        if key not in computed_keys:
+            rows.append(old_row)
+    return rows
+
+
+def comparison_is_stale(
+    seg_a: str,
+    seg_b: str,
+    comparison_type: str,
+    registry: Dict[str, Dict[str, str]],
+    comparison_registry: Dict[Tuple[str, str, str], Dict[str, str]],
+) -> bool:
+    """True if this pair has never been computed, or either side's
+    population_hash/last_run_utc has moved since it was last computed —
+    including a Template/Container reference re-running and producing new
+    bundle output with the target's own population unchanged."""
+    prior = comparison_registry.get((seg_a, seg_b, comparison_type))
+    if prior is None:
+        return True
+    rec_a = registry.get(seg_a, {})
+    rec_b = registry.get(seg_b, {})
+    if prior.get("population_hash_a", "") != rec_a.get("population_hash", ""):
+        return True
+    if prior.get("population_hash_b", "") != rec_b.get("population_hash", ""):
+        return True
+    if prior.get("last_run_utc_a", "") != rec_a.get("last_run_utc", ""):
+        return True
+    if prior.get("last_run_utc_b", "") != rec_b.get("last_run_utc", ""):
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -2998,14 +3088,20 @@ def main() -> int:
 
     # --dry-run: print table and exit
     if args.dry_run:
+        comparison_registry = load_comparison_registry(out_dir)
         col_w = 36
-        print(f"{'segment_a':<{col_w}}  {'segment_b':<{col_w}}  {'comparison_type':<28}")
-        print("-" * (col_w * 2 + 32))
+        print(f"{'segment_a':<{col_w}}  {'segment_b':<{col_w}}  {'comparison_type':<28}  {'staleness':<10}")
+        print("-" * (col_w * 2 + 44))
+        n_stale = 0
         for a, b, ctype in pairs:
             la = manifest.get(a, {}).get("segment_label", a)
             lb = manifest.get(b, {}).get("segment_label", b)
-            print(f"{la:<{col_w}}  {lb:<{col_w}}  {ctype:<28}")
-        print(f"\n[compare] {len(pairs)} pairs discovered")
+            stale = comparison_is_stale(a, b, ctype, registry, comparison_registry)
+            if stale:
+                n_stale += 1
+            staleness_label = "stale" if stale else "current"
+            print(f"{la:<{col_w}}  {lb:<{col_w}}  {ctype:<28}  {staleness_label:<10}")
+        print(f"\n[compare] {len(pairs)} pairs discovered ({n_stale} stale, {len(pairs) - n_stale} current)")
         return 0
 
     # Run comparisons
@@ -3356,6 +3452,13 @@ def main() -> int:
 
     if not summary_rows and not pooled_rows and not governance_state_rows and not union_inventory_rows:
         print("[compare] no comparison rows produced — check segment data and min-patterns threshold")
+
+    existing_comparison_registry = load_comparison_registry(out_dir)
+    comparison_registry_rows = build_comparison_registry_rows(
+        pairs, registry, existing_comparison_registry, executed_utc
+    )
+    atomic_write_csv(out_dir / "comparison_registry.csv", COMPARISON_REGISTRY_FIELDS, comparison_registry_rows)
+    print(f"[compare] wrote {len(comparison_registry_rows)} rows → {out_dir / 'comparison_registry.csv'}")
 
     return 0
 

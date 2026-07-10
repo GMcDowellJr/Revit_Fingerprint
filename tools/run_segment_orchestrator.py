@@ -1026,9 +1026,11 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             file_count = len([x for x in export_run_ids_raw.split("|") if x.strip()])
 
             status_label = "complete (would skip)" if skip else status or "pending"
+            reason_note = reg_row.get("notes", "").strip()
+            reason_suffix = f"  reason={reason_note}" if (not skip and reason_note) else ""
             print(
                 f"[dry-run] segment={sid}  level={level}  files={file_count}"
-                f"  output={output_folder}  status={status_label}"
+                f"  output={output_folder}  status={status_label}{reason_suffix}"
             )
             if skip:
                 print(f"  (skipped — already complete; use --force to re-run)")

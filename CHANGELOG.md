@@ -11,6 +11,31 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Added
+- Segment staleness model extended (build_segment_manifest.py `_build_registry()`):
+  `run_registry.csv` gains `export_run_ids` (persisted per-run member list, enabling
+  next-run diffing) and `conformance_reference_mode` (currently always `"latest"` —
+  compare_cross_segment.py always resolves reference segments dynamically against
+  current output; a pinned/snapshot mode is deferred until Phase-2 baseline authority
+  is established). When `population_hash` changes, the registry now records
+  `new_files:<n>` and/or `removed_files:<n>` reason counts alongside the existing
+  `population_changed` marker, diffed against the prior run's `export_run_ids`. A
+  metadata edit that moves a file between segments (e.g. a corrected `client_label`)
+  surfaces as `removed_files` on the old segment and `new_files` on the new one —
+  no separate "metadata change" detection path was needed or added.
+- `tools/run_segment_orchestrator.py --dry-run` now prints each pending segment's
+  registry `notes` (the staleness reason) alongside its status.
+- `tools/compare_cross_segment.py` now writes `comparison_registry.csv` after every
+  run: one row per discovered (segment_a, segment_b, comparison_type) pair, stamped
+  with each side's `population_hash`/`last_run_utc` (read from `run_registry.csv`) and
+  `computed_utc`. This is new tracking state only — comparisons are still always
+  fully recomputed on every invocation; nothing is skipped based on this registry.
+  `--dry-run` now looks up each discovered pair against this registry and labels it
+  `stale` (never computed, or either side's stamp has moved since — this is how a
+  Template/Container reference re-running with new bundle output is surfaced as
+  invalidating its downstream Project/Container comparisons, even though the
+  target's own file population is unchanged) or `current`.
+
 ### Fixed
 - line_patterns sig_hash policy corrected to segments_def_hash (sig_hash.v2):
   segments_norm_hash was incorrectly used as sig_hash basis — it belongs in join_hash only.
