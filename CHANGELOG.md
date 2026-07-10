@@ -11,6 +11,38 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Changed (breaking pipeline-contract)
+- `segment_manifest.csv` and `run_registry.csv` no longer carry per-segment file
+  membership as inline pipe-delimited columns (`export_run_ids`,
+  `seed_export_run_ids`). For large populations these columns exceeded
+  spreadsheet cell limits (Excel ~32,767 chars/cell, Google Sheets ~50,000
+  chars/cell — confirmed offenders in the current corpus reached 59,271
+  chars), and a viewer truncating a field mid-quote desyncs the CSV parser
+  for every row after it. Membership now lives in a new normalized join
+  table, `segment_membership.csv` (`segment_id,export_run_id,is_seed`), one
+  row per (segment, file) pair, written alongside the other two files by
+  `build_segment_manifest.py`. `segment_manifest.csv` keeps only scalar
+  summary fields (`file_count`, `has_seed_file`, `population_hash`);
+  `run_registry.csv` keeps `population_hash` only — neither file will ever
+  again carry a variable-length filename list. `population_hash` is computed
+  identically to before (still from the in-memory `eids` list, not a
+  round-trip through any CSV), so it is unchanged for any segment given the
+  same file population — skip-logic/staleness comparisons are unaffected.
+  `tools/run_segment_orchestrator.py` gains a `--membership-file` flag
+  (default: sibling of `--manifest-file`) and now sources every
+  `export_run_ids`/`allowed_ids` lookup from `segment_membership.csv` instead
+  of the retired manifest column. `_build_registry()`'s `new_files`/
+  `removed_files` staleness-reason diffing now reads the prior run's
+  population from `existing_membership` (loaded from a prior
+  `segment_membership.csv`) instead of an `export_run_ids` field embedded in
+  the prior `run_registry.csv` row; a registry rebuilt for the first time
+  after this migration (no prior `segment_membership.csv` on disk) will show
+  every current file as `new_files` with no `removed_files` on that one
+  transitional run, since there is no prior per-segment file list to diff
+  against — a one-time artifact of the migration, not an ongoing dual-path.
+  No fallback to the old inline column was kept; this is a schema change, not
+  an additive one.
+
 ### Added
 - Segment staleness model extended (build_segment_manifest.py `_build_registry()`):
   `run_registry.csv` gains `export_run_ids` (persisted per-run member list, enabling

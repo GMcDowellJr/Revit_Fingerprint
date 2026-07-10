@@ -8,8 +8,9 @@ from typing import Dict,Iterable,List,Sequence
 
 SEED_ROLES={"Template","Container"}
 REQUIRED_COLUMNS={"export_run_id","unit_system","client_label","governance_role"}
-MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","discipline_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","export_run_ids","has_seed_file","seed_export_run_ids","population_hash","notes","segment_purpose","segment_label"]
-REGISTRY_FIELDNAMES=["segment_id","parent_segment_id","run_type","population_hash","export_run_ids","conformance_reference_mode","output_folder","status","last_run_utc","notes","segment_purpose","segment_label"]
+MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","discipline_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","has_seed_file","population_hash","notes","segment_purpose","segment_label"]
+REGISTRY_FIELDNAMES=["segment_id","parent_segment_id","run_type","population_hash","conformance_reference_mode","output_folder","status","last_run_utc","notes","segment_purpose","segment_label"]
+MEMBERSHIP_FIELDNAMES=["segment_id","export_run_id","is_seed"]
 DIMENSION_CONFIG = [
     {"field": "unit_system", "type": "root"},
     {"field": "governance_role", "type": "governance"},
@@ -41,6 +42,37 @@ def _population_hash(export_run_ids: List[str]) -> str:
 
 _UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]+')
 def _sanitize_folder(segment_id:str)->str:return _UNSAFE_FOLDER_CHARS.sub("_",segment_id).lower().strip("_")
+
+def _build_membership_rows(manifest_rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Flatten each manifest row's internal export_run_ids/seed_export_run_ids
+    (pipe-delimited, not written to segment_manifest.csv) into one
+    (segment_id, export_run_id, is_seed) row per membership pair.
+
+    Covers every segment in manifest_rows, not just run_registry-eligible
+    (bundle/reference) ones, so segment_membership.csv joins cleanly against
+    the full segment_manifest.csv the same way file_count does today.
+    """
+    rows: List[Dict[str, str]] = []
+    for r in manifest_rows:
+        sid = r["segment_id"]
+        eids = [x for x in (r.get("export_run_ids") or "").split("|") if x]
+        seeds = {x for x in (r.get("seed_export_run_ids") or "").split("|") if x}
+        for eid in eids:
+            rows.append({"segment_id": sid, "export_run_id": eid, "is_seed": "true" if eid in seeds else "false"})
+    rows.sort(key=lambda row: (row["segment_id"], row["export_run_id"]))
+    return rows
+
+def _membership_by_segment(membership_rows: List[Dict[str, str]]) -> Dict[str, List[str]]:
+    """Group membership CSV rows into segment_id -> sorted export_run_ids, for
+    reconstructing a prior run's per-segment population (used by _build_registry's
+    population_changed diffing in place of the old registry-embedded export_run_ids)."""
+    grouped: Dict[str, List[str]] = defaultdict(list)
+    for row in membership_rows:
+        sid = (row.get("segment_id") or "").strip()
+        eid = (row.get("export_run_id") or "").strip()
+        if sid and eid:
+            grouped[sid].append(eid)
+    return {sid: sorted(eids) for sid, eids in grouped.items()}
 
 def _append_note(row,k,v=""):
     note=f"{k}:{v}" if v else k
@@ -310,6 +342,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
 def _build_registry(
     manifest_rows: List[Dict[str, str]],
     existing_registry: List[Dict[str, str]] | None = None,
+    existing_membership: Dict[str, List[str]] | None = None,
 ) -> List[Dict[str, str]]:
     """Build run_registry.csv rows from freshly computed manifest rows.
 
@@ -324,13 +357,22 @@ def _build_registry(
     analysis to be produced.
 
     When population_hash changes, the reason is diffed against the prior run's
-    export_run_ids (also persisted in the registry) and recorded as new_files
-    and/or removed_files counts alongside the population_changed marker, so the
-    run plan states why a segment went stale rather than just that it did.
+    export_run_ids and recorded as new_files and/or removed_files counts
+    alongside the population_changed marker, so the run plan states why a
+    segment went stale rather than just that it did. The prior population is
+    read from existing_membership (segment_id -> export_run_ids, built from a
+    previously-written segment_membership.csv) rather than from
+    existing_registry — run_registry.csv no longer carries a per-segment
+    member list. A segment with no entry in existing_membership (e.g. the
+    first registry rebuild after this migration, before any
+    segment_membership.csv existed) is treated as having an empty prior
+    population, so its notes will show every current file as new_files with
+    no removed_files on that one transitional run.
     conformance_reference_mode is carried over verbatim (defaulting to "latest"
     for new segments and for older registries written before this field
     existed); no other mode is implemented yet.
     """
+    existing_membership = existing_membership or {}
     existing_by_id: Dict[str, Dict[str, str]] = {}
     if existing_registry:
         for row in existing_registry:
@@ -365,7 +407,6 @@ def _build_registry(
                 "parent_segment_id": row["parent_segment_id"],
                 "run_type": row["run_type"],
                 "population_hash": row["population_hash"],
-                "export_run_ids": row.get("export_run_ids", ""),
                 # "latest" is the only mode implemented: conformance comparisons
                 # (tools/compare_cross_segment.py) always resolve reference segments
                 # dynamically against current output. A pinned/snapshot mode is
@@ -387,7 +428,7 @@ def _build_registry(
                 reg_row["notes"] = row.get("notes", "")
                 if population_changed:
                     _append_note(reg_row, "population_changed")
-                    old_export_ids = {x for x in old.get("export_run_ids", "").split("|") if x}
+                    old_export_ids = set(existing_membership.get(sid, []))
                     new_export_ids = {x for x in row.get("export_run_ids", "").split("|") if x}
                     added = new_export_ids - old_export_ids
                     removed = old_export_ids - new_export_ids
@@ -417,7 +458,6 @@ def _build_registry(
                 "parent_segment_id": row["parent_segment_id"],
                 "run_type": row["run_type"],
                 "population_hash": row["population_hash"],
-                "export_run_ids": row.get("export_run_ids", ""),
                 "conformance_reference_mode": "latest",
                 "output_folder": folder,
                 "status": "pending",
@@ -573,15 +613,27 @@ def main(argv: List[str] | None = None) -> int:
 
     manifest_path = out_dir / "segment_manifest.csv"
     registry_path = out_dir / "run_registry.csv"
+    membership_path = out_dir / "segment_membership.csv"
 
     existing_registry_rows: List[Dict[str, str]] | None = None
     if registry_path.is_file():
         _, existing_registry_rows = _read_csv(registry_path)
 
-    registry_rows = _build_registry(manifest_rows, existing_registry=existing_registry_rows)
+    existing_membership: Dict[str, List[str]] | None = None
+    if membership_path.is_file():
+        _, existing_membership_rows = _read_csv(membership_path)
+        existing_membership = _membership_by_segment(existing_membership_rows)
+
+    registry_rows = _build_registry(
+        manifest_rows,
+        existing_registry=existing_registry_rows,
+        existing_membership=existing_membership,
+    )
+    membership_rows = _build_membership_rows(manifest_rows)
 
     _atomic_write_csv(manifest_path, MANIFEST_FIELDNAMES, manifest_rows)
     _atomic_write_csv(registry_path, REGISTRY_FIELDNAMES, registry_rows)
+    _atomic_write_csv(membership_path, MEMBERSHIP_FIELDNAMES, membership_rows)
 
     _print_summary(manifest_path, registry_path, manifest_rows, min_files)
     return 0

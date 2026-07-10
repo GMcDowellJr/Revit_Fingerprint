@@ -10,7 +10,17 @@ import pytest
 # Allow running without installing; resolve to repo root.
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
-from build_segment_manifest import _build_segments, _build_registry, _population_hash, _normalize_rows, main
+from build_segment_manifest import (
+    _build_segments,
+    _build_registry,
+    _population_hash,
+    _normalize_rows,
+    _build_membership_rows,
+    _membership_by_segment,
+    MANIFEST_FIELDNAMES,
+    REGISTRY_FIELDNAMES,
+    main,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -30,6 +40,12 @@ def _meta_row(export_run_id, unit_system, client_label, governance_role, discipl
 def _read_csv(path: Path):
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         return list(csv.DictReader(f))
+
+
+def _membership_ids(out_dir: Path, segment_id: str) -> set:
+    """Read segment_membership.csv and return the export_run_id set for one segment_id."""
+    rows = _read_csv(out_dir / "segment_membership.csv")
+    return {r["export_run_id"] for r in rows if r["segment_id"] == segment_id}
 
 
 # ---------------------------------------------------------------------------
@@ -165,10 +181,35 @@ def test_sort_order_within_level_alphabetical():
 
 
 def test_export_run_ids_sorted_pipe_delimited():
+    # File membership now lives in segment_membership.csv, not an inline
+    # pipe-delimited manifest column (which blew past spreadsheet cell limits
+    # for large populations). Rows are sorted (segment_id, export_run_id).
     segs = _build_segments(ROWS, min_files=3)
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
-    ids = kaiser["export_run_ids"].split("|")
-    assert ids == sorted(ids)
+    membership = _build_membership_rows(segs)
+    kaiser_ids = [r["export_run_id"] for r in membership if r["segment_id"] == "imperial|Kaiser"]
+    assert kaiser_ids == sorted(kaiser_ids)
+    assert kaiser_ids  # non-empty for this fixture
+
+
+def test_membership_rows_no_pipe_delimited_values():
+    # Regression guard for the original bug: export_run_id/is_seed must never
+    # be a pipe-joined list (segment_id legitimately contains "|" as its own
+    # hierarchical separator, e.g. "imperial|Kaiser" — that's unrelated).
+    segs = _build_segments(ROWS, min_files=3)
+    membership = _build_membership_rows(segs)
+    for row in membership:
+        assert "|" not in row["export_run_id"]
+        assert "|" not in row["is_seed"]
+
+
+def test_manifest_and_registry_have_no_list_columns():
+    # Regression guard: segment_manifest.csv / run_registry.csv must only ever
+    # carry scalar summary fields — file membership belongs in
+    # segment_membership.csv exclusively.
+    assert "export_run_ids" not in MANIFEST_FIELDNAMES
+    assert "seed_export_run_ids" not in MANIFEST_FIELDNAMES
+    assert "export_run_ids" not in REGISTRY_FIELDNAMES
+    assert "seed_export_run_ids" not in REGISTRY_FIELDNAMES
 
 
 def test_population_hash_in_manifest():
@@ -866,9 +907,7 @@ def test_governance_role_case_variants_merge_and_no_false_warning(tmp_path, caps
     captured = capsys.readouterr()
     assert "Unrecognised governance_role" not in captured.err
 
-    manifest_rows = _read_csv(out_dir / "segment_manifest.csv")
-    container_acme = next(r for r in manifest_rows if r["segment_id"] == "imperial|Container|Acme")
-    ids = set(container_acme["export_run_ids"].split("|"))
+    ids = _membership_ids(out_dir, "imperial|Container|Acme")
     assert ids == {f"a{i:02d}" for i in range(3)} | {f"b{i:02d}" for i in range(3)}
 
 
@@ -977,20 +1016,25 @@ def test_conformance_reference_mode_defaults_to_latest_for_old_registry_missing_
     assert kaiser2["conformance_reference_mode"] == "latest"
 
 
-def test_registry_persists_export_run_ids():
+def test_registry_no_longer_carries_export_run_ids():
+    # run_registry.csv dropped its inline export_run_ids column (moved to
+    # segment_membership.csv) — the in-memory row built by _build_registry()
+    # must not carry the key either, since REGISTRY_FIELDNAMES no longer
+    # includes it.
     segs = _build_segments(ROWS, min_files=3)
     reg = _build_registry(segs)
     kaiser = next(r for r in reg if r["segment_id"] == "imperial|Project|Kaiser")
-    assert kaiser["export_run_ids"] == "r01|r02|r03"
+    assert "export_run_ids" not in kaiser
 
 
 def test_registry_new_files_reason_when_file_added():
     segs1 = _build_segments(ROWS, min_files=3)
     reg1 = _build_registry(segs1)
+    membership1 = _membership_by_segment(_build_membership_rows(segs1))
 
     rows2 = ROWS + [_meta_row("r11", "imperial", "Kaiser", "Project")]
     segs2 = _build_segments(rows2, min_files=3)
-    reg2 = _build_registry(segs2, existing_registry=reg1)
+    reg2 = _build_registry(segs2, existing_registry=reg1, existing_membership=membership1)
     kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
 
     assert "population_changed" in kaiser2["notes"]
@@ -1005,10 +1049,11 @@ def test_registry_removed_files_reason_when_file_removed():
     rows1 = ROWS + [_meta_row("r12", "imperial", "Kaiser", "Project")]
     segs1 = _build_segments(rows1, min_files=3)
     reg1 = _build_registry(segs1)
+    membership1 = _membership_by_segment(_build_membership_rows(segs1))
 
     rows2 = [r for r in rows1 if r["export_run_id"] != "r03"]
     segs2 = _build_segments(rows2, min_files=3)
-    reg2 = _build_registry(segs2, existing_registry=reg1)
+    reg2 = _build_registry(segs2, existing_registry=reg1, existing_membership=membership1)
     kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
 
     assert "population_changed" in kaiser2["notes"]
@@ -1020,13 +1065,14 @@ def test_registry_both_new_and_removed_files_reasons_when_combined_change():
     rows1 = ROWS + [_meta_row("r12", "imperial", "Kaiser", "Project")]
     segs1 = _build_segments(rows1, min_files=3)
     reg1 = _build_registry(segs1)
+    membership1 = _membership_by_segment(_build_membership_rows(segs1))
 
     # Swap r03 out for a new file r11 in the same segment in one run.
     rows2 = [r for r in rows1 if r["export_run_id"] != "r03"] + [
         _meta_row("r11", "imperial", "Kaiser", "Project")
     ]
     segs2 = _build_segments(rows2, min_files=3)
-    reg2 = _build_registry(segs2, existing_registry=reg1)
+    reg2 = _build_registry(segs2, existing_registry=reg1, existing_membership=membership1)
     kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
 
     assert "population_changed" in kaiser2["notes"]
@@ -1042,10 +1088,11 @@ def test_registry_new_files_reason_does_not_cause_false_removal_warnings(capsys)
     # cleanup warning.
     segs1 = _build_segments(ROWS, min_files=3)
     reg1 = _build_registry(segs1)
+    membership1 = _membership_by_segment(_build_membership_rows(segs1))
 
     rows2 = ROWS + [_meta_row("r11", "imperial", "Kaiser", "Project")]
     segs2 = _build_segments(rows2, min_files=3)
-    reg2 = _build_registry(segs2, existing_registry=reg1)
+    reg2 = _build_registry(segs2, existing_registry=reg1, existing_membership=membership1)
 
     reg2_ids = {r["segment_id"] for r in reg2}
     reg1_ids = {r["segment_id"] for r in reg1}
@@ -1069,3 +1116,123 @@ def test_registry_no_reason_notes_for_brand_new_segment():
     assert "population_changed" not in zenith["notes"]
     assert "new_files" not in zenith["notes"]
     assert "removed_files" not in zenith["notes"]
+
+
+# ---------------------------------------------------------------------------
+# segment_membership.csv — normalized join table (replaces inline
+# export_run_ids / seed_export_run_ids pipe-delimited columns)
+# ---------------------------------------------------------------------------
+
+def test_segment_membership_round_trip_reconstructs_in_memory_sets(tmp_path):
+    # Build segments -> write segment_membership.csv -> reconstruct per-segment
+    # export_run_ids/seed sets by filtering the membership CSV by segment_id ->
+    # assert equality with the in-memory sets used to compute
+    # file_count/has_seed_file/population_hash.
+    meta = tmp_path / "file_metadata.csv"
+    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        w.writeheader()
+        for row in ROWS:
+            w.writerow(row)
+
+    out_dir = tmp_path / "out"
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "3"])
+    assert rc == 0
+
+    segs = _build_segments(ROWS, min_files=3)
+    membership_rows = _read_csv(out_dir / "segment_membership.csv")
+
+    for seg in segs:
+        sid = seg["segment_id"]
+        expected_eids = {x for x in seg.get("export_run_ids", "").split("|") if x}
+        expected_seeds = {x for x in seg.get("seed_export_run_ids", "").split("|") if x}
+
+        seg_rows = [r for r in membership_rows if r["segment_id"] == sid]
+        reconstructed_eids = {r["export_run_id"] for r in seg_rows}
+        reconstructed_seeds = {r["export_run_id"] for r in seg_rows if r["is_seed"] == "true"}
+
+        assert reconstructed_eids == expected_eids, f"segment {sid}: export_run_id mismatch"
+        assert reconstructed_seeds == expected_seeds, f"segment {sid}: is_seed mismatch"
+        assert str(len(reconstructed_eids)) == seg["file_count"]
+        assert ("true" if reconstructed_seeds else "false") == seg["has_seed_file"]
+
+
+def test_segment_membership_join_keys_present_in_manifest_and_metadata(tmp_path):
+    # segment_id joins back to segment_manifest.csv; export_run_id joins back
+    # to file_metadata.csv (definition grain, unchanged by this migration).
+    meta = tmp_path / "file_metadata.csv"
+    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        w.writeheader()
+        for row in ROWS:
+            w.writerow(row)
+
+    out_dir = tmp_path / "out"
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "3"])
+    assert rc == 0
+
+    manifest_ids = {r["segment_id"] for r in _read_csv(out_dir / "segment_manifest.csv")}
+    metadata_ids = {r["export_run_id"] for r in ROWS if r["export_run_id"]}
+    membership_rows = _read_csv(out_dir / "segment_membership.csv")
+
+    for row in membership_rows:
+        assert row["segment_id"] in manifest_ids
+        assert row["export_run_id"] in metadata_ids
+
+
+def test_population_hash_unchanged_by_membership_storage_migration():
+    # population_hash must byte-for-byte match prior runs given the same file
+    # population — it's load-bearing for skip-logic/staleness comparisons.
+    # Confirmed here by hand-tracing: it is still computed from the in-memory
+    # eids list, not by re-reading any CSV (segment_membership.csv included).
+    segs = _build_segments(ROWS, min_files=3)
+    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
+    eids = [x for x in kaiser["export_run_ids"].split("|") if x]
+    assert kaiser["population_hash"] == hashlib.sha1("|".join(sorted(eids)).encode()).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Field-length regression guard — the original bug this migration fixes was a
+# manifest/registry cell exceeding spreadsheet limits (Excel ~32,767 chars,
+# Google Sheets ~50,000 chars) and desyncing downstream CSV parsers.
+# ---------------------------------------------------------------------------
+
+_MAX_SANE_FIELD_LEN = 10_000
+
+
+def test_manifest_and_registry_fields_stay_under_size_threshold(tmp_path):
+    # Large population: enough files that the old inline export_run_ids column
+    # would have blown past the threshold (each id here is ~30 chars; 500 files
+    # -> ~15,000 chars, comfortably over the 10,000-char guard).
+    rows = [
+        _meta_row(f"export-run-id-{i:06d}-looooong-suffix", "imperial", "BigClient", "Project")
+        for i in range(500)
+    ]
+    meta = tmp_path / "file_metadata.csv"
+    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        w.writeheader()
+        for row in rows:
+            w.writerow(row)
+
+    out_dir = tmp_path / "out"
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "3"])
+    assert rc == 0
+
+    for csv_name in ("segment_manifest.csv", "run_registry.csv"):
+        for row in _read_csv(out_dir / csv_name):
+            for field, value in row.items():
+                assert len(value) < _MAX_SANE_FIELD_LEN, (
+                    f"{csv_name} field '{field}' on segment_id={row.get('segment_id')} "
+                    f"is {len(value)} chars — file membership must live in "
+                    f"segment_membership.csv, not an inline manifest/registry column"
+                )
+
+    # segment_membership.csv rows themselves must also stay well under the
+    # threshold (each row is one segment_id/export_run_id/is_seed triple).
+    for row in _read_csv(out_dir / "segment_membership.csv"):
+        for field, value in row.items():
+            assert len(value) < _MAX_SANE_FIELD_LEN
