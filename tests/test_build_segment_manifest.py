@@ -625,6 +625,118 @@ def test_client_discipline_leaf_purpose_project():
     assert seg["segment_label"] == "Kaiser Architectural projects — standards as practiced"
 
 
+# ---------------------------------------------------------------------------
+# Registry stability + population-hash-based status preservation
+# ---------------------------------------------------------------------------
+
+def test_registry_first_run_no_existing_file_unaffected():
+    # Regression guard: calling _build_registry with no existing_registry (or
+    # existing_registry=None explicitly) must be byte-for-byte identical to
+    # the pre-change behavior.
+    segs = _build_segments(ROWS, min_files=3)
+    reg_default = _build_registry(segs)
+    reg_explicit_none = _build_registry(segs, existing_registry=None)
+    assert reg_default == reg_explicit_none
+    for r in reg_default:
+        assert r["status"] == "pending"
+        assert r["last_run_utc"] == ""
+    kaiser_reg = next(r for r in reg_default if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser_reg["output_folder"] == "imperial_project_kaiser"
+
+
+def test_registry_preserves_output_folder_across_runs_when_unchanged():
+    segs = _build_segments(ROWS, min_files=3)
+    reg1 = _build_registry(segs)
+    reg2 = _build_registry(segs, existing_registry=reg1)
+    folders1 = {r["segment_id"]: r["output_folder"] for r in reg1}
+    folders2 = {r["segment_id"]: r["output_folder"] for r in reg2}
+    assert folders1 == folders2
+
+
+def test_registry_preserves_status_when_population_hash_unchanged():
+    segs = _build_segments(ROWS, min_files=3)
+    reg1 = _build_registry(segs)
+    for r in reg1:
+        if r["segment_id"] == "imperial|Project|Kaiser":
+            r["status"] = "complete"
+            r["last_run_utc"] = "2026-01-01T00:00:00Z"
+
+    reg2 = _build_registry(segs, existing_registry=reg1)
+    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser2["status"] == "complete"
+    assert kaiser2["last_run_utc"] == "2026-01-01T00:00:00Z"
+    assert kaiser2["output_folder"] == "imperial_project_kaiser"
+
+
+def test_registry_resets_status_when_population_hash_changes():
+    segs1 = _build_segments(ROWS, min_files=3)
+    reg1 = _build_registry(segs1)
+    for r in reg1:
+        if r["segment_id"] == "imperial|Project|Kaiser":
+            r["status"] = "complete"
+            r["last_run_utc"] = "2026-01-01T00:00:00Z"
+
+    rows2 = ROWS + [_meta_row("r11", "imperial", "Kaiser", "Project")]
+    segs2 = _build_segments(rows2, min_files=3)
+    reg2 = _build_registry(segs2, existing_registry=reg1)
+    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+
+    kaiser1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser2["population_hash"] != kaiser1["population_hash"]
+    assert kaiser2["status"] == "pending"
+    assert kaiser2["last_run_utc"] == ""
+    assert "population_changed" in kaiser2["notes"]
+    # Folder name must remain stable even though status reset.
+    assert kaiser2["output_folder"] == kaiser1["output_folder"]
+
+
+def test_registry_new_segment_gets_unique_folder_not_colliding_with_carryover():
+    # First run: only "kaiser" (lower) and "Kaiser" (upper) — the natural
+    # sanitized-name collision assigns Kaiser -> imperial_project_kaiser_2.
+    rows_a = [_meta_row(f"a{i:02d}", "imperial", "kaiser", "Project") for i in range(3)]
+    rows_b = [_meta_row(f"b{i:02d}", "imperial", "Kaiser", "Project") for i in range(3)]
+    segs1 = _build_segments(rows_a + rows_b, min_files=1)
+    reg1 = _build_registry(segs1)
+
+    folder_lower_1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|kaiser")["output_folder"]
+    folder_upper_1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|Kaiser")["output_folder"]
+    assert folder_lower_1 != folder_upper_1
+
+    # Second run: a brand-new client "kaiser_2" is added — its natural sanitized
+    # name collides with whatever suffix the first run picked for "Kaiser".
+    rows_c = [_meta_row(f"c{i:02d}", "imperial", "kaiser_2", "Project") for i in range(3)]
+    segs2 = _build_segments(rows_a + rows_b + rows_c, min_files=1)
+    reg2 = _build_registry(segs2, existing_registry=reg1)
+
+    folder_lower_2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|kaiser")["output_folder"]
+    folder_upper_2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")["output_folder"]
+    folder_new_2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|kaiser_2")["output_folder"]
+
+    # Pre-existing segments keep their prior folder names untouched.
+    assert folder_lower_2 == folder_lower_1
+    assert folder_upper_2 == folder_upper_1
+    # All three are distinct.
+    assert len({folder_lower_2, folder_upper_2, folder_new_2}) == 3
+
+
+def test_registry_drops_removed_segment_ids_with_warning(capsys):
+    rows_full = ROWS  # includes both imperial|Kaiser and imperial|Renown
+    segs1 = _build_segments(rows_full, min_files=3)
+    reg1 = _build_registry(segs1)
+    assert any(r["segment_id"] == "imperial|Project|Renown" for r in reg1)
+
+    rows_dropped = [r for r in rows_full if r.get("client_label") != "Renown"]
+    segs2 = _build_segments(rows_dropped, min_files=3)
+    reg2 = _build_registry(segs2, existing_registry=reg1)
+
+    reg2_ids = {r["segment_id"] for r in reg2}
+    assert "imperial|Project|Renown" not in reg2_ids
+    assert "imperial|Renown" not in reg2_ids
+
+    captured = capsys.readouterr()
+    assert "imperial|Project|Renown" in captured.err or "imperial|Renown" in captured.err
+
+
 def test_client_discipline_leaf_no_empty_purpose():
     # No level-4 client+discipline segment should have an empty segment_purpose.
     segs = _build_segments(_disc_rows(), min_files=3)

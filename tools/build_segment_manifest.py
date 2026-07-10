@@ -249,31 +249,89 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
 
 # preserve remaining functions from original manually omitted
 
-def _build_registry(manifest_rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    registry = []
+def _build_registry(
+    manifest_rows: List[Dict[str, str]],
+    existing_registry: List[Dict[str, str]] | None = None,
+) -> List[Dict[str, str]]:
+    """Build run_registry.csv rows from freshly computed manifest rows.
+
+    When existing_registry is supplied, prior segment_id -> output_folder
+    mappings are reused verbatim (folder-name stability across runs), and
+    status/last_run_utc are carried over unless population_hash changed for
+    that segment_id (population-hash-based incremental skip).
+    """
+    existing_by_id: Dict[str, Dict[str, str]] = {}
+    if existing_registry:
+        for row in existing_registry:
+            sid = (row.get("segment_id") or "").strip()
+            if sid:
+                existing_by_id[sid] = row
+
+    eligible_rows = [r for r in manifest_rows if r["run_type"] in {"bundle", "reference"}]
+    new_ids = {r["segment_id"] for r in eligible_rows}
+
+    # Reserve folders already owned by carried-over segments before assigning
+    # any folder to a genuinely new segment, so new assignments never collide
+    # with a prior run's folder regardless of row order in this batch.
     assigned_folders: set = set()
-    for row in manifest_rows:
-        if row["run_type"] not in {"bundle", "reference"}:
-            continue
-        base = _sanitize_folder(row["segment_id"])
-        folder = base
-        n = 2
-        while folder in assigned_folders:
-            folder = f"{base}_{n}"
-            n += 1
-        assigned_folders.add(folder)
-        registry.append({
-            "segment_id": row["segment_id"],
-            "parent_segment_id": row["parent_segment_id"],
-            "run_type": row["run_type"],
-            "population_hash": row["population_hash"],
-            "output_folder": folder,
-            "status": "pending",
-            "last_run_utc": "",
-            "notes": row.get("notes", ""),
-            "segment_purpose": row.get("segment_purpose", ""),
-            "segment_label": row.get("segment_label", ""),
-        })
+    for r in eligible_rows:
+        old = existing_by_id.get(r["segment_id"])
+        if old is not None:
+            assigned_folders.add(old.get("output_folder", ""))
+
+    registry = []
+    for row in eligible_rows:
+        sid = row["segment_id"]
+        old = existing_by_id.get(sid)
+        if old is not None:
+            folder = old.get("output_folder", "") or _sanitize_folder(sid)
+            reg_row = {
+                "segment_id": sid,
+                "parent_segment_id": row["parent_segment_id"],
+                "run_type": row["run_type"],
+                "population_hash": row["population_hash"],
+                "output_folder": folder,
+                "status": old.get("status", "pending"),
+                "last_run_utc": old.get("last_run_utc", ""),
+                "notes": old.get("notes", ""),
+                "segment_purpose": row.get("segment_purpose", ""),
+                "segment_label": row.get("segment_label", ""),
+            }
+            if old.get("population_hash", "") != row["population_hash"]:
+                reg_row["status"] = "pending"
+                reg_row["last_run_utc"] = ""
+                reg_row["notes"] = row.get("notes", "")
+                _append_note(reg_row, "population_changed")
+        else:
+            base = _sanitize_folder(sid)
+            folder = base
+            n = 2
+            while folder in assigned_folders:
+                folder = f"{base}_{n}"
+                n += 1
+            assigned_folders.add(folder)
+            reg_row = {
+                "segment_id": sid,
+                "parent_segment_id": row["parent_segment_id"],
+                "run_type": row["run_type"],
+                "population_hash": row["population_hash"],
+                "output_folder": folder,
+                "status": "pending",
+                "last_run_utc": "",
+                "notes": row.get("notes", ""),
+                "segment_purpose": row.get("segment_purpose", ""),
+                "segment_label": row.get("segment_label", ""),
+            }
+        registry.append(reg_row)
+
+    dropped_ids = sorted(set(existing_by_id) - new_ids)
+    if dropped_ids:
+        sys.stderr.write(
+            f"[WARN] Segment(s) removed from registry (no longer in manifest): "
+            f"{', '.join(dropped_ids)} — review corresponding folders under segments/ "
+            f"for manual cleanup\n"
+        )
+
     return registry
 
 
@@ -389,10 +447,14 @@ def main(argv: List[str] | None = None) -> int:
         if len(segs) > 1:
             sys.stderr.write(f"[WARN] Duplicate bundle population_hash {pop_hash}: {', '.join(sorted(segs))}\n")
 
-    registry_rows = _build_registry(manifest_rows)
-
     manifest_path = out_dir / "segment_manifest.csv"
     registry_path = out_dir / "run_registry.csv"
+
+    existing_registry_rows: List[Dict[str, str]] | None = None
+    if registry_path.is_file():
+        _, existing_registry_rows = _read_csv(registry_path)
+
+    registry_rows = _build_registry(manifest_rows, existing_registry=existing_registry_rows)
 
     _atomic_write_csv(manifest_path, MANIFEST_FIELDNAMES, manifest_rows)
     _atomic_write_csv(registry_path, REGISTRY_FIELDNAMES, registry_rows)
