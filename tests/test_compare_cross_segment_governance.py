@@ -107,6 +107,36 @@ def test_discover_governance_chain_prefers_business_center_label_over_collection
     assert ("acme_t", "acme_p", "template_to_project") in pairs
 
 
+def test_discover_governance_chain_namespaces_business_center_fallback_from_real_client():
+    # A real client whose name happens to match a business_center_label text
+    # (e.g. both literally "BC_2270") must not be pooled with the
+    # business-center-scoped rows that fall back to that same text via
+    # business_center_label. client_label and business_center_label are
+    # distinct cut dimensions with independent namespaces.
+    manifest = {
+        "bc_t": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_2270",
+        },
+        "bc_c": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_2270",
+        },
+        "real_client_t": _seg("Template", client="BC_2270"),
+        "real_client_p": _seg("Project", client="BC_2270"),
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # The business-center rows still group with each other.
+    assert ("bc_t", "bc_c", "template_to_container") in pairs
+    # The real "BC_2270" client rows still group with each other.
+    assert ("real_client_t", "real_client_p", "template_to_project") in pairs
+    # But the two namespaces must never cross-pollinate despite sharing text.
+    assert ("bc_t", "real_client_p", "template_to_project") not in pairs
+    assert ("real_client_t", "bc_c", "template_to_container") not in pairs
+
+
 def test_project_target_governance_state_uses_target_used():
     assert _usage_interpretable_for_role("Project") is True
     assert _recommended_primary_view("Template", "Project", "template_to_project") == "used"
