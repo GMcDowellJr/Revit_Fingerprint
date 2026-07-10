@@ -26,13 +26,18 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 - `tools/run_segment_orchestrator.py --dry-run` now prints each pending segment's
   registry `notes` (the staleness reason) alongside its status.
 - `tools/compare_cross_segment.py` now writes `comparison_registry.csv` after every
-  run: one row per discovered (segment_a, segment_b, comparison_type) pair, stamped
-  with each side's `population_hash`/`last_run_utc` (read from `run_registry.csv`) and
-  `computed_utc`. This is new tracking state only — comparisons are still always
-  fully recomputed on every invocation; nothing is skipped based on this registry.
-  `--dry-run` now looks up each discovered pair against this registry and labels it
-  `stale` (never computed, or either side's stamp has moved since — this is how a
-  Template/Container reference re-running with new bundle output is surfaced as
+  run: one row per actually-recomputed (segment_a, segment_b, comparison_type,
+  domain) work item, stamped with each side's `population_hash`/`last_run_utc`
+  (read from `run_registry.csv`) and `computed_utc`. Keyed at the domain granularity
+  matching `work_items`, not the coarser pair — a `--domain`-scoped invocation only
+  recomputes one domain per pair, so stamping at pair granularity would silently
+  mark every other domain on that pair "current" without having recomputed it,
+  hiding real staleness from a later `--dry-run`. This is new tracking state
+  only — comparisons are still always fully recomputed on every invocation; nothing
+  is skipped based on this registry. `--dry-run` now looks up each discovered
+  (pair, domain) work item against this registry and labels it `stale` (never
+  computed, or either side's stamp has moved since — this is how a Template/
+  Container reference re-running with new bundle output is surfaced as
   invalidating its downstream Project/Container comparisons, even though the
   target's own file population is unchanged) or `current`.
 

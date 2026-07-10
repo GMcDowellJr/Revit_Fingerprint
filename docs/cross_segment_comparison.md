@@ -532,22 +532,23 @@ Container caution: this reporting layer does not introduce container authority r
 
 ## 11. comparison_registry.csv — staleness tracking (not a cache)
 
-`tools/compare_cross_segment.py` has no cached results of its own: every invocation recomputes every discovered pair from whatever is currently on disk under `segments/`. `comparison_registry.csv` exists purely so a caller can tell *which* pairs are worth recomputing before spending the time, and to make the segment-staleness model's parent-dependency propagation ("a Template re-runs and produces new bundle output → any Project whose conformance comparison reads it is stale, even though the Project's own file population is unchanged") visible somewhere concrete. It is written unconditionally at the end of every non-dry-run invocation (never during `--dry-run`) and is never consulted to skip computation.
+`tools/compare_cross_segment.py` has no cached results of its own: every invocation recomputes whatever (pair × domain) work items it is given (`build_pair_domain_work_items`), from whatever is currently on disk under `segments/`. `comparison_registry.csv` exists purely so a caller can tell *which* pair×domain comparisons are worth recomputing before spending the time, and to make the segment-staleness model's parent-dependency propagation ("a Template re-runs and produces new bundle output → any Project whose conformance comparison reads it is stale, even though the Project's own file population is unchanged") visible somewhere concrete. It is written unconditionally at the end of every non-dry-run invocation (never during `--dry-run`) and is never consulted to skip computation.
 
-One row per discovered `(segment_id_a, segment_id_b, comparison_type)` pair:
+One row per actually-recomputed `(segment_id_a, segment_id_b, comparison_type, domain)` work item — the same granularity as `work_items`, not the coarser `(segment_id_a, segment_id_b, comparison_type)` pair. This matters for scoped invocations: a `--domain line_patterns` run only recomputes `line_patterns` for each discovered pair, so stamping at pair granularity would silently mark every *other* domain on that pair "current" without having recomputed it — hiding real staleness from a later `--dry-run`. Keying on domain means a `--domain`-scoped run only refreshes the domains it actually touched; every other domain for the same pair keeps its previously recorded stamp.
 
 | Column | Description |
 |---|---|
 | `segment_id_a` / `segment_id_b` | The pair, in the same orientation as `cross_segment_summary.csv`. |
 | `comparison_type` | One of the comparison_type values from section 2. |
-| `population_hash_a` / `population_hash_b` | Each side's `population_hash` from `run_registry.csv`, captured at the moment this pair was last actually computed. |
+| `domain` | The domain this stamp applies to. |
+| `population_hash_a` / `population_hash_b` | Each side's `population_hash` from `run_registry.csv`, captured at the moment this (pair, domain) was last actually computed. |
 | `last_run_utc_a` / `last_run_utc_b` | Each side's `last_run_utc` from `run_registry.csv`, captured at the same moment. Present in addition to `population_hash` because a `--force` segment re-run (e.g. after a sig_hash/join_hash policy change) can regenerate bundle output without the population itself changing. |
 | `conformance_reference_mode` | Copied from segment_a's `run_registry.csv` row at compute time. Currently always `"latest"` — see section below. |
-| `computed_utc` | When this pair was last actually computed by `compare_cross_segment.py`. |
+| `computed_utc` | When this (pair, domain) was last actually computed by `compare_cross_segment.py`. |
 
-A pair not recomputed by the current invocation (e.g. a `--segment-a`/`--domain`-filtered run) keeps its prior row untouched rather than being dropped, mirroring how `_build_registry()` in `build_segment_manifest.py` carries over segments it didn't touch.
+A (pair, domain) not recomputed by the current invocation (e.g. a `--segment-a`/`--domain`-scoped run touches only a subset of domains for a pair) keeps its prior row untouched rather than being dropped or refreshed, mirroring how `_build_registry()` in `build_segment_manifest.py` carries over segments it didn't touch.
 
-`--dry-run` looks up every discovered pair against this registry and labels it `stale` (no prior row, or either side's `population_hash`/`last_run_utc` has moved since) or `current`. This is the run-plan view of propagated staleness for comparisons specifically — it is intentionally separate from `run_segment_orchestrator.py --dry-run`, which shows which *segments* need to re-run their own patterns/bundle stage. The two are different questions: a segment's own patterns/bundle output is self-contained and never depends on another segment's output, so a Template re-running never obligates a Project to re-run its patterns/bundle stage — it only obligates the *comparison* between them to be recomputed.
+`--dry-run` looks up every discovered (pair, domain) work item against this registry and labels it `stale` (no prior row, or either side's `population_hash`/`last_run_utc` has moved since) or `current`. This is the run-plan view of propagated staleness for comparisons specifically — it is intentionally separate from `run_segment_orchestrator.py --dry-run`, which shows which *segments* need to re-run their own patterns/bundle stage. The two are different questions: a segment's own patterns/bundle output is self-contained and never depends on another segment's output, so a Template re-running never obligates a Project to re-run its patterns/bundle stage — it only obligates the *comparison* between them to be recomputed.
 
 ### conformance_reference_mode
 
