@@ -25,7 +25,7 @@ if ($Run -eq "") {
     Write-Host "  .\corpus_update_runbook.ps1 -Run C    # segments + all/used bundle analysis (use compare_cross_segment.py for cross-segment comparison)"
     Write-Host "  .\corpus_update_runbook.ps1 -Run C -ForceAll   # Run C, but re-run every segment regardless of registry status"
     Write-Host ""
-    Write-Host "  -ForceAll (Run C only): registry-driven skip is the default — a segment is"
+    Write-Host "  -ForceAll (Run C only): registry-driven skip is the default - a segment is"
     Write-Host "    re-run only if its file population changed since the last complete run."
     Write-Host "    Pass -ForceAll after a sig_hash/join_hash policy change (population_hash is"
     Write-Host "    membership-only and cannot detect those) to force a full-corpus rebuild."
@@ -91,7 +91,7 @@ if ($Run -eq "C") {
         --enable-parent-bundle-runs
 
     # C1.5: latent_purgeable.csv is created once and cached forever by
-    # _ensure_latent_purgeable() in run_bundle_analysis.py — it does NOT
+    # _ensure_latent_purgeable() in run_bundle_analysis.py - it does NOT
     # refresh on its own when upstream records/identity_items change.
     # Only clear it on a -ForceAll full-corpus rebuild: registry-driven skip
     # (default) leaves untouched segments' cached data alone, since orchestrator

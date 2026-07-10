@@ -315,8 +315,13 @@ def _build_registry(
 
     When existing_registry is supplied, prior segment_id -> output_folder
     mappings are reused verbatim (folder-name stability across runs), and
-    status/last_run_utc are carried over unless population_hash changed for
-    that segment_id (population-hash-based incremental skip).
+    status/last_run_utc are carried over unless population_hash or run_type
+    changed for that segment_id (population-hash-based incremental skip).
+    A run_type change (e.g. a --min-files threshold change turning a
+    "reference" segment into a "bundle" with the same file population) must
+    also reset status, since population_hash alone would miss it and the
+    orchestrator would keep skipping a segment that now needs a different
+    analysis to be produced.
     """
     existing_by_id: Dict[str, Dict[str, str]] = {}
     if existing_registry:
@@ -328,14 +333,18 @@ def _build_registry(
     eligible_rows = [r for r in manifest_rows if r["run_type"] in {"bundle", "reference"}]
     new_ids = {r["segment_id"] for r in eligible_rows}
 
-    # Reserve folders already owned by carried-over segments before assigning
-    # any folder to a genuinely new segment, so new assignments never collide
-    # with a prior run's folder regardless of row order in this batch.
+    # Reserve every folder the old registry ever assigned — carried-over AND
+    # dropped segments alike — before assigning any folder to a genuinely new
+    # segment. A dropped segment's directory under segments/ still holds its
+    # old records/markers/analysis output (the caller is only warned to review
+    # it for manual cleanup, not to delete it), so a new segment must never be
+    # handed that same folder name — it would start writing into a directory
+    # still full of a different segment's stale data.
     assigned_folders: set = set()
-    for r in eligible_rows:
-        old = existing_by_id.get(r["segment_id"])
-        if old is not None:
-            assigned_folders.add(old.get("output_folder", ""))
+    for old_row in existing_by_id.values():
+        of = old_row.get("output_folder", "")
+        if of:
+            assigned_folders.add(of)
 
     registry = []
     for row in eligible_rows:
@@ -355,11 +364,16 @@ def _build_registry(
                 "segment_purpose": row.get("segment_purpose", ""),
                 "segment_label": row.get("segment_label", ""),
             }
-            if old.get("population_hash", "") != row["population_hash"]:
+            population_changed = old.get("population_hash", "") != row["population_hash"]
+            run_type_changed = old.get("run_type", "") != row["run_type"]
+            if population_changed or run_type_changed:
                 reg_row["status"] = "pending"
                 reg_row["last_run_utc"] = ""
                 reg_row["notes"] = row.get("notes", "")
-                _append_note(reg_row, "population_changed")
+                if population_changed:
+                    _append_note(reg_row, "population_changed")
+                if run_type_changed:
+                    _append_note(reg_row, "run_type_changed", f"{old.get('run_type', '')}->{row['run_type']}")
         else:
             base = _sanitize_folder(sid)
             folder = base

@@ -732,6 +732,69 @@ def test_registry_new_segment_gets_unique_folder_not_colliding_with_carryover():
     assert len({folder_a_2, folder_b_2, folder_new_2}) == 3
 
 
+def _manifest_row(segment_id, run_type="bundle", population_hash="h1", parent="", notes="", purpose="", label=""):
+    """Hand-craft a manifest-row-shaped dict for testing _build_registry() in
+    isolation, without routing through _build_segments()."""
+    return {
+        "segment_id": segment_id, "parent_segment_id": parent, "run_type": run_type,
+        "population_hash": population_hash, "notes": notes,
+        "segment_purpose": purpose, "segment_label": label,
+    }
+
+
+def test_registry_resets_status_when_run_type_changes():
+    # population_hash alone must not be the only staleness signal — a
+    # run_type change (e.g. lowering --min-files turns a "reference" segment
+    # into a "bundle" for the same file population) must also reset status,
+    # otherwise the orchestrator keeps skipping a segment that now needs a
+    # different analysis to be produced.
+    segs = _build_segments(ROWS, min_files=3)
+    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser["run_type"] == "bundle"
+
+    reg1 = _build_registry(segs)
+    for r in reg1:
+        if r["segment_id"] == "imperial|Project|Kaiser":
+            r["status"] = "complete"
+            r["last_run_utc"] = "2026-01-01T00:00:00Z"
+
+    segs2 = [dict(r) for r in segs]
+    for r in segs2:
+        if r["segment_id"] == "imperial|Project|Kaiser":
+            r["run_type"] = "reference"  # same population_hash, different run_type
+
+    reg2 = _build_registry(segs2, existing_registry=reg1)
+    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser2["population_hash"] == kaiser["population_hash"]
+    assert kaiser2["status"] == "pending"
+    assert kaiser2["last_run_utc"] == ""
+    assert "run_type_changed" in kaiser2["notes"]
+    # Folder name must remain stable even though status reset.
+    kaiser1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser2["output_folder"] == kaiser1["output_folder"]
+
+
+def test_registry_reserves_dropped_segment_folder_from_new_reuse():
+    # A dropped segment's directory under segments/ still holds its old
+    # records/markers/analysis output (the caller is only warned to review it
+    # for manual cleanup, not to delete it) — a new segment must never be
+    # silently handed that same folder name.
+    old_manifest = [_manifest_row("imperial|Project|OldClient", population_hash="h1")]
+    reg1 = _build_registry(old_manifest)
+    old_row = next(r for r in reg1 if r["segment_id"] == "imperial|Project|OldClient")
+    assert old_row["output_folder"] == "imperial_project_oldclient"
+
+    # OldClient is dropped entirely; a different, unrelated new segment
+    # happens to sanitize to the exact same folder base (distinct separator
+    # characters both collapse to "_" under _sanitize_folder).
+    new_manifest = [_manifest_row("imperial|Project OldClient", population_hash="h2")]
+    reg2 = _build_registry(new_manifest, existing_registry=reg1)
+
+    assert not any(r["segment_id"] == "imperial|Project|OldClient" for r in reg2)
+    new_row = next(r for r in reg2 if r["segment_id"] == "imperial|Project OldClient")
+    assert new_row["output_folder"] != "imperial_project_oldclient"
+
+
 def test_registry_drops_removed_segment_ids_with_warning(capsys):
     rows_full = ROWS  # includes both imperial|Kaiser and imperial|Renown
     segs1 = _build_segments(rows_full, min_files=3)
