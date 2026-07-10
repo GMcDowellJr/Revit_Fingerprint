@@ -944,3 +944,128 @@ def test_clean_corpus_unaffected_by_normalization():
     assert "imperial|Kaiser" in seg_ids
     assert "imperial|Renown" in seg_ids
     assert "metric|Global" in seg_ids
+
+
+# ---------------------------------------------------------------------------
+# Staleness reasons + conformance_reference_mode
+# ---------------------------------------------------------------------------
+
+def test_conformance_reference_mode_defaults_to_latest_for_new_segment():
+    segs = _build_segments(ROWS, min_files=3)
+    reg = _build_registry(segs)
+    kaiser = next(r for r in reg if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser["conformance_reference_mode"] == "latest"
+
+
+def test_conformance_reference_mode_carried_over_across_runs():
+    segs = _build_segments(ROWS, min_files=3)
+    reg1 = _build_registry(segs)
+    reg2 = _build_registry(segs, existing_registry=reg1)
+    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser2["conformance_reference_mode"] == "latest"
+
+
+def test_conformance_reference_mode_defaults_to_latest_for_old_registry_missing_field():
+    # Simulate a registry written before this field existed: DictReader on an
+    # older CSV yields no "conformance_reference_mode" key at all.
+    segs = _build_segments(ROWS, min_files=3)
+    reg1 = _build_registry(segs)
+    for r in reg1:
+        r.pop("conformance_reference_mode", None)
+    reg2 = _build_registry(segs, existing_registry=reg1)
+    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser2["conformance_reference_mode"] == "latest"
+
+
+def test_registry_persists_export_run_ids():
+    segs = _build_segments(ROWS, min_files=3)
+    reg = _build_registry(segs)
+    kaiser = next(r for r in reg if r["segment_id"] == "imperial|Project|Kaiser")
+    assert kaiser["export_run_ids"] == "r01|r02|r03"
+
+
+def test_registry_new_files_reason_when_file_added():
+    segs1 = _build_segments(ROWS, min_files=3)
+    reg1 = _build_registry(segs1)
+
+    rows2 = ROWS + [_meta_row("r11", "imperial", "Kaiser", "Project")]
+    segs2 = _build_segments(rows2, min_files=3)
+    reg2 = _build_registry(segs2, existing_registry=reg1)
+    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+
+    assert "population_changed" in kaiser2["notes"]
+    assert "new_files:1" in kaiser2["notes"]
+    assert "removed_files" not in kaiser2["notes"]
+
+
+def test_registry_removed_files_reason_when_file_removed():
+    # Kaiser needs more than min_files here so removing one file doesn't also
+    # cross the min_files threshold and flip run_type to "skip" (which would
+    # drop the segment from the registry entirely rather than mark it stale).
+    rows1 = ROWS + [_meta_row("r12", "imperial", "Kaiser", "Project")]
+    segs1 = _build_segments(rows1, min_files=3)
+    reg1 = _build_registry(segs1)
+
+    rows2 = [r for r in rows1 if r["export_run_id"] != "r03"]
+    segs2 = _build_segments(rows2, min_files=3)
+    reg2 = _build_registry(segs2, existing_registry=reg1)
+    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+
+    assert "population_changed" in kaiser2["notes"]
+    assert "removed_files:1" in kaiser2["notes"]
+    assert "new_files" not in kaiser2["notes"]
+
+
+def test_registry_both_new_and_removed_files_reasons_when_combined_change():
+    rows1 = ROWS + [_meta_row("r12", "imperial", "Kaiser", "Project")]
+    segs1 = _build_segments(rows1, min_files=3)
+    reg1 = _build_registry(segs1)
+
+    # Swap r03 out for a new file r11 in the same segment in one run.
+    rows2 = [r for r in rows1 if r["export_run_id"] != "r03"] + [
+        _meta_row("r11", "imperial", "Kaiser", "Project")
+    ]
+    segs2 = _build_segments(rows2, min_files=3)
+    reg2 = _build_registry(segs2, existing_registry=reg1)
+    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+
+    assert "population_changed" in kaiser2["notes"]
+    assert "new_files:1" in kaiser2["notes"]
+    assert "removed_files:1" in kaiser2["notes"]
+
+
+def test_registry_new_files_reason_does_not_cause_false_removal_warnings(capsys):
+    # Regression guard: diffing export_run_ids inside the population_changed
+    # branch must not clobber the outer new_ids (segment_id set) used later
+    # for dropped_ids — otherwise a plain file add to one segment would make
+    # every other still-present segment look "removed" and trigger a false
+    # cleanup warning.
+    segs1 = _build_segments(ROWS, min_files=3)
+    reg1 = _build_registry(segs1)
+
+    rows2 = ROWS + [_meta_row("r11", "imperial", "Kaiser", "Project")]
+    segs2 = _build_segments(rows2, min_files=3)
+    reg2 = _build_registry(segs2, existing_registry=reg1)
+
+    reg2_ids = {r["segment_id"] for r in reg2}
+    reg1_ids = {r["segment_id"] for r in reg1}
+    assert reg1_ids <= reg2_ids, "no segment should appear removed when only a file was added"
+
+    captured = capsys.readouterr()
+    assert "removed from registry" not in captured.err
+
+
+def test_registry_no_reason_notes_for_brand_new_segment():
+    # A segment that didn't exist in the prior registry is "new", not "stale" —
+    # it must not carry population_changed/new_files/removed_files reasons.
+    segs1 = _build_segments(ROWS, min_files=3)
+    reg1 = _build_registry(segs1)
+
+    rows2 = ROWS + [_meta_row(f"z{i:02d}", "imperial", "Zenith", "Project") for i in range(3)]
+    segs2 = _build_segments(rows2, min_files=3)
+    reg2 = _build_registry(segs2, existing_registry=reg1)
+    zenith = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Zenith")
+
+    assert "population_changed" not in zenith["notes"]
+    assert "new_files" not in zenith["notes"]
+    assert "removed_files" not in zenith["notes"]

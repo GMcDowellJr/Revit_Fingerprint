@@ -11,7 +11,70 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Added
+- Segment staleness model extended (build_segment_manifest.py `_build_registry()`):
+  `run_registry.csv` gains `export_run_ids` (persisted per-run member list, enabling
+  next-run diffing) and `conformance_reference_mode` (currently always `"latest"` —
+  compare_cross_segment.py always resolves reference segments dynamically against
+  current output; a pinned/snapshot mode is deferred until Phase-2 baseline authority
+  is established). When `population_hash` changes, the registry now records
+  `new_files:<n>` and/or `removed_files:<n>` reason counts alongside the existing
+  `population_changed` marker, diffed against the prior run's `export_run_ids`. A
+  metadata edit that moves a file between segments (e.g. a corrected `client_label`)
+  surfaces as `removed_files` on the old segment and `new_files` on the new one —
+  no separate "metadata change" detection path was needed or added.
+- `tools/run_segment_orchestrator.py --dry-run` now prints each pending segment's
+  registry `notes` (the staleness reason) alongside its status.
+- `tools/compare_cross_segment.py` now writes `comparison_registry.csv` after every
+  run: one row per actually-recomputed (segment_a, segment_b, comparison_type,
+  domain) work item, stamped with each side's `population_hash`/`last_run_utc`
+  (read from `run_registry.csv`) and `computed_utc`. Keyed at the domain granularity
+  matching `work_items`, not the coarser pair — a `--domain`-scoped invocation only
+  recomputes one domain per pair, so stamping at pair granularity would silently
+  mark every other domain on that pair "current" without having recomputed it,
+  hiding real staleness from a later `--dry-run`. This is new tracking state
+  only — comparisons are still always fully recomputed on every invocation; nothing
+  is skipped based on this registry. `--dry-run` now looks up each discovered
+  (pair, domain) work item against this registry and labels it `stale` (never
+  computed, or either side's stamp has moved since — this is how a Template/
+  Container reference re-running with new bundle output is surfaced as
+  invalidating its downstream Project/Container comparisons, even though the
+  target's own file population is unchanged) or `current`.
+
 ### Fixed
+- `tools/compare_cross_segment.py` `comparison_registry.csv`: a (pair, domain) is now
+  also omitted from the stamp if either side's `run_registry.csv` `status` is not
+  `"complete"`. `build_segment_manifest.py` updates `population_hash` to a segment's
+  new file population immediately on manifest rebuild, resetting `status` to
+  `"pending"` (and clearing `last_run_utc`) until the orchestrator actually re-runs
+  that segment — but its output folder on disk still holds the *old* population's
+  results until then. A compare run in that window read the stale on-disk data yet
+  got stamped with the segment's already-updated (new) `population_hash`; once the
+  segment reached `"complete"` with that same hash, a later `--dry-run` would have
+  wrongly reported the pair as already current.
+- `tools/compare_cross_segment.py` `comparison_registry.csv`: removed the carryover of
+  prior (pair, domain) entries not recomputed this run, and stopped stamping work
+  items that produced no output. Every other output this tool writes
+  (`cross_segment_summary.csv` etc.) is a full `atomic_write_csv` replace from only
+  the current invocation's rows, never a merge — so a `--domain`/`--segment`-scoped
+  run sharing the same `--out-dir` as an earlier full run already destroys those
+  other domains'/pairs' output rows. Carrying their old `comparison_registry.csv`
+  stamp forward falsely claimed that data was still current. The registry is now a
+  full snapshot of only what this invocation actually produced: a scoped run leaves
+  every non-recomputed (pair, domain) with no row at all (correctly staleness-flagged
+  on the next `--dry-run`), and a work item where `run_pair()`/`_run_pair_domain()`
+  returned `None` with no governance-state rows either (e.g. below `--min-patterns`,
+  or a within-project pair with no eligible file pairs) is omitted rather than
+  stamped current for output that was never written.
+- `build_segment_manifest.py` `_build_registry()`: the new `new_files`/`removed_files`
+  reason diff reused the name `new_ids` for the per-segment export_run_id diff,
+  shadowing the outer `new_ids` (the full eligible segment_id set) used later to
+  compute `dropped_ids`. Any retained segment whose population changed left
+  `new_ids` holding export_run_ids instead of segment_ids, so every other
+  still-present segment was reported as removed from the registry with a false
+  "review corresponding folders for manual cleanup" warning. Renamed the
+  per-segment locals to `old_export_ids`/`new_export_ids` so they no longer
+  collide with the outer set.
 - line_patterns sig_hash policy corrected to segments_def_hash (sig_hash.v2):
   segments_norm_hash was incorrectly used as sig_hash basis — it belongs in join_hash only.
   sig_hash answers exact identity (scale variants are distinct records);

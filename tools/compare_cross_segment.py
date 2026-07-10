@@ -195,6 +195,14 @@ DELTA_FIELDS: List[str] = [
     "executed_utc",
 ]
 
+COMPARISON_REGISTRY_FIELDS: List[str] = [
+    "segment_id_a", "segment_id_b", "comparison_type", "domain",
+    "population_hash_a", "population_hash_b",
+    "last_run_utc_a", "last_run_utc_b",
+    "conformance_reference_mode",
+    "computed_utc",
+]
+
 POOLED_FIELDS: List[str] = [
     "comparison_run_id",
     "segment_id", "segment_label",
@@ -535,6 +543,142 @@ def load_file_metadata(records_dir: Path) -> Dict[str, Dict[str, str]]:
         print(f"[warn] file_metadata.csv not found at {path}", file=sys.stderr)
         return {}
     return {row["export_run_id"]: row for row in read_csv_rows(path)}
+
+
+# ---------------------------------------------------------------------------
+# Comparison staleness registry
+#
+# compare_cross_segment.py has no cached results of its own — every invocation
+# recomputes whatever (pair × domain) work items it is given, from whatever is
+# currently on disk under segments/. comparison_registry.csv exists purely to
+# let a run-plan preview (--dry-run below) tell a caller *which* pair×domain
+# comparisons are worth recomputing, by recording each side's
+# population_hash/last_run_utc (from run_registry.csv) at the moment that
+# specific (pair, domain) was last actually computed. It is not consulted to
+# skip computation — a live run always recomputes every work item it is given.
+#
+# Keyed on (segment_id_a, segment_id_b, comparison_type, domain) — matching
+# the actual work granularity (work_items from build_pair_domain_work_items),
+# not just the pair. A --domain-scoped invocation only recomputes one domain
+# per pair; stamping at pair granularity would mark every other domain for
+# that pair "current" without having recomputed it, hiding real staleness in
+# a later --dry-run.
+#
+# The file is a full snapshot of this invocation only — never merged with a
+# prior comparison_registry.csv — matching every other output this tool
+# writes (cross_segment_summary.csv etc. are always a full atomic_write_csv
+# replace, never a merge). A --domain/--segment-scoped run sharing the same
+# --out-dir as an earlier full run already destroys those other domains'
+# output rows; carrying their old registry stamp forward would falsely claim
+# they are still current. Only (pair, domain) work items that actually
+# produced a persisted output row this run are written.
+# ---------------------------------------------------------------------------
+
+ComparisonRegistryKey = Tuple[str, str, str, str]  # (seg_a, seg_b, comparison_type, domain)
+
+
+def load_comparison_registry(out_dir: Path) -> Dict[ComparisonRegistryKey, Dict[str, str]]:
+    path = out_dir / "comparison_registry.csv"
+    if not path.exists():
+        return {}
+    result: Dict[ComparisonRegistryKey, Dict[str, str]] = {}
+    for row in read_csv_rows(path):
+        key = (
+            row.get("segment_id_a", ""), row.get("segment_id_b", ""),
+            row.get("comparison_type", ""), row.get("domain", ""),
+        )
+        result[key] = row
+    return result
+
+
+def _segment_status_complete(registry: Dict[str, Dict[str, str]], segment_id: str) -> bool:
+    return registry.get(segment_id, {}).get("status", "").strip().lower() == "complete"
+
+
+def build_comparison_registry_rows(
+    completed_work_items: Sequence[Tuple[str, str, str, str]],
+    registry: Dict[str, Dict[str, str]],
+    computed_utc: str,
+) -> List[Dict[str, str]]:
+    """Return comparison_registry.csv rows: a fresh stamp for every (pair,
+    domain) that actually produced output this run (`completed_work_items`)
+    where both sides' run_registry.csv status is "complete".
+
+    Deliberately no carryover of prior comparison_registry.csv rows: every
+    other output this tool writes (cross_segment_summary.csv,
+    cross_segment_file_pairs.csv, ...) is a full atomic_write_csv replace from
+    only this invocation's rows, not a merge — a --domain/--segment-scoped run
+    sharing the same --out-dir as an earlier full run already destroys those
+    other domains'/pairs' output rows. Carrying their old comparison_registry
+    stamp forward would claim they are still "current" when the data backing
+    that claim no longer exists on disk. comparison_registry.csv must mirror
+    the same full-snapshot-of-this-run semantics, so a scoped run correctly
+    makes every non-recomputed (pair, domain) report as stale (no recorded
+    stamp) on the next --dry-run — matching reality.
+
+    Only work items that actually produced a persisted output row are
+    included — `run_pair()`/`_run_pair_domain()` returning None (e.g. a domain
+    below --min-patterns, or a within-project pair with no eligible file
+    pairs) must not get a fresh "current" stamp for output that was never
+    written.
+
+    A (pair, domain) is also excluded if either side's registry status is not
+    "complete". build_segment_manifest.py updates population_hash to reflect
+    a segment's new file population immediately on manifest rebuild, resetting
+    status to "pending" (and clearing last_run_utc) until the orchestrator
+    actually re-runs that segment — but its output folder on disk still holds
+    the OLD population's results until then. A compare run in that window
+    reads the stale on-disk data yet would otherwise get stamped with the
+    segment's already-updated (new) population_hash, so once the segment
+    finally reaches "complete" with that same hash, a later --dry-run would
+    wrongly report the pair as already current."""
+    rows: List[Dict[str, str]] = []
+    for a, b, ctype, dom in completed_work_items:
+        if not (_segment_status_complete(registry, a) and _segment_status_complete(registry, b)):
+            continue
+        rec_a = registry.get(a, {})
+        rec_b = registry.get(b, {})
+        rows.append({
+            "segment_id_a": a,
+            "segment_id_b": b,
+            "comparison_type": ctype,
+            "domain": dom,
+            "population_hash_a": rec_a.get("population_hash", ""),
+            "population_hash_b": rec_b.get("population_hash", ""),
+            "last_run_utc_a": rec_a.get("last_run_utc", ""),
+            "last_run_utc_b": rec_b.get("last_run_utc", ""),
+            "conformance_reference_mode": rec_a.get("conformance_reference_mode", "") or "latest",
+            "computed_utc": computed_utc,
+        })
+    return rows
+
+
+def comparison_is_stale(
+    seg_a: str,
+    seg_b: str,
+    comparison_type: str,
+    domain: str,
+    registry: Dict[str, Dict[str, str]],
+    comparison_registry: Dict[ComparisonRegistryKey, Dict[str, str]],
+) -> bool:
+    """True if this (pair, domain) has never been computed, or either side's
+    population_hash/last_run_utc has moved since it was last computed —
+    including a Template/Container reference re-running and producing new
+    bundle output with the target's own population unchanged."""
+    prior = comparison_registry.get((seg_a, seg_b, comparison_type, domain))
+    if prior is None:
+        return True
+    rec_a = registry.get(seg_a, {})
+    rec_b = registry.get(seg_b, {})
+    if prior.get("population_hash_a", "") != rec_a.get("population_hash", ""):
+        return True
+    if prior.get("population_hash_b", "") != rec_b.get("population_hash", ""):
+        return True
+    if prior.get("last_run_utc_a", "") != rec_a.get("last_run_utc", ""):
+        return True
+    if prior.get("last_run_utc_b", "") != rec_b.get("last_run_utc", ""):
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -2996,16 +3140,42 @@ def main() -> int:
     if not pairs:
         print("[compare] no pairs discovered — check manifest hierarchy and mode flags")
 
+    runnable_pairs = [
+        (seg_a, seg_b, ctype)
+        for seg_a, seg_b, ctype in pairs
+        if segment_is_runnable(registry, seg_a)
+        and (seg_a == seg_b or segment_is_runnable(registry, seg_b))
+    ]
+
+    # Build flat work list: one item per (pair × domain), limited to domains
+    # present in either side of the pair so sparse corpora do not generate a
+    # global-domain cross product of mostly-empty worker tasks. Computed
+    # before the --dry-run branch so the preview reflects exactly the
+    # (pair, domain) granularity a live run would recompute — including a
+    # --domain filter, which only ever touches one domain per pair.
+    work_items, _domains_by_segment, active_domain_filter = build_pair_domain_work_items(
+        runnable_pairs, segments_root, registry, args.domain
+    )
+
     # --dry-run: print table and exit
     if args.dry_run:
+        comparison_registry = load_comparison_registry(out_dir)
         col_w = 36
-        print(f"{'segment_a':<{col_w}}  {'segment_b':<{col_w}}  {'comparison_type':<28}")
-        print("-" * (col_w * 2 + 32))
-        for a, b, ctype in pairs:
+        print(f"{'segment_a':<{col_w}}  {'segment_b':<{col_w}}  {'comparison_type':<28}  {'domain':<24}  {'staleness':<10}")
+        print("-" * (col_w * 2 + 68))
+        n_stale = 0
+        for a, b, ctype, dom in work_items:
             la = manifest.get(a, {}).get("segment_label", a)
             lb = manifest.get(b, {}).get("segment_label", b)
-            print(f"{la:<{col_w}}  {lb:<{col_w}}  {ctype:<28}")
-        print(f"\n[compare] {len(pairs)} pairs discovered")
+            stale = comparison_is_stale(a, b, ctype, dom, registry, comparison_registry)
+            if stale:
+                n_stale += 1
+            staleness_label = "stale" if stale else "current"
+            print(f"{la:<{col_w}}  {lb:<{col_w}}  {ctype:<28}  {dom:<24}  {staleness_label:<10}")
+        print(
+            f"\n[compare] {len(runnable_pairs)} pairs, {len(work_items)} pair-domain work items "
+            f"({n_stale} stale, {len(work_items) - n_stale} current)"
+        )
         return 0
 
     # Run comparisons
@@ -3021,20 +3191,6 @@ def main() -> int:
     if args.workers < 1:
         sys.exit("[error] --workers must be >= 1")
 
-    runnable_pairs = [
-        (seg_a, seg_b, ctype)
-        for seg_a, seg_b, ctype in pairs
-        if segment_is_runnable(registry, seg_a)
-        and (seg_a == seg_b or segment_is_runnable(registry, seg_b))
-    ]
-
-    # Build flat work list: one item per (pair × domain), limited to domains
-    # present in either side of the pair so sparse corpora do not generate a
-    # global-domain cross product of mostly-empty worker tasks.
-    work_items, _domains_by_segment, active_domain_filter = build_pair_domain_work_items(
-        runnable_pairs, segments_root, registry, args.domain
-    )
-
     print(
         f"[compare] {len(runnable_pairs)} pairs × {len(active_domain_filter)} active domains = "
         f"{len(work_items)} pair-domain work items  workers={args.workers}"
@@ -3042,6 +3198,7 @@ def main() -> int:
 
     n_complete = 0
     n_skipped = 0
+    completed_work_items: List[Tuple[str, str, str, str]] = []
 
     t0 = time.perf_counter()
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
@@ -3156,6 +3313,8 @@ def main() -> int:
             else:
                 n_skipped += 1
 
+            produced_output = result is not None
+
             # Governance-state output is independent of legacy run_pair() summary
             # thresholds. Sparse or empty targets still need provided_but_missing
             # rows so missing downstream stock is visible.
@@ -3180,6 +3339,16 @@ def main() -> int:
                     governance_state_rows.extend(state_rows)
                     governance_state_summary_rows.append(state_summary)
                     governance_combo_count += 1
+                    produced_output = True
+
+            # comparison_registry.csv must only stamp (pair, domain) work items
+            # that actually produced a persisted output row somewhere this run
+            # (cross_segment_summary.csv via `result`, or governance-state
+            # output) — a domain below --min-patterns or a within-project pair
+            # with no eligible file pairs must not get a fresh "current" stamp
+            # for output that was never written.
+            if produced_output:
+                completed_work_items.append((seg_a, seg_b, ctype, domain))
 
             done = n_complete + n_skipped
             if done % 50 == 0 or done == len(work_items):
@@ -3356,6 +3525,12 @@ def main() -> int:
 
     if not summary_rows and not pooled_rows and not governance_state_rows and not union_inventory_rows:
         print("[compare] no comparison rows produced — check segment data and min-patterns threshold")
+
+    comparison_registry_rows = build_comparison_registry_rows(
+        completed_work_items, registry, executed_utc
+    )
+    atomic_write_csv(out_dir / "comparison_registry.csv", COMPARISON_REGISTRY_FIELDS, comparison_registry_rows)
+    print(f"[compare] wrote {len(comparison_registry_rows)} rows → {out_dir / 'comparison_registry.csv'}")
 
     return 0
 
