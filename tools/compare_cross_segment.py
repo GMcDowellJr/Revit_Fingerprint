@@ -1786,12 +1786,16 @@ def discover_governance_chain(
         # (na, N/A, __NOT_APPLICABLE__, ...), for Standards-collection rows
         # that were never a client engagement (e.g. BC_2270 templates/
         # containers). Pooling all of those under a single "" key would group
-        # unrelated collections together; fall back to collection_label so
-        # each collection's siblings still group with each other instead of
-        # pooling under "". is_blank_or_na() (shared with
-        # build_segment_manifest.py) recognizes any NA spelling, not just the
-        # one literal "__NOT_APPLICABLE__" token this used to hardcode.
+        # unrelated collections together; fall back to business_center_label
+        # first (the real, populated cut dimension for BC-scoped rows per
+        # build_segment_manifest.py), then to collection_label as a
+        # last-resort fallback for whenever that field does get wired in.
+        # is_blank_or_na() (shared with build_segment_manifest.py) recognizes
+        # any NA spelling, not just the one literal "__NOT_APPLICABLE__"
+        # token this used to hardcode.
         client = row.get("client_label", "").strip()
+        if is_blank_or_na(client):
+            client = row.get("business_center_label", "").strip()
         if is_blank_or_na(client):
             client = row.get("collection_label", "").strip()
         return (

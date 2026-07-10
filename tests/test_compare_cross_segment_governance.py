@@ -74,6 +74,39 @@ def test_discover_governance_chain_falls_back_to_collection_label_for_na_client(
     assert ("bc_t", "acme_p", "template_to_project") not in pairs
 
 
+def test_discover_governance_chain_prefers_business_center_label_over_collection_label():
+    manifest = {
+        "bc_t": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_2270",
+            "collection_label": "BC_2270 Standards",
+        },
+        "bc_c": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_2270",
+            "collection_label": "BC_2270 Standards",
+        },
+        "other_bc_t": {
+            **_seg("Template", client=""),
+            "business_center_label": "BC_9999",
+            "collection_label": "BC_2270 Standards",
+        },
+        "acme_t": _seg("Template", client="Acme"),
+        "acme_p": _seg("Project", client="Acme"),
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # BC_2270's Template/Container (client blank/NA) now group via
+    # business_center_label, not collection_label.
+    assert ("bc_t", "bc_c", "template_to_container") in pairs
+    # A different business_center_label sharing the same collection_label
+    # must NOT be pooled together now that business_center_label wins.
+    assert ("other_bc_t", "bc_c", "template_to_container") not in pairs
+    # A real client is entirely unaffected by the fallback.
+    assert ("acme_t", "acme_p", "template_to_project") in pairs
+
+
 def test_project_target_governance_state_uses_target_used():
     assert _usage_interpretable_for_role("Project") is True
     assert _recommended_primary_view("Template", "Project", "template_to_project") == "used"
