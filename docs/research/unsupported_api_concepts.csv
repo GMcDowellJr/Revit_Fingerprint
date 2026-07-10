@@ -1,0 +1,14 @@
+exclusion_group,api_concept_or_pattern,persistence_class,reason,disposition,exception_rule,notes
+API query filters,Element*Filter; Logical*Filter,query infrastructure,"Filtering classes express API selection logic, not fingerprint domains",exclude as API infrastructure,ParameterFilterElement rules remain supported via view_filter_definitions,
+UI and command classes,Autodesk.Revit.UI.*; ExternalCommand*,UI/runtime command,UI objects are not persistent RVT configuration,exclude,None,
+analysis result wrappers,*Analysis*Data; *Results*,runtime/value result,Analysis outputs are computed wrappers rather than stable project configuration,exclude unless a current domain explicitly fingerprints persisted settings,Persisted analysis settings may be mapped separately,
+built-in failure catalogs,BuiltInFailures; FailureDefinition*,API catalog/runtime failure,Failure handling catalogs are not RVT configuration inventory,exclude,No exception unless a persistent failure setting domain is added,
+collector and iterator classes,FilteredElementCollector; *Iterator,API infrastructure,Collectors enumerate objects but are not persisted file concepts,exclude,May appear in feasible collector notes only,
+enums used only as API vocabulary,BuiltIn*; *Type enum,API vocabulary,Vocabulary supports interpretation but is not a domain by itself,exclude as standalone concept,Enums may remain supporting fields,
+event and event-argument classes,Autodesk.Revit.DB.Events.*; *EventArgs,runtime-only,Events describe runtime changes and callbacks,exclude,None for static RVT fingerprinting,
+heuristic graph communities,community_id; heuristic community labels,heuristic topology,"Communities are navigation aids, not domains/archetypes/evidence of use",exclude,None,community_used_as_archetype=no
+import/export runtime objects,*ImportOptions; *ExportOptions; Importer*; Exporter*,operational runtime,Options drive commands/external formats rather than persistent model inventory,exclude,Persisted link/import type elements can be mapped separately,
+options classes,*Options,API call options,Options usually parameterize API operations,exclude,Persisted project settings classes may be mapped individually,
+transaction infrastructure,Transaction; SubTransaction; TransactionGroup,runtime-only,Transaction classes control API mutation scope,exclude,None,
+transient geometry objects,XYZ; Curve; Face; Solid; Mesh; GeometryElement,transient/value geometry,Geometry wrappers are derived values and unstable as domain identity,exclude,Future geometry metrics require separate behavior-changing PR,
+utility classes,*Utils; *Utility; UnitUtils,API infrastructure,Utility helpers are not model concepts,exclude,Can be cited in collector feasibility only,
