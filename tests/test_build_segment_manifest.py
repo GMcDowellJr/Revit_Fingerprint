@@ -10,7 +10,7 @@ import pytest
 # Allow running without installing; resolve to repo root.
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
-from build_segment_manifest import _build_segments, _build_registry, _population_hash, main
+from build_segment_manifest import _build_segments, _build_registry, _population_hash, _normalize_rows, main
 
 
 # ---------------------------------------------------------------------------
@@ -204,15 +204,18 @@ def test_sanitize_folder_strips_path_separators():
 
 def test_registry_output_folders_globally_unique_with_suffix_collision():
     # Reproduce the case where a generated suffix collides with another
-    # segment's natural sanitized name:
-    #   imperial|kaiser   → imperial_kaiser (natural)
-    #   imperial|Kaiser   → imperial_kaiser (collision → imperial_kaiser_2)
-    #   imperial|kaiser_2 → imperial_kaiser_2 (natural — collides with the suffix!)
+    # segment's natural sanitized name. Uses distinct literal client_label
+    # strings (not case variants — those now merge upstream in
+    # _build_segments() via _normalize_rows(), so they can no longer produce
+    # two different segment_ids to collide in the first place):
+    #   imperial|west/coast   → imperial_west_coast (natural)
+    #   imperial|west_coast   → imperial_west_coast (collision → imperial_west_coast_2)
+    #   imperial|west_coast_2 → imperial_west_coast_2 (natural — collides with the suffix!)
     # The registry must still produce three distinct output_folder values.
     rows = (
-        [_meta_row(f"a{i:02d}", "imperial", "kaiser", "Project") for i in range(3)]
-        + [_meta_row(f"b{i:02d}", "imperial", "Kaiser", "Project") for i in range(3)]
-        + [_meta_row(f"c{i:02d}", "imperial", "kaiser_2", "Project") for i in range(3)]
+        [_meta_row(f"a{i:02d}", "imperial", "west/coast", "Project") for i in range(3)]
+        + [_meta_row(f"b{i:02d}", "imperial", "west_coast", "Project") for i in range(3)]
+        + [_meta_row(f"c{i:02d}", "imperial", "west_coast_2", "Project") for i in range(3)]
     )
     segs = _build_segments(rows, min_files=1)
     reg = _build_registry(segs)
@@ -304,17 +307,23 @@ def test_seed_only_note_set_when_segment_has_seeds_no_project():
     assert l2["has_seed_file"] == "true"
 
 
-def test_registry_output_folders_unique_across_case_variants():
-    # "imperial|Kaiser" and "imperial|kaiser" both sanitize to "imperial_kaiser";
-    # the registry must still assign each a distinct output_folder.
+def test_registry_folder_merges_for_client_label_case_variants():
+    # "Kaiser" and "kaiser" are case variants of the same client, not two
+    # clients — _normalize_rows() folds them together (first-seen casing)
+    # before segment_id construction, so this must produce ONE registry row
+    # / output_folder, not two. (Previously this scenario produced two
+    # distinct segment_ids that both sanitized to "imperial_kaiser" and had
+    # to be disambiguated with a suffix — that was the bug this fix closes.)
     rows = (
         [_meta_row(f"r{i:02d}", "imperial", "Kaiser", "Project") for i in range(3)]
         + [_meta_row(f"r{i:02d}", "imperial", "kaiser", "Project") for i in range(10, 13)]
     )
     segs = _build_segments(rows, min_files=1)
     reg = _build_registry(segs)
-    folders = [r["output_folder"] for r in reg]
-    assert len(folders) == len(set(folders)), f"Duplicate output_folder values: {folders}"
+    kaiser_rows = [r for r in reg if r["segment_id"] == "imperial|Project|Kaiser"]
+    assert len(kaiser_rows) == 1
+    assert not any(r["segment_id"] == "imperial|Project|kaiser" for r in reg)
+    assert kaiser_rows[0]["output_folder"] == "imperial_project_kaiser"
 
 
 def test_blank_client_label_level2_id_distinct_from_level1():
@@ -691,32 +700,36 @@ def test_registry_resets_status_when_population_hash_changes():
 
 
 def test_registry_new_segment_gets_unique_folder_not_colliding_with_carryover():
-    # First run: only "kaiser" (lower) and "Kaiser" (upper) — the natural
-    # sanitized-name collision assigns Kaiser -> imperial_project_kaiser_2.
-    rows_a = [_meta_row(f"a{i:02d}", "imperial", "kaiser", "Project") for i in range(3)]
-    rows_b = [_meta_row(f"b{i:02d}", "imperial", "Kaiser", "Project") for i in range(3)]
+    # First run: two distinct clients whose sanitized names collide — not
+    # case variants (those merge upstream in _normalize_rows() and can no
+    # longer produce two segment_ids to collide in the first place; see
+    # test_registry_folder_merges_for_client_label_case_variants).
+    # "west/coast" and "west_coast" both sanitize to "imperial_..._west_coast";
+    # the second gets suffixed -> imperial_project_west_coast_2.
+    rows_a = [_meta_row(f"a{i:02d}", "imperial", "west/coast", "Project") for i in range(3)]
+    rows_b = [_meta_row(f"b{i:02d}", "imperial", "west_coast", "Project") for i in range(3)]
     segs1 = _build_segments(rows_a + rows_b, min_files=1)
     reg1 = _build_registry(segs1)
 
-    folder_lower_1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|kaiser")["output_folder"]
-    folder_upper_1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|Kaiser")["output_folder"]
-    assert folder_lower_1 != folder_upper_1
+    folder_a_1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|west/coast")["output_folder"]
+    folder_b_1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|west_coast")["output_folder"]
+    assert folder_a_1 != folder_b_1
 
-    # Second run: a brand-new client "kaiser_2" is added — its natural sanitized
-    # name collides with whatever suffix the first run picked for "Kaiser".
-    rows_c = [_meta_row(f"c{i:02d}", "imperial", "kaiser_2", "Project") for i in range(3)]
+    # Second run: a brand-new client "west_coast_2" is added — its natural
+    # sanitized name collides with whatever suffix the first run picked for "b".
+    rows_c = [_meta_row(f"c{i:02d}", "imperial", "west_coast_2", "Project") for i in range(3)]
     segs2 = _build_segments(rows_a + rows_b + rows_c, min_files=1)
     reg2 = _build_registry(segs2, existing_registry=reg1)
 
-    folder_lower_2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|kaiser")["output_folder"]
-    folder_upper_2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")["output_folder"]
-    folder_new_2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|kaiser_2")["output_folder"]
+    folder_a_2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|west/coast")["output_folder"]
+    folder_b_2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|west_coast")["output_folder"]
+    folder_new_2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|west_coast_2")["output_folder"]
 
     # Pre-existing segments keep their prior folder names untouched.
-    assert folder_lower_2 == folder_lower_1
-    assert folder_upper_2 == folder_upper_1
+    assert folder_a_2 == folder_a_1
+    assert folder_b_2 == folder_b_1
     # All three are distinct.
-    assert len({folder_lower_2, folder_upper_2, folder_new_2}) == 3
+    assert len({folder_a_2, folder_b_2, folder_new_2}) == 3
 
 
 def test_registry_drops_removed_segment_ids_with_warning(capsys):
@@ -749,3 +762,122 @@ def test_client_discipline_leaf_no_empty_purpose():
         assert r["segment_label"] != r["segment_id"], (
             f"segment_label fell back to raw ID for {r['segment_id']}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Case normalization for segment dimension fields
+# ---------------------------------------------------------------------------
+
+def test_unit_system_case_variants_merge_into_single_segment():
+    # "imperial" and "Imperial" are the same unit system typed inconsistently
+    # during manual file_metadata.csv editing — they must merge into one
+    # level-1 segment, not fragment into two shadow populations.
+    rows = (
+        [_meta_row(f"r{i:02d}", "imperial", "Acme", "Project") for i in range(3)]
+        + [_meta_row(f"r{i:02d}", "Imperial", "Acme", "Project") for i in range(10, 13)]
+    )
+    segs = _build_segments(rows, min_files=1)
+    l1_ids = {r["segment_id"] for r in segs if r["segment_level"] == "1"}
+    assert l1_ids == {"imperial"}
+    l1 = next(r for r in segs if r["segment_level"] == "1")
+    assert l1["file_count"] == "6"
+
+
+def test_governance_role_case_variants_merge_and_no_false_warning(tmp_path, capsys):
+    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
+    rows = (
+        [{"export_run_id": f"a{i:02d}", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Container"} for i in range(3)]
+        + [{"export_run_id": f"b{i:02d}", "unit_system": "imperial", "client_label": "Acme", "governance_role": "container"} for i in range(3)]
+    )
+    meta = tmp_path / "file_metadata.csv"
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for row in rows:
+            w.writerow(row)
+
+    out_dir = tmp_path / "out"
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+    assert rc == 0
+
+    captured = capsys.readouterr()
+    assert "Unrecognised governance_role" not in captured.err
+
+    manifest_rows = _read_csv(out_dir / "segment_manifest.csv")
+    container_acme = next(r for r in manifest_rows if r["segment_id"] == "imperial|Container|Acme")
+    ids = set(container_acme["export_run_ids"].split("|"))
+    assert ids == {f"a{i:02d}" for i in range(3)} | {f"b{i:02d}" for i in range(3)}
+
+
+def test_unknown_governance_role_still_warns_after_normalization_added(tmp_path, capsys):
+    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
+    meta = tmp_path / "file_metadata.csv"
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for i in range(3):
+            w.writerow({
+                "export_run_id": f"r{i:02d}", "unit_system": "imperial",
+                "client_label": "Acme", "governance_role": "Contractor",
+            })
+
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "1"])
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert "Unrecognised governance_role value in metadata: 'Contractor'" in captured.err
+
+
+def test_client_label_first_seen_casing_is_canonical():
+    # "Stantec" appears first in row order — all case variants fold to it,
+    # not to an arbitrary or alphabetically-chosen casing.
+    rows = [
+        _meta_row("s01", "imperial", "Stantec", "Container"),
+        _meta_row("s02", "imperial", "stantec", "Container"),
+        _meta_row("s03", "imperial", "STANTEC", "Container"),
+    ]
+    segs = _build_segments(rows, min_files=1)
+    seg_ids = {r["segment_id"] for r in segs}
+    assert "imperial|Container|Stantec" in seg_ids
+    assert "imperial|Container|stantec" not in seg_ids
+    assert "imperial|Container|STANTEC" not in seg_ids
+    merged = next(r for r in segs if r["segment_id"] == "imperial|Container|Stantec")
+    assert merged["client_label"] == "Stantec"
+    assert set(merged["export_run_ids"].split("|")) == {"s01", "s02", "s03"}
+
+
+def test_normalization_warning_emitted_with_aggregate_count(tmp_path, capsys):
+    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
+    meta = tmp_path / "file_metadata.csv"
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for i in range(16):
+            w.writerow({
+                "export_run_id": f"r{i:02d}", "unit_system": "Imperial",
+                "client_label": "Acme", "governance_role": "Project",
+            })
+
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "1"])
+    assert rc == 0
+    captured = capsys.readouterr()
+    warn_lines = [ln for ln in captured.err.splitlines() if "Normalized unit_system" in ln]
+    assert len(warn_lines) == 1, f"Expected one aggregated warning line, got: {warn_lines}"
+    assert "'Imperial' -> 'imperial'" in warn_lines[0]
+    assert "(16 row(s))" in warn_lines[0]
+
+
+def test_clean_corpus_unaffected_by_normalization():
+    # Regression guard: consistently-cased fixtures produce zero normalization
+    # changes, and _build_segments() output is unaffected.
+    _, changes_rows = _normalize_rows(ROWS)
+    assert changes_rows == []
+    _, changes_disc = _normalize_rows(_disc_rows())
+    assert changes_disc == []
+
+    segs = _build_segments(ROWS, min_files=3)
+    seg_ids = {r["segment_id"] for r in segs}
+    assert "imperial" in seg_ids
+    assert "metric" in seg_ids
+    assert "imperial|Kaiser" in seg_ids
+    assert "imperial|Renown" in seg_ids
+    assert "metric|Global" in seg_ids

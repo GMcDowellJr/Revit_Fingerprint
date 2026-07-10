@@ -47,6 +47,62 @@ def _append_note(row,k,v=""):
     if row.get("notes"): row["notes"] += f"|{note}"
     else: row["notes"]=note
 
+_GOVERNANCE_ROLE_CANONICAL = {
+    "project": "Project", "template": "Template", "container": "Container", "generic": "Generic",
+}
+
+def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], List[tuple]]":
+    """Case-normalize DIMENSION_CONFIG fields before they enter segment_id
+    construction, so a manual-edit typo (e.g. "Imperial" vs "imperial" during
+    the Run A -> Run B annotation pause) does not silently fragment one
+    population into two shadow segments that never merge.
+
+    Normalization rule per field:
+      - unit_system: folds to lowercase — the established canonical form
+        ("imperial" / "metric") used throughout the pipeline.
+      - governance_role: values matching a KNOWN_ROLES member case-insensitively
+        fold to that member's canonical casing (Project/Template/Container/
+        Generic). A value that is NOT a case variant of a known role is not
+        assumed to be a typo of one — it falls through to the same
+        first-seen-casing fold as client_label/discipline_label below, so
+        repeated variants of an unrecognized role still converge on one
+        segment instead of fragmenting (main()'s unrecognized-role warning
+        still fires for it either way).
+      - client_label / discipline_label: no fixed enum. Case-insensitive fold
+        to the casing of the first occurrence in row order. `rows` is a list,
+        not a set/dict, so "first occurrence" is deterministic regardless of
+        any hash/iteration order.
+
+    Returns (normalized_rows, changes) where changes is a list of
+    (field, raw_value, normalized_value) tuples, one per row-field whose value
+    was altered by normalization (duplicates included — callers aggregate).
+    """
+    fields = [d["field"] for d in DIMENSION_CONFIG]
+    first_seen: Dict[str, Dict[str, str]] = {f: {} for f in fields}
+    changes: List[tuple] = []
+    normalized_rows: List[Dict[str, str]] = []
+
+    for row in rows:
+        new_row = dict(row)
+        for field in fields:
+            raw = (row.get(field) or "").strip()
+            if not raw:
+                continue
+            if field == "unit_system":
+                canon = raw.lower()
+            elif field == "governance_role":
+                canon = _GOVERNANCE_ROLE_CANONICAL.get(raw.lower())
+                if canon is None:
+                    canon = first_seen[field].setdefault(raw.lower(), raw)
+            else:
+                canon = first_seen[field].setdefault(raw.lower(), raw)
+            if canon != raw:
+                changes.append((field, raw, canon))
+            new_row[field] = canon
+        normalized_rows.append(new_row)
+
+    return normalized_rows, changes
+
 def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_template_bundles:bool=False,enable_parent_bundle_runs:bool=False)->List[Dict[str,str]]:
     root_dims = [d for d in DIMENSION_CONFIG if d["type"] == "root"]
     gov_dims = [d for d in DIMENSION_CONFIG if d["type"] == "governance"]
@@ -66,7 +122,9 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         kv = dict(key)
         return "|".join(kv[f] for f in cfg_fields if f in kv)
 
-    for row in rows:
+    normalized_rows, _changes = _normalize_rows(rows)
+
+    for row in normalized_rows:
         export_run_id = (row.get("export_run_id") or "").strip()
         if not export_run_id:
             continue
@@ -419,14 +477,34 @@ def main(argv: List[str] | None = None) -> int:
     if skipped_blank_eid:
         sys.stderr.write(f"[WARN] Excluded {skipped_blank_eid} row(s) with blank export_run_id\n")
 
+    # Normalize once here — for the KNOWN_ROLES check and the aggregated
+    # normalization-change warning below — routing both through the same
+    # helper _build_segments() uses internally, so there is one source of
+    # truth for "what does this dimension value canonically mean" rather than
+    # two independent checks that could drift apart. _build_segments() still
+    # normalizes rows itself when called directly (e.g. from tests), so
+    # passing the original (un-normalized) rows through to it here is safe —
+    # normalization is idempotent.
+    normalized_rows, normalization_changes = _normalize_rows(rows)
+
     KNOWN_ROLES = {"Project", "Template", "Container", "Generic", ""}
     unknown_roles = {
         (r.get("governance_role") or "").strip()
-        for r in rows
+        for r in normalized_rows
         if (r.get("governance_role") or "").strip() not in KNOWN_ROLES
     }
     for role in sorted(unknown_roles):
         sys.stderr.write(f"[WARN] Unrecognised governance_role value in metadata: '{role}' — rows with this role will create unexpected segments\n")
+
+    if normalization_changes:
+        agg: Dict[tuple, int] = defaultdict(int)
+        for field, raw, canon in normalization_changes:
+            agg[(field, raw, canon)] += 1
+        for (field, raw, canon), count in sorted(agg.items()):
+            sys.stderr.write(
+                f"[WARN] Normalized {field} '{raw}' -> '{canon}' ({count} row(s)) — "
+                f"check file_metadata.csv for manual-edit typos\n"
+            )
 
     manifest_rows = _build_segments(rows, min_files, args.enable_cross_org_template_bundles, args.enable_parent_bundle_runs)
 
