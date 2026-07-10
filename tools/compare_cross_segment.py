@@ -1776,8 +1776,17 @@ def discover_governance_chain(
     # remain provided-vocabulary inventories.
     # Reference segments are included — they participate using their file inventories.
     def _key(row: Dict[str, str]) -> Tuple[str, str]:
+        # client_label is blank (or the explicit "__NOT_APPLICABLE__" sentinel)
+        # for Standards-collection rows that were never a client engagement
+        # (e.g. BC_2270 templates/containers). Pooling all of those under a
+        # single "" key would group unrelated collections together; fall back
+        # to collection_label so each collection's siblings still group with
+        # each other instead of pooling under "".
+        client = row.get("client_label", "").strip()
+        if not client or client == "__NOT_APPLICABLE__":
+            client = row.get("collection_label", "").strip()
         return (
-            row.get("client_label", "").strip(),
+            client,
             row.get("unit_system", "").strip(),
         )
 
