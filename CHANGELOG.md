@@ -42,6 +42,16 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   target's own file population is unchanged) or `current`.
 
 ### Fixed
+- `tools/compare_cross_segment.py` `comparison_registry.csv`: a (pair, domain) is now
+  also omitted from the stamp if either side's `run_registry.csv` `status` is not
+  `"complete"`. `build_segment_manifest.py` updates `population_hash` to a segment's
+  new file population immediately on manifest rebuild, resetting `status` to
+  `"pending"` (and clearing `last_run_utc`) until the orchestrator actually re-runs
+  that segment — but its output folder on disk still holds the *old* population's
+  results until then. A compare run in that window read the stale on-disk data yet
+  got stamped with the segment's already-updated (new) `population_hash`; once the
+  segment reached `"complete"` with that same hash, a later `--dry-run` would have
+  wrongly reported the pair as already current.
 - `tools/compare_cross_segment.py` `comparison_registry.csv`: removed the carryover of
   prior (pair, domain) entries not recomputed this run, and stopped stamping work
   items that produced no output. Every other output this tool writes

@@ -15,11 +15,12 @@ from compare_cross_segment import (  # noqa: E402
 )
 
 
-def _reg_row(population_hash="h1", last_run_utc="2026-01-01T00:00:00Z", conformance_reference_mode="latest"):
+def _reg_row(population_hash="h1", last_run_utc="2026-01-01T00:00:00Z", conformance_reference_mode="latest", status="complete"):
     return {
         "population_hash": population_hash,
         "last_run_utc": last_run_utc,
         "conformance_reference_mode": conformance_reference_mode,
+        "status": status,
     }
 
 
@@ -165,6 +166,45 @@ def test_build_comparison_registry_rows_omits_work_items_with_no_output():
     completed_work_items = []  # nothing produced output this run
     rows = build_comparison_registry_rows(completed_work_items, registry, computed_utc="2026-07-10T00:00:00Z")
     assert rows == []
+
+
+def test_build_comparison_registry_rows_omits_pair_when_reference_segment_is_pending():
+    # build_segment_manifest.py updates population_hash to a segment's new
+    # file population immediately on manifest rebuild, resetting status to
+    # "pending" (and clearing last_run_utc) until the orchestrator actually
+    # re-runs it. The segment's output folder on disk still holds the OLD
+    # population's results in that window. A compare run then reads stale
+    # on-disk data but must not get stamped with the segment's already-updated
+    # (new) population_hash — once the segment finally reaches "complete"
+    # with that same hash, a naive stamp would make a later --dry-run wrongly
+    # report the pair as already current.
+    registry = {
+        "t": _reg_row(population_hash="h1-new", last_run_utc="", status="pending"),
+        "p": _reg_row(population_hash="h2", status="complete"),
+    }
+    completed_work_items = [("t", "p", "template_to_project", "line_patterns")]
+    rows = build_comparison_registry_rows(completed_work_items, registry, computed_utc="2026-07-10T00:00:00Z")
+    assert rows == []
+
+
+def test_build_comparison_registry_rows_omits_pair_when_target_segment_is_failed():
+    registry = {
+        "t": _reg_row(population_hash="h1", status="complete"),
+        "p": _reg_row(population_hash="h2", status="failed"),
+    }
+    completed_work_items = [("t", "p", "template_to_project", "line_patterns")]
+    rows = build_comparison_registry_rows(completed_work_items, registry, computed_utc="2026-07-10T00:00:00Z")
+    assert rows == []
+
+
+def test_build_comparison_registry_rows_stamps_when_both_sides_complete():
+    registry = {
+        "t": _reg_row(population_hash="h1", status="complete"),
+        "p": _reg_row(population_hash="h2", status="complete"),
+    }
+    completed_work_items = [("t", "p", "template_to_project", "line_patterns")]
+    rows = build_comparison_registry_rows(completed_work_items, registry, computed_utc="2026-07-10T00:00:00Z")
+    assert len(rows) == 1
 
 
 def test_load_comparison_registry_roundtrip(tmp_path):

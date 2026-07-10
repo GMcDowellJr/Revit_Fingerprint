@@ -591,13 +591,18 @@ def load_comparison_registry(out_dir: Path) -> Dict[ComparisonRegistryKey, Dict[
     return result
 
 
+def _segment_status_complete(registry: Dict[str, Dict[str, str]], segment_id: str) -> bool:
+    return registry.get(segment_id, {}).get("status", "").strip().lower() == "complete"
+
+
 def build_comparison_registry_rows(
     completed_work_items: Sequence[Tuple[str, str, str, str]],
     registry: Dict[str, Dict[str, str]],
     computed_utc: str,
 ) -> List[Dict[str, str]]:
     """Return comparison_registry.csv rows: a fresh stamp for every (pair,
-    domain) that actually produced output this run (`completed_work_items`).
+    domain) that actually produced output this run (`completed_work_items`)
+    where both sides' run_registry.csv status is "complete".
 
     Deliberately no carryover of prior comparison_registry.csv rows: every
     other output this tool writes (cross_segment_summary.csv,
@@ -615,9 +620,22 @@ def build_comparison_registry_rows(
     included — `run_pair()`/`_run_pair_domain()` returning None (e.g. a domain
     below --min-patterns, or a within-project pair with no eligible file
     pairs) must not get a fresh "current" stamp for output that was never
-    written."""
+    written.
+
+    A (pair, domain) is also excluded if either side's registry status is not
+    "complete". build_segment_manifest.py updates population_hash to reflect
+    a segment's new file population immediately on manifest rebuild, resetting
+    status to "pending" (and clearing last_run_utc) until the orchestrator
+    actually re-runs that segment — but its output folder on disk still holds
+    the OLD population's results until then. A compare run in that window
+    reads the stale on-disk data yet would otherwise get stamped with the
+    segment's already-updated (new) population_hash, so once the segment
+    finally reaches "complete" with that same hash, a later --dry-run would
+    wrongly report the pair as already current."""
     rows: List[Dict[str, str]] = []
     for a, b, ctype, dom in completed_work_items:
+        if not (_segment_status_complete(registry, a) and _segment_status_complete(registry, b)):
+            continue
         rec_a = registry.get(a, {})
         rec_b = registry.get(b, {})
         rows.append({
