@@ -1011,7 +1011,10 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
     ]
 
     # Read existing annotations before opening output files so we can apply them inline.
-    annotation_columns = ["client_label", "governance_role", "discipline_label", "project_label"]
+    annotation_columns = [
+        "client_label", "governance_role", "discipline_label", "project_label",
+        "business_center_label", "collection_label",
+    ]
     existing_annotations: Dict[str, Dict[str, str]] = {}
     existing_meta_path = out_dir / "file_metadata.csv"
     if existing_meta_path.exists():
@@ -1250,6 +1253,7 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
         "lineage_hash", "revit_version_number", "revit_version_name", "revit_build",
         "is_workshared", "tool_version", "exported_utc",
         "client_label", "governance_role", "unit_system", "discipline_label",
+        "business_center_label", "collection_label",
     ], _sort_rows(meta_rows, ["export_run_id"]))
 
     for stem in _streaming_stems:

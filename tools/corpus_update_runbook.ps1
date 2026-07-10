@@ -1,3 +1,14 @@
+# collection_label vs. governance_role (manual file_metadata.csv entry)
+# ------------------------------------------------------------------------
+# collection_label answers "why was this file captured" — the standards/
+# resource collection it was pulled for (e.g. "BC_2270 Standards", "Sutter
+# Standards"). governance_role answers "what does this file do" — its
+# behavioral function (Template / Container / Project / Generic). The two
+# are independent and must both be set on their own merits: a
+# governance_role=Project file can still carry a collection_label if it is
+# kept as a reference exemplar within a client's standards collection
+# rather than a live tracked project. Do not infer one from the other.
+
 param(
     [ValidateSet("A","B","C")]
     [string]$Run = "",
@@ -35,6 +46,7 @@ if ($Run -eq "") {
     Write-Host "  Set for each new file:"
     Write-Host "    governance_role  ->  Container | Template | Project | Generic"
     Write-Host "    client_label     ->  client name or internal identifier"
+    Write-Host "    collection_label ->  standards/resource collection this file belongs to (optional; independent of governance_role - see header comment)"
     Write-Host "    unit_system      ->  imperial | metric"
     Write-Host ""
     exit 0
@@ -56,6 +68,7 @@ if ($Run -eq "A") {
     Write-Host "  Set for each new file:" -ForegroundColor Yellow
     Write-Host "    governance_role  ->  Container | Template | Project | Generic" -ForegroundColor Yellow
     Write-Host "    client_label     ->  client name or internal identifier" -ForegroundColor Yellow
+    Write-Host "    collection_label ->  standards/resource collection this file belongs to (optional; independent of governance_role - see header comment)" -ForegroundColor Yellow
     Write-Host "    unit_system      ->  imperial | metric" -ForegroundColor Yellow
     Write-Host "Then run: .\corpus_update_runbook.ps1 -Run B" -ForegroundColor Yellow
 }
