@@ -76,6 +76,25 @@ def load_registry(path: Path) -> List[dict]:
         return list(csv.DictReader(f))
 
 
+def load_membership(path: Path) -> Dict[str, List[str]]:
+    """Load segment_membership.csv grouped by segment_id -> sorted export_run_ids.
+
+    Replaces the old segment_manifest.csv `export_run_ids` pipe-delimited column,
+    which could exceed spreadsheet cell limits for large populations.
+    """
+    membership: Dict[str, List[str]] = {}
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        grouped: Dict[str, List[str]] = {}
+        for row in csv.DictReader(f):
+            sid = (row.get("segment_id") or "").strip()
+            eid = (row.get("export_run_id") or "").strip()
+            if sid and eid:
+                grouped.setdefault(sid, []).append(eid)
+        for sid, eids in grouped.items():
+            membership[sid] = sorted(eids)
+    return membership
+
+
 def write_registry_atomic(path: Path, rows: List[dict]) -> None:
     """Write registry rows atomically via temp-file + replace."""
     if not rows:
@@ -712,6 +731,7 @@ def _run_one_segment(
     total: int,
     reg_row: dict,
     mrow: dict,
+    membership: Dict[str, List[str]],
     records_dir: Path,
     exports_dir: Path,
     segments_root: Path,
@@ -738,8 +758,7 @@ def _run_one_segment(
     except (ValueError, TypeError):
         level = 0
 
-    export_run_ids_raw = mrow.get("export_run_ids", "")
-    export_run_ids = sorted(x.strip() for x in export_run_ids_raw.split("|") if x.strip())
+    export_run_ids = sorted(membership.get(sid, []))
     file_count = len(export_run_ids)
     run_type = reg_row.get("run_type", "bundle").strip()
 
@@ -975,6 +994,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
     manifest_file = Path(args.manifest_file).resolve()
     registry_file = Path(args.registry_file).resolve()
     results_registry_file = Path(args.results_registry_file).resolve()
+    membership_file = Path(args.membership_file).resolve()
     records_dir = Path(args.records_dir).resolve()
     exports_dir = Path(args.exports_dir).resolve()
     segments_root = Path(args.segments_root).resolve()
@@ -983,6 +1003,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
 
     manifest = load_manifest(manifest_file)
     registry = load_registry(registry_file)
+    membership = load_membership(membership_file)
 
     plan = build_run_plan(
         manifest, registry, args.segment, args.force
@@ -1022,8 +1043,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             except (ValueError, TypeError):
                 level = 0
 
-            export_run_ids_raw = mrow.get("export_run_ids", "")
-            file_count = len([x for x in export_run_ids_raw.split("|") if x.strip()])
+            file_count = len(membership.get(sid, []))
 
             status_label = "complete (would skip)" if skip else status or "pending"
             reason_note = reg_row.get("notes", "").strip()
@@ -1077,8 +1097,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         if args.segment and sid not in set(args.segment):
             continue
         output_folder = reg_row.get("output_folder", "").strip()
-        export_run_ids_raw = mrow.get("export_run_ids", "")
-        allowed_ids = set(x.strip() for x in export_run_ids_raw.split("|") if x.strip())
+        allowed_ids = set(membership.get(sid, []))
         out_root = segments_root / output_folder
         segment_records_dir = out_root / "results" / "records"
         segment_plans[sid] = {
@@ -1136,7 +1155,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 _skip_level = int(mrow.get("segment_level", 0))
             except (ValueError, TypeError):
                 _skip_level = 0
-            _skip_files = len([x for x in mrow.get("export_run_ids", "").split("|") if x.strip()])
+            _skip_files = len(membership.get(sid, []))
             segment_results.append({
                 "segment_id": sid,
                 "status": "skipped",
@@ -1168,7 +1187,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         futures = {
             executor.submit(
                 _run_one_segment,
-                idx, total, reg_row, mrow,
+                idx, total, reg_row, mrow, membership,
                 records_dir, exports_dir, segments_root, repo_root,
                 join_policy, args.skip_bi_merge,
                 registry, reg_index, registry_file,
@@ -1287,6 +1306,11 @@ def main() -> None:
         help="Path to results_registry.csv (default: sibling of run_registry.csv)",
     )
     ap.add_argument(
+        "--membership-file",
+        default=None,
+        help="Path to segment_membership.csv (default: sibling of segment_manifest.csv)",
+    )
+    ap.add_argument(
         "--records-dir", required=True,
         help="Path to corpus-level results/records/ directory",
     )
@@ -1328,6 +1352,8 @@ def main() -> None:
     args = ap.parse_args()
     if args.results_registry_file is None:
         args.results_registry_file = str(Path(args.registry_file).resolve().with_name("results_registry.csv"))
+    if args.membership_file is None:
+        args.membership_file = str(Path(args.manifest_file).resolve().with_name("segment_membership.csv"))
     sys.exit(run_orchestrator(args))
 
 
