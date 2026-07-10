@@ -16,7 +16,7 @@ This behavior-preserving research artifact maps the current emitted Revit Finger
 1. Parsed runner domain routing and recorded each emitted domain exactly once.
 2. Mapped each domain to zero or more API concepts while preserving project-owned domain identifiers.
 3. Reviewed candidate relationship families against extractor behavior and recorded explicit evidence states.
-4. Classified 105 excluded core-confidence graph edges without treating heuristic communities as domains, archetypes, governance roles, or evidence of RVT usage.
+4. Classified 105 excluded core-confidence graph edges without treating heuristic communities as domains, archetypes, governance roles, or evidence of RVT usage; overloaded API members retain `source_url`/`edge_discriminator` values so rows can be audited without collapsing duplicates.
 5. Documented feasible runtime collection approaches only as future implementation notes.
 
 ## Output Status
@@ -31,7 +31,7 @@ This behavior-preserving research artifact maps the current emitted Revit Finger
 - `fingerprint_api_concept_map.csv` maps each current fingerprint domain to API concepts, semantic-core membership, unresolved concepts, and extractor references.
 - `candidate_dependency_edges.csv` records candidate relationships, current representation state, API evidence, collector feasibility, target resolution, signature verification state, and semantic validation state.
 - `unsupported_api_concepts.csv` records explicit exclusions for API-only, runtime, transient, operational, and heuristic concepts.
-- `semantic_label_review.csv` classifies the 105 excluded core-confidence edges while preserving distinct signature, target-resolution, semantic-validation, and fingerprint-relevance states.
+- `semantic_label_review.csv` classifies the 105 excluded core-confidence edges while preserving distinct signature, target-resolution, semantic-validation, fingerprint-relevance, and stable graph-edge discriminator states for overloaded API members.
 
 ## Edge Classification Totals
 
