@@ -6,6 +6,12 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Dict,Iterable,List,Sequence
 
+_TOOLS_DIR = str(Path(__file__).resolve().parent)
+if _TOOLS_DIR not in sys.path:
+    sys.path.insert(0, _TOOLS_DIR)
+
+from na_token import is_na_token
+
 SEED_ROLES={"Template","Container"}
 REQUIRED_COLUMNS={"export_run_id","unit_system","client_label","governance_role"}
 MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","discipline_label","business_center_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","has_seed_file","population_hash","notes","segment_purpose","segment_label"]
@@ -83,18 +89,6 @@ _GOVERNANCE_ROLE_CANONICAL = {
     "project": "Project", "template": "Template", "container": "Container", "generic": "Generic",
 }
 
-_NA_TOKEN_STRIP_RE = re.compile(r"[^a-z0-9]")
-_NA_TOKENS = {"na", "notapplicable"}
-
-def _is_na_token(value: str) -> bool:
-    """True for any spelling of "not applicable" (na, n/a, N/A, not applicable,
-    not_applicable, __NOT_APPLICABLE__, ...). Blank is a distinct signal — "not
-    yet filled in" per corpus_update_runbook.ps1's A->B pause checklist — and is
-    handled separately; this only recognizes values that explicitly assert "does
-    not apply" so they normalize to blank instead of leaking into segment_id as
-    a literal token (e.g. "imperial|__NOT_APPLICABLE__")."""
-    return _NA_TOKEN_STRIP_RE.sub("", value.lower()) in _NA_TOKENS
-
 def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], List[tuple]]":
     """Case-normalize DIMENSION_CONFIG fields before they enter segment_id
     construction, so a manual-edit typo (e.g. "Imperial" vs "imperial" during
@@ -117,7 +111,7 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
         not a set/dict, so "first occurrence" is deterministic regardless of
         any hash/iteration order.
       - Any DIMENSION_CONFIG field whose value is a recognized "not applicable"
-        spelling (see _is_na_token) folds to blank ("") ahead of the
+        spelling (see na_token.is_na_token) folds to blank ("") ahead of the
         field-specific rule above. Blank means "not yet filled in" (a manual-
         entry todo); an explicit N/A spelling means "reviewed, does not apply" —
         both must behave identically for segment-key purposes (neither should
@@ -139,7 +133,7 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
             raw = (row.get(field) or "").strip()
             if not raw:
                 continue
-            if _is_na_token(raw):
+            if is_na_token(raw):
                 changes.append((field, raw, ""))
                 new_row[field] = ""
                 continue

@@ -96,6 +96,12 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
+_TOOLS_DIR = str(Path(__file__).resolve().parent)
+if _TOOLS_DIR not in sys.path:
+    sys.path.insert(0, _TOOLS_DIR)
+
+from na_token import is_blank_or_na
+
 
 # ---------------------------------------------------------------------------
 # I/O helpers
@@ -1776,14 +1782,17 @@ def discover_governance_chain(
     # remain provided-vocabulary inventories.
     # Reference segments are included — they participate using their file inventories.
     def _key(row: Dict[str, str]) -> Tuple[str, str]:
-        # client_label is blank (or the explicit "__NOT_APPLICABLE__" sentinel)
-        # for Standards-collection rows that were never a client engagement
-        # (e.g. BC_2270 templates/containers). Pooling all of those under a
-        # single "" key would group unrelated collections together; fall back
-        # to collection_label so each collection's siblings still group with
-        # each other instead of pooling under "".
+        # client_label is blank, or an explicit "not applicable" spelling
+        # (na, N/A, __NOT_APPLICABLE__, ...), for Standards-collection rows
+        # that were never a client engagement (e.g. BC_2270 templates/
+        # containers). Pooling all of those under a single "" key would group
+        # unrelated collections together; fall back to collection_label so
+        # each collection's siblings still group with each other instead of
+        # pooling under "". is_blank_or_na() (shared with
+        # build_segment_manifest.py) recognizes any NA spelling, not just the
+        # one literal "__NOT_APPLICABLE__" token this used to hardcode.
         client = row.get("client_label", "").strip()
-        if not client or client == "__NOT_APPLICABLE__":
+        if is_blank_or_na(client):
             client = row.get("collection_label", "").strip()
         return (
             client,

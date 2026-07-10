@@ -55,6 +55,25 @@ def test_discover_governance_chain_includes_generic_upstream_roles():
     assert ("c", "p", "container_to_project") in pairs
 
 
+def test_discover_governance_chain_falls_back_to_collection_label_for_na_client():
+    manifest = {
+        "bc_t": {**_seg("Template", client="__NOT_APPLICABLE__"), "collection_label": "BC_2270 Standards"},
+        "bc_c": {**_seg("Container", client="n/a"), "collection_label": "BC_2270 Standards"},
+        "acme_t": _seg("Template", client="Acme"),
+        "acme_p": _seg("Project", client="Acme"),
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # BC_2270's Template/Container (client blank/NA, various spellings) group
+    # with each other via collection_label instead of pooling under "".
+    assert ("bc_t", "bc_c", "template_to_container") in pairs
+    # A real client is entirely unaffected by the fallback.
+    assert ("acme_t", "acme_p", "template_to_project") in pairs
+    # BC content must not cross-pollinate with an unrelated real client pool.
+    assert ("bc_t", "acme_p", "template_to_project") not in pairs
+
+
 def test_project_target_governance_state_uses_target_used():
     assert _usage_interpretable_for_role("Project") is True
     assert _recommended_primary_view("Template", "Project", "template_to_project") == "used"
