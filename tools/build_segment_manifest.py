@@ -47,6 +47,62 @@ def _append_note(row,k,v=""):
     if row.get("notes"): row["notes"] += f"|{note}"
     else: row["notes"]=note
 
+_GOVERNANCE_ROLE_CANONICAL = {
+    "project": "Project", "template": "Template", "container": "Container", "generic": "Generic",
+}
+
+def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], List[tuple]]":
+    """Case-normalize DIMENSION_CONFIG fields before they enter segment_id
+    construction, so a manual-edit typo (e.g. "Imperial" vs "imperial" during
+    the Run A -> Run B annotation pause) does not silently fragment one
+    population into two shadow segments that never merge.
+
+    Normalization rule per field:
+      - unit_system: folds to lowercase — the established canonical form
+        ("imperial" / "metric") used throughout the pipeline.
+      - governance_role: values matching a KNOWN_ROLES member case-insensitively
+        fold to that member's canonical casing (Project/Template/Container/
+        Generic). A value that is NOT a case variant of a known role is not
+        assumed to be a typo of one — it falls through to the same
+        first-seen-casing fold as client_label/discipline_label below, so
+        repeated variants of an unrecognized role still converge on one
+        segment instead of fragmenting (main()'s unrecognized-role warning
+        still fires for it either way).
+      - client_label / discipline_label: no fixed enum. Case-insensitive fold
+        to the casing of the first occurrence in row order. `rows` is a list,
+        not a set/dict, so "first occurrence" is deterministic regardless of
+        any hash/iteration order.
+
+    Returns (normalized_rows, changes) where changes is a list of
+    (field, raw_value, normalized_value) tuples, one per row-field whose value
+    was altered by normalization (duplicates included — callers aggregate).
+    """
+    fields = [d["field"] for d in DIMENSION_CONFIG]
+    first_seen: Dict[str, Dict[str, str]] = {f: {} for f in fields}
+    changes: List[tuple] = []
+    normalized_rows: List[Dict[str, str]] = []
+
+    for row in rows:
+        new_row = dict(row)
+        for field in fields:
+            raw = (row.get(field) or "").strip()
+            if not raw:
+                continue
+            if field == "unit_system":
+                canon = raw.lower()
+            elif field == "governance_role":
+                canon = _GOVERNANCE_ROLE_CANONICAL.get(raw.lower())
+                if canon is None:
+                    canon = first_seen[field].setdefault(raw.lower(), raw)
+            else:
+                canon = first_seen[field].setdefault(raw.lower(), raw)
+            if canon != raw:
+                changes.append((field, raw, canon))
+            new_row[field] = canon
+        normalized_rows.append(new_row)
+
+    return normalized_rows, changes
+
 def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_template_bundles:bool=False,enable_parent_bundle_runs:bool=False)->List[Dict[str,str]]:
     root_dims = [d for d in DIMENSION_CONFIG if d["type"] == "root"]
     gov_dims = [d for d in DIMENSION_CONFIG if d["type"] == "governance"]
@@ -66,7 +122,9 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         kv = dict(key)
         return "|".join(kv[f] for f in cfg_fields if f in kv)
 
-    for row in rows:
+    normalized_rows, _changes = _normalize_rows(rows)
+
+    for row in normalized_rows:
         export_run_id = (row.get("export_run_id") or "").strip()
         if not export_run_id:
             continue
@@ -249,31 +307,103 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
 
 # preserve remaining functions from original manually omitted
 
-def _build_registry(manifest_rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    registry = []
+def _build_registry(
+    manifest_rows: List[Dict[str, str]],
+    existing_registry: List[Dict[str, str]] | None = None,
+) -> List[Dict[str, str]]:
+    """Build run_registry.csv rows from freshly computed manifest rows.
+
+    When existing_registry is supplied, prior segment_id -> output_folder
+    mappings are reused verbatim (folder-name stability across runs), and
+    status/last_run_utc are carried over unless population_hash or run_type
+    changed for that segment_id (population-hash-based incremental skip).
+    A run_type change (e.g. a --min-files threshold change turning a
+    "reference" segment into a "bundle" with the same file population) must
+    also reset status, since population_hash alone would miss it and the
+    orchestrator would keep skipping a segment that now needs a different
+    analysis to be produced.
+    """
+    existing_by_id: Dict[str, Dict[str, str]] = {}
+    if existing_registry:
+        for row in existing_registry:
+            sid = (row.get("segment_id") or "").strip()
+            if sid:
+                existing_by_id[sid] = row
+
+    eligible_rows = [r for r in manifest_rows if r["run_type"] in {"bundle", "reference"}]
+    new_ids = {r["segment_id"] for r in eligible_rows}
+
+    # Reserve every folder the old registry ever assigned — carried-over AND
+    # dropped segments alike — before assigning any folder to a genuinely new
+    # segment. A dropped segment's directory under segments/ still holds its
+    # old records/markers/analysis output (the caller is only warned to review
+    # it for manual cleanup, not to delete it), so a new segment must never be
+    # handed that same folder name — it would start writing into a directory
+    # still full of a different segment's stale data.
     assigned_folders: set = set()
-    for row in manifest_rows:
-        if row["run_type"] not in {"bundle", "reference"}:
-            continue
-        base = _sanitize_folder(row["segment_id"])
-        folder = base
-        n = 2
-        while folder in assigned_folders:
-            folder = f"{base}_{n}"
-            n += 1
-        assigned_folders.add(folder)
-        registry.append({
-            "segment_id": row["segment_id"],
-            "parent_segment_id": row["parent_segment_id"],
-            "run_type": row["run_type"],
-            "population_hash": row["population_hash"],
-            "output_folder": folder,
-            "status": "pending",
-            "last_run_utc": "",
-            "notes": row.get("notes", ""),
-            "segment_purpose": row.get("segment_purpose", ""),
-            "segment_label": row.get("segment_label", ""),
-        })
+    for old_row in existing_by_id.values():
+        of = old_row.get("output_folder", "")
+        if of:
+            assigned_folders.add(of)
+
+    registry = []
+    for row in eligible_rows:
+        sid = row["segment_id"]
+        old = existing_by_id.get(sid)
+        if old is not None:
+            folder = old.get("output_folder", "") or _sanitize_folder(sid)
+            reg_row = {
+                "segment_id": sid,
+                "parent_segment_id": row["parent_segment_id"],
+                "run_type": row["run_type"],
+                "population_hash": row["population_hash"],
+                "output_folder": folder,
+                "status": old.get("status", "pending"),
+                "last_run_utc": old.get("last_run_utc", ""),
+                "notes": old.get("notes", ""),
+                "segment_purpose": row.get("segment_purpose", ""),
+                "segment_label": row.get("segment_label", ""),
+            }
+            population_changed = old.get("population_hash", "") != row["population_hash"]
+            run_type_changed = old.get("run_type", "") != row["run_type"]
+            if population_changed or run_type_changed:
+                reg_row["status"] = "pending"
+                reg_row["last_run_utc"] = ""
+                reg_row["notes"] = row.get("notes", "")
+                if population_changed:
+                    _append_note(reg_row, "population_changed")
+                if run_type_changed:
+                    _append_note(reg_row, "run_type_changed", f"{old.get('run_type', '')}->{row['run_type']}")
+        else:
+            base = _sanitize_folder(sid)
+            folder = base
+            n = 2
+            while folder in assigned_folders:
+                folder = f"{base}_{n}"
+                n += 1
+            assigned_folders.add(folder)
+            reg_row = {
+                "segment_id": sid,
+                "parent_segment_id": row["parent_segment_id"],
+                "run_type": row["run_type"],
+                "population_hash": row["population_hash"],
+                "output_folder": folder,
+                "status": "pending",
+                "last_run_utc": "",
+                "notes": row.get("notes", ""),
+                "segment_purpose": row.get("segment_purpose", ""),
+                "segment_label": row.get("segment_label", ""),
+            }
+        registry.append(reg_row)
+
+    dropped_ids = sorted(set(existing_by_id) - new_ids)
+    if dropped_ids:
+        sys.stderr.write(
+            f"[WARN] Segment(s) removed from registry (no longer in manifest): "
+            f"{', '.join(dropped_ids)} — review corresponding folders under segments/ "
+            f"for manual cleanup\n"
+        )
+
     return registry
 
 
@@ -361,14 +491,34 @@ def main(argv: List[str] | None = None) -> int:
     if skipped_blank_eid:
         sys.stderr.write(f"[WARN] Excluded {skipped_blank_eid} row(s) with blank export_run_id\n")
 
+    # Normalize once here — for the KNOWN_ROLES check and the aggregated
+    # normalization-change warning below — routing both through the same
+    # helper _build_segments() uses internally, so there is one source of
+    # truth for "what does this dimension value canonically mean" rather than
+    # two independent checks that could drift apart. _build_segments() still
+    # normalizes rows itself when called directly (e.g. from tests), so
+    # passing the original (un-normalized) rows through to it here is safe —
+    # normalization is idempotent.
+    normalized_rows, normalization_changes = _normalize_rows(rows)
+
     KNOWN_ROLES = {"Project", "Template", "Container", "Generic", ""}
     unknown_roles = {
         (r.get("governance_role") or "").strip()
-        for r in rows
+        for r in normalized_rows
         if (r.get("governance_role") or "").strip() not in KNOWN_ROLES
     }
     for role in sorted(unknown_roles):
         sys.stderr.write(f"[WARN] Unrecognised governance_role value in metadata: '{role}' — rows with this role will create unexpected segments\n")
+
+    if normalization_changes:
+        agg: Dict[tuple, int] = defaultdict(int)
+        for field, raw, canon in normalization_changes:
+            agg[(field, raw, canon)] += 1
+        for (field, raw, canon), count in sorted(agg.items()):
+            sys.stderr.write(
+                f"[WARN] Normalized {field} '{raw}' -> '{canon}' ({count} row(s)) — "
+                f"check file_metadata.csv for manual-edit typos\n"
+            )
 
     manifest_rows = _build_segments(rows, min_files, args.enable_cross_org_template_bundles, args.enable_parent_bundle_runs)
 
@@ -389,10 +539,14 @@ def main(argv: List[str] | None = None) -> int:
         if len(segs) > 1:
             sys.stderr.write(f"[WARN] Duplicate bundle population_hash {pop_hash}: {', '.join(sorted(segs))}\n")
 
-    registry_rows = _build_registry(manifest_rows)
-
     manifest_path = out_dir / "segment_manifest.csv"
     registry_path = out_dir / "run_registry.csv"
+
+    existing_registry_rows: List[Dict[str, str]] | None = None
+    if registry_path.is_file():
+        _, existing_registry_rows = _read_csv(registry_path)
+
+    registry_rows = _build_registry(manifest_rows, existing_registry=existing_registry_rows)
 
     _atomic_write_csv(manifest_path, MANIFEST_FIELDNAMES, manifest_rows)
     _atomic_write_csv(registry_path, REGISTRY_FIELDNAMES, registry_rows)

@@ -780,6 +780,15 @@ def _run_one_segment(
             ids_file = out_root / "export_run_ids.txt"
             ids_file.write_text("\n".join(export_run_ids) + "\n", encoding="utf-8")
 
+            # _ensure_latent_purgeable() in run_bundle_analysis.py short-circuits
+            # if this file already exists, so a stale one from this segment's
+            # prior population would make the "used" view compute purgeability
+            # against the old file set. This step only runs for segments that
+            # are actually being (re)processed (skipped-complete segments never
+            # reach here), so it is always safe to drop the cached file and let
+            # it regenerate fresh against the current export_run_ids.
+            (segment_records_dir / "latent_purgeable.csv").unlink(missing_ok=True)
+
             _write_segment_records(records_dir, segment_records_dir, set(export_run_ids))
         except Exception as exc:
             step_failed = "prepare"
@@ -1080,13 +1089,22 @@ def run_orchestrator(args: argparse.Namespace) -> int:
     if segment_plans:
         preshard_marker = records_dir / _CORPUS_PRESHARD_MARKER
         _do_preshard = False
+        # The corpus marker only means "nothing needs fresh sharded records" if
+        # every planned segment is already complete. A registry-driven skip run
+        # (default, no --force) can carry pending segments whose population
+        # just changed — those need their records.csv/identity shards refreshed
+        # even though the marker predates that change, otherwise _write_segment_records()'s
+        # per-segment .preshard_complete fallback marker (also stale) causes the
+        # segment to run against its OLD population while export_run_ids.txt
+        # reflects the NEW one.
+        _has_pending = any(plan.get("status") != "complete" for plan in segment_plans.values())
         if args.no_preshard:
             print("[orchestrator] preshard skipped (--no-preshard)", flush=True)
         elif args.force_preshard or args.force:
             _do_preshard = True
             preshard_marker.unlink(missing_ok=True)
-        elif preshard_marker.is_file():
-            print("[orchestrator] preshard skipped (corpus marker found)", flush=True)
+        elif preshard_marker.is_file() and not _has_pending:
+            print("[orchestrator] preshard skipped (corpus marker found, no pending segments)", flush=True)
         else:
             _do_preshard = True
 

@@ -1,6 +1,7 @@
 param(
     [ValidateSet("A","B","C")]
-    [string]$Run = ""
+    [string]$Run = "",
+    [switch]$ForceAll
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,6 +23,12 @@ if ($Run -eq "") {
     Write-Host "  .\corpus_update_runbook.ps1 -Run A    # flatten + apply + placeholders"
     Write-Host "  .\corpus_update_runbook.ps1 -Run B    # authority + patterns + patch"
     Write-Host "  .\corpus_update_runbook.ps1 -Run C    # segments + all/used bundle analysis (use compare_cross_segment.py for cross-segment comparison)"
+    Write-Host "  .\corpus_update_runbook.ps1 -Run C -ForceAll   # Run C, but re-run every segment regardless of registry status"
+    Write-Host ""
+    Write-Host "  -ForceAll (Run C only): registry-driven skip is the default - a segment is"
+    Write-Host "    re-run only if its file population changed since the last complete run."
+    Write-Host "    Pass -ForceAll after a sig_hash/join_hash policy change (population_hash is"
+    Write-Host "    membership-only and cannot detect those) to force a full-corpus rebuild."
     Write-Host ""
     Write-Host "MANDATORY PAUSE between Run A and Run B:"
     Write-Host "  Edit $RECORDS\file_metadata.csv"
@@ -84,19 +91,26 @@ if ($Run -eq "C") {
         --enable-parent-bundle-runs
 
     # C1.5: latent_purgeable.csv is created once and cached forever by
-    # _ensure_latent_purgeable() in run_bundle_analysis.py — it does NOT
+    # _ensure_latent_purgeable() in run_bundle_analysis.py - it does NOT
     # refresh on its own when upstream records/identity_items change.
-    # Since Run C already fully reprocesses every segment, force a clean
-    # rebuild here rather than silently reusing stale purgeability data.
-    Write-Host "--- C1.5: clear stale latent_purgeable.csv ---" -ForegroundColor Cyan
-    Get-ChildItem -Path $SEGMENTS -Recurse -Filter "latent_purgeable.csv" -ErrorAction SilentlyContinue | Remove-Item -Force
-    $corpusLatentPurgeable = "$RECORDS\latent_purgeable.csv"
-    if (Test-Path $corpusLatentPurgeable) { Remove-Item $corpusLatentPurgeable -Force }
-	
+    # Only clear it on a -ForceAll full-corpus rebuild: registry-driven skip
+    # (default) leaves untouched segments' cached data alone, since orchestrator
+    # never revisits a skipped segment to regenerate this file.
+    if ($ForceAll) {
+        Write-Host "--- C1.5: clear stale latent_purgeable.csv (-ForceAll) ---" -ForegroundColor Cyan
+        Get-ChildItem -Path $SEGMENTS -Recurse -Filter "latent_purgeable.csv" -ErrorAction SilentlyContinue | Remove-Item -Force
+        $corpusLatentPurgeable = "$RECORDS\latent_purgeable.csv"
+        if (Test-Path $corpusLatentPurgeable) { Remove-Item $corpusLatentPurgeable -Force }
+    } else {
+        Write-Host "--- C1.5: skipped (pass -ForceAll to clear cached latent_purgeable.csv) ---" -ForegroundColor Cyan
+    }
+
     # The orchestrator invokes run_bundle_analysis.py with --purge-view both,
     # producing results/bundle_analysis/all/... and results/bundle_analysis/used/...
     # for downstream governance comparisons.
     Write-Host "--- C2: segment orchestrator (produces all-view and used-view bundle analysis) ---" -ForegroundColor Cyan
+    $forceArg = @()
+    if ($ForceAll) { $forceArg = @("--force") }
     python tools/run_segment_orchestrator.py `
         --manifest-file "$RECORDS\segment_manifest.csv" `
         --registry-file "$RECORDS\run_registry.csv" `
@@ -105,8 +119,8 @@ if ($Run -eq "C") {
         --exports-dir $EXPORTS `
         --segments-root $SEGMENTS `
         --repo-root $REPO `
-        --force `
-        --join-policy $JOIN_POL
+        --join-policy $JOIN_POL `
+        @forceArg
 
     Write-Host "--- C2.5: rebuild BI results registry ---" -ForegroundColor Cyan
     python tools\build_results_registry.py `
@@ -132,8 +146,14 @@ if ($Run -eq "C") {
 #   Run: .\tools\label_refresh_runbook.ps1
 #   Synthesizes fragmented labels, patches all domain_patterns.csv files,
 #   and exports bundle pattern detail CSVs for Power BI.
-#   C2 (segments)  - --force re-runs all; use --segment <id> for one segment
-#                    emits both all-view (full configured vocabulary) and used-view
+#   C2 (segments)  - registry-driven skip by default: a segment only re-runs if its
+#                    file population changed since the last complete run (see
+#                    run_registry.csv population_hash). Pass -ForceAll to this script
+#                    to re-run every segment regardless of registry status (needed
+#                    after a sig_hash/join_hash policy change, since population_hash
+#                    is membership-only and won't detect that). Orchestrator's own
+#                    --segment <id> / --force flags still work for targeted manual runs.
+#                    Emits both all-view (full configured vocabulary) and used-view
 #                    (excluding conclusively purgeable records) bundle analysis.
 #                    Used/purge interpretation is meaningful primarily for Project
 #                    targets, not Template/Generic standards stock.
