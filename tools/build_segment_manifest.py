@@ -8,7 +8,7 @@ from typing import Dict,Iterable,List,Sequence
 
 SEED_ROLES={"Template","Container"}
 REQUIRED_COLUMNS={"export_run_id","unit_system","client_label","governance_role"}
-MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","discipline_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","has_seed_file","population_hash","notes","segment_purpose","segment_label"]
+MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","discipline_label","business_center_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","has_seed_file","population_hash","notes","segment_purpose","segment_label"]
 REGISTRY_FIELDNAMES=["segment_id","parent_segment_id","run_type","population_hash","conformance_reference_mode","output_folder","status","last_run_utc","notes","segment_purpose","segment_label"]
 MEMBERSHIP_FIELDNAMES=["segment_id","export_run_id","is_seed"]
 DIMENSION_CONFIG = [
@@ -16,10 +16,10 @@ DIMENSION_CONFIG = [
     {"field": "governance_role", "type": "governance"},
     {"field": "client_label", "type": "cut"},
     {"field": "discipline_label", "type": "cut"},
+    {"field": "business_center_label", "type": "cut"},
     # Future cut dimensions added here:
     # {"field": "region", "type": "cut"},
     # {"field": "office_location", "type": "cut"},
-    # {"field": "business_center", "type": "cut"},
 ]
 
 def _read_csv(path: Path) -> tuple:
@@ -83,6 +83,18 @@ _GOVERNANCE_ROLE_CANONICAL = {
     "project": "Project", "template": "Template", "container": "Container", "generic": "Generic",
 }
 
+_NA_TOKEN_STRIP_RE = re.compile(r"[^a-z0-9]")
+_NA_TOKENS = {"na", "notapplicable"}
+
+def _is_na_token(value: str) -> bool:
+    """True for any spelling of "not applicable" (na, n/a, N/A, not applicable,
+    not_applicable, __NOT_APPLICABLE__, ...). Blank is a distinct signal — "not
+    yet filled in" per corpus_update_runbook.ps1's A->B pause checklist — and is
+    handled separately; this only recognizes values that explicitly assert "does
+    not apply" so they normalize to blank instead of leaking into segment_id as
+    a literal token (e.g. "imperial|__NOT_APPLICABLE__")."""
+    return _NA_TOKEN_STRIP_RE.sub("", value.lower()) in _NA_TOKENS
+
 def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], List[tuple]]":
     """Case-normalize DIMENSION_CONFIG fields before they enter segment_id
     construction, so a manual-edit typo (e.g. "Imperial" vs "imperial" during
@@ -104,6 +116,13 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
         to the casing of the first occurrence in row order. `rows` is a list,
         not a set/dict, so "first occurrence" is deterministic regardless of
         any hash/iteration order.
+      - Any DIMENSION_CONFIG field whose value is a recognized "not applicable"
+        spelling (see _is_na_token) folds to blank ("") ahead of the
+        field-specific rule above. Blank means "not yet filled in" (a manual-
+        entry todo); an explicit N/A spelling means "reviewed, does not apply" —
+        both must behave identically for segment-key purposes (neither should
+        leak into segment_id as a literal token), but only the N/A case is
+        folded here since blank cells are already blank.
 
     Returns (normalized_rows, changes) where changes is a list of
     (field, raw_value, normalized_value) tuples, one per row-field whose value
@@ -119,6 +138,10 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
         for field in fields:
             raw = (row.get(field) or "").strip()
             if not raw:
+                continue
+            if _is_na_token(raw):
+                changes.append((field, raw, ""))
+                new_row[field] = ""
                 continue
             if field == "unit_system":
                 canon = raw.lower()
@@ -170,10 +193,14 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         root_value = dim_values.get(root_field, "")
         if not root_value:
             continue
+        # Blank client_label participates in subset generation like any other
+        # value (as the pair (client_field, "")) — it is not special-cased to
+        # strip governance_role/discipline_label/business_center_label out of
+        # non_root_pairs. Previously, a blank-client row only ever populated
+        # the root and root+client("") keys, so it was invisible to every
+        # role-scoped and business-center-scoped segment and only ever landed
+        # in one governance-agnostic pool at (root, client="").
         non_root_pairs = [(f, dim_values[f]) for f in cfg_fields if f != root_field and f in dim_values]
-        client_is_blank = (client_field in dim_values and dim_values.get(client_field, "") == "")
-        if client_is_blank:
-            non_root_pairs = [pair for pair in non_root_pairs if pair[0] == client_field]
         for size in range(len(non_root_pairs) + 1):
             for subset in combinations(non_root_pairs, size):
                 key = frozenset([(root_field, root_value), *subset])
@@ -221,6 +248,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             "governance_role": dim_map.get(governance_field, ""),
             "client_label": dim_map.get(client_field, ""),
             "discipline_label": dim_map.get("discipline_label", ""),
+            "business_center_label": dim_map.get("business_center_label", ""),
             "extra_dimensions": "|".join(extra),
             "ancestor_segment_ids": "|".join(ancestor_ids),
             "run_type": "",
@@ -287,38 +315,83 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     # purpose/label
     def child_span(r):
         row_key = row_to_key[id(r)]
-        cs={key_to_row[k]["client_label"] for k in key_to_children.get(row_key,[]) if key_to_row[k]["segment_level"]=="3" and key_to_row[k]["client_label"]}
+        # A distinct scope is either a real client_label or a real
+        # business_center_label on a level-3 child — the two are mutually
+        # exclusive per row today, so `or` picks whichever one differentiates
+        # that child. Without counting business_center_label here, a Template
+        # pool whose only children are BC-scoped (no client-having children at
+        # all) would look like it has zero distinct children and get wrongly
+        # collapsed as "redundant_single_child" even when multiple distinct
+        # business centers are present.
+        cs={
+            key_to_row[k]["client_label"] or key_to_row[k]["business_center_label"]
+            for k in key_to_children.get(row_key,[])
+            if key_to_row[k]["segment_level"]=="3"
+            and (key_to_row[k]["client_label"] or key_to_row[k]["business_center_label"])
+        }
         return "multi_client" if len(cs)>1 else "single_client"
     for r in rows_out:
         pur="insufficient_population" if r["run_type"]=="skip" else ""
         lev,role,rt=int(r["segment_level"]),r["governance_role"],r["run_type"]
         disc=r["discipline_label"]
-        is_disc_cut=bool(disc and not r["client_label"])
+        bc=r["business_center_label"]
+        # client_label and business_center_label are mutually exclusive "why
+        # was this captured" scopes; each is a distinct differentiator, so a
+        # level-3/4 segment is only "disc cut" or "bc cut" when the other
+        # scope isn't also present in that segment's key.
+        is_disc_cut=bool(disc and not r["client_label"] and not bc)
         is_client_disc_cut=bool(disc and r["client_label"])
+        is_bc_cut=bool(bc and not r["client_label"] and not disc)
+        is_bc_disc_cut=bool(bc and disc and not r["client_label"])
+        # True when a role-scoped key has no other dimension in play — covers
+        # both the plain level-2 {role} key and its level-3 "twin"
+        # {role, client=""} produced by client_label's always-present-even-
+        # blank dim_values treatment (see non_root_pairs comment above).
+        is_role_alone=bool(not disc and not bc and not r["client_label"])
         if lev==1: pur="population_denominator"
         elif lev == 2 and r["client_label"] and not role:
             pur = "client_population"
-        elif lev==2 and role=="Template":
+        elif lev == 2 and bc and not role:
+            pur = "business_center_population"
+        elif lev in (2,3) and is_role_alone and role=="Template":
             if rt=="bundle": pur="cross_template_agreement"
             elif rt in {"registration","reference"}: pur="cross_org_template_pool" if child_span(r)=="multi_client" else "redundant_single_child"
-        elif lev==2 and role=="Project": pur="cross_project_practice" if rt=="bundle" else "practiced_standards_corpus"
-        elif lev==2 and role=="Container": pur="coordination_corpus"
-        elif lev==2 and role=="Generic" and rt=="reference": pur="generic_reference_corpus"
-        elif lev==3 and is_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="discipline_templates"
-        elif lev==3 and is_disc_cut and role=="Project": pur="discipline_practice" if rt=="bundle" else "insufficient_population"
-        elif lev==3 and is_disc_cut and role=="Container": pur="discipline_coordination"
-        elif lev==3 and is_disc_cut and role=="Generic" and rt=="reference": pur="discipline_reference"
-        elif lev==3 and role=="Template" and rt in {"bundle","reference"}: pur="client_standard_anchor"
-        elif lev==3 and role=="Project": pur="client_practice" if rt=="bundle" else "insufficient_population"
-        elif lev==3 and role=="Container": pur="client_coordination"
-        elif lev==3 and role=="Generic" and rt=="reference": pur="client_reference"
+        elif lev in (2,3) and is_role_alone and role=="Project": pur="cross_project_practice" if rt=="bundle" else "practiced_standards_corpus"
+        elif lev in (2,3) and is_role_alone and role=="Container": pur="coordination_corpus"
+        elif lev in (2,3) and is_role_alone and role=="Generic" and rt=="reference": pur="generic_reference_corpus"
+        # lev in (3,4)/(4,5) rather than a single level: client_label is the
+        # only field always present in dim_values (even blank), so every
+        # combo not involving a real client has a "twin" one level deeper
+        # with a redundant (client, "") pair tacked on — e.g. both
+        # {role,discipline} (lev 3) and {role,client="",discipline} (lev 4)
+        # are reachable for a blank-client row. The two are population-
+        # identical and pass5 below collapses whichever is shallower into a
+        # "redundant_single_child" pointer at the other — but which one
+        # survives as the real "bundle"/"reference" segment depends on
+        # sibling shape, so both levels need the same purpose branch.
+        elif lev in (3,4) and is_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="discipline_templates"
+        elif lev in (3,4) and is_disc_cut and role=="Project": pur="discipline_practice" if rt=="bundle" else "insufficient_population"
+        elif lev in (3,4) and is_disc_cut and role=="Container": pur="discipline_coordination"
+        elif lev in (3,4) and is_disc_cut and role=="Generic" and rt=="reference": pur="discipline_reference"
+        elif lev in (3,4) and is_bc_cut and role=="Template" and rt in {"bundle","reference"}: pur="business_center_standard_anchor"
+        elif lev in (3,4) and is_bc_cut and role=="Project": pur="business_center_practice" if rt=="bundle" else "insufficient_population"
+        elif lev in (3,4) and is_bc_cut and role=="Container": pur="business_center_coordination"
+        elif lev in (3,4) and is_bc_cut and role=="Generic" and rt=="reference": pur="business_center_reference"
+        elif lev==3 and role=="Template" and r["client_label"] and rt in {"bundle","reference"}: pur="client_standard_anchor"
+        elif lev==3 and role=="Project" and r["client_label"]: pur="client_practice" if rt=="bundle" else "insufficient_population"
+        elif lev==3 and role=="Container" and r["client_label"]: pur="client_coordination"
+        elif lev==3 and role=="Generic" and r["client_label"] and rt=="reference": pur="client_reference"
         elif lev==4 and is_client_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="client_discipline_standard_anchor"
         elif lev==4 and is_client_disc_cut and role=="Project": pur="client_discipline_practice" if rt=="bundle" else "insufficient_population"
         elif lev==4 and is_client_disc_cut and role=="Container": pur="client_discipline_coordination"
         elif lev==4 and is_client_disc_cut and role=="Generic" and rt=="reference": pur="client_discipline_reference"
+        elif lev in (4,5) and is_bc_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="business_center_discipline_standard_anchor"
+        elif lev in (4,5) and is_bc_disc_cut and role=="Project": pur="business_center_discipline_practice" if rt=="bundle" else "insufficient_population"
+        elif lev in (4,5) and is_bc_disc_cut and role=="Container": pur="business_center_discipline_coordination"
+        elif lev in (4,5) and is_bc_disc_cut and role=="Generic" and rt=="reference": pur="business_center_discipline_reference"
         r["segment_purpose"]=pur
         unit=r["unit_system"].title(); client=r["client_label"]; sid=r["segment_id"]
-        templates={"population_denominator":f"All {unit} files","cross_org_template_pool":f"{unit} templates — all organisations (registration only)","cross_template_agreement":f"{unit} templates — cross-template agreement","practiced_standards_corpus":f"{unit} projects — full corpus","cross_project_practice":f"{unit} projects — cross-project practice","coordination_corpus":f"{unit} coordination files","generic_reference_corpus":f"{unit} generic reference","client_population":f"{client} — all roles combined","client_standard_anchor":f"{client} templates — standards as authored","client_practice":f"{client} projects — standards as practiced","client_coordination":f"{client} coordination files","client_reference":f"{client} generic reference","insufficient_population":f"{sid} — below minimum file threshold","discipline_practice":f"{disc} projects — standards as practiced","discipline_templates":f"{disc} templates — standards as authored","discipline_coordination":f"{disc} coordination files","discipline_reference":f"{disc} generic reference","client_discipline_standard_anchor":f"{client} {disc} templates — standards as authored","client_discipline_practice":f"{client} {disc} projects — standards as practiced","client_discipline_coordination":f"{client} {disc} coordination files","client_discipline_reference":f"{client} {disc} generic reference"}
+        templates={"population_denominator":f"All {unit} files","cross_org_template_pool":f"{unit} templates — all organisations (registration only)","cross_template_agreement":f"{unit} templates — cross-template agreement","practiced_standards_corpus":f"{unit} projects — full corpus","cross_project_practice":f"{unit} projects — cross-project practice","coordination_corpus":f"{unit} coordination files","generic_reference_corpus":f"{unit} generic reference","client_population":f"{client} — all roles combined","client_standard_anchor":f"{client} templates — standards as authored","client_practice":f"{client} projects — standards as practiced","client_coordination":f"{client} coordination files","client_reference":f"{client} generic reference","insufficient_population":f"{sid} — below minimum file threshold","discipline_practice":f"{disc} projects — standards as practiced","discipline_templates":f"{disc} templates — standards as authored","discipline_coordination":f"{disc} coordination files","discipline_reference":f"{disc} generic reference","client_discipline_standard_anchor":f"{client} {disc} templates — standards as authored","client_discipline_practice":f"{client} {disc} projects — standards as practiced","client_discipline_coordination":f"{client} {disc} coordination files","client_discipline_reference":f"{client} {disc} generic reference","business_center_population":f"{bc} — all roles combined","business_center_standard_anchor":f"{bc} templates — standards as authored","business_center_practice":f"{bc} projects — standards as practiced","business_center_coordination":f"{bc} coordination files","business_center_reference":f"{bc} generic reference","business_center_discipline_standard_anchor":f"{bc} {disc} templates — standards as authored","business_center_discipline_practice":f"{bc} {disc} projects — standards as practiced","business_center_discipline_coordination":f"{bc} {disc} coordination files","business_center_discipline_reference":f"{bc} {disc} generic reference"}
         if r["segment_purpose"]:
             r["segment_label"]=templates.get(r["segment_purpose"],sid)
         else:
