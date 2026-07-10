@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -726,6 +727,45 @@ def build_run_plan(
     return plan
 
 
+def validate_membership_against_manifest(
+    plan: List[tuple[dict, dict]],
+    membership: Dict[str, List[str]],
+) -> List[str]:
+    """Return one error string per segment where segment_membership.csv disagrees
+    with segment_manifest.csv's file_count/population_hash for that segment_id.
+
+    Guards against a stale or mismatched segment_membership.csv silently driving
+    a segment's export_run_ids.txt/preshard population — e.g. build_segment_manifest.py
+    interrupted after replacing segment_manifest.csv/run_registry.csv but before
+    replacing segment_membership.csv, or a custom --membership-file pointing at
+    the wrong sidecar. A mismatch here means population_hash/file_count on the
+    manifest row describe a different population than the membership rows
+    actually loaded, which could mark a segment complete for the wrong file set.
+    """
+    errors: List[str] = []
+    for reg_row, mrow in plan:
+        sid = reg_row.get("segment_id", "").strip()
+        if not sid:
+            continue
+        ids = membership.get(sid, [])
+        expected_count = (mrow.get("file_count") or "").strip()
+        if expected_count and str(len(ids)) != expected_count:
+            errors.append(
+                f"segment={sid}: segment_membership.csv has {len(ids)} export_run_id(s) "
+                f"but segment_manifest.csv file_count={expected_count}"
+            )
+            continue
+        expected_hash = (mrow.get("population_hash") or "").strip()
+        if expected_hash:
+            actual_hash = hashlib.sha1("|".join(sorted(ids)).encode()).hexdigest()
+            if actual_hash != expected_hash:
+                errors.append(
+                    f"segment={sid}: segment_membership.csv population_hash={actual_hash} "
+                    f"does not match segment_manifest.csv population_hash={expected_hash}"
+                )
+    return errors
+
+
 def _run_one_segment(
     idx: int,
     total: int,
@@ -1008,6 +1048,18 @@ def run_orchestrator(args: argparse.Namespace) -> int:
     plan = build_run_plan(
         manifest, registry, args.segment, args.force
     )
+
+    membership_errors = validate_membership_against_manifest(plan, membership)
+    if membership_errors:
+        sys.stderr.write(
+            f"[ERROR orchestrator] segment_membership.csv ({membership_file}) disagrees "
+            f"with segment_manifest.csv ({manifest_file}) for {len(membership_errors)} "
+            f"segment(s) — refusing to run against a possibly stale or mismatched "
+            f"membership file. Re-run build_segment_manifest.py, or check --membership-file:\n"
+        )
+        for err in membership_errors:
+            sys.stderr.write(f"  {err}\n")
+        return 1
 
     total = len(plan)
     n_complete = 0
