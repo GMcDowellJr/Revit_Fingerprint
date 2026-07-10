@@ -42,6 +42,15 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   target's own file population is unchanged) or `current`.
 
 ### Fixed
+- `build_segment_manifest.py` `_build_registry()`: the new `new_files`/`removed_files`
+  reason diff reused the name `new_ids` for the per-segment export_run_id diff,
+  shadowing the outer `new_ids` (the full eligible segment_id set) used later to
+  compute `dropped_ids`. Any retained segment whose population changed left
+  `new_ids` holding export_run_ids instead of segment_ids, so every other
+  still-present segment was reported as removed from the registry with a false
+  "review corresponding folders for manual cleanup" warning. Renamed the
+  per-segment locals to `old_export_ids`/`new_export_ids` so they no longer
+  collide with the outer set.
 - line_patterns sig_hash policy corrected to segments_def_hash (sig_hash.v2):
   segments_norm_hash was incorrectly used as sig_hash basis — it belongs in join_hash only.
   sig_hash answers exact identity (scale variants are distinct records);

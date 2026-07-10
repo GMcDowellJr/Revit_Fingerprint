@@ -387,10 +387,10 @@ def _build_registry(
                 reg_row["notes"] = row.get("notes", "")
                 if population_changed:
                     _append_note(reg_row, "population_changed")
-                    old_ids = {x for x in old.get("export_run_ids", "").split("|") if x}
-                    new_ids = {x for x in row.get("export_run_ids", "").split("|") if x}
-                    added = new_ids - old_ids
-                    removed = old_ids - new_ids
+                    old_export_ids = {x for x in old.get("export_run_ids", "").split("|") if x}
+                    new_export_ids = {x for x in row.get("export_run_ids", "").split("|") if x}
+                    added = new_export_ids - old_export_ids
+                    removed = old_export_ids - new_export_ids
                     # A population_hash change is purely a function of the
                     # export_run_id set, so at least one of added/removed is always
                     # non-empty here — this also covers a metadata edit that moves a

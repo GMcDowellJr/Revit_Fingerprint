@@ -1034,6 +1034,27 @@ def test_registry_both_new_and_removed_files_reasons_when_combined_change():
     assert "removed_files:1" in kaiser2["notes"]
 
 
+def test_registry_new_files_reason_does_not_cause_false_removal_warnings(capsys):
+    # Regression guard: diffing export_run_ids inside the population_changed
+    # branch must not clobber the outer new_ids (segment_id set) used later
+    # for dropped_ids — otherwise a plain file add to one segment would make
+    # every other still-present segment look "removed" and trigger a false
+    # cleanup warning.
+    segs1 = _build_segments(ROWS, min_files=3)
+    reg1 = _build_registry(segs1)
+
+    rows2 = ROWS + [_meta_row("r11", "imperial", "Kaiser", "Project")]
+    segs2 = _build_segments(rows2, min_files=3)
+    reg2 = _build_registry(segs2, existing_registry=reg1)
+
+    reg2_ids = {r["segment_id"] for r in reg2}
+    reg1_ids = {r["segment_id"] for r in reg1}
+    assert reg1_ids <= reg2_ids, "no segment should appear removed when only a file was added"
+
+    captured = capsys.readouterr()
+    assert "removed from registry" not in captured.err
+
+
 def test_registry_no_reason_notes_for_brand_new_segment():
     # A segment that didn't exist in the prior registry is "new", not "stale" —
     # it must not carry population_changed/new_files/removed_files reasons.
