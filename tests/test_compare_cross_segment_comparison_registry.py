@@ -92,13 +92,13 @@ def test_comparison_staleness_is_isolated_per_domain():
     assert comparison_is_stale("t", "p", "template_to_project", "object_styles_model", registry, existing) is True
 
 
-def test_build_comparison_registry_rows_stamps_current_work_items():
+def test_build_comparison_registry_rows_stamps_completed_work_items():
     registry = {
         "t": _reg_row(population_hash="h1", conformance_reference_mode="latest"),
         "p": _reg_row(population_hash="h2"),
     }
-    work_items = [("t", "p", "template_to_project", "line_patterns")]
-    rows = build_comparison_registry_rows(work_items, registry, existing={}, computed_utc="2026-07-10T00:00:00Z")
+    completed_work_items = [("t", "p", "template_to_project", "line_patterns")]
+    rows = build_comparison_registry_rows(completed_work_items, registry, computed_utc="2026-07-10T00:00:00Z")
     assert len(rows) == 1
     row = rows[0]
     assert row["segment_id_a"] == "t"
@@ -110,79 +110,61 @@ def test_build_comparison_registry_rows_stamps_current_work_items():
     assert row["computed_utc"] == "2026-07-10T00:00:00Z"
 
 
-def test_build_comparison_registry_rows_carries_over_work_items_not_recomputed():
-    # A --segment-a filtered run only recomputes a subset of work items;
-    # previously recorded (pair, domain) entries outside that filter must
-    # survive untouched.
+def test_build_comparison_registry_rows_is_a_full_snapshot_no_carryover():
+    # Every other output this tool writes (cross_segment_summary.csv etc.) is
+    # a full atomic_write_csv replace from only this invocation's rows, never
+    # a merge with a prior file. comparison_registry.csv must match that
+    # semantics exactly: entries from a prior run that were NOT recomputed
+    # this run must not appear in the output at all — carrying them forward
+    # would claim data is current when the underlying output row was already
+    # destroyed by this same (possibly scoped) invocation.
     registry = {"t": _reg_row(population_hash="h1"), "p": _reg_row(population_hash="h2")}
-    existing = {
-        ("other_a", "other_b", "sibling_projects", "line_patterns"): {
-            "segment_id_a": "other_a", "segment_id_b": "other_b",
-            "comparison_type": "sibling_projects", "domain": "line_patterns",
-            "population_hash_a": "x1", "population_hash_b": "x2",
-            "last_run_utc_a": "", "last_run_utc_b": "",
-            "conformance_reference_mode": "latest", "computed_utc": "2026-06-01T00:00:00Z",
-        }
-    }
-    work_items = [("t", "p", "template_to_project", "line_patterns")]
-    rows = build_comparison_registry_rows(work_items, registry, existing, computed_utc="2026-07-10T00:00:00Z")
+    completed_work_items = [("t", "p", "template_to_project", "line_patterns")]
+    rows = build_comparison_registry_rows(completed_work_items, registry, computed_utc="2026-07-10T00:00:00Z")
     keys = {(r["segment_id_a"], r["segment_id_b"], r["comparison_type"], r["domain"]) for r in rows}
-    assert ("t", "p", "template_to_project", "line_patterns") in keys
-    assert ("other_a", "other_b", "sibling_projects", "line_patterns") in keys
-    carried = next(r for r in rows if r["segment_id_a"] == "other_a")
-    assert carried["computed_utc"] == "2026-06-01T00:00:00Z"
+    assert keys == {("t", "p", "template_to_project", "line_patterns")}
 
 
-def test_build_comparison_registry_rows_domain_scoped_run_does_not_stamp_other_domains():
-    # This is the exact scenario the staleness tracking must get right: a
-    # --domain line_patterns invocation only recomputes line_patterns for a
-    # pair that also has object_styles_model comparisons on record. The
-    # object_styles_model row must survive with its OLD stamp — not be
-    # silently re-stamped current — or a later --dry-run would wrongly report
-    # it as up to date despite never having been recomputed.
+def test_build_comparison_registry_rows_domain_scoped_run_omits_other_domains():
+    # A --domain line_patterns invocation only recomputes line_patterns for a
+    # pair that also has object_styles_model comparisons on record. The prior
+    # object_styles_model output row was already wiped by this run sharing
+    # the same --out-dir (cross_segment_summary.csv is fully overwritten from
+    # only this run's rows), so its registry entry must be OMITTED — not
+    # carried over with a stale-but-present stamp — so the next --dry-run
+    # correctly reports it as never-computed/stale rather than current.
     registry = {
         "t": _reg_row(population_hash="h1-new"),  # template just re-ran with new files
         "p": _reg_row(population_hash="h2"),
     }
-    existing = {
-        ("t", "p", "template_to_project", "line_patterns"): {
-            "segment_id_a": "t", "segment_id_b": "p",
-            "comparison_type": "template_to_project", "domain": "line_patterns",
-            "population_hash_a": "h1-old", "population_hash_b": "h2",
-            "last_run_utc_a": "", "last_run_utc_b": "",
-            "conformance_reference_mode": "latest", "computed_utc": "2026-06-01T00:00:00Z",
-        },
-        ("t", "p", "template_to_project", "object_styles_model"): {
-            "segment_id_a": "t", "segment_id_b": "p",
-            "comparison_type": "template_to_project", "domain": "object_styles_model",
-            "population_hash_a": "h1-old", "population_hash_b": "h2",
-            "last_run_utc_a": "", "last_run_utc_b": "",
-            "conformance_reference_mode": "latest", "computed_utc": "2026-06-01T00:00:00Z",
-        },
-    }
     # Only line_patterns was recomputed this run (e.g. --domain line_patterns).
-    work_items = [("t", "p", "template_to_project", "line_patterns")]
-    rows = build_comparison_registry_rows(work_items, registry, existing, computed_utc="2026-07-10T00:00:00Z")
+    completed_work_items = [("t", "p", "template_to_project", "line_patterns")]
+    rows = build_comparison_registry_rows(completed_work_items, registry, computed_utc="2026-07-10T00:00:00Z")
 
-    line_patterns_row = next(r for r in rows if r["domain"] == "line_patterns")
-    object_styles_row = next(r for r in rows if r["domain"] == "object_styles_model")
+    domains = {r["domain"] for r in rows}
+    assert domains == {"line_patterns"}
 
-    # The recomputed domain gets a fresh stamp reflecting the template's new population.
-    assert line_patterns_row["population_hash_a"] == "h1-new"
-    assert line_patterns_row["computed_utc"] == "2026-07-10T00:00:00Z"
-
-    # The domain that was NOT recomputed keeps its old stamp untouched, so a
-    # later --dry-run still reports it stale (population_hash_a stayed at the
-    # old value even though the live registry has moved to h1-new).
-    assert object_styles_row["population_hash_a"] == "h1-old"
-    assert object_styles_row["computed_utc"] == "2026-06-01T00:00:00Z"
-    stale_check_registry = {"t": _reg_row(population_hash="h1-new"), "p": _reg_row(population_hash="h2")}
     rebuilt_registry = {
         (r["segment_id_a"], r["segment_id_b"], r["comparison_type"], r["domain"]): r for r in rows
     }
+    # No recorded stamp at all for object_styles_model on this pair — a later
+    # --dry-run must treat it as stale (never computed), never "current".
     assert comparison_is_stale(
-        "t", "p", "template_to_project", "object_styles_model", stale_check_registry, rebuilt_registry
+        "t", "p", "template_to_project", "object_styles_model", registry, rebuilt_registry
     ) is True
+
+
+def test_build_comparison_registry_rows_omits_work_items_with_no_output():
+    # run_pair()/_run_pair_domain() returning None (e.g. a domain below
+    # --min-patterns, or a within-project pair with no eligible file pairs)
+    # means no output row was ever written for that (pair, domain) — the
+    # caller must exclude such items from completed_work_items before calling
+    # this function, so it never gets a "current" stamp for data that
+    # doesn't exist.
+    registry = {"t": _reg_row(population_hash="h1"), "p": _reg_row(population_hash="h2")}
+    completed_work_items = []  # nothing produced output this run
+    rows = build_comparison_registry_rows(completed_work_items, registry, computed_utc="2026-07-10T00:00:00Z")
+    assert rows == []
 
 
 def test_load_comparison_registry_roundtrip(tmp_path):

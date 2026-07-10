@@ -42,6 +42,20 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   target's own file population is unchanged) or `current`.
 
 ### Fixed
+- `tools/compare_cross_segment.py` `comparison_registry.csv`: removed the carryover of
+  prior (pair, domain) entries not recomputed this run, and stopped stamping work
+  items that produced no output. Every other output this tool writes
+  (`cross_segment_summary.csv` etc.) is a full `atomic_write_csv` replace from only
+  the current invocation's rows, never a merge — so a `--domain`/`--segment`-scoped
+  run sharing the same `--out-dir` as an earlier full run already destroys those
+  other domains'/pairs' output rows. Carrying their old `comparison_registry.csv`
+  stamp forward falsely claimed that data was still current. The registry is now a
+  full snapshot of only what this invocation actually produced: a scoped run leaves
+  every non-recomputed (pair, domain) with no row at all (correctly staleness-flagged
+  on the next `--dry-run`), and a work item where `run_pair()`/`_run_pair_domain()`
+  returned `None` with no governance-state rows either (e.g. below `--min-patterns`,
+  or a within-project pair with no eligible file pairs) is omitted rather than
+  stamped current for output that was never written.
 - `build_segment_manifest.py` `_build_registry()`: the new `new_files`/`removed_files`
   reason diff reused the name `new_ids` for the per-segment export_run_id diff,
   shadowing the outer `new_ids` (the full eligible segment_id set) used later to

@@ -562,8 +562,16 @@ def load_file_metadata(records_dir: Path) -> Dict[str, Dict[str, str]]:
 # not just the pair. A --domain-scoped invocation only recomputes one domain
 # per pair; stamping at pair granularity would mark every other domain for
 # that pair "current" without having recomputed it, hiding real staleness in
-# a later --dry-run. Domains not in the current work item set keep their
-# prior recorded stamp untouched.
+# a later --dry-run.
+#
+# The file is a full snapshot of this invocation only — never merged with a
+# prior comparison_registry.csv — matching every other output this tool
+# writes (cross_segment_summary.csv etc. are always a full atomic_write_csv
+# replace, never a merge). A --domain/--segment-scoped run sharing the same
+# --out-dir as an earlier full run already destroys those other domains'
+# output rows; carrying their old registry stamp forward would falsely claim
+# they are still current. Only (pair, domain) work items that actually
+# produced a persisted output row this run are written.
 # ---------------------------------------------------------------------------
 
 ComparisonRegistryKey = Tuple[str, str, str, str]  # (seg_a, seg_b, comparison_type, domain)
@@ -584,20 +592,32 @@ def load_comparison_registry(out_dir: Path) -> Dict[ComparisonRegistryKey, Dict[
 
 
 def build_comparison_registry_rows(
-    work_items: Sequence[Tuple[str, str, str, str]],
+    completed_work_items: Sequence[Tuple[str, str, str, str]],
     registry: Dict[str, Dict[str, str]],
-    existing: Dict[ComparisonRegistryKey, Dict[str, str]],
     computed_utc: str,
 ) -> List[Dict[str, str]]:
     """Return comparison_registry.csv rows: a fresh stamp for every (pair,
-    domain) actually recomputed this run (`work_items`), plus untouched
-    carryover for any previously recorded (pair, domain) not recomputed this
-    run (e.g. a --segment-a / --domain-scoped invocation touches only a
-    subset of domains for a pair — the rest must not be re-stamped as
-    current)."""
-    computed_keys = {(a, b, ct, dom) for a, b, ct, dom in work_items}
+    domain) that actually produced output this run (`completed_work_items`).
+
+    Deliberately no carryover of prior comparison_registry.csv rows: every
+    other output this tool writes (cross_segment_summary.csv,
+    cross_segment_file_pairs.csv, ...) is a full atomic_write_csv replace from
+    only this invocation's rows, not a merge — a --domain/--segment-scoped run
+    sharing the same --out-dir as an earlier full run already destroys those
+    other domains'/pairs' output rows. Carrying their old comparison_registry
+    stamp forward would claim they are still "current" when the data backing
+    that claim no longer exists on disk. comparison_registry.csv must mirror
+    the same full-snapshot-of-this-run semantics, so a scoped run correctly
+    makes every non-recomputed (pair, domain) report as stale (no recorded
+    stamp) on the next --dry-run — matching reality.
+
+    Only work items that actually produced a persisted output row are
+    included — `run_pair()`/`_run_pair_domain()` returning None (e.g. a domain
+    below --min-patterns, or a within-project pair with no eligible file
+    pairs) must not get a fresh "current" stamp for output that was never
+    written."""
     rows: List[Dict[str, str]] = []
-    for a, b, ctype, dom in work_items:
+    for a, b, ctype, dom in completed_work_items:
         rec_a = registry.get(a, {})
         rec_b = registry.get(b, {})
         rows.append({
@@ -612,9 +632,6 @@ def build_comparison_registry_rows(
             "conformance_reference_mode": rec_a.get("conformance_reference_mode", "") or "latest",
             "computed_utc": computed_utc,
         })
-    for key, old_row in existing.items():
-        if key not in computed_keys:
-            rows.append(old_row)
     return rows
 
 
@@ -3163,6 +3180,7 @@ def main() -> int:
 
     n_complete = 0
     n_skipped = 0
+    completed_work_items: List[Tuple[str, str, str, str]] = []
 
     t0 = time.perf_counter()
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
@@ -3277,6 +3295,8 @@ def main() -> int:
             else:
                 n_skipped += 1
 
+            produced_output = result is not None
+
             # Governance-state output is independent of legacy run_pair() summary
             # thresholds. Sparse or empty targets still need provided_but_missing
             # rows so missing downstream stock is visible.
@@ -3301,6 +3321,16 @@ def main() -> int:
                     governance_state_rows.extend(state_rows)
                     governance_state_summary_rows.append(state_summary)
                     governance_combo_count += 1
+                    produced_output = True
+
+            # comparison_registry.csv must only stamp (pair, domain) work items
+            # that actually produced a persisted output row somewhere this run
+            # (cross_segment_summary.csv via `result`, or governance-state
+            # output) — a domain below --min-patterns or a within-project pair
+            # with no eligible file pairs must not get a fresh "current" stamp
+            # for output that was never written.
+            if produced_output:
+                completed_work_items.append((seg_a, seg_b, ctype, domain))
 
             done = n_complete + n_skipped
             if done % 50 == 0 or done == len(work_items):
@@ -3478,9 +3508,8 @@ def main() -> int:
     if not summary_rows and not pooled_rows and not governance_state_rows and not union_inventory_rows:
         print("[compare] no comparison rows produced — check segment data and min-patterns threshold")
 
-    existing_comparison_registry = load_comparison_registry(out_dir)
     comparison_registry_rows = build_comparison_registry_rows(
-        work_items, registry, existing_comparison_registry, executed_utc
+        completed_work_items, registry, executed_utc
     )
     atomic_write_csv(out_dir / "comparison_registry.csv", COMPARISON_REGISTRY_FIELDS, comparison_registry_rows)
     print(f"[compare] wrote {len(comparison_registry_rows)} rows → {out_dir / 'comparison_registry.csv'}")
