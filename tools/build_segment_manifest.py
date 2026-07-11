@@ -200,7 +200,17 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         for f in cfg_fields:
             if f not in kv:
                 continue
-            value = kv[f]
+            # Every value's own colons are doubled before the collection:
+            # namespace marker is applied (to collection_label's value, or
+            # left off entirely for other fields). That guarantees a single,
+            # unescaped "collection:" prefix can only ever be produced by
+            # this namespacing step itself — a raw client_label/
+            # business_center_label/discipline_label value that happens to
+            # literally read "collection:Shared" has its colon doubled to
+            # "collection::Shared" first, so it can never collide with a
+            # real collection_label="Shared" row's "collection:Shared"
+            # token, even though only collection_label gets the prefix.
+            value = kv[f].replace(":", "::")
             ns = _SUBSET_ID_NAMESPACED_FIELDS.get(f)
             parts.append(f"{ns}:{value}" if ns and value else value)
         return "|".join(parts)

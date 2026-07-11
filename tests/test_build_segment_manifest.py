@@ -907,6 +907,34 @@ def test_collection_label_value_does_not_collide_with_other_dimension_value():
     )
 
 
+def test_collection_namespace_prefix_itself_cannot_be_forged_by_other_fields():
+    # A business_center_label whose raw value literally IS the reserved
+    # "collection:Shared" token must not collide with a real
+    # collection_label="Shared" row's namespaced "collection:Shared" token.
+    # Without escaping the raw value's own colon, both would render as the
+    # identical segment_id substring "collection:Shared".
+    rows = []
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"forge{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "business_center_label": "collection:Shared", "discipline_label": "",
+        })
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"real{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "collection_label": "Shared", "discipline_label": "",
+        })
+    segs = _build_segments(rows, min_files=3)
+    ids = [r["segment_id"] for r in segs]
+    assert len(ids) == len(set(ids)), f"duplicate segment_id values: {ids}"
+
+    forged = next(r for r in segs if r.get("business_center_label") == "collection:Shared" and r["segment_level"] == "4")
+    real = next(r for r in segs if r.get("collection_label") == "Shared" and r["segment_level"] == "4")
+    assert forged["segment_id"] != real["segment_id"]
+    assert forged["segment_id"] == "imperial|Template||collection::Shared"
+    assert real["segment_id"] == "imperial|Template||collection:Shared"
+
+
 def test_collection_label_segment_id_namespaced_in_output():
     segs = _build_segments(_collision_rows(), min_files=3)
     coll_leaf = next(
