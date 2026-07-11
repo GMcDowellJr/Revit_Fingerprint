@@ -1781,7 +1781,7 @@ def discover_governance_chain(
     # and Container→Project. Project target used-view is usage; other target roles
     # remain provided-vocabulary inventories.
     # Reference segments are included — they participate using their file inventories.
-    def _key(row: Dict[str, str]) -> Tuple[str, str, str, str]:
+    def _key(row: Dict[str, str]) -> Tuple[str, str, str]:
         # client_label is blank, or an explicit "not applicable" spelling
         # (na, N/A, __NOT_APPLICABLE__, ...), for Standards-collection rows
         # that were never a client engagement (e.g. BC_2270 templates/
@@ -1801,30 +1801,35 @@ def discover_governance_chain(
         # key therefore tags which dimension supplied the value instead of
         # collapsing them all into one bare string slot.
         #
-        # collection_label is also a real cut dimension in
-        # build_segment_manifest.py's DIMENSION_CONFIG, orthogonal to
-        # business_center_label — a single business center can house more
-        # than one named collection (e.g. its own general standards plus a
-        # separately-named legacy collection). Folding every collection
-        # under one business_center-only key would pool unrelated standards
-        # libraries together and produce template_to_project/
-        # container_to_project pairs across collections that only happen to
-        # share a BC. So when business_center_label wins the fallback and
-        # collection_label is also populated on that row, the collection
-        # rides along as a fourth slot to keep those collections apart.
+        # collection_label is NOT folded into this key, even though it is a
+        # real cut dimension in build_segment_manifest.py's DIMENSION_CONFIG
+        # that can distinguish multiple named collections under the same
+        # client or business_center. It is intentionally handled the same
+        # way discipline_label is — via _collection_match() below, applied
+        # when pairs are generated — rather than as a hard partition here.
+        # Hard-partitioning by collection would sever the client_label case:
+        # a real client's Container/Template rows are typically tagged with
+        # that client's own collection_label (e.g. "Sutter Standards"), but
+        # its Project rows are typically not tagged with any collection at
+        # all. Splitting on collection here would put those two populations
+        # in different buckets and silently stop producing
+        # template_to_project/container_to_project pairs for that client —
+        # the tool's primary comparison. A soft match (required only when
+        # both sides have a populated value) blocks two different, both-
+        # populated collections from pairing while still letting a
+        # collection-tagged standards segment pair against its
+        # collection-blank usage.
         unit = row.get("unit_system", "").strip()
-        collection = row.get("collection_label", "").strip()
-        if is_blank_or_na(collection):
-            collection = ""
         client = row.get("client_label", "").strip()
         if not is_blank_or_na(client):
-            return ("client", client, "", unit)
+            return ("client", client, unit)
         bc = row.get("business_center_label", "").strip()
         if not is_blank_or_na(bc):
-            return ("business_center", bc, collection, unit)
-        if collection:
-            return ("collection", collection, "", unit)
-        return ("client", client, "", unit)
+            return ("business_center", bc, unit)
+        collection = row.get("collection_label", "").strip()
+        if not is_blank_or_na(collection):
+            return ("collection", collection, unit)
+        return ("client", client, unit)
 
     def _disc(row: Dict[str, str]) -> str:
         return row.get("discipline_label", "").strip()
@@ -1835,7 +1840,17 @@ def discover_governance_chain(
             return True
         return da == db
 
-    by_key: Dict[Tuple[str, str, str, str], Dict[str, List[str]]] = defaultdict(
+    def _collection(row: Dict[str, str]) -> str:
+        value = row.get("collection_label", "").strip()
+        return "" if is_blank_or_na(value) else value
+
+    def _collection_match(ra: Dict[str, str], rb: Dict[str, str]) -> bool:
+        ca, cb = _collection(ra), _collection(rb)
+        if not ca or not cb:
+            return True
+        return ca == cb
+
+    by_key: Dict[Tuple[str, str, str], Dict[str, List[str]]] = defaultdict(
         lambda: defaultdict(list)
     )
     for sid, row in manifest.items():
@@ -1848,8 +1863,8 @@ def discover_governance_chain(
 
     # Generic / Generic-Host is an upstream stock vocabulary. Compare it across
     # matching unit_system even when its client_label differs from the downstream
-    # Template/Container/Project client scope. Discipline, when populated on both
-    # sides, still scopes the comparison.
+    # Template/Container/Project client scope. Discipline and collection, when
+    # populated on both sides, still scope the comparison.
     generic_ids = [
         sid for sid, row in manifest.items()
         if _is_generic_role(row.get("governance_role", ""))
@@ -1862,11 +1877,11 @@ def discover_governance_chain(
                 continue
             if row.get("run_type", "").strip().lower() not in ("bundle", "reference"):
                 continue
-            if not _same_unit(manifest, g, sid) or not _disc_match(manifest[g], row):
+            if not _same_unit(manifest, g, sid) or not _disc_match(manifest[g], row) or not _collection_match(manifest[g], row):
                 continue
             pairs.append((g, sid, f"generic_to_{role}"))
 
-    for (_dim, _client, _coll, _us), role_map in by_key.items():
+    for (_dim, _client, _us), role_map in by_key.items():
         generics = role_map.get("generic", [])
         templates = role_map.get("template", [])
         projects = role_map.get("project", [])
@@ -1874,25 +1889,25 @@ def discover_governance_chain(
 
         for g in generics:
             for t in templates:
-                if _disc_match(manifest[g], manifest[t]):
+                if _disc_match(manifest[g], manifest[t]) and _collection_match(manifest[g], manifest[t]):
                     pairs.append((g, t, "generic_to_template"))
             for c in containers:
-                if _disc_match(manifest[g], manifest[c]):
+                if _disc_match(manifest[g], manifest[c]) and _collection_match(manifest[g], manifest[c]):
                     pairs.append((g, c, "generic_to_container"))
             for p in projects:
-                if _disc_match(manifest[g], manifest[p]):
+                if _disc_match(manifest[g], manifest[p]) and _collection_match(manifest[g], manifest[p]):
                     pairs.append((g, p, "generic_to_project"))
 
         for t in templates:
             for p in projects:
-                if _disc_match(manifest[t], manifest[p]):
+                if _disc_match(manifest[t], manifest[p]) and _collection_match(manifest[t], manifest[p]):
                     pairs.append((t, p, "template_to_project"))
             for c in containers:
-                if _disc_match(manifest[t], manifest[c]):
+                if _disc_match(manifest[t], manifest[c]) and _collection_match(manifest[t], manifest[c]):
                     pairs.append((t, c, "template_to_container"))
         for c in containers:
             for p in projects:
-                if _disc_match(manifest[c], manifest[p]):
+                if _disc_match(manifest[c], manifest[p]) and _collection_match(manifest[c], manifest[p]):
                     pairs.append((c, p, "container_to_project"))
     return pairs
 

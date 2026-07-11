@@ -191,6 +191,41 @@ def test_discover_governance_chain_preserves_collection_scope_within_business_ce
     assert ("bc_only_t", "bc_only_c", "template_to_container") in pairs
 
 
+def test_discover_governance_chain_collection_match_is_soft_for_client_scope():
+    # Mirrors real data: a client's own Container/Template rows are tagged
+    # with that client's collection_label (e.g. "Sutter Standards"), but its
+    # Project rows typically carry no collection_label at all. Hard-
+    # partitioning by collection_label would put those in different _key()
+    # buckets and silently stop producing template_to_project/
+    # container_to_project pairs — the tool's primary comparison. A soft
+    # match (required only when both sides are populated) must still pair
+    # them, while two DIFFERENT populated collections under the same client
+    # must not cross-pollinate.
+    manifest = {
+        "sutter_t": {**_seg("Template", client="Sutter"), "collection_label": "Sutter Standards"},
+        "sutter_c": {**_seg("Container", client="Sutter"), "collection_label": "Sutter Standards"},
+        # Project rows: no collection_label at all, matching real data.
+        "sutter_p": _seg("Project", client="Sutter"),
+        # A second, differently-named collection under the SAME client must
+        # not silently pair with "Sutter Standards" — two populated,
+        # different values are a genuine mismatch.
+        "sutter_legacy_t": {**_seg("Template", client="Sutter"), "collection_label": "Sutter Legacy"},
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # Collection-tagged standards still pair with collection-blank usage.
+    assert ("sutter_t", "sutter_p", "template_to_project") in pairs
+    assert ("sutter_c", "sutter_p", "container_to_project") in pairs
+    assert ("sutter_t", "sutter_c", "template_to_container") in pairs
+    # Two different, both-populated collections under the same client don't
+    # cross-pollinate.
+    assert ("sutter_legacy_t", "sutter_c", "template_to_container") not in pairs
+    # But the differently-collectioned template still reaches the
+    # collection-blank project, since blank is permissive on one side.
+    assert ("sutter_legacy_t", "sutter_p", "template_to_project") in pairs
+
+
 def test_project_target_governance_state_uses_target_used():
     assert _usage_interpretable_for_role("Project") is True
     assert _recommended_primary_view("Template", "Project", "template_to_project") == "used"
