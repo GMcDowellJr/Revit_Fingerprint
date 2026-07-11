@@ -2182,6 +2182,7 @@
       "tools_generate_governance_narrative_rationale_496",
       "tools_generate_governance_narrative_rationale_579",
       "tools_generate_governance_narrative_rationale_595",
+      "tools_generate_governance_narrative_read_csv",
       "tools_generate_governance_narrative_render_client_section",
       "tools_generate_governance_narrative_render_delta_section",
       "tools_generate_governance_narrative_render_domain_tiers",
@@ -3365,7 +3366,8 @@
       "migration_migrate_materials_identity_items_rationale_179",
       "migration_migrate_materials_identity_items_rationale_66",
       "migration_migrate_materials_identity_items_rationale_78",
-      "migration_migrate_materials_identity_items_write_json"
+      "migration_migrate_materials_identity_items_write_json",
+      "path"
     ],
     "97": [
       "tests_test_na_token",
@@ -3791,7 +3793,6 @@
       "migration_role_policy_dimension_types_spot_slope"
     ],
     "127": [
-      "path",
       "tools_build_results_registry",
       "tools_build_results_registry_atomic_write_csv",
       "tools_build_results_registry_build_results_registry_rows",
@@ -3802,8 +3803,7 @@
       "tools_build_results_registry_rationale_63",
       "tools_build_results_registry_read_csv_rows",
       "tools_build_results_registry_safe_int",
-      "tools_build_results_registry_write_results_registry",
-      "tools_generate_governance_narrative_read_csv"
+      "tools_build_results_registry_write_results_registry"
     ],
     "128": [
       "archive_example_use_split_export",
@@ -4534,7 +4534,7 @@
     "39": 0.11182795698924732,
     "40": 0.1471264367816092,
     "41": 0.11494252873563218,
-    "42": 0.14532019704433496,
+    "42": 0.14022988505747128,
     "43": 0.12433862433862433,
     "44": 0.15873015873015872,
     "45": 0.15608465608465608,
@@ -4588,7 +4588,7 @@
     "93": 0.21978021978021978,
     "94": 0.31868131868131866,
     "95": 0.2857142857142857,
-    "96": 0.24358974358974358,
+    "96": 0.26373626373626374,
     "97": 0.21978021978021978,
     "98": 0.23076923076923078,
     "99": 0.2564102564102564,
@@ -4619,7 +4619,7 @@
     "124": 0.3090909090909091,
     "125": 0.18181818181818182,
     "126": 0.5454545454545454,
-    "127": 0.2564102564102564,
+    "127": 0.2727272727272727,
     "128": 0.3333333333333333,
     "129": 0.3111111111111111,
     "130": 0.24444444444444444,
@@ -4844,41 +4844,8 @@
       "why": "connects across different repos/directories; bridges separate communities; peripheral node `Path` unexpectedly reaches hub `load_join_key_policies()`"
     }
   ],
-  "questions": [
-    {
-      "type": "bridge_node",
-      "question": "Why does `_phase2_item()` connect `Domain Index Building` to `Number Canonicalization`, `Value Canonicalization`?",
-      "why": "High betweenness centrality (0.179) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `load_exports()` connect `Domain Payload Management` to `Attribute Stability Analysis`, `Collision Differencing`, `Typography Surface Extraction`, `Domain Index Building`, `Join Hash Parameter Extraction`, `Cluster Analysis`, `Reference Standards Building`, `Join-Key Discovery`, `Join Key Evaluation`, `Export File Loading`, `Join Key Application`, `Intradomain Summary`, `Candidate Join Key Simulation`?",
-      "why": "High betweenness centrality (0.144) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `_load_governance_role_rules()` connect `Placeholder Exclusion Management` to `Analysis Metrics Computation`?",
-      "why": "High betweenness centrality (0.091) - this node is a cross-community bridge."
-    },
-    {
-      "type": "isolated_nodes",
-      "question": "What connects `PreToolUse`, `PreToolUse`, `version` to the rest of the system?",
-      "why": "933 weakly-connected nodes found - possible documentation gaps or missing edges."
-    },
-    {
-      "type": "low_cohesion",
-      "question": "Should `Line Style Extraction` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.055239236839476576 - nodes in this community are weakly interconnected."
-    },
-    {
-      "type": "low_cohesion",
-      "question": "Should `Wall Object Management` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.07472527472527472 - nodes in this community are weakly interconnected."
-    },
-    {
-      "type": "low_cohesion",
-      "question": "Should `Hash Key Generation` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.082896379525593 - nodes in this community are weakly interconnected."
-    }
-  ]
+  "tokens": {
+    "input": 151150,
+    "output": 3260
+  }
 }
