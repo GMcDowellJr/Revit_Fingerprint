@@ -1781,7 +1781,7 @@ def discover_governance_chain(
     # and Container→Project. Project target used-view is usage; other target roles
     # remain provided-vocabulary inventories.
     # Reference segments are included — they participate using their file inventories.
-    def _key(row: Dict[str, str]) -> Tuple[str, str, str]:
+    def _key(row: Dict[str, str]) -> Tuple[str, str, str, str]:
         # client_label is blank, or an explicit "not applicable" spelling
         # (na, N/A, __NOT_APPLICABLE__, ...), for Standards-collection rows
         # that were never a client engagement (e.g. BC_2270 templates/
@@ -1800,17 +1800,31 @@ def discover_governance_chain(
         # row whose business_center_label happens to be the same text. The
         # key therefore tags which dimension supplied the value instead of
         # collapsing them all into one bare string slot.
+        #
+        # collection_label is also a real cut dimension in
+        # build_segment_manifest.py's DIMENSION_CONFIG, orthogonal to
+        # business_center_label — a single business center can house more
+        # than one named collection (e.g. its own general standards plus a
+        # separately-named legacy collection). Folding every collection
+        # under one business_center-only key would pool unrelated standards
+        # libraries together and produce template_to_project/
+        # container_to_project pairs across collections that only happen to
+        # share a BC. So when business_center_label wins the fallback and
+        # collection_label is also populated on that row, the collection
+        # rides along as a fourth slot to keep those collections apart.
         unit = row.get("unit_system", "").strip()
+        collection = row.get("collection_label", "").strip()
+        if is_blank_or_na(collection):
+            collection = ""
         client = row.get("client_label", "").strip()
         if not is_blank_or_na(client):
-            return ("client", client, unit)
+            return ("client", client, "", unit)
         bc = row.get("business_center_label", "").strip()
         if not is_blank_or_na(bc):
-            return ("business_center", bc, unit)
-        collection = row.get("collection_label", "").strip()
-        if not is_blank_or_na(collection):
-            return ("collection", collection, unit)
-        return ("client", client, unit)
+            return ("business_center", bc, collection, unit)
+        if collection:
+            return ("collection", collection, "", unit)
+        return ("client", client, "", unit)
 
     def _disc(row: Dict[str, str]) -> str:
         return row.get("discipline_label", "").strip()
@@ -1821,7 +1835,7 @@ def discover_governance_chain(
             return True
         return da == db
 
-    by_key: Dict[Tuple[str, str, str], Dict[str, List[str]]] = defaultdict(
+    by_key: Dict[Tuple[str, str, str, str], Dict[str, List[str]]] = defaultdict(
         lambda: defaultdict(list)
     )
     for sid, row in manifest.items():
@@ -1852,7 +1866,7 @@ def discover_governance_chain(
                 continue
             pairs.append((g, sid, f"generic_to_{role}"))
 
-    for (_dim, _client, _us), role_map in by_key.items():
+    for (_dim, _client, _coll, _us), role_map in by_key.items():
         generics = role_map.get("generic", [])
         templates = role_map.get("template", [])
         projects = role_map.get("project", [])

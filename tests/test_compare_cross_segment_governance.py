@@ -137,6 +137,60 @@ def test_discover_governance_chain_namespaces_business_center_fallback_from_real
     assert ("real_client_t", "bc_c", "template_to_container") not in pairs
 
 
+def test_discover_governance_chain_preserves_collection_scope_within_business_center():
+    # A single business center can house more than one named collection (its
+    # own general standards plus a separately-named legacy collection, per
+    # build_segment_manifest.py's collection_label cut dimension). Two rows
+    # sharing business_center_label but differing in collection_label must
+    # not be pooled together, or Page's standards and the firm-wide
+    # "Stantec Standards" collection (both business_center=BC_0000 in
+    # practice) would get spurious template_to_project/container_to_project
+    # pairs against each other.
+    manifest = {
+        "page_t": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Page Standards",
+        },
+        "page_c": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Page Standards",
+        },
+        "stantec_t": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Stantec Standards",
+        },
+        "stantec_c": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Stantec Standards",
+        },
+        # No collection_label at all — still groups purely on business_center,
+        # unaffected by the new collection-scoping.
+        "bc_only_t": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_2270",
+        },
+        "bc_only_c": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_2270",
+        },
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # Same business_center AND same collection: still group.
+    assert ("page_t", "page_c", "template_to_container") in pairs
+    assert ("stantec_t", "stantec_c", "template_to_container") in pairs
+    # Same business_center, DIFFERENT collection: must not cross-pollinate.
+    assert ("page_t", "stantec_c", "template_to_container") not in pairs
+    assert ("stantec_t", "page_c", "template_to_container") not in pairs
+    # business_center-only rows (no collection_label) are unaffected.
+    assert ("bc_only_t", "bc_only_c", "template_to_container") in pairs
+
+
 def test_project_target_governance_state_uses_target_used():
     assert _usage_interpretable_for_role("Project") is True
     assert _recommended_primary_view("Template", "Project", "template_to_project") == "used"
