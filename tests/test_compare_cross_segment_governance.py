@@ -191,6 +191,25 @@ def test_discover_governance_chain_preserves_collection_scope_within_business_ce
     assert ("bc_only_t", "bc_only_c", "template_to_container") in pairs
 
 
+def test_discover_governance_chain_final_fallback_normalizes_na_spelling():
+    # When client_label, business_center_label, and collection_label are all
+    # blank/NA, the final fallback must return a canonical blank key, not the
+    # raw NA token. Two rows spelled differently ("__NOT_APPLICABLE__" vs
+    # "n/a") but otherwise identically blank must still group together —
+    # every NA spelling is documented as equivalent to blank for grouping.
+    manifest = {
+        "na_t": _seg("Template", client="__NOT_APPLICABLE__"),
+        "na_c": _seg("Container", client="n/a"),
+        "na_p": _seg("Project", client="NA"),
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    assert ("na_t", "na_c", "template_to_container") in pairs
+    assert ("na_t", "na_p", "template_to_project") in pairs
+    assert ("na_c", "na_p", "container_to_project") in pairs
+
+
 def test_discover_governance_chain_collection_match_is_soft_for_client_scope():
     # Mirrors real data: a client's own Container/Template rows are tagged
     # with that client's collection_label (e.g. "Sutter Standards"), but its

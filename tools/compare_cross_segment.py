@@ -1829,7 +1829,15 @@ def discover_governance_chain(
         collection = row.get("collection_label", "").strip()
         if not is_blank_or_na(collection):
             return ("collection", collection, unit)
-        return ("client", client, unit)
+        # client_label, business_center_label, and collection_label are all
+        # blank/NA — every spelling of "not applicable" must land on the
+        # same key here, or e.g. a Template row spelled "__NOT_APPLICABLE__"
+        # and a Container row spelled "n/a" (both otherwise-blank, no bc, no
+        # collection) would fragment into different by_key buckets and never
+        # get compared. Returning the raw `client` token instead of a
+        # canonical "" would reintroduce exactly the fragmentation this
+        # fallback chain exists to prevent.
+        return ("client", "", unit)
 
     def _disc(row: Dict[str, str]) -> str:
         return row.get("discipline_label", "").strip()
