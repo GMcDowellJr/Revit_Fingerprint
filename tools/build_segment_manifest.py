@@ -173,9 +173,37 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     seed_pops = defaultdict(list)
     project_presence_by_l2: Dict[str, bool] = defaultdict(bool)
 
+    # collection_label is free text (unlike client_label/discipline_label/
+    # business_center_label, which draw from comparatively disjoint,
+    # controlled-ish vocabularies), so its value is markedly more likely to
+    # collide with another dimension's value at the same position in
+    # _subset_to_id()'s output — e.g. a business-center-scoped
+    # "imperial|Template||Shared" and a collection-scoped
+    # "imperial|Template||Shared" (business_center_label="Shared" vs.
+    # collection_label="Shared") render identically today, since the join
+    # encodes which VALUES were selected but not which FIELDS supplied them.
+    # That is a real, pre-existing structural gap in _subset_to_id() (any two
+    # dimensions could in principle collide this way), but collection_label
+    # is the first field free-text enough to make it likely in practice.
+    # Namespace collection_label's contribution rather than rewriting the id
+    # scheme for every dimension — segment_id is parsed positionally
+    # elsewhere (tools/generate_governance_narrative.py) and hardcoded
+    # verbatim across dozens of existing tests and any already-run
+    # run_registry.csv folder mappings, so changing the format for the four
+    # pre-existing dimensions would be a much larger, hash-breaking-style
+    # change for a collision risk that hasn't manifested there in practice.
+    _SUBSET_ID_NAMESPACED_FIELDS = {"collection_label": "collection"}
+
     def _subset_to_id(key: frozenset) -> str:
         kv = dict(key)
-        return "|".join(kv[f] for f in cfg_fields if f in kv)
+        parts = []
+        for f in cfg_fields:
+            if f not in kv:
+                continue
+            value = kv[f]
+            ns = _SUBSET_ID_NAMESPACED_FIELDS.get(f)
+            parts.append(f"{ns}:{value}" if ns and value else value)
+        return "|".join(parts)
 
     normalized_rows, _changes = _normalize_rows(rows)
 

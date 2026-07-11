@@ -869,6 +869,67 @@ def test_client_discipline_leaf_no_empty_purpose():
 
 
 # ---------------------------------------------------------------------------
+# collection_label segment-id collision guard
+# ---------------------------------------------------------------------------
+
+def _collision_rows():
+    rows = []
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"bc{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "business_center_label": "Shared", "discipline_label": "",
+        })
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"coll{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "collection_label": "Shared", "discipline_label": "",
+        })
+    return rows
+
+
+def test_collection_label_value_does_not_collide_with_other_dimension_value():
+    # A business-center-scoped segment and a collection-scoped segment that
+    # happen to share the same literal value ("Shared") must not produce the
+    # same segment_id, or one overwrites the other in any downstream loader
+    # that keys segment_manifest.csv by segment_id, and their memberships mix
+    # in segment_membership.csv.
+    segs = _build_segments(_collision_rows(), min_files=3)
+    ids = [r["segment_id"] for r in segs]
+    assert len(ids) == len(set(ids)), f"duplicate segment_id values: {ids}"
+
+    bc_scoped = [r for r in segs if r.get("business_center_label") == "Shared" and not r.get("collection_label")]
+    coll_scoped = [r for r in segs if r.get("collection_label") == "Shared" and not r.get("business_center_label")]
+    assert bc_scoped and coll_scoped
+    bc_ids = {r["segment_id"] for r in bc_scoped}
+    coll_ids = {r["segment_id"] for r in coll_scoped}
+    assert bc_ids.isdisjoint(coll_ids), (
+        f"business-center-scoped and collection-scoped segment_ids collide: {bc_ids & coll_ids}"
+    )
+
+
+def test_collection_label_segment_id_namespaced_in_output():
+    segs = _build_segments(_collision_rows(), min_files=3)
+    coll_leaf = next(
+        r for r in segs
+        if r.get("collection_label") == "Shared" and r["governance_role"] == "Template" and not r.get("business_center_label")
+    )
+    assert "collection:Shared" in coll_leaf["segment_id"]
+
+
+def test_non_collection_segment_ids_unaffected_by_namespacing():
+    # The pre-existing dimensions (client/discipline/business_center) must
+    # keep their exact prior segment_id format — only collection_label gets
+    # namespaced.
+    segs = _build_segments(_collision_rows(), min_files=3)
+    bc_leaf = next(
+        r for r in segs
+        if r.get("business_center_label") == "Shared" and r["governance_role"] == "Template"
+        and not r.get("collection_label") and r["segment_level"] == "3"
+    )
+    assert bc_leaf["segment_id"] == "imperial|Template|Shared"
+
+
+# ---------------------------------------------------------------------------
 # Case normalization for segment dimension fields
 # ---------------------------------------------------------------------------
 
