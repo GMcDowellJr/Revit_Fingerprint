@@ -930,6 +930,58 @@ def test_non_collection_segment_ids_unaffected_by_namespacing():
 
 
 # ---------------------------------------------------------------------------
+# client_label + collection_label leaf purposes
+# ---------------------------------------------------------------------------
+
+def _client_collection_rows():
+    """Mirrors real Sutter-shaped data: a client's Container/Template rows
+    are all tagged with that client's own collection_label, but its Project
+    rows carry no collection_label at all — so the level-3 client-alone
+    Container segment has population-identical children (the discipline-cut
+    child and the client+collection leaf), and pass5 can demote the level-3
+    parent, making the client+collection leaf the actual runnable segment."""
+    rows = []
+    for i in range(4):
+        rows.append({
+            "export_run_id": f"sc{i}", "unit_system": "imperial", "governance_role": "Container",
+            "client_label": "Sutter", "collection_label": "Sutter Standards",
+        })
+    for i in range(4):
+        rows.append({
+            "export_run_id": f"sp{i}", "unit_system": "imperial", "governance_role": "Project",
+            "client_label": "Sutter",
+        })
+    return rows
+
+
+def test_client_collection_leaf_gets_purpose_and_label():
+    segs = _build_segments(_client_collection_rows(), min_files=3)
+    leaf = next(
+        r for r in segs
+        if r["client_label"] == "Sutter" and r.get("collection_label") == "Sutter Standards"
+        and r["governance_role"] == "Container"
+    )
+    assert leaf["run_type"] in ("bundle", "reference"), (
+        "expected the client+collection leaf to be runnable in this fixture"
+    )
+    assert leaf["segment_purpose"] == "client_collection_coordination"
+    assert leaf["segment_label"] == "Sutter — Sutter Standards coordination files"
+    assert leaf["segment_label"] != leaf["segment_id"]
+
+
+def test_client_collection_discipline_leaf_gets_purpose_and_label():
+    rows = [dict(r, discipline_label="architectural") for r in _client_collection_rows() if r["governance_role"] == "Container"]
+    segs = _build_segments(rows, min_files=3)
+    leaf = next(
+        r for r in segs
+        if r["client_label"] == "Sutter" and r.get("collection_label") == "Sutter Standards"
+        and r["discipline_label"] == "architectural" and r["governance_role"] == "Container"
+    )
+    assert leaf["segment_purpose"] == "client_collection_discipline_coordination"
+    assert leaf["segment_label"] != leaf["segment_id"]
+
+
+# ---------------------------------------------------------------------------
 # Case normalization for segment dimension fields
 # ---------------------------------------------------------------------------
 
