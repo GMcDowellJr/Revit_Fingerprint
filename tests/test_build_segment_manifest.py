@@ -989,6 +989,32 @@ def test_colon_in_non_collection_value_not_forging_prefix_is_left_untouched():
     assert leaf["segment_id"] == "imperial|Project|A:B"
 
 
+def test_collection_label_own_leading_colon_does_not_collide_with_forged_escape():
+    # collection_label=":Shared" and business_center_label="collection:Shared"
+    # must not render to the identical segment_id substring. Without also
+    # escaping collection_label's own value, "collection:" + ":Shared" and
+    # the escaped forgery "collection:Shared".replace(":","::") both produce
+    # "collection::Shared".
+    rows = []
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"lead{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "collection_label": ":Shared", "discipline_label": "",
+        })
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"forge{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "business_center_label": "collection:Shared", "discipline_label": "",
+        })
+    segs = _build_segments(rows, min_files=3)
+    ids = [r["segment_id"] for r in segs]
+    assert len(ids) == len(set(ids)), f"duplicate segment_id values: {ids}"
+
+    coll_leaf = next(r for r in segs if r.get("collection_label") == ":Shared" and r["segment_level"] == "4")
+    forged_leaf = next(r for r in segs if r.get("business_center_label") == "collection:Shared" and r["segment_level"] == "4")
+    assert coll_leaf["segment_id"] != forged_leaf["segment_id"]
+
+
 def test_collection_label_segment_id_namespaced_in_output():
     segs = _build_segments(_collision_rows(), min_files=3)
     coll_leaf = next(

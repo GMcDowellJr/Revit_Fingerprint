@@ -204,11 +204,18 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             value = kv[f]
             ns = _SUBSET_ID_NAMESPACED_FIELDS.get(f)
             if ns:
-                # collection_label's own value is never escaped — a single,
-                # unescaped "collection:" prefix is always safe to produce
-                # here, because the only way anything ELSE could render the
-                # identical text is covered by the branch below.
-                parts.append(f"{ns}:{value}" if value else value)
+                # collection_label's own colons are doubled too, exactly
+                # like the escaped-forgery branch below, before the single
+                # literal separator colon is prepended. That single colon
+                # immediately after "collection" is then unambiguously the
+                # namespace separator, never a colon that originated from
+                # the value itself — e.g. collection_label=":Shared" must
+                # not render to the same text ("collection::Shared") as an
+                # escaped business_center_label="collection:Shared". Without
+                # this, a collection_label value that itself starts with a
+                # colon could collide with an escaped forgery from the
+                # branch below.
+                parts.append(f"{ns}:{value.replace(':', '::')}" if value else value)
             elif value.startswith(_SUBSET_ID_RESERVED_PREFIX):
                 # Escaping is scoped to exactly this narrow case: a non-
                 # collection field (client_label/discipline_label/
