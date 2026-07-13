@@ -243,6 +243,43 @@ def test_sanitize_folder_strips_path_separators():
     assert result == result.lower()
 
 
+def test_sanitize_folder_preserves_selected_blank_vs_unselected_dimension():
+    # A cut dimension explicitly selected in a subset with a blank value
+    # (e.g. client_label == "" chosen as a subset criterion) renders in
+    # segment_id as an empty part between/after separator pipes, distinct
+    # from that same dimension not being selected at all (which pools every
+    # value of the field, blank included — always a superset of the
+    # selected-blank population). _sanitize_folder() must not collapse that
+    # distinction away, or two segments with genuinely different
+    # populations sanitize to the identical folder name.
+    from build_segment_manifest import _sanitize_folder
+
+    # Trailing blank (client selected blank, nothing follows it).
+    assert _sanitize_folder("imperial|Template") != _sanitize_folder("imperial|Template|")
+    # Embedded blank (client selected blank, discipline follows it).
+    assert (
+        _sanitize_folder("imperial|Container|architectural")
+        != _sanitize_folder("imperial|Container||architectural")
+    )
+
+
+def test_sanitize_folder_renders_selected_blank_as_enterprise_token():
+    # A bare "_" (trailing) or "__" (embedded) reads as a naming mistake, not
+    # an intentional "no client selected" segment. Render it as "enterprise"
+    # instead — the same scope-level term compare_cross_segment.py already
+    # uses for "no client, no bc" rows — so the folder name is
+    # self-explanatory.
+    from build_segment_manifest import _sanitize_folder
+
+    assert _sanitize_folder("imperial|Template|") == "imperial_template_enterprise"
+    assert (
+        _sanitize_folder("imperial|Container||architectural")
+        == "imperial_container_enterprise_architectural"
+    )
+    # A segment with no blank-selected dimension at all is untouched.
+    assert _sanitize_folder("imperial|Template") == "imperial_template"
+
+
 def test_registry_output_folders_globally_unique_with_suffix_collision():
     # Reproduce the case where a generated suffix collides with another
     # segment's natural sanitized name. Uses distinct literal client_label
@@ -262,6 +299,29 @@ def test_registry_output_folders_globally_unique_with_suffix_collision():
     reg = _build_registry(segs)
     folders = [r["output_folder"] for r in reg]
     assert len(folders) == len(set(folders)), f"Duplicate output_folder values: {folders}"
+
+
+def test_registry_distinguishes_selected_blank_client_from_unselected_client_pool():
+    # "Client not selected" (root+governance only — pools every client's
+    # rows, blank included) and "client selected as blank" (root+governance
+    # +client="" — blank-client rows only) are different populations
+    # whenever any non-blank-client rows also exist for that governance_role
+    # (the pooled population is then a strict superset of the blank-only
+    # one), and both can independently end up run_type="bundle"/"reference"
+    # in real corpora. Their segment_ids differ only by a trailing/embedded
+    # blank part (e.g. "imperial|Template" vs "imperial|Template|"), which
+    # _sanitize_folder() previously collapsed to the identical folder name.
+    # _manifest_row() constructs eligible rows directly, decoupled from
+    # _build_segments()'s own eligibility-determination rules.
+    manifest_rows = [
+        _manifest_row("imperial|Template", population_hash="h_pooled"),
+        _manifest_row("imperial|Template|", population_hash="h_blank_only"),
+    ]
+    reg = _build_registry(manifest_rows)
+
+    pooled = next(r for r in reg if r["segment_id"] == "imperial|Template")
+    blank_only = next(r for r in reg if r["segment_id"] == "imperial|Template|")
+    assert pooled["output_folder"] != blank_only["output_folder"]
 
 
 def test_registry_initial_status_pending():
