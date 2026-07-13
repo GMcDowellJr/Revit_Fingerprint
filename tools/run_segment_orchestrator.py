@@ -22,6 +22,8 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import math
+import os
 import subprocess
 import sys
 import tempfile
@@ -113,6 +115,45 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def compute_worker_split(
+    total_budget: Optional[int] = None,
+    headroom: int = 2,
+    segment_workers: Optional[int] = None,
+) -> tuple[int, int]:
+    """Returns (segment_workers, domain_workers) whose product approximates
+    available logical cores minus headroom.
+
+    If segment_workers is None (auto mode), both values are derived from the
+    budget using a sqrt-biased split, favoring segment-level concurrency since
+    segments are more I/O-independent than domain workers within one segment's
+    bundle stage.
+
+    If segment_workers is given (explicit --workers N), domain_workers is
+    solved as budget // segment_workers so the bundle-stage pool stays
+    coordinated to the same CPU budget instead of defaulting to
+    run_bundle_analysis.py's own fixed default of 4 — which would otherwise let
+    total concurrency grow unbounded as N grows (N x 4 instead of ~N).
+    """
+    if total_budget is None:
+        cpu_count = os.cpu_count()
+        if not cpu_count:
+            # os.cpu_count() returned None (restricted/containerized environment) —
+            # fall back to the existing hardcoded default of 4 for both values.
+            if segment_workers is None:
+                return 4, 4
+            total_budget = 4
+        else:
+            total_budget = max(1, cpu_count - headroom)
+
+    if segment_workers is not None:
+        domain_workers = max(1, total_budget // max(1, segment_workers))
+        return segment_workers, domain_workers
+
+    domain_workers = max(1, round(math.sqrt(total_budget) * 0.8))
+    segment_workers = max(1, total_budget // domain_workers)
+    return segment_workers, domain_workers
+
+
 def _write_run_summary(
     segments_root: Path,
     run_start_utc: str,
@@ -120,6 +161,8 @@ def _write_run_summary(
     total_elapsed_s: int,
     segment_results: List[Dict],
     workers: int,
+    bundle_workers: int,
+    workers_auto: bool,
 ) -> Path:
     """Write run_summary.txt to segments_root atomically (temp + replace)."""
     out_path = segments_root / "run_summary.txt"
@@ -203,6 +246,8 @@ def _write_run_summary(
         f"run_end_utc   : {run_end_utc}",
         f"total_elapsed : {total_elapsed_s}s ({total_min:.1f} min)",
         f"workers       : {workers}",
+        f"worker_split  : segment_workers={workers} domain_workers={bundle_workers}"
+        f" (mode={'auto' if workers_auto else 'explicit'})",
         f"segments_run  : {segments_run}",
         f"  complete    : {n_complete}",
         f"  failed      : {n_failed}",
@@ -787,6 +832,7 @@ def _run_one_segment(
     counters: Dict[str, object],
     counters_lock: threading.Lock,
     worker_id: int,
+    bundle_workers: int,
 ) -> Dict:
     """Process one segment. Returns result dict."""
     sid = reg_row.get("segment_id", "").strip()
@@ -916,6 +962,7 @@ def _run_one_segment(
                 "--purge-view", "both",
                 "--latent-purgeable-file", str(out_root / "results" / "records" / "latent_purgeable.csv"),
             ]
+            bundle_cmd += ["--workers", str(bundle_workers)]
             t_step3_start = time.monotonic()
             rc, tail, _content = run_step_log(bundle_cmd, out_root / "bundle.log", cwd=str(repo_root))
             t_bundle = int(time.monotonic() - t_step3_start)
@@ -1075,7 +1122,11 @@ def run_orchestrator(args: argparse.Namespace) -> int:
 
     # ── dry-run ──────────────────────────────────────────────────────────────
     if args.dry_run:
-        print(f"[dry-run] {total} bundle segment(s) in plan\n")
+        print(f"[dry-run] {total} bundle segment(s) in plan")
+        print(
+            f"[dry-run] workers: segment_workers={args.workers} domain_workers={args.bundle_workers}"
+            f" (mode={'auto' if args.workers_auto else 'explicit'})\n"
+        )
         for idx, (reg_row, mrow) in enumerate(plan, 1):
             sid = reg_row.get("segment_id", "")
             output_folder = reg_row.get("output_folder", "").strip()
@@ -1134,6 +1185,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                     "--purge-view", "both",
                     "--latent-purgeable-file", str(out_root / "results" / "records" / "latent_purgeable.csv"),
                 ]
+                bundle_cmd += ["--workers", str(args.bundle_workers)]
                 print(f"  step 3: {' '.join(bundle_cmd[1:])}")
             print()
         return 0
@@ -1246,6 +1298,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 manifest_file, results_registry_file,
                 registry_lock, counters, counters_lock,
                 worker_id=(i % args.workers) + 1,
+                bundle_workers=args.bundle_workers,
             ): reg_row.get("segment_id", "")
             for i, (idx, (reg_row, mrow)) in enumerate(enumerate(plan_to_run, 1))
         }
@@ -1333,6 +1386,8 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 total_elapsed,
                 segment_results,
                 workers=args.workers,
+                bundle_workers=args.bundle_workers,
+                workers_auto=args.workers_auto,
             )
             print(f"[orchestrator] run_summary written to {summary_path}", flush=True)
         except Exception as _sum_exc:
@@ -1390,8 +1445,8 @@ def main() -> None:
         help="Skip the BI merge post-processing step (useful for dry runs and debugging)",
     )
     ap.add_argument(
-        "--workers", type=int, default=4,
-        help="Max parallel segments (default: 4)",
+        "--workers", default=4,
+        help="Max parallel segments, or 'auto' to derive from CPU count (default: 4)",
     )
     ap.add_argument(
         "--no-preshard", action="store_true",
@@ -1402,6 +1457,17 @@ def main() -> None:
         help="Force preshard even if corpus marker exists",
     )
     args = ap.parse_args()
+    if str(args.workers).strip().lower() == "auto":
+        args.workers, args.bundle_workers = compute_worker_split()
+        args.workers_auto = True
+    else:
+        args.workers = int(args.workers)
+        # Coordinate the bundle-stage pool to the same CPU budget rather than
+        # letting it default to run_bundle_analysis.py's own fixed default of 4
+        # — otherwise total concurrency grows unbounded as --workers N grows
+        # (N x 4 instead of staying near the actual core budget).
+        _, args.bundle_workers = compute_worker_split(segment_workers=args.workers)
+        args.workers_auto = False
     if args.results_registry_file is None:
         args.results_registry_file = str(Path(args.registry_file).resolve().with_name("results_registry.csv"))
     if args.membership_file is None:
