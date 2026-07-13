@@ -320,6 +320,18 @@ def test_bc_bookkeeping_tags_normalize_to_blank():
     assert _scope_level({**_seg("Template", client=""), "business_center_label": "0000"}) == "enterprise"
 
 
+def test_na_spelled_business_center_labels_normalize_to_blank():
+    # A missing business_center_label spelled as an NA token (n/a, NA,
+    # __NOT_APPLICABLE__, ...) must normalize to blank the same way the
+    # pre-existing governance-chain fallback did via is_blank_or_na() —
+    # it is not a real business center any more than an empty string is.
+    for token in ("n/a", "NA", "__NOT_APPLICABLE__", "not applicable"):
+        assert _normalize_bc_label(token) == ""
+        row = {**_seg("Template", client=""), "business_center_label": token}
+        assert _bc_of(row) == ""
+        assert _scope_level(row) == "enterprise"
+
+
 def test_discover_governance_chain_enterprise_to_project_reaches_every_scope():
     # An enterprise-scoped Template/Container has no client/bc of its own and
     # applies across the whole business — it must reach every Project

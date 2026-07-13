@@ -340,8 +340,8 @@
     "semantic_hash": "105440e837898048a17d9a7bcdf6f63b"
   },
   "tests/test_compare_cross_segment_governance.py": {
-    "mtime": 1783909616.3810148,
-    "ast_hash": "d4e06239318ef58b2977a4f7faea01d0",
+    "mtime": 1783909953.761007,
+    "ast_hash": "9fc9987f49be5f35f01247975f992dc2",
     "semantic_hash": ""
   },
   "tests/test_compound_types_wall.py": {
@@ -780,8 +780,8 @@
     "semantic_hash": "d01acd53dc21614aaea7a312ee6a83db"
   },
   "tools/compare_cross_segment.py": {
-    "mtime": 1783909583.0570157,
-    "ast_hash": "65ca09e889a931d670298d15489183f9",
+    "mtime": 1783909936.5010076,
+    "ast_hash": "6efbebadae8eb182021fd8c2bdcfbfe6",
     "semantic_hash": ""
   },
   "tools/compare_templates_stand-alone/compare_view_templates_stand-alone.py": {

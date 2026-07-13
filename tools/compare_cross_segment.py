@@ -1677,7 +1677,7 @@ _ENTERPRISE_BC_BOOKKEEPING_TOKENS = {"0000", "bc_0000"}
 
 def _normalize_bc_label(value: str) -> str:
     v = (value or "").strip()
-    if not v or v.lower() in _ENTERPRISE_BC_BOOKKEEPING_TOKENS:
+    if is_blank_or_na(v) or v.lower() in _ENTERPRISE_BC_BOOKKEEPING_TOKENS:
         return ""
     return v
 
