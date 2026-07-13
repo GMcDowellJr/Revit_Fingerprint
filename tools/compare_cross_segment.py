@@ -1852,11 +1852,41 @@ def discover_governance_chain(
         value = row.get("collection_label", "").strip()
         return "" if is_blank_or_na(value) else value
 
+    # A collection-blank row is a wildcard ONLY when its blankness means
+    # "collection is simply not tracked here" (the Sutter-shaped case: a
+    # Project row that never got a collection_label). It must NOT wildcard
+    # when the blankness instead means "this segment is a roll-up pooling
+    # every collection under it together" — e.g. build_segment_manifest.py
+    # now keeps a runnable business-center-scoped Template/Container
+    # aggregate (blank collection_label) alongside its collection-specific
+    # children whenever the aggregate's population isn't identical to any
+    # single child's (i.e. the business center hosts more than one named
+    # collection). Wildcard-matching that aggregate against one specific
+    # collection's segment on the other side would mix the pooled
+    # population with a single library's population in the same
+    # comparison — precisely what collection_label was added to keep
+    # apart. A row counts as a roll-up when some OTHER manifest row's
+    # parent_segment_id points at it and that other row has a populated
+    # collection_label.
+    _collection_rollup_ids = {
+        row.get("parent_segment_id", "").strip()
+        for row in manifest.values()
+        if row.get("parent_segment_id", "").strip()
+        and not is_blank_or_na(row.get("collection_label", ""))
+    }
+
+    def _is_collection_rollup(row: Dict[str, str]) -> bool:
+        return row.get("segment_id", "") in _collection_rollup_ids
+
     def _collection_match(ra: Dict[str, str], rb: Dict[str, str]) -> bool:
         ca, cb = _collection(ra), _collection(rb)
-        if not ca or not cb:
-            return True
-        return ca == cb
+        if ca and cb:
+            return ca == cb
+        if ca and not cb:
+            return not _is_collection_rollup(rb)
+        if cb and not ca:
+            return not _is_collection_rollup(ra)
+        return True
 
     by_key: Dict[Tuple[str, str, str], Dict[str, List[str]]] = defaultdict(
         lambda: defaultdict(list)

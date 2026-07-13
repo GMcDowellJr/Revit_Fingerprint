@@ -245,6 +245,57 @@ def test_discover_governance_chain_collection_match_is_soft_for_client_scope():
     assert ("sutter_legacy_t", "sutter_p", "template_to_project") in pairs
 
 
+def test_discover_governance_chain_rollup_does_not_wildcard_match_specific_collection():
+    # Mirrors real data: business_center_label="BC_0000" hosts two distinct
+    # collections (Page Standards, Stantec Standards). build_segment_manifest.py
+    # keeps a runnable, collection-blank aggregate Template alongside its
+    # collection-specific children whenever the aggregate's population isn't
+    # identical to either child's (i.e. the BC hosts more than one
+    # collection). That aggregate's blank collection_label must NOT act as a
+    # wildcard against a specific-collection Container — doing so would mix
+    # the pooled (both-collections) population into a comparison meant to
+    # isolate one collection's own population.
+    manifest = {
+        "bc_t_rollup": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_0000",
+            "segment_id": "bc_t_rollup",
+            "parent_segment_id": "",
+        },
+        # This child's parent_segment_id points back at bc_t_rollup and
+        # carries a populated collection_label — that's what marks
+        # bc_t_rollup as a roll-up rather than a genuinely collection-blank
+        # segment.
+        "bc_t_page": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Page Standards",
+            "segment_id": "bc_t_page",
+            "parent_segment_id": "bc_t_rollup",
+        },
+        "bc_c_page": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Page Standards",
+        },
+        "bc_c_stantec": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Stantec Standards",
+        },
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # The roll-up must not wildcard-match ANY specific-collection Container.
+    assert ("bc_t_rollup", "bc_c_page", "template_to_container") not in pairs
+    assert ("bc_t_rollup", "bc_c_stantec", "template_to_container") not in pairs
+    # A collection-specific Template still correctly pairs with the matching
+    # collection's Container, and not with a different one.
+    assert ("bc_t_page", "bc_c_page", "template_to_container") in pairs
+    assert ("bc_t_page", "bc_c_stantec", "template_to_container") not in pairs
+
+
 def test_project_target_governance_state_uses_target_used():
     assert _usage_interpretable_for_role("Project") is True
     assert _recommended_primary_view("Template", "Project", "template_to_project") == "used"
