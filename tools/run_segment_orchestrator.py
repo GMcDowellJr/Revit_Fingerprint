@@ -115,19 +115,40 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def compute_worker_split(total_budget: Optional[int] = None, headroom: int = 2) -> tuple[int, int]:
+def compute_worker_split(
+    total_budget: Optional[int] = None,
+    headroom: int = 2,
+    segment_workers: Optional[int] = None,
+) -> tuple[int, int]:
     """Returns (segment_workers, domain_workers) whose product approximates
-    available logical cores minus headroom, biased toward segment-level
-    concurrency since segments are more I/O-independent than domain workers
-    within one segment's bundle stage.
+    available logical cores minus headroom.
+
+    If segment_workers is None (auto mode), both values are derived from the
+    budget using a sqrt-biased split, favoring segment-level concurrency since
+    segments are more I/O-independent than domain workers within one segment's
+    bundle stage.
+
+    If segment_workers is given (explicit --workers N), domain_workers is
+    solved as budget // segment_workers so the bundle-stage pool stays
+    coordinated to the same CPU budget instead of defaulting to
+    run_bundle_analysis.py's own fixed default of 4 — which would otherwise let
+    total concurrency grow unbounded as N grows (N x 4 instead of ~N).
     """
     if total_budget is None:
         cpu_count = os.cpu_count()
         if not cpu_count:
             # os.cpu_count() returned None (restricted/containerized environment) —
             # fall back to the existing hardcoded default of 4 for both values.
-            return 4, 4
-        total_budget = max(1, cpu_count - headroom)
+            if segment_workers is None:
+                return 4, 4
+            total_budget = 4
+        else:
+            total_budget = max(1, cpu_count - headroom)
+
+    if segment_workers is not None:
+        domain_workers = max(1, total_budget // max(1, segment_workers))
+        return segment_workers, domain_workers
+
     domain_workers = max(1, round(math.sqrt(total_budget) * 0.8))
     segment_workers = max(1, total_budget // domain_workers)
     return segment_workers, domain_workers
@@ -811,7 +832,7 @@ def _run_one_segment(
     counters: Dict[str, object],
     counters_lock: threading.Lock,
     worker_id: int,
-    bundle_workers: Optional[int],
+    bundle_workers: int,
 ) -> Dict:
     """Process one segment. Returns result dict."""
     sid = reg_row.get("segment_id", "").strip()
@@ -941,8 +962,7 @@ def _run_one_segment(
                 "--purge-view", "both",
                 "--latent-purgeable-file", str(out_root / "results" / "records" / "latent_purgeable.csv"),
             ]
-            if bundle_workers is not None:
-                bundle_cmd += ["--workers", str(bundle_workers)]
+            bundle_cmd += ["--workers", str(bundle_workers)]
             t_step3_start = time.monotonic()
             rc, tail, _content = run_step_log(bundle_cmd, out_root / "bundle.log", cwd=str(repo_root))
             t_bundle = int(time.monotonic() - t_step3_start)
@@ -1165,8 +1185,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                     "--purge-view", "both",
                     "--latent-purgeable-file", str(out_root / "results" / "records" / "latent_purgeable.csv"),
                 ]
-                if args.workers_auto:
-                    bundle_cmd += ["--workers", str(args.bundle_workers)]
+                bundle_cmd += ["--workers", str(args.bundle_workers)]
                 print(f"  step 3: {' '.join(bundle_cmd[1:])}")
             print()
         return 0
@@ -1279,7 +1298,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 manifest_file, results_registry_file,
                 registry_lock, counters, counters_lock,
                 worker_id=(i % args.workers) + 1,
-                bundle_workers=(args.bundle_workers if args.workers_auto else None),
+                bundle_workers=args.bundle_workers,
             ): reg_row.get("segment_id", "")
             for i, (idx, (reg_row, mrow)) in enumerate(enumerate(plan_to_run, 1))
         }
@@ -1443,9 +1462,11 @@ def main() -> None:
         args.workers_auto = True
     else:
         args.workers = int(args.workers)
-        # run_bundle_analysis.py's own --workers default (unchanged, not threaded
-        # through for explicit --workers callers — only 'auto' coordinates the split).
-        args.bundle_workers = 4
+        # Coordinate the bundle-stage pool to the same CPU budget rather than
+        # letting it default to run_bundle_analysis.py's own fixed default of 4
+        # — otherwise total concurrency grows unbounded as --workers N grows
+        # (N x 4 instead of staying near the actual core budget).
+        _, args.bundle_workers = compute_worker_split(segment_workers=args.workers)
         args.workers_auto = False
     if args.results_registry_file is None:
         args.results_registry_file = str(Path(args.registry_file).resolve().with_name("results_registry.csv"))
