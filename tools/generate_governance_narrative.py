@@ -217,24 +217,26 @@ def used_view_falls_back_to_legacy() -> bool:
 
 # ── data loading ───────────────────────────────────────────────────────────────
 
-def get_disc(seg_id: str) -> Optional[str]:
-    for part in seg_id.split("|"):
-        if part in DISC_KEYWORDS:
-            return part
-    return None
+def _is_unscoped_segment(row: dict, suffix: str) -> bool:
+    """True when a segment is the broadest (client/discipline-unscoped) population
+    for its governance role — the condition the old is_generic() tried to detect
+    via "segment_id has exactly 2 pipe-separated parts" (unit_system + role only).
 
+    A blank governance_role is NOT this condition — it is a scope rollup with no
+    role filter at all (e.g. a business-center-wide rollup like "imperial|BC_2014"),
+    which also happens to produce a 2-part segment_id and was therefore
+    misclassified as "generic" by the old part-count check. See
+    docs/governance_narrative_scope_gap_audit.md B5.
 
-def get_client(seg_id: str) -> Optional[str]:
-    parts = seg_id.split("|")
-    if len(parts) >= 3 and parts[2] not in (
-        "Template", "Container", "Project", *DISC_KEYWORDS
-    ):
-        return parts[2]
-    return None
-
-
-def is_generic(seg_id: str) -> bool:
-    return len(seg_id.split("|")) == 2
+    business_center_label / collection_label are not yet columns on SUMMARY_FIELDS
+    (see B6), so a segment scoped only by one of those two dimensions cannot be
+    fully distinguished from a truly unscoped one from these columns alone — that
+    gap is a producer-side prerequisite tracked in B6, not introduced here.
+    """
+    role = row.get(f"governance_role_{suffix}", "")
+    client = row.get(f"client_label_{suffix}", "")
+    disc = row.get(f"discipline_label_{suffix}", "")
+    return bool(role) and not client and not disc
 
 
 def load_corpus_counts(
@@ -276,10 +278,10 @@ def load_corpus_counts(
         counts["total"] = counts["Template"] + counts["Container"] + counts["Project"]
         # Disciplines and clients from segment IDs
         for r in summary_rows:
-            d = get_disc(r["segment_id_a"]) or get_disc(r["segment_id_b"])
+            d = _pick(r, "discipline_label_a", "discipline_label_b")
             if d:
                 disciplines.add(d)
-            c = get_client(r["segment_id_a"]) or get_client(r["segment_id_b"])
+            c = _pick(r, "client_label_a", "client_label_b")
             if c:
                 clients.add(c)
 
@@ -326,7 +328,7 @@ def build_cascade(summary_rows: list[dict]) -> dict:
         if dom in EXCLUDED_FROM_SCORING:
             continue
 
-        if ct == "template_to_container" and is_generic(a) and is_generic(b):
+        if ct == "template_to_container" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 tc[dom].append(v)
@@ -334,7 +336,7 @@ def build_cascade(summary_rows: list[dict]) -> dict:
             if vu is not None:
                 tc_used[dom].append(vu)
 
-        elif ct == "container_to_project" and is_generic(a) and is_generic(b):
+        elif ct == "container_to_project" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 cp[dom].append(v)
@@ -342,7 +344,7 @@ def build_cascade(summary_rows: list[dict]) -> dict:
             if vu is not None:
                 cp_used[dom].append(vu)
 
-        elif ct in ("template_to_project", "parent_sibling_roles") and is_generic(a) and is_generic(b):
+        elif ct in ("template_to_project", "parent_sibling_roles") and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 tp[dom].append(v)
@@ -362,17 +364,17 @@ def build_cascade(summary_rows: list[dict]) -> dict:
 
         elif ct == "within_project":
             v = pf(_col(r, "jaccard_mean"))
-            disc = get_disc(a) or "all"
+            disc = _pick(r, "discipline_label_a") or "all"
             if v is not None:
                 wp_disc[dom][disc].append(v)
                 wp_all[dom].append(v)
             vu = pf(_col(r, "used_jaccard_mean"))
             if vu is not None:
                 wp_used[dom].append(vu)
-            if a == b and "Template" in a and v is not None:
+            if a == b and r["governance_role_a"] == "Template" and v is not None:
                 tw[dom].append(v)
             # Capture p10/p90 for all-view and used-view from most inclusive generic segment
-            if a == b and is_generic(a):
+            if a == b and _is_unscoped_segment(r, "a"):
                 n = int(r["n_files_a"]) if r.get("n_files_a") else 0
                 if _col(r, "jaccard_p10") and _col(r, "jaccard_p90"):
                     existing_n = wp_p10.get(dom + "_n", -1)
@@ -405,7 +407,7 @@ def build_cascade(summary_rows: list[dict]) -> dict:
     for r in summary_rows:
         if r["comparison_type"] not in ("template_to_project", "parent_sibling_roles"):
             continue
-        if not (is_generic(r["segment_id_a"]) and is_generic(r["segment_id_b"])):
+        if not (_is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b")):
             continue
         dom = r["domain"]
         if dom in EXCLUDED_FROM_SCORING:
@@ -791,7 +793,15 @@ def build_client_summary(
     """Per-client alignment summary."""
     all_clients = set()
     for r in pooled_rows:
-        c = get_client(r["segment_id"])
+        # This section (client "internal coherence" + cross-client Jaccard) has always
+        # implicitly meant the parent-sibling (project-vs-project) grain. cross_segment_
+        # pooled.csv also carries bc- and client-pool grain rows (pool_scope == "bc" /
+        # "client") for the same segment; blending those in here would silently mix three
+        # distinct comparison populations into one number. See
+        # docs/governance_narrative_scope_gap_audit.md A2.
+        if r.get("pool_scope", "") not in ("parent_sibling", ""):
+            continue
+        c = _pick(r, "client_label")
         if c and r["governance_role"] == "Project":
             all_clients.add(c)
 
@@ -812,15 +822,17 @@ def build_client_summary(
     for r in summary_rows:
         if r["comparison_type"] != "within_project":
             continue
-        c = get_client(r["segment_id_a"])
+        c = _pick(r, "client_label_a")
         v = pf(_col(r, "jaccard_mean"))
         if v is not None and c:
             wp_by_client[c].append(v)
 
-    # n_files from pooled
+    # n_files from pooled — parent_sibling grain only, same rationale as all_clients above.
     client_files = {}
     for r in pooled_rows:
-        c = get_client(r["segment_id"])
+        if r.get("pool_scope", "") not in ("parent_sibling", ""):
+            continue
+        c = _pick(r, "client_label")
         if c and r["governance_role"] == "Project":
             nf = int(r["n_files_focal"]) if r.get("n_files_focal") else 0
             if c not in client_files or nf > client_files[c]:
@@ -1406,7 +1418,7 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
     for r in summary_rows:
         if r["comparison_type"] != "within_project":
             continue
-        disc = get_disc(r["segment_id_a"])
+        disc = _pick(r, "discipline_label_a")
         v = pf(_col(r, "jaccard_mean"))
         if disc and v is not None:
             disc_domain_wp[disc][r["domain"]].append(v)
@@ -1416,8 +1428,9 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
     # Has-template flag
     template_discs = set()
     for r in summary_rows:
-        if "Template" in r["segment_id_a"] and get_disc(r["segment_id_a"]):
-            template_discs.add(get_disc(r["segment_id_a"]))
+        disc = _pick(r, "discipline_label_a")
+        if r["governance_role_a"] == "Template" and disc:
+            template_discs.add(disc)
 
     for disc in sorted(DISC_LABELS.keys()):
         if disc not in disc_domain_wp:
