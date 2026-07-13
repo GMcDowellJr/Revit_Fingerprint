@@ -637,6 +637,43 @@ def test_single_child_same_hash_still_demoted():
     )
 
 
+def test_matching_child_demotes_parent_even_with_other_nonmatching_children():
+    # Real-world shape: a business_center-scoped Container pool where every
+    # row also happens to have a blank client_label (so the client=""-twin
+    # child is a byte-identical duplicate of the parent), AND a subset of
+    # those rows also carry a discipline_label (so a second, non-matching
+    # discipline-cut child also exists as a sibling). The old "exactly one
+    # child" gate saw two children and skipped the redundancy check
+    # entirely, leaving the parent — a true duplicate of its client=""-twin
+    # — independently runnable alongside that twin. It must now demote
+    # regardless of the extra non-matching sibling.
+    rows = (
+        [{"export_run_id": f"s{i:02d}", "unit_system": "imperial", "governance_role": "Container",
+          "client_label": "", "business_center_label": "Shared", "discipline_label": "architectural"}
+         for i in range(2)]
+        + [{"export_run_id": f"s{i:02d}", "unit_system": "imperial", "governance_role": "Container",
+            "client_label": "", "business_center_label": "Shared"}
+           for i in range(2, 5)]
+    )
+    segs = _build_segments(rows, min_files=3)
+    parent = next(r for r in segs if r["segment_id"] == "imperial|Container|Shared")
+    twin = next(r for r in segs if r["segment_id"] == "imperial|Container||Shared")
+    disc_child = next(r for r in segs if r["segment_id"] == "imperial|Container|architectural|Shared")
+
+    assert parent["file_count"] == "5"
+    assert twin["file_count"] == "5"
+    assert disc_child["file_count"] == "2"
+
+    assert parent["run_type"] == "registration", (
+        "Parent with a byte-identical child (the client=\"\" twin) must demote "
+        "even though it also has a second, non-matching discipline-cut child"
+    )
+    assert "redundant_single_child" in (parent.get("notes") or "")
+    # The pointer must name the matching twin, not the non-matching sibling.
+    assert "imperial|Container||Shared" in parent["notes"]
+    assert disc_child["file_count"] != parent["file_count"]
+
+
 # ---------------------------------------------------------------------------
 # Level-4 client+discipline leaf segment purpose and label
 # ---------------------------------------------------------------------------
@@ -866,6 +903,190 @@ def test_client_discipline_leaf_no_empty_purpose():
         assert r["segment_label"] != r["segment_id"], (
             f"segment_label fell back to raw ID for {r['segment_id']}"
         )
+
+
+# ---------------------------------------------------------------------------
+# collection_label segment-id collision guard
+# ---------------------------------------------------------------------------
+
+def _collision_rows():
+    rows = []
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"bc{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "business_center_label": "Shared", "discipline_label": "",
+        })
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"coll{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "collection_label": "Shared", "discipline_label": "",
+        })
+    return rows
+
+
+def test_collection_label_value_does_not_collide_with_other_dimension_value():
+    # A business-center-scoped segment and a collection-scoped segment that
+    # happen to share the same literal value ("Shared") must not produce the
+    # same segment_id, or one overwrites the other in any downstream loader
+    # that keys segment_manifest.csv by segment_id, and their memberships mix
+    # in segment_membership.csv.
+    segs = _build_segments(_collision_rows(), min_files=3)
+    ids = [r["segment_id"] for r in segs]
+    assert len(ids) == len(set(ids)), f"duplicate segment_id values: {ids}"
+
+    bc_scoped = [r for r in segs if r.get("business_center_label") == "Shared" and not r.get("collection_label")]
+    coll_scoped = [r for r in segs if r.get("collection_label") == "Shared" and not r.get("business_center_label")]
+    assert bc_scoped and coll_scoped
+    bc_ids = {r["segment_id"] for r in bc_scoped}
+    coll_ids = {r["segment_id"] for r in coll_scoped}
+    assert bc_ids.isdisjoint(coll_ids), (
+        f"business-center-scoped and collection-scoped segment_ids collide: {bc_ids & coll_ids}"
+    )
+
+
+def test_collection_namespace_prefix_itself_cannot_be_forged_by_other_fields():
+    # A business_center_label whose raw value literally IS the reserved
+    # "collection:Shared" token must not collide with a real
+    # collection_label="Shared" row's namespaced "collection:Shared" token.
+    # Without escaping the raw value's own colon, both would render as the
+    # identical segment_id substring "collection:Shared".
+    rows = []
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"forge{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "business_center_label": "collection:Shared", "discipline_label": "",
+        })
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"real{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "collection_label": "Shared", "discipline_label": "",
+        })
+    segs = _build_segments(rows, min_files=3)
+    ids = [r["segment_id"] for r in segs]
+    assert len(ids) == len(set(ids)), f"duplicate segment_id values: {ids}"
+
+    forged = next(r for r in segs if r.get("business_center_label") == "collection:Shared" and r["segment_level"] == "4")
+    real = next(r for r in segs if r.get("collection_label") == "Shared" and r["segment_level"] == "4")
+    assert forged["segment_id"] != real["segment_id"]
+    assert forged["segment_id"] == "imperial|Template||collection::Shared"
+    assert real["segment_id"] == "imperial|Template||collection:Shared"
+
+
+def test_colon_in_non_collection_value_not_forging_prefix_is_left_untouched():
+    # A client_label/discipline_label/business_center_label containing a
+    # colon that does NOT start with the reserved "collection:" prefix
+    # can never be confused with a namespaced token, so its segment_id
+    # rendering must stay byte-for-byte identical to before namespacing was
+    # introduced. Escaping it anyway would silently change segment_id for
+    # an already-stable segment on the next rebuild with unchanged source
+    # data, breaking _build_registry()'s folder-stability guarantee for it.
+    rows = [{
+        "export_run_id": f"r{i}", "unit_system": "imperial", "governance_role": "Project",
+        "client_label": "A:B", "discipline_label": "",
+    } for i in range(3)]
+    segs = _build_segments(rows, min_files=3)
+    leaf = next(r for r in segs if r["client_label"] == "A:B" and r["segment_level"] == "3")
+    assert leaf["segment_id"] == "imperial|Project|A:B"
+
+
+def test_collection_label_own_leading_colon_does_not_collide_with_forged_escape():
+    # collection_label=":Shared" and business_center_label="collection:Shared"
+    # must not render to the identical segment_id substring. Without also
+    # escaping collection_label's own value, "collection:" + ":Shared" and
+    # the escaped forgery "collection:Shared".replace(":","::") both produce
+    # "collection::Shared".
+    rows = []
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"lead{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "collection_label": ":Shared", "discipline_label": "",
+        })
+    for i in range(3):
+        rows.append({
+            "export_run_id": f"forge{i}", "unit_system": "imperial", "governance_role": "Template",
+            "client_label": "", "business_center_label": "collection:Shared", "discipline_label": "",
+        })
+    segs = _build_segments(rows, min_files=3)
+    ids = [r["segment_id"] for r in segs]
+    assert len(ids) == len(set(ids)), f"duplicate segment_id values: {ids}"
+
+    coll_leaf = next(r for r in segs if r.get("collection_label") == ":Shared" and r["segment_level"] == "4")
+    forged_leaf = next(r for r in segs if r.get("business_center_label") == "collection:Shared" and r["segment_level"] == "4")
+    assert coll_leaf["segment_id"] != forged_leaf["segment_id"]
+
+
+def test_collection_label_segment_id_namespaced_in_output():
+    segs = _build_segments(_collision_rows(), min_files=3)
+    coll_leaf = next(
+        r for r in segs
+        if r.get("collection_label") == "Shared" and r["governance_role"] == "Template" and not r.get("business_center_label")
+    )
+    assert "collection:Shared" in coll_leaf["segment_id"]
+
+
+def test_non_collection_segment_ids_unaffected_by_namespacing():
+    # The pre-existing dimensions (client/discipline/business_center) must
+    # keep their exact prior segment_id format — only collection_label gets
+    # namespaced.
+    segs = _build_segments(_collision_rows(), min_files=3)
+    bc_leaf = next(
+        r for r in segs
+        if r.get("business_center_label") == "Shared" and r["governance_role"] == "Template"
+        and not r.get("collection_label") and r["segment_level"] == "3"
+    )
+    assert bc_leaf["segment_id"] == "imperial|Template|Shared"
+
+
+# ---------------------------------------------------------------------------
+# client_label + collection_label leaf purposes
+# ---------------------------------------------------------------------------
+
+def _client_collection_rows():
+    """Mirrors real Sutter-shaped data: a client's Container/Template rows
+    are all tagged with that client's own collection_label, but its Project
+    rows carry no collection_label at all — so the level-3 client-alone
+    Container segment has population-identical children (the discipline-cut
+    child and the client+collection leaf), and pass5 can demote the level-3
+    parent, making the client+collection leaf the actual runnable segment."""
+    rows = []
+    for i in range(4):
+        rows.append({
+            "export_run_id": f"sc{i}", "unit_system": "imperial", "governance_role": "Container",
+            "client_label": "Sutter", "collection_label": "Sutter Standards",
+        })
+    for i in range(4):
+        rows.append({
+            "export_run_id": f"sp{i}", "unit_system": "imperial", "governance_role": "Project",
+            "client_label": "Sutter",
+        })
+    return rows
+
+
+def test_client_collection_leaf_gets_purpose_and_label():
+    segs = _build_segments(_client_collection_rows(), min_files=3)
+    leaf = next(
+        r for r in segs
+        if r["client_label"] == "Sutter" and r.get("collection_label") == "Sutter Standards"
+        and r["governance_role"] == "Container"
+    )
+    assert leaf["run_type"] in ("bundle", "reference"), (
+        "expected the client+collection leaf to be runnable in this fixture"
+    )
+    assert leaf["segment_purpose"] == "client_collection_coordination"
+    assert leaf["segment_label"] == "Sutter — Sutter Standards coordination files"
+    assert leaf["segment_label"] != leaf["segment_id"]
+
+
+def test_client_collection_discipline_leaf_gets_purpose_and_label():
+    rows = [dict(r, discipline_label="architectural") for r in _client_collection_rows() if r["governance_role"] == "Container"]
+    segs = _build_segments(rows, min_files=3)
+    leaf = next(
+        r for r in segs
+        if r["client_label"] == "Sutter" and r.get("collection_label") == "Sutter Standards"
+        and r["discipline_label"] == "architectural" and r["governance_role"] == "Container"
+    )
+    assert leaf["segment_purpose"] == "client_collection_discipline_coordination"
+    assert leaf["segment_label"] != leaf["segment_id"]
 
 
 # ---------------------------------------------------------------------------

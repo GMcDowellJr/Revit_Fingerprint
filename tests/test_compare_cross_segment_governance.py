@@ -74,6 +74,228 @@ def test_discover_governance_chain_falls_back_to_collection_label_for_na_client(
     assert ("bc_t", "acme_p", "template_to_project") not in pairs
 
 
+def test_discover_governance_chain_prefers_business_center_label_over_collection_label():
+    manifest = {
+        "bc_t": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_2270",
+            "collection_label": "BC_2270 Standards",
+        },
+        "bc_c": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_2270",
+            "collection_label": "BC_2270 Standards",
+        },
+        "other_bc_t": {
+            **_seg("Template", client=""),
+            "business_center_label": "BC_9999",
+            "collection_label": "BC_2270 Standards",
+        },
+        "acme_t": _seg("Template", client="Acme"),
+        "acme_p": _seg("Project", client="Acme"),
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # BC_2270's Template/Container (client blank/NA) now group via
+    # business_center_label, not collection_label.
+    assert ("bc_t", "bc_c", "template_to_container") in pairs
+    # A different business_center_label sharing the same collection_label
+    # must NOT be pooled together now that business_center_label wins.
+    assert ("other_bc_t", "bc_c", "template_to_container") not in pairs
+    # A real client is entirely unaffected by the fallback.
+    assert ("acme_t", "acme_p", "template_to_project") in pairs
+
+
+def test_discover_governance_chain_namespaces_business_center_fallback_from_real_client():
+    # A real client whose name happens to match a business_center_label text
+    # (e.g. both literally "BC_2270") must not be pooled with the
+    # business-center-scoped rows that fall back to that same text via
+    # business_center_label. client_label and business_center_label are
+    # distinct cut dimensions with independent namespaces.
+    manifest = {
+        "bc_t": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_2270",
+        },
+        "bc_c": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_2270",
+        },
+        "real_client_t": _seg("Template", client="BC_2270"),
+        "real_client_p": _seg("Project", client="BC_2270"),
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # The business-center rows still group with each other.
+    assert ("bc_t", "bc_c", "template_to_container") in pairs
+    # The real "BC_2270" client rows still group with each other.
+    assert ("real_client_t", "real_client_p", "template_to_project") in pairs
+    # But the two namespaces must never cross-pollinate despite sharing text.
+    assert ("bc_t", "real_client_p", "template_to_project") not in pairs
+    assert ("real_client_t", "bc_c", "template_to_container") not in pairs
+
+
+def test_discover_governance_chain_preserves_collection_scope_within_business_center():
+    # A single business center can house more than one named collection (its
+    # own general standards plus a separately-named legacy collection, per
+    # build_segment_manifest.py's collection_label cut dimension). Two rows
+    # sharing business_center_label but differing in collection_label must
+    # not be pooled together, or Page's standards and the firm-wide
+    # "Stantec Standards" collection (both business_center=BC_0000 in
+    # practice) would get spurious template_to_project/container_to_project
+    # pairs against each other.
+    manifest = {
+        "page_t": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Page Standards",
+        },
+        "page_c": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Page Standards",
+        },
+        "stantec_t": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Stantec Standards",
+        },
+        "stantec_c": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Stantec Standards",
+        },
+        # No collection_label at all — still groups purely on business_center,
+        # unaffected by the new collection-scoping.
+        "bc_only_t": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_2270",
+        },
+        "bc_only_c": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_2270",
+        },
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # Same business_center AND same collection: still group.
+    assert ("page_t", "page_c", "template_to_container") in pairs
+    assert ("stantec_t", "stantec_c", "template_to_container") in pairs
+    # Same business_center, DIFFERENT collection: must not cross-pollinate.
+    assert ("page_t", "stantec_c", "template_to_container") not in pairs
+    assert ("stantec_t", "page_c", "template_to_container") not in pairs
+    # business_center-only rows (no collection_label) are unaffected.
+    assert ("bc_only_t", "bc_only_c", "template_to_container") in pairs
+
+
+def test_discover_governance_chain_final_fallback_normalizes_na_spelling():
+    # When client_label, business_center_label, and collection_label are all
+    # blank/NA, the final fallback must return a canonical blank key, not the
+    # raw NA token. Two rows spelled differently ("__NOT_APPLICABLE__" vs
+    # "n/a") but otherwise identically blank must still group together —
+    # every NA spelling is documented as equivalent to blank for grouping.
+    manifest = {
+        "na_t": _seg("Template", client="__NOT_APPLICABLE__"),
+        "na_c": _seg("Container", client="n/a"),
+        "na_p": _seg("Project", client="NA"),
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    assert ("na_t", "na_c", "template_to_container") in pairs
+    assert ("na_t", "na_p", "template_to_project") in pairs
+    assert ("na_c", "na_p", "container_to_project") in pairs
+
+
+def test_discover_governance_chain_collection_match_is_soft_for_client_scope():
+    # Mirrors real data: a client's own Container/Template rows are tagged
+    # with that client's collection_label (e.g. "Sutter Standards"), but its
+    # Project rows typically carry no collection_label at all. Hard-
+    # partitioning by collection_label would put those in different _key()
+    # buckets and silently stop producing template_to_project/
+    # container_to_project pairs — the tool's primary comparison. A soft
+    # match (required only when both sides are populated) must still pair
+    # them, while two DIFFERENT populated collections under the same client
+    # must not cross-pollinate.
+    manifest = {
+        "sutter_t": {**_seg("Template", client="Sutter"), "collection_label": "Sutter Standards"},
+        "sutter_c": {**_seg("Container", client="Sutter"), "collection_label": "Sutter Standards"},
+        # Project rows: no collection_label at all, matching real data.
+        "sutter_p": _seg("Project", client="Sutter"),
+        # A second, differently-named collection under the SAME client must
+        # not silently pair with "Sutter Standards" — two populated,
+        # different values are a genuine mismatch.
+        "sutter_legacy_t": {**_seg("Template", client="Sutter"), "collection_label": "Sutter Legacy"},
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # Collection-tagged standards still pair with collection-blank usage.
+    assert ("sutter_t", "sutter_p", "template_to_project") in pairs
+    assert ("sutter_c", "sutter_p", "container_to_project") in pairs
+    assert ("sutter_t", "sutter_c", "template_to_container") in pairs
+    # Two different, both-populated collections under the same client don't
+    # cross-pollinate.
+    assert ("sutter_legacy_t", "sutter_c", "template_to_container") not in pairs
+    # But the differently-collectioned template still reaches the
+    # collection-blank project, since blank is permissive on one side.
+    assert ("sutter_legacy_t", "sutter_p", "template_to_project") in pairs
+
+
+def test_discover_governance_chain_rollup_does_not_wildcard_match_specific_collection():
+    # Mirrors real data: business_center_label="BC_0000" hosts two distinct
+    # collections (Page Standards, Stantec Standards). build_segment_manifest.py
+    # keeps a runnable, collection-blank aggregate Template alongside its
+    # collection-specific children whenever the aggregate's population isn't
+    # identical to either child's (i.e. the BC hosts more than one
+    # collection). That aggregate's blank collection_label must NOT act as a
+    # wildcard against a specific-collection Container — doing so would mix
+    # the pooled (both-collections) population into a comparison meant to
+    # isolate one collection's own population.
+    manifest = {
+        "bc_t_rollup": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_0000",
+            "segment_id": "bc_t_rollup",
+            "parent_segment_id": "",
+        },
+        # This child's parent_segment_id points back at bc_t_rollup and
+        # carries a populated collection_label — that's what marks
+        # bc_t_rollup as a roll-up rather than a genuinely collection-blank
+        # segment.
+        "bc_t_page": {
+            **_seg("Template", client="__NOT_APPLICABLE__"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Page Standards",
+            "segment_id": "bc_t_page",
+            "parent_segment_id": "bc_t_rollup",
+        },
+        "bc_c_page": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Page Standards",
+        },
+        "bc_c_stantec": {
+            **_seg("Container", client="n/a"),
+            "business_center_label": "BC_0000",
+            "collection_label": "Stantec Standards",
+        },
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # The roll-up must not wildcard-match ANY specific-collection Container.
+    assert ("bc_t_rollup", "bc_c_page", "template_to_container") not in pairs
+    assert ("bc_t_rollup", "bc_c_stantec", "template_to_container") not in pairs
+    # A collection-specific Template still correctly pairs with the matching
+    # collection's Container, and not with a different one.
+    assert ("bc_t_page", "bc_c_page", "template_to_container") in pairs
+    assert ("bc_t_page", "bc_c_stantec", "template_to_container") not in pairs
+
+
 def test_project_target_governance_state_uses_target_used():
     assert _usage_interpretable_for_role("Project") is True
     assert _recommended_primary_view("Template", "Project", "template_to_project") == "used"

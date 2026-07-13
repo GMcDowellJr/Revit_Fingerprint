@@ -1781,23 +1781,63 @@ def discover_governance_chain(
     # and Container→Project. Project target used-view is usage; other target roles
     # remain provided-vocabulary inventories.
     # Reference segments are included — they participate using their file inventories.
-    def _key(row: Dict[str, str]) -> Tuple[str, str]:
+    def _key(row: Dict[str, str]) -> Tuple[str, str, str]:
         # client_label is blank, or an explicit "not applicable" spelling
         # (na, N/A, __NOT_APPLICABLE__, ...), for Standards-collection rows
         # that were never a client engagement (e.g. BC_2270 templates/
         # containers). Pooling all of those under a single "" key would group
-        # unrelated collections together; fall back to collection_label so
-        # each collection's siblings still group with each other instead of
-        # pooling under "". is_blank_or_na() (shared with
-        # build_segment_manifest.py) recognizes any NA spelling, not just the
-        # one literal "__NOT_APPLICABLE__" token this used to hardcode.
+        # unrelated collections together; fall back to business_center_label
+        # first (the real, populated cut dimension for BC-scoped rows per
+        # build_segment_manifest.py), then to collection_label as a
+        # last-resort fallback for whenever that field does get wired in.
+        # is_blank_or_na() (shared with build_segment_manifest.py) recognizes
+        # any NA spelling, not just the one literal "__NOT_APPLICABLE__"
+        # token this used to hardcode.
+        #
+        # client_label, business_center_label, and collection_label are
+        # distinct cut dimensions with independent text namespaces — a real
+        # client named e.g. "BC_2270" must not collide with a business-center
+        # row whose business_center_label happens to be the same text. The
+        # key therefore tags which dimension supplied the value instead of
+        # collapsing them all into one bare string slot.
+        #
+        # collection_label is NOT folded into this key, even though it is a
+        # real cut dimension in build_segment_manifest.py's DIMENSION_CONFIG
+        # that can distinguish multiple named collections under the same
+        # client or business_center. It is intentionally handled the same
+        # way discipline_label is — via _collection_match() below, applied
+        # when pairs are generated — rather than as a hard partition here.
+        # Hard-partitioning by collection would sever the client_label case:
+        # a real client's Container/Template rows are typically tagged with
+        # that client's own collection_label (e.g. "Sutter Standards"), but
+        # its Project rows are typically not tagged with any collection at
+        # all. Splitting on collection here would put those two populations
+        # in different buckets and silently stop producing
+        # template_to_project/container_to_project pairs for that client —
+        # the tool's primary comparison. A soft match (required only when
+        # both sides have a populated value) blocks two different, both-
+        # populated collections from pairing while still letting a
+        # collection-tagged standards segment pair against its
+        # collection-blank usage.
+        unit = row.get("unit_system", "").strip()
         client = row.get("client_label", "").strip()
-        if is_blank_or_na(client):
-            client = row.get("collection_label", "").strip()
-        return (
-            client,
-            row.get("unit_system", "").strip(),
-        )
+        if not is_blank_or_na(client):
+            return ("client", client, unit)
+        bc = row.get("business_center_label", "").strip()
+        if not is_blank_or_na(bc):
+            return ("business_center", bc, unit)
+        collection = row.get("collection_label", "").strip()
+        if not is_blank_or_na(collection):
+            return ("collection", collection, unit)
+        # client_label, business_center_label, and collection_label are all
+        # blank/NA — every spelling of "not applicable" must land on the
+        # same key here, or e.g. a Template row spelled "__NOT_APPLICABLE__"
+        # and a Container row spelled "n/a" (both otherwise-blank, no bc, no
+        # collection) would fragment into different by_key buckets and never
+        # get compared. Returning the raw `client` token instead of a
+        # canonical "" would reintroduce exactly the fragmentation this
+        # fallback chain exists to prevent.
+        return ("client", "", unit)
 
     def _disc(row: Dict[str, str]) -> str:
         return row.get("discipline_label", "").strip()
@@ -1808,7 +1848,47 @@ def discover_governance_chain(
             return True
         return da == db
 
-    by_key: Dict[Tuple[str, str], Dict[str, List[str]]] = defaultdict(
+    def _collection(row: Dict[str, str]) -> str:
+        value = row.get("collection_label", "").strip()
+        return "" if is_blank_or_na(value) else value
+
+    # A collection-blank row is a wildcard ONLY when its blankness means
+    # "collection is simply not tracked here" (the Sutter-shaped case: a
+    # Project row that never got a collection_label). It must NOT wildcard
+    # when the blankness instead means "this segment is a roll-up pooling
+    # every collection under it together" — e.g. build_segment_manifest.py
+    # now keeps a runnable business-center-scoped Template/Container
+    # aggregate (blank collection_label) alongside its collection-specific
+    # children whenever the aggregate's population isn't identical to any
+    # single child's (i.e. the business center hosts more than one named
+    # collection). Wildcard-matching that aggregate against one specific
+    # collection's segment on the other side would mix the pooled
+    # population with a single library's population in the same
+    # comparison — precisely what collection_label was added to keep
+    # apart. A row counts as a roll-up when some OTHER manifest row's
+    # parent_segment_id points at it and that other row has a populated
+    # collection_label.
+    _collection_rollup_ids = {
+        row.get("parent_segment_id", "").strip()
+        for row in manifest.values()
+        if row.get("parent_segment_id", "").strip()
+        and not is_blank_or_na(row.get("collection_label", ""))
+    }
+
+    def _is_collection_rollup(row: Dict[str, str]) -> bool:
+        return row.get("segment_id", "") in _collection_rollup_ids
+
+    def _collection_match(ra: Dict[str, str], rb: Dict[str, str]) -> bool:
+        ca, cb = _collection(ra), _collection(rb)
+        if ca and cb:
+            return ca == cb
+        if ca and not cb:
+            return not _is_collection_rollup(rb)
+        if cb and not ca:
+            return not _is_collection_rollup(ra)
+        return True
+
+    by_key: Dict[Tuple[str, str, str], Dict[str, List[str]]] = defaultdict(
         lambda: defaultdict(list)
     )
     for sid, row in manifest.items():
@@ -1821,8 +1901,8 @@ def discover_governance_chain(
 
     # Generic / Generic-Host is an upstream stock vocabulary. Compare it across
     # matching unit_system even when its client_label differs from the downstream
-    # Template/Container/Project client scope. Discipline, when populated on both
-    # sides, still scopes the comparison.
+    # Template/Container/Project client scope. Discipline and collection, when
+    # populated on both sides, still scope the comparison.
     generic_ids = [
         sid for sid, row in manifest.items()
         if _is_generic_role(row.get("governance_role", ""))
@@ -1835,11 +1915,11 @@ def discover_governance_chain(
                 continue
             if row.get("run_type", "").strip().lower() not in ("bundle", "reference"):
                 continue
-            if not _same_unit(manifest, g, sid) or not _disc_match(manifest[g], row):
+            if not _same_unit(manifest, g, sid) or not _disc_match(manifest[g], row) or not _collection_match(manifest[g], row):
                 continue
             pairs.append((g, sid, f"generic_to_{role}"))
 
-    for (_client, _us), role_map in by_key.items():
+    for (_dim, _client, _us), role_map in by_key.items():
         generics = role_map.get("generic", [])
         templates = role_map.get("template", [])
         projects = role_map.get("project", [])
@@ -1847,25 +1927,25 @@ def discover_governance_chain(
 
         for g in generics:
             for t in templates:
-                if _disc_match(manifest[g], manifest[t]):
+                if _disc_match(manifest[g], manifest[t]) and _collection_match(manifest[g], manifest[t]):
                     pairs.append((g, t, "generic_to_template"))
             for c in containers:
-                if _disc_match(manifest[g], manifest[c]):
+                if _disc_match(manifest[g], manifest[c]) and _collection_match(manifest[g], manifest[c]):
                     pairs.append((g, c, "generic_to_container"))
             for p in projects:
-                if _disc_match(manifest[g], manifest[p]):
+                if _disc_match(manifest[g], manifest[p]) and _collection_match(manifest[g], manifest[p]):
                     pairs.append((g, p, "generic_to_project"))
 
         for t in templates:
             for p in projects:
-                if _disc_match(manifest[t], manifest[p]):
+                if _disc_match(manifest[t], manifest[p]) and _collection_match(manifest[t], manifest[p]):
                     pairs.append((t, p, "template_to_project"))
             for c in containers:
-                if _disc_match(manifest[t], manifest[c]):
+                if _disc_match(manifest[t], manifest[c]) and _collection_match(manifest[t], manifest[c]):
                     pairs.append((t, c, "template_to_container"))
         for c in containers:
             for p in projects:
-                if _disc_match(manifest[c], manifest[p]):
+                if _disc_match(manifest[c], manifest[p]) and _collection_match(manifest[c], manifest[p]):
                     pairs.append((c, p, "container_to_project"))
     return pairs
 
