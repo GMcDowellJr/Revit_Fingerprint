@@ -53,25 +53,35 @@ def _population_hash(export_run_ids: List[str]) -> str:
     token="|".join(sorted(export_run_ids));return hashlib.sha1(token.encode()).hexdigest()
 
 _UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]')
+# A cut dimension explicitly selected in a subset with a blank value
+# (currently only client_label — see _build_segments()'s blank-client
+# handling) renders in segment_id as an empty part between pipes (e.g.
+# "imperial|Template|" or "imperial|Container||architectural"). That part is
+# rendered as this token in the derived folder name, matching the "enterprise"
+# scope-level term compare_cross_segment.py already uses for "no client, no
+# bc" rows — a bare "_" (or "__") there reads as a naming mistake rather than
+# the intentional "no client selected" segment it actually is.
+_BLANK_SELECTED_FOLDER_TOKEN = "enterprise"
 def _sanitize_folder(segment_id:str)->str:
     # No "+" quantifier on _UNSAFE_FOLDER_CHARS and no .strip("_") at the end:
-    # both are deliberate. A cut dimension explicitly selected in a subset
-    # with a blank value (currently only client_label — see _build_segments()
-    # blank-client handling) renders in segment_id as an empty part between/
-    # after separator pipes (e.g. "imperial|Template|" or
-    # "imperial|Container||architectural"), distinct from that same dimension
-    # not being selected at all (e.g. "imperial|Template", which pools every
-    # value of the field, blank included). Collapsing consecutive separator
-    # runs into one "_" and trimming leading/trailing "_" erases exactly that
-    # distinguishing signal, so both segment_ids sanitize to the identical
-    # folder name even though they are different populations (the
-    # not-selected form is always a superset of the selected-blank form).
-    # Replacing each unsafe char one-for-one and keeping any resulting
-    # leading/trailing "_" preserves the distinction. segment_id can never
-    # itself start with an unsafe char (the root dimension, unit_system, is
-    # never blank — rows with a blank root are skipped before any subset is
-    # built), so this never produces a folder name that is only underscores.
-    return _UNSAFE_FOLDER_CHARS.sub("_", segment_id).lower()
+    # both are deliberate. An empty part between/after separator pipes is
+    # distinct from that same dimension not being selected at all (e.g.
+    # "imperial|Template", which pools every value of the field, blank
+    # included) — collapsing consecutive separator runs into one "_" and
+    # trimming leading/trailing "_" would erase exactly that distinguishing
+    # signal, so both segment_ids would sanitize to the identical folder name
+    # even though they are different populations (the not-selected form is
+    # always a superset of the selected-blank form). Rendering the blank part
+    # as _BLANK_SELECTED_FOLDER_TOKEN before the generic substitution below
+    # keeps that distinction self-explanatory rather than relying on a bare
+    # underscore. segment_id can never itself start with an unsafe char (the
+    # root dimension, unit_system, is never blank — rows with a blank root
+    # are skipped before any subset is built), so the first part is never
+    # replaced this way.
+    readable = "|".join(
+        part or _BLANK_SELECTED_FOLDER_TOKEN for part in segment_id.split("|")
+    )
+    return _UNSAFE_FOLDER_CHARS.sub("_", readable).lower()
 
 def _build_membership_rows(manifest_rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """Flatten each manifest row's internal export_run_ids/seed_export_run_ids

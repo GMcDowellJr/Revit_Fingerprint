@@ -320,8 +320,8 @@
     "semantic_hash": "d316cd96fce926cc07a701291c7c3a27"
   },
   "tests/test_build_segment_manifest.py": {
-    "mtime": 1783960389.053998,
-    "ast_hash": "6dcb47432824673910136ee9eb5d6916",
+    "mtime": 1783963258.7791398,
+    "ast_hash": "49387bb21c2e3dd7825c8a4eb1e81275",
     "semantic_hash": ""
   },
   "tests/test_bundle_pattern_classification_roles.py": {
@@ -340,7 +340,7 @@
     "semantic_hash": "105440e837898048a17d9a7bcdf6f63b"
   },
   "tests/test_compare_cross_segment_governance.py": {
-    "mtime": 1783960376.3737936,
+    "mtime": 1783963192.7951388,
     "ast_hash": "4358e6f441924f13122f6baafb51e217",
     "semantic_hash": "4358e6f441924f13122f6baafb51e217"
   },
@@ -690,8 +690,8 @@
     "semantic_hash": "bb71ad279a0cb52e7d7951af09f54877"
   },
   "tools/build_segment_manifest.py": {
-    "mtime": 1783960389.053998,
-    "ast_hash": "4d5443bab71326c0a73048b462a221c4",
+    "mtime": 1783963216.331139,
+    "ast_hash": "69a86bb9fcfec109389e6a3344f7d794",
     "semantic_hash": ""
   },
   "tools/bundle_analysis/__init__.py": {
@@ -780,7 +780,7 @@
     "semantic_hash": "d01acd53dc21614aaea7a312ee6a83db"
   },
   "tools/compare_cross_segment.py": {
-    "mtime": 1783960376.3737936,
+    "mtime": 1783963192.7951388,
     "ast_hash": "ca7b5be109b288e83a1056d1118c444a",
     "semantic_hash": "ca7b5be109b288e83a1056d1118c444a"
   },
@@ -1790,8 +1790,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1783960415.1617928,
-    "ast_hash": "a017b42f85149bc6cdc896db4a87c6f6",
+    "mtime": 1783963277.25914,
+    "ast_hash": "8eefbee34b6351d55447bfbc7a5eda74",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -1905,7 +1905,7 @@
     "semantic_hash": ""
   },
   "docs/cross_segment_comparison.md": {
-    "mtime": 1783960376.3617935,
+    "mtime": 1783963192.7751389,
     "ast_hash": "f4be6e2cbd8b8b87219d076c4be6a7ce",
     "semantic_hash": ""
   },

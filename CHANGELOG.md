@@ -31,12 +31,18 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   a `+` quantifier (each unsafe character is replaced one-for-one, so
   consecutive separators no longer collapse to a single `_`) and the final
   `.strip("_")` was removed, so a trailing/embedded blank-selected segment
-  now sanitizes to a distinguishable folder name. `segment_id` text itself
-  (used elsewhere — parsed positionally in `tools/generate_governance_narrative.py`
-  and hardcoded across dozens of existing tests) is completely unchanged;
-  only the derived folder name changes, and only for segments that select a
-  blank cut-dimension value. Verified against a real corpus manifest: 5
-  `bundle`/`reference`-eligible folder-name collisions, all resolved.
+  now sanitizes to a distinguishable folder name. Each blank part is also
+  rendered as the literal token `enterprise` (the same scope-level term
+  `compare_cross_segment.py` already uses for "no client, no bc" rows)
+  rather than a bare `_`/`__`, so e.g. `imperial|Template|` sanitizes to
+  `imperial_template_enterprise` instead of `imperial_template_` — a
+  self-explanatory name instead of something that reads as a naming
+  mistake. `segment_id` text itself (used elsewhere — parsed positionally
+  in `tools/generate_governance_narrative.py` and hardcoded across dozens
+  of existing tests) is completely unchanged; only the derived folder name
+  changes, and only for segments that select a blank cut-dimension value.
+  Verified against a real corpus manifest: 5 `bundle`/`reference`-eligible
+  folder-name collisions, all resolved.
 
 ### Changed (breaking pipeline-contract)
 - `segment_manifest.csv` and `run_registry.csv` no longer carry per-segment file

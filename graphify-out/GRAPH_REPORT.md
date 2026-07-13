@@ -1,16 +1,16 @@
 # Graph Report - Revit_Fingerprint  (2026-07-13)
 
 ## Corpus Check
-- 395 files · ~2,499,885 words
+- 395 files · ~2,500,100 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4654 nodes · 9949 edges · 298 communities (249 shown, 49 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 344 edges (avg confidence: 0.77)
+- 4655 nodes · 9951 edges · 302 communities (254 shown, 48 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 345 edges (avg confidence: 0.77)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `aa17e9e1`
+- Built from commit: `b47e9e0e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -298,6 +298,10 @@
 - __init__.py
 - Powershell Commands
 - probe_roof_type_import.py
+- run_fingerprint
+- TestCollectIdIntsNoRevit
+- _client_collection_rows
+- _sanitize_folder
 
 ## God Nodes (most connected - your core abstractions)
 1. `make_identity_item()` - 119 edges
@@ -312,33 +316,33 @@
 10. `build_record_v2()` - 58 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `TestCollectIdIntsNoRevit` --uses--> `CollectCtx`  [INFERRED]
+  tests/test_collect.py → core/collect.py
+- `TestIsInvalidElementId` --uses--> `CollectCtx`  [INFERRED]
+  tests/test_collect.py → core/collect.py
+- `TestMakeQueryKey` --uses--> `CollectCtx`  [INFERRED]
+  tests/test_collect.py → core/collect.py
+- `TestSafeUniqueId` --uses--> `CollectCtx`  [INFERRED]
+  tests/test_collect.py → core/collect.py
 - `test_make_hash_accepts_generator_large_input_sanity()` --calls--> `make_hash()`  [EXTRACTED]
   tests/test_hashing_incremental.py → core/hashing.py
-- `test_make_hash_deterministic_repeated_calls()` --calls--> `make_hash()`  [EXTRACTED]
-  tests/test_hashing_incremental.py → core/hashing.py
-- `test_make_hash_is_order_sensitive_contract()` --calls--> `make_hash()`  [EXTRACTED]
-  tests/test_hashing_incremental.py → core/hashing.py
-- `test_blank_unit_system_excluded()` --calls--> `_build_segments()`  [INFERRED]
-  tests/test_build_segment_manifest.py → tools/build_segment_manifest.py
-- `test_level1_segments_present()` --calls--> `_build_segments()`  [INFERRED]
-  tests/test_build_segment_manifest.py → tools/build_segment_manifest.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (298 total, 49 thin omitted)
+## Communities (302 total, 48 thin omitted)
 
 ### Community 0 - "Cross-Segment Comparison"
-Cohesion: 0.07
-Nodes (92): canon_bool(), canon_id(), canon_num(), Canonicalize Revit ElementId-like values to a decimal string.      Accepts:, Canonicalize booleans.      - None -> <MISSING>     - bool -> "true"/"false", Canonicalize numbers to a fixed decimal string.      - None -> <MISSING>     - C, make_hash(), Deterministic hash based on a sequence of strings.      Streaming/incremental im (+84 more)
+Cohesion: 0.09
+Nodes (67): make_hash(), _make_hash_impl(), Deterministic hash based on a sequence of strings.      Streaming/incremental im, Inner hash implementation (separated for timing wrapper clarity)., build_join_key_from_policy(), _dedupe_preserve_order(), _expand_sequence_key(), _get_shape_specific_requirements() (+59 more)
 
 ### Community 1 - "test_compound_types_wall.py"
-Cohesion: 0.07
-Nodes (99): canon_str(), fnum(), is_sentinel(), Any, Legacy alias for canon_num., Create RGB signature string from a Revit Color object., Create RGB dict from a Revit Color object.      Returns None on missing/unreadab, Canonicalize string-like values.      Rules:     - None -> <MISSING>     - str(. (+91 more)
+Cohesion: 0.09
+Nodes (74): purge_lookup(), _build_text_appearance_items(), _fmt_float(), _fmt_in_from_ft(), _format_options_to_kv(), _get_dimension_shape(), get_type_display_name(), Detect dimension shape from a Revit DimensionType object.      Revit exposes sha (+66 more)
 
 ### Community 2 - "make_identity_item"
-Cohesion: 0.07
-Nodes (51): FiredEdgeRow, _basic_wall(), _CS, _CSWrapError, _default_ctx(), _Doc, _FillPatternDef, _FillPatternElem (+43 more)
+Cohesion: 0.09
+Nodes (42): _basic_wall(), _CS, _CSWrapError, _default_ctx(), _Doc, _FillPatternDef, _FillPatternElem, _Id (+34 more)
 
 ### Community 3 - "discover_hash_policy.py"
 Cohesion: 0.21
@@ -349,16 +353,16 @@ Cohesion: 0.06
 Nodes (48): _append_color_item(), _append_pattern_items(), _append_value_item(), extract_cut_graphics(), extract_halftone(), extract_projection_graphics(), extract_transparency(), _is_category() (+40 more)
 
 ### Community 5 - "CollectCtx"
-Cohesion: 0.06
-Nodes (32): CacheKey, build_purgeable_id_set(), collect_elements(), collect_id_ints(), _collect_id_ints_uncached(), CollectCtx, _get_element(), _is_invalid_element_id() (+24 more)
+Cohesion: 0.26
+Nodes (12): CacheKey, collect_elements(), collect_id_ints(), _collect_id_ints_uncached(), _get_element(), is_type_purgeable(), Any, Execute a collection query without caching and return ElementId.IntegerValue lis (+4 more)
 
 ### Community 6 - "compare_view_templates_stand-alone.py"
 Cohesion: 0.14
 Nodes (26): analyze(), _canonical_item_str(), classify_authority_outcome(), classify_convergence(), _domain_payload_from_fp(), extract_domains_summary(), _extract_record_sig_hashes_v2(), _jaccard_multiset() (+18 more)
 
 ### Community 7 - "compute_latent_purgeable.py"
-Cohesion: 0.08
-Nodes (54): collect_instances(), build_record_v2(), compute_identity_quality(), make_record_id_from_element(), Create a stable record_id from a Revit element.      Priority:       1) UniqueId, Compute record.v2 identity_quality from required key qualities.      Args:, Assemble a record.v2 structure.      This helper does not compute sig_hash; call, emit_builtin_params() (+46 more)
+Cohesion: 0.13
+Nodes (41): canon_str(), Canonicalize string-like values.      Rules:     - None -> <MISSING>     - str(., collect_instances(), make_record_id_from_element(), Create a stable record_id from a Revit element.      Priority:       1) UniqueId, emit_builtin_params(), emit_shared_params_stub(), Read a BuiltInParameter integer value from a view template element.      Returns (+33 more)
 
 ### Community 8 - "record_v2.py"
 Cohesion: 0.16
@@ -413,8 +417,8 @@ Cohesion: 0.12
 Nodes (27): apply_join_keys_by_ids(), compute_join_hash(), extract_identity_map(), main(), md5_utf8_join_pipe(), Any, compute_coverage(), compute_join_hash_for_record() (+19 more)
 
 ### Community 22 - "build_semantic_groups.py"
-Cohesion: 0.07
-Nodes (26): DocViewContext, Any, # NOTE: Current repo domains are mostly non-geometry; link/transform helpers are, Deterministic, explainable view context snapshot.      Fields:     - view_id: in, Shared context object for domains that need consistent view-scoped reads.      T, Return a cached ViewInfo for `view`, with explicit reasons for missing/unreadabl, ViewInfo, _ensure_parent_dir() (+18 more)
+Cohesion: 0.04
+Nodes (85): canon_bool(), canon_id(), canon_num(), is_sentinel(), Any, Canonicalize Revit ElementId-like values to a decimal string.      Accepts:, Create RGB signature string from a Revit Color object., Create RGB dict from a Revit Color object.      Returns None on missing/unreadab (+77 more)
 
 ### Community 23 - "run_segment_orchestrator.py"
 Cohesion: 0.11
@@ -429,8 +433,8 @@ Cohesion: 0.15
 Nodes (18): _accuracy_label(), _center_marks_label(), _decoration_label(), _extract_kv(), format_synopsis(), Any, tools/label_synthesis/synopsis_formatters/dimension_types.py  Behavioral synopsi, Map Revit dimension shape string to short label. (+10 more)
 
 ### Community 26 - "extractor.py"
-Cohesion: 0.12
-Nodes (38): compute_attribute_concentration_metrics(), compute_effective_clusters(), compute_hhi_from_shares(), emit_analysis(), emit_records(), _extract_acc_project_label(), _file_id(), _fmt_metric() (+30 more)
+Cohesion: 0.11
+Nodes (40): compute_attribute_concentration_metrics(), compute_effective_clusters(), compute_hhi_from_shares(), emit_analysis(), emit_records(), _extract_acc_project_label(), _file_id(), _fmt_metric() (+32 more)
 
 ### Community 27 - "annotate_cluster_labels.py"
 Cohesion: 0.22
@@ -449,8 +453,8 @@ Cohesion: 0.25
 Nodes (15): test_project_target_governance_state_uses_target_used(), test_standards_carrier_target_avoids_passive_bloat_label(), _bool_str(), build_governance_state_outputs(), _build_summary_row(), _classify_governance_state(), _comparison_role_semantics(), get_role_jh_set() (+7 more)
 
 ### Community 31 - "main"
-Cohesion: 0.12
-Nodes (22): phase2_join_hash(), phase2_sorted_items(), Return IdentityItem-like dicts sorted by key 'k'., Deterministic join-hash for Phase-2 joins.     Expects caller to have already so, _canonical_identity_items_from_signature(), _phase2_items_from_def_signature(), Convert legacy def_signature entries ('k=v') into IdentityItems safely.      Har, Canonical evidence superset for view_templates.      Pilot rule: identity_basis. (+14 more)
+Cohesion: 0.08
+Nodes (45): phase2_join_hash(), Deterministic join-hash for Phase-2 joins.     Expects caller to have already so, _block_record_for_unstable_id(), block_record_v2(), canonical_structural_fields(), _canonical_structural_value(), canonicalize_enum(), canonicalize_str() (+37 more)
 
 ### Community 32 - "write_json_report"
 Cohesion: 0.11
@@ -473,12 +477,12 @@ Cohesion: 0.09
 Nodes (33): _build_synthetic_items_for_pair(), _build_template_lookup(), _extract_active_vco_fields(), _extract_graphic_fields(), _extract_object_style_baseline_fields(), _get_domain_payload(), _get_identity_item_value(), _get_phase2_cosmetic_value() (+25 more)
 
 ### Community 37 - "test_build_segment_manifest.py"
-Cohesion: 0.07
-Nodes (64): _client_collection_rows(), _collision_rows(), _disc_rows(), _meta_row(), Tests for tools/build_segment_manifest.py., Mirrors real Sutter-shaped data: a client's Container/Template rows     are all, Multi-client, multi-discipline Container corpus for discipline tests., test_blank_client_label_level2_id_distinct_from_level1() (+56 more)
+Cohesion: 0.08
+Nodes (60): _collision_rows(), _disc_rows(), _meta_row(), Tests for tools/build_segment_manifest.py., Multi-client, multi-discipline Container corpus for discipline tests., test_blank_client_label_level2_id_distinct_from_level1(), test_blank_discipline_does_not_generate_discipline_cut(), test_blank_unit_system_excluded() (+52 more)
 
 ### Community 38 - "prepare_archetype_review.py"
-Cohesion: 0.12
-Nodes (28): is_fragmented(), load_label_population(), Return True if label population is too fragmented for modal label promotion., Load joinhash_label_population.csv and index by join_hash.     Returns: {join_ha, _call_llm(), _collect_union_bundle_join_hashes(), _generic_build_prompt(), _generic_system_prompt() (+20 more)
+Cohesion: 0.11
+Nodes (31): is_fragmented(), load_label_population(), load_llm_cache(), Any, Return True if label population is too fragmented for modal label promotion., Load joinhash_label_population.csv and index by join_hash.     Returns: {join_ha, save_llm_cache(), _call_llm() (+23 more)
 
 ### Community 39 - "log"
 Cohesion: 0.17
@@ -493,8 +497,8 @@ Cohesion: 0.19
 Nodes (18): read_csv_rows(), _choose_threshold(), compute_placeholder_exclusions(), compute_placeholder_exclusions(), _is_truthy(), _largest_gap_threshold(), main(), _parse_args() (+10 more)
 
 ### Community 42 - "generate_governance_narrative.py"
-Cohesion: 0.09
-Nodes (53): collect_types(), _make_hash_impl(), Convert any value to a string representation safely.      Handles both str and u, Inner hash implementation (separated for timing wrapper clarity)., safe_str(), canonicalize_str(), Canonicalize a string-like value for IdentityItem.v.      Returns:         (valu, _compute_delta_items() (+45 more)
+Cohesion: 0.11
+Nodes (43): collect_types(), Convert any value to a string representation safely.      Handles both str and u, safe_str(), _compute_delta_items(), Semantic selector list over canonical evidence.      Keep join-key material sepa, Compare override to baseline, return only changed properties.      Same logic as, _semantic_keys_from_identity_items(), _attach_placeholder_metadata() (+35 more)
 
 ### Community 43 - "build_domain_index"
 Cohesion: 0.60
@@ -569,8 +573,8 @@ Cohesion: 0.08
 Nodes (23): For /graphify add and --watch, For /graphify query, For the commit hook and native CLAUDE.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+15 more)
 
 ### Community 61 - "materials_joinkey_discover.py"
-Cohesion: 0.11
-Nodes (25): make_record_id_structural(), Create a structural-hash record_id base and canonical preimage., exported_fingerprint_json(), Provide exporter output JSON for validation.      Options:       1) Set env var, test_all_exported_records_conform_to_record_contract_v2(), _make_record(), test_structural_record_id_dup_index_deterministic(), test_structural_record_id_duplicate_keys_blocked() (+17 more)
+Cohesion: 0.12
+Nodes (22): exported_fingerprint_json(), Provide exporter output JSON for validation.      Options:       1) Set env var, test_all_exported_records_conform_to_record_contract_v2(), _make_record(), test_structural_record_id_dup_index_deterministic(), test_structural_record_id_duplicate_keys_blocked(), test_validate_records_duplicate_within_file_and_domain(), _compute_identity_quality() (+14 more)
 
 ### Community 62 - "pareto_join_keys_by_ids.py"
 Cohesion: 0.13
@@ -593,8 +597,8 @@ Cohesion: 0.08
 Nodes (23): 1. Data-scope checkpoint, 1. What is the scope?, 2. All/used checkpoint, 2. What is internally consistent?, 3. Governance-state checkpoint, 3. What is provided, carried, and used?, 4. Ratification checkpoint, 4. What is created or modified locally? (+15 more)
 
 ### Community 67 - "._load_policy"
-Cohesion: 0.09
-Nodes (24): _manifest_row(), Hand-craft a manifest-row-shaped dict for testing _build_registry() in     isola, test_conformance_reference_mode_carried_over_across_runs(), test_conformance_reference_mode_defaults_to_latest_for_new_segment(), test_conformance_reference_mode_defaults_to_latest_for_old_registry_missing_field(), test_registry_distinguishes_selected_blank_client_from_unselected_client_pool(), test_registry_drops_removed_segment_ids_with_warning(), test_registry_excludes_skip_segments() (+16 more)
+Cohesion: 0.10
+Nodes (21): _manifest_row(), Hand-craft a manifest-row-shaped dict for testing _build_registry() in     isola, test_conformance_reference_mode_carried_over_across_runs(), test_conformance_reference_mode_defaults_to_latest_for_new_segment(), test_conformance_reference_mode_defaults_to_latest_for_old_registry_missing_field(), test_registry_distinguishes_selected_blank_client_from_unselected_client_pool(), test_registry_drops_removed_segment_ids_with_warning(), test_registry_excludes_skip_segments() (+13 more)
 
 ### Community 68 - "export_bundle_pattern_detail.py"
 Cohesion: 0.14
@@ -653,8 +657,8 @@ Cohesion: 0.10
 Nodes (19): Audit 4 — Bundle Analysis, Cross-Segment Pipeline & Structural Debt, compare_cross_segment.py — current output columns, D1 — n_pairs threshold for cross_segment_file_pairs.csv, D2 — n_unique_patterns_a / n_unique_patterns_b columns, D3 — file-grain aggregate scores alongside bundle-mode summary, D4 — cascade containment data / comparison_mode, D5 — score_ambiguity_band / signal_spread, D6 — view_templates_renderings_drafting exclusion (+11 more)
 
 ### Community 82 - "DomainProfile"
-Cohesion: 0.17
-Nodes (19): _load_label_resolution_inputs(), _are_near_duplicates(), _extract_kv_typed(), find_near_duplicate_merges(), _get_synopsis_formatter(), load_annotations(), load_llm_cache(), Any (+11 more)
+Cohesion: 0.19
+Nodes (14): _are_near_duplicates(), _extract_kv_typed(), find_near_duplicate_merges(), _get_synopsis_formatter(), tools/label_synthesis/label_resolver.py  Five-layer (plus 2.5) pattern label res, Detect near-duplicate clusters and return {smaller_jh -> canonical_jh}.      Mus, Build {key: (value_str, is_numeric)} from ok-quality identity_items.     Returns, Return True if two kv dicts represent near-duplicate configurations. (+6 more)
 
 ### Community 83 - "probe_line_patterns.py"
 Cohesion: 0.19
@@ -737,8 +741,8 @@ Cohesion: 0.13
 Nodes (14): Audit 3 — Extraction Layer & Contracts, Detailed Findings, E1 — material.class identity_item + sig_hash revision, E2 — materials join_hash composition, E3 — materials latent purgeable chain, E4 — wt.cfpsh in wall_types, E5 — FilterInverseRule, Files Not Found (+6 more)
 
 ### Community 105 - "Layer 0 - Core (Pure Python)"
-Cohesion: 0.07
-Nodes (53): _as_dict(), _as_int(), build_features(), _extract_counts_from_legacy(), Any, Extract stable count signals from legacy domain payloads when present.      Conv, Build deterministic features from payload.      Features include:       - schema, build_manifest() (+45 more)
+Cohesion: 0.11
+Nodes (37): _as_dict(), _as_int(), build_features(), _extract_counts_from_legacy(), Any, Extract stable count signals from legacy domain payloads when present.      Conv, Build deterministic features from payload.      Features include:       - schema, build_manifest() (+29 more)
 
 ### Community 106 - "build_manifest"
 Cohesion: 0.36
@@ -757,8 +761,8 @@ Cohesion: 0.25
 Nodes (13): _add_inventory_obs(), _fmt_display(), _format_param_contract(), _get_view_phase_filter_param(), _is_angle_datatype(), _is_length_datatype(), _maybe_set_example(), _phase_status_bucket() (+5 more)
 
 ### Community 110 - "Detailed Findings"
-Cohesion: 0.27
-Nodes (13): _canon_obj(), canonical_json_bytes(), compare_json(), diff_paths(), pretty_json(), Any, Returns (equal, summary)     summary includes stable hashes and bounded diffs., Return an object that is stable under json.dumps(sort_keys=True). (+5 more)
+Cohesion: 0.22
+Nodes (4): _make_query_key(), Cache key must be based on semantic query intent, not object reprs that can drif, Determinism: same inputs must produce the same key., TestMakeQueryKey
 
 ### Community 111 - "Detailed Findings"
 Cohesion: 0.21
@@ -877,8 +881,8 @@ Cohesion: 0.42
 Nodes (8): fetch_raw(), get_current_commit_sha(), github_get(), list_all_cs_files(), main(), Path, sync_revitlookup_reference.py  Copies RevitLookup descriptor source files into t, sync()
 
 ### Community 141 - "Decision Log"
-Cohesion: 0.13
-Nodes (20): _load_json(), main(), _now_stamp(), _membership_ids(), Path, Read segment_membership.csv and return the export_run_id set for one segment_id., _read_csv(), test_discipline_cut_not_required_column() (+12 more)
+Cohesion: 0.10
+Nodes (33): _canon_obj(), canonical_json_bytes(), compare_json(), diff_paths(), pretty_json(), Any, Returns (equal, summary)     summary includes stable hashes and bounded diffs., Return an object that is stable under json.dumps(sort_keys=True). (+25 more)
 
 ### Community 142 - "sync_revitlookup_reference.py"
 Cohesion: 0.13
@@ -929,8 +933,8 @@ Cohesion: 0.17
 Nodes (11): Architecture Overview, Context Dictionary Schema, Dependency Contract, Dependency Direction, Design Intent, Domain-Populated Keys, Layer 0 — Core (Pure Python), Layer 1 — Domain Extractors (Revit-aware) (+3 more)
 
 ### Community 154 - "probe_phases.py"
-Cohesion: 0.23
-Nodes (11): _collect_fill_patterns(), _export_fill_pattern_ctx(), extract_drafting(), extract_model(), _phase2_fill_pattern_is_import(), # IMPORTANT: grid order is identity-significant; do NOT sort the preimage., # NOTE: name/uid/elem_id are labels/metadata and MUST NOT participate in identit, Best-effort PAT-import flag for FillPatternElement extraction. (+3 more)
+Cohesion: 0.26
+Nodes (5): _is_invalid_element_id(), Returns True if elem_id is missing/invalid.      Handles:     - None     - Revit, An object with no IntegerValue attribute is treated as invalid., Zero IntegerValue should be invalid (Revit InvalidElementId)., TestIsInvalidElementId
 
 ### Community 155 - "Architecture Overview"
 Cohesion: 0.36
@@ -945,8 +949,8 @@ Cohesion: 0.60
 Nodes (5): load_csv(), main(), Any, Path, write_csv()
 
 ### Community 158 - "Population-aware mode (Step 0 + per-population runs)"
-Cohesion: 0.17
-Nodes (18): atomic_write_csv(), atomic_write_json(), build_edge_aliases(), Any, Path, Shared IO/logging helpers for the cross-domain archetype discovery pipeline.  Co, Strip a trailing "_drafting"/"_model" suffix; None if neither present., Build edge_id -> canonical_edge_id and canonical -> [collapsed edge_ids].      T (+10 more)
+Cohesion: 0.13
+Nodes (23): main(), atomic_write_csv(), atomic_write_json(), build_edge_aliases(), Any, Path, Shared IO/logging helpers for the cross-domain archetype discovery pipeline.  Co, Strip a trailing "_drafting"/"_model" suffix; None if neither present. (+15 more)
 
 ### Community 159 - "probe_loaded_family_types.py"
 Cohesion: 0.50
@@ -1021,8 +1025,8 @@ Cohesion: 0.22
 Nodes (10): additionalProperties, items, minItems, properties, required, type, items, k (+2 more)
 
 ### Community 180 - "_build_dynamic_rows"
-Cohesion: 0.33
-Nodes (9): _build_arrow_identity_items(), _build_common_identity_items(), _build_tick_identity_items(), _get_arrowhead_style(), Return a canonical arrowhead style label.      Prefer the Revit display string f, test_get_arrowhead_style_fallback(), test_no_missing_for_unrelated_style_properties(), test_style_discriminator_first() (+1 more)
+Cohesion: 0.13
+Nodes (22): fnum(), Legacy alias for canon_num., get_type_display_name(), Get the type name as shown in the Type selector.      Tries SYMBOL_NAME_PARAM fi, _as_value_string(), _build_arrow_identity_items(), _build_common_identity_items(), _build_tick_identity_items() (+14 more)
 
 ### Community 181 - "build_policy"
 Cohesion: 0.08
@@ -1181,8 +1185,8 @@ Cohesion: 0.40
 Nodes (4): Files, Notes, `phase0_records.csv` columns, V2.1 Phase 0 Export Schema
 
 ### Community 230 - "D-018 — loaded_family_types scope: loaded families only; system families deferred"
-Cohesion: 0.60
-Nodes (4): _eligibility_reason(), main(), _pattern_id(), Any
+Cohesion: 0.22
+Nodes (8): FiredEdgeRow, DomainPatternLabelCache, _evaluate_signal(), Any, Path, Lazy `(domain, join_hash) -> human_label` lookup for domain patterns., Return the best `(source_join_hash, source_domain)` for a fired signal.      The, _signal_fired_source()
 
 ### Community 231 - "V2.1 Analysis Schema"
 Cohesion: 0.50
@@ -1241,8 +1245,8 @@ Cohesion: 0.50
 Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
 
 ### Community 249 - "graphify reference: commit hook and native CLAUDE.md integration"
-Cohesion: 0.50
-Nodes (4): _expand_sequence_key(), _infer_indexed_count(), Expand policy key with [] to indexed keys in order.  Supports:   - vf.rules[].si, Infer count for keys like f"{prefix}[###]." by scanning keys.
+Cohesion: 0.18
+Nodes (11): _domain_run(), _extract_legacy_quality(), _extract_v2_block_reasons(), _extract_v2_hash(), _has_v2_surface(), _looks_like_revit_unique_id(), Best-effort extraction of the contract semantic hash (v2) without changing legac, Best-effort extraction of v2 block reasons from a domain payload.      Domains a (+3 more)
 
 ### Community 250 - "graphify reference: query, path, explain"
 Cohesion: 0.50
@@ -1264,25 +1268,45 @@ Nodes (3): format_synopsis(), Any, tools/label_synthesis/synopsis_formatters/pha
 Cohesion: 0.67
 Nodes (3): enum, type, is_purgeable_q
 
+### Community 261 - "graphify reference: GitHub clone and cross-repo merge"
+Cohesion: 0.43
+Nodes (3): CollectCtx, Per-run collection context.      - collector_cache maps semantic query keys to a, TestCollectCtx
+
+### Community 298 - "run_fingerprint"
+Cohesion: 0.29
+Nodes (7): build_purgeable_id_set(), Builds a frozenset of ElementId.IntegerValue (int) for all elements     currentl, _canonicalize_all_domain_records(), _enabled(), Allowlist gate for domain execution.     - ENABLED_DOMAINS = None  -> run all do, Execute fingerprint extraction on the given document.      Args:         doc: Re, run_fingerprint()
+
+### Community 299 - "TestCollectIdIntsNoRevit"
+Cohesion: 0.29
+Nodes (4): Without Revit API, collect_id_ints should raise RuntimeError., None doc should raise ValueError (after Revit check)., When where is provided without where_key, cache should be bypassed., TestCollectIdIntsNoRevit
+
+### Community 300 - "_client_collection_rows"
+Cohesion: 0.50
+Nodes (4): _client_collection_rows(), Mirrors real Sutter-shaped data: a client's Container/Template rows     are all, test_client_collection_discipline_leaf_gets_purpose_and_label(), test_client_collection_leaf_gets_purpose_and_label()
+
+### Community 301 - "_sanitize_folder"
+Cohesion: 0.50
+Nodes (4): test_sanitize_folder_preserves_selected_blank_vs_unselected_dimension(), test_sanitize_folder_renders_selected_blank_as_enterprise_token(), test_sanitize_folder_strips_path_separators(), _sanitize_folder()
+
 ## Knowledge Gaps
 - **672 isolated node(s):** `session-start.sh script`, `hook-check.sh script`, `setup.sh script`, `$schema`, `$id` (+667 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **49 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **48 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `main()` connect `Decision Log` to `Layer 0 - Core (Pure Python)`, `Detailed Findings`?**
-  _High betweenness centrality (0.061) - this node is a cross-community bridge._
+- **Why does `main()` connect `Decision Log` to `Layer 0 - Core (Pure Python)`, `run_fingerprint`?**
+  _High betweenness centrality (0.068) - this node is a cross-community bridge._
 - **Why does `load_exports()` connect `vt_profile.py` to `canonicalize_str`, `is_blank_or_na`, `test_discover_vfd_edges.py`, `test_record_v2_utils.py`, `dimension_types.join_key.md`, `probe_dimension_types.py`, `standards_governance_report.py`, `safe_str`, `main`, `migrate_materials_identity_items.py`, `probe_arrowheads.py`, `Detailed Findings`, `probe_phase_filters.py`?**
-  _High betweenness centrality (0.055) - this node is a cross-community bridge._
-- **Why does `log()` connect `probe_view_category_overrides.py` to `write_json_report`, `make_identity_item`, `D-018 — loaded_family_types scope: loaded families only; system families deferred`, `test_output_row_sort_helpers_are_stable_by_content`, `run_dynamo.py`, `Architecture Overview`, `Population-aware mode (Step 0 + per-population runs)`?**
-  _High betweenness centrality (0.046) - this node is a cross-community bridge._
+  _High betweenness centrality (0.060) - this node is a cross-community bridge._
+- **Why does `log()` connect `probe_view_category_overrides.py` to `write_json_report`, `test_output_row_sort_helpers_are_stable_by_content`, `run_dynamo.py`, `Architecture Overview`, `Population-aware mode (Step 0 + per-population runs)`?**
+  _High betweenness centrality (0.052) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `safe_str()` (e.g. with `_as_string()` and `_as_value_string()`) actually correct?**
   _`safe_str()` has 3 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `session-start.sh script`, `hook-check.sh script`, `setup.sh script` to the rest of the system?**
   _1442 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Cross-Segment Comparison` be split into smaller, more focused modules?**
-  _Cohesion score 0.0711484593837535 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08580183861082738 - nodes in this community are weakly interconnected._
 - **Should `test_compound_types_wall.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.0652014652014652 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08757908757908758 - nodes in this community are weakly interconnected._

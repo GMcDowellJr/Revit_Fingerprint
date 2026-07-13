@@ -263,6 +263,23 @@ def test_sanitize_folder_preserves_selected_blank_vs_unselected_dimension():
     )
 
 
+def test_sanitize_folder_renders_selected_blank_as_enterprise_token():
+    # A bare "_" (trailing) or "__" (embedded) reads as a naming mistake, not
+    # an intentional "no client selected" segment. Render it as "enterprise"
+    # instead — the same scope-level term compare_cross_segment.py already
+    # uses for "no client, no bc" rows — so the folder name is
+    # self-explanatory.
+    from build_segment_manifest import _sanitize_folder
+
+    assert _sanitize_folder("imperial|Template|") == "imperial_template_enterprise"
+    assert (
+        _sanitize_folder("imperial|Container||architectural")
+        == "imperial_container_enterprise_architectural"
+    )
+    # A segment with no blank-selected dimension at all is untouched.
+    assert _sanitize_folder("imperial|Template") == "imperial_template"
+
+
 def test_registry_output_folders_globally_unique_with_suffix_collision():
     # Reproduce the case where a generated suffix collides with another
     # segment's natural sanitized name. Uses distinct literal client_label
