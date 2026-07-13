@@ -44,6 +44,42 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   an additive one.
 
 ### Added
+- `tools/compare_cross_segment.py` governance comparisons now fan out across
+  enterprise/bc/client scope levels instead of routing everything through a
+  single client-scoped grouping key. Scope level is derived per-row from
+  which of `client_label`/`business_center_label` are populated (enterprise =
+  neither; bc = business_center_label only; client = client_label only;
+  project = both) — orthogonal to `governance_role`, and computed the same
+  way for every comparison in this file.
+  `discover_governance_chain()` gains four new directed pairwise comparison
+  types, each an independent parallel edge (no fixed override precedence
+  between enterprise/bc/client standards, since any one may or may not have
+  adapted from another): `enterprise_to_project` (an enterprise-scoped
+  Template/Container reaches every Project regardless of its own client/bc),
+  `bc_to_project` (a bc-scoped Template/Container reaches only Projects in
+  the same normalized business center), `enterprise_to_bc`, and
+  `enterprise_to_client` (same-role, standard-to-standard — Template vs.
+  Template or Container vs. Container, never mixed roles). All four are
+  registered in `DIRECTED_TYPES` and `GOVERNANCE_STATE_DIRECTED_TYPES`;
+  `enterprise_to_project`/`bc_to_project` are additionally registered in
+  `DELTA_DIRECTED_TYPES` alongside `template_to_project`/`container_to_project`,
+  since they are the same shape of comparison (standard reference vs. Project
+  target) just at a different scope level. Generic/Generic-Host is
+  deliberately excluded from this fan-out — it already pairs unconditionally
+  against every Template/Container/Project via the pre-existing `generic_ids`
+  loop, so a separate scope-scoped edge would be redundant.
+  `run_pooled_comparison()` gains two new pool grains alongside the existing
+  `(parent_segment_id, role, unit_system)` pool (now labeled `pool_scope=
+  parent_sibling` in `cross_segment_pooled.csv`, a new column): `pool_scope=
+  bc` pools `(business_center_label, role, unit_system)` ignoring
+  client_label (whichever clients happen to have work in that bc), and
+  `pool_scope=client` pools `(client_label, role, unit_system)` ignoring
+  business_center_label (whichever bcs happen to have work for that client).
+  These are genuinely different pools with different membership, not two
+  views of the same pool — a segment can now appear in `cross_segment_pooled.csv`
+  once per applicable pool grain. The per-pool containment/bundle computation
+  itself is unchanged; it was extracted into a shared `_build_pooled_row()`
+  helper so all three grains share one implementation.
 - Segment staleness model extended (build_segment_manifest.py `_build_registry()`):
   `run_registry.csv` gains `export_run_ids` (persisted per-run member list, enabling
   next-run diffing) and `conformance_reference_mode` (currently always `"latest"` —
@@ -74,6 +110,63 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   target's own file population is unchanged) or `current`.
 
 ### Fixed
+- `tools/compare_cross_segment.py` `discover_governance_chain()`'s four
+  scope-level fan-out edges (`enterprise_to_project`, `bc_to_project`,
+  `enterprise_to_bc`, `enterprise_to_client`) group purely by scope level,
+  ignoring `parent_segment_id` — the same class of bug just fixed in
+  `run_pooled_comparison()`'s bc/client pool grains, but in the pairwise
+  path. Verified against a real corpus manifest: 14 of 139 new-type pairs
+  were a segment paired against its own `parent_segment_id` ancestor or
+  descendant (e.g. an enterprise-scoped Template paired against a
+  bc-scoped Template nested directly under it), which would inflate
+  containment toward a false 1.0 the same way. `_build_ancestor_map()` and
+  a shared `_is_lineage_related()` helper (used by both this fix and the
+  pooled-comparison one) now exclude any such pair from all four edges.
+- `tools/compare_cross_segment.py` `run_pooled_comparison()`'s new `bc`/`client`
+  pool grains ignore `parent_segment_id` for grouping, so a collection-blank
+  BC roll-up and its own collection-specific child (or any ancestor/descendant
+  pair sharing the same normalized bc/client value) could land in the same
+  pool. Since segments are hierarchical cuts of the same underlying file
+  population, an ancestor's data is always a superset of its descendants' —
+  pooling them as peers compared a segment against a pool already containing
+  its own data, inflating `all_containment_focal_in_pool`/
+  `used_containment_focal_in_pool` toward a false 1.0. A new `_build_ancestor_map()`
+  walks each segment's `parent_segment_id` chain once per invocation;
+  `run_pooled_comparison()` now excludes any segment in the focal segment's
+  own ancestor/descendant lineage from its pool, for all three pool_scope
+  grains.
+- `tools/compare_cross_segment.py` `build_explicit_matrix_outputs()`'s pool
+  matrix (`project_pool_containment_similarity_matrix.csv`) keyed cells only
+  as `row_id -> peer_pool:<row_id>` by view/domain, ignoring `pool_scope`.
+  Since a project can now emit one pooled row per applicable `pool_scope`
+  grain (`parent_sibling`/`bc`/`client`), different grains for the same
+  project collided on identical matrix coordinates with different values.
+  `column_id` now folds in `pool_scope` (`peer_pool:<pool_scope>:<row_id>`)
+  so each grain gets its own cell.
+- `tools/compare_cross_segment.py` `_normalize_bc_label()` only blanked empty
+  strings and the `"0000"`/`"BC_0000"` bookkeeping tokens, dropping the
+  `is_blank_or_na()` NA-token handling (`n/a`, `NA`, `__NOT_APPLICABLE__`, ...)
+  that `discover_governance_chain()`'s `_key()` previously relied on for its
+  `business_center_label` fallback. An NA-spelled bc was being treated as a
+  real peer business center by `_bc_of()`, `_scope_level()` (misclassified as
+  `"bc"` scope instead of `"enterprise"`), and the new bc-scoped
+  pooling/pairwise comparisons. Restored the `is_blank_or_na()` check
+  alongside the bookkeeping-token check.
+- `tools/compare_cross_segment.py` `discover_governance_chain()`'s `_key()`
+  business_center_label fallback (used when `client_label` is blank/NA) no
+  longer treats bookkeeping tags `"0000"`/`"BC_0000"` (any case) as a real
+  peer business center. Those values mean "enterprise work, tagged for
+  bookkeeping," not a specific business center; grouping by the raw string
+  would have silently pooled unrelated enterprise-wide rows together as if
+  they shared one bc. The fallback now normalizes through the same
+  `_bc_of()`/`_normalize_bc_label()` helpers the new enterprise/bc/client
+  scope-level fan-out uses, falling through to the collection/blank
+  fallbacks below when the tag normalizes to blank. Existing fixtures using
+  `business_center_label="BC_0000"` alongside a populated `collection_label`
+  are unaffected (they already grouped via collection_label, not
+  business_center_label); a row with an unadorned `"0000"`/`"BC_0000"` and no
+  collection_label now falls through to the blank-key fallback instead of
+  pairing with unrelated same-tagged rows.
 - `tools/compare_cross_segment.py` `comparison_registry.csv`: a (pair, domain) is now
   also omitted from the stamp if either side's `run_registry.csv` `status` is not
   `"complete"`. `build_segment_manifest.py` updates `population_hash` to a segment's
