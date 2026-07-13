@@ -637,6 +637,43 @@ def test_single_child_same_hash_still_demoted():
     )
 
 
+def test_matching_child_demotes_parent_even_with_other_nonmatching_children():
+    # Real-world shape: a business_center-scoped Container pool where every
+    # row also happens to have a blank client_label (so the client=""-twin
+    # child is a byte-identical duplicate of the parent), AND a subset of
+    # those rows also carry a discipline_label (so a second, non-matching
+    # discipline-cut child also exists as a sibling). The old "exactly one
+    # child" gate saw two children and skipped the redundancy check
+    # entirely, leaving the parent — a true duplicate of its client=""-twin
+    # — independently runnable alongside that twin. It must now demote
+    # regardless of the extra non-matching sibling.
+    rows = (
+        [{"export_run_id": f"s{i:02d}", "unit_system": "imperial", "governance_role": "Container",
+          "client_label": "", "business_center_label": "Shared", "discipline_label": "architectural"}
+         for i in range(2)]
+        + [{"export_run_id": f"s{i:02d}", "unit_system": "imperial", "governance_role": "Container",
+            "client_label": "", "business_center_label": "Shared"}
+           for i in range(2, 5)]
+    )
+    segs = _build_segments(rows, min_files=3)
+    parent = next(r for r in segs if r["segment_id"] == "imperial|Container|Shared")
+    twin = next(r for r in segs if r["segment_id"] == "imperial|Container||Shared")
+    disc_child = next(r for r in segs if r["segment_id"] == "imperial|Container|architectural|Shared")
+
+    assert parent["file_count"] == "5"
+    assert twin["file_count"] == "5"
+    assert disc_child["file_count"] == "2"
+
+    assert parent["run_type"] == "registration", (
+        "Parent with a byte-identical child (the client=\"\" twin) must demote "
+        "even though it also has a second, non-matching discipline-cut child"
+    )
+    assert "redundant_single_child" in (parent.get("notes") or "")
+    # The pointer must name the matching twin, not the non-matching sibling.
+    assert "imperial|Container||Shared" in parent["notes"]
+    assert disc_child["file_count"] != parent["file_count"]
+
+
 # ---------------------------------------------------------------------------
 # Level-4 client+discipline leaf segment purpose and label
 # ---------------------------------------------------------------------------

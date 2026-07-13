@@ -491,14 +491,37 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         else:
             r["segment_label"]=sid
     # pass5 redundant hash
+    #
+    # A parent is redundant whenever ANY direct child has byte-identical
+    # population — not only when it happens to have exactly one child. The
+    # old "exactly one child" gate made sense back when a node's only
+    # plausible sibling was its client_label="" twin, but with discipline_
+    # label/business_center_label/collection_label all coexisting as cut
+    # dimensions, most parents now have several distinct children (a
+    # discipline-cut child, a business-center-cut child, a collection-cut
+    # child, the client=""-twin, ...). That gate silently stopped the
+    # redundant-parent detection from firing at all for those parents, even
+    # when one specific child (most commonly the client=""-twin) turns out
+    # to carry the parent's *entire* population — e.g. a business-center
+    # pool where every file also happens to have a blank client_label. Such
+    # a parent is a true duplicate of that child: same files, same hash, yet
+    # both were left as independently runnable bundle/reference segments.
+    #
+    # If more than one child ties on population_hash (only possible when two
+    # different cut dimensions each fully, non-fragmentarily cover the same
+    # population), the pointer target is picked deterministically by
+    # segment_id — which specific matching child gets named in the note
+    # doesn't change whether the parent itself is correctly recognized as
+    # redundant.
     for r in rows_out:
         if r["run_type"] not in {"bundle", "registration", "reference"}: continue
         row_key = row_to_key[id(r)]
         direct_children = [key_to_row[k] for k in key_to_children.get(row_key, [])]
-        if len(direct_children) > 1:
-            continue
-        matches = [c for c in direct_children if c["population_hash"] == r["population_hash"]]
-        if len(direct_children) == 1 and len(matches) == 1:
+        matches = sorted(
+            (c for c in direct_children if c["population_hash"] == r["population_hash"]),
+            key=lambda c: c["segment_id"],
+        )
+        if matches:
             ch=matches[0]["segment_id"]; _append_note(r,"redundant_single_child",ch)
             r["run_type"]="registration"; r["segment_purpose"]="redundant_single_child"; r["segment_label"]=f"{r['segment_id']} — same population as {ch}"
     rows_out.sort(key=lambda r:(int(r["segment_level"]),r["segment_id"]))
