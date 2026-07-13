@@ -976,7 +976,6 @@
       "archive_split_detection_extract_dates_from_paths",
       "archive_split_detection_extract_metadata_patterns",
       "archive_split_detection_file_level",
-      "archive_split_detection_file_level_build_element_profiles",
       "archive_split_detection_file_level_compute_avg_between_cluster_similarity",
       "archive_split_detection_file_level_compute_avg_internal_similarity",
       "archive_split_detection_file_level_compute_named_cluster_flags",
@@ -996,7 +995,6 @@
       "archive_split_detection_file_level_rationale_407",
       "archive_split_detection_file_level_rationale_429",
       "archive_split_detection_file_level_rationale_454",
-      "archive_split_detection_file_level_rationale_77",
       "archive_split_detection_file_level_run_file_level_clustering",
       "archive_split_detection_file_level_select_cluster_representative",
       "archive_split_detection_file_level_threshold_graph_cluster_files",
@@ -1715,7 +1713,6 @@
       "docs_analysis-phases-question-map",
       "docs_cross_segment_comparison",
       "docs_tools_DEPRECATED",
-      "tests_test_compare_cross_segment_governance_test_output_row_sort_helpers_are_stable_by_content",
       "tests_test_compare_cross_segment_governance_test_project_target_governance_state_uses_target_used",
       "tests_test_compare_cross_segment_governance_test_standards_carrier_target_avoids_passive_bloat_label",
       "tools_compare_cross_segment",
@@ -1724,6 +1721,7 @@
       "tools_compare_cross_segment_build_pattern_reuse_summary_rows",
       "tools_compare_cross_segment_build_summary_row",
       "tools_compare_cross_segment_build_union_inventory_rows",
+      "tools_compare_cross_segment_classify_delta",
       "tools_compare_cross_segment_classify_governance_state",
       "tools_compare_cross_segment_comparison_role_semantics",
       "tools_compare_cross_segment_deduplicate_pairs",
@@ -1740,6 +1738,7 @@
       "tools_compare_cross_segment_rationale_1",
       "tools_compare_cross_segment_rationale_1097",
       "tools_compare_cross_segment_rationale_2523",
+      "tools_compare_cross_segment_rationale_421",
       "tools_compare_cross_segment_rationale_888",
       "tools_compare_cross_segment_recommended_primary_view",
       "tools_compare_cross_segment_role_key",
@@ -1747,8 +1746,6 @@
       "tools_compare_cross_segment_safe_pct",
       "tools_compare_cross_segment_same_unit",
       "tools_compare_cross_segment_segment_is_runnable",
-      "tools_compare_cross_segment_sort_pair_detail_rows",
-      "tools_compare_cross_segment_sort_summary_rows",
       "tools_compare_cross_segment_usage_interpretable_for_role"
     ],
     "31": [
@@ -1872,8 +1869,10 @@
     "34": [
       "archive_io_get_domain_payload",
       "archive_io_get_domain_records",
+      "archive_io_load_exports",
       "archive_io_rationale_116",
       "archive_io_rationale_122",
+      "archive_io_rationale_64",
       "archive_run_dimension_types_by_family",
       "archive_run_dimension_types_by_family_discover_families_from_exports",
       "archive_run_dimension_types_by_family_families_present_in_baseline",
@@ -1899,6 +1898,8 @@
       "archive_run_joinhash_label_population_get_join_hash",
       "archive_run_joinhash_label_population_main",
       "archive_run_joinhash_label_population_rationale_29",
+      "archive_split_detection_file_level_build_element_profiles",
+      "archive_split_detection_file_level_rationale_77",
       "tools_patterns_analysis_archive_run_dimension_types_by_family_py_any",
       "tools_patterns_analysis_archive_run_joinhash_label_population_py_any"
     ],
@@ -2054,7 +2055,6 @@
       "tools_compare_cross_segment_atomic_write_csv",
       "tools_compare_cross_segment_build_pair_domain_work_items",
       "tools_compare_cross_segment_bundle_analysis_dir",
-      "tools_compare_cross_segment_classify_delta",
       "tools_compare_cross_segment_discover_domains_for_segment",
       "tools_compare_cross_segment_discover_within_project",
       "tools_compare_cross_segment_domain_patterns_path",
@@ -2077,7 +2077,6 @@
       "tools_compare_cross_segment_rationale_2380",
       "tools_compare_cross_segment_rationale_2673",
       "tools_compare_cross_segment_rationale_3104",
-      "tools_compare_cross_segment_rationale_421",
       "tools_compare_cross_segment_rationale_843",
       "tools_compare_cross_segment_rationale_933",
       "tools_compare_cross_segment_read_csv_rows",
@@ -3711,8 +3710,6 @@
       "archive_intradomain_summary_profile_records",
       "archive_intradomain_summary_rationale_58",
       "archive_intradomain_summary_safe_str",
-      "archive_io_load_exports",
-      "archive_io_rationale_64",
       "tools_patterns_analysis_archive_intradomain_summary_py_any",
       "tools_patterns_analysis_archive_intradomain_summary_py_dataframe"
     ],
@@ -4288,6 +4285,11 @@
       "migration_extract_first_record_main",
       "tools_migration_extract_first_record_py_any"
     ],
+    "187": [
+      "tests_test_compare_cross_segment_governance_test_output_row_sort_helpers_are_stable_by_content",
+      "tools_compare_cross_segment_sort_pair_detail_rows",
+      "tools_compare_cross_segment_sort_summary_rows"
+    ],
     "188": [
       "tests_test_dimension_types_placeholder_fields",
       "tests_test_dimension_types_placeholder_fields_test_attach_placeholder_metadata_ok",
@@ -4485,7 +4487,7 @@
     "11": 0.06748911465892599,
     "12": 0.09728506787330317,
     "13": 0.11450980392156863,
-    "14": 0.06748911465892599,
+    "14": 0.07058823529411765,
     "15": 0.06547619047619048,
     "16": 0.09863945578231292,
     "17": 0.08953900709219859,
@@ -4501,16 +4503,16 @@
     "27": 0.08717948717948718,
     "28": 0.05128205128205128,
     "29": 0.09446693657219973,
-    "30": 0.10661268556005399,
+    "30": 0.10953058321479374,
     "31": 0.0953058321479374,
     "32": 0.11095305832147938,
     "33": 0.10476190476190476,
-    "34": 0.12043010752688173,
+    "34": 0.11092436974789915,
     "35": 0.08907563025210084,
     "36": 0.35126050420168065,
     "37": 0.08067226890756303,
     "38": 0.32620320855614976,
-    "39": 0.1380952380952381,
+    "39": 0.15151515151515152,
     "40": 0.17045454545454544,
     "41": 0.14022988505747128,
     "42": 0.19310344827586207,
@@ -4591,7 +4593,7 @@
     "117": 0.3333333333333333,
     "118": 0.34545454545454546,
     "119": 0.2909090909090909,
-    "120": 0.2948717948717949,
+    "120": 0.36363636363636365,
     "121": 0.32727272727272727,
     "122": 0.3090909090909091,
     "123": 0.18181818181818182,
@@ -4658,6 +4660,7 @@
     "184": 0.6666666666666666,
     "185": 1.0,
     "186": 0.6666666666666666,
+    "187": 0.6666666666666666,
     "188": 0.6666666666666666,
     "189": 1.0,
     "190": 0.6666666666666666,
@@ -4822,41 +4825,8 @@
       "why": "connects across different repos/directories; bridges separate communities; peripheral node `test_make_hash_accepts_generator_large_input_sanity()` unexpectedly reaches hub `make_hash()`"
     }
   ],
-  "questions": [
-    {
-      "type": "bridge_node",
-      "question": "Why does `_phase2_item()` connect `Domain Indexing` to `Value Canonicalization`, `Phase 2 Join Key Management`?",
-      "why": "High betweenness centrality (0.203) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `load_exports()` connect `Intradomain Identity Summary` to `Domain Indexing`, `Collision Differencing`, `Domain Record Extraction`, `Fingerprint API Mapping`, `Typography Features Extraction`, `Cluster Analysis and Metrics`, `Change Classification`, `Element-Level Classification`, `Reference Standards Building`, `Join Key Evaluation`, `Join Keys Application`, `Join Hash Parameter Extraction`, `Candidate Join Key Simulation`?",
-      "why": "High betweenness centrality (0.165) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `_load_governance_role_rules()` connect `Analysis Run Management` to `Attribute Analysis`?",
-      "why": "High betweenness centrality (0.110) - this node is a cross-community bridge."
-    },
-    {
-      "type": "verify_inferred",
-      "question": "Are the 79 inferred relationships involving `_build_segments()` (e.g. with `test_blank_client_label_level2_id_distinct_from_level1()` and `test_blank_discipline_does_not_generate_discipline_cut()`) actually correct?",
-      "why": "`_build_segments()` has 79 INFERRED edges - model-reasoned connections that need verification."
-    },
-    {
-      "type": "isolated_nodes",
-      "question": "What connects `PreToolUse`, `PreToolUse`, `version` to the rest of the system?",
-      "why": "220 weakly-connected nodes found - possible documentation gaps or missing edges."
-    },
-    {
-      "type": "low_cohesion",
-      "question": "Should `Hashing and Key Generation` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.07960526315789473 - nodes in this community are weakly interconnected."
-    },
-    {
-      "type": "low_cohesion",
-      "question": "Should `Dimension Shape Detection` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.07472527472527472 - nodes in this community are weakly interconnected."
-    }
-  ]
+  "tokens": {
+    "input": 151150,
+    "output": 3384
+  }
 }
