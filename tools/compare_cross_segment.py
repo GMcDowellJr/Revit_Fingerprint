@@ -1713,6 +1713,41 @@ def _is_standard_role(role_key: str) -> bool:
     return role_key in ("template", "container")
 
 
+def _build_ancestor_map(manifest: Dict[str, Dict[str, str]]) -> Dict[str, Set[str]]:
+    """Map each segment_id to the set of its parent_segment_id ancestors.
+
+    Segments are hierarchical cuts of the same underlying file population —
+    build_segment_manifest.py derives each child as its parent's population
+    narrowed by one additional cut dimension, so a child's files are always
+    a subset of its parent's (this is also why a collection-blank BC
+    roll-up's own population can be a strict superset of its
+    collection-specific children's — see discover_governance_chain()'s
+    _is_collection_rollup). Treating an ancestor and its own descendant as
+    independent peers — whether pooled together or paired directly — compares
+    a segment against data that already contains (some or all of) its own.
+    """
+    ancestors: Dict[str, Set[str]] = {}
+
+    def _walk(sid: str, seen: Set[str]) -> Set[str]:
+        if sid in ancestors:
+            return ancestors[sid]
+        parent = manifest.get(sid, {}).get("parent_segment_id", "").strip()
+        result: Set[str] = set()
+        if parent and parent != sid and parent not in seen:
+            result.add(parent)
+            result |= _walk(parent, seen | {sid})
+        ancestors[sid] = result
+        return result
+
+    for sid in manifest:
+        _walk(sid, set())
+    return ancestors
+
+
+def _is_lineage_related(ancestor_map: Dict[str, Set[str]], sid_a: str, sid_b: str) -> bool:
+    return sid_b in ancestor_map.get(sid_a, set()) or sid_a in ancestor_map.get(sid_b, set())
+
+
 ComparisonPair = Tuple[str, str, str]  # (seg_a, seg_b, comparison_type)
 
 
@@ -2051,8 +2086,20 @@ def discover_governance_chain(
     bc_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row) == "bc"]
     client_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row) == "client"]
 
+    # These loops group purely by scope level, ignoring parent_segment_id —
+    # so an ancestor and its own descendant (e.g. an enterprise-scoped
+    # Template and a bc/client-scoped Template nested under it) can
+    # otherwise land on opposite sides of one of these edges even though
+    # segments are hierarchical cuts of the same underlying file population
+    # (a descendant's data is always a subset of its ancestor's). Pairing
+    # them as independent standards would compare a segment against data
+    # that already contains its own.
+    ancestor_map = _build_ancestor_map(manifest)
+
     for e_sid, e_row in enterprise_standards:
         for p_sid, p_row in project_rows:
+            if _is_lineage_related(ancestor_map, e_sid, p_sid):
+                continue
             if (
                 _same_unit(manifest, e_sid, p_sid)
                 and _disc_match(e_row, p_row)
@@ -2064,6 +2111,8 @@ def discover_governance_chain(
         bc_value = _bc_of(bc_row)
         for p_sid, p_row in project_rows:
             if _bc_of(p_row) != bc_value:
+                continue
+            if _is_lineage_related(ancestor_map, bc_sid, p_sid):
                 continue
             if (
                 _same_unit(manifest, bc_sid, p_sid)
@@ -2077,6 +2126,8 @@ def discover_governance_chain(
         for bc_sid, bc_row in bc_standards:
             if _role_key(bc_row.get("governance_role", "")) != e_role:
                 continue
+            if _is_lineage_related(ancestor_map, e_sid, bc_sid):
+                continue
             if (
                 _same_unit(manifest, e_sid, bc_sid)
                 and _disc_match(e_row, bc_row)
@@ -2088,6 +2139,8 @@ def discover_governance_chain(
         e_role = _role_key(e_row.get("governance_role", ""))
         for c_sid, c_row in client_standards:
             if _role_key(c_row.get("governance_role", "")) != e_role:
+                continue
+            if _is_lineage_related(ancestor_map, e_sid, c_sid):
                 continue
             if (
                 _same_unit(manifest, e_sid, c_sid)
@@ -2952,37 +3005,6 @@ def _build_pooled_row(
     }
 
 
-def _build_ancestor_map(manifest: Dict[str, Dict[str, str]]) -> Dict[str, Set[str]]:
-    """Map each segment_id to the set of its parent_segment_id ancestors.
-
-    Segments are hierarchical cuts of the same underlying file population —
-    build_segment_manifest.py derives each child as its parent's population
-    narrowed by one additional cut dimension, so a child's files are always
-    a subset of its parent's (this is also why a collection-blank BC
-    roll-up's own population can be a strict superset of its
-    collection-specific children's — see discover_governance_chain()'s
-    _is_collection_rollup). Pooling an ancestor together with its own
-    descendant as independent peers would compare a segment against a pool
-    that already contains (some or all of) that same segment's own data.
-    """
-    ancestors: Dict[str, Set[str]] = {}
-
-    def _walk(sid: str, seen: Set[str]) -> Set[str]:
-        if sid in ancestors:
-            return ancestors[sid]
-        parent = manifest.get(sid, {}).get("parent_segment_id", "").strip()
-        result: Set[str] = set()
-        if parent and parent != sid and parent not in seen:
-            result.add(parent)
-            result |= _walk(parent, seen | {sid})
-        ancestors[sid] = result
-        return result
-
-    for sid in manifest:
-        _walk(sid, set())
-    return ancestors
-
-
 def run_pooled_comparison(
     manifest: Dict[str, Dict[str, str]],
     registry: Dict[str, Dict[str, str]],
@@ -3038,9 +3060,6 @@ def run_pooled_comparison(
 
     ancestor_map = _build_ancestor_map(manifest)
 
-    def _lineage_related(sid_a: str, sid_b: str) -> bool:
-        return sid_b in ancestor_map.get(sid_a, set()) or sid_a in ancestor_map.get(sid_b, set())
-
     rows: List[Dict[str, str]] = []
 
     def _emit_for_groups(
@@ -3060,7 +3079,7 @@ def run_pooled_comparison(
                 # contains (some or all of) the child's own data.
                 pool_sids = [
                     s for s in members
-                    if s != focal_sid and not _lineage_related(focal_sid, s)
+                    if s != focal_sid and not _is_lineage_related(ancestor_map, focal_sid, s)
                 ]
 
                 focal_domains = discover_domains_for_segment(segments_root, registry, focal_sid)

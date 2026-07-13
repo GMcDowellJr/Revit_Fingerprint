@@ -110,6 +110,18 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   target's own file population is unchanged) or `current`.
 
 ### Fixed
+- `tools/compare_cross_segment.py` `discover_governance_chain()`'s four
+  scope-level fan-out edges (`enterprise_to_project`, `bc_to_project`,
+  `enterprise_to_bc`, `enterprise_to_client`) group purely by scope level,
+  ignoring `parent_segment_id` — the same class of bug just fixed in
+  `run_pooled_comparison()`'s bc/client pool grains, but in the pairwise
+  path. Verified against a real corpus manifest: 14 of 139 new-type pairs
+  were a segment paired against its own `parent_segment_id` ancestor or
+  descendant (e.g. an enterprise-scoped Template paired against a
+  bc-scoped Template nested directly under it), which would inflate
+  containment toward a false 1.0 the same way. `_build_ancestor_map()` and
+  a shared `_is_lineage_related()` helper (used by both this fix and the
+  pooled-comparison one) now exclude any such pair from all four edges.
 - `tools/compare_cross_segment.py` `run_pooled_comparison()`'s new `bc`/`client`
   pool grains ignore `parent_segment_id` for grouping, so a collection-blank
   BC roll-up and its own collection-specific child (or any ancestor/descendant

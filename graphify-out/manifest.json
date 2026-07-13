@@ -340,8 +340,8 @@
     "semantic_hash": "105440e837898048a17d9a7bcdf6f63b"
   },
   "tests/test_compare_cross_segment_governance.py": {
-    "mtime": 1783910434.494603,
-    "ast_hash": "5dfd85d2815a8de3f36ee32ccfac1551",
+    "mtime": 1783913905.8770268,
+    "ast_hash": "126ae914d60185b03b58d9aabbc59743",
     "semantic_hash": ""
   },
   "tests/test_compound_types_wall.py": {
@@ -780,8 +780,8 @@
     "semantic_hash": "d01acd53dc21614aaea7a312ee6a83db"
   },
   "tools/compare_cross_segment.py": {
-    "mtime": 1783910358.9289978,
-    "ast_hash": "3d3a07a93fb0ccb24a63476eb77973e6",
+    "mtime": 1783913820.709029,
+    "ast_hash": "04522b33a1d5545a5be8e0db0202eeec",
     "semantic_hash": ""
   },
   "tools/compare_templates_stand-alone/compare_view_templates_stand-alone.py": {
@@ -1790,8 +1790,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1783910498.1449947,
-    "ast_hash": "4e84c4b537246185b64360d7ce6c0b75",
+    "mtime": 1783913951.017026,
+    "ast_hash": "bd200aafd0ceff1412ce7b764309f05f",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -1905,8 +1905,8 @@
     "semantic_hash": ""
   },
   "docs/cross_segment_comparison.md": {
-    "mtime": 1783910463.6129954,
-    "ast_hash": "de4e22dc53c720389fba16771927ad69",
+    "mtime": 1783913936.0450263,
+    "ast_hash": "bcc9924fe29c507678529a095030de79",
     "semantic_hash": ""
   },
   "docs/extract_stage_matrix.md": {

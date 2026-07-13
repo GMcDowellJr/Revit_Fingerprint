@@ -77,6 +77,8 @@ Standards segments (Template/Container) can carry any of the four scope levels. 
 
 There is no fixed override precedence between enterprise/bc/client standards: a bc's standard may or may not have adapted the enterprise standard, and a client's standard may or may not have adapted the bc's or enterprise's — this is unknowable in advance from manifest data alone, so `enterprise_to_bc`, `enterprise_to_client`, `enterprise_to_project`, and `bc_to_project` are computed as independent parallel edges, never routed through a single "winning" standard.
 
+These four edges group purely by scope level, ignoring `parent_segment_id` — so an ancestor and its own descendant (e.g. an enterprise-scoped Template and a bc/client-scoped Template nested directly under it in the segment hierarchy) can otherwise land on opposite sides of one of these edges, even though a descendant's file population is always a subset of its ancestor's. Pairing them as independent standards would compare a segment against data that already contains its own. All four edges exclude any pair where one side is in the other's `parent_segment_id` lineage (ancestor or descendant), computed once per invocation via the same ancestor map used by the pooled-comparison lineage guard (section 6).
+
 ---
 
 ## 3. Measurement Architecture

@@ -399,6 +399,44 @@ def test_discover_governance_chain_excludes_generic_from_scope_fanout():
     assert not any(ctype in ("enterprise_to_project", "bc_to_project") for _a, _b, ctype in pairs if _a == "g")
 
 
+def test_discover_governance_chain_excludes_ancestor_descendant_from_scope_fanout():
+    # The scope-fanout loops group purely by scope level, ignoring
+    # parent_segment_id — so an ancestor and its own descendant (e.g. an
+    # enterprise-scoped Template and a bc-scoped Template nested directly
+    # under it) can otherwise land on opposite sides of one of these edges,
+    # even though a descendant's data is always a subset of its ancestor's.
+    manifest = {
+        "ent_t": {**_seg("Template", client=""), "parent_segment_id": ""},
+        "bc_t_child": {
+            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            "parent_segment_id": "ent_t",
+        },
+        "proj_grandchild": {
+            **_seg("Project", client="Acme"), "business_center_label": "BC_1234",
+            "parent_segment_id": "bc_t_child",
+        },
+        "bc_t_unrelated": {
+            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            "parent_segment_id": "",
+        },
+        "proj_unrelated": {
+            **_seg("Project", client="Widgets"), "business_center_label": "BC_1234",
+            "parent_segment_id": "",
+        },
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # Ancestor/descendant pairs excluded from all four scope-fanout edges.
+    assert ("ent_t", "bc_t_child", "enterprise_to_bc") not in pairs
+    assert ("ent_t", "proj_grandchild", "enterprise_to_project") not in pairs
+    assert ("bc_t_child", "proj_grandchild", "bc_to_project") not in pairs
+    # Unrelated peers (no shared lineage) still pair normally.
+    assert ("ent_t", "bc_t_unrelated", "enterprise_to_bc") in pairs
+    assert ("ent_t", "proj_unrelated", "enterprise_to_project") in pairs
+    assert ("bc_t_unrelated", "proj_unrelated", "bc_to_project") in pairs
+
+
 def test_pooled_comparison_bc_scope_pools_across_clients_ignoring_client(tmp_path):
     segments_root = tmp_path / "segments"
     domain = "line_patterns"
