@@ -1090,7 +1090,8 @@ def _load_segment_file_join_hashes_with_status(
 
 
 def _project_label_for_file(file_metadata: Dict[str, Dict[str, str]], export_run_id: str) -> str:
-    return file_metadata.get(export_run_id, {}).get("project_label", "").strip() or export_run_id
+    label = file_metadata.get(export_run_id, {}).get("project_label", "").strip()
+    return export_run_id if is_blank_or_na(label) else label
 
 
 def build_union_inventory_rows(
@@ -2186,7 +2187,8 @@ def discover_within_project(
         by_proj: Dict[str, List[str]] = defaultdict(list)
         for eid in eids:
             meta = file_metadata.get(eid, {})
-            proj = meta.get("project_label", "").strip() or eid
+            label = meta.get("project_label", "").strip()
+            proj = eid if is_blank_or_na(label) else label
             by_proj[proj].append(eid)
         if any(len(v) >= 2 for v in by_proj.values()):
             pairs.append((sid, sid, "within_project"))
@@ -2253,14 +2255,16 @@ def run_pair(
         by_proj: Dict[str, Dict[str, Set[str]]] = defaultdict(dict)
         for eid, jhs in all_files.items():
             meta = file_metadata.get(eid, {})
-            proj = meta.get("project_label", "").strip() or eid
+            label = meta.get("project_label", "").strip()
+            proj = eid if is_blank_or_na(label) else label
             by_proj[proj][eid] = jhs
 
         # Used-view project grouping (same labels, but used-view join_hash sets)
         by_proj_used: Dict[str, Dict[str, Set[str]]] = defaultdict(dict)
         for eid, jhs in all_files_used.items():
             meta = file_metadata.get(eid, {})
-            proj = meta.get("project_label", "").strip() or eid
+            label = meta.get("project_label", "").strip()
+            proj = eid if is_blank_or_na(label) else label
             by_proj_used[proj][eid] = jhs
 
         PairRecord = Tuple[str, str, str, int, int, int, float, float, float]

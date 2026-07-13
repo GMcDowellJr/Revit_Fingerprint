@@ -12,6 +12,27 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Fixed
+- `tools/compare_cross_segment.py` Mode D (`within_project`) grouped files by
+  `project_label` using `.strip() or eid` — a fallback that only catches a
+  truly-blank string, not a populated NA placeholder like
+  `"__NOT_APPLICABLE__"`, `"n/a"`, or `"NA"`. Every file in a segment whose
+  project is unassigned carries the exact same placeholder string, so all of
+  them collapsed into one giant fake "project" and got pairwise-compared
+  against each other (`C(n,2)` spurious pairs for `n` unassigned files —
+  484 files in the `imperial` segment pre-fix). Fixed at all four sites that
+  used this pattern: the `discover_within_project()` pair-discovery gate,
+  both grouping loops (`by_proj`/`by_proj_used`, all-view and used-view) in
+  `run_pair()`'s `is_within_project` branch, and `_project_label_for_file()`
+  (used by `build_union_inventory_rows()` for the `n_projects_present`/
+  `n_projects_denominator` union-inventory counts). All four now use
+  `na_token.is_blank_or_na()` — the same NA-recognition helper Mode E's
+  `discover_governance_chain()` already uses for `client_label`/
+  `collection_label` — to decide when to fall back to the per-file `eid`
+  singleton key, so unassigned-project files no longer group with each
+  other (each remains its own singleton, same as a truly-blank label
+  already did) while real shared `project_label` values (e.g. `"Renown"`,
+  41 files) are unaffected.
+
 - `tools/build_segment_manifest.py` `_sanitize_folder()` collapsed consecutive
   separator characters into one `_` and trimmed leading/trailing `_`, which
   erased a real distinction in `segment_id`: a cut dimension explicitly
