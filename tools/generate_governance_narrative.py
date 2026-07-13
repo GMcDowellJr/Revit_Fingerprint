@@ -290,6 +290,81 @@ def load_corpus_counts(
     return counts
 
 
+# ── build_cascade comparison_type coverage ──────────────────────────────────────
+# The full comparison_type vocabulary compare_cross_segment.py can emit splits into
+# four groups that need different treatment (see docs/governance_narrative_scope_gap_audit.md
+# A1). Every comparison_type value build_cascade can see must appear in exactly one
+# of these — the coverage check at the end of the main loop below warns on anything
+# that doesn't, so a future producer addition is never silently invisible again.
+
+# Group 1 — already handled by the explicit branches in the main loop; directed
+# cross-role cascade stages (Template<->Container<->Project) plus the two
+# self/peer-comparison shapes (sibling_projects -> xc, within_project -> wp_*).
+CASCADE_GROUP1_TYPES = {
+    "template_to_container", "container_to_project", "template_to_project",
+    "parent_sibling_roles", "sibling_projects", "within_project",
+}
+
+# Group 2 — one level up the cascade: Generic/Generic-Host (out-of-box Revit stock
+# content) into Template/Container/Project. This is the literal top rung of the
+# "Governance Cascade" diagram already printed in render_header() ("Generic /
+# Enterprise Baseline down-arrow [generic -> template/container/project
+# containment]") — an existing promise in the narrative's own output that was
+# never implemented before this pass.
+CASCADE_GROUP2_TYPES = {
+    "generic_to_template", "generic_to_container", "generic_to_project",
+}
+
+# Group 3 — a different axis entirely (scope level: enterprise/bc/client standards
+# vs. Project), not one more cascade stage. Captured into the `cascade` dict under
+# new keys (ep/bp/eb/ec) using the same containment-extraction pattern as Group 1/2,
+# but deliberately NOT rendered, tiered, or anomaly-detected in this pass — that is
+# a future business-center-section design decision, not an extension of this
+# bug-fix prompt.
+CASCADE_GROUP3_TYPES = {
+    "enterprise_to_project", "bc_to_project", "enterprise_to_bc", "enterprise_to_client",
+}
+
+# Group 4 — known comparison types intentionally excluded from cascade, one reason
+# each (verified against compare_cross_segment.py's actual discovery functions, not
+# guessed):
+CASCADE_GROUP4_EXCLUDED_TYPES = {
+    "sibling_templates": (
+        "Same-role peer-to-peer comparison (Template vs Template), not a cross-role "
+        "directed cascade measurement. build_cascade only extracts a peer-similarity "
+        "signal from one role today (sibling_projects -> xc, restricted to a specific "
+        "client-pair filter) and does not generalise that pattern to other roles. "
+        "Whether/how Template-vs-Template consistency should be surfaced is a design "
+        "decision, not resolved by this pass."
+    ),
+    "sibling_containers": (
+        "Same defect/reason class as sibling_templates — same-role peer comparison, "
+        "no directed-cascade analog implemented for this role either."
+    ),
+    "sibling_generic": (
+        "Same-role peer comparison among Generic/Generic-Host segments. "
+        "_comparison_role_semantics() in compare_cross_segment.py already documents "
+        "that used-view is not meaningful for these pairs (all-view is primary); no "
+        "cascade-shaped (cross-role containment) signal applies to peer-vs-peer "
+        "Generic comparisons either."
+    ),
+    "sibling_segments": (
+        "Fallback bucket (discover_sibling_segments()'s ctype default) for peer "
+        "segments whose governance_role doesn't match template/container/project/"
+        "generic. By construction these aren't role-typed the way the cascade's "
+        "role buckets are, so there's no directed-cascade slot to route them into."
+    ),
+    "governance_chain": (
+        "Reserved vocabulary token in compare_cross_segment.py's DIRECTED_TYPES — "
+        "verified (grep) that no discovery function ever actually emits the literal "
+        "string \"governance_chain\" as a comparison_type; discover_governance_chain() "
+        "itself emits concrete generic_to_*/template_to_*/container_to_project types, "
+        "not this string. Nothing to feed into cascade under this name; kept here "
+        "only so the coverage check below doesn't flag it as unrecognized."
+    ),
+}
+
+
 def build_cascade(summary_rows: list[dict]) -> dict:
     """
     Returns domain-keyed dict with cascade scores from generic segments:
@@ -302,6 +377,11 @@ def build_cascade(summary_rows: list[dict]) -> dict:
       tw: within-template Jaccard
       wp_p10: within-project Jaccard p10 (generic segment, all roles)
       wp_p90: within-project Jaccard p90 (generic segment, all roles)
+      gt/gc/gp: generic->template/container/project containment_a_in_b_mean
+        (Group 2 — one level up the cascade from tc/cp/tp; see CASCADE_GROUP2_TYPES)
+      ep/bp/eb/ec: enterprise->project / bc->project / enterprise->bc / enterprise->client
+        containment_a_in_b_mean (Group 3 — scope-level fan-out, captured but not yet
+        rendered/tiered/anomaly-detected; see CASCADE_GROUP3_TYPES)
     """
     tc = defaultdict(list)
     cp = defaultdict(list)
@@ -321,10 +401,32 @@ def build_cascade(summary_rows: list[dict]) -> dict:
     wp_used_p10 = {}
     wp_used_p90 = {}
 
+    # Group 2 — generic->template/container/project containment (all-view + used-view)
+    gt = defaultdict(list)
+    gc = defaultdict(list)
+    gp = defaultdict(list)
+    gt_used = defaultdict(list)
+    gc_used = defaultdict(list)
+    gp_used = defaultdict(list)
+
+    # Group 3 — scope-level fan-out containment (all-view + used-view). Captured only;
+    # not rendered/tiered/anomaly-detected in this pass (see CASCADE_GROUP3_TYPES above).
+    ep = defaultdict(list)
+    bp = defaultdict(list)
+    eb = defaultdict(list)
+    ec = defaultdict(list)
+    ep_used = defaultdict(list)
+    bp_used = defaultdict(list)
+    eb_used = defaultdict(list)
+    ec_used = defaultdict(list)
+
+    seen_comparison_types: set = set()
+
     for r in summary_rows:
         ct = r["comparison_type"]
         a, b = r["segment_id_a"], r["segment_id_b"]
         dom = r["domain"]
+        seen_comparison_types.add(ct)
         if dom in EXCLUDED_FROM_SCORING:
             continue
 
@@ -389,6 +491,92 @@ def build_cascade(summary_rows: list[dict]) -> dict:
                         wp_used_p90[dom] = pf(_col(r, "used_jaccard_p90"))
                         wp_used_p10[dom + "_n"] = n
 
+        # Group 2 — one level up the cascade from tc/cp/tp. Same extraction pattern
+        # and same broadest-segment gating as Group 1, since generic_to_* pairs can
+        # also exist at multiple scope levels (see docs/governance_narrative_scope_gap_audit.md A1).
+        elif ct == "generic_to_template" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                gt[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                gt_used[dom].append(vu)
+
+        elif ct == "generic_to_container" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                gc[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                gc_used[dom].append(vu)
+
+        elif ct == "generic_to_project" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                gp[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                gp_used[dom].append(vu)
+
+        # Group 3 — scope-level fan-out (enterprise/bc/client vs. Project, and
+        # enterprise vs. bc/client). A different axis than the cascade stages above;
+        # captured under new keys only. NOT rendered, tiered, or anomaly-detected in
+        # this pass — pending a future business-center-section design decision.
+        elif ct == "enterprise_to_project":
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                ep[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                ep_used[dom].append(vu)
+
+        elif ct == "bc_to_project":
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                bp[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                bp_used[dom].append(vu)
+
+        elif ct == "enterprise_to_bc":
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                eb[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                eb_used[dom].append(vu)
+
+        elif ct == "enterprise_to_client":
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                ec[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                ec_used[dom].append(vu)
+
+        # Group 4 — known, deliberately excluded from cascade (see
+        # CASCADE_GROUP4_EXCLUDED_TYPES above for the reason behind each).
+        elif ct in CASCADE_GROUP4_EXCLUDED_TYPES:
+            pass
+
+    # Coverage check: every comparison_type actually present in summary_rows must be
+    # accounted for by name in one of the four groups above. This is the actual fix
+    # for "future producer additions are invisible by default" (docs/
+    # governance_narrative_scope_gap_audit.md A1) — an unrecognized type is a real
+    # signal that either this dispatch or compare_cross_segment.py's vocabulary has
+    # drifted, and must not be swallowed silently the way the old bare if/elif did.
+    _known_comparison_types = (
+        CASCADE_GROUP1_TYPES | CASCADE_GROUP2_TYPES | CASCADE_GROUP3_TYPES
+        | set(CASCADE_GROUP4_EXCLUDED_TYPES.keys())
+    )
+    _unrecognized_types = seen_comparison_types - _known_comparison_types
+    if _unrecognized_types:
+        print(
+            f"[warn] build_cascade: unrecognized comparison_type value(s) not in any "
+            f"known group (Group 1-4), excluded from cascade: {sorted(_unrecognized_types)}",
+            file=sys.stderr,
+        )
+
     # ── Bundle signal collection ──────────────────────────────────────────────
     # Dual-view schema (future):  all_n_shared_bundle_both / used_n_shared_bundle_both
     # Single-view schema (current): n_shared_bundle_both
@@ -438,6 +626,8 @@ def build_cascade(summary_rows: list[dict]) -> dict:
     result = {}
     all_domains = (
         set(tc) | set(cp) | set(tp) | set(xc) | set(wp_all) | set(tw)
+        | set(gt) | set(gc) | set(gp)
+        | set(ep) | set(bp) | set(eb) | set(ec)
     )
     for dom in all_domains:
         bs_all = mean_or_none(bshare_all[dom])
@@ -479,6 +669,26 @@ def build_cascade(summary_rows: list[dict]) -> dict:
             "bundle_share_used": bs_used,
             "passive_indicator": pi_mean,       # primary: containment delta, fallback: bundle delta
             "passive_indicator_method": "containment" if pi_containment is not None else ("bundle" if pi_bundle is not None else "none"),
+            # Group 2 — generic->template/container/project containment (one level up
+            # the cascade from tc/cp/tp)
+            "gt": mean_or_none(gt[dom]),
+            "gc": mean_or_none(gc[dom]),
+            "gp": mean_or_none(gp[dom]),
+            "gt_used": mean_or_none(gt_used[dom]),
+            "gc_used": mean_or_none(gc_used[dom]),
+            "gp_used": mean_or_none(gp_used[dom]),
+            # Group 3 — scope-level fan-out containment. Captured only; NOT rendered,
+            # tiered, or anomaly-detected in this pass — pending a future
+            # business-center-section design decision (see
+            # docs/governance_narrative_scope_gap_audit.md A1).
+            "ep": mean_or_none(ep[dom]),
+            "bp": mean_or_none(bp[dom]),
+            "eb": mean_or_none(eb[dom]),
+            "ec": mean_or_none(ec[dom]),
+            "ep_used": mean_or_none(ep_used[dom]),
+            "bp_used": mean_or_none(bp_used[dom]),
+            "eb_used": mean_or_none(eb_used[dom]),
+            "ec_used": mean_or_none(ec_used[dom]),
         }
     return result
 
@@ -737,6 +947,20 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
                     "Shared vocabulary is largely unstructured — consider used-view analysis "
                     "to confirm patterns are actively exercised."
                 )
+
+    # Group 2 (generic->template) signal — surfaces a distinct governance question
+    # from tc/cp/tp alone: the enterprise/generic baseline successfully reached
+    # templates, but templates aren't cascading down to projects, so the break is
+    # specifically between templates and projects rather than with the baseline
+    # content itself.
+    gt = d.get("gt")
+    if gt is not None and gt >= 0.75 and tp is not None and tp < 0.55:
+        notes.append(
+            f"Generic/enterprise baseline containment into templates is strong (G→T = {pct(gt)}) "
+            f"but template-to-project propagation is weak (T→P = {pct(tp)}). The enterprise "
+            "baseline is reaching templates; the break is between templates and projects, "
+            "not with the baseline content itself."
+        )
 
     if tc is not None and tp is not None and tp > tc + 0.25:
         notes.append(
@@ -1358,14 +1582,14 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
         has_state = any(state for _, _, state in group)
         if has_state:
             sections.append(
-                "| Domain | T→Container | T→Project | C→Project | Cross-Client | Reliability | Provided→Used | Local Active | Passive | Missing |"
+                "| Domain | G→Template | T→Container | T→Project | C→Project | Cross-Client | Reliability | Provided→Used | Local Active | Passive | Missing |"
             )
-            sections.append("|---|---:|---:|---:|---:|---|---:|---:|---:|---:|")
+            sections.append("|---|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|")
         else:
             sections.append(
-                "| Domain | T→Container | T→Project | C→Project | Cross-Client | Reliability | Bundle Density | Passive Inherit. |"
+                "| Domain | G→Template | T→Container | T→Project | C→Project | Cross-Client | Reliability | Bundle Density | Passive Inherit. |"
             )
-            sections.append("|---|---:|---:|---:|---:|---|---:|---:|")
+            sections.append("|---|---:|---:|---:|---:|---:|---|---:|---:|")
 
         for dom, d, state in group:
             label = DOMAIN_LABELS.get(dom, dom)
@@ -1375,6 +1599,7 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
                 state = state or {}
                 row = (
                     f"| {label}{pi_flag} "
+                    f"| {fmt(d.get('gt'))} "
                     f"| {fmt(d['tc'])} "
                     f"| {fmt(d['tp'])} "
                     f"| {fmt(d['cp'])} "
@@ -1388,6 +1613,7 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
             else:
                 row = (
                     f"| {label}{pi_flag} "
+                    f"| {fmt(d.get('gt'))} "
                     f"| {fmt(d['tc'])} "
                     f"| {fmt(d['tp'])} "
                     f"| {fmt(d['cp'])} "
