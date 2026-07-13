@@ -1504,6 +1504,48 @@ def test_density_similarity_uses_domain_density_vectors_not_containment():
     assert pool_row["value"] == "0.123456"
 
 
+def test_pool_matrix_keeps_pool_scopes_distinct_for_same_project():
+    # A project can appear once per applicable pool_scope grain
+    # (parent_sibling/bc/client). Different grains must land on distinct
+    # matrix coordinates instead of colliding on identical
+    # (row_id, col_id, view, domain) with different values.
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    pooled = [
+        {
+            "governance_role": "Project", "segment_label": "A", "domain": "d1",
+            "pool_scope": "parent_sibling",
+            "all_containment_focal_in_pool": "0.111111",
+            "used_containment_focal_in_pool": "",
+        },
+        {
+            "governance_role": "Project", "segment_label": "A", "domain": "d1",
+            "pool_scope": "bc",
+            "all_containment_focal_in_pool": "0.222222",
+            "used_containment_focal_in_pool": "",
+        },
+        {
+            "governance_role": "Project", "segment_label": "A", "domain": "d1",
+            "pool_scope": "client",
+            "all_containment_focal_in_pool": "0.333333",
+            "used_containment_focal_in_pool": "",
+        },
+    ]
+
+    matrices, _, _ = build_explicit_matrix_outputs([], pooled, [], "2026-07-13T00:00:00Z")
+    rows = [
+        r for r in matrices["project_pool_containment_similarity_matrix.csv"]
+        if r["row_id"] == "A" and r["view_scope"] == "all" and r["domain"] == "d1"
+    ]
+
+    coords = {(r["row_id"], r["column_id"], r["view_scope"], r["domain"]) for r in rows}
+    assert len(coords) == len(rows) == 3
+    by_col = {r["column_id"]: r["value"] for r in rows}
+    assert by_col["peer_pool:parent_sibling:A"] == "0.111111"
+    assert by_col["peer_pool:bc:A"] == "0.222222"
+    assert by_col["peer_pool:client:A"] == "0.333333"
+
+
 def test_fragmentation_diagnostic_unavailable_without_required_inputs():
     from compare_cross_segment import build_explicit_matrix_outputs
 

@@ -340,8 +340,8 @@
     "semantic_hash": "105440e837898048a17d9a7bcdf6f63b"
   },
   "tests/test_compare_cross_segment_governance.py": {
-    "mtime": 1783908924.850764,
-    "ast_hash": "0a044862a2338a081448b7d84df52618",
+    "mtime": 1783909616.3810148,
+    "ast_hash": "d4e06239318ef58b2977a4f7faea01d0",
     "semantic_hash": ""
   },
   "tests/test_compound_types_wall.py": {
@@ -780,8 +780,8 @@
     "semantic_hash": "d01acd53dc21614aaea7a312ee6a83db"
   },
   "tools/compare_cross_segment.py": {
-    "mtime": 1783909099.3410265,
-    "ast_hash": "02ce6c9b58a8016b055d43fcb126eb38",
+    "mtime": 1783909583.0570157,
+    "ast_hash": "65ca09e889a931d670298d15489183f9",
     "semantic_hash": ""
   },
   "tools/compare_templates_stand-alone/compare_view_templates_stand-alone.py": {
@@ -1905,8 +1905,8 @@
     "semantic_hash": ""
   },
   "docs/cross_segment_comparison.md": {
-    "mtime": 1783909066.2170274,
-    "ast_hash": "4b7cbcd44ae1700cb60b35ea26738e6f",
+    "mtime": 1783909637.2250144,
+    "ast_hash": "1674479b21f944c025804482043390a7",
     "semantic_hash": ""
   },
   "docs/extract_stage_matrix.md": {

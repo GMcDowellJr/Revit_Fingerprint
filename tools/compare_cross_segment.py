@@ -3240,13 +3240,19 @@ def build_explicit_matrix_outputs(
         if _role_key(r.get("governance_role", "")) != "project":
             continue
         row_id = r.get("segment_label") or r.get("segment_id", "")
-        col_id = f"peer_pool:{row_id}"
+        # A project can now appear once per applicable pool_scope grain
+        # (parent_sibling, bc, client — see run_pooled_comparison()). Fold
+        # pool_scope into col_id so different grains for the same project
+        # land on distinct matrix coordinates instead of colliding on
+        # identical (row_id, col_id, view, domain) with different values.
+        pool_scope = r.get("pool_scope", "") or "parent_sibling"
+        col_id = f"peer_pool:{pool_scope}:{row_id}"
         for view, col in [("all", "all_containment_focal_in_pool"), ("used", "used_containment_focal_in_pool")]:
             raw = r.get(col, "")
             add_matrix("project_pool_containment_similarity_matrix.csv", row_id, col_id, view, r.get("domain", ""),
                        "pool_containment_similarity", float(raw) if raw else None, "ok" if raw else "unavailable",
                        "Focal-in-peer-pool containment; answers how much each system aligns with its peer pool.")
-    add_manifest("project_pool_containment_similarity_matrix.csv", "Project", "all,used", "cross_segment_pooled.csv", "focal_segment/domain/peer_pool", "pool_containment_similarity", "normalized join_hash", "Focal union contained in sibling pool union", "How much does each project system align with its peer pool?", "Peer pools derive only from existing manifest sibling grain; no new authority taxonomy is inferred.")
+    add_manifest("project_pool_containment_similarity_matrix.csv", "Project", "all,used", "cross_segment_pooled.csv", "focal_segment/domain/peer_pool_scope", "pool_containment_similarity", "normalized join_hash", "Focal union contained in sibling pool union", "How much does each project system align with its peer pool?", "Peer pools derive only from existing manifest sibling grain; no new authority taxonomy is inferred. column_id encodes pool_scope (parent_sibling/bc/client) so a project's separate pool grains never share a matrix cell.")
 
     # Diagnostic: union footprint minus exact mean identity overlap, only when both inputs are available.
     union_index = {(r["row_id"], r["column_id"], r["view_scope"], r["domain"]): r for r in outputs.get("project_union_jaccard_matrix.csv", []) if r.get("value_status") == "ok" and r.get("domain") == "ALL_DOMAINS"}
