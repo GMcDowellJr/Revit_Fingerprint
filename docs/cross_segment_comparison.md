@@ -15,6 +15,10 @@
 | How consistent are files within the same project? | Within-project Jaccard (Mode D) |
 | Is Generic / Generic-Host stock flowing into downstream standards and projects? | Generic→Template / Generic→Container / Generic→Project (Mode E) |
 | Is the template driving pattern adoption across the governance chain? | Full governance chain (Mode E) |
+| Does a firm-wide standard reach every project regardless of client/bc? | `enterprise_to_project` (Mode E) |
+| Does a business center's standard reach only the projects within that bc? | `bc_to_project` (Mode E) |
+| Has a bc's or a client's standard adapted the enterprise standard, before looking at any project? | `enterprise_to_bc` / `enterprise_to_client` (Mode E) |
+| Is a project's own scope (enterprise/bc/client-together) internally consistent with its peer pool? | Pooled comparison `pool_scope` grains (section 6) |
 
 **attribution_gap**: The fraction of project-bundle join_hashes that do *not* appear in the reference template union. High values indicate locally invented (non-governed) patterns.
 
@@ -41,6 +45,10 @@ All-view is the full configured vocabulary for a segment. Used-view is the vocab
 | `template_to_project` | Directed | Template segment | Project segment | `provided_to_configured_containment`; project `provided_to_used_containment` | What fraction of template patterns appear in project all-view and used-view vocabularies? |
 | `template_to_container` | Directed | Template segment | Container segment | all-view `provided_to_configured_containment` | Does the container inherit template patterns? |
 | `container_to_project` | Directed | Container segment | Project segment | `provided_to_configured_containment`; project `provided_to_used_containment` | Does the project configure and actively use the container's patterns? |
+| `enterprise_to_project` | Directed | Enterprise-scoped Template/Container | Project segment (any client/bc) | `provided_to_configured_containment`; project `provided_to_used_containment` | Does a firm-wide standard reach projects regardless of which client or business center they belong to? |
+| `bc_to_project` | Directed | Bc-scoped Template/Container | Project segment in the same business center | `provided_to_configured_containment`; project `provided_to_used_containment` | Does a business center's standard reach the projects within that bc, across whichever clients happen to have work there? |
+| `enterprise_to_bc` | Directed | Enterprise-scoped Template/Container | Bc-scoped Template/Container (same role) | all-view `provided_to_configured_containment` | Has a business center's standard adapted the enterprise standard, before even looking at any project? |
+| `enterprise_to_client` | Directed | Enterprise-scoped Template/Container | Client-scoped Template/Container (same role) | all-view `provided_to_configured_containment` | Has a client's standard adapted the enterprise standard, before even looking at any project? |
 | `parent_sibling_roles` | Directed | Template-role level-2 | Project-role level-2 | `containment_b_in_a` | Template efficacy at peer level within the hierarchy |
 | `sibling_templates` | Symmetric | Template segment | Template segment | `jaccard_mean` | Are template siblings converging? |
 | `sibling_projects` | Symmetric | Project segment | Project segment | `jaccard_mean` | Are project siblings consistent? |
@@ -49,6 +57,27 @@ All-view is the full configured vocabulary for a segment. Used-view is the vocab
 | `governance_chain` | Directed | Template / Container | Project / Container | `containment_b_in_a` | End-to-end governance chain coverage |
 
 Directed pairs use containment metrics; symmetric pairs use Jaccard. Both are always computed at the join_hash level, not pattern_id level.
+
+### Enterprise / bc / client / project scope levels
+
+Every segment has a **scope level**, derived purely from which of `client_label` and `business_center_label` are populated on that segment's own manifest row — it is orthogonal to `governance_role`:
+
+| Scope level | Condition |
+|---|---|
+| `enterprise` | Neither `client_label` nor `business_center_label` populated |
+| `bc` | `business_center_label` populated, `client_label` not |
+| `client` | `client_label` populated, `business_center_label` not |
+| `project` | Both populated (the shape Project-role segments carry going forward — some legacy Project rows may still lack bc, in which case they present as `client` scope) |
+
+These are plain scope filters, not cardinality claims: a `bc`-scoped segment isn't defined by "having multiple clients," and a `client`-scoped segment isn't defined by "spanning multiple bcs" — those are consequences observed when *pooling* (section 5), not part of what the scope level means.
+
+`business_center_label` values of `"0000"`/`"BC_0000"` (any case) mean "enterprise work, tagged for bookkeeping" and are normalized to blank before any bc-scoped grouping or comparison — they are never treated as a real peer business center.
+
+Standards segments (Template/Container) can carry any of the four scope levels. Generic/Generic-Host is excluded from scope-level comparisons below — it already pairs unconditionally against every Template/Container/Project (regardless of client/bc) via `generic_to_template`/`generic_to_container`/`generic_to_project`.
+
+There is no fixed override precedence between enterprise/bc/client standards: a bc's standard may or may not have adapted the enterprise standard, and a client's standard may or may not have adapted the bc's or enterprise's — this is unknowable in advance from manifest data alone, so `enterprise_to_bc`, `enterprise_to_client`, `enterprise_to_project`, and `bc_to_project` are computed as independent parallel edges, never routed through a single "winning" standard.
+
+These four edges group purely by scope level, ignoring `parent_segment_id` — so an ancestor and its own descendant (e.g. an enterprise-scoped Template and a bc/client-scoped Template nested directly under it in the segment hierarchy) can otherwise land on opposite sides of one of these edges, even though a descendant's file population is always a subset of its ancestor's. Pairing them as independent standards would compare a segment against data that already contains its own. All four edges exclude any pair where one side is in the other's `parent_segment_id` lineage (ancestor or descendant), computed once per invocation via the same ancestor map used by the pooled-comparison lineage guard (section 6).
 
 ---
 
@@ -212,9 +241,43 @@ Written only for (segment_a, segment_b, domain) triples where `n_pairs ≤ 50`.
 | `all_n_shared_bundle_both/a_only/b_only` | All-view bundle overlap annotation buckets |
 | `used_n_shared_bundle_both/a_only/b_only` | Used-view bundle overlap annotation buckets |
 
+### cross_segment_pooled.csv
+
+N-1 pooled comparison: each segment compared against the union of a pool of siblings, computed across three independent pool grains (`pool_scope` column). Each grain is a genuinely different pool with different membership, not a different view of the same pool — grid analogy: fix-row-vary-column vs. fix-column-vary-row.
+
+| `pool_scope` | Pool membership |
+|---|---|
+| `parent_sibling` | Segments sharing `(parent_segment_id, governance_role, unit_system)` — the narrowest client+bc-together pool. This is the original pool grain. |
+| `bc` | Segments sharing `(business_center_label, governance_role, unit_system)`, ignoring `client_label` — pools whichever clients happen to have work in that bc, to check bc-level consistency. `business_center_label` bookkeeping tags (`"0000"`/`"BC_0000"`) are normalized to blank first, so they never form a fake shared-bc pool. |
+| `client` | Segments sharing `(client_label, governance_role, unit_system)`, ignoring `business_center_label` — pools whichever bcs happen to have work for that client, to check client-level consistency. |
+
+A segment can appear once per applicable pool grain — e.g. a Project with both a populated `parent_segment_id` sibling group and a populated `business_center_label` will get both a `parent_sibling` row and a `bc` row for the same domain.
+
+`bc`/`client` grouping ignores `parent_segment_id`, so an ancestor segment (e.g. a collection-blank BC roll-up) and its own descendant (a collection-specific child) can otherwise share the same normalized bc/client value and land in the same pool — even though segments are hierarchical cuts of the same underlying file population, so an ancestor's data is always a superset of its descendants'. Pooling them as independent peers would compare a segment against a pool that already contains its own data. Pool membership therefore excludes any segment in the focal segment's own `parent_segment_id` lineage (ancestor or descendant), computed once per invocation and applied to every grain.
+
+| Column | Description |
+|--------|-------------|
+| `comparison_run_id` | `cmp_<sha1[:12]>` derived from the focal segment and pool key |
+| `segment_id` | Focal segment identifier |
+| `segment_label` | Focal segment's human-readable label |
+| `governance_role` | Focal segment's role |
+| `client_label` | Focal segment's client scope (may be blank for bc-pooled non-client rows) |
+| `unit_system` | Unit system; always matches across focal and pool |
+| `domain` | Domain name |
+| `pool_scope` | `parent_sibling`, `bc`, or `client` — which pool grain produced this row |
+| `n_files_focal` / `n_files_pool` | File counts for the focal segment and the aggregated pool |
+| `n_unique_patterns_focal` / `n_unique_patterns_pool` | Distinct join_hash counts |
+| `n_shared_join_hash` | Intersection size between focal and pool unions |
+| `all_containment_focal_in_pool` / `all_containment_pool_in_focal` | All-view containment in both directions |
+| `used_containment_focal_in_pool` / `used_containment_pool_in_focal` | Used-view containment in both directions |
+| `all_has_bundles_focal/pool`, `all_n_shared_bundle_both/focal_only/pool_only` | All-view bundle overlap annotation |
+| `used_has_bundles_focal/pool`, `used_n_shared_bundle_both/focal_only/pool_only` | Used-view bundle overlap annotation |
+| `data_sufficient` | `"true"` only when both focal and pool have `n_files >= 5` |
+| `executed_utc` | ISO-8601 UTC timestamp |
+
 ### cross_segment_governance_states.csv
 
-Written for directed governance comparison types (`generic_to_template`, `generic_to_container`, `generic_to_project`, `template_to_project`, `template_to_container`, `container_to_project`). One row is emitted for each join_hash in `reference_all ∪ target_all`, so inherited-but-unused (`provided_but_passive`) and upstream-missing (`provided_but_missing`) states are visible and not limited to legacy target deltas. Governance-state rows are emitted independently of the legacy summary `--min-patterns` filter, so sparse or empty downstream targets can still report provided-but-missing stock. Bundle membership is target-side annotation (`is_bundle_member_target_all`, `is_bundle_member_target_used`) and Generic references do not need bundle output to participate as upstream vocabulary.
+Written for directed governance comparison types (`generic_to_template`, `generic_to_container`, `generic_to_project`, `template_to_project`, `template_to_container`, `container_to_project`, `enterprise_to_project`, `bc_to_project`, `enterprise_to_bc`, `enterprise_to_client`). One row is emitted for each join_hash in `reference_all ∪ target_all`, so inherited-but-unused (`provided_but_passive`) and upstream-missing (`provided_but_missing`) states are visible and not limited to legacy target deltas. Governance-state rows are emitted independently of the legacy summary `--min-patterns` filter, so sparse or empty downstream targets can still report provided-but-missing stock. Bundle membership is target-side annotation (`is_bundle_member_target_all`, `is_bundle_member_target_used`) and Generic references do not need bundle output to participate as upstream vocabulary.
 
 State values for Project targets include `provided_and_used`, `provided_but_passive`, `provided_but_missing`, `local_active`, `local_passive`, and `local_unbundled`. For Template, Generic, and most Container targets, `target_usage_interpretable=false`, `recommended_primary_view=all`, and configured inventory uses non-bloat labels such as `provided_configured` / `local_configured`.
 
@@ -224,7 +287,7 @@ One row per directed governance comparison/domain with counts and unambiguous sh
 
 ### cross_segment_delta.csv
 
-Written for directed comparison types (`template_to_project`, `template_to_container`, `container_to_project`) when `--no-delta` is not set. One row per delta join_hash per (segment_pair, domain). Sorted by comparison_type → segment_id_reference → segment_id_target → domain → pct_files_in_target DESC → join_hash.
+Written for directed comparison types (`template_to_project`, `template_to_container`, `container_to_project`, `enterprise_to_project`, `bc_to_project`) when `--no-delta` is not set. One row per delta join_hash per (segment_pair, domain). Sorted by comparison_type → segment_id_reference → segment_id_target → domain → pct_files_in_target DESC → join_hash.
 
 | Column | Description |
 |--------|-------------|
@@ -276,7 +339,7 @@ python tools/compare_cross_segment.py \
 | `--sibling-segments` | Mode B: same parent, same governance_role. All pairwise combinations. |
 | `--parent-siblings` | Mode C: level-2 Template-vs-Project under the same level-1 parent. |
 | `--within-project` | Mode D: per-segment file pairs grouped by `project_label`. |
-| `--governance-chain` | Mode E: directed Generic/Generic-Host→Template/Container/Project by `unit_system` (and populated discipline), plus Template→Project/Container and Container→Project scoped by `client_label`. |
+| `--governance-chain` | Mode E: directed Generic/Generic-Host→Template/Container/Project by `unit_system` (and populated discipline), plus Template→Project/Container and Container→Project scoped by `client_label`, plus the enterprise/bc/client scope-level fan-out (`enterprise_to_project`, `bc_to_project`, `enterprise_to_bc`, `enterprise_to_client` — see section 2). |
 | `--domain DOMAIN` | Restrict all comparisons to a single domain name. |
 | `--segment-a SEGMENT_ID` | Restrict the left side of all pairs to this segment. |
 | `--segment-b SEGMENT_ID` | Restrict the right side of all pairs to this segment. |
@@ -382,7 +445,7 @@ delta_jh           = target_union_jh − reference_union_jh
 
 Each join_hash in `delta_jh` is a pattern present in the target that has no counterpart in the reference. Delta patterns are the explicit complement of template-in-project containment: a project with `containment_b_in_a_mean = 0.60` has delta patterns equal to 40% of the reference mandate, and `cross_segment_delta.csv` names every one of them.
 
-Delta rows are only emitted for `template_to_project`, `template_to_container`, and `container_to_project` comparison types. Symmetric types (`sibling_*`, `within_project`) and `parent_sibling_roles` do not produce delta output.
+Delta rows are only emitted for `template_to_project`, `template_to_container`, `container_to_project`, `enterprise_to_project`, and `bc_to_project` comparison types — the same shape of comparison (standard reference vs. Project/Container target) at different scope levels. `enterprise_to_bc` and `enterprise_to_client` are standard-to-standard comparisons and do not produce delta output, matching `generic_to_template`/`generic_to_container`. Symmetric types (`sibling_*`, `within_project`) and `parent_sibling_roles` do not produce delta output either.
 
 ### Interpretation — three categories
 
@@ -520,7 +583,7 @@ Two additive summaries are also written from the distribution rows:
 | `project_union_jaccard_matrix.csv` | `union_jaccard` | `cross_segment_union_inventory.csv` | Jaccard between normalized project-level `join_hash` unions. It answers whether project/client scopes contain or use the same canonical patterns. | Do not read this as typical file-to-file similarity. It can differ from mean file-pair Jaccard. Missing union inventory, or union inventory with no usable Project rows, blocks this output with an explicit status row. |
 | `project_mean_file_pair_jaccard_matrix.csv` | `mean_file_pair_jaccard` | `cross_segment_summary.csv` | Existing-style mean of pairwise file comparisons. It answers whether individual files are typically similar across compared groups. | Do not treat this as union overlap or as a replacement for `union_jaccard`. |
 | `project_density_similarity_matrix.csv` | `density_similarity` | `cross_segment_union_inventory.csv` | Cosine similarity over domain pattern-density vectors. It answers whether domains are populated to similar degrees. | It does not measure exact identity overlap. By definition, absent domains are treated as zero occupancy in the vector. |
-| `project_pool_containment_similarity_matrix.csv` | `pool_containment_similarity` | `cross_segment_pooled.csv` | Focal-in-peer-pool containment. It answers how much each project system aligns with its existing manifest-derived peer pool. | Peer pools use only existing manifest sibling grain; no container authority or grouping taxonomy is inferred. |
+| `project_pool_containment_similarity_matrix.csv` | `pool_containment_similarity` | `cross_segment_pooled.csv` | Focal-in-peer-pool containment. It answers how much each project system aligns with its existing manifest-derived peer pool. `column_id` is `peer_pool:<pool_scope>:<row_id>` — pool_scope (`parent_sibling`/`bc`/`client`) is folded into the coordinate so a project's separate pool grains never collide into one matrix cell. | Peer pools use only existing manifest sibling grain; no container authority or grouping taxonomy is inferred. |
 | `project_fragmentation_diagnostic.csv` | `fragmentation_diagnostic` | union and mean-file-pair matrices | Diagnostic difference between footprint similarity and exact identity overlap when both inputs are available. | This is a diagnostic only, not a mathematically authoritative governance index. It is unavailable unless both required inputs are present. |
 | `matrix_output_manifest.csv` | manifest | all matrix builders | Documents each matrix’s governance role, view scope, source grain, identity unit, aggregation method, interpretation, limitations, and execution timestamp. | The manifest is descriptive metadata, not a score table. |
 

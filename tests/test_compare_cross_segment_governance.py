@@ -7,9 +7,12 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
 from compare_cross_segment import (  # noqa: E402
+    _bc_of,
     _classify_governance_state,
     _comparison_role_semantics,
+    _normalize_bc_label,
     _recommended_primary_view,
+    _scope_level,
     _usage_interpretable_for_role,
     REUSE_BUCKET_THRESHOLDS,
     _reuse_bucket_for,
@@ -20,6 +23,7 @@ from compare_cross_segment import (  # noqa: E402
     discover_governance_chain,
     load_file_join_hashes,
     main as compare_main,
+    run_pooled_comparison,
     sort_pair_detail_rows,
     sort_summary_rows,
 )
@@ -294,6 +298,274 @@ def test_discover_governance_chain_rollup_does_not_wildcard_match_specific_colle
     # collection's Container, and not with a different one.
     assert ("bc_t_page", "bc_c_page", "template_to_container") in pairs
     assert ("bc_t_page", "bc_c_stantec", "template_to_container") not in pairs
+
+
+def test_scope_level_derivation():
+    # Scope level is purely about which of client_label/business_center_label
+    # are populated on the segment's own row — orthogonal to governance_role.
+    assert _scope_level(_seg("Template", client="")) == "enterprise"
+    assert _scope_level({**_seg("Template", client=""), "business_center_label": "BC_1234"}) == "bc"
+    assert _scope_level(_seg("Template", client="Acme")) == "client"
+    assert _scope_level({**_seg("Project", client="Acme"), "business_center_label": "BC_1234"}) == "project"
+
+
+def test_bc_bookkeeping_tags_normalize_to_blank():
+    # "0000"/"BC_0000" (any case) mean enterprise work tagged for
+    # bookkeeping, never a real peer business center.
+    assert _normalize_bc_label("0000") == ""
+    assert _normalize_bc_label("BC_0000") == ""
+    assert _normalize_bc_label("bc_0000") == ""
+    assert _normalize_bc_label("BC_1234") == "BC_1234"
+    assert _bc_of({**_seg("Template", client=""), "business_center_label": "0000"}) == ""
+    assert _scope_level({**_seg("Template", client=""), "business_center_label": "0000"}) == "enterprise"
+
+
+def test_na_spelled_business_center_labels_normalize_to_blank():
+    # A missing business_center_label spelled as an NA token (n/a, NA,
+    # __NOT_APPLICABLE__, ...) must normalize to blank the same way the
+    # pre-existing governance-chain fallback did via is_blank_or_na() —
+    # it is not a real business center any more than an empty string is.
+    for token in ("n/a", "NA", "__NOT_APPLICABLE__", "not applicable"):
+        assert _normalize_bc_label(token) == ""
+        row = {**_seg("Template", client=""), "business_center_label": token}
+        assert _bc_of(row) == ""
+        assert _scope_level(row) == "enterprise"
+
+
+def test_discover_governance_chain_enterprise_to_project_reaches_every_scope():
+    # An enterprise-scoped Template/Container has no client/bc of its own and
+    # applies across the whole business — it must reach every Project
+    # regardless of that project's own client/bc scope.
+    manifest = {
+        "ent_t": _seg("Template", client=""),
+        "proj_a": {**_seg("Project", client="Acme"), "business_center_label": "BC_1234"},
+        "proj_b": {**_seg("Project", client="Widgets"), "business_center_label": "BC_9999"},
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    assert ("ent_t", "proj_a", "enterprise_to_project") in pairs
+    assert ("ent_t", "proj_b", "enterprise_to_project") in pairs
+
+
+def test_discover_governance_chain_bc_to_project_scoped_to_matching_bc_only():
+    # A bc-scoped Template only reaches Projects within the SAME
+    # (normalized) business center — not projects in a different bc, even
+    # though both are still "downstream" of the enterprise.
+    manifest = {
+        "bc_t": {**_seg("Template", client=""), "business_center_label": "BC_1234"},
+        "proj_same_bc": {**_seg("Project", client="Acme"), "business_center_label": "BC_1234"},
+        "proj_other_bc": {**_seg("Project", client="Widgets"), "business_center_label": "BC_9999"},
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    assert ("bc_t", "proj_same_bc", "bc_to_project") in pairs
+    assert ("bc_t", "proj_other_bc", "bc_to_project") not in pairs
+
+
+def test_discover_governance_chain_enterprise_to_bc_and_client_are_same_role_only():
+    # enterprise_to_bc / enterprise_to_client are standard-to-standard
+    # (Template vs Template, Container vs Container) — they must not mix
+    # roles (Template vs Container).
+    manifest = {
+        "ent_t": _seg("Template", client=""),
+        "ent_c": _seg("Container", client=""),
+        "bc_t": {**_seg("Template", client=""), "business_center_label": "BC_1234"},
+        "bc_c": {**_seg("Container", client=""), "business_center_label": "BC_1234"},
+        "client_t": _seg("Template", client="Acme"),
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    assert ("ent_t", "bc_t", "enterprise_to_bc") in pairs
+    assert ("ent_c", "bc_c", "enterprise_to_bc") in pairs
+    assert ("ent_t", "bc_c", "enterprise_to_bc") not in pairs
+    assert ("ent_t", "client_t", "enterprise_to_client") in pairs
+
+
+def test_discover_governance_chain_excludes_generic_from_scope_fanout():
+    # Generic/Generic-Host already pairs unconditionally against every
+    # Template/Container/Project via the existing generic_ids loop — it must
+    # not also get a redundant enterprise/bc/client-scoped edge.
+    manifest = {
+        "g": _seg("Generic", client="Global"),
+        "proj": _seg("Project", client="Acme"),
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    assert ("g", "proj", "generic_to_project") in pairs
+    assert not any(ctype in ("enterprise_to_project", "bc_to_project") for _a, _b, ctype in pairs if _a == "g")
+
+
+def test_discover_governance_chain_excludes_ancestor_descendant_from_scope_fanout():
+    # The scope-fanout loops group purely by scope level, ignoring
+    # parent_segment_id — so an ancestor and its own descendant (e.g. an
+    # enterprise-scoped Template and a bc-scoped Template nested directly
+    # under it) can otherwise land on opposite sides of one of these edges,
+    # even though a descendant's data is always a subset of its ancestor's.
+    manifest = {
+        "ent_t": {**_seg("Template", client=""), "parent_segment_id": ""},
+        "bc_t_child": {
+            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            "parent_segment_id": "ent_t",
+        },
+        "proj_grandchild": {
+            **_seg("Project", client="Acme"), "business_center_label": "BC_1234",
+            "parent_segment_id": "bc_t_child",
+        },
+        "bc_t_unrelated": {
+            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            "parent_segment_id": "",
+        },
+        "proj_unrelated": {
+            **_seg("Project", client="Widgets"), "business_center_label": "BC_1234",
+            "parent_segment_id": "",
+        },
+    }
+
+    pairs = set(discover_governance_chain(manifest))
+
+    # Ancestor/descendant pairs excluded from all four scope-fanout edges.
+    assert ("ent_t", "bc_t_child", "enterprise_to_bc") not in pairs
+    assert ("ent_t", "proj_grandchild", "enterprise_to_project") not in pairs
+    assert ("bc_t_child", "proj_grandchild", "bc_to_project") not in pairs
+    # Unrelated peers (no shared lineage) still pair normally.
+    assert ("ent_t", "bc_t_unrelated", "enterprise_to_bc") in pairs
+    assert ("ent_t", "proj_unrelated", "enterprise_to_project") in pairs
+    assert ("bc_t_unrelated", "proj_unrelated", "bc_to_project") in pairs
+
+
+def test_pooled_comparison_bc_scope_pools_across_clients_ignoring_client(tmp_path):
+    segments_root = tmp_path / "segments"
+    domain = "line_patterns"
+    _write_segment(
+        segments_root, "proj_a", domain,
+        [("p1", "shared", "Shared"), ("p2", "a_only", "A Only")],
+        [{"export_run_id": "proj_a_file", "pattern_id": "p1"}, {"export_run_id": "proj_a_file", "pattern_id": "p2"}],
+        [{"export_run_id": "proj_a_file", "pattern_id": "p1"}],
+        ["p1", "p2"],
+    )
+    _write_segment(
+        segments_root, "proj_b", domain,
+        [("p1", "shared", "Shared"), ("p2", "b_only", "B Only")],
+        [{"export_run_id": "proj_b_file", "pattern_id": "p1"}, {"export_run_id": "proj_b_file", "pattern_id": "p2"}],
+        [{"export_run_id": "proj_b_file", "pattern_id": "p1"}],
+        ["p1", "p2"],
+    )
+    manifest = {
+        "proj_a": {**_seg("Project", client="Acme"), "business_center_label": "BC_1234", "segment_label": "Proj A"},
+        "proj_b": {**_seg("Project", client="Widgets"), "business_center_label": "BC_1234", "segment_label": "Proj B"},
+    }
+    registry = {
+        "proj_a": {"output_folder": "proj_a", "run_type": "bundle"},
+        "proj_b": {"output_folder": "proj_b", "run_type": "bundle"},
+    }
+
+    rows = run_pooled_comparison(manifest, registry, segments_root, min_patterns=1, executed_utc="2026-07-13T00:00:00Z")
+
+    # No shared parent_segment_id and different clients — only the bc-scoped
+    # pool should fire, not parent_sibling or client.
+    assert {r["pool_scope"] for r in rows} == {"bc"}
+    by_sid = {r["segment_id"]: r for r in rows}
+    assert by_sid["proj_a"]["n_shared_join_hash"] == "1"
+    assert by_sid["proj_a"]["all_containment_focal_in_pool"] == "0.500000"
+
+
+def test_pooled_comparison_client_scope_pools_across_bcs_ignoring_bc(tmp_path):
+    segments_root = tmp_path / "segments"
+    domain = "line_patterns"
+    _write_segment(
+        segments_root, "proj_a", domain,
+        [("p1", "shared", "Shared"), ("p2", "a_only", "A Only")],
+        [{"export_run_id": "proj_a_file", "pattern_id": "p1"}, {"export_run_id": "proj_a_file", "pattern_id": "p2"}],
+        [{"export_run_id": "proj_a_file", "pattern_id": "p1"}],
+        ["p1", "p2"],
+    )
+    _write_segment(
+        segments_root, "proj_b", domain,
+        [("p1", "shared", "Shared"), ("p2", "b_only", "B Only")],
+        [{"export_run_id": "proj_b_file", "pattern_id": "p1"}, {"export_run_id": "proj_b_file", "pattern_id": "p2"}],
+        [{"export_run_id": "proj_b_file", "pattern_id": "p1"}],
+        ["p1", "p2"],
+    )
+    manifest = {
+        "proj_a": {**_seg("Project", client="Acme"), "business_center_label": "BC_1234", "segment_label": "Proj A"},
+        "proj_b": {**_seg("Project", client="Acme"), "business_center_label": "BC_9999", "segment_label": "Proj B"},
+    }
+    registry = {
+        "proj_a": {"output_folder": "proj_a", "run_type": "bundle"},
+        "proj_b": {"output_folder": "proj_b", "run_type": "bundle"},
+    }
+
+    rows = run_pooled_comparison(manifest, registry, segments_root, min_patterns=1, executed_utc="2026-07-13T00:00:00Z")
+
+    # Same client, different bc, no shared parent_segment_id — only the
+    # client-scoped pool should fire.
+    assert {r["pool_scope"] for r in rows} == {"client"}
+    by_sid = {r["segment_id"]: r for r in rows}
+    assert by_sid["proj_b"]["n_shared_join_hash"] == "1"
+    assert by_sid["proj_b"]["all_containment_focal_in_pool"] == "0.500000"
+
+
+def test_pooled_comparison_excludes_rollup_ancestor_from_bc_pool(tmp_path):
+    # A collection-blank BC roll-up and its collection-specific child share
+    # the same normalized business_center_label, so a naive bc-pool grouping
+    # would put the child in a pool that includes its own ancestor — whose
+    # population already contains (a superset of) the child's own data.
+    # The child's real peer ("peer", no lineage relation) must be the only
+    # pool member; if the rollup leaked in, focal-in-pool containment would
+    # be 1.0 instead of 0.0 (peer shares nothing with the child).
+    segments_root = tmp_path / "segments"
+    domain = "line_patterns"
+    _write_segment(
+        segments_root, "rollup", domain,
+        [("r1", "jh_child", "Child Pattern")],
+        [{"export_run_id": "rollup_file", "pattern_id": "r1"}],
+        [{"export_run_id": "rollup_file", "pattern_id": "r1"}],
+        ["r1"],
+    )
+    _write_segment(
+        segments_root, "child", domain,
+        [("c1", "jh_child", "Child Pattern")],
+        [{"export_run_id": "child_file", "pattern_id": "c1"}],
+        [{"export_run_id": "child_file", "pattern_id": "c1"}],
+        ["c1"],
+    )
+    _write_segment(
+        segments_root, "peer", domain,
+        [("p1", "jh_peer_only", "Peer Only")],
+        [{"export_run_id": "peer_file", "pattern_id": "p1"}],
+        [{"export_run_id": "peer_file", "pattern_id": "p1"}],
+        ["p1"],
+    )
+    manifest = {
+        "rollup": {
+            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            "segment_label": "Rollup", "parent_segment_id": "",
+        },
+        "child": {
+            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            "segment_label": "Child", "parent_segment_id": "rollup",
+        },
+        "peer": {
+            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            "segment_label": "Peer", "parent_segment_id": "",
+        },
+    }
+    registry = {
+        "rollup": {"output_folder": "rollup", "run_type": "bundle"},
+        "child": {"output_folder": "child", "run_type": "bundle"},
+        "peer": {"output_folder": "peer", "run_type": "bundle"},
+    }
+
+    rows = run_pooled_comparison(manifest, registry, segments_root, min_patterns=1, executed_utc="2026-07-13T00:00:00Z")
+
+    child_row = [r for r in rows if r["segment_id"] == "child" and r["pool_scope"] == "bc"][0]
+    assert child_row["n_files_pool"] == "1"
+    assert child_row["n_shared_join_hash"] == "0"
+    assert child_row["all_containment_focal_in_pool"] == "0.000000"
 
 
 def test_project_target_governance_state_uses_target_used():
@@ -1339,6 +1611,48 @@ def test_density_similarity_uses_domain_density_vectors_not_containment():
     assert density_ab["value"] == "1.000000"
     assert pool_row["metric"] == "pool_containment_similarity"
     assert pool_row["value"] == "0.123456"
+
+
+def test_pool_matrix_keeps_pool_scopes_distinct_for_same_project():
+    # A project can appear once per applicable pool_scope grain
+    # (parent_sibling/bc/client). Different grains must land on distinct
+    # matrix coordinates instead of colliding on identical
+    # (row_id, col_id, view, domain) with different values.
+    from compare_cross_segment import build_explicit_matrix_outputs
+
+    pooled = [
+        {
+            "governance_role": "Project", "segment_label": "A", "domain": "d1",
+            "pool_scope": "parent_sibling",
+            "all_containment_focal_in_pool": "0.111111",
+            "used_containment_focal_in_pool": "",
+        },
+        {
+            "governance_role": "Project", "segment_label": "A", "domain": "d1",
+            "pool_scope": "bc",
+            "all_containment_focal_in_pool": "0.222222",
+            "used_containment_focal_in_pool": "",
+        },
+        {
+            "governance_role": "Project", "segment_label": "A", "domain": "d1",
+            "pool_scope": "client",
+            "all_containment_focal_in_pool": "0.333333",
+            "used_containment_focal_in_pool": "",
+        },
+    ]
+
+    matrices, _, _ = build_explicit_matrix_outputs([], pooled, [], "2026-07-13T00:00:00Z")
+    rows = [
+        r for r in matrices["project_pool_containment_similarity_matrix.csv"]
+        if r["row_id"] == "A" and r["view_scope"] == "all" and r["domain"] == "d1"
+    ]
+
+    coords = {(r["row_id"], r["column_id"], r["view_scope"], r["domain"]) for r in rows}
+    assert len(coords) == len(rows) == 3
+    by_col = {r["column_id"]: r["value"] for r in rows}
+    assert by_col["peer_pool:parent_sibling:A"] == "0.111111"
+    assert by_col["peer_pool:bc:A"] == "0.222222"
+    assert by_col["peer_pool:client:A"] == "0.333333"
 
 
 def test_fragmentation_diagnostic_unavailable_without_required_inputs():
