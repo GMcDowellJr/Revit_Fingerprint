@@ -110,6 +110,36 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   target's own file population is unchanged) or `current`.
 
 ### Fixed
+- `tools/compare_cross_segment.py` `run_pooled_comparison()`'s new `bc`/`client`
+  pool grains ignore `parent_segment_id` for grouping, so a collection-blank
+  BC roll-up and its own collection-specific child (or any ancestor/descendant
+  pair sharing the same normalized bc/client value) could land in the same
+  pool. Since segments are hierarchical cuts of the same underlying file
+  population, an ancestor's data is always a superset of its descendants' —
+  pooling them as peers compared a segment against a pool already containing
+  its own data, inflating `all_containment_focal_in_pool`/
+  `used_containment_focal_in_pool` toward a false 1.0. A new `_build_ancestor_map()`
+  walks each segment's `parent_segment_id` chain once per invocation;
+  `run_pooled_comparison()` now excludes any segment in the focal segment's
+  own ancestor/descendant lineage from its pool, for all three pool_scope
+  grains.
+- `tools/compare_cross_segment.py` `build_explicit_matrix_outputs()`'s pool
+  matrix (`project_pool_containment_similarity_matrix.csv`) keyed cells only
+  as `row_id -> peer_pool:<row_id>` by view/domain, ignoring `pool_scope`.
+  Since a project can now emit one pooled row per applicable `pool_scope`
+  grain (`parent_sibling`/`bc`/`client`), different grains for the same
+  project collided on identical matrix coordinates with different values.
+  `column_id` now folds in `pool_scope` (`peer_pool:<pool_scope>:<row_id>`)
+  so each grain gets its own cell.
+- `tools/compare_cross_segment.py` `_normalize_bc_label()` only blanked empty
+  strings and the `"0000"`/`"BC_0000"` bookkeeping tokens, dropping the
+  `is_blank_or_na()` NA-token handling (`n/a`, `NA`, `__NOT_APPLICABLE__`, ...)
+  that `discover_governance_chain()`'s `_key()` previously relied on for its
+  `business_center_label` fallback. An NA-spelled bc was being treated as a
+  real peer business center by `_bc_of()`, `_scope_level()` (misclassified as
+  `"bc"` scope instead of `"enterprise"`), and the new bc-scoped
+  pooling/pairwise comparisons. Restored the `is_blank_or_na()` check
+  alongside the bookkeeping-token check.
 - `tools/compare_cross_segment.py` `discover_governance_chain()`'s `_key()`
   business_center_label fallback (used when `client_label` is blank/NA) no
   longer treats bookkeeping tags `"0000"`/`"BC_0000"` (any case) as a real

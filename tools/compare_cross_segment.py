@@ -2952,6 +2952,37 @@ def _build_pooled_row(
     }
 
 
+def _build_ancestor_map(manifest: Dict[str, Dict[str, str]]) -> Dict[str, Set[str]]:
+    """Map each segment_id to the set of its parent_segment_id ancestors.
+
+    Segments are hierarchical cuts of the same underlying file population —
+    build_segment_manifest.py derives each child as its parent's population
+    narrowed by one additional cut dimension, so a child's files are always
+    a subset of its parent's (this is also why a collection-blank BC
+    roll-up's own population can be a strict superset of its
+    collection-specific children's — see discover_governance_chain()'s
+    _is_collection_rollup). Pooling an ancestor together with its own
+    descendant as independent peers would compare a segment against a pool
+    that already contains (some or all of) that same segment's own data.
+    """
+    ancestors: Dict[str, Set[str]] = {}
+
+    def _walk(sid: str, seen: Set[str]) -> Set[str]:
+        if sid in ancestors:
+            return ancestors[sid]
+        parent = manifest.get(sid, {}).get("parent_segment_id", "").strip()
+        result: Set[str] = set()
+        if parent and parent != sid and parent not in seen:
+            result.add(parent)
+            result |= _walk(parent, seen | {sid})
+        ancestors[sid] = result
+        return result
+
+    for sid in manifest:
+        _walk(sid, set())
+    return ancestors
+
+
 def run_pooled_comparison(
     manifest: Dict[str, Dict[str, str]],
     registry: Dict[str, Dict[str, str]],
@@ -3005,6 +3036,11 @@ def run_pooled_comparison(
         if client:
             client_groups[(client, role, us)].append(sid)
 
+    ancestor_map = _build_ancestor_map(manifest)
+
+    def _lineage_related(sid_a: str, sid_b: str) -> bool:
+        return sid_b in ancestor_map.get(sid_a, set()) or sid_a in ancestor_map.get(sid_b, set())
+
     rows: List[Dict[str, str]] = []
 
     def _emit_for_groups(
@@ -3016,7 +3052,16 @@ def run_pooled_comparison(
             for focal_sid in members:
                 if focal_segment_ids is not None and focal_sid not in focal_segment_ids:
                     continue
-                pool_sids = [s for s in members if s != focal_sid]
+                # Exclude any member in the focal's own parent_segment_id
+                # lineage (ancestor or descendant) — a bc/client pool grain
+                # ignores parent_segment_id for grouping, so an ancestor
+                # roll-up and its own child can otherwise land in the same
+                # pool even though the roll-up's population already
+                # contains (some or all of) the child's own data.
+                pool_sids = [
+                    s for s in members
+                    if s != focal_sid and not _lineage_related(focal_sid, s)
+                ]
 
                 focal_domains = discover_domains_for_segment(segments_root, registry, focal_sid)
                 if domain_filter:

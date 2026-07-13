@@ -251,6 +251,8 @@ N-1 pooled comparison: each segment compared against the union of a pool of sibl
 
 A segment can appear once per applicable pool grain — e.g. a Project with both a populated `parent_segment_id` sibling group and a populated `business_center_label` will get both a `parent_sibling` row and a `bc` row for the same domain.
 
+`bc`/`client` grouping ignores `parent_segment_id`, so an ancestor segment (e.g. a collection-blank BC roll-up) and its own descendant (a collection-specific child) can otherwise share the same normalized bc/client value and land in the same pool — even though segments are hierarchical cuts of the same underlying file population, so an ancestor's data is always a superset of its descendants'. Pooling them as independent peers would compare a segment against a pool that already contains its own data. Pool membership therefore excludes any segment in the focal segment's own `parent_segment_id` lineage (ancestor or descendant), computed once per invocation and applied to every grain.
+
 | Column | Description |
 |--------|-------------|
 | `comparison_run_id` | `cmp_<sha1[:12]>` derived from the focal segment and pool key |

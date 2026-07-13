@@ -471,6 +471,65 @@ def test_pooled_comparison_client_scope_pools_across_bcs_ignoring_bc(tmp_path):
     assert by_sid["proj_b"]["all_containment_focal_in_pool"] == "0.500000"
 
 
+def test_pooled_comparison_excludes_rollup_ancestor_from_bc_pool(tmp_path):
+    # A collection-blank BC roll-up and its collection-specific child share
+    # the same normalized business_center_label, so a naive bc-pool grouping
+    # would put the child in a pool that includes its own ancestor — whose
+    # population already contains (a superset of) the child's own data.
+    # The child's real peer ("peer", no lineage relation) must be the only
+    # pool member; if the rollup leaked in, focal-in-pool containment would
+    # be 1.0 instead of 0.0 (peer shares nothing with the child).
+    segments_root = tmp_path / "segments"
+    domain = "line_patterns"
+    _write_segment(
+        segments_root, "rollup", domain,
+        [("r1", "jh_child", "Child Pattern")],
+        [{"export_run_id": "rollup_file", "pattern_id": "r1"}],
+        [{"export_run_id": "rollup_file", "pattern_id": "r1"}],
+        ["r1"],
+    )
+    _write_segment(
+        segments_root, "child", domain,
+        [("c1", "jh_child", "Child Pattern")],
+        [{"export_run_id": "child_file", "pattern_id": "c1"}],
+        [{"export_run_id": "child_file", "pattern_id": "c1"}],
+        ["c1"],
+    )
+    _write_segment(
+        segments_root, "peer", domain,
+        [("p1", "jh_peer_only", "Peer Only")],
+        [{"export_run_id": "peer_file", "pattern_id": "p1"}],
+        [{"export_run_id": "peer_file", "pattern_id": "p1"}],
+        ["p1"],
+    )
+    manifest = {
+        "rollup": {
+            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            "segment_label": "Rollup", "parent_segment_id": "",
+        },
+        "child": {
+            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            "segment_label": "Child", "parent_segment_id": "rollup",
+        },
+        "peer": {
+            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            "segment_label": "Peer", "parent_segment_id": "",
+        },
+    }
+    registry = {
+        "rollup": {"output_folder": "rollup", "run_type": "bundle"},
+        "child": {"output_folder": "child", "run_type": "bundle"},
+        "peer": {"output_folder": "peer", "run_type": "bundle"},
+    }
+
+    rows = run_pooled_comparison(manifest, registry, segments_root, min_patterns=1, executed_utc="2026-07-13T00:00:00Z")
+
+    child_row = [r for r in rows if r["segment_id"] == "child" and r["pool_scope"] == "bc"][0]
+    assert child_row["n_files_pool"] == "1"
+    assert child_row["n_shared_join_hash"] == "0"
+    assert child_row["all_containment_focal_in_pool"] == "0.000000"
+
+
 def test_project_target_governance_state_uses_target_used():
     assert _usage_interpretable_for_role("Project") is True
     assert _recommended_primary_view("Template", "Project", "template_to_project") == "used"
