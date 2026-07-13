@@ -193,6 +193,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     # pre-existing dimensions would be a much larger, hash-breaking-style
     # change for a collision risk that hasn't manifested there in practice.
     _SUBSET_ID_NAMESPACED_FIELDS = {"collection_label": "collection"}
+    _SUBSET_ID_RESERVED_PREFIX = "collection:"
 
     def _subset_to_id(key: frozenset) -> str:
         kv = dict(key)
@@ -200,19 +201,36 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         for f in cfg_fields:
             if f not in kv:
                 continue
-            # Every value's own colons are doubled before the collection:
-            # namespace marker is applied (to collection_label's value, or
-            # left off entirely for other fields). That guarantees a single,
-            # unescaped "collection:" prefix can only ever be produced by
-            # this namespacing step itself — a raw client_label/
-            # business_center_label/discipline_label value that happens to
-            # literally read "collection:Shared" has its colon doubled to
-            # "collection::Shared" first, so it can never collide with a
-            # real collection_label="Shared" row's "collection:Shared"
-            # token, even though only collection_label gets the prefix.
-            value = kv[f].replace(":", "::")
+            value = kv[f]
             ns = _SUBSET_ID_NAMESPACED_FIELDS.get(f)
-            parts.append(f"{ns}:{value}" if ns and value else value)
+            if ns:
+                # collection_label's own value is never escaped — a single,
+                # unescaped "collection:" prefix is always safe to produce
+                # here, because the only way anything ELSE could render the
+                # identical text is covered by the branch below.
+                parts.append(f"{ns}:{value}" if value else value)
+            elif value.startswith(_SUBSET_ID_RESERVED_PREFIX):
+                # Escaping is scoped to exactly this narrow case: a non-
+                # collection field (client_label/discipline_label/
+                # business_center_label) whose raw value already starts
+                # with the reserved "collection:" prefix, which would
+                # otherwise be indistinguishable from a real
+                # collection_label-derived token at the same position (e.g.
+                # business_center_label="collection:Shared" colliding with
+                # collection_label="Shared"). Doubling every colon in
+                # *every* field's value (the prior approach) fixed that but
+                # also silently rewrote segment_id for any unrelated,
+                # already-stable segment whose client_label/discipline_
+                # label/business_center_label happened to contain a colon
+                # (e.g. "A:B") — breaking _build_registry()'s folder-
+                # stability guarantee for those segments on the very next
+                # rebuild, even with unchanged source data. A value that
+                # doesn't start with "collection:" can never be confused
+                # with a namespaced token regardless of what it contains, so
+                # it is left byte-for-byte as before.
+                parts.append(value.replace(":", "::"))
+            else:
+                parts.append(value)
         return "|".join(parts)
 
     normalized_rows, _changes = _normalize_rows(rows)

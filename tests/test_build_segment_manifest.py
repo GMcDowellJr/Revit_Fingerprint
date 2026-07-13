@@ -972,6 +972,23 @@ def test_collection_namespace_prefix_itself_cannot_be_forged_by_other_fields():
     assert real["segment_id"] == "imperial|Template||collection:Shared"
 
 
+def test_colon_in_non_collection_value_not_forging_prefix_is_left_untouched():
+    # A client_label/discipline_label/business_center_label containing a
+    # colon that does NOT start with the reserved "collection:" prefix
+    # can never be confused with a namespaced token, so its segment_id
+    # rendering must stay byte-for-byte identical to before namespacing was
+    # introduced. Escaping it anyway would silently change segment_id for
+    # an already-stable segment on the next rebuild with unchanged source
+    # data, breaking _build_registry()'s folder-stability guarantee for it.
+    rows = [{
+        "export_run_id": f"r{i}", "unit_system": "imperial", "governance_role": "Project",
+        "client_label": "A:B", "discipline_label": "",
+    } for i in range(3)]
+    segs = _build_segments(rows, min_files=3)
+    leaf = next(r for r in segs if r["client_label"] == "A:B" and r["segment_level"] == "3")
+    assert leaf["segment_id"] == "imperial|Project|A:B"
+
+
 def test_collection_label_segment_id_namespaced_in_output():
     segs = _build_segments(_collision_rows(), min_files=3)
     coll_leaf = next(
