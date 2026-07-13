@@ -52,8 +52,26 @@ def _atomic_write_csv(path: Path, fieldnames: Sequence[str], rows: Iterable[Dict
 def _population_hash(export_run_ids: List[str]) -> str:
     token="|".join(sorted(export_run_ids));return hashlib.sha1(token.encode()).hexdigest()
 
-_UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]+')
-def _sanitize_folder(segment_id:str)->str:return _UNSAFE_FOLDER_CHARS.sub("_",segment_id).lower().strip("_")
+_UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]')
+def _sanitize_folder(segment_id:str)->str:
+    # No "+" quantifier on _UNSAFE_FOLDER_CHARS and no .strip("_") at the end:
+    # both are deliberate. A cut dimension explicitly selected in a subset
+    # with a blank value (currently only client_label — see _build_segments()
+    # blank-client handling) renders in segment_id as an empty part between/
+    # after separator pipes (e.g. "imperial|Template|" or
+    # "imperial|Container||architectural"), distinct from that same dimension
+    # not being selected at all (e.g. "imperial|Template", which pools every
+    # value of the field, blank included). Collapsing consecutive separator
+    # runs into one "_" and trimming leading/trailing "_" erases exactly that
+    # distinguishing signal, so both segment_ids sanitize to the identical
+    # folder name even though they are different populations (the
+    # not-selected form is always a superset of the selected-blank form).
+    # Replacing each unsafe char one-for-one and keeping any resulting
+    # leading/trailing "_" preserves the distinction. segment_id can never
+    # itself start with an unsafe char (the root dimension, unit_system, is
+    # never blank — rows with a blank root are skipped before any subset is
+    # built), so this never produces a folder name that is only underscores.
+    return _UNSAFE_FOLDER_CHARS.sub("_", segment_id).lower()
 
 def _build_membership_rows(manifest_rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """Flatten each manifest row's internal export_run_ids/seed_export_run_ids
