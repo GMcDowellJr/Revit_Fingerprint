@@ -21,6 +21,7 @@ from compare_cross_segment import (  # noqa: E402
     build_union_inventory_rows,
     discover_domains_for_segment,
     discover_governance_chain,
+    discover_within_project,
     load_file_join_hashes,
     main as compare_main,
     run_pooled_comparison,
@@ -1784,3 +1785,61 @@ def test_matrix_manifest_and_diagonal_are_deterministic():
     assert diagonal["self_comparison"] == "true"
     assert diagonal["value"] == "1.000000"
     assert {"matrix_name", "governance_role", "view_scope", "source_file", "source_grain", "metric", "identity_unit", "aggregation_method", "interpretation", "known_limitations", "executed_utc"} == set(first[2][0])
+
+
+def _write_within_project_segment(segments_root: Path, folder: str, domain: str, export_run_ids):
+    base = segments_root / folder / "results" / "bundle_analysis" / "all" / domain
+    _write_csv(
+        base / "membership_matrix.csv",
+        [{"export_run_id": eid} for eid in export_run_ids],
+    )
+
+
+def test_discover_within_project_na_spellings_do_not_group(tmp_path):
+    # Mirrors test_discover_governance_chain_final_fallback_normalizes_na_spelling,
+    # but for Mode D: unlike governance chain's canonical-blank merge, an
+    # unassigned project_label must NOT let unrelated files collide into one
+    # fake "project" — every NA spelling (and repeats of the same spelling)
+    # must fall back to its own per-file singleton, so no within_project
+    # pair is ever discovered for a segment where every file is NA-labeled.
+    segments_root = tmp_path / "segments"
+    domain = "line_patterns"
+    _write_within_project_segment(
+        segments_root, "mixed_na", domain,
+        ["na_t", "na_c", "na_p", "na_dup1", "na_dup2"],
+    )
+    manifest = {"mixed_na": {}}
+    registry = {"mixed_na": {"output_folder": "mixed_na", "run_type": "bundle"}}
+    file_metadata = {
+        "na_t": {"project_label": "__NOT_APPLICABLE__"},
+        "na_c": {"project_label": "n/a"},
+        "na_p": {"project_label": "NA"},
+        # Same exact NA spelling repeated: pre-fix these collapsed into one
+        # fake project too and must also NOT pair post-fix.
+        "na_dup1": {"project_label": "__NOT_APPLICABLE__"},
+        "na_dup2": {"project_label": "__NOT_APPLICABLE__"},
+    }
+
+    pairs = discover_within_project(manifest, registry, file_metadata, segments_root)
+
+    assert ("mixed_na", "mixed_na", "within_project") not in pairs
+
+
+def test_discover_within_project_real_shared_label_still_groups(tmp_path):
+    segments_root = tmp_path / "segments"
+    domain = "line_patterns"
+    _write_within_project_segment(
+        segments_root, "renown", domain,
+        ["r1", "r2", "na_extra"],
+    )
+    manifest = {"renown": {}}
+    registry = {"renown": {"output_folder": "renown", "run_type": "bundle"}}
+    file_metadata = {
+        "r1": {"project_label": "Renown"},
+        "r2": {"project_label": "Renown"},
+        "na_extra": {"project_label": "__NOT_APPLICABLE__"},
+    }
+
+    pairs = discover_within_project(manifest, registry, file_metadata, segments_root)
+
+    assert ("renown", "renown", "within_project") in pairs
