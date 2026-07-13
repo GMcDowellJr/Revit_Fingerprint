@@ -215,6 +215,7 @@ POOLED_FIELDS: List[str] = [
     "governance_role", "client_label",
     "unit_system",
     "domain",
+    "pool_scope",
     "n_files_focal", "n_files_pool",
     "n_unique_patterns_focal", "n_unique_patterns_pool", "n_shared_join_hash",
     "all_containment_focal_in_pool", "all_containment_pool_in_focal",
@@ -394,6 +395,8 @@ DELTA_DIRECTED_TYPES = {
     "template_to_project",
     "template_to_container",
     "container_to_project",
+    "enterprise_to_project",
+    "bc_to_project",
 }
 
 GOVERNANCE_STATE_DIRECTED_TYPES = {
@@ -403,6 +406,10 @@ GOVERNANCE_STATE_DIRECTED_TYPES = {
     "template_to_project",
     "template_to_container",
     "container_to_project",
+    "enterprise_to_project",
+    "bc_to_project",
+    "enterprise_to_bc",
+    "enterprise_to_client",
 }
 
 GENERIC_ROLE_KEYS = {"generic", "generic-host", "generic_host"}
@@ -1638,7 +1645,73 @@ DIRECTED_TYPES = {
     "container_to_project",
     "parent_sibling_roles",
     "governance_chain",
+    "enterprise_to_project",
+    "bc_to_project",
+    "enterprise_to_bc",
+    "enterprise_to_client",
 }
+
+# ---------------------------------------------------------------------------
+# Scope-level fan-out (enterprise / bc / client / project)
+#
+# Scope level is derived purely from which of business_center_label /
+# client_label are populated on a segment's own row — it is orthogonal to
+# governance_role. Enterprise = neither populated. BC = business_center_label
+# populated, client_label not. Client = client_label populated,
+# business_center_label not. Project = both populated (the shape Project-role
+# segments carry going forward; some legacy Project rows may still lack bc,
+# in which case they present as Client scope here — that is a data-quality
+# fact about those rows, not a special case this function needs to know
+# about). These are plain scope filters, not cardinality claims: a bc-scoped
+# segment isn't defined by "having multiple clients" — that's a consequence
+# observed when pooling, not part of what the scope level means.
+# ---------------------------------------------------------------------------
+
+# business_center_label values that mean "enterprise work, tagged for
+# bookkeeping" rather than a real peer business center. Must be normalized to
+# blank before any bc-scoped grouping or comparison — treating "0000" as a
+# real bc would silently group unrelated enterprise-wide rows together as if
+# they shared one specific business center.
+_ENTERPRISE_BC_BOOKKEEPING_TOKENS = {"0000", "bc_0000"}
+
+
+def _normalize_bc_label(value: str) -> str:
+    v = (value or "").strip()
+    if not v or v.lower() in _ENTERPRISE_BC_BOOKKEEPING_TOKENS:
+        return ""
+    return v
+
+
+def _bc_of(row: Dict[str, str]) -> str:
+    return _normalize_bc_label(row.get("business_center_label", ""))
+
+
+def _client_of(row: Dict[str, str]) -> str:
+    v = row.get("client_label", "").strip()
+    return "" if is_blank_or_na(v) else v
+
+
+def _scope_level(row: Dict[str, str]) -> str:
+    client = _client_of(row)
+    bc = _bc_of(row)
+    if client and bc:
+        return "project"
+    if bc:
+        return "bc"
+    if client:
+        return "client"
+    return "enterprise"
+
+
+def _is_standard_role(role_key: str) -> bool:
+    # Template/Container are the two governance roles that can carry an
+    # independent enterprise/bc/client scope identity for this fan-out.
+    # Generic/Generic-Host already pairs unconditionally against every
+    # Template/Container/Project in discover_governance_chain()'s
+    # generic_ids loop below (no client/bc scoping at all today), so it has
+    # no separate scope-scoped edge to add here.
+    return role_key in ("template", "container")
+
 
 ComparisonPair = Tuple[str, str, str]  # (seg_a, seg_b, comparison_type)
 
@@ -1823,8 +1896,12 @@ def discover_governance_chain(
         client = row.get("client_label", "").strip()
         if not is_blank_or_na(client):
             return ("client", client, unit)
-        bc = row.get("business_center_label", "").strip()
-        if not is_blank_or_na(bc):
+        # "0000"/"BC_0000" are enterprise-wide bookkeeping tags, not a real
+        # peer business center — _bc_of() normalizes them to blank so they
+        # fall through to the collection/blank fallbacks below instead of
+        # wildcarding every enterprise-tagged row into one fake shared bc.
+        bc = _bc_of(row)
+        if bc:
             return ("business_center", bc, unit)
         collection = row.get("collection_label", "").strip()
         if not is_blank_or_na(collection):
@@ -1947,6 +2024,78 @@ def discover_governance_chain(
             for p in projects:
                 if _disc_match(manifest[c], manifest[p]) and _collection_match(manifest[c], manifest[p]):
                     pairs.append((c, p, "container_to_project"))
+
+    # --- Scope-level fan-out (enterprise / bc / client) ---
+    # Independent parallel edges alongside the by_key() pairs above — no
+    # fixed override precedence is assumed between enterprise/bc/client
+    # standards, since any of them may or may not have adapted from any
+    # other. bc's own Project-role rows are matched by normalized
+    # business_center_label alone (ignoring client_label), since a
+    # bc-scoped Template/Container is meant to apply across whichever
+    # clients happen to have work in that bc. An enterprise-scoped
+    # Template/Container has no client/bc of its own, so it is compared
+    # against every runnable Project regardless of scope.
+    eligible_rows = [
+        (sid, row) for sid, row in manifest.items()
+        if row.get("run_type", "").strip().lower() in ("bundle", "reference")
+    ]
+    standard_rows = [
+        (sid, row) for sid, row in eligible_rows
+        if _is_standard_role(_role_key(row.get("governance_role", "")))
+    ]
+    project_rows = [
+        (sid, row) for sid, row in eligible_rows
+        if _role_key(row.get("governance_role", "")) == "project"
+    ]
+    enterprise_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row) == "enterprise"]
+    bc_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row) == "bc"]
+    client_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row) == "client"]
+
+    for e_sid, e_row in enterprise_standards:
+        for p_sid, p_row in project_rows:
+            if (
+                _same_unit(manifest, e_sid, p_sid)
+                and _disc_match(e_row, p_row)
+                and _collection_match(e_row, p_row)
+            ):
+                pairs.append((e_sid, p_sid, "enterprise_to_project"))
+
+    for bc_sid, bc_row in bc_standards:
+        bc_value = _bc_of(bc_row)
+        for p_sid, p_row in project_rows:
+            if _bc_of(p_row) != bc_value:
+                continue
+            if (
+                _same_unit(manifest, bc_sid, p_sid)
+                and _disc_match(bc_row, p_row)
+                and _collection_match(bc_row, p_row)
+            ):
+                pairs.append((bc_sid, p_sid, "bc_to_project"))
+
+    for e_sid, e_row in enterprise_standards:
+        e_role = _role_key(e_row.get("governance_role", ""))
+        for bc_sid, bc_row in bc_standards:
+            if _role_key(bc_row.get("governance_role", "")) != e_role:
+                continue
+            if (
+                _same_unit(manifest, e_sid, bc_sid)
+                and _disc_match(e_row, bc_row)
+                and _collection_match(e_row, bc_row)
+            ):
+                pairs.append((e_sid, bc_sid, "enterprise_to_bc"))
+
+    for e_sid, e_row in enterprise_standards:
+        e_role = _role_key(e_row.get("governance_role", ""))
+        for c_sid, c_row in client_standards:
+            if _role_key(c_row.get("governance_role", "")) != e_role:
+                continue
+            if (
+                _same_unit(manifest, e_sid, c_sid)
+                and _disc_match(e_row, c_row)
+                and _collection_match(e_row, c_row)
+            ):
+                pairs.append((e_sid, c_sid, "enterprise_to_client"))
+
     return pairs
 
 
@@ -2661,6 +2810,148 @@ def build_governance_state_outputs(
 # Pooled comparison
 # ---------------------------------------------------------------------------
 
+def _build_pooled_row(
+    focal_sid: str,
+    pool_sids: List[str],
+    domain: str,
+    manifest: Dict[str, Dict[str, str]],
+    registry: Dict[str, Dict[str, str]],
+    segments_root: Path,
+    min_patterns: int,
+    executed_utc: str,
+    pool_scope: str,
+    pool_key_str: str,
+) -> Optional[Dict[str, str]]:
+    """Compute one focal-vs-pool row. Shared across every pool_scope grain
+    (parent_sibling, bc, client) — only pool membership and the reported
+    pool_scope differ between grains; the containment/bundle math is
+    identical."""
+    focal_files = load_file_join_hashes(segments_root, registry, focal_sid, domain)
+    focal_union: Set[str] = set()
+    for jhs in focal_files.values():
+        focal_union |= jhs
+
+    if len(focal_union) < min_patterns:
+        return None
+
+    # Aggregate pool files — key by (segment_id, export_run_id) so that
+    # the same export_run_id appearing in two sibling segments is counted twice
+    # rather than silently collapsed into one entry.
+    pool_files_keyed: Dict[Tuple[str, str], Set[str]] = {}
+    for pool_sid in pool_sids:
+        pf = load_file_join_hashes(segments_root, registry, pool_sid, domain)
+        for eid, jhs in pf.items():
+            pool_files_keyed[(pool_sid, eid)] = jhs
+
+    pool_union: Set[str] = set()
+    for jhs in pool_files_keyed.values():
+        pool_union |= jhs
+
+    if len(pool_union) < min_patterns:
+        return None
+
+    shared = focal_union & pool_union
+    n_shared = len(shared)
+    n_focal_unique = len(focal_union)
+    n_pool_unique = len(pool_union)
+
+    c_focal_in_pool = n_shared / n_focal_unique if n_focal_unique else 0.0
+    c_pool_in_focal = n_shared / n_pool_unique if n_pool_unique else 0.0
+
+    # Used-view containment
+    focal_files_used = load_file_join_hashes(
+        segments_root, registry, focal_sid, domain, "used"
+    )
+    focal_union_used: Set[str] = set()
+    for jhs in focal_files_used.values():
+        focal_union_used |= jhs
+    pool_files_used_keyed: Dict[Tuple[str, str], Set[str]] = {}
+    for pool_sid in pool_sids:
+        pf_u = load_file_join_hashes(
+            segments_root, registry, pool_sid, domain, "used"
+        )
+        for eid, jhs in pf_u.items():
+            pool_files_used_keyed[(pool_sid, eid)] = jhs
+    pool_union_used: Set[str] = set()
+    for jhs in pool_files_used_keyed.values():
+        pool_union_used |= jhs
+    shared_used = focal_union_used & pool_union_used
+    used_c_focal_in_pool = (
+        len(shared_used) / len(focal_union_used) if focal_union_used else 0.0
+    )
+    used_c_pool_in_focal = (
+        len(shared_used) / len(pool_union_used) if pool_union_used else 0.0
+    )
+
+    n_files_focal = len(focal_files)
+    n_files_pool = len(pool_files_keyed)
+    data_suff = "true" if (n_files_focal >= 5 and n_files_pool >= 5) else "false"
+
+    # Bundle annotation — dual-view
+    focal_bundle_all = load_bundle_join_hash_set(
+        segments_root, registry, focal_sid, domain, "all"
+    )
+    focal_bundle_used = load_bundle_join_hash_set(
+        segments_root, registry, focal_sid, domain, "used"
+    )
+    pool_bundle_all: Set[str] = set()
+    pool_bundle_used: Set[str] = set()
+    for pool_sid in pool_sids:
+        pool_bundle_all |= load_bundle_join_hash_set(
+            segments_root, registry, pool_sid, domain, "all"
+        )
+        pool_bundle_used |= load_bundle_join_hash_set(
+            segments_root, registry, pool_sid, domain, "used"
+        )
+
+    all_has_bundles_focal = "true" if focal_bundle_all else "false"
+    all_has_bundles_pool = "true" if pool_bundle_all else "false"
+    used_has_bundles_focal = "true" if focal_bundle_used else "false"
+    used_has_bundles_pool = "true" if pool_bundle_used else "false"
+
+    n_both_all, n_focal_only_all, n_pool_only_all = annotate_bundle_overlap(
+        shared, focal_bundle_all, pool_bundle_all
+    )
+    n_both_used, n_focal_only_used, n_pool_only_used = annotate_bundle_overlap(
+        shared, focal_bundle_used, pool_bundle_used
+    )
+
+    mf = manifest.get(focal_sid, {})
+    crid = make_comparison_run_id(focal_sid, f"pool_{pool_scope}_{pool_key_str}", executed_utc)
+
+    return {
+        "comparison_run_id": crid,
+        "segment_id": focal_sid,
+        "segment_label": mf.get("segment_label", ""),
+        "governance_role": mf.get("governance_role", ""),
+        "client_label": mf.get("client_label", ""),
+        "unit_system": mf.get("unit_system", ""),
+        "domain": domain,
+        "pool_scope": pool_scope,
+        "n_files_focal": str(n_files_focal),
+        "n_files_pool": str(n_files_pool),
+        "n_unique_patterns_focal": str(n_focal_unique),
+        "n_unique_patterns_pool": str(n_pool_unique),
+        "n_shared_join_hash": str(n_shared),
+        "all_containment_focal_in_pool": _fmt(c_focal_in_pool),
+        "all_containment_pool_in_focal": _fmt(c_pool_in_focal),
+        "used_containment_focal_in_pool": _fmt(used_c_focal_in_pool),
+        "used_containment_pool_in_focal": _fmt(used_c_pool_in_focal),
+        "all_has_bundles_focal": all_has_bundles_focal,
+        "all_has_bundles_pool": all_has_bundles_pool,
+        "all_n_shared_bundle_both": str(n_both_all),
+        "all_n_shared_bundle_focal_only": str(n_focal_only_all),
+        "all_n_shared_bundle_pool_only": str(n_pool_only_all),
+        "used_has_bundles_focal": used_has_bundles_focal,
+        "used_has_bundles_pool": used_has_bundles_pool,
+        "used_n_shared_bundle_both": str(n_both_used),
+        "used_n_shared_bundle_focal_only": str(n_focal_only_used),
+        "used_n_shared_bundle_pool_only": str(n_pool_only_used),
+        "data_sufficient": data_suff,
+        "executed_utc": executed_utc,
+    }
+
+
 def run_pooled_comparison(
     manifest: Dict[str, Dict[str, str]],
     registry: Dict[str, Dict[str, str]],
@@ -2670,166 +2961,79 @@ def run_pooled_comparison(
     domain_filter: Optional[str] = None,
     focal_segment_ids: Optional[Set[str]] = None,
 ) -> List[Dict[str, str]]:
-    """N-1 pooled comparison: each segment vs its sibling pool.
+    """N-1 pooled comparison, across three independent pool grains.
 
-    Pool = all files from sibling segments sharing the same
-    (parent_segment_id, governance_role, unit_system), excluding the focal segment.
-    Emits one row per (segment_id, domain).
+    Each grain is a genuinely different pool with different membership, not
+    a different view of the same pool (grid analogy: fix-row-vary-column vs.
+    fix-column-vary-row):
+
+      - parent_sibling: pool = sibling segments sharing the same
+        (parent_segment_id, governance_role, unit_system) — the narrowest
+        client+bc-together pool. This is the original/default pool grain.
+      - bc: pool = segments sharing the same (business_center_label, role,
+        unit_system), ignoring client_label — pools whichever clients happen
+        to have work in that bc, to check bc-level consistency.
+      - client: pool = segments sharing the same (client_label, role,
+        unit_system), ignoring business_center_label — pools whichever bcs
+        happen to have work for that client, to check client-level
+        consistency.
+
+    business_center_label bookkeeping tags ("0000"/"BC_0000") are normalized
+    to blank before bc-pool grouping (see _bc_of()) so they never masquerade
+    as a shared peer bc.
+
+    Emits one row per (segment_id, domain, pool_scope).
     """
-    # Group segments by (parent, role, unit_system)
-    groups: Dict[Tuple[str, str, str], List[str]] = defaultdict(list)
+    parent_groups: Dict[Tuple[str, str, str], List[str]] = defaultdict(list)
+    bc_groups: Dict[Tuple[str, str, str], List[str]] = defaultdict(list)
+    client_groups: Dict[Tuple[str, str, str], List[str]] = defaultdict(list)
     for sid, row in manifest.items():
-        parent = row.get("parent_segment_id", "").strip()
         role = row.get("governance_role", "").strip().lower()
         us = row.get("unit_system", "").strip()
         rt = registry.get(sid, {}).get("run_type", "").strip().lower()
         if rt in ("skip", "registration"):
             continue
-        if parent and role and us:
-            groups[(parent, role, us)].append(sid)
-
-    # Only groups with >=2 members have siblings
-    sibling_groups = {k: v for k, v in groups.items() if len(v) >= 2}
+        if not role or not us:
+            continue
+        parent = row.get("parent_segment_id", "").strip()
+        if parent:
+            parent_groups[(parent, role, us)].append(sid)
+        bc = _bc_of(row)
+        if bc:
+            bc_groups[(bc, role, us)].append(sid)
+        client = _client_of(row)
+        if client:
+            client_groups[(client, role, us)].append(sid)
 
     rows: List[Dict[str, str]] = []
 
-    for (parent, role, us), members in sibling_groups.items():
-        for focal_sid in members:
-            if focal_segment_ids is not None and focal_sid not in focal_segment_ids:
-                continue
-            pool_sids = [s for s in members if s != focal_sid]
-
-            # Discover domains from the focal segment
-            focal_domains = discover_domains_for_segment(segments_root, registry, focal_sid)
-            if domain_filter:
-                focal_domains = focal_domains & {domain_filter}
-
-            for domain in sorted(focal_domains):
-                focal_files = load_file_join_hashes(
-                    segments_root, registry, focal_sid, domain
-                )
-                focal_union: Set[str] = set()
-                for jhs in focal_files.values():
-                    focal_union |= jhs
-
-                if len(focal_union) < min_patterns:
+    def _emit_for_groups(
+        groups: Dict[Tuple[str, str, str], List[str]], pool_scope: str
+    ) -> None:
+        sibling_groups = {k: v for k, v in groups.items() if len(v) >= 2}
+        for key, members in sibling_groups.items():
+            pool_key_str = "_".join(key)
+            for focal_sid in members:
+                if focal_segment_ids is not None and focal_sid not in focal_segment_ids:
                     continue
+                pool_sids = [s for s in members if s != focal_sid]
 
-                # Aggregate pool files — key by (segment_id, export_run_id) so that
-                # the same export_run_id appearing in two sibling segments is counted twice
-                # rather than silently collapsed into one entry.
-                pool_files_keyed: Dict[Tuple[str, str], Set[str]] = {}
-                for pool_sid in pool_sids:
-                    pf = load_file_join_hashes(segments_root, registry, pool_sid, domain)
-                    for eid, jhs in pf.items():
-                        pool_files_keyed[(pool_sid, eid)] = jhs
+                focal_domains = discover_domains_for_segment(segments_root, registry, focal_sid)
+                if domain_filter:
+                    focal_domains = focal_domains & {domain_filter}
 
-                pool_union: Set[str] = set()
-                for jhs in pool_files_keyed.values():
-                    pool_union |= jhs
-
-                if len(pool_union) < min_patterns:
-                    continue
-
-                shared = focal_union & pool_union
-                n_shared = len(shared)
-                n_focal_unique = len(focal_union)
-                n_pool_unique = len(pool_union)
-
-                c_focal_in_pool = n_shared / n_focal_unique if n_focal_unique else 0.0
-                c_pool_in_focal = n_shared / n_pool_unique if n_pool_unique else 0.0
-
-                # Used-view containment
-                focal_files_used = load_file_join_hashes(
-                    segments_root, registry, focal_sid, domain, "used"
-                )
-                focal_union_used: Set[str] = set()
-                for jhs in focal_files_used.values():
-                    focal_union_used |= jhs
-                pool_files_used_keyed: Dict[Tuple[str, str], Set[str]] = {}
-                for pool_sid in pool_sids:
-                    pf_u = load_file_join_hashes(
-                        segments_root, registry, pool_sid, domain, "used"
+                for domain in sorted(focal_domains):
+                    pooled_row = _build_pooled_row(
+                        focal_sid, pool_sids, domain, manifest, registry,
+                        segments_root, min_patterns, executed_utc,
+                        pool_scope, pool_key_str,
                     )
-                    for eid, jhs in pf_u.items():
-                        pool_files_used_keyed[(pool_sid, eid)] = jhs
-                pool_union_used: Set[str] = set()
-                for jhs in pool_files_used_keyed.values():
-                    pool_union_used |= jhs
-                shared_used = focal_union_used & pool_union_used
-                used_c_focal_in_pool = (
-                    len(shared_used) / len(focal_union_used) if focal_union_used else 0.0
-                )
-                used_c_pool_in_focal = (
-                    len(shared_used) / len(pool_union_used) if pool_union_used else 0.0
-                )
+                    if pooled_row is not None:
+                        rows.append(pooled_row)
 
-                n_files_focal = len(focal_files)
-                n_files_pool = len(pool_files_keyed)
-                data_suff = "true" if (n_files_focal >= 5 and n_files_pool >= 5) else "false"
-
-                # Bundle annotation — dual-view
-                focal_bundle_all = load_bundle_join_hash_set(
-                    segments_root, registry, focal_sid, domain, "all"
-                )
-                focal_bundle_used = load_bundle_join_hash_set(
-                    segments_root, registry, focal_sid, domain, "used"
-                )
-                pool_bundle_all: Set[str] = set()
-                pool_bundle_used: Set[str] = set()
-                for pool_sid in pool_sids:
-                    pool_bundle_all |= load_bundle_join_hash_set(
-                        segments_root, registry, pool_sid, domain, "all"
-                    )
-                    pool_bundle_used |= load_bundle_join_hash_set(
-                        segments_root, registry, pool_sid, domain, "used"
-                    )
-
-                all_has_bundles_focal = "true" if focal_bundle_all else "false"
-                all_has_bundles_pool = "true" if pool_bundle_all else "false"
-                used_has_bundles_focal = "true" if focal_bundle_used else "false"
-                used_has_bundles_pool = "true" if pool_bundle_used else "false"
-
-                n_both_all, n_focal_only_all, n_pool_only_all = annotate_bundle_overlap(
-                    shared, focal_bundle_all, pool_bundle_all
-                )
-                n_both_used, n_focal_only_used, n_pool_only_used = annotate_bundle_overlap(
-                    shared, focal_bundle_used, pool_bundle_used
-                )
-
-                mf = manifest.get(focal_sid, {})
-                crid = make_comparison_run_id(focal_sid, f"pool_{parent}_{role}_{us}", executed_utc)
-
-                rows.append({
-                    "comparison_run_id": crid,
-                    "segment_id": focal_sid,
-                    "segment_label": mf.get("segment_label", ""),
-                    "governance_role": mf.get("governance_role", ""),
-                    "client_label": mf.get("client_label", ""),
-                    "unit_system": us,
-                    "domain": domain,
-                    "n_files_focal": str(n_files_focal),
-                    "n_files_pool": str(n_files_pool),
-                    "n_unique_patterns_focal": str(n_focal_unique),
-                    "n_unique_patterns_pool": str(n_pool_unique),
-                    "n_shared_join_hash": str(n_shared),
-                    "all_containment_focal_in_pool": _fmt(c_focal_in_pool),
-                    "all_containment_pool_in_focal": _fmt(c_pool_in_focal),
-                    "used_containment_focal_in_pool": _fmt(used_c_focal_in_pool),
-                    "used_containment_pool_in_focal": _fmt(used_c_pool_in_focal),
-                    "all_has_bundles_focal": all_has_bundles_focal,
-                    "all_has_bundles_pool": all_has_bundles_pool,
-                    "all_n_shared_bundle_both": str(n_both_all),
-                    "all_n_shared_bundle_focal_only": str(n_focal_only_all),
-                    "all_n_shared_bundle_pool_only": str(n_pool_only_all),
-                    "used_has_bundles_focal": used_has_bundles_focal,
-                    "used_has_bundles_pool": used_has_bundles_pool,
-                    "used_n_shared_bundle_both": str(n_both_used),
-                    "used_n_shared_bundle_focal_only": str(n_focal_only_used),
-                    "used_n_shared_bundle_pool_only": str(n_pool_only_used),
-                    "data_sufficient": data_suff,
-                    "executed_utc": executed_utc,
-                })
+    _emit_for_groups(parent_groups, "parent_sibling")
+    _emit_for_groups(bc_groups, "bc")
+    _emit_for_groups(client_groups, "client")
 
     return rows
 
