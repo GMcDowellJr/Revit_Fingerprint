@@ -12,11 +12,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
 from compare_cross_segment import SUMMARY_FIELDS, POOLED_FIELDS  # noqa: E402
 from generate_governance_narrative import (  # noqa: E402
+    _DEFAULT_CLIENT_SECTOR_PATH,
+    _client_onboarding_profile,
     _disc_label,
     build_cascade,
     build_client_summary,
     load_client_sectors,
     normalise_summary_schema,
+    read_csv,
+    render_client_section,
     render_discipline_section,
 )
 
@@ -159,3 +163,44 @@ def test_cascade_cross_client_jaccard_uses_sector_map():
     cascade = build_cascade(rows, sector_map)
     # Only the Kaiser/Sutter (both healthcare) pair should count toward xc.
     assert cascade["arrowheads"]["xc"] == 0.5
+
+
+# ---------------------------------------------------------------------------
+# PR #350 review round 4: default --client-sector path + unknown-vs-non-healthcare
+# ---------------------------------------------------------------------------
+
+def test_default_client_sector_path_exists_and_loads():
+    """Existing invocations that don't pass --client-sector must still pick up
+    the shipped classification, or cross-client convergence (xc) silently goes
+    to None for every domain -- not just the sector/tier fields."""
+    assert _DEFAULT_CLIENT_SECTOR_PATH.exists()
+    sector_map = load_client_sectors(read_csv(_DEFAULT_CLIENT_SECTOR_PATH))
+    assert sector_map.get("Kaiser") == "healthcare"
+    assert sector_map.get("Intel") not in ("healthcare", None, "")
+
+
+def test_unclassified_client_not_treated_as_confirmed_non_healthcare():
+    """is_healthcare=False alone can't distinguish 'known different sector' from
+    'we don't know' -- only a client with a KNOWN non-healthcare sector should
+    get the different-sector operating implication / render note."""
+    profile_unknown = _client_onboarding_profile(
+        {"sector": "unknown", "is_healthcare": False, "xc_mean": 0.4, "wp_mean": 0.6, "n_files": 20}
+    )
+    profile_known_non_healthcare = _client_onboarding_profile(
+        {"sector": "semiconductor", "is_healthcare": False, "xc_mean": 0.4, "wp_mean": 0.6, "n_files": 20}
+    )
+    assert "healthcare baseline assumptions" not in profile_unknown["operating_implication"]
+    assert "healthcare baseline assumptions" in profile_known_non_healthcare["operating_implication"]
+
+    client_rows = [
+        {"client": "Unknown Co", "sector": "unknown", "is_healthcare": False, "tier": "Insufficient Data",
+         "xc_mean": None, "wp_mean": None, "n_files": 5, "confidence_note": "", "strongest": [], "weakest": []},
+        {"client": "Intel", "sector": "semiconductor", "is_healthcare": False,
+         "tier": "Non-comparable (different sector)",
+         "xc_mean": None, "wp_mean": None, "n_files": 5, "confidence_note": "", "strongest": [], "weakest": []},
+    ]
+    md = render_client_section(client_rows)
+    unknown_section = md.split("### Unknown Co")[1].split("### Intel")[0]
+    intel_section = md.split("### Intel")[1]
+    assert "_Non-healthcare sector" not in unknown_section
+    assert "_Non-healthcare sector" in intel_section

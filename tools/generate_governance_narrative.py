@@ -296,6 +296,15 @@ def _is_unscoped_segment(row: dict, suffix: str) -> bool:
     return all(p == "" for p in seg_id.split("|")[2:])
 
 
+# Default location for the optional client_sector.csv, resolved relative to this
+# script's own directory (tools/) rather than the CWD -- so existing invocations
+# that don't pass --client-sector still pick up the shipped classification and
+# keep today's healthcare cross-client convergence signal, without requiring
+# every caller to learn a new flag. Passing --client-sector explicitly (a real
+# path or a nonexistent one) always overrides this default.
+_DEFAULT_CLIENT_SECTOR_PATH = Path(__file__).resolve().parent.parent / "policies" / "client_sector.csv"
+
+
 def load_client_sectors(client_sector_rows: Optional[list[dict]]) -> dict:
     """Build a {client_label: sector} map from an optional client_sector.csv
     (--client-sector). Sector membership is a real business fact that cannot be
@@ -1266,6 +1275,7 @@ def build_client_summary(
             "confidence_note": conf,
             "strongest": strongest,
             "weakest": weakest,
+            "sector": sector,
             "is_healthcare": sector == "healthcare",
         })
 
@@ -1977,7 +1987,12 @@ def _client_onboarding_profile(r: dict) -> dict:
     common_base = _format_domain_items(r.get("strongest", []))
     variant_burden = _format_domain_items(r.get("weakest", []))
 
-    if not r.get("is_healthcare", True):
+    # Only a client with a KNOWN non-healthcare sector gets the different-sector
+    # implication -- an unclassified client (sector == "unknown") must not be
+    # treated as confirmed non-healthcare, since is_healthcare=False alone can't
+    # distinguish "known different sector" from "we don't know."
+    sector = r.get("sector", "unknown")
+    if sector not in ("unknown", "healthcare"):
         operating_implication = (
             "Do not use healthcare baseline assumptions as the default. Treat this as a separate sector profile."
         )
@@ -2090,7 +2105,9 @@ def render_client_section(client_rows: list[dict]) -> str:
                 f"{DOMAIN_LABELS.get(d, d)} ({pct(v)})" for d, v in r["weakest"]
             )
             lines.append(f"Weakest alignment domains: {weak_str}.\n")
-        if not r["is_healthcare"]:
+        # Only note a different sector when it's actually KNOWN (not "unknown") --
+        # an unclassified client must not be presented as confirmed non-healthcare.
+        if r.get("sector", "unknown") not in ("unknown", "healthcare"):
             lines.append(
                 "_Non-healthcare sector — configuration baseline differs from healthcare "
                 "client comparisons. Excluded from healthcare cross-client convergence reads._\n"
@@ -2497,10 +2514,14 @@ def main():
     parser.add_argument("--governance-state-summary", help="cross_segment_governance_state_summary.csv (optional)")
     parser.add_argument("--delta", help="cross_segment_delta.csv (optional legacy fallback)")
     parser.add_argument("--file-meta", help="file_metadata.csv (optional)")
-    parser.add_argument("--client-sector",
-                        help="client_sector.csv (optional; client_label,sector columns — "
-                             "classifies cross-client convergence and non-comparable-sector "
-                             "tiering; absent = every client treated as unclassified)")
+    parser.add_argument("--client-sector", default=str(_DEFAULT_CLIENT_SECTOR_PATH),
+                        help="client_sector.csv (client_label,sector columns — classifies "
+                             "cross-client convergence and non-comparable-sector tiering). "
+                             f"Defaults to {_DEFAULT_CLIENT_SECTOR_PATH} if present, so existing "
+                             "invocations keep today's healthcare cross-client convergence "
+                             "signal without needing to pass this flag. Pass an explicit path "
+                             "to override, or a nonexistent path to run with every client "
+                             "unclassified.")
     parser.add_argument("--union-inventory",
                         help="cross_segment_union_inventory.csv (optional)")
     parser.add_argument("--reuse-distribution",
@@ -2538,9 +2559,13 @@ def main():
         file_meta_rows = read_csv(Path(args.file_meta))
 
     client_sector_rows = []
-    if args.client_sector:
+    if args.client_sector and Path(args.client_sector).exists():
         print(f"Loading {args.client_sector}...")
         client_sector_rows = read_csv(Path(args.client_sector))
+    elif args.client_sector:
+        print(f"[warn] {args.client_sector} not found — every client will be treated as "
+              f"unclassified (no sector). Pass --client-sector explicitly to silence this "
+              f"if that's intended.", file=sys.stderr)
 
     union_inventory_rows = []
     if args.union_inventory:
