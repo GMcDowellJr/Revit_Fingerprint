@@ -1128,7 +1128,11 @@ def build_client_summary(
 
     # n_files from pooled — every pool_scope grain, same rationale as all_clients
     # above: n_files_focal describes the focal segment, not the pool, so it's
-    # identical across a segment's parent_sibling/bc/client rows.
+    # identical across a segment's parent_sibling/bc/client rows. Falls back to
+    # summary_rows' own n_files_a/n_files_b for clients discovered only from
+    # summary_rows above (e.g. a single-project client with no >=2-member pool
+    # grain at all) -- without this, such a client reports n_files=0 / "Low
+    # corpus confidence" despite the summary row itself carrying a real count.
     client_files = {}
     for r in pooled_rows:
         c = _pick(r, "client_label")
@@ -1136,6 +1140,18 @@ def build_client_summary(
             nf = int(r["n_files_focal"]) if r.get("n_files_focal") else 0
             if c not in client_files or nf > client_files[c]:
                 client_files[c] = nf
+    for r in summary_rows:
+        if r["comparison_type"] == "within_project":
+            c = _pick(r, "client_label_a")
+            nf = int(r["n_files_a"]) if r.get("n_files_a") else 0
+            if c and (c not in client_files or nf > client_files[c]):
+                client_files[c] = nf
+        elif r["comparison_type"] == "sibling_projects":
+            for suffix in ("a", "b"):
+                c = _pick(r, f"client_label_{suffix}")
+                nf = int(r[f"n_files_{suffix}"]) if r.get(f"n_files_{suffix}") else 0
+                if c and (c not in client_files or nf > client_files[c]):
+                    client_files[c] = nf
 
     # Domain-level xc means
     xc_dom_by_client = defaultdict(lambda: defaultdict(list))
