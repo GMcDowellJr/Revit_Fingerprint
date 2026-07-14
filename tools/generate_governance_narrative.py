@@ -321,6 +321,24 @@ CASCADE_GROUP1_TYPES = {
 # Enterprise Baseline down-arrow [generic -> template/container/project
 # containment]") — an existing promise in the narrative's own output that was
 # never implemented before this pass.
+#
+# Scope decision (PR #350 review): compare_cross_segment.py intentionally emits
+# generic_to_template/_container/_project rows for client-/discipline-/bc-/
+# collection-scoped targets too, not only the single broadest one -- those scoped
+# rows are real baseline-propagation evidence. gt/gc/gp below deliberately keep
+# the SAME single-broadest-pair gating as tc/cp/tp anyway (both sides must pass
+# _is_unscoped_segment), matching Group 1's existing "one clean enterprise-wide
+# number" semantics and avoiding the blend-distinct-scope-grains anti-pattern
+# this audit already fixed elsewhere (A2's pool_scope filter, A3's governance-
+# state blending) -- rather than relaxing the gate and averaging enterprise-wide
+# together with client-/discipline-/bc-scoped rows into one number. Accepted
+# tradeoff: gt/gc/gp may be sparse or empty in real runs, reflecting only the one
+# broadest-vs-broadest row per domain/unit_system, if it exists.
+#
+# Deferred to a future PR: break gt/gc/gp down by target scope level (mirroring
+# wp_disc's per-discipline breakdown) so the scoped generic-to-Template/Container/
+# Project rows aren't discarded but also aren't blended into a single number. Not
+# attempted here -- it's a real design/rendering change, not a narrow bug fix.
 CASCADE_GROUP2_TYPES = {
     "generic_to_template", "generic_to_container", "generic_to_project",
 }
