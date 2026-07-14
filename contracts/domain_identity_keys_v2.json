@@ -18,6 +18,7 @@
   "domains": {
     "arrowheads": {
       "domain_family": "arrowheads",
+      "display_label": "Arrowheads",
       "allowed_keys": [
         "arrowhead.style",
         "arrowhead.arrow_style_raw_int",
@@ -39,6 +40,7 @@
     },
     "ceiling_types": {
       "domain_family": "compound_types",
+      "display_label": "Ceiling Types",
       "allowed_keys": [
         "ct.layer_count",
         "ct.total_thickness_in",
@@ -74,6 +76,7 @@
     },
     "dimension_types_angular": {
       "domain_family": "dimension_types",
+      "display_label": "Dimension Types — Angular",
       "allowed_keys": [
         "dim_type.shape",
         "dim_type.accuracy",
@@ -109,6 +112,7 @@
     },
     "dimension_types_diameter": {
       "domain_family": "dimension_types",
+      "display_label": "Dimension Types — Diameter",
       "allowed_keys": [
         "dim_type.shape",
         "dim_type.accuracy",
@@ -144,6 +148,7 @@
     },
     "dimension_types_linear": {
       "domain_family": "dimension_types",
+      "display_label": "Dimension Types — Linear",
       "allowed_keys": [
         "dim_type.shape",
         "dim_type.accuracy",
@@ -179,6 +184,7 @@
     },
     "dimension_types_radial": {
       "domain_family": "dimension_types",
+      "display_label": "Dimension Types — Radial",
       "allowed_keys": [
         "dim_type.shape",
         "dim_type.accuracy",
@@ -214,6 +220,7 @@
     },
     "dimension_types_spot_coordinate": {
       "domain_family": "dimension_types",
+      "display_label": "Dimension Types — Spot Coordinate",
       "allowed_keys": [
         "dim_type.shape",
         "dim_type.unit_format_id",
@@ -258,6 +265,7 @@
     },
     "dimension_types_spot_elevation": {
       "domain_family": "dimension_types",
+      "display_label": "Dimension Types — Spot Elevation",
       "allowed_keys": [
         "dim_type.shape",
         "dim_type.unit_format_id",
@@ -300,6 +308,7 @@
     },
     "dimension_types_spot_slope": {
       "domain_family": "dimension_types",
+      "display_label": "Dimension Types — Spot Slope",
       "allowed_keys": [
         "dim_type.shape",
         "dim_type.unit_format_id",
@@ -328,6 +337,7 @@
     },
     "fill_patterns_drafting": {
       "domain_family": "fill_patterns",
+      "display_label": "Fill Patterns — Drafting",
       "allowed_keys": [
         "fill_pattern.target",
         "fill_pattern.grid_count",
@@ -355,6 +365,7 @@
     },
     "fill_patterns_model": {
       "domain_family": "fill_patterns",
+      "display_label": "Fill Patterns — Model",
       "allowed_keys": [
         "fill_pattern.target",
         "fill_pattern.grid_count",
@@ -382,6 +393,7 @@
     },
     "floor_types": {
       "domain_family": "compound_types",
+      "display_label": "Floor Types",
       "allowed_keys": [
         "ft.function",
         "ft.layer_count",
@@ -435,6 +447,7 @@
     },
     "line_patterns": {
       "domain_family": "line_patterns",
+      "display_label": "Line Patterns",
       "allowed_keys": [
         "line_pattern.segment_count",
         "line_pattern.segments_def_hash"
@@ -461,6 +474,7 @@
     },
     "line_styles": {
       "domain_family": "line_styles",
+      "display_label": "Line Styles",
       "allowed_keys": [
         "line_style.weight.projection",
         "line_style.color.rgb",
@@ -479,6 +493,7 @@
     },
     "loaded_family_types": {
       "domain_family": "loaded_family_types",
+      "display_label": "Loaded Family Types",
       "allowed_keys": [
         "lft.shape_gate.category",
         "lft.shape_gate.category_id",
@@ -519,6 +534,7 @@
     },
     "materials": {
       "domain_family": "materials",
+      "display_label": "Materials",
       "allowed_keys": [
         "material.graphics_sig_hash_v2",
         "material.uid",
@@ -552,6 +568,7 @@
     },
     "object_styles_analytical": {
       "domain_family": "object_styles",
+      "display_label": "Object Styles — Analytical",
       "allowed_keys": [
         "obj_style.row_key",
         "obj_style.weight.projection",
@@ -567,6 +584,7 @@
     },
     "object_styles_annotation": {
       "domain_family": "object_styles",
+      "display_label": "Object Styles — Annotation",
       "allowed_keys": [
         "obj_style.row_key",
         "obj_style.weight.projection",
@@ -597,6 +615,7 @@
     },
     "object_styles_model": {
       "domain_family": "object_styles",
+      "display_label": "Object Styles — Model",
       "allowed_keys": [
         "obj_style.row_key",
         "obj_style.weight.projection",
@@ -614,6 +633,7 @@
     },
     "phase_filters": {
       "domain_family": "phase_filters",
+      "display_label": "Phase Filters",
       "allowed_keys": [
         "phase_filter.demolished.presentation_id",
         "phase_filter.existing.presentation_id",
@@ -634,6 +654,7 @@
     },
     "phases": {
       "domain_family": "phases",
+      "display_label": "Phases",
       "allowed_keys": [
         "phase.seq",
         "phase.name"
@@ -650,6 +671,7 @@
     },
     "roof_types": {
       "domain_family": "compound_types",
+      "display_label": "Roof Types",
       "allowed_keys": [
         "rt.layer_count",
         "rt.total_thickness_in",
@@ -685,6 +707,7 @@
     },
     "text_types": {
       "domain_family": "text_types",
+      "display_label": "Text Types",
       "allowed_keys": [
         "text_type.font",
         "text_type.size_in",
@@ -716,6 +739,7 @@
     },
     "units": {
       "domain_family": "units",
+      "display_label": "Units",
       "allowed_keys": [
         "units.spec",
         "units.unit_type_id",
@@ -733,6 +757,7 @@
     },
     "view_category_overrides_annotation": {
       "domain_family": "view_category_overrides",
+      "display_label": "View Category Overrides — Annotation",
       "allowed_keys": [
         "vco.baseline_category_path",
         "vco.baseline_sig_hash",
@@ -766,6 +791,7 @@
     },
     "view_category_overrides_model": {
       "domain_family": "view_category_overrides",
+      "display_label": "View Category Overrides — Model",
       "allowed_keys": [
         "vco.baseline_category_path",
         "vco.baseline_sig_hash",
@@ -804,6 +830,7 @@
     },
     "view_filter_applications_view_templates": {
       "domain_family": "view_filter_applications_view_templates",
+      "display_label": "View Filter Applications",
       "allowed_keys": [
         "vfa.stack_def_hash"
       ],
@@ -821,6 +848,7 @@
     },
     "view_filter_definitions": {
       "domain_family": "view_filter_definitions",
+      "display_label": "View Filter Definitions",
       "allowed_keys": [
         "vf.categories",
         "vf.def_hash",
@@ -855,6 +883,7 @@
     },
     "view_templates_ceiling_plans": {
       "domain_family": "view_templates",
+      "display_label": "View Templates — Ceiling Plans",
       "allowed_keys": [
         "view_template.def_hash"
       ],
@@ -870,6 +899,7 @@
     },
     "view_templates_elevations_sections_detail": {
       "domain_family": "view_templates",
+      "display_label": "View Templates — Elevations/Sections",
       "allowed_keys": [
         "view_template.def_hash"
       ],
@@ -885,6 +915,7 @@
     },
     "view_templates_floor_structural_area_plans": {
       "domain_family": "view_templates",
+      "display_label": "View Templates — Floor/Structural Plans",
       "allowed_keys": [
         "view_template.def_hash"
       ],
@@ -900,6 +931,7 @@
     },
     "view_templates_renderings_drafting": {
       "domain_family": "view_templates",
+      "display_label": "View Templates — Renderings/Drafting",
       "allowed_keys": [
         "view_template.def_hash"
       ],
@@ -915,6 +947,7 @@
     },
     "view_templates_schedules": {
       "domain_family": "view_templates",
+      "display_label": "View Templates — Schedules",
       "allowed_keys": [
         "view_template.def_hash"
       ],
