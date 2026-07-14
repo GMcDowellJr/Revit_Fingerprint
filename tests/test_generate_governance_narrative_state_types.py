@@ -95,6 +95,10 @@ def test_detailed_loop_no_longer_drops_new_scope_types():
         _state_row(domain="arrowheads", comparison_type="bc_to_project", state="provided_but_passive"),
         _state_row(domain="arrowheads", comparison_type="enterprise_to_bc", state="provided_but_missing"),
         _state_row(domain="arrowheads", comparison_type="enterprise_to_client", state="local_active"),
+        # A rendered-type row for the same domain so it isn't entirely omitted from
+        # the result (see test_domain_with_only_group3_state_is_omitted_from_result
+        # for the all-Group-3 case).
+        _state_row(domain="arrowheads", comparison_type="template_to_project", state="provided_and_used"),
     ]
     result = build_governance_state_summary(rows, [])
     by_type = result["arrowheads"]["by_comparison_type"]
@@ -104,9 +108,25 @@ def test_detailed_loop_no_longer_drops_new_scope_types():
     assert by_type["enterprise_to_bc"]["provided_but_missing_count"] == 1
     assert by_type["enterprise_to_client"]["local_active_count"] == 1
 
-    # None of these four (Group 3) reach the merged/rendered domain-level counts.
+    # None of these four (Group 3) reach the merged/rendered domain-level counts --
+    # only the template_to_project row does.
     merged = result["arrowheads"]
-    assert merged["provided_and_used_count"] == 0
+    assert merged["provided_and_used_count"] == 1
     assert merged["provided_but_passive_count"] == 0
     assert merged["provided_but_missing_count"] == 0
     assert merged["local_active_count"] == 0
+
+
+def test_domain_with_only_group3_state_is_omitted_from_result():
+    """A domain whose ENTIRE governance-state signal is Group 3 (scope-level
+    fan-out) rows must be absent from the returned map entirely, not present with
+    an all-None-but-truthy merged entry -- render_domain_tiers()'s has_state check
+    treats any non-None dict as "this domain has state data" regardless of its
+    values, which would wrongly switch its whole tier group to state-column
+    rendering. See PR #350 review."""
+    rows = [
+        _state_row(domain="scope_only_domain", comparison_type="enterprise_to_project", state="provided_and_used"),
+        _state_row(domain="scope_only_domain", comparison_type="bc_to_project", state="provided_but_passive"),
+    ]
+    result = build_governance_state_summary(rows, [])
+    assert "scope_only_domain" not in result

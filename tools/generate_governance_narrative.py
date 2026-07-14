@@ -1529,6 +1529,20 @@ def build_governance_state_summary(
             if not ctype or ctype in _GOVERNANCE_STATE_RENDERED_TYPES:
                 rendered_buckets.append(bucket)
 
+        if not rendered_buckets:
+            # This domain's ENTIRE governance-state signal is Group 3 (scope-level
+            # fan-out) rows -- deferred, not rendered (see CASCADE_GROUP3_TYPES).
+            # Omit it from the returned map entirely rather than storing an
+            # all-None-but-truthy dict: render_domain_tiers()'s has_state check
+            # (`any(state for _, _, state in group)`) treats ANY non-None dict as
+            # "this tier group has state data" regardless of its values, which
+            # would switch the WHOLE tier group's table to state columns -- hiding
+            # bundle/passive columns for every domain in that group while showing
+            # blank state values for this one. state_summary.get(dom) returning
+            # None here is what every downstream consumer (assign_tier,
+            # detect_anomalies, render_domain_tiers, the CSV writer) already
+            # expects for "no governance-state input."
+            continue
         merged = _finalize_state_bucket(_merge_state_buckets(rendered_buckets))
         merged["by_comparison_type"] = by_ctype
         result[dom] = merged
