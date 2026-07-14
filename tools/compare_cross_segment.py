@@ -3444,6 +3444,13 @@ def sort_pair_detail_rows(rows: List[Dict[str, str]]) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+# ProcessPoolExecutor raises ValueError when max_workers > 61 on Windows
+# (WaitForMultipleObjects handle-count limit) — auto-detected counts must
+# respect this cap there, or a default `--workers auto` run on a 64+-core
+# Windows host fails outright.
+_WIN32_MAX_WORKERS = 61
+
+
 def resolve_worker_count(value: str, headroom: int = 2) -> int:
     """Resolve --workers, accepting either an int or the literal string 'auto'.
 
@@ -3454,7 +3461,10 @@ def resolve_worker_count(value: str, headroom: int = 2) -> int:
     """
     if str(value).strip().lower() == "auto":
         cpu_count = os.cpu_count()
-        return max(1, cpu_count - headroom) if cpu_count else 4
+        workers = max(1, cpu_count - headroom) if cpu_count else 4
+        if sys.platform == "win32":
+            workers = min(workers, _WIN32_MAX_WORKERS)
+        return workers
     return int(value)
 
 

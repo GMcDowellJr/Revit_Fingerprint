@@ -36,3 +36,17 @@ def test_explicit_string_int_is_parsed():
 
 def test_explicit_int_passthrough():
     assert resolve_worker_count(8) == 8
+
+
+def test_auto_caps_at_61_on_windows(monkeypatch):
+    import compare_cross_segment as mod
+    monkeypatch.setattr(mod.os, "cpu_count", lambda: 128)
+    monkeypatch.setattr(mod.sys, "platform", "win32")
+    assert resolve_worker_count("auto") == 61
+
+
+def test_auto_uncapped_on_non_windows(monkeypatch):
+    import compare_cross_segment as mod
+    monkeypatch.setattr(mod.os, "cpu_count", lambda: 128)
+    monkeypatch.setattr(mod.sys, "platform", "linux")
+    assert resolve_worker_count("auto") == 126  # 128 - headroom(2), no cap
