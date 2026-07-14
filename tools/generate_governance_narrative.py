@@ -1071,19 +1071,38 @@ def build_client_summary(
     pooled_rows: list[dict],
 ) -> list[dict]:
     """Per-client alignment summary."""
+    # Client existence must not depend on which pool grain happens to have >=2
+    # siblings for that client. _emit_for_groups() in compare_cross_segment.py
+    # requires len(members) >= 2 INDEPENDENTLY per grain (parent_sibling/bc/client),
+    # so a client whose Project segments never share a common immediate parent with
+    # another sibling gets ZERO parent_sibling rows, even though it may have real
+    # bc- or client-grain pooled rows, or real summary_rows (within_project/
+    # sibling_projects) data. An earlier pool_scope filter here (meant to stop
+    # pool-relative metrics from blending three distinct pools together -- see
+    # docs/governance_narrative_scope_gap_audit.md A2) accidentally dropped such
+    # clients from the client section entirely. client_label and n_files_focal both
+    # describe the FOCAL segment itself, not the pool, so they're identical across
+    # a segment's parent_sibling/bc/client pooled rows -- there is no blending risk
+    # in reading them from every pool_scope grain. (If a genuinely pool-relative
+    # metric -- e.g. all_containment_focal_in_pool, used_containment_pool_in_focal,
+    # n_shared_join_hash -- is ever read from pooled_rows in this function, THAT
+    # read must filter by pool_scope at its own point of use; client discovery and
+    # n_files below must not.)
     all_clients = set()
     for r in pooled_rows:
-        # This section (client "internal coherence" + cross-client Jaccard) has always
-        # implicitly meant the parent-sibling (project-vs-project) grain. cross_segment_
-        # pooled.csv also carries bc- and client-pool grain rows (pool_scope == "bc" /
-        # "client") for the same segment; blending those in here would silently mix three
-        # distinct comparison populations into one number. See
-        # docs/governance_narrative_scope_gap_audit.md A2.
-        if r.get("pool_scope", "") not in ("parent_sibling", ""):
-            continue
         c = _pick(r, "client_label")
         if c and r["governance_role"] == "Project":
             all_clients.add(c)
+    for r in summary_rows:
+        if r["comparison_type"] == "within_project":
+            c = _pick(r, "client_label_a")
+            if c:
+                all_clients.add(c)
+        elif r["comparison_type"] == "sibling_projects":
+            for suffix in ("a", "b"):
+                c = _pick(r, f"client_label_{suffix}")
+                if c:
+                    all_clients.add(c)
 
     # Cross-client Jaccard
     xc_by_client = defaultdict(list)
@@ -1107,11 +1126,11 @@ def build_client_summary(
         if v is not None and c:
             wp_by_client[c].append(v)
 
-    # n_files from pooled — parent_sibling grain only, same rationale as all_clients above.
+    # n_files from pooled — every pool_scope grain, same rationale as all_clients
+    # above: n_files_focal describes the focal segment, not the pool, so it's
+    # identical across a segment's parent_sibling/bc/client rows.
     client_files = {}
     for r in pooled_rows:
-        if r.get("pool_scope", "") not in ("parent_sibling", ""):
-            continue
         c = _pick(r, "client_label")
         if c and r["governance_role"] == "Project":
             nf = int(r["n_files_focal"]) if r.get("n_files_focal") else 0
@@ -2494,6 +2513,14 @@ def main():
             "domain_label": DOMAIN_LABELS.get(dom, dom),
             "governance_tier": tier,
             "score_reliability": reliability,
+            # Cascade-computed generic->template/container/project (Group 2), sourced
+            # from the always-required cross_segment_summary.csv -- distinct from the
+            # optional-governance-state-summary-sourced "generic_to_template"/etc.
+            # columns below, which are blank when --governance-state-summary isn't
+            # supplied. These cascade columns are populated regardless.
+            "cascade_generic_to_template": fmt(d.get("gt")),
+            "cascade_generic_to_container": fmt(d.get("gc")),
+            "cascade_generic_to_project": fmt(d.get("gp")),
             "template_to_container": fmt(d["tc"]),
             "container_to_project": fmt(d["cp"]),
             "template_to_project": fmt(d["tp"]),
