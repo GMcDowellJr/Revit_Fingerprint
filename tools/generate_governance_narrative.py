@@ -296,6 +296,32 @@ def _is_unscoped_segment(row: dict, suffix: str) -> bool:
     return all(p == "" for p in seg_id.split("|")[2:])
 
 
+def _target_scope_label(row: dict, suffix: str) -> str:
+    """Classify a generic_to_*'s TARGET side (Template/Container/Project) into a
+    scope-level bucket for gt/gc/gp's per-scope breakdown, using real columns
+    (client_label, business_center_label -- now on SUMMARY_FIELDS per B6,
+    discipline_label) rather than segment_id parsing.
+
+    "enterprise" reuses _is_unscoped_segment()'s own definition of the broadest
+    population. Otherwise the bucket names every populated dimension
+    (client/bc/discipline), e.g. "client", "client_discipline". collection_label
+    is still not a SUMMARY_FIELDS column (residual B6 gap) -- a segment scoped
+    only by collection would have all three known dimensions blank yet still
+    fail _is_unscoped_segment()'s segment_id structural check, landing in
+    "other_scoped" rather than being silently mislabeled "enterprise".
+    """
+    if _is_unscoped_segment(row, suffix):
+        return "enterprise"
+    parts = []
+    if row.get(f"client_label_{suffix}", ""):
+        parts.append("client")
+    if row.get(f"business_center_label_{suffix}", ""):
+        parts.append("bc")
+    if row.get(f"discipline_label_{suffix}", ""):
+        parts.append("discipline")
+    return "_".join(parts) if parts else "other_scoped"
+
+
 # Default location for the optional client_sector.csv, resolved relative to this
 # script's own directory (tools/) rather than the CWD -- so existing invocations
 # that don't pass --client-sector still pick up the shipped classification and
@@ -401,23 +427,23 @@ CASCADE_GROUP1_TYPES = {
 # containment]") — an existing promise in the narrative's own output that was
 # never implemented before this pass.
 #
-# Scope decision (PR #350 review): compare_cross_segment.py intentionally emits
-# generic_to_template/_container/_project rows for client-/discipline-/bc-/
-# collection-scoped targets too, not only the single broadest one -- those scoped
-# rows are real baseline-propagation evidence. gt/gc/gp below deliberately keep
-# the SAME single-broadest-pair gating as tc/cp/tp anyway (both sides must pass
-# _is_unscoped_segment), matching Group 1's existing "one clean enterprise-wide
-# number" semantics and avoiding the blend-distinct-scope-grains anti-pattern
-# this audit already fixed elsewhere (A2's pool_scope filter, A3's governance-
-# state blending) -- rather than relaxing the gate and averaging enterprise-wide
-# together with client-/discipline-/bc-scoped rows into one number. Accepted
-# tradeoff: gt/gc/gp may be sparse or empty in real runs, reflecting only the one
-# broadest-vs-broadest row per domain/unit_system, if it exists.
-#
-# Deferred to a future PR: break gt/gc/gp down by target scope level (mirroring
-# wp_disc's per-discipline breakdown) so the scoped generic-to-Template/Container/
-# Project rows aren't discarded but also aren't blended into a single number. Not
-# attempted here -- it's a real design/rendering change, not a narrow bug fix.
+# Scope decision (PR #350 review, revised -- Option C): compare_cross_segment.py
+# intentionally emits generic_to_template/_container/_project rows for client-/
+# discipline-/bc-scoped targets too, not only the single broadest one -- those
+# scoped rows are real baseline-propagation evidence. gt/gc/gp keep the SAME
+# single-broadest-pair semantics as tc/cp/tp (the GENERIC/reference side must
+# still pass _is_unscoped_segment -- one canonical enterprise-wide Generic
+# population -- and gt/gc/gp themselves are populated only from target rows whose
+# OWN scope is "enterprise"), avoiding the blend-distinct-scope-grains anti-
+# pattern this audit already fixed elsewhere (A2's pool_scope filter, A3's
+# governance-state blending). But the target (Template/Container/Project) side is
+# no longer gated to broadest-only: every other target scope level is captured,
+# not discarded, in gt_by_scope/gc_by_scope/gp_by_scope (see _target_scope_label()
+# and build_cascade()'s docstring) -- Option C from the original PR #350 review
+# discussion, implemented as its own follow-up once the tradeoff was accepted.
+# collection_label is still not a SUMMARY_FIELDS column (B6 residual gap after the
+# business_center_label addition); a collection-only-scoped target lands in the
+# "other_scoped" bucket rather than being silently mislabeled "enterprise".
 CASCADE_GROUP2_TYPES = {
     "generic_to_template", "generic_to_container", "generic_to_project",
 }
@@ -497,8 +523,13 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
       tw: within-template Jaccard
       wp_p10: within-project Jaccard p10 (generic segment, all roles)
       wp_p90: within-project Jaccard p90 (generic segment, all roles)
-      gt/gc/gp: generic->template/container/project containment_a_in_b_mean
-        (Group 2 — one level up the cascade from tc/cp/tp; see CASCADE_GROUP2_TYPES)
+      gt/gc/gp: generic->template/container/project containment_a_in_b_mean, the
+        "enterprise" (target-unscoped) slice only (Group 2 — one level up the
+        cascade from tc/cp/tp; see CASCADE_GROUP2_TYPES)
+      gt_by_scope/gc_by_scope/gp_by_scope: {scope_label: mean_containment} for
+        EVERY target scope level compare_cross_segment.py emits (client/bc/
+        discipline and combinations thereof, plus "enterprise" itself) -- see
+        _target_scope_label(). Mirrors wp_disc's per-discipline breakdown pattern.
       ep/bp/eb/ec: enterprise->project / bc->project / enterprise->bc / enterprise->client
         containment_a_in_b_mean (Group 3 — scope-level fan-out, captured but not yet
         rendered/tiered/anomaly-detected; see CASCADE_GROUP3_TYPES)
@@ -521,13 +552,28 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     wp_used_p10 = {}
     wp_used_p90 = {}
 
-    # Group 2 — generic->template/container/project containment (all-view + used-view)
+    # Group 2 — generic->template/container/project containment (all-view + used-view).
+    # gt/gc/gp remain the "enterprise" scope-level slice only (Option A -- one clean
+    # number, matching tc/cp/tp; see the Scope decision comment on CASCADE_GROUP2_TYPES
+    # above), populated as a subset of the *_by_scope breakdowns below rather than a
+    # separately-gated accumulation, so the two can never drift apart.
     gt = defaultdict(list)
     gc = defaultdict(list)
     gp = defaultdict(list)
     gt_used = defaultdict(list)
     gc_used = defaultdict(list)
     gp_used = defaultdict(list)
+    # Option C — per-target-scope-level breakdown (mirrors wp_disc's per-discipline
+    # pattern): {dom: {scope_label: [values]}}. Captures the client-/bc-/discipline-
+    # scoped generic_to_* rows compare_cross_segment.py intentionally emits (see the
+    # Scope decision comment on CASCADE_GROUP2_TYPES above) instead of discarding
+    # them -- without blending them into the enterprise number itself.
+    gt_by_scope = defaultdict(lambda: defaultdict(list))
+    gc_by_scope = defaultdict(lambda: defaultdict(list))
+    gp_by_scope = defaultdict(lambda: defaultdict(list))
+    gt_used_by_scope = defaultdict(lambda: defaultdict(list))
+    gc_used_by_scope = defaultdict(lambda: defaultdict(list))
+    gp_used_by_scope = defaultdict(lambda: defaultdict(list))
 
     # Group 3 — scope-level fan-out containment (all-view + used-view). Captured only;
     # not rendered/tiered/anomaly-detected in this pass (see CASCADE_GROUP3_TYPES above).
@@ -618,32 +664,55 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
                         wp_used_p90[dom] = pf(_col(r, "used_jaccard_p90"))
                         wp_used_p10[dom + "_n"] = n
 
-        # Group 2 — one level up the cascade from tc/cp/tp. Same extraction pattern
-        # and same broadest-segment gating as Group 1, since generic_to_* pairs can
-        # also exist at multiple scope levels (see docs/governance_narrative_scope_gap_audit.md A1).
-        elif ct == "generic_to_template" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+        # Group 2 — one level up the cascade from tc/cp/tp. The GENERIC (reference)
+        # side must still be the one canonical enterprise-wide Generic population --
+        # _is_unscoped_segment(r, "a") -- but the TARGET (Template/Container/Project)
+        # side is bucketed by its own scope level (Option C) rather than gated to
+        # broadest-only, since compare_cross_segment.py intentionally emits
+        # generic_to_* rows for client-/bc-/discipline-scoped targets too (real
+        # baseline-propagation evidence -- see the Scope decision comment on
+        # CASCADE_GROUP2_TYPES above). gt/gc/gp (the enterprise slice) are populated
+        # only when the target's own scope label is "enterprise", keeping today's
+        # single clean number unchanged; every other scope level lands in
+        # gt_by_scope/gc_by_scope/gp_by_scope instead of being discarded.
+        elif ct == "generic_to_template" and _is_unscoped_segment(r, "a"):
+            scope = _target_scope_label(r, "b")
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
-                gt[dom].append(v)
+                gt_by_scope[dom][scope].append(v)
+                if scope == "enterprise":
+                    gt[dom].append(v)
             vu = pf(_col(r, "used_containment_a_in_b_mean"))
             if vu is not None:
-                gt_used[dom].append(vu)
+                gt_used_by_scope[dom][scope].append(vu)
+                if scope == "enterprise":
+                    gt_used[dom].append(vu)
 
-        elif ct == "generic_to_container" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+        elif ct == "generic_to_container" and _is_unscoped_segment(r, "a"):
+            scope = _target_scope_label(r, "b")
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
-                gc[dom].append(v)
+                gc_by_scope[dom][scope].append(v)
+                if scope == "enterprise":
+                    gc[dom].append(v)
             vu = pf(_col(r, "used_containment_a_in_b_mean"))
             if vu is not None:
-                gc_used[dom].append(vu)
+                gc_used_by_scope[dom][scope].append(vu)
+                if scope == "enterprise":
+                    gc_used[dom].append(vu)
 
-        elif ct == "generic_to_project" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+        elif ct == "generic_to_project" and _is_unscoped_segment(r, "a"):
+            scope = _target_scope_label(r, "b")
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
-                gp[dom].append(v)
+                gp_by_scope[dom][scope].append(v)
+                if scope == "enterprise":
+                    gp[dom].append(v)
             vu = pf(_col(r, "used_containment_a_in_b_mean"))
             if vu is not None:
-                gp_used[dom].append(vu)
+                gp_used_by_scope[dom][scope].append(vu)
+                if scope == "enterprise":
+                    gp_used[dom].append(vu)
 
         # Group 3 — scope-level fan-out (enterprise/bc/client vs. Project, and
         # enterprise vs. bc/client). A different axis than the cascade stages above;
@@ -748,6 +817,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     all_domains = (
         set(tc) | set(cp) | set(tp) | set(xc) | set(wp_all) | set(tw)
         | set(gt) | set(gc) | set(gp)
+        | set(gt_by_scope) | set(gc_by_scope) | set(gp_by_scope)
         | set(ep) | set(bp) | set(eb) | set(ec)
     )
     for dom in all_domains:
@@ -798,6 +868,16 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             "gt_used": mean_or_none(gt_used[dom]),
             "gc_used": mean_or_none(gc_used[dom]),
             "gp_used": mean_or_none(gp_used[dom]),
+            # Option C — per-target-scope-level breakdown, e.g. {"enterprise": 0.9,
+            # "client": 0.4, "client_discipline": 0.3}. "enterprise" always equals
+            # the "gt"/"gc"/"gp" value above (same source data); every other key is
+            # scoped evidence that used to be silently discarded.
+            "gt_by_scope": {s: statistics.mean(v) for s, v in gt_by_scope[dom].items() if v},
+            "gc_by_scope": {s: statistics.mean(v) for s, v in gc_by_scope[dom].items() if v},
+            "gp_by_scope": {s: statistics.mean(v) for s, v in gp_by_scope[dom].items() if v},
+            "gt_used_by_scope": {s: statistics.mean(v) for s, v in gt_used_by_scope[dom].items() if v},
+            "gc_used_by_scope": {s: statistics.mean(v) for s, v in gc_used_by_scope[dom].items() if v},
+            "gp_used_by_scope": {s: statistics.mean(v) for s, v in gp_used_by_scope[dom].items() if v},
             # Group 3 — scope-level fan-out containment. Captured only; NOT rendered,
             # tiered, or anomaly-detected in this pass — pending a future
             # business-center-section design decision (see
@@ -1082,6 +1162,33 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
             "baseline is reaching templates; the break is between templates and projects, "
             "not with the baseline content itself."
         )
+
+    # Group 2 scope-breakdown divergence (Option C) — a distinct governance question
+    # from the enterprise-only gt/gc/gp values alone: does the generic/enterprise
+    # baseline propagate as well into SCOPED (client-/bc-/discipline-specific)
+    # templates/containers/projects as it does into the single broadest one? A
+    # material gap in either direction is informative (the baseline holding at the
+    # enterprise level while eroding for specific clients/disciplines, or vice
+    # versa) and would otherwise stay invisible now that gt_by_scope/gc_by_scope/
+    # gp_by_scope capture it instead of discarding it.
+    for cascade_label, enterprise_val, by_scope in (
+        ("Generic→Template", d.get("gt"), d.get("gt_by_scope") or {}),
+        ("Generic→Container", d.get("gc"), d.get("gc_by_scope") or {}),
+        ("Generic→Project", d.get("gp"), d.get("gp_by_scope") or {}),
+    ):
+        scoped_vals = {k: v for k, v in by_scope.items() if k != "enterprise"}
+        if enterprise_val is None or not scoped_vals:
+            continue
+        scoped_mean = statistics.mean(scoped_vals.values())
+        if abs(enterprise_val - scoped_mean) >= 0.25:
+            direction = "weaker" if scoped_mean < enterprise_val else "stronger"
+            detail = ", ".join(f"{k}={pct(v)}" for k, v in sorted(scoped_vals.items()))
+            notes.append(
+                f"{cascade_label} propagation is {direction} into scoped targets than the "
+                f"enterprise-wide reading ({pct(enterprise_val)} enterprise vs. {pct(scoped_mean)} "
+                f"scoped mean — {detail}). Review whether client-/business-center-/discipline-"
+                "specific practice is diverging from or exceeding the enterprise baseline."
+            )
 
     if tc is not None and tp is not None and tp > tc + 0.25:
         notes.append(
@@ -1903,6 +2010,54 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
                 sections.append(f"**{label}:** " + " ".join(notes) + "\n")
 
     return "\n".join(sections)
+
+
+def render_generic_baseline_scope_section(cascade: dict) -> str:
+    """Render the Option C per-target-scope-level breakdown for gt/gc/gp.
+
+    The scope buckets (enterprise/client/bc/discipline and combinations) are
+    dynamic, not a small fixed set like disciplines -- a per-domain fixed-column
+    table would either explode in width or silently drop combined-dimension
+    buckets (e.g. "client_discipline"). One row per (domain, scope) instead, so
+    every bucket that actually occurred is shown without inventing new columns.
+    """
+    rows = []
+    for dom, d in cascade.items():
+        scopes = set(d.get("gt_by_scope") or {}) | set(d.get("gc_by_scope") or {}) | set(d.get("gp_by_scope") or {})
+        for scope in scopes:
+            rows.append((
+                dom, scope,
+                (d.get("gt_by_scope") or {}).get(scope),
+                (d.get("gc_by_scope") or {}).get(scope),
+                (d.get("gp_by_scope") or {}).get(scope),
+            ))
+    if not rows:
+        return ""
+
+    lines = [
+        "## Generic Baseline Propagation by Scope\n",
+        "Breaks the Generic/Enterprise Baseline → Template/Container/Project cascade "
+        "(the top rung of the Governance Cascade diagram above) down by the TARGET's "
+        "own scope level, instead of only the single broadest (enterprise-wide) "
+        "reading. **enterprise** is the same value already shown as G→Template/"
+        "G→Container/G→Project in the Domain Governance Classification table above; "
+        "the other rows are client-/business-center-/discipline-specific evidence "
+        "that a prior pass deliberately excluded from that headline number to avoid "
+        "blending distinct scope grains together, but which is real "
+        "baseline-propagation evidence in its own right.\n",
+        "| Domain | Scope | G→Template | G→Container | G→Project |",
+        "|---|---|---:|---:|---:|",
+    ]
+    for dom, scope, gt_v, gc_v, gp_v in sorted(
+        rows, key=lambda r: (DOMAIN_LABELS.get(r[0], r[0]), r[1] != "enterprise", r[1])
+    ):
+        lines.append(
+            f"| {DOMAIN_LABELS.get(dom, dom)} | {scope} "
+            f"| {fmt(gt_v)} | {fmt(gc_v)} | {fmt(gp_v)} |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
 
 def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
     """Render per-discipline within-project coherence and cascade summary."""
@@ -2757,6 +2912,11 @@ def main():
         render_header(args.date, corpus, bool(governance_state_summary), used_view_falls_back_to_legacy()),
         render_governance_state_model(bool(governance_state_summary)),
         render_domain_tiers(cascade, governance_state_summary),
+    ]
+    generic_scope_section = render_generic_baseline_scope_section(cascade)
+    if generic_scope_section:
+        sections.append(generic_scope_section)
+    sections += [
         render_discipline_section(cascade, summary_rows),
         render_client_section(client_rows),
         render_onboarding_section(client_rows),
