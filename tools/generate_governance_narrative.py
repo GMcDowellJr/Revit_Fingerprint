@@ -39,6 +39,12 @@ from datetime import date
 from pathlib import Path
 from typing import Optional
 
+# compare_cross_segment.py lives in this same directory and is side-effect-free on
+# import (its pipeline logic is gated behind `if __name__ == "__main__":`), so its
+# GOVERNANCE_STATE_DIRECTED_TYPES is imported directly rather than hand-copied --
+# see _DIRECTED_GOVERNANCE_TYPES below for why a hand-copy drifted before.
+from compare_cross_segment import GOVERNANCE_STATE_DIRECTED_TYPES
+
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +65,22 @@ def fmt(v: Optional[float], decimals: int = 3) -> str:
     if v is None:
         return "—"
     return f"{v:.{decimals}f}"
+
+
+def _warn_unrecognized_comparison_types(seen: set, known: set, context: str) -> None:
+    """Warn once, to stderr, for any comparison_type not accounted for by name.
+
+    Shared by build_cascade() and build_governance_state_summary() so an
+    unrecognized/drifted comparison_type is never silently swallowed in either
+    place -- see docs/governance_narrative_scope_gap_audit.md A1/A3.
+    """
+    unrecognized = seen - known
+    if unrecognized:
+        print(
+            f"[warn] {context}: unrecognized comparison_type value(s) not in any "
+            f"known group, excluded: {sorted(unrecognized)}",
+            file=sys.stderr,
+        )
 
 
 def read_csv(path: Path) -> list[dict]:
@@ -609,13 +631,7 @@ def build_cascade(summary_rows: list[dict]) -> dict:
         CASCADE_GROUP1_TYPES | CASCADE_GROUP2_TYPES | CASCADE_GROUP3_TYPES
         | set(CASCADE_GROUP4_EXCLUDED_TYPES.keys())
     )
-    _unrecognized_types = seen_comparison_types - _known_comparison_types
-    if _unrecognized_types:
-        print(
-            f"[warn] build_cascade: unrecognized comparison_type value(s) not in any "
-            f"known group (Group 1-4), excluded from cascade: {sorted(_unrecognized_types)}",
-            file=sys.stderr,
-        )
+    _warn_unrecognized_comparison_types(seen_comparison_types, _known_comparison_types, "build_cascade")
 
     # ── Bundle signal collection ──────────────────────────────────────────────
     # Dual-view schema (future):  all_n_shared_bundle_both / used_n_shared_bundle_both
@@ -1217,20 +1233,106 @@ _STATE_COUNT_FIELDS = {
 }
 
 
-_DIRECTED_GOVERNANCE_TYPES = {
-    "generic_to_template",
-    "generic_to_container",
-    "generic_to_project",
+
+# Synced from compare_cross_segment.py's GOVERNANCE_STATE_DIRECTED_TYPES via direct
+# import (this local copy had drifted -- missing all 4 new scope types, and carrying
+# two entries the producer's write-gate (compare_cross_segment.py:3697,
+# `if ctype in GOVERNANCE_STATE_DIRECTED_TYPES:`) confirms never reach a governance-
+# state output file today:
+#   - "parent_sibling_roles" -- governance-state rows are only ever written for the
+#     imported 10-type set; parent_sibling_roles pairs are cascade-only (Prompt 2).
+#   - "generic_to_downstream" -- appears nowhere in compare_cross_segment.py,
+#     CHANGELOG.md, DECISIONS.md, or the canonical directed-type list in
+#     docs/cross_segment_comparison.md:280. This repo's git history is a shallow
+#     clone whose earliest visible commit already contains it in this file, so its
+#     origin/intent can't be traced further from available history.
+# Per this prompt's instruction not to guess and silently drop, both are kept as a
+# defensive superset rather than removed -- flagged for Greg to confirm neither is
+# needed before deleting.
+_DIRECTED_GOVERNANCE_TYPES = GOVERNANCE_STATE_DIRECTED_TYPES | {
     "generic_to_downstream",
-    "template_to_container",
-    "template_to_project",
     "parent_sibling_roles",
-    "container_to_project",
 }
+
+# The subset of _DIRECTED_GOVERNANCE_TYPES that render_governance_state_section()
+# actually renders today -- everything EXCEPT the four new scope-level types
+# (CASCADE_GROUP3_TYPES), consistent with Prompt 2's deferred-rendering treatment of
+# the same four types in build_cascade. Used to build the domain-level merged view
+# without blending in enterprise_to_project/bc_to_project/enterprise_to_bc/
+# enterprise_to_client -- see build_governance_state_summary().
+_GOVERNANCE_STATE_RENDERED_TYPES = _DIRECTED_GOVERNANCE_TYPES - CASCADE_GROUP3_TYPES
 
 
 def _mean(values: list[float]) -> Optional[float]:
     return statistics.mean(values) if values else None
+
+
+def _merge_state_buckets(buckets: list) -> dict:
+    """Sum a list of _state_bucket()-shaped dicts into one (counts add, vals concat)."""
+    merged = _state_bucket()
+    for bucket in buckets:
+        for k, v in bucket.items():
+            if k.endswith("_vals"):
+                merged[k].extend(v)
+            else:
+                merged[k] += v
+    return merged
+
+
+def _finalize_state_bucket(bucket: dict) -> dict:
+    """Compute shares/labels from one _state_bucket()-shaped dict. Same math regardless
+    of whether `bucket` represents one comparison_type or a merge of several."""
+    ref_n = bucket["reference_all_count"]
+    tgt_used_n = bucket["target_used_count"]
+    provided_used = bucket["provided_and_used_count"]
+    provided_passive = bucket["provided_but_passive_count"]
+    provided_missing = bucket["provided_but_missing_count"]
+    local_active = bucket["local_active_count"]
+
+    # Prefer explicit summary metrics; otherwise derive from state counts.
+    provided_to_configured = _mean(bucket["provided_to_configured_vals"])
+    if provided_to_configured is None and ref_n:
+        provided_to_configured = (provided_used + provided_passive) / ref_n
+
+    provided_to_used = _mean(bucket["provided_to_used_vals"])
+    if provided_to_used is None and ref_n:
+        provided_to_used = provided_used / ref_n
+
+    provided_passive_share = _mean(bucket["provided_passive_vals"])
+    if provided_passive_share is None and ref_n:
+        provided_passive_share = provided_passive / ref_n
+
+    provided_missing_share = _mean(bucket["provided_missing_vals"])
+    if provided_missing_share is None and ref_n:
+        provided_missing_share = provided_missing / ref_n
+
+    local_active_share = _mean(bucket["local_active_vals"])
+    if local_active_share is None and tgt_used_n:
+        local_active_share = local_active / tgt_used_n
+
+    if provided_to_used is not None and provided_to_used >= 0.85:
+        primary_read = "Provided standard is actively used"
+    elif provided_passive_share is not None and provided_passive_share >= PASSIVE_MATERIAL_THRESHOLD:
+        primary_read = "Provided standard is carried but partly passive"
+    elif local_active_share is not None and local_active_share >= LOCAL_ACTIVE_MATERIAL_THRESHOLD:
+        primary_read = "Active local practice may need roll-up review"
+    elif provided_missing_share is not None and provided_missing_share >= MISSING_MATERIAL_THRESHOLD:
+        primary_read = "Provided content is missing downstream"
+    else:
+        primary_read = "State signal available; no dominant exception pattern"
+
+    return {
+        **{k: v for k, v in bucket.items() if not k.endswith("_vals")},
+        "generic_to_template": _mean(bucket["generic_to_template_vals"]),
+        "generic_to_container": _mean(bucket["generic_to_container_vals"]),
+        "generic_to_project": _mean(bucket["generic_to_project_vals"]),
+        "provided_to_configured_containment": provided_to_configured,
+        "provided_to_used_containment": provided_to_used,
+        "provided_passive_share": provided_passive_share,
+        "provided_missing_share": provided_missing_share,
+        "local_active_share": local_active_share,
+        "primary_governance_read": primary_read,
+    }
 
 
 def build_governance_state_summary(
@@ -1243,16 +1345,26 @@ def build_governance_state_summary(
     detailed per-pattern governance-state file. Column names are intentionally
     read leniently so the narrative can remain compatible with early pipeline
     revisions while the comparison output stabilises.
+
+    Aggregation is keyed by (domain, comparison_type) throughout, never by domain
+    alone -- rows for enterprise_to_project/bc_to_project/enterprise_to_bc/
+    enterprise_to_client must never be blended into the same number as
+    template_to_project/container_to_project/generic_to_*, since they measure a
+    different axis (scope level, not cascade stage). See
+    docs/governance_narrative_scope_gap_audit.md A3.
     """
-    by_domain = defaultdict(_state_bucket)
+    by_type = defaultdict(_state_bucket)  # keyed by (domain, comparison_type)
+    seen_comparison_types: set = set()
 
     # Compact summary rows, when provided, are authoritative for counts/shares.
     for row in summary_rows:
         dom = row.get("domain", "").strip()
         if not dom or dom in EXCLUDED_FROM_SCORING:
             continue
-        bucket = by_domain[dom]
         ctype = row.get("comparison_type", "").strip()
+        if ctype:
+            seen_comparison_types.add(ctype)
+        bucket = by_type[(dom, ctype)]
 
         for state, field in _STATE_COUNT_FIELDS.items():
             raw = _pick(row, field, f"{state}_n", f"n_{state}")
@@ -1283,15 +1395,19 @@ def build_governance_state_summary(
         elif ctype == "generic_to_project":
             _add_float(bucket["generic_to_project_vals"], row, "provided_to_configured_containment", "all_containment_a_in_b_mean")
 
-    # Detailed per-pattern rows fill gaps and support early-state files.
+    # Detailed per-pattern rows fill gaps and support early-state files. Kept under
+    # the same (dom, ctype) key as the compact loop so the two data sources merge
+    # coherently below rather than one being type-separated and the other not.
     for row in state_rows:
         dom = row.get("domain", "").strip()
         if not dom or dom in EXCLUDED_FROM_SCORING:
             continue
         ctype = row.get("comparison_type", "").strip()
+        if ctype:
+            seen_comparison_types.add(ctype)
         if ctype and ctype not in _DIRECTED_GOVERNANCE_TYPES:
             continue
-        bucket = by_domain[dom]
+        bucket = by_type[(dom, ctype)]
         state = row.get("state", "").strip()
         field = _STATE_COUNT_FIELDS.get(state)
         if field:
@@ -1303,60 +1419,28 @@ def build_governance_state_summary(
         if _truthy(row.get("in_target_used")):
             bucket["target_used_count"] += 1
 
-    # Finalise shares and labels.
+    _warn_unrecognized_comparison_types(
+        seen_comparison_types, _DIRECTED_GOVERNANCE_TYPES, "build_governance_state_summary"
+    )
+
+    # Finalise shares and labels: one fully-separated view per (domain, comparison_type)
+    # for inspection/future use, and one merged per-domain view -- ONLY over the types
+    # render_governance_state_section() actually renders today -- for the renderer.
+    domains = {dom for dom, _ctype in by_type}
     result = {}
-    for dom, bucket in by_domain.items():
-        ref_n = bucket["reference_all_count"]
-        tgt_used_n = bucket["target_used_count"]
-        provided_used = bucket["provided_and_used_count"]
-        provided_passive = bucket["provided_but_passive_count"]
-        provided_missing = bucket["provided_but_missing_count"]
-        local_active = bucket["local_active_count"]
+    for dom in domains:
+        by_ctype = {}
+        rendered_buckets = []
+        for (d2, ctype), bucket in by_type.items():
+            if d2 != dom:
+                continue
+            by_ctype[ctype or "(unspecified)"] = _finalize_state_bucket(bucket)
+            if not ctype or ctype in _GOVERNANCE_STATE_RENDERED_TYPES:
+                rendered_buckets.append(bucket)
 
-        # Prefer explicit summary metrics; otherwise derive from state counts.
-        provided_to_configured = _mean(bucket["provided_to_configured_vals"])
-        if provided_to_configured is None and ref_n:
-            provided_to_configured = (provided_used + provided_passive) / ref_n
-
-        provided_to_used = _mean(bucket["provided_to_used_vals"])
-        if provided_to_used is None and ref_n:
-            provided_to_used = provided_used / ref_n
-
-        provided_passive_share = _mean(bucket["provided_passive_vals"])
-        if provided_passive_share is None and ref_n:
-            provided_passive_share = provided_passive / ref_n
-
-        provided_missing_share = _mean(bucket["provided_missing_vals"])
-        if provided_missing_share is None and ref_n:
-            provided_missing_share = provided_missing / ref_n
-
-        local_active_share = _mean(bucket["local_active_vals"])
-        if local_active_share is None and tgt_used_n:
-            local_active_share = local_active / tgt_used_n
-
-        if provided_to_used is not None and provided_to_used >= 0.85:
-            primary_read = "Provided standard is actively used"
-        elif provided_passive_share is not None and provided_passive_share >= PASSIVE_MATERIAL_THRESHOLD:
-            primary_read = "Provided standard is carried but partly passive"
-        elif local_active_share is not None and local_active_share >= LOCAL_ACTIVE_MATERIAL_THRESHOLD:
-            primary_read = "Active local practice may need roll-up review"
-        elif provided_missing_share is not None and provided_missing_share >= MISSING_MATERIAL_THRESHOLD:
-            primary_read = "Provided content is missing downstream"
-        else:
-            primary_read = "State signal available; no dominant exception pattern"
-
-        result[dom] = {
-            **{k: v for k, v in bucket.items() if not k.endswith("_vals")},
-            "generic_to_template": _mean(bucket["generic_to_template_vals"]),
-            "generic_to_container": _mean(bucket["generic_to_container_vals"]),
-            "generic_to_project": _mean(bucket["generic_to_project_vals"]),
-            "provided_to_configured_containment": provided_to_configured,
-            "provided_to_used_containment": provided_to_used,
-            "provided_passive_share": provided_passive_share,
-            "provided_missing_share": provided_missing_share,
-            "local_active_share": local_active_share,
-            "primary_governance_read": primary_read,
-        }
+        merged = _finalize_state_bucket(_merge_state_buckets(rendered_buckets))
+        merged["by_comparison_type"] = by_ctype
+        result[dom] = merged
     return result
 
 
