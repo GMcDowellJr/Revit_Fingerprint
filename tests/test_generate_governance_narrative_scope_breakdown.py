@@ -20,7 +20,9 @@ from compare_cross_segment import SUMMARY_FIELDS  # noqa: E402
 from generate_governance_narrative import (  # noqa: E402
     _target_scope_label,
     build_cascade,
+    detect_anomalies,
     normalise_summary_schema,
+    render_generic_baseline_scope_section,
 )
 
 
@@ -129,3 +131,76 @@ def test_generic_side_still_gated_to_unscoped_reference():
     normalise_summary_schema(rows)
     cascade = build_cascade(rows)
     assert "ghost_domain" not in cascade
+
+
+# ---------------------------------------------------------------------------
+# Rendering / anomaly-detection for the Option C breakdown
+# ---------------------------------------------------------------------------
+
+def _generic_to_template_rows(enterprise_val, client_val, domain="arrowheads"):
+    rows = [
+        _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template",
+             governance_role_a="Generic", governance_role_b="Template",
+             comparison_type="generic_to_template", domain=domain,
+             all_containment_a_in_b_mean=str(enterprise_val), n_files_a="1", n_files_b="3"),
+    ]
+    if client_val is not None:
+        rows.append(
+            _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template|Kaiser",
+                 governance_role_a="Generic", governance_role_b="Template",
+                 client_label_b="Kaiser",
+                 comparison_type="generic_to_template", domain=domain,
+                 all_containment_a_in_b_mean=str(client_val), n_files_a="1", n_files_b="4")
+        )
+    return rows
+
+
+def test_detect_anomalies_flags_material_scope_divergence():
+    rows = _generic_to_template_rows(enterprise_val=0.90, client_val=0.40)
+    normalise_summary_schema(rows)
+    d = build_cascade(rows)["arrowheads"]
+    notes = detect_anomalies("arrowheads", d, None)
+    matches = [n for n in notes if "Generic→Template propagation is weaker into scoped targets" in n]
+    assert matches, f"expected a scope-divergence note, got: {notes}"
+    assert "90%" in matches[0] and "40%" in matches[0] and "client=40%" in matches[0]
+
+
+def test_detect_anomalies_silent_when_no_material_divergence():
+    """A small gap (< 0.25) between enterprise and scoped must not fire the note."""
+    rows = _generic_to_template_rows(enterprise_val=0.90, client_val=0.80)
+    normalise_summary_schema(rows)
+    d = build_cascade(rows)["arrowheads"]
+    notes = detect_anomalies("arrowheads", d, None)
+    assert not any("propagation is" in n and "scoped targets" in n for n in notes)
+
+
+def test_detect_anomalies_silent_when_only_enterprise_scope_exists():
+    """No scoped rows at all (only "enterprise") must not fire the divergence note --
+    there's nothing to compare against."""
+    rows = _generic_to_template_rows(enterprise_val=0.90, client_val=None)
+    normalise_summary_schema(rows)
+    d = build_cascade(rows)["arrowheads"]
+    notes = detect_anomalies("arrowheads", d, None)
+    assert not any("scoped targets" in n for n in notes)
+
+
+def test_render_generic_baseline_scope_section_includes_all_scopes():
+    rows = _generic_to_template_rows(enterprise_val=0.90, client_val=0.40)
+    normalise_summary_schema(rows)
+    cascade = build_cascade(rows)
+    section = render_generic_baseline_scope_section(cascade)
+    assert "## Generic Baseline Propagation by Scope" in section
+    assert "| Arrowheads | enterprise | 0.900 | — | — |" in section
+    assert "| Arrowheads | client | 0.400 | — | — |" in section
+
+
+def test_render_generic_baseline_scope_section_empty_when_no_data():
+    rows = [
+        _row(segment_id_a="imperial|Template", segment_id_b="imperial|Container",
+             governance_role_a="Template", governance_role_b="Container",
+             comparison_type="template_to_container", domain="arrowheads",
+             all_containment_a_in_b_mean="0.8", n_files_a="3", n_files_b="5"),
+    ]
+    normalise_summary_schema(rows)
+    cascade = build_cascade(rows)
+    assert render_generic_baseline_scope_section(cascade) == ""

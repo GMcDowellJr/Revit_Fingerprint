@@ -1163,6 +1163,33 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
             "not with the baseline content itself."
         )
 
+    # Group 2 scope-breakdown divergence (Option C) — a distinct governance question
+    # from the enterprise-only gt/gc/gp values alone: does the generic/enterprise
+    # baseline propagate as well into SCOPED (client-/bc-/discipline-specific)
+    # templates/containers/projects as it does into the single broadest one? A
+    # material gap in either direction is informative (the baseline holding at the
+    # enterprise level while eroding for specific clients/disciplines, or vice
+    # versa) and would otherwise stay invisible now that gt_by_scope/gc_by_scope/
+    # gp_by_scope capture it instead of discarding it.
+    for cascade_label, enterprise_val, by_scope in (
+        ("Generic→Template", d.get("gt"), d.get("gt_by_scope") or {}),
+        ("Generic→Container", d.get("gc"), d.get("gc_by_scope") or {}),
+        ("Generic→Project", d.get("gp"), d.get("gp_by_scope") or {}),
+    ):
+        scoped_vals = {k: v for k, v in by_scope.items() if k != "enterprise"}
+        if enterprise_val is None or not scoped_vals:
+            continue
+        scoped_mean = statistics.mean(scoped_vals.values())
+        if abs(enterprise_val - scoped_mean) >= 0.25:
+            direction = "weaker" if scoped_mean < enterprise_val else "stronger"
+            detail = ", ".join(f"{k}={pct(v)}" for k, v in sorted(scoped_vals.items()))
+            notes.append(
+                f"{cascade_label} propagation is {direction} into scoped targets than the "
+                f"enterprise-wide reading ({pct(enterprise_val)} enterprise vs. {pct(scoped_mean)} "
+                f"scoped mean — {detail}). Review whether client-/business-center-/discipline-"
+                "specific practice is diverging from or exceeding the enterprise baseline."
+            )
+
     if tc is not None and tp is not None and tp > tc + 0.25:
         notes.append(
             "Template patterns arrive in projects via direct Revit inheritance, "
@@ -1983,6 +2010,54 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
                 sections.append(f"**{label}:** " + " ".join(notes) + "\n")
 
     return "\n".join(sections)
+
+
+def render_generic_baseline_scope_section(cascade: dict) -> str:
+    """Render the Option C per-target-scope-level breakdown for gt/gc/gp.
+
+    The scope buckets (enterprise/client/bc/discipline and combinations) are
+    dynamic, not a small fixed set like disciplines -- a per-domain fixed-column
+    table would either explode in width or silently drop combined-dimension
+    buckets (e.g. "client_discipline"). One row per (domain, scope) instead, so
+    every bucket that actually occurred is shown without inventing new columns.
+    """
+    rows = []
+    for dom, d in cascade.items():
+        scopes = set(d.get("gt_by_scope") or {}) | set(d.get("gc_by_scope") or {}) | set(d.get("gp_by_scope") or {})
+        for scope in scopes:
+            rows.append((
+                dom, scope,
+                (d.get("gt_by_scope") or {}).get(scope),
+                (d.get("gc_by_scope") or {}).get(scope),
+                (d.get("gp_by_scope") or {}).get(scope),
+            ))
+    if not rows:
+        return ""
+
+    lines = [
+        "## Generic Baseline Propagation by Scope\n",
+        "Breaks the Generic/Enterprise Baseline → Template/Container/Project cascade "
+        "(the top rung of the Governance Cascade diagram above) down by the TARGET's "
+        "own scope level, instead of only the single broadest (enterprise-wide) "
+        "reading. **enterprise** is the same value already shown as G→Template/"
+        "G→Container/G→Project in the Domain Governance Classification table above; "
+        "the other rows are client-/business-center-/discipline-specific evidence "
+        "that a prior pass deliberately excluded from that headline number to avoid "
+        "blending distinct scope grains together, but which is real "
+        "baseline-propagation evidence in its own right.\n",
+        "| Domain | Scope | G→Template | G→Container | G→Project |",
+        "|---|---|---:|---:|---:|",
+    ]
+    for dom, scope, gt_v, gc_v, gp_v in sorted(
+        rows, key=lambda r: (DOMAIN_LABELS.get(r[0], r[0]), r[1] != "enterprise", r[1])
+    ):
+        lines.append(
+            f"| {DOMAIN_LABELS.get(dom, dom)} | {scope} "
+            f"| {fmt(gt_v)} | {fmt(gc_v)} | {fmt(gp_v)} |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
 
 def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
     """Render per-discipline within-project coherence and cascade summary."""
@@ -2837,6 +2912,11 @@ def main():
         render_header(args.date, corpus, bool(governance_state_summary), used_view_falls_back_to_legacy()),
         render_governance_state_model(bool(governance_state_summary)),
         render_domain_tiers(cascade, governance_state_summary),
+    ]
+    generic_scope_section = render_generic_baseline_scope_section(cascade)
+    if generic_scope_section:
+        sections.append(generic_scope_section)
+    sections += [
         render_discipline_section(cascade, summary_rows),
         render_client_section(client_rows),
         render_onboarding_section(client_rows),

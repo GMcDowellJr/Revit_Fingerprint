@@ -30,6 +30,17 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   GENERIC (reference) side of the comparison is still required to be the one
   canonical enterprise-wide Generic population.
 
+  Rendering/anomaly-detection followed as a second pass: `detect_anomalies()`
+  now flags a material (≥0.25 absolute) divergence between the enterprise
+  reading and the mean of a domain's scoped buckets, in either direction, per
+  cascade stage (Generic→Template/Container/Project); a new
+  `render_generic_baseline_scope_section()` renders one row per
+  `(domain, scope)` pair actually observed (`Domain | Scope | G→Template |
+  G→Container | G→Project`) — a fixed-column table doesn't fit here since scope
+  buckets are combinatorial (`client`, `bc`, `discipline`, `client_discipline`,
+  etc.), not a small fixed set like disciplines. The section is omitted
+  entirely when no domain has any scope-breakdown data.
+
 ### Fixed
 - `tools/generate_governance_narrative.py` read `client_label`/`discipline_label`/
   the "is this the broadest population for its role" condition by parsing
