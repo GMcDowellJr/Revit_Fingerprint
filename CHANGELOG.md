@@ -12,6 +12,102 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Fixed
+- `tools/generate_governance_narrative.py` read `client_label`/`discipline_label`/
+  the "is this the broadest population for its role" condition by parsing
+  `segment_id` positionally (`get_client()`, `get_disc()`, `is_generic()`, a
+  `"Template" in segment_id` substring check) instead of the real
+  `client_label_a/b`/`discipline_label_a/b`/`governance_role_a/b` columns that
+  already exist on `SUMMARY_FIELDS`. This silently misparsed segments whose
+  third pipe-separated part is a `business_center_label`/`collection_label`
+  rather than a client (e.g. `imperial|Template|Shared` read as
+  `client="Shared"`), and `is_generic()`'s length-2 heuristic couldn't
+  distinguish a genuine broadest-role segment from a blank-`governance_role`
+  scope rollup that also happens to produce 2 parts (e.g. `imperial|BC_2014`).
+  Replaced with direct column reads and a `_is_unscoped_segment()` helper
+  (role non-blank, `client_label`/`discipline_label` both blank). Two follow-on
+  refinements to that helper, both confirmed against real segment-manifest
+  construction: (1) `business_center_label`/`collection_label` are not yet
+  columns on `SUMMARY_FIELDS`, so a segment scoped only by one of those two
+  dimensions (e.g. `imperial|Template|BC_1234`) can slip past the column checks
+  — rejected via a structural check that any segment_id part beyond
+  `unit_system+role` must be blank once client/discipline are confirmed blank
+  via their own columns; (2) that same check initially rejected a *genuinely*
+  unscoped segment whose `client_label`/`discipline_label` dimension is
+  explicitly selected-but-blank in its key (`build_segment_manifest.py`'s
+  `_subset_to_id()` emits a literal empty token for this, e.g.
+  `imperial|Template||Shared` for a blank client alongside a real
+  `business_center_label` — see that function's own code comment), which is
+  not hidden scope data and must not cause rejection; fixed by requiring only
+  that any extra part be *empty*, not merely that there are exactly 2 parts.
+
+- `tools/generate_governance_narrative.py`'s `build_cascade()` was a bare
+  `if/elif` chain recognizing 5 of the ~16 `comparison_type` values
+  `compare_cross_segment.py` can emit, silently dropping every other row with
+  no signal that anything was excluded — including all four new scope-level
+  types (`enterprise_to_project`, `bc_to_project`, `enterprise_to_bc`,
+  `enterprise_to_client`) and the `generic_to_template`/`_container`/`_project`
+  triple that is the literal top rung of the "Governance Cascade" diagram the
+  narrative's own header already describes but never computed. Replaced with
+  an explicit dispatch naming every known type across four groups (already-
+  handled cascade stages; the newly-wired generic-to-* stage, threaded through
+  as new `gt`/`gc`/`gp` fields and rendered as new table columns; the four
+  scope-level types, captured under new `ep`/`bp`/`eb`/`ec` keys but
+  deliberately not rendered/tiered yet — a scope-level axis, not one more
+  cascade stage; and an explicit "known, deliberately excluded" registry for
+  `sibling_templates`/`sibling_containers`/`sibling_generic`/`sibling_segments`/
+  `governance_chain`, each with a verified reason) plus a coverage-check
+  warning for any comparison_type not accounted for by name in any group.
+
+- `build_governance_state_summary()`'s compact-summary loop had no
+  `comparison_type` filter on any of its count/share fields, so rows for the
+  four new scope-level types were silently averaged into the same per-domain
+  number as `template_to_project`/`container_to_project` — a scope-level axis
+  blended into a cascade-stage number with no indication it happened (traced:
+  a synthetic `bc_to_project` + `template_to_project` pair for one domain
+  produced a blended `provided_passive_share` of 0.375 pre-fix; 0.05 —
+  `template_to_project` alone — post-fix). Its detailed per-pattern loop's own
+  `_DIRECTED_GOVERNANCE_TYPES` gate was a stale hand-maintained copy of
+  `compare_cross_segment.py`'s `GOVERNANCE_STATE_DIRECTED_TYPES`, missing all
+  four new types and carrying two entries (`generic_to_downstream`,
+  `parent_sibling_roles`) confirmed to never reach a governance-state output
+  file today. Fixed by keying aggregation by `(domain, comparison_type)`
+  throughout and importing `GOVERNANCE_STATE_DIRECTED_TYPES` directly instead
+  of hand-copying it; the two unexplained legacy entries are kept rather than
+  silently dropped pending confirmation of their disposition. A domain whose
+  *entire* governance-state signal is scope-level-only is now correctly
+  omitted from the returned map rather than stored as an all-`None`-valued but
+  still-truthy dict, which had been switching its whole tier group's rendered
+  table to state-columns mode with every visible state value blank.
+
+- `DISC_KEYWORDS`/`DISC_LABELS` hardcoded a 7-discipline set that `get_disc()`
+  used as the sole vocabulary for discipline detection, and
+  `render_discipline_section()` iterated `DISC_LABELS.keys()` to decide which
+  disciplines to render a section for — so any discipline outside that set
+  (confirmed real: `lighting`, `medical_equipment`, `security`, alongside the
+  existing 7) was invisible in that section even though the underlying
+  `discipline_label_a/b` data already had it. Discipline vocabulary is now
+  computed from the data actually present (`disc_domain_wp.keys()`);
+  `DISC_LABELS` is kept only as an optional display-name override, falling
+  back to a humanized title-case render (e.g. `medical_equipment` ->
+  `"Medical Equipment"`) for anything not in the override map.
+
+- `HEALTHCARE_CLIENTS = {"Kaiser", "Sutter", "Renown", "DCMH"}` plus a
+  standalone `if client == "Intel": tier = "Non-comparable (different
+  sector)"` special case hardcoded a business fact (client sector membership)
+  that cannot be derived from the pipeline's own data into Python literals,
+  requiring a code change and redeploy for every new client. Replaced with a
+  `sector_map` lookup loaded from a new optional `client_sector.csv`
+  (`client_label,sector` columns, `--client-sector`, defaulting to
+  `policies/client_sector.csv` so existing invocations that don't pass the
+  flag still get today's classification rather than silently losing the
+  cross-client-convergence signal for every domain). An unclassified client
+  (absent from the file, or the file itself absent) is `sector = "unknown"`,
+  which now falls through to normal alignment tiering rather than being
+  treated as either "Non-comparable" (that requires an explicit, *known*
+  non-healthcare sector) or a confirmed different-sector profile in the
+  onboarding-implications text — both of those previously fired for any
+  `is_healthcare == False`, which conflated "known different sector" with "we
+  don't know."
 - `tools/compare_cross_segment.py` Mode D (`within_project`) grouped files by
   `project_label` using `.strip() or eid` — a fallback that only catches a
   truly-blank string, not a populated NA placeholder like

@@ -15,6 +15,10 @@ Optional inputs (enrich state, delta, and pattern sections when available):
   --delta                    cross_segment_delta.csv
   --run-registry             run_registry.csv          (for corpus metadata)
   --file-meta                file_metadata.csv         (for file counts by role/client/discipline)
+  --client-sector            client_sector.csv         (client_label,sector -- classifies
+                                                          cross-client convergence and
+                                                          non-comparable-sector tiering;
+                                                          absent = every client unclassified)
 
 Output:
   --out          governance_narrative_context.md  (default)
@@ -25,6 +29,7 @@ Usage:
       --pooled  cross_segment_pooled.csv \\
       [--delta  cross_segment_delta.csv] \\
       [--file-meta file_metadata.csv] \\
+      [--client-sector policies/client_sector.csv] \\
       --out governance_narrative_context.md
 """
 
@@ -38,6 +43,12 @@ from collections import defaultdict
 from datetime import date
 from pathlib import Path
 from typing import Optional
+
+# compare_cross_segment.py lives in this same directory and is side-effect-free on
+# import (its pipeline logic is gated behind `if __name__ == "__main__":`), so its
+# GOVERNANCE_STATE_DIRECTED_TYPES is imported directly rather than hand-copied --
+# see _DIRECTED_GOVERNANCE_TYPES below for why a hand-copy drifted before.
+from compare_cross_segment import GOVERNANCE_STATE_DIRECTED_TYPES
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -59,6 +70,22 @@ def fmt(v: Optional[float], decimals: int = 3) -> str:
     if v is None:
         return "—"
     return f"{v:.{decimals}f}"
+
+
+def _warn_unrecognized_comparison_types(seen: set, known: set, context: str) -> None:
+    """Warn once, to stderr, for any comparison_type not accounted for by name.
+
+    Shared by build_cascade() and build_governance_state_summary() so an
+    unrecognized/drifted comparison_type is never silently swallowed in either
+    place -- see docs/governance_narrative_scope_gap_audit.md A1/A3.
+    """
+    unrecognized = seen - known
+    if unrecognized:
+        print(
+            f"[warn] {context}: unrecognized comparison_type value(s) not in any "
+            f"known group, excluded: {sorted(unrecognized)}",
+            file=sys.stderr,
+        )
 
 
 def read_csv(path: Path) -> list[dict]:
@@ -115,9 +142,17 @@ DISC_LABELS = {
     "water": "Water",
 }
 
-DISC_KEYWORDS = set(DISC_LABELS.keys())
 
-HEALTHCARE_CLIENTS = {"Kaiser", "Sutter", "Renown", "DCMH"}
+def _disc_label(disc: str) -> str:
+    """Display name for a discipline_label value. DISC_LABELS is an optional
+    override for known disciplines' display casing/punctuation (e.g.
+    "Mechanical/Plumbing" instead of a plain title-case render) -- it is NOT the
+    source of which disciplines exist. A discipline outside DISC_LABELS still
+    renders humanely (e.g. "medical_equipment" -> "Medical Equipment") rather
+    than crashing or being silently dropped from any disc-keyed section. See
+    docs/governance_narrative_scope_gap_audit.md C7.
+    """
+    return DISC_LABELS.get(disc, disc.replace("_", " ").title())
 
 # Domains where passive inheritance is most likely to inflate all-view scores.
 # These domains are often fully inherited from templates but rarely customised.
@@ -217,24 +252,80 @@ def used_view_falls_back_to_legacy() -> bool:
 
 # ── data loading ───────────────────────────────────────────────────────────────
 
-def get_disc(seg_id: str) -> Optional[str]:
-    for part in seg_id.split("|"):
-        if part in DISC_KEYWORDS:
-            return part
-    return None
+def _is_unscoped_segment(row: dict, suffix: str) -> bool:
+    """True when a segment is the broadest (client/discipline-unscoped) population
+    for its governance role — the condition the old is_generic() tried to detect
+    via "segment_id has exactly 2 pipe-separated parts" (unit_system + role only).
+
+    A blank governance_role is NOT this condition — it is a scope rollup with no
+    role filter at all (e.g. a business-center-wide rollup like "imperial|BC_2014"),
+    which also happens to produce a 2-part segment_id and was therefore
+    misclassified as "generic" by the old part-count check. See
+    docs/governance_narrative_scope_gap_audit.md B5.
+
+    business_center_label / collection_label are not yet columns on SUMMARY_FIELDS
+    (see B6), so a row with role set and client_label/discipline_label both blank
+    could still be a business-center- or collection-scoped standard (e.g.
+    "imperial|Template|BC_1234" or "imperial|Template|collection:Shared") that
+    these three columns alone can't reveal. Once client_label/discipline_label are
+    confirmed blank, any EXTRA NON-EMPTY pipe-separated part in segment_id can only
+    have come from business_center_label/collection_label (per
+    build_segment_manifest.py's fixed field order) and must be rejected — but an
+    extra part that is itself EMPTY is not hidden data: build_segment_manifest.py's
+    _subset_to_id() emits a literal empty token for a client_label/discipline_label
+    dimension that IS selected as part of the segment's key but happens to have a
+    blank value (e.g. "imperial|Template||Shared" for a blank client_label
+    alongside a real business_center_label "Shared" -- see the comment in
+    _subset_to_id() itself), as distinct from a dimension simply absent from the
+    key (which contributes no token at all, e.g. "imperial|Template"). A segment
+    like "imperial|Generic|" (trailing blank client token, nothing else) is
+    therefore still genuinely unscoped and must not be rejected just because it
+    has more than 2 raw pipe-separated parts. This is a structural completeness
+    check on segment_id, not the positional-parsing anti-pattern removed elsewhere
+    in this file: it never reads a VALUE out of segment_id, it only confirms any
+    extra part is blank rather than a hidden scope token.
+    """
+    role = row.get(f"governance_role_{suffix}", "")
+    client = row.get(f"client_label_{suffix}", "")
+    disc = row.get(f"discipline_label_{suffix}", "")
+    if not role or client or disc:
+        return False
+    seg_id = row.get(f"segment_id_{suffix}", "")
+    if not seg_id:
+        return True
+    return all(p == "" for p in seg_id.split("|")[2:])
 
 
-def get_client(seg_id: str) -> Optional[str]:
-    parts = seg_id.split("|")
-    if len(parts) >= 3 and parts[2] not in (
-        "Template", "Container", "Project", *DISC_KEYWORDS
-    ):
-        return parts[2]
-    return None
+# Default location for the optional client_sector.csv, resolved relative to this
+# script's own directory (tools/) rather than the CWD -- so existing invocations
+# that don't pass --client-sector still pick up the shipped classification and
+# keep today's healthcare cross-client convergence signal, without requiring
+# every caller to learn a new flag. Passing --client-sector explicitly (a real
+# path or a nonexistent one) always overrides this default.
+_DEFAULT_CLIENT_SECTOR_PATH = Path(__file__).resolve().parent.parent / "policies" / "client_sector.csv"
 
 
-def is_generic(seg_id: str) -> bool:
-    return len(seg_id.split("|")) == 2
+def load_client_sectors(client_sector_rows: Optional[list[dict]]) -> dict:
+    """Build a {client_label: sector} map from an optional client_sector.csv
+    (--client-sector). Sector membership is a real business fact that cannot be
+    derived from the fingerprint pipeline's own data -- nothing in
+    segment_manifest.csv/file_metadata.csv encodes "sector" -- so it lives in an
+    editable data file instead of a Python literal. See
+    docs/governance_narrative_scope_gap_audit.md C7.
+
+    Absent input (file not supplied) returns an empty map: every client is then
+    "unknown" (not healthcare, not non-comparable) and falls through to normal
+    cross-client alignment tiering -- there is no special-cased client name.
+    """
+    if not client_sector_rows:
+        return {}
+    sector_map = {}
+    for row in client_sector_rows:
+        client = _pick(row, "client_label")
+        sector = _pick(row, "sector").strip().lower()
+        if client and sector:
+            sector_map[client] = sector
+    return sector_map
 
 
 def load_corpus_counts(
@@ -276,10 +367,10 @@ def load_corpus_counts(
         counts["total"] = counts["Template"] + counts["Container"] + counts["Project"]
         # Disciplines and clients from segment IDs
         for r in summary_rows:
-            d = get_disc(r["segment_id_a"]) or get_disc(r["segment_id_b"])
+            d = _pick(r, "discipline_label_a", "discipline_label_b")
             if d:
                 disciplines.add(d)
-            c = get_client(r["segment_id_a"]) or get_client(r["segment_id_b"])
+            c = _pick(r, "client_label_a", "client_label_b")
             if c:
                 clients.add(c)
 
@@ -288,18 +379,129 @@ def load_corpus_counts(
     return counts
 
 
-def build_cascade(summary_rows: list[dict]) -> dict:
+# ── build_cascade comparison_type coverage ──────────────────────────────────────
+# The full comparison_type vocabulary compare_cross_segment.py can emit splits into
+# four groups that need different treatment (see docs/governance_narrative_scope_gap_audit.md
+# A1). Every comparison_type value build_cascade can see must appear in exactly one
+# of these — the coverage check at the end of the main loop below warns on anything
+# that doesn't, so a future producer addition is never silently invisible again.
+
+# Group 1 — already handled by the explicit branches in the main loop; directed
+# cross-role cascade stages (Template<->Container<->Project) plus the two
+# self/peer-comparison shapes (sibling_projects -> xc, within_project -> wp_*).
+CASCADE_GROUP1_TYPES = {
+    "template_to_container", "container_to_project", "template_to_project",
+    "parent_sibling_roles", "sibling_projects", "within_project",
+}
+
+# Group 2 — one level up the cascade: Generic/Generic-Host (out-of-box Revit stock
+# content) into Template/Container/Project. This is the literal top rung of the
+# "Governance Cascade" diagram already printed in render_header() ("Generic /
+# Enterprise Baseline down-arrow [generic -> template/container/project
+# containment]") — an existing promise in the narrative's own output that was
+# never implemented before this pass.
+#
+# Scope decision (PR #350 review): compare_cross_segment.py intentionally emits
+# generic_to_template/_container/_project rows for client-/discipline-/bc-/
+# collection-scoped targets too, not only the single broadest one -- those scoped
+# rows are real baseline-propagation evidence. gt/gc/gp below deliberately keep
+# the SAME single-broadest-pair gating as tc/cp/tp anyway (both sides must pass
+# _is_unscoped_segment), matching Group 1's existing "one clean enterprise-wide
+# number" semantics and avoiding the blend-distinct-scope-grains anti-pattern
+# this audit already fixed elsewhere (A2's pool_scope filter, A3's governance-
+# state blending) -- rather than relaxing the gate and averaging enterprise-wide
+# together with client-/discipline-/bc-scoped rows into one number. Accepted
+# tradeoff: gt/gc/gp may be sparse or empty in real runs, reflecting only the one
+# broadest-vs-broadest row per domain/unit_system, if it exists.
+#
+# Deferred to a future PR: break gt/gc/gp down by target scope level (mirroring
+# wp_disc's per-discipline breakdown) so the scoped generic-to-Template/Container/
+# Project rows aren't discarded but also aren't blended into a single number. Not
+# attempted here -- it's a real design/rendering change, not a narrow bug fix.
+CASCADE_GROUP2_TYPES = {
+    "generic_to_template", "generic_to_container", "generic_to_project",
+}
+
+# Group 3 — a different axis entirely (scope level: enterprise/bc/client standards
+# vs. Project), not one more cascade stage. Captured into the `cascade` dict under
+# new keys (ep/bp/eb/ec) using the same containment-extraction pattern as Group 1/2,
+# but deliberately NOT rendered, tiered, or anomaly-detected in this pass — that is
+# a future business-center-section design decision, not an extension of this
+# bug-fix prompt.
+CASCADE_GROUP3_TYPES = {
+    "enterprise_to_project", "bc_to_project", "enterprise_to_bc", "enterprise_to_client",
+}
+
+# Group 4 — known comparison types intentionally excluded from cascade, one reason
+# each (verified against compare_cross_segment.py's actual discovery functions, not
+# guessed):
+CASCADE_GROUP4_EXCLUDED_TYPES = {
+    "sibling_templates": (
+        "Same-role peer-to-peer comparison (Template vs Template), not a cross-role "
+        "directed cascade measurement. build_cascade only extracts a peer-similarity "
+        "signal from one role today (sibling_projects -> xc, restricted to a specific "
+        "client-pair filter) and does not generalise that pattern to other roles. "
+        "Whether/how Template-vs-Template consistency should be surfaced is a design "
+        "decision, not resolved by this pass."
+    ),
+    "sibling_containers": (
+        "Same defect/reason class as sibling_templates — same-role peer comparison, "
+        "no directed-cascade analog implemented for this role either."
+    ),
+    "sibling_generic": (
+        "Same-role peer comparison among Generic/Generic-Host segments. "
+        "_comparison_role_semantics() in compare_cross_segment.py already documents "
+        "that used-view is not meaningful for these pairs (all-view is primary); no "
+        "cascade-shaped (cross-role containment) signal applies to peer-vs-peer "
+        "Generic comparisons either."
+    ),
+    "sibling_segments": (
+        "Fallback bucket (discover_sibling_segments()'s ctype default) for peer "
+        "segments whose governance_role doesn't match template/container/project/"
+        "generic. By construction these aren't role-typed the way the cascade's "
+        "role buckets are, so there's no directed-cascade slot to route them into."
+    ),
+    "governance_chain": (
+        "Reserved vocabulary token in compare_cross_segment.py's DIRECTED_TYPES — "
+        "verified (grep) that no discovery function ever actually emits the literal "
+        "string \"governance_chain\" as a comparison_type; discover_governance_chain() "
+        "itself emits concrete generic_to_*/template_to_*/container_to_project types, "
+        "not this string. Nothing to feed into cascade under this name; kept here "
+        "only so the coverage check below doesn't flag it as unrecognized."
+    ),
+}
+
+# Group 1/2 signal keys -- a domain with data in at least one of these has something
+# to tier/render. A domain whose ONLY data is Group 3 (ep/bp/eb/ec) has no cascade-
+# stage signal at all; it must stay in the `cascade` dict (captured, per Group 3's
+# contract) but must NOT reach render_domain_tiers()/the domain summary CSV, which
+# only know how to tier/render Group 1/2 fields and would otherwise show it as a
+# spurious "Insufficient Evidence" row with every visible column blank.
+_CASCADE_RENDERABLE_SIGNAL_KEYS = ("tc", "cp", "tp", "xc", "wp_all", "tw", "gt", "gc", "gp")
+
+
+def _has_renderable_cascade_signal(d: dict) -> bool:
+    return any(d.get(k) is not None for k in _CASCADE_RENDERABLE_SIGNAL_KEYS)
+
+
+def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -> dict:
     """
     Returns domain-keyed dict with cascade scores from generic segments:
       tc: template->container containment_a_in_b_mean
       cp: container->project containment_a_in_b_mean
       tp: template->project containment_a_in_b_mean
-      xc: cross-client Jaccard mean (healthcare clients)
+      xc: cross-client Jaccard mean (clients whose sector is "healthcare" per
+        sector_map — see load_client_sectors())
       wp_all: overall within-project Jaccard mean
       wp_disc: {disc: mean_jaccard}
       tw: within-template Jaccard
       wp_p10: within-project Jaccard p10 (generic segment, all roles)
       wp_p90: within-project Jaccard p90 (generic segment, all roles)
+      gt/gc/gp: generic->template/container/project containment_a_in_b_mean
+        (Group 2 — one level up the cascade from tc/cp/tp; see CASCADE_GROUP2_TYPES)
+      ep/bp/eb/ec: enterprise->project / bc->project / enterprise->bc / enterprise->client
+        containment_a_in_b_mean (Group 3 — scope-level fan-out, captured but not yet
+        rendered/tiered/anomaly-detected; see CASCADE_GROUP3_TYPES)
     """
     tc = defaultdict(list)
     cp = defaultdict(list)
@@ -319,14 +521,37 @@ def build_cascade(summary_rows: list[dict]) -> dict:
     wp_used_p10 = {}
     wp_used_p90 = {}
 
+    # Group 2 — generic->template/container/project containment (all-view + used-view)
+    gt = defaultdict(list)
+    gc = defaultdict(list)
+    gp = defaultdict(list)
+    gt_used = defaultdict(list)
+    gc_used = defaultdict(list)
+    gp_used = defaultdict(list)
+
+    # Group 3 — scope-level fan-out containment (all-view + used-view). Captured only;
+    # not rendered/tiered/anomaly-detected in this pass (see CASCADE_GROUP3_TYPES above).
+    ep = defaultdict(list)
+    bp = defaultdict(list)
+    eb = defaultdict(list)
+    ec = defaultdict(list)
+    ep_used = defaultdict(list)
+    bp_used = defaultdict(list)
+    eb_used = defaultdict(list)
+    ec_used = defaultdict(list)
+
+    seen_comparison_types: set = set()
+    sector_map = sector_map or {}
+
     for r in summary_rows:
         ct = r["comparison_type"]
         a, b = r["segment_id_a"], r["segment_id_b"]
         dom = r["domain"]
+        seen_comparison_types.add(ct)
         if dom in EXCLUDED_FROM_SCORING:
             continue
 
-        if ct == "template_to_container" and is_generic(a) and is_generic(b):
+        if ct == "template_to_container" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 tc[dom].append(v)
@@ -334,7 +559,7 @@ def build_cascade(summary_rows: list[dict]) -> dict:
             if vu is not None:
                 tc_used[dom].append(vu)
 
-        elif ct == "container_to_project" and is_generic(a) and is_generic(b):
+        elif ct == "container_to_project" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 cp[dom].append(v)
@@ -342,7 +567,7 @@ def build_cascade(summary_rows: list[dict]) -> dict:
             if vu is not None:
                 cp_used[dom].append(vu)
 
-        elif ct in ("template_to_project", "parent_sibling_roles") and is_generic(a) and is_generic(b):
+        elif ct in ("template_to_project", "parent_sibling_roles") and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 tp[dom].append(v)
@@ -351,28 +576,26 @@ def build_cascade(summary_rows: list[dict]) -> dict:
                 tp_used[dom].append(vu)
 
         elif ct == "sibling_projects":
-            pa, pb = a.split("|"), b.split("|")
-            if (
-                len(pa) == 3 and pa[2] in HEALTHCARE_CLIENTS
-                and len(pb) == 3 and pb[2] in HEALTHCARE_CLIENTS
-            ):
+            ca = _pick(r, "client_label_a")
+            cb = _pick(r, "client_label_b")
+            if sector_map.get(ca) == "healthcare" and sector_map.get(cb) == "healthcare":
                 v = pf(_col(r, "jaccard_mean"))
                 if v is not None:
                     xc[dom].append(v)
 
         elif ct == "within_project":
             v = pf(_col(r, "jaccard_mean"))
-            disc = get_disc(a) or "all"
+            disc = _pick(r, "discipline_label_a") or "all"
             if v is not None:
                 wp_disc[dom][disc].append(v)
                 wp_all[dom].append(v)
             vu = pf(_col(r, "used_jaccard_mean"))
             if vu is not None:
                 wp_used[dom].append(vu)
-            if a == b and "Template" in a and v is not None:
+            if a == b and r["governance_role_a"] == "Template" and v is not None:
                 tw[dom].append(v)
             # Capture p10/p90 for all-view and used-view from most inclusive generic segment
-            if a == b and is_generic(a):
+            if a == b and _is_unscoped_segment(r, "a"):
                 n = int(r["n_files_a"]) if r.get("n_files_a") else 0
                 if _col(r, "jaccard_p10") and _col(r, "jaccard_p90"):
                     existing_n = wp_p10.get(dom + "_n", -1)
@@ -386,6 +609,86 @@ def build_cascade(summary_rows: list[dict]) -> dict:
                         wp_used_p10[dom] = pf(_col(r, "used_jaccard_p10"))
                         wp_used_p90[dom] = pf(_col(r, "used_jaccard_p90"))
                         wp_used_p10[dom + "_n"] = n
+
+        # Group 2 — one level up the cascade from tc/cp/tp. Same extraction pattern
+        # and same broadest-segment gating as Group 1, since generic_to_* pairs can
+        # also exist at multiple scope levels (see docs/governance_narrative_scope_gap_audit.md A1).
+        elif ct == "generic_to_template" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                gt[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                gt_used[dom].append(vu)
+
+        elif ct == "generic_to_container" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                gc[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                gc_used[dom].append(vu)
+
+        elif ct == "generic_to_project" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                gp[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                gp_used[dom].append(vu)
+
+        # Group 3 — scope-level fan-out (enterprise/bc/client vs. Project, and
+        # enterprise vs. bc/client). A different axis than the cascade stages above;
+        # captured under new keys only. NOT rendered, tiered, or anomaly-detected in
+        # this pass — pending a future business-center-section design decision.
+        elif ct == "enterprise_to_project":
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                ep[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                ep_used[dom].append(vu)
+
+        elif ct == "bc_to_project":
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                bp[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                bp_used[dom].append(vu)
+
+        elif ct == "enterprise_to_bc":
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                eb[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                eb_used[dom].append(vu)
+
+        elif ct == "enterprise_to_client":
+            v = pf(_col(r, "containment_a_in_b_mean"))
+            if v is not None:
+                ec[dom].append(v)
+            vu = pf(_col(r, "used_containment_a_in_b_mean"))
+            if vu is not None:
+                ec_used[dom].append(vu)
+
+        # Group 4 — known, deliberately excluded from cascade (see
+        # CASCADE_GROUP4_EXCLUDED_TYPES above for the reason behind each).
+        elif ct in CASCADE_GROUP4_EXCLUDED_TYPES:
+            pass
+
+    # Coverage check: every comparison_type actually present in summary_rows must be
+    # accounted for by name in one of the four groups above. This is the actual fix
+    # for "future producer additions are invisible by default" (docs/
+    # governance_narrative_scope_gap_audit.md A1) — an unrecognized type is a real
+    # signal that either this dispatch or compare_cross_segment.py's vocabulary has
+    # drifted, and must not be swallowed silently the way the old bare if/elif did.
+    _known_comparison_types = (
+        CASCADE_GROUP1_TYPES | CASCADE_GROUP2_TYPES | CASCADE_GROUP3_TYPES
+        | set(CASCADE_GROUP4_EXCLUDED_TYPES.keys())
+    )
+    _warn_unrecognized_comparison_types(seen_comparison_types, _known_comparison_types, "build_cascade")
 
     # ── Bundle signal collection ──────────────────────────────────────────────
     # Dual-view schema (future):  all_n_shared_bundle_both / used_n_shared_bundle_both
@@ -405,7 +708,7 @@ def build_cascade(summary_rows: list[dict]) -> dict:
     for r in summary_rows:
         if r["comparison_type"] not in ("template_to_project", "parent_sibling_roles"):
             continue
-        if not (is_generic(r["segment_id_a"]) and is_generic(r["segment_id_b"])):
+        if not (_is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b")):
             continue
         dom = r["domain"]
         if dom in EXCLUDED_FROM_SCORING:
@@ -436,6 +739,8 @@ def build_cascade(summary_rows: list[dict]) -> dict:
     result = {}
     all_domains = (
         set(tc) | set(cp) | set(tp) | set(xc) | set(wp_all) | set(tw)
+        | set(gt) | set(gc) | set(gp)
+        | set(ep) | set(bp) | set(eb) | set(ec)
     )
     for dom in all_domains:
         bs_all = mean_or_none(bshare_all[dom])
@@ -477,6 +782,26 @@ def build_cascade(summary_rows: list[dict]) -> dict:
             "bundle_share_used": bs_used,
             "passive_indicator": pi_mean,       # primary: containment delta, fallback: bundle delta
             "passive_indicator_method": "containment" if pi_containment is not None else ("bundle" if pi_bundle is not None else "none"),
+            # Group 2 — generic->template/container/project containment (one level up
+            # the cascade from tc/cp/tp)
+            "gt": mean_or_none(gt[dom]),
+            "gc": mean_or_none(gc[dom]),
+            "gp": mean_or_none(gp[dom]),
+            "gt_used": mean_or_none(gt_used[dom]),
+            "gc_used": mean_or_none(gc_used[dom]),
+            "gp_used": mean_or_none(gp_used[dom]),
+            # Group 3 — scope-level fan-out containment. Captured only; NOT rendered,
+            # tiered, or anomaly-detected in this pass — pending a future
+            # business-center-section design decision (see
+            # docs/governance_narrative_scope_gap_audit.md A1).
+            "ep": mean_or_none(ep[dom]),
+            "bp": mean_or_none(bp[dom]),
+            "eb": mean_or_none(eb[dom]),
+            "ec": mean_or_none(ec[dom]),
+            "ep_used": mean_or_none(ep_used[dom]),
+            "bp_used": mean_or_none(bp_used[dom]),
+            "eb_used": mean_or_none(eb_used[dom]),
+            "ec_used": mean_or_none(ec_used[dom]),
         }
     return result
 
@@ -736,6 +1061,20 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
                     "to confirm patterns are actively exercised."
                 )
 
+    # Group 2 (generic->template) signal — surfaces a distinct governance question
+    # from tc/cp/tp alone: the enterprise/generic baseline successfully reached
+    # templates, but templates aren't cascading down to projects, so the break is
+    # specifically between templates and projects rather than with the baseline
+    # content itself.
+    gt = d.get("gt")
+    if gt is not None and gt >= 0.75 and tp is not None and tp < 0.55:
+        notes.append(
+            f"Generic/enterprise baseline containment into templates is strong (G→T = {pct(gt)}) "
+            f"but template-to-project propagation is weak (T→P = {pct(tp)}). The enterprise "
+            "baseline is reaching templates; the break is between templates and projects, "
+            "not with the baseline content itself."
+        )
+
     if tc is not None and tp is not None and tp > tc + 0.25:
         notes.append(
             "Template patterns arrive in projects via direct Revit inheritance, "
@@ -764,7 +1103,7 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
         )
     if "view_template" in dom:
         disc_wp = d["wp_disc"]
-        zero_discs = [DISC_LABELS.get(k, k) for k, v in disc_wp.items() if v < 0.05 and k != "all"]
+        zero_discs = [_disc_label(k) for k, v in disc_wp.items() if v < 0.05 and k != "all"]
         if zero_discs:
             notes.append(
                 f"Architecturally specific — near-zero within-project coherence for: "
@@ -787,13 +1126,42 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
 def build_client_summary(
     summary_rows: list[dict],
     pooled_rows: list[dict],
+    sector_map: Optional[dict] = None,
 ) -> list[dict]:
     """Per-client alignment summary."""
+    sector_map = sector_map or {}
+    # Client existence must not depend on which pool grain happens to have >=2
+    # siblings for that client. _emit_for_groups() in compare_cross_segment.py
+    # requires len(members) >= 2 INDEPENDENTLY per grain (parent_sibling/bc/client),
+    # so a client whose Project segments never share a common immediate parent with
+    # another sibling gets ZERO parent_sibling rows, even though it may have real
+    # bc- or client-grain pooled rows, or real summary_rows (within_project/
+    # sibling_projects) data. An earlier pool_scope filter here (meant to stop
+    # pool-relative metrics from blending three distinct pools together -- see
+    # docs/governance_narrative_scope_gap_audit.md A2) accidentally dropped such
+    # clients from the client section entirely. client_label and n_files_focal both
+    # describe the FOCAL segment itself, not the pool, so they're identical across
+    # a segment's parent_sibling/bc/client pooled rows -- there is no blending risk
+    # in reading them from every pool_scope grain. (If a genuinely pool-relative
+    # metric -- e.g. all_containment_focal_in_pool, used_containment_pool_in_focal,
+    # n_shared_join_hash -- is ever read from pooled_rows in this function, THAT
+    # read must filter by pool_scope at its own point of use; client discovery and
+    # n_files below must not.)
     all_clients = set()
     for r in pooled_rows:
-        c = get_client(r["segment_id"])
+        c = _pick(r, "client_label")
         if c and r["governance_role"] == "Project":
             all_clients.add(c)
+    for r in summary_rows:
+        if r["comparison_type"] == "within_project":
+            c = _pick(r, "client_label_a")
+            if c:
+                all_clients.add(c)
+        elif r["comparison_type"] == "sibling_projects":
+            for suffix in ("a", "b"):
+                c = _pick(r, f"client_label_{suffix}")
+                if c:
+                    all_clients.add(c)
 
     # Cross-client Jaccard
     xc_by_client = defaultdict(list)
@@ -812,19 +1180,37 @@ def build_client_summary(
     for r in summary_rows:
         if r["comparison_type"] != "within_project":
             continue
-        c = get_client(r["segment_id_a"])
+        c = _pick(r, "client_label_a")
         v = pf(_col(r, "jaccard_mean"))
         if v is not None and c:
             wp_by_client[c].append(v)
 
-    # n_files from pooled
+    # n_files from pooled — every pool_scope grain, same rationale as all_clients
+    # above: n_files_focal describes the focal segment, not the pool, so it's
+    # identical across a segment's parent_sibling/bc/client rows. Falls back to
+    # summary_rows' own n_files_a/n_files_b for clients discovered only from
+    # summary_rows above (e.g. a single-project client with no >=2-member pool
+    # grain at all) -- without this, such a client reports n_files=0 / "Low
+    # corpus confidence" despite the summary row itself carrying a real count.
     client_files = {}
     for r in pooled_rows:
-        c = get_client(r["segment_id"])
+        c = _pick(r, "client_label")
         if c and r["governance_role"] == "Project":
             nf = int(r["n_files_focal"]) if r.get("n_files_focal") else 0
             if c not in client_files or nf > client_files[c]:
                 client_files[c] = nf
+    for r in summary_rows:
+        if r["comparison_type"] == "within_project":
+            c = _pick(r, "client_label_a")
+            nf = int(r["n_files_a"]) if r.get("n_files_a") else 0
+            if c and (c not in client_files or nf > client_files[c]):
+                client_files[c] = nf
+        elif r["comparison_type"] == "sibling_projects":
+            for suffix in ("a", "b"):
+                c = _pick(r, f"client_label_{suffix}")
+                nf = int(r[f"n_files_{suffix}"]) if r.get(f"n_files_{suffix}") else 0
+                if c and (c not in client_files or nf > client_files[c]):
+                    client_files[c] = nf
 
     # Domain-level xc means
     xc_dom_by_client = defaultdict(lambda: defaultdict(list))
@@ -854,8 +1240,14 @@ def build_client_summary(
         strongest = sorted(dom_means.items(), key=lambda x: -x[1])[:3]
         weakest = sorted(dom_means.items(), key=lambda x: x[1])[:3]
 
-        # Tier from cross-client Jaccard
-        if client == "Intel":
+        # Tier from cross-client Jaccard. sector_map is external, editable data
+        # (see load_client_sectors()/--client-sector) -- a client tagged with a
+        # known, non-healthcare sector is treated as non-comparable; an
+        # unclassified client (absent from the file, or no file supplied at all)
+        # falls through to the normal alignment tiers below rather than being
+        # guessed at. See docs/governance_narrative_scope_gap_audit.md C7.
+        sector = sector_map.get(client, "unknown")
+        if sector not in ("unknown", "healthcare"):
             tier = "Non-comparable (different sector)"
         elif xc_mean is None:
             tier = "Insufficient Data"
@@ -883,7 +1275,8 @@ def build_client_summary(
             "confidence_note": conf,
             "strongest": strongest,
             "weakest": weakest,
-            "is_healthcare": client in HEALTHCARE_CLIENTS,
+            "sector": sector,
+            "is_healthcare": sector == "healthcare",
         })
 
     rows_out.sort(key=lambda r: -(r["xc_mean"] or 0))
@@ -941,20 +1334,106 @@ _STATE_COUNT_FIELDS = {
 }
 
 
-_DIRECTED_GOVERNANCE_TYPES = {
-    "generic_to_template",
-    "generic_to_container",
-    "generic_to_project",
+
+# Synced from compare_cross_segment.py's GOVERNANCE_STATE_DIRECTED_TYPES via direct
+# import (this local copy had drifted -- missing all 4 new scope types, and carrying
+# two entries the producer's write-gate (compare_cross_segment.py:3697,
+# `if ctype in GOVERNANCE_STATE_DIRECTED_TYPES:`) confirms never reach a governance-
+# state output file today:
+#   - "parent_sibling_roles" -- governance-state rows are only ever written for the
+#     imported 10-type set; parent_sibling_roles pairs are cascade-only (Prompt 2).
+#   - "generic_to_downstream" -- appears nowhere in compare_cross_segment.py,
+#     CHANGELOG.md, DECISIONS.md, or the canonical directed-type list in
+#     docs/cross_segment_comparison.md:280. This repo's git history is a shallow
+#     clone whose earliest visible commit already contains it in this file, so its
+#     origin/intent can't be traced further from available history.
+# Per this prompt's instruction not to guess and silently drop, both are kept as a
+# defensive superset rather than removed -- flagged for Greg to confirm neither is
+# needed before deleting.
+_DIRECTED_GOVERNANCE_TYPES = GOVERNANCE_STATE_DIRECTED_TYPES | {
     "generic_to_downstream",
-    "template_to_container",
-    "template_to_project",
     "parent_sibling_roles",
-    "container_to_project",
 }
+
+# The subset of _DIRECTED_GOVERNANCE_TYPES that render_governance_state_section()
+# actually renders today -- everything EXCEPT the four new scope-level types
+# (CASCADE_GROUP3_TYPES), consistent with Prompt 2's deferred-rendering treatment of
+# the same four types in build_cascade. Used to build the domain-level merged view
+# without blending in enterprise_to_project/bc_to_project/enterprise_to_bc/
+# enterprise_to_client -- see build_governance_state_summary().
+_GOVERNANCE_STATE_RENDERED_TYPES = _DIRECTED_GOVERNANCE_TYPES - CASCADE_GROUP3_TYPES
 
 
 def _mean(values: list[float]) -> Optional[float]:
     return statistics.mean(values) if values else None
+
+
+def _merge_state_buckets(buckets: list) -> dict:
+    """Sum a list of _state_bucket()-shaped dicts into one (counts add, vals concat)."""
+    merged = _state_bucket()
+    for bucket in buckets:
+        for k, v in bucket.items():
+            if k.endswith("_vals"):
+                merged[k].extend(v)
+            else:
+                merged[k] += v
+    return merged
+
+
+def _finalize_state_bucket(bucket: dict) -> dict:
+    """Compute shares/labels from one _state_bucket()-shaped dict. Same math regardless
+    of whether `bucket` represents one comparison_type or a merge of several."""
+    ref_n = bucket["reference_all_count"]
+    tgt_used_n = bucket["target_used_count"]
+    provided_used = bucket["provided_and_used_count"]
+    provided_passive = bucket["provided_but_passive_count"]
+    provided_missing = bucket["provided_but_missing_count"]
+    local_active = bucket["local_active_count"]
+
+    # Prefer explicit summary metrics; otherwise derive from state counts.
+    provided_to_configured = _mean(bucket["provided_to_configured_vals"])
+    if provided_to_configured is None and ref_n:
+        provided_to_configured = (provided_used + provided_passive) / ref_n
+
+    provided_to_used = _mean(bucket["provided_to_used_vals"])
+    if provided_to_used is None and ref_n:
+        provided_to_used = provided_used / ref_n
+
+    provided_passive_share = _mean(bucket["provided_passive_vals"])
+    if provided_passive_share is None and ref_n:
+        provided_passive_share = provided_passive / ref_n
+
+    provided_missing_share = _mean(bucket["provided_missing_vals"])
+    if provided_missing_share is None and ref_n:
+        provided_missing_share = provided_missing / ref_n
+
+    local_active_share = _mean(bucket["local_active_vals"])
+    if local_active_share is None and tgt_used_n:
+        local_active_share = local_active / tgt_used_n
+
+    if provided_to_used is not None and provided_to_used >= 0.85:
+        primary_read = "Provided standard is actively used"
+    elif provided_passive_share is not None and provided_passive_share >= PASSIVE_MATERIAL_THRESHOLD:
+        primary_read = "Provided standard is carried but partly passive"
+    elif local_active_share is not None and local_active_share >= LOCAL_ACTIVE_MATERIAL_THRESHOLD:
+        primary_read = "Active local practice may need roll-up review"
+    elif provided_missing_share is not None and provided_missing_share >= MISSING_MATERIAL_THRESHOLD:
+        primary_read = "Provided content is missing downstream"
+    else:
+        primary_read = "State signal available; no dominant exception pattern"
+
+    return {
+        **{k: v for k, v in bucket.items() if not k.endswith("_vals")},
+        "generic_to_template": _mean(bucket["generic_to_template_vals"]),
+        "generic_to_container": _mean(bucket["generic_to_container_vals"]),
+        "generic_to_project": _mean(bucket["generic_to_project_vals"]),
+        "provided_to_configured_containment": provided_to_configured,
+        "provided_to_used_containment": provided_to_used,
+        "provided_passive_share": provided_passive_share,
+        "provided_missing_share": provided_missing_share,
+        "local_active_share": local_active_share,
+        "primary_governance_read": primary_read,
+    }
 
 
 def build_governance_state_summary(
@@ -967,16 +1446,26 @@ def build_governance_state_summary(
     detailed per-pattern governance-state file. Column names are intentionally
     read leniently so the narrative can remain compatible with early pipeline
     revisions while the comparison output stabilises.
+
+    Aggregation is keyed by (domain, comparison_type) throughout, never by domain
+    alone -- rows for enterprise_to_project/bc_to_project/enterprise_to_bc/
+    enterprise_to_client must never be blended into the same number as
+    template_to_project/container_to_project/generic_to_*, since they measure a
+    different axis (scope level, not cascade stage). See
+    docs/governance_narrative_scope_gap_audit.md A3.
     """
-    by_domain = defaultdict(_state_bucket)
+    by_type = defaultdict(_state_bucket)  # keyed by (domain, comparison_type)
+    seen_comparison_types: set = set()
 
     # Compact summary rows, when provided, are authoritative for counts/shares.
     for row in summary_rows:
         dom = row.get("domain", "").strip()
         if not dom or dom in EXCLUDED_FROM_SCORING:
             continue
-        bucket = by_domain[dom]
         ctype = row.get("comparison_type", "").strip()
+        if ctype:
+            seen_comparison_types.add(ctype)
+        bucket = by_type[(dom, ctype)]
 
         for state, field in _STATE_COUNT_FIELDS.items():
             raw = _pick(row, field, f"{state}_n", f"n_{state}")
@@ -1007,15 +1496,19 @@ def build_governance_state_summary(
         elif ctype == "generic_to_project":
             _add_float(bucket["generic_to_project_vals"], row, "provided_to_configured_containment", "all_containment_a_in_b_mean")
 
-    # Detailed per-pattern rows fill gaps and support early-state files.
+    # Detailed per-pattern rows fill gaps and support early-state files. Kept under
+    # the same (dom, ctype) key as the compact loop so the two data sources merge
+    # coherently below rather than one being type-separated and the other not.
     for row in state_rows:
         dom = row.get("domain", "").strip()
         if not dom or dom in EXCLUDED_FROM_SCORING:
             continue
         ctype = row.get("comparison_type", "").strip()
+        if ctype:
+            seen_comparison_types.add(ctype)
         if ctype and ctype not in _DIRECTED_GOVERNANCE_TYPES:
             continue
-        bucket = by_domain[dom]
+        bucket = by_type[(dom, ctype)]
         state = row.get("state", "").strip()
         field = _STATE_COUNT_FIELDS.get(state)
         if field:
@@ -1027,60 +1520,42 @@ def build_governance_state_summary(
         if _truthy(row.get("in_target_used")):
             bucket["target_used_count"] += 1
 
-    # Finalise shares and labels.
+    _warn_unrecognized_comparison_types(
+        seen_comparison_types, _DIRECTED_GOVERNANCE_TYPES, "build_governance_state_summary"
+    )
+
+    # Finalise shares and labels: one fully-separated view per (domain, comparison_type)
+    # for inspection/future use, and one merged per-domain view -- ONLY over the types
+    # render_governance_state_section() actually renders today -- for the renderer.
+    domains = {dom for dom, _ctype in by_type}
     result = {}
-    for dom, bucket in by_domain.items():
-        ref_n = bucket["reference_all_count"]
-        tgt_used_n = bucket["target_used_count"]
-        provided_used = bucket["provided_and_used_count"]
-        provided_passive = bucket["provided_but_passive_count"]
-        provided_missing = bucket["provided_but_missing_count"]
-        local_active = bucket["local_active_count"]
+    for dom in domains:
+        by_ctype = {}
+        rendered_buckets = []
+        for (d2, ctype), bucket in by_type.items():
+            if d2 != dom:
+                continue
+            by_ctype[ctype or "(unspecified)"] = _finalize_state_bucket(bucket)
+            if not ctype or ctype in _GOVERNANCE_STATE_RENDERED_TYPES:
+                rendered_buckets.append(bucket)
 
-        # Prefer explicit summary metrics; otherwise derive from state counts.
-        provided_to_configured = _mean(bucket["provided_to_configured_vals"])
-        if provided_to_configured is None and ref_n:
-            provided_to_configured = (provided_used + provided_passive) / ref_n
-
-        provided_to_used = _mean(bucket["provided_to_used_vals"])
-        if provided_to_used is None and ref_n:
-            provided_to_used = provided_used / ref_n
-
-        provided_passive_share = _mean(bucket["provided_passive_vals"])
-        if provided_passive_share is None and ref_n:
-            provided_passive_share = provided_passive / ref_n
-
-        provided_missing_share = _mean(bucket["provided_missing_vals"])
-        if provided_missing_share is None and ref_n:
-            provided_missing_share = provided_missing / ref_n
-
-        local_active_share = _mean(bucket["local_active_vals"])
-        if local_active_share is None and tgt_used_n:
-            local_active_share = local_active / tgt_used_n
-
-        if provided_to_used is not None and provided_to_used >= 0.85:
-            primary_read = "Provided standard is actively used"
-        elif provided_passive_share is not None and provided_passive_share >= PASSIVE_MATERIAL_THRESHOLD:
-            primary_read = "Provided standard is carried but partly passive"
-        elif local_active_share is not None and local_active_share >= LOCAL_ACTIVE_MATERIAL_THRESHOLD:
-            primary_read = "Active local practice may need roll-up review"
-        elif provided_missing_share is not None and provided_missing_share >= MISSING_MATERIAL_THRESHOLD:
-            primary_read = "Provided content is missing downstream"
-        else:
-            primary_read = "State signal available; no dominant exception pattern"
-
-        result[dom] = {
-            **{k: v for k, v in bucket.items() if not k.endswith("_vals")},
-            "generic_to_template": _mean(bucket["generic_to_template_vals"]),
-            "generic_to_container": _mean(bucket["generic_to_container_vals"]),
-            "generic_to_project": _mean(bucket["generic_to_project_vals"]),
-            "provided_to_configured_containment": provided_to_configured,
-            "provided_to_used_containment": provided_to_used,
-            "provided_passive_share": provided_passive_share,
-            "provided_missing_share": provided_missing_share,
-            "local_active_share": local_active_share,
-            "primary_governance_read": primary_read,
-        }
+        if not rendered_buckets:
+            # This domain's ENTIRE governance-state signal is Group 3 (scope-level
+            # fan-out) rows -- deferred, not rendered (see CASCADE_GROUP3_TYPES).
+            # Omit it from the returned map entirely rather than storing an
+            # all-None-but-truthy dict: render_domain_tiers()'s has_state check
+            # (`any(state for _, _, state in group)`) treats ANY non-None dict as
+            # "this tier group has state data" regardless of its values, which
+            # would switch the WHOLE tier group's table to state columns -- hiding
+            # bundle/passive columns for every domain in that group while showing
+            # blank state values for this one. state_summary.get(dom) returning
+            # None here is what every downstream consumer (assign_tier,
+            # detect_anomalies, render_domain_tiers, the CSV writer) already
+            # expects for "no governance-state input."
+            continue
+        merged = _finalize_state_bucket(_merge_state_buckets(rendered_buckets))
+        merged["by_comparison_type"] = by_ctype
+        result[dom] = merged
     return result
 
 
@@ -1119,7 +1594,7 @@ def load_delta_summary(delta_rows: list[dict]) -> dict:
 def render_header(analysis_date: str, corpus: dict, has_state_outputs: bool, legacy_used_fallback: bool) -> str:
     n_disc = len(corpus.get("disciplines", set()))
     disc_list = ", ".join(
-        DISC_LABELS.get(d, d)
+        _disc_label(d)
         for d in sorted(corpus.get("disciplines", set()))
     ) or "Unknown"
     client_list = ", ".join(sorted(corpus.get("clients", set()))) or "Unknown"
@@ -1264,6 +1739,10 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
     state_summary = state_summary or {}
     scored = []
     for dom, d in cascade.items():
+        if not _has_renderable_cascade_signal(d):
+            # Scope-only domain (Group 3 fan-out data only) -- captured in
+            # `cascade` but not yet tiered/rendered. See CASCADE_GROUP3_TYPES.
+            continue
         state = state_summary.get(dom)
         tier = assign_tier(d, state)
         primary = d["tp"] if d["tp"] is not None else d["cp"]
@@ -1346,14 +1825,14 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
         has_state = any(state for _, _, state in group)
         if has_state:
             sections.append(
-                "| Domain | T→Container | T→Project | C→Project | Cross-Client | Reliability | Provided→Used | Local Active | Passive | Missing |"
+                "| Domain | G→Template | G→Container | G→Project | T→Container | T→Project | C→Project | Cross-Client | Reliability | Provided→Used | Local Active | Passive | Missing |"
             )
-            sections.append("|---|---:|---:|---:|---:|---|---:|---:|---:|---:|")
+            sections.append("|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|")
         else:
             sections.append(
-                "| Domain | T→Container | T→Project | C→Project | Cross-Client | Reliability | Bundle Density | Passive Inherit. |"
+                "| Domain | G→Template | G→Container | G→Project | T→Container | T→Project | C→Project | Cross-Client | Reliability | Bundle Density | Passive Inherit. |"
             )
-            sections.append("|---|---:|---:|---:|---:|---|---:|---:|")
+            sections.append("|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|")
 
         for dom, d, state in group:
             label = DOMAIN_LABELS.get(dom, dom)
@@ -1363,6 +1842,9 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
                 state = state or {}
                 row = (
                     f"| {label}{pi_flag} "
+                    f"| {fmt(d.get('gt'))} "
+                    f"| {fmt(d.get('gc'))} "
+                    f"| {fmt(d.get('gp'))} "
                     f"| {fmt(d['tc'])} "
                     f"| {fmt(d['tp'])} "
                     f"| {fmt(d['cp'])} "
@@ -1376,6 +1858,9 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
             else:
                 row = (
                     f"| {label}{pi_flag} "
+                    f"| {fmt(d.get('gt'))} "
+                    f"| {fmt(d.get('gc'))} "
+                    f"| {fmt(d.get('gp'))} "
                     f"| {fmt(d['tc'])} "
                     f"| {fmt(d['tp'])} "
                     f"| {fmt(d['cp'])} "
@@ -1406,7 +1891,7 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
     for r in summary_rows:
         if r["comparison_type"] != "within_project":
             continue
-        disc = get_disc(r["segment_id_a"])
+        disc = _pick(r, "discipline_label_a")
         v = pf(_col(r, "jaccard_mean"))
         if disc and v is not None:
             disc_domain_wp[disc][r["domain"]].append(v)
@@ -1416,13 +1901,12 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
     # Has-template flag
     template_discs = set()
     for r in summary_rows:
-        if "Template" in r["segment_id_a"] and get_disc(r["segment_id_a"]):
-            template_discs.add(get_disc(r["segment_id_a"]))
+        disc = _pick(r, "discipline_label_a")
+        if r["governance_role_a"] == "Template" and disc:
+            template_discs.add(disc)
 
-    for disc in sorted(DISC_LABELS.keys()):
-        if disc not in disc_domain_wp:
-            continue
-        label = DISC_LABELS[disc]
+    for disc in sorted(disc_domain_wp.keys()):
+        label = _disc_label(disc)
         n_files = disc_file_counts.get(disc, "?")
         has_template = disc in template_discs
 
@@ -1503,7 +1987,12 @@ def _client_onboarding_profile(r: dict) -> dict:
     common_base = _format_domain_items(r.get("strongest", []))
     variant_burden = _format_domain_items(r.get("weakest", []))
 
-    if not r.get("is_healthcare", True):
+    # Only a client with a KNOWN non-healthcare sector gets the different-sector
+    # implication -- an unclassified client (sector == "unknown") must not be
+    # treated as confirmed non-healthcare, since is_healthcare=False alone can't
+    # distinguish "known different sector" from "we don't know."
+    sector = r.get("sector", "unknown")
+    if sector not in ("unknown", "healthcare"):
         operating_implication = (
             "Do not use healthcare baseline assumptions as the default. Treat this as a separate sector profile."
         )
@@ -1616,7 +2105,9 @@ def render_client_section(client_rows: list[dict]) -> str:
                 f"{DOMAIN_LABELS.get(d, d)} ({pct(v)})" for d, v in r["weakest"]
             )
             lines.append(f"Weakest alignment domains: {weak_str}.\n")
-        if not r["is_healthcare"]:
+        # Only note a different sector when it's actually KNOWN (not "unknown") --
+        # an unclassified client must not be presented as confirmed non-healthcare.
+        if r.get("sector", "unknown") not in ("unknown", "healthcare"):
             lines.append(
                 "_Non-healthcare sector — configuration baseline differs from healthcare "
                 "client comparisons. Excluded from healthcare cross-client convergence reads._\n"
@@ -2023,6 +2514,14 @@ def main():
     parser.add_argument("--governance-state-summary", help="cross_segment_governance_state_summary.csv (optional)")
     parser.add_argument("--delta", help="cross_segment_delta.csv (optional legacy fallback)")
     parser.add_argument("--file-meta", help="file_metadata.csv (optional)")
+    parser.add_argument("--client-sector", default=str(_DEFAULT_CLIENT_SECTOR_PATH),
+                        help="client_sector.csv (client_label,sector columns — classifies "
+                             "cross-client convergence and non-comparable-sector tiering). "
+                             f"Defaults to {_DEFAULT_CLIENT_SECTOR_PATH} if present, so existing "
+                             "invocations keep today's healthcare cross-client convergence "
+                             "signal without needing to pass this flag. Pass an explicit path "
+                             "to override, or a nonexistent path to run with every client "
+                             "unclassified.")
     parser.add_argument("--union-inventory",
                         help="cross_segment_union_inventory.csv (optional)")
     parser.add_argument("--reuse-distribution",
@@ -2059,6 +2558,15 @@ def main():
         print(f"Loading {args.file_meta}...")
         file_meta_rows = read_csv(Path(args.file_meta))
 
+    client_sector_rows = []
+    if args.client_sector and Path(args.client_sector).exists():
+        print(f"Loading {args.client_sector}...")
+        client_sector_rows = read_csv(Path(args.client_sector))
+    elif args.client_sector:
+        print(f"[warn] {args.client_sector} not found — every client will be treated as "
+              f"unclassified (no sector). Pass --client-sector explicitly to silence this "
+              f"if that's intended.", file=sys.stderr)
+
     union_inventory_rows = []
     if args.union_inventory:
         print(f"Loading {args.union_inventory}...")
@@ -2074,15 +2582,17 @@ def main():
         print(f"Loading {args.matrix_manifest}...")
         matrix_manifest_rows = read_csv(Path(args.matrix_manifest))
 
+    sector_map = load_client_sectors(client_sector_rows)
+
     normalise_summary_schema(summary_rows)
     print("Computing cascade scores...")
-    cascade = build_cascade(summary_rows)
+    cascade = build_cascade(summary_rows, sector_map)
 
     print("Computing corpus counts...")
     corpus = load_corpus_counts(summary_rows, file_meta_rows)
 
     print("Building client summary...")
-    client_rows = build_client_summary(summary_rows, pooled_rows)
+    client_rows = build_client_summary(summary_rows, pooled_rows, sector_map)
 
     print("Building governance state summary...")
     governance_state_summary = build_governance_state_summary(
@@ -2111,6 +2621,10 @@ def main():
 
     domain_csv_rows = []
     for dom, d in sorted(cascade.items()):
+        if not _has_renderable_cascade_signal(d):
+            # Scope-only domain (Group 3 fan-out data only) -- captured in
+            # `cascade` but not yet tiered/rendered. See CASCADE_GROUP3_TYPES.
+            continue
         tier = assign_tier(d, governance_state_summary.get(dom))
         reliability = score_reliability(d)
         anomalies = detect_anomalies(dom, d, governance_state_summary.get(dom))
@@ -2119,6 +2633,14 @@ def main():
             "domain_label": DOMAIN_LABELS.get(dom, dom),
             "governance_tier": tier,
             "score_reliability": reliability,
+            # Cascade-computed generic->template/container/project (Group 2), sourced
+            # from the always-required cross_segment_summary.csv -- distinct from the
+            # optional-governance-state-summary-sourced "generic_to_template"/etc.
+            # columns below, which are blank when --governance-state-summary isn't
+            # supplied. These cascade columns are populated regardless.
+            "cascade_generic_to_template": fmt(d.get("gt")),
+            "cascade_generic_to_container": fmt(d.get("gc")),
+            "cascade_generic_to_project": fmt(d.get("gp")),
             "template_to_container": fmt(d["tc"]),
             "container_to_project": fmt(d["cp"]),
             "template_to_project": fmt(d["tp"]),
