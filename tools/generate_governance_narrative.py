@@ -268,12 +268,22 @@ def _is_unscoped_segment(row: dict, suffix: str) -> bool:
     could still be a business-center- or collection-scoped standard (e.g.
     "imperial|Template|BC_1234" or "imperial|Template|collection:Shared") that
     these three columns alone can't reveal. Once client_label/discipline_label are
-    confirmed blank, segment_id can only have gained extra pipe-separated parts
-    from business_center_label/collection_label (per build_segment_manifest.py's
-    fixed field order) — so a plain part-count check against segment_id at that
-    point is a structural completeness check, not the positional-parsing anti-
-    pattern removed elsewhere in this file: it never reads a value out of
-    segment_id, it only confirms nothing beyond unit_system+role snuck in.
+    confirmed blank, any EXTRA NON-EMPTY pipe-separated part in segment_id can only
+    have come from business_center_label/collection_label (per
+    build_segment_manifest.py's fixed field order) and must be rejected — but an
+    extra part that is itself EMPTY is not hidden data: build_segment_manifest.py's
+    _subset_to_id() emits a literal empty token for a client_label/discipline_label
+    dimension that IS selected as part of the segment's key but happens to have a
+    blank value (e.g. "imperial|Template||Shared" for a blank client_label
+    alongside a real business_center_label "Shared" -- see the comment in
+    _subset_to_id() itself), as distinct from a dimension simply absent from the
+    key (which contributes no token at all, e.g. "imperial|Template"). A segment
+    like "imperial|Generic|" (trailing blank client token, nothing else) is
+    therefore still genuinely unscoped and must not be rejected just because it
+    has more than 2 raw pipe-separated parts. This is a structural completeness
+    check on segment_id, not the positional-parsing anti-pattern removed elsewhere
+    in this file: it never reads a VALUE out of segment_id, it only confirms any
+    extra part is blank rather than a hidden scope token.
     """
     role = row.get(f"governance_role_{suffix}", "")
     client = row.get(f"client_label_{suffix}", "")
@@ -281,7 +291,9 @@ def _is_unscoped_segment(row: dict, suffix: str) -> bool:
     if not role or client or disc:
         return False
     seg_id = row.get(f"segment_id_{suffix}", "")
-    return len(seg_id.split("|")) == 2 if seg_id else True
+    if not seg_id:
+        return True
+    return all(p == "" for p in seg_id.split("|")[2:])
 
 
 def load_client_sectors(client_sector_rows: Optional[list[dict]]) -> dict:
