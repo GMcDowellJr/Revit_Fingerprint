@@ -12,14 +12,21 @@ Output:
 Processing:
   - For each (edge_id_a, edge_id_b) edge pair appearing in
     cross_domain_patterns.csv, derive a governance_question_hint from the
-    target domains touched by the pair:
+    source/target domains touched by the pair:
       both target domains == "arrowheads"          -> arrowhead_consistency
+      both source domains == "view_filter_definitions" -> view_filter_strategy
       target domain containing "wall_types"        -> wall_graphics
       target domain starting with "fill_patterns"  -> fill_pattern_usage
       target domain == "line_patterns"             -> line_pattern_usage
       target domain == "view_filter_definitions"   -> view_filter_strategy
       otherwise                                     -> unknown
-    (checked against both target domains in the pair, in that priority order)
+    (checked in that priority order; the source_domain check exists because
+    dynamic VFD edges carry source_domain == "view_filter_definitions" but
+    target_domain == the element-type domain the filter scopes to, e.g.
+    "wall_types"/"ceiling_types"/"floor_types"/"roof_types" -- without this
+    check, VFD-to-VFD pairs targeting wall_types collide with the
+    wall_graphics rule, and VFD-to-VFD pairs targeting ceiling/floor/roof
+    types match none of the target-domain predicates and fall to "unknown")
   - Patterns sharing the same (governance_question_hint, edge_id_a, edge_id_b)
     are clustered into one candidate archetype definition.
   - Each candidate gets archetype_id containing a "CANDIDATE" marker,
@@ -97,9 +104,16 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _governance_question_hint(target_domain_a: str, target_domain_b: str) -> str:
+def _governance_question_hint(
+    target_domain_a: str,
+    target_domain_b: str,
+    source_domain_a: str = "",
+    source_domain_b: str = "",
+) -> str:
     if target_domain_a == "arrowheads" and target_domain_b == "arrowheads":
         return "arrowhead_consistency"
+    if source_domain_a == "view_filter_definitions" and source_domain_b == "view_filter_definitions":
+        return "view_filter_strategy"
     for hint, predicate in _HINT_PRIORITY:
         if predicate(target_domain_a) or predicate(target_domain_b):
             return hint
@@ -211,7 +225,9 @@ def main() -> int:
 
         target_domain_a = edge_a.get("target_domain", "")
         target_domain_b = edge_b.get("target_domain", "")
-        hint = _governance_question_hint(target_domain_a, target_domain_b)
+        source_domain_a = edge_a.get("source_domain", "")
+        source_domain_b = edge_b.get("source_domain", "")
+        hint = _governance_question_hint(target_domain_a, target_domain_b, source_domain_a, source_domain_b)
 
         archetype_id = f"CANDIDATE__{hint}__{slugify(edge_id_a)}__{slugify(edge_id_b)}"
 
