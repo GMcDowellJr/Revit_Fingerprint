@@ -12,14 +12,27 @@ Output:
 Processing:
   - For each (edge_id_a, edge_id_b) edge pair appearing in
     cross_domain_patterns.csv, derive a governance_question_hint from the
-    target domains touched by the pair:
+    source/target domains touched by the pair:
       both target domains == "arrowheads"          -> arrowhead_consistency
+      both edges VFD-related (see below)           -> view_filter_strategy
       target domain containing "wall_types"        -> wall_graphics
       target domain starting with "fill_patterns"  -> fill_pattern_usage
       target domain == "line_patterns"             -> line_pattern_usage
       target domain == "view_filter_definitions"   -> view_filter_strategy
       otherwise                                     -> unknown
-    (checked against both target domains in the pair, in that priority order)
+    (checked in that priority order)
+    An edge is "VFD-related" if its source_domain == "view_filter_definitions"
+    (a dynamic VFD edge, whose target_domain is the element-type domain the
+    filter scopes to, e.g. "wall_types"/"ceiling_types"/"floor_types"/
+    "roof_types") or its target_domain == "view_filter_definitions" (the
+    static view_filter_applications_view_templates.stack_filter chain edge).
+    Without this pre-check, a VFD-to-VFD pair targeting wall_types collides
+    with the wall_graphics rule, a VFD-to-VFD pair targeting ceiling/floor/
+    roof types matches none of the target-domain predicates and falls to
+    "unknown", and a VFD edge paired with the stack_filter chain edge also
+    collides with wall_graphics/fill_pattern_usage/line_pattern_usage --
+    see archetype_dp1_prompt.md's known-misfire list, which covers all three
+    shapes.
   - Patterns sharing the same (governance_question_hint, edge_id_a, edge_id_b)
     are clustered into one candidate archetype definition.
   - Each candidate gets archetype_id containing a "CANDIDATE" marker,
@@ -97,9 +110,23 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _governance_question_hint(target_domain_a: str, target_domain_b: str) -> str:
+def _is_vfd_related(source_domain: str, target_domain: str) -> bool:
+    """True for a dynamic VFD edge (source == view_filter_definitions) or the
+    static view_filter_applications_view_templates.stack_filter chain edge
+    (target == view_filter_definitions)."""
+    return source_domain == "view_filter_definitions" or target_domain == "view_filter_definitions"
+
+
+def _governance_question_hint(
+    target_domain_a: str,
+    target_domain_b: str,
+    source_domain_a: str = "",
+    source_domain_b: str = "",
+) -> str:
     if target_domain_a == "arrowheads" and target_domain_b == "arrowheads":
         return "arrowhead_consistency"
+    if _is_vfd_related(source_domain_a, target_domain_a) and _is_vfd_related(source_domain_b, target_domain_b):
+        return "view_filter_strategy"
     for hint, predicate in _HINT_PRIORITY:
         if predicate(target_domain_a) or predicate(target_domain_b):
             return hint
@@ -211,7 +238,9 @@ def main() -> int:
 
         target_domain_a = edge_a.get("target_domain", "")
         target_domain_b = edge_b.get("target_domain", "")
-        hint = _governance_question_hint(target_domain_a, target_domain_b)
+        source_domain_a = edge_a.get("source_domain", "")
+        source_domain_b = edge_b.get("source_domain", "")
+        hint = _governance_question_hint(target_domain_a, target_domain_b, source_domain_a, source_domain_b)
 
         archetype_id = f"CANDIDATE__{hint}__{slugify(edge_id_a)}__{slugify(edge_id_b)}"
 
