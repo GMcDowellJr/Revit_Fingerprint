@@ -3613,14 +3613,17 @@ def main() -> int:
     n_skipped = 0
     completed_work_items: List[Tuple[str, str, str, str]] = []
 
-    # cross_segment_file_pairs.csv is written incrementally as work items complete
-    # rather than accumulated in memory — one row per matched file pair within a
-    # domain comparison, easily millions of rows for a large corpus, which was the
-    # dominant driver of multi-GB peak memory when held in a single Python list for
-    # the whole run. Streamed rows land in worker-completion order rather than the
-    # fully sorted order sort_pair_detail_rows() used to produce; nothing downstream
-    # depends on that ordering, so this trades a "nice to skim" property for a large
-    # cut in peak memory and gets partial output on disk before the run finishes.
+    # cross_segment_file_pairs.csv rows are streamed to a temp file as work items
+    # complete rather than accumulated in memory — one row per matched file pair
+    # within a domain comparison, easily millions of rows for a large corpus, which
+    # was the dominant driver of multi-GB peak memory when held in a single Python
+    # list for the whole run. Streamed rows land in worker-completion order rather
+    # than the fully sorted order sort_pair_detail_rows() used to produce; nothing
+    # downstream depends on that ordering. The temp file is only published (atomic
+    # rename) later, in the "Write outputs" section below, alongside the other
+    # outputs — not here — so a failure in the pooled/union/reuse/matrix steps
+    # between here and there leaves the previous run's file untouched rather than
+    # publishing a new pairs file paired with stale companion outputs.
     out_dir.mkdir(parents=True, exist_ok=True)
     pair_detail_tmp = NamedTemporaryFile(
         "w", encoding="utf-8", newline="", delete=False,
@@ -3800,19 +3803,14 @@ def main() -> int:
         flush=True,
     )
 
-    # Finalize the streamed cross_segment_file_pairs.csv: atomic rename on success
-    # (rows are in worker-completion order, not sort_pair_detail_rows() order — see
-    # comment at pair_detail_tmp above), or discard the temp file if nothing was
-    # written so no empty/header-only file appears when there were no pairs.
+    # Rows for cross_segment_file_pairs.csv are fully streamed to the temp file at
+    # this point, but the rename into place is deferred to the "Write outputs"
+    # section below (after pooled/union/reuse/matrix computation and the registry
+    # write) rather than published here. Publishing immediately would let this one
+    # file jump ahead to reflect the new run while comparison_registry.csv and the
+    # other outputs still reflect the old run, if any later step below raises —
+    # breaking the previous all-or-nothing guarantee across the output set.
     pair_detail_tmp.close()
-    if pair_detail_row_count:
-        pair_detail_tmp_path.replace(out_dir / "cross_segment_file_pairs.csv")
-        print(
-            f"[compare] wrote {pair_detail_row_count} rows (streamed, unsorted) → "
-            f"{out_dir / 'cross_segment_file_pairs.csv'}"
-        )
-    else:
-        pair_detail_tmp_path.unlink(missing_ok=True)
 
     # Pooled comparison
     focal_filter: Optional[Set[str]] = None
@@ -3853,6 +3851,21 @@ def main() -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
         atomic_write_csv(out_dir / "cross_segment_summary.csv", SUMMARY_FIELDS, summary_rows)
         print(f"[compare] wrote {len(summary_rows)} rows → {out_dir / 'cross_segment_summary.csv'}")
+
+    # Publish the streamed cross_segment_file_pairs.csv here, alongside the other
+    # outputs, so a failure anywhere above (pooled/union/reuse/matrix computation)
+    # leaves the previous run's file untouched instead of a fresh pairs file paired
+    # with stale companions. Rows are in worker-completion order, not the fully
+    # sorted order sort_pair_detail_rows() used to produce — confirmed with the
+    # requester that nothing downstream depends on that ordering.
+    if pair_detail_row_count:
+        pair_detail_tmp_path.replace(out_dir / "cross_segment_file_pairs.csv")
+        print(
+            f"[compare] wrote {pair_detail_row_count} rows (streamed, unsorted) → "
+            f"{out_dir / 'cross_segment_file_pairs.csv'}"
+        )
+    else:
+        pair_detail_tmp_path.unlink(missing_ok=True)
 
     if governance_state_rows:
         governance_state_rows.sort(key=lambda r: (

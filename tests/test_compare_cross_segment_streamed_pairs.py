@@ -144,3 +144,110 @@ def test_main_streams_real_file_pair_rows_to_disk(tmp_path, monkeypatch):
     assert {r["segment_id_a"] for r in rows} == {"proj_a"}
     assert {r["segment_id_b"] for r in rows} == {"proj_b"}
     assert {r["domain"] for r in rows} == {domain}
+
+
+def _build_sibling_fixture(tmp_path, domain):
+    records_dir = tmp_path / "records"
+    segments_root = tmp_path / "segments"
+    out_dir = tmp_path / "out"
+    records_dir.mkdir()
+
+    _write_csv(
+        records_dir / "segment_manifest.csv",
+        [
+            {
+                "segment_id": "proj_a", "segment_label": "Project A",
+                "governance_role": "Project", "client_label": "Acme",
+                "discipline_label": "Arch", "unit_system": "imperial",
+                "run_type": "bundle", "segment_level": "2",
+                "parent_segment_id": "imperial",
+            },
+            {
+                "segment_id": "proj_b", "segment_label": "Project B",
+                "governance_role": "Project", "client_label": "Acme",
+                "discipline_label": "Arch", "unit_system": "imperial",
+                "run_type": "bundle", "segment_level": "2",
+                "parent_segment_id": "imperial",
+            },
+        ],
+    )
+    _write_csv(
+        records_dir / "run_registry.csv",
+        [
+            {"segment_id": "proj_a", "output_folder": "proj_a", "run_type": "bundle"},
+            {"segment_id": "proj_b", "output_folder": "proj_b", "run_type": "bundle"},
+        ],
+    )
+    _write_csv(
+        records_dir / "file_metadata.csv",
+        [
+            {"export_run_id": "fa1", "project_label": ""},
+            {"export_run_id": "fb1", "project_label": ""},
+        ],
+    )
+    _write_segment(
+        segments_root, "proj_a", domain,
+        [("p1", "jh1", "L1"), ("p2", "jh2", "L2"), ("p3", "jh3", "L3")],
+        [{"export_run_id": "fa1", "pattern_id": pid} for pid in ("p1", "p2", "p3")],
+        [{"export_run_id": "fa1", "pattern_id": "p1"}],
+        ["p1", "p2", "p3"],
+    )
+    _write_segment(
+        segments_root, "proj_b", domain,
+        [("q1", "jh1", "L1"), ("q2", "jh2", "L2"), ("q3", "jh3", "L3")],
+        [{"export_run_id": "fb1", "pattern_id": pid} for pid in ("q1", "q2", "q3")],
+        [{"export_run_id": "fb1", "pattern_id": "q1"}],
+        ["q1", "q2", "q3"],
+    )
+    return records_dir, segments_root, out_dir
+
+
+def test_failure_after_streaming_leaves_previous_pairs_file_untouched(tmp_path, monkeypatch):
+    domain = "line_patterns"
+    records_dir, segments_root, out_dir = _build_sibling_fixture(tmp_path, domain)
+
+    argv = [
+        "compare_cross_segment.py",
+        "--segments-root", str(segments_root),
+        "--records-dir", str(records_dir),
+        "--out-dir", str(out_dir),
+        "--sibling-segments",
+        "--domain", domain,
+        "--min-patterns", "1",
+        "--workers", "1",
+        "--no-delta",
+    ]
+
+    # First run succeeds and publishes a "previous run" pairs file.
+    monkeypatch.setattr(sys, "argv", argv)
+    assert compare_main() == 0
+    pairs_path = out_dir / "cross_segment_file_pairs.csv"
+    assert pairs_path.is_file()
+    previous_content = pairs_path.read_text(encoding="utf-8")
+    assert previous_content  # sanity: first run actually produced rows
+
+    # Second run: force a failure in a post-loop step (run_pooled_comparison),
+    # which happens after pair-domain rows are fully streamed to the temp file
+    # but before the deferred rename in the "Write outputs" section.
+    import compare_cross_segment as mod
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated failure in a post-loop step")
+
+    monkeypatch.setattr(mod, "run_pooled_comparison", _boom)
+    monkeypatch.setattr(sys, "argv", argv)
+    try:
+        compare_main()
+        raised = False
+    except RuntimeError:
+        raised = True
+    assert raised, "expected the simulated post-loop failure to propagate"
+
+    # The published pairs file must be untouched by the failed second run —
+    # the new run's rows must never have replaced it before the crash.
+    assert pairs_path.read_text(encoding="utf-8") == previous_content
+
+    # An orphaned, unrenamed temp file from the failed run's streaming writer
+    # is the expected leftover (matches the pre-existing atomic_write_csv
+    # convention of not cleaning up on a mid-write exception).
+    assert list(out_dir.glob("*.tmp")) != []
