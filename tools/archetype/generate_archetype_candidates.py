@@ -14,19 +14,25 @@ Processing:
     cross_domain_patterns.csv, derive a governance_question_hint from the
     source/target domains touched by the pair:
       both target domains == "arrowheads"          -> arrowhead_consistency
-      both source domains == "view_filter_definitions" -> view_filter_strategy
+      both edges VFD-related (see below)           -> view_filter_strategy
       target domain containing "wall_types"        -> wall_graphics
       target domain starting with "fill_patterns"  -> fill_pattern_usage
       target domain == "line_patterns"             -> line_pattern_usage
       target domain == "view_filter_definitions"   -> view_filter_strategy
       otherwise                                     -> unknown
-    (checked in that priority order; the source_domain check exists because
-    dynamic VFD edges carry source_domain == "view_filter_definitions" but
-    target_domain == the element-type domain the filter scopes to, e.g.
-    "wall_types"/"ceiling_types"/"floor_types"/"roof_types" -- without this
-    check, VFD-to-VFD pairs targeting wall_types collide with the
-    wall_graphics rule, and VFD-to-VFD pairs targeting ceiling/floor/roof
-    types match none of the target-domain predicates and fall to "unknown")
+    (checked in that priority order)
+    An edge is "VFD-related" if its source_domain == "view_filter_definitions"
+    (a dynamic VFD edge, whose target_domain is the element-type domain the
+    filter scopes to, e.g. "wall_types"/"ceiling_types"/"floor_types"/
+    "roof_types") or its target_domain == "view_filter_definitions" (the
+    static view_filter_applications_view_templates.stack_filter chain edge).
+    Without this pre-check, a VFD-to-VFD pair targeting wall_types collides
+    with the wall_graphics rule, a VFD-to-VFD pair targeting ceiling/floor/
+    roof types matches none of the target-domain predicates and falls to
+    "unknown", and a VFD edge paired with the stack_filter chain edge also
+    collides with wall_graphics/fill_pattern_usage/line_pattern_usage --
+    see archetype_dp1_prompt.md's known-misfire list, which covers all three
+    shapes.
   - Patterns sharing the same (governance_question_hint, edge_id_a, edge_id_b)
     are clustered into one candidate archetype definition.
   - Each candidate gets archetype_id containing a "CANDIDATE" marker,
@@ -104,6 +110,13 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _is_vfd_related(source_domain: str, target_domain: str) -> bool:
+    """True for a dynamic VFD edge (source == view_filter_definitions) or the
+    static view_filter_applications_view_templates.stack_filter chain edge
+    (target == view_filter_definitions)."""
+    return source_domain == "view_filter_definitions" or target_domain == "view_filter_definitions"
+
+
 def _governance_question_hint(
     target_domain_a: str,
     target_domain_b: str,
@@ -112,7 +125,7 @@ def _governance_question_hint(
 ) -> str:
     if target_domain_a == "arrowheads" and target_domain_b == "arrowheads":
         return "arrowhead_consistency"
-    if source_domain_a == "view_filter_definitions" and source_domain_b == "view_filter_definitions":
+    if _is_vfd_related(source_domain_a, target_domain_a) and _is_vfd_related(source_domain_b, target_domain_b):
         return "view_filter_strategy"
     for hint, predicate in _HINT_PRIORITY:
         if predicate(target_domain_a) or predicate(target_domain_b):
