@@ -1626,14 +1626,14 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
         has_state = any(state for _, _, state in group)
         if has_state:
             sections.append(
-                "| Domain | G→Template | T→Container | T→Project | C→Project | Cross-Client | Reliability | Provided→Used | Local Active | Passive | Missing |"
+                "| Domain | G→Template | G→Container | G→Project | T→Container | T→Project | C→Project | Cross-Client | Reliability | Provided→Used | Local Active | Passive | Missing |"
             )
-            sections.append("|---|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|")
+            sections.append("|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|")
         else:
             sections.append(
-                "| Domain | G→Template | T→Container | T→Project | C→Project | Cross-Client | Reliability | Bundle Density | Passive Inherit. |"
+                "| Domain | G→Template | G→Container | G→Project | T→Container | T→Project | C→Project | Cross-Client | Reliability | Bundle Density | Passive Inherit. |"
             )
-            sections.append("|---|---:|---:|---:|---:|---:|---|---:|---:|")
+            sections.append("|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|")
 
         for dom, d, state in group:
             label = DOMAIN_LABELS.get(dom, dom)
@@ -1644,6 +1644,8 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
                 row = (
                     f"| {label}{pi_flag} "
                     f"| {fmt(d.get('gt'))} "
+                    f"| {fmt(d.get('gc'))} "
+                    f"| {fmt(d.get('gp'))} "
                     f"| {fmt(d['tc'])} "
                     f"| {fmt(d['tp'])} "
                     f"| {fmt(d['cp'])} "
@@ -1658,6 +1660,8 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
                 row = (
                     f"| {label}{pi_flag} "
                     f"| {fmt(d.get('gt'))} "
+                    f"| {fmt(d.get('gc'))} "
+                    f"| {fmt(d.get('gp'))} "
                     f"| {fmt(d['tc'])} "
                     f"| {fmt(d['tp'])} "
                     f"| {fmt(d['cp'])} "
