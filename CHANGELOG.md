@@ -11,6 +11,25 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Added
+- `tools/generate_governance_narrative.py`'s `build_cascade()` now breaks
+  `gt`/`gc`/`gp` (generic->template/container/project containment) down by the
+  TARGET's own scope level, instead of discarding every row where the target
+  isn't the single broadest ("enterprise") population. `compare_cross_segment.py`
+  intentionally emits `generic_to_template`/`_container`/`_project` rows for
+  client-/bc-/discipline-scoped targets too — real baseline-propagation evidence
+  that a prior pass (PR #350) deliberately gated away to keep `gt`/`gc`/`gp` as a
+  single clean enterprise-wide number (Option A, avoiding the blend-distinct-
+  scope-grains anti-pattern this file's other fixes already correct for). `gt`/
+  `gc`/`gp` themselves are unchanged — still the enterprise-only slice — but a
+  new `gt_by_scope`/`gc_by_scope`/`gp_by_scope` (`{scope_label: mean_containment}`,
+  mirroring the existing `wp_disc` per-discipline breakdown pattern) now captures
+  every other scope level (`client`, `bc`, `discipline`, and combinations, via a
+  new `_target_scope_label()` using the `business_center_label_a/b` columns added
+  in the intervening B6 schema fix) rather than silently dropping it. The
+  GENERIC (reference) side of the comparison is still required to be the one
+  canonical enterprise-wide Generic population.
+
 ### Fixed
 - `tools/generate_governance_narrative.py` read `client_label`/`discipline_label`/
   the "is this the broadest population for its role" condition by parsing
