@@ -3595,7 +3595,6 @@ def main() -> int:
     # Run comparisons
     executed_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     summary_rows: List[Dict[str, str]] = []
-    pair_detail_rows: List[Dict[str, str]] = []
     delta_rows: List[Dict[str, str]] = []
     governance_state_rows: List[Dict[str, str]] = []
     governance_state_summary_rows: List[Dict[str, str]] = []
@@ -3613,6 +3612,24 @@ def main() -> int:
     n_complete = 0
     n_skipped = 0
     completed_work_items: List[Tuple[str, str, str, str]] = []
+
+    # cross_segment_file_pairs.csv is written incrementally as work items complete
+    # rather than accumulated in memory — one row per matched file pair within a
+    # domain comparison, easily millions of rows for a large corpus, which was the
+    # dominant driver of multi-GB peak memory when held in a single Python list for
+    # the whole run. Streamed rows land in worker-completion order rather than the
+    # fully sorted order sort_pair_detail_rows() used to produce; nothing downstream
+    # depends on that ordering, so this trades a "nice to skim" property for a large
+    # cut in peak memory and gets partial output on disk before the run finishes.
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pair_detail_tmp = NamedTemporaryFile(
+        "w", encoding="utf-8", newline="", delete=False,
+        dir=str(out_dir), suffix=".tmp",
+    )
+    pair_detail_writer = csv.DictWriter(pair_detail_tmp, fieldnames=PAIRS_FIELDS)
+    pair_detail_writer.writeheader()
+    pair_detail_row_count = 0
+    pair_detail_tmp_path = Path(pair_detail_tmp.name)
 
     t0 = time.perf_counter()
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
@@ -3642,7 +3659,10 @@ def main() -> int:
                 summary_rows.append(result)
                 for pair_row in pairs_out:
                     pair_row["_comparison_type"] = ctype
-                pair_detail_rows.extend(pairs_out)
+                    pair_detail_writer.writerow(
+                        {name: pair_row.get(name, "") for name in PAIRS_FIELDS}
+                    )
+                pair_detail_row_count += len(pairs_out)
                 n_complete += 1
                 n_p = result.get("n_pairs", "?")
                 print(
@@ -3780,6 +3800,20 @@ def main() -> int:
         flush=True,
     )
 
+    # Finalize the streamed cross_segment_file_pairs.csv: atomic rename on success
+    # (rows are in worker-completion order, not sort_pair_detail_rows() order — see
+    # comment at pair_detail_tmp above), or discard the temp file if nothing was
+    # written so no empty/header-only file appears when there were no pairs.
+    pair_detail_tmp.close()
+    if pair_detail_row_count:
+        pair_detail_tmp_path.replace(out_dir / "cross_segment_file_pairs.csv")
+        print(
+            f"[compare] wrote {pair_detail_row_count} rows (streamed, unsorted) → "
+            f"{out_dir / 'cross_segment_file_pairs.csv'}"
+        )
+    else:
+        pair_detail_tmp_path.unlink(missing_ok=True)
+
     # Pooled comparison
     focal_filter: Optional[Set[str]] = None
     if args.segment_a or args.segment_b:
@@ -3819,11 +3853,6 @@ def main() -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
         atomic_write_csv(out_dir / "cross_segment_summary.csv", SUMMARY_FIELDS, summary_rows)
         print(f"[compare] wrote {len(summary_rows)} rows → {out_dir / 'cross_segment_summary.csv'}")
-
-    if pair_detail_rows:
-        sort_pair_detail_rows(pair_detail_rows)
-        atomic_write_csv(out_dir / "cross_segment_file_pairs.csv", PAIRS_FIELDS, pair_detail_rows)
-        print(f"[compare] wrote {len(pair_detail_rows)} rows → {out_dir / 'cross_segment_file_pairs.csv'}")
 
     if governance_state_rows:
         governance_state_rows.sort(key=lambda r: (
