@@ -229,14 +229,24 @@ def _is_unscoped_segment(row: dict, suffix: str) -> bool:
     docs/governance_narrative_scope_gap_audit.md B5.
 
     business_center_label / collection_label are not yet columns on SUMMARY_FIELDS
-    (see B6), so a segment scoped only by one of those two dimensions cannot be
-    fully distinguished from a truly unscoped one from these columns alone — that
-    gap is a producer-side prerequisite tracked in B6, not introduced here.
+    (see B6), so a row with role set and client_label/discipline_label both blank
+    could still be a business-center- or collection-scoped standard (e.g.
+    "imperial|Template|BC_1234" or "imperial|Template|collection:Shared") that
+    these three columns alone can't reveal. Once client_label/discipline_label are
+    confirmed blank, segment_id can only have gained extra pipe-separated parts
+    from business_center_label/collection_label (per build_segment_manifest.py's
+    fixed field order) — so a plain part-count check against segment_id at that
+    point is a structural completeness check, not the positional-parsing anti-
+    pattern removed elsewhere in this file: it never reads a value out of
+    segment_id, it only confirms nothing beyond unit_system+role snuck in.
     """
     role = row.get(f"governance_role_{suffix}", "")
     client = row.get(f"client_label_{suffix}", "")
     disc = row.get(f"discipline_label_{suffix}", "")
-    return bool(role) and not client and not disc
+    if not role or client or disc:
+        return False
+    seg_id = row.get(f"segment_id_{suffix}", "")
+    return len(seg_id.split("|")) == 2 if seg_id else True
 
 
 def load_corpus_counts(
@@ -363,6 +373,18 @@ CASCADE_GROUP4_EXCLUDED_TYPES = {
         "only so the coverage check below doesn't flag it as unrecognized."
     ),
 }
+
+# Group 1/2 signal keys -- a domain with data in at least one of these has something
+# to tier/render. A domain whose ONLY data is Group 3 (ep/bp/eb/ec) has no cascade-
+# stage signal at all; it must stay in the `cascade` dict (captured, per Group 3's
+# contract) but must NOT reach render_domain_tiers()/the domain summary CSV, which
+# only know how to tier/render Group 1/2 fields and would otherwise show it as a
+# spurious "Insufficient Evidence" row with every visible column blank.
+_CASCADE_RENDERABLE_SIGNAL_KEYS = ("tc", "cp", "tp", "xc", "wp_all", "tw", "gt", "gc", "gp")
+
+
+def _has_renderable_cascade_signal(d: dict) -> bool:
+    return any(d.get(k) is not None for k in _CASCADE_RENDERABLE_SIGNAL_KEYS)
 
 
 def build_cascade(summary_rows: list[dict]) -> dict:
@@ -1500,6 +1522,10 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
     state_summary = state_summary or {}
     scored = []
     for dom, d in cascade.items():
+        if not _has_renderable_cascade_signal(d):
+            # Scope-only domain (Group 3 fan-out data only) -- captured in
+            # `cascade` but not yet tiered/rendered. See CASCADE_GROUP3_TYPES.
+            continue
         state = state_summary.get(dom)
         tier = assign_tier(d, state)
         primary = d["tp"] if d["tp"] is not None else d["cp"]
@@ -2350,6 +2376,10 @@ def main():
 
     domain_csv_rows = []
     for dom, d in sorted(cascade.items()):
+        if not _has_renderable_cascade_signal(d):
+            # Scope-only domain (Group 3 fan-out data only) -- captured in
+            # `cascade` but not yet tiered/rendered. See CASCADE_GROUP3_TYPES.
+            continue
         tier = assign_tier(d, governance_state_summary.get(dom))
         reliability = score_reliability(d)
         anomalies = detect_anomalies(dom, d, governance_state_summary.get(dom))
