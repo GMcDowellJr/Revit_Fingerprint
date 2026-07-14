@@ -15,6 +15,10 @@ Optional inputs (enrich state, delta, and pattern sections when available):
   --delta                    cross_segment_delta.csv
   --run-registry             run_registry.csv          (for corpus metadata)
   --file-meta                file_metadata.csv         (for file counts by role/client/discipline)
+  --client-sector            client_sector.csv         (client_label,sector -- classifies
+                                                          cross-client convergence and
+                                                          non-comparable-sector tiering;
+                                                          absent = every client unclassified)
 
 Output:
   --out          governance_narrative_context.md  (default)
@@ -25,6 +29,7 @@ Usage:
       --pooled  cross_segment_pooled.csv \\
       [--delta  cross_segment_delta.csv] \\
       [--file-meta file_metadata.csv] \\
+      [--client-sector policies/client_sector.csv] \\
       --out governance_narrative_context.md
 """
 
@@ -137,9 +142,17 @@ DISC_LABELS = {
     "water": "Water",
 }
 
-DISC_KEYWORDS = set(DISC_LABELS.keys())
 
-HEALTHCARE_CLIENTS = {"Kaiser", "Sutter", "Renown", "DCMH"}
+def _disc_label(disc: str) -> str:
+    """Display name for a discipline_label value. DISC_LABELS is an optional
+    override for known disciplines' display casing/punctuation (e.g.
+    "Mechanical/Plumbing" instead of a plain title-case render) -- it is NOT the
+    source of which disciplines exist. A discipline outside DISC_LABELS still
+    renders humanely (e.g. "medical_equipment" -> "Medical Equipment") rather
+    than crashing or being silently dropped from any disc-keyed section. See
+    docs/governance_narrative_scope_gap_audit.md C7.
+    """
+    return DISC_LABELS.get(disc, disc.replace("_", " ").title())
 
 # Domains where passive inheritance is most likely to inflate all-view scores.
 # These domains are often fully inherited from templates but rarely customised.
@@ -269,6 +282,29 @@ def _is_unscoped_segment(row: dict, suffix: str) -> bool:
         return False
     seg_id = row.get(f"segment_id_{suffix}", "")
     return len(seg_id.split("|")) == 2 if seg_id else True
+
+
+def load_client_sectors(client_sector_rows: Optional[list[dict]]) -> dict:
+    """Build a {client_label: sector} map from an optional client_sector.csv
+    (--client-sector). Sector membership is a real business fact that cannot be
+    derived from the fingerprint pipeline's own data -- nothing in
+    segment_manifest.csv/file_metadata.csv encodes "sector" -- so it lives in an
+    editable data file instead of a Python literal. See
+    docs/governance_narrative_scope_gap_audit.md C7.
+
+    Absent input (file not supplied) returns an empty map: every client is then
+    "unknown" (not healthcare, not non-comparable) and falls through to normal
+    cross-client alignment tiering -- there is no special-cased client name.
+    """
+    if not client_sector_rows:
+        return {}
+    sector_map = {}
+    for row in client_sector_rows:
+        client = _pick(row, "client_label")
+        sector = _pick(row, "sector").strip().lower()
+        if client and sector:
+            sector_map[client] = sector
+    return sector_map
 
 
 def load_corpus_counts(
@@ -427,13 +463,14 @@ def _has_renderable_cascade_signal(d: dict) -> bool:
     return any(d.get(k) is not None for k in _CASCADE_RENDERABLE_SIGNAL_KEYS)
 
 
-def build_cascade(summary_rows: list[dict]) -> dict:
+def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -> dict:
     """
     Returns domain-keyed dict with cascade scores from generic segments:
       tc: template->container containment_a_in_b_mean
       cp: container->project containment_a_in_b_mean
       tp: template->project containment_a_in_b_mean
-      xc: cross-client Jaccard mean (healthcare clients)
+      xc: cross-client Jaccard mean (clients whose sector is "healthcare" per
+        sector_map — see load_client_sectors())
       wp_all: overall within-project Jaccard mean
       wp_disc: {disc: mean_jaccard}
       tw: within-template Jaccard
@@ -483,6 +520,7 @@ def build_cascade(summary_rows: list[dict]) -> dict:
     ec_used = defaultdict(list)
 
     seen_comparison_types: set = set()
+    sector_map = sector_map or {}
 
     for r in summary_rows:
         ct = r["comparison_type"]
@@ -517,11 +555,9 @@ def build_cascade(summary_rows: list[dict]) -> dict:
                 tp_used[dom].append(vu)
 
         elif ct == "sibling_projects":
-            pa, pb = a.split("|"), b.split("|")
-            if (
-                len(pa) == 3 and pa[2] in HEALTHCARE_CLIENTS
-                and len(pb) == 3 and pb[2] in HEALTHCARE_CLIENTS
-            ):
+            ca = _pick(r, "client_label_a")
+            cb = _pick(r, "client_label_b")
+            if sector_map.get(ca) == "healthcare" and sector_map.get(cb) == "healthcare":
                 v = pf(_col(r, "jaccard_mean"))
                 if v is not None:
                     xc[dom].append(v)
@@ -1046,7 +1082,7 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
         )
     if "view_template" in dom:
         disc_wp = d["wp_disc"]
-        zero_discs = [DISC_LABELS.get(k, k) for k, v in disc_wp.items() if v < 0.05 and k != "all"]
+        zero_discs = [_disc_label(k) for k, v in disc_wp.items() if v < 0.05 and k != "all"]
         if zero_discs:
             notes.append(
                 f"Architecturally specific — near-zero within-project coherence for: "
@@ -1069,8 +1105,10 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
 def build_client_summary(
     summary_rows: list[dict],
     pooled_rows: list[dict],
+    sector_map: Optional[dict] = None,
 ) -> list[dict]:
     """Per-client alignment summary."""
+    sector_map = sector_map or {}
     # Client existence must not depend on which pool grain happens to have >=2
     # siblings for that client. _emit_for_groups() in compare_cross_segment.py
     # requires len(members) >= 2 INDEPENDENTLY per grain (parent_sibling/bc/client),
@@ -1181,8 +1219,14 @@ def build_client_summary(
         strongest = sorted(dom_means.items(), key=lambda x: -x[1])[:3]
         weakest = sorted(dom_means.items(), key=lambda x: x[1])[:3]
 
-        # Tier from cross-client Jaccard
-        if client == "Intel":
+        # Tier from cross-client Jaccard. sector_map is external, editable data
+        # (see load_client_sectors()/--client-sector) -- a client tagged with a
+        # known, non-healthcare sector is treated as non-comparable; an
+        # unclassified client (absent from the file, or no file supplied at all)
+        # falls through to the normal alignment tiers below rather than being
+        # guessed at. See docs/governance_narrative_scope_gap_audit.md C7.
+        sector = sector_map.get(client, "unknown")
+        if sector not in ("unknown", "healthcare"):
             tier = "Non-comparable (different sector)"
         elif xc_mean is None:
             tier = "Insufficient Data"
@@ -1210,7 +1254,7 @@ def build_client_summary(
             "confidence_note": conf,
             "strongest": strongest,
             "weakest": weakest,
-            "is_healthcare": client in HEALTHCARE_CLIENTS,
+            "is_healthcare": sector == "healthcare",
         })
 
     rows_out.sort(key=lambda r: -(r["xc_mean"] or 0))
@@ -1514,7 +1558,7 @@ def load_delta_summary(delta_rows: list[dict]) -> dict:
 def render_header(analysis_date: str, corpus: dict, has_state_outputs: bool, legacy_used_fallback: bool) -> str:
     n_disc = len(corpus.get("disciplines", set()))
     disc_list = ", ".join(
-        DISC_LABELS.get(d, d)
+        _disc_label(d)
         for d in sorted(corpus.get("disciplines", set()))
     ) or "Unknown"
     client_list = ", ".join(sorted(corpus.get("clients", set()))) or "Unknown"
@@ -1825,10 +1869,8 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
         if r["governance_role_a"] == "Template" and disc:
             template_discs.add(disc)
 
-    for disc in sorted(DISC_LABELS.keys()):
-        if disc not in disc_domain_wp:
-            continue
-        label = DISC_LABELS[disc]
+    for disc in sorted(disc_domain_wp.keys()):
+        label = _disc_label(disc)
         n_files = disc_file_counts.get(disc, "?")
         has_template = disc in template_discs
 
@@ -2429,6 +2471,10 @@ def main():
     parser.add_argument("--governance-state-summary", help="cross_segment_governance_state_summary.csv (optional)")
     parser.add_argument("--delta", help="cross_segment_delta.csv (optional legacy fallback)")
     parser.add_argument("--file-meta", help="file_metadata.csv (optional)")
+    parser.add_argument("--client-sector",
+                        help="client_sector.csv (optional; client_label,sector columns — "
+                             "classifies cross-client convergence and non-comparable-sector "
+                             "tiering; absent = every client treated as unclassified)")
     parser.add_argument("--union-inventory",
                         help="cross_segment_union_inventory.csv (optional)")
     parser.add_argument("--reuse-distribution",
@@ -2465,6 +2511,11 @@ def main():
         print(f"Loading {args.file_meta}...")
         file_meta_rows = read_csv(Path(args.file_meta))
 
+    client_sector_rows = []
+    if args.client_sector:
+        print(f"Loading {args.client_sector}...")
+        client_sector_rows = read_csv(Path(args.client_sector))
+
     union_inventory_rows = []
     if args.union_inventory:
         print(f"Loading {args.union_inventory}...")
@@ -2480,15 +2531,17 @@ def main():
         print(f"Loading {args.matrix_manifest}...")
         matrix_manifest_rows = read_csv(Path(args.matrix_manifest))
 
+    sector_map = load_client_sectors(client_sector_rows)
+
     normalise_summary_schema(summary_rows)
     print("Computing cascade scores...")
-    cascade = build_cascade(summary_rows)
+    cascade = build_cascade(summary_rows, sector_map)
 
     print("Computing corpus counts...")
     corpus = load_corpus_counts(summary_rows, file_meta_rows)
 
     print("Building client summary...")
-    client_rows = build_client_summary(summary_rows, pooled_rows)
+    client_rows = build_client_summary(summary_rows, pooled_rows, sector_map)
 
     print("Building governance state summary...")
     governance_state_summary = build_governance_state_summary(
