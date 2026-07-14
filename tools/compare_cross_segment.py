@@ -86,6 +86,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import os
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -3443,6 +3444,20 @@ def sort_pair_detail_rows(rows: List[Dict[str, str]]) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+def resolve_worker_count(value: str, headroom: int = 2) -> int:
+    """Resolve --workers, accepting either an int or the literal string 'auto'.
+
+    'auto' derives a single-layer worker count from available logical cores
+    minus headroom — this script's ProcessPoolExecutor is not nested inside
+    another worker pool, so (unlike run_segment_orchestrator.py's bundle-stage
+    subprocess) there is no second layer to coordinate against.
+    """
+    if str(value).strip().lower() == "auto":
+        cpu_count = os.cpu_count()
+        return max(1, cpu_count - headroom) if cpu_count else 4
+    return int(value)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Cross-segment comparison — computes join_hash overlap metrics\n"
@@ -3481,10 +3496,12 @@ def main() -> int:
                     help="Print discovered pairs without computing; no output files written")
     ap.add_argument("--no-delta", action="store_true",
                     help="Skip delta pattern output (cross_segment_delta.csv); useful for large corpora")
-    ap.add_argument("--workers", type=int, default=4,
-                    help="Max parallel pair×domain workers (default: 4)")
+    ap.add_argument("--workers", default="auto",
+                    help="Max parallel pair×domain workers, or 'auto' to derive from "
+                         "CPU count (default: auto)")
 
     args = ap.parse_args()
+    args.workers = resolve_worker_count(args.workers)
 
     segments_root = Path(args.segments_root).resolve()
     records_dir = Path(args.records_dir).resolve()
