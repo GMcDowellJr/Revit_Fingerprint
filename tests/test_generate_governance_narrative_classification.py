@@ -204,3 +204,56 @@ def test_unclassified_client_not_treated_as_confirmed_non_healthcare():
     intel_section = md.split("### Intel")[1]
     assert "_Non-healthcare sector" not in unknown_section
     assert "_Non-healthcare sector" in intel_section
+
+
+# ---------------------------------------------------------------------------
+# Post-merge review round: within-client sibling comparisons; non-Project
+# within_project fallback rows
+# ---------------------------------------------------------------------------
+
+def test_within_client_sibling_projects_excluded_from_cross_client_xc():
+    """discover_sibling_segments() groups purely by (parent_segment_id,
+    governance_role, unit_system), so two differently-scoped Project segments
+    under the SAME client (e.g. Kaiser's discipline-scoped siblings) can pair as
+    sibling_projects with client_label_a == client_label_b -- a within-client
+    comparison, not cross-client convergence, and must not count toward xc."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser|architectural", segment_id_b="imperial|Project|Kaiser|electrical",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Kaiser",
+            comparison_type="sibling_projects", domain="arrowheads",
+            all_jaccard_mean="0.95", n_files_a="5", n_files_b="5",
+        ),
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="sibling_projects", domain="arrowheads",
+            all_jaccard_mean="0.5", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    cascade = build_cascade(rows, sector_map)
+    assert cascade["arrowheads"]["xc"] == 0.5
+
+
+def test_non_project_within_project_rows_excluded_from_client_summary():
+    """discover_within_project() can emit within_project rows for any non-skip/
+    non-registration segment, not just Project-role ones (e.g. a client-scoped
+    Template library). The Client Analysis section is specifically about the
+    client's PROJECT portfolio -- a Template-only client must not appear with
+    project file counts/coherence sourced from Template data."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Template|GhostClient", segment_id_b="imperial|Template|GhostClient",
+            governance_role_a="Template", governance_role_b="Template",
+            client_label_a="GhostClient", client_label_b="GhostClient",
+            comparison_type="within_project", domain="arrowheads",
+            all_jaccard_mean="0.99", n_files_a="50", n_files_b="50",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    client_rows = build_client_summary(rows, [], {})
+    assert "GhostClient" not in {r["client"] for r in client_rows}

@@ -578,7 +578,15 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
         elif ct == "sibling_projects":
             ca = _pick(r, "client_label_a")
             cb = _pick(r, "client_label_b")
-            if sector_map.get(ca) == "healthcare" and sector_map.get(cb) == "healthcare":
+            # discover_sibling_segments() groups purely by (parent_segment_id,
+            # governance_role, unit_system), so two DIFFERENTLY-scoped Project
+            # segments under the SAME client (e.g. Kaiser's discipline- or
+            # collection-scoped siblings sharing a client-level parent) can pair
+            # as sibling_projects with ca == cb -- a within-client comparison, not
+            # cross-client convergence. The old segment_id-length==3 guard
+            # incidentally excluded these (they render with >3 parts); requiring
+            # distinct clients here is the direct, column-based replacement.
+            if ca != cb and sector_map.get(ca) == "healthcare" and sector_map.get(cb) == "healthcare":
                 v = pf(_col(r, "jaccard_mean"))
                 if v is not None:
                     xc[dom].append(v)
@@ -1153,11 +1161,21 @@ def build_client_summary(
         if c and r["governance_role"] == "Project":
             all_clients.add(c)
     for r in summary_rows:
-        if r["comparison_type"] == "within_project":
+        # discover_within_project() can emit within_project rows for ANY
+        # non-skip/non-registration segment, not just Project-role ones (e.g. a
+        # client-scoped Template/Container/Generic segment). This section is
+        # specifically about the client's PROJECT portfolio (project file counts,
+        # project-vs-project coherence), so gate on governance_role_a == "Project"
+        # before treating a row as evidence this client has project data.
+        # sibling_projects rows are already structurally Project-only by
+        # construction (discover_sibling_segments() only labels a pair
+        # "sibling_projects" when both sides share governance_role == "project"),
+        # but the check is kept here too for defense-in-depth.
+        if r["comparison_type"] == "within_project" and r["governance_role_a"] == "Project":
             c = _pick(r, "client_label_a")
             if c:
                 all_clients.add(c)
-        elif r["comparison_type"] == "sibling_projects":
+        elif r["comparison_type"] == "sibling_projects" and r["governance_role_a"] == "Project" and r["governance_role_b"] == "Project":
             for suffix in ("a", "b"):
                 c = _pick(r, f"client_label_{suffix}")
                 if c:
@@ -1175,10 +1193,12 @@ def build_client_summary(
                 xc_by_client[pa[2]].append(v)
                 xc_by_client[pb[2]].append(v)
 
-    # Within-project coherence
+    # Within-project coherence. Gated on governance_role_a == "Project" for the
+    # same reason as the all_clients fallback above -- within_project rows exist
+    # for any role, and this section reports PROJECT coherence specifically.
     wp_by_client = defaultdict(list)
     for r in summary_rows:
-        if r["comparison_type"] != "within_project":
+        if r["comparison_type"] != "within_project" or r["governance_role_a"] != "Project":
             continue
         c = _pick(r, "client_label_a")
         v = pf(_col(r, "jaccard_mean"))
@@ -1200,12 +1220,15 @@ def build_client_summary(
             if c not in client_files or nf > client_files[c]:
                 client_files[c] = nf
     for r in summary_rows:
-        if r["comparison_type"] == "within_project":
+        # Same governance_role_a == "Project" gating as all_clients above --
+        # within_project rows exist for any role, and n_files here specifically
+        # means project file counts for the Client Analysis section.
+        if r["comparison_type"] == "within_project" and r["governance_role_a"] == "Project":
             c = _pick(r, "client_label_a")
             nf = int(r["n_files_a"]) if r.get("n_files_a") else 0
             if c and (c not in client_files or nf > client_files[c]):
                 client_files[c] = nf
-        elif r["comparison_type"] == "sibling_projects":
+        elif r["comparison_type"] == "sibling_projects" and r["governance_role_a"] == "Project" and r["governance_role_b"] == "Project":
             for suffix in ("a", "b"):
                 c = _pick(r, f"client_label_{suffix}")
                 nf = int(r[f"n_files_{suffix}"]) if r.get(f"n_files_{suffix}") else 0
