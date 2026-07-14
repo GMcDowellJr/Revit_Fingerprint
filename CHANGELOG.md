@@ -42,6 +42,35 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   entirely when no domain has any scope-breakdown data.
 
 ### Fixed
+- `tools/archetype/generate_archetype_candidates.py`'s `_governance_question_hint()`
+  only ever inspected `target_domain`, so it couldn't distinguish a dynamic
+  View Filter Definition (VFD) edge from a structural one. Dynamic VFD edges
+  carry `source_domain == "view_filter_definitions"` but `target_domain` ==
+  whatever element-type domain the filter scopes to (`wall_types`,
+  `ceiling_types`, `floor_types`, `roof_types`); the static
+  `view_filter_applications_view_templates.stack_filter__view_filter_definitions`
+  chain edge instead carries `target_domain == "view_filter_definitions"`.
+  Two consequences, both independently documented in
+  `tools/archetype/review/archetype_dp1_prompt.md`'s known-misfire list as a
+  manual correction required every Decision Point 1 cycle: (1) a VFD-to-VFD
+  pair targeting `wall_types` collided with the `wall_graphics` predicate
+  (`"wall_types" in target_domain`) before any VFD-aware check existed; (2) a
+  VFD-to-VFD pair targeting `ceiling_types`/`floor_types`/`roof_types` matched
+  none of the target-domain predicates and fell through to `"unknown"`.
+  Fixed by adding `_is_vfd_related(source_domain, target_domain)` (true when
+  `source_domain == "view_filter_definitions"` OR `target_domain ==
+  "view_filter_definitions"`), returning `"view_filter_strategy"` when both
+  sides of the pair are VFD-related, checked before the existing
+  target-domain-only priority list. The first version of this fix only
+  checked `source_domain_a == source_domain_b == "view_filter_definitions"`
+  (VFD-to-VFD only) and still misclassified a VFD edge paired with the static
+  stack_filter chain edge as `wall_graphics` — caught in PR #357 review and
+  corrected to the broader `_is_vfd_related()` form above. This only affects
+  auto-generated candidates in `archetype_definitions_candidates.json`; it
+  does not retroactively change `governance_question` on already-promoted
+  archetypes in `config/archetype/archetype_definitions.json`, which are set
+  by human curation at DP1 independent of this hint.
+
 - `tools/generate_governance_narrative.py` read `client_label`/`discipline_label`/
   the "is this the broadest population for its role" condition by parsing
   `segment_id` positionally (`get_client()`, `get_disc()`, `is_generic()`, a
