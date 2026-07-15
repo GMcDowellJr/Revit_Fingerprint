@@ -10,7 +10,7 @@ _TOOLS_DIR = str(Path(__file__).resolve().parent)
 if _TOOLS_DIR not in sys.path:
     sys.path.insert(0, _TOOLS_DIR)
 
-from na_token import is_na_token
+from na_token import is_na_token, ENTERPRISE_BC_BOOKKEEPING_TOKENS
 
 SEED_ROLES={"Template","Container"}
 REQUIRED_COLUMNS={"export_run_id","unit_system","client_label","governance_role"}
@@ -151,6 +151,15 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
         both must behave identically for segment-key purposes (neither should
         leak into segment_id as a literal token), but only the N/A case is
         folded here since blank cells are already blank.
+      - business_center_label additionally folds any spelling in
+        ENTERPRISE_BC_BOOKKEEPING_TOKENS (e.g. "0000"/"bc_0000",
+        case-insensitive) to blank, ahead of the field-specific rule above —
+        same treatment as an N/A spelling, and the same token set
+        compare_cross_segment.py's _normalize_bc_label() already applies when
+        reading segment rows back out. Without this, "0000"-tagged enterprise
+        rows would be folded blank only at comparison time, not at segment-
+        build time, so they'd still get pooled into whichever real business
+        center's segment happened to also be missing that fold.
 
     Returns (normalized_rows, changes) where changes is a list of
     (field, raw_value, normalized_value) tuples, one per row-field whose value
@@ -168,6 +177,10 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
             if not raw:
                 continue
             if is_na_token(raw):
+                changes.append((field, raw, ""))
+                new_row[field] = ""
+                continue
+            if field == "business_center_label" and raw.lower() in ENTERPRISE_BC_BOOKKEEPING_TOKENS:
                 changes.append((field, raw, ""))
                 new_row[field] = ""
                 continue

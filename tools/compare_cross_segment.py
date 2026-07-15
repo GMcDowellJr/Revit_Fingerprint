@@ -101,7 +101,7 @@ _TOOLS_DIR = str(Path(__file__).resolve().parent)
 if _TOOLS_DIR not in sys.path:
     sys.path.insert(0, _TOOLS_DIR)
 
-from na_token import is_blank_or_na
+from na_token import is_blank_or_na, ENTERPRISE_BC_BOOKKEEPING_TOKENS as _ENTERPRISE_BC_BOOKKEEPING_TOKENS
 
 
 # ---------------------------------------------------------------------------
@@ -1677,8 +1677,10 @@ DIRECTED_TYPES = {
 # bookkeeping" rather than a real peer business center. Must be normalized to
 # blank before any bc-scoped grouping or comparison — treating "0000" as a
 # real bc would silently group unrelated enterprise-wide rows together as if
-# they shared one specific business center.
-_ENTERPRISE_BC_BOOKKEEPING_TOKENS = {"0000", "bc_0000"}
+# they shared one specific business center. The token set itself lives in
+# na_token.py (imported above as _ENTERPRISE_BC_BOOKKEEPING_TOKENS) so
+# build_segment_manifest.py's own bookkeeping-token fold shares one literal
+# list instead of a hand-maintained duplicate.
 
 
 def _normalize_bc_label(value: str) -> str:
