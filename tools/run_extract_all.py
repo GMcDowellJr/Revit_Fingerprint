@@ -931,7 +931,6 @@ def main() -> None:
             record_rows = _read_csv_rows(phase0_records_csv)
         if (records_source_dir / "file_metadata.csv").is_file():
             meta_rows = _read_csv_rows(records_source_dir / "file_metadata.csv")
-            _check_governance_field_completeness(meta_rows)
         # Snapshot pre-filter rows so split domain auto-discovery (which runs after
         # this block) uses the full post-reload population regardless of filter.
         _pre_filter_record_rows = record_rows
@@ -961,6 +960,10 @@ def main() -> None:
                     f"[WARN extract_all] filter_file={_filter_path} (first 5 IDs: {_sample_allowed})\n"
                     f"[WARN extract_all] file_metadata.csv first 5 export_run_ids: {_meta_ids}\n"
                 )
+
+        # Validate after export-run-id filtering (if any) so a targeted rerun is not
+        # blocked by incomplete governance fields on files outside the requested scope.
+        _check_governance_field_completeness(meta_rows)
 
         if require_join_policy and phase0_records_csv.is_file():
             _enforce_policy_gate(record_rows, v21_root / "diagnostics", active_domains, allow_sig_hash_join_key)
