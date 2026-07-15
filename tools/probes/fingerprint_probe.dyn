@@ -146,7 +146,7 @@
       ],
       "Replication": "Disabled",
       "Description": "Enables selection between True and False",
-      "InputValue": true
+      "InputValue": false
     },
     {
       "ConcreteType": "CoreNodeModels.Watch, CoreNodeModels",
