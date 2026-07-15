@@ -24,6 +24,7 @@ from bundle_analysis.common import atomic_write_csv, read_csv_rows
 from bundle_analysis.reference_bundle import write_sidecar
 from core.sig_hash_policy import load_sig_hash_policies, get_domain_sig_hash_policy
 from core.sig_hash_builder import build_sig_hash_from_policy
+from na_token import is_na_token
 
 try:
     csv.field_size_limit(sys.maxsize)
@@ -405,6 +406,41 @@ def _iter_csv_rows(path: Path):
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
             yield {str(k): "" if v is None else str(v) for k, v in row.items()}
+
+
+_GOVERNANCE_COMPLETENESS_COLUMNS = ("client_label", "business_center_label")
+
+
+def _check_governance_field_completeness(meta_rows: List[Dict[str, str]]) -> None:
+    """Hard-fail if any file_metadata.csv row has a blank or N/A-spelled
+    client_label or business_center_label. These columns are expected to carry
+    real values (e.g. "Stantec" for internal/no-external-client work, a bare
+    numeric business-center code, or "0000"/"BC_0000" for enterprise-scoped
+    rows) after the manual annotation pause between Run A and Run B — this is
+    a pure completeness check, not a fallback; it does not fill in anything.
+    """
+    offenders: Dict[str, List[str]] = {}
+    for row in meta_rows:
+        export_run_id = row.get("export_run_id", "").strip() or "<missing export_run_id>"
+        bad_columns = [
+            column
+            for column in _GOVERNANCE_COMPLETENESS_COLUMNS
+            if not (raw := row.get(column, "").strip()) or is_na_token(raw)
+        ]
+        if bad_columns:
+            offenders[export_run_id] = bad_columns
+    if offenders:
+        detail_lines = "\n".join(
+            f"  {export_run_id}: {', '.join(offenders[export_run_id])}"
+            for export_run_id in sorted(offenders)
+        )
+        raise SystemExit(
+            "[FATAL extract_all] governance-field completeness gate failed: "
+            f"{len(offenders)} row(s) in file_metadata.csv have a blank or N/A "
+            "client_label/business_center_label. Fill in real values for these "
+            "rows (see corpus_update_runbook.ps1's manual-pause instructions) "
+            "before re-running Run B.\n" + detail_lines
+        )
 
 
 def _ensure_domain_scoped_identity_items(phase0_dir: Path) -> Optional[Path]:
@@ -924,6 +960,10 @@ def main() -> None:
                     f"[WARN extract_all] filter_file={_filter_path} (first 5 IDs: {_sample_allowed})\n"
                     f"[WARN extract_all] file_metadata.csv first 5 export_run_ids: {_meta_ids}\n"
                 )
+
+        # Validate after export-run-id filtering (if any) so a targeted rerun is not
+        # blocked by incomplete governance fields on files outside the requested scope.
+        _check_governance_field_completeness(meta_rows)
 
         if require_join_policy and phase0_records_csv.is_file():
             _enforce_policy_gate(record_rows, v21_root / "diagnostics", active_domains, allow_sig_hash_join_key)

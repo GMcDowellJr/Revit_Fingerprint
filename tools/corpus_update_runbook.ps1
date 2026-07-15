@@ -44,10 +44,14 @@ if ($Run -eq "") {
     Write-Host "MANDATORY PAUSE between Run A and Run B:"
     Write-Host "  Edit $RECORDS\file_metadata.csv"
     Write-Host "  Set for each new file:"
-    Write-Host "    governance_role  ->  Container | Template | Project | Generic"
-    Write-Host "    client_label     ->  client name or internal identifier"
-    Write-Host "    collection_label ->  standards/resource collection this file belongs to (optional; independent of governance_role - see header comment)"
-    Write-Host "    unit_system      ->  imperial | metric"
+    Write-Host "    governance_role       ->  Container | Template | Project | Generic"
+    Write-Host "    client_label          ->  client name or internal identifier (e.g. 'Stantec' for internal/no-external-client work)"
+    Write-Host "    business_center_label ->  bare numeric business center code (e.g. '2014'), or '0000'/'BC_0000' for enterprise-scoped work"
+    Write-Host "    collection_label      ->  standards/resource collection this file belongs to (optional; independent of governance_role - see header comment)"
+    Write-Host "    unit_system           ->  imperial | metric"
+    Write-Host ""
+    Write-Host "  Run B hard-fails if client_label or business_center_label is blank or an N/A spelling — see"
+    Write-Host "  run_extract_all.py's _check_governance_field_completeness()."
     Write-Host ""
     exit 0
 }
@@ -66,10 +70,12 @@ if ($Run -eq "A") {
     Write-Host "NEXT: Edit file_metadata.csv before running Run B" -ForegroundColor Yellow
     Write-Host "  File: $RECORDS\file_metadata.csv" -ForegroundColor Yellow
     Write-Host "  Set for each new file:" -ForegroundColor Yellow
-    Write-Host "    governance_role  ->  Container | Template | Project | Generic" -ForegroundColor Yellow
-    Write-Host "    client_label     ->  client name or internal identifier" -ForegroundColor Yellow
-    Write-Host "    collection_label ->  standards/resource collection this file belongs to (optional; independent of governance_role - see header comment)" -ForegroundColor Yellow
-    Write-Host "    unit_system      ->  imperial | metric" -ForegroundColor Yellow
+    Write-Host "    governance_role       ->  Container | Template | Project | Generic" -ForegroundColor Yellow
+    Write-Host "    client_label          ->  client name or internal identifier (e.g. 'Stantec' for internal/no-external-client work)" -ForegroundColor Yellow
+    Write-Host "    business_center_label ->  bare numeric business center code (e.g. '2014'), or '0000'/'BC_0000' for enterprise-scoped work" -ForegroundColor Yellow
+    Write-Host "    collection_label      ->  standards/resource collection this file belongs to (optional; independent of governance_role - see header comment)" -ForegroundColor Yellow
+    Write-Host "    unit_system           ->  imperial | metric" -ForegroundColor Yellow
+    Write-Host "  Run B hard-fails if client_label or business_center_label is blank or an N/A spelling." -ForegroundColor Yellow
     Write-Host "Then run: .\corpus_update_runbook.ps1 -Run B" -ForegroundColor Yellow
 }
 
