@@ -1,0 +1,351 @@
+{
+  "Uuid": "777174c3-310d-4313-a515-5d2f4f704884",
+  "IsCustomNode": false,
+  "Description": "",
+  "Name": "fingerprint_probe",
+  "ElementResolver": {
+    "ResolutionMap": {}
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "Code": "# -*- coding: utf-8 -*-\r\n\"\"\"\r\nprobe_thin_runner.py\r\n\r\nDynamo CPython3 thin runner that executes every breadth probe under\r\ntools/probes/ against the current Revit document in one pass and writes a\r\nsingle combined result file:\r\n\r\n    tools/probes/probes_<revit_version>_<run_id>.json\r\n\r\n    {\r\n      \"run_metadata\": {\r\n        \"run_id\": \"...\",\r\n        \"extraction_date\": \"<ISO8601>\",\r\n        \"revit_version\": \"2025\",\r\n        \"tool_version\": \"<VERSION.txt contents, or null>\",\r\n        \"document\": {\"title\":..., \"path_name\":..., \"is_workshared\":...},\r\n        \"source\": \"thin_runner\",\r\n        \"probes_run\": [\"arrowheads\", \"dimension_types\", ...]\r\n      },\r\n      \"domains\": {\r\n        \"arrowheads\": [ ...same per-domain entries a standalone probe run\r\n                         with write_json=True would have produced... ],\r\n        ...\r\n      }\r\n    }\r\n\r\nThis is deliberately ONE file per batch run rather than one file per probe:\r\ntools/probes/build_probe_inventory.py consolidates across domains/runs\r\nanyway, so per-probe files were only ever an artifact of running probes one\r\nat a time by hand. The extraction date lives as JSON metadata here, not as\r\na filename token -- the filename groups by Revit release (revit_version)\r\nplus an opaque run_id, so repeated runs against the same release don't\r\ncollide but also aren't pretending the date is the meaningful axis.\r\n\r\nEach probe_*.py file is still a self-contained, paste-able Dynamo Python\r\nnode in its own right (unchanged by this runner) -- this just orchestrates\r\nrunning all of them in one Revit session instead of pasting/running ~20\r\nscripts one at a time.\r\n\r\nPaste into a Dynamo Python Script node (CPython3 engine) and run.\r\n\r\nInputs (IN):\r\n  IN[0] output_directory (str)\r\n      Where to write the combined JSON file. Default: None -> same fallback\r\n      chain the individual probes use (current .rvt's folder, else TEMP/TMP,\r\n      else cwd).\r\n\r\n  IN[1] domain_filter (str | list[str])\r\n      Comma-separated string or list restricting which probes run, matched\r\n      against the probe's domain name (e.g. \"dimension_types\") or its\r\n      filename stem (e.g. \"probe_dimension_types\"). Default: None -> run\r\n      every probe_*.py found.\r\n\r\n  IN[2] probe_inputs (dict[str, list])\r\n      Optional per-probe IN overrides, keyed by domain name or filename\r\n      stem, e.g. {\"object_styles\": [500, False, 30, True]}. Any probe not\r\n      named here runs with IN = [] (its own documented defaults apply).\r\n      Default: {}.\r\n\r\n  IN[3] repo_dir_override (str)\r\n      Optional explicit repo root (must contain tools/probes/). Same escape\r\n      hatch as runner/thin_runner.py's REVIT_FINGERPRINT_REPO_DIR.\r\n\r\n  IN[4] fail_fast (bool)\r\n      If True, stop the whole run on the first probe exception instead of\r\n      recording it and continuing. Default: False (fail-soft: one broken\r\n      probe must not block the rest of the sweep).\r\n\r\nOutput (OUT): a JSON string summarizing the run -- per-probe status, the\r\nsingle combined file written, and repo-resolution diagnostics.\r\n\"\"\"\r\n\r\nimport fnmatch\r\nimport json\r\nimport os\r\nimport sys\r\nimport traceback\r\nimport uuid\r\nfrom datetime import datetime\r\n\r\n# ---------------------------------------------------------------------------\r\n# Repo discovery (mirrors runner/thin_runner.py's approach: no __file__\r\n# reliance, since this is pasted into a Dynamo node; conventional per-user\r\n# install locations, with an explicit override escape hatch).\r\n# ---------------------------------------------------------------------------\r\n\r\nORG_DIR = str(os.environ.get(\"REVIT_FINGERPRINT_ORG_DIR\", \"Company\")).strip() or \"Company\"\r\nAPP_DIR = \"RevitFingerprint\"\r\nCHANNEL_DIR = \"current\"\r\n\r\n\r\ndef _looks_like_unc_path(p):\r\n    try:\r\n        return str(p).startswith(\"\\\\\\\\\")\r\n    except Exception:\r\n        return False\r\n\r\n\r\ndef _is_probably_sync_path(p):\r\n    try:\r\n        s = os.path.abspath(str(p)).lower()\r\n    except Exception:\r\n        return False\r\n    for m in (\"\\\\onedrive\\\\\", \"\\\\sharepoint\\\\\", \"\\\\microsoft teams\\\\\"):\r\n        if m in s:\r\n            return True\r\n    if \"\\\\documents\\\\\" in s and (\"- sharepoint\" in s or \"sharepoint\" in s):\r\n        return True\r\n    return False\r\n\r\n\r\ndef _is_probes_root(p):\r\n    try:\r\n        base = os.path.abspath(str(p))\r\n    except Exception:\r\n        return False\r\n    return os.path.isdir(os.path.join(base, \"tools\", \"probes\"))\r\n\r\n\r\ndef _candidate_repo_dirs(explicit_override):\r\n    tried = []\r\n\r\n    if explicit_override:\r\n        tried.append((\"in:IN[3]\", str(explicit_override).strip()))\r\n\r\n    try:\r\n        v = str(os.environ.get(\"REVIT_FINGERPRINT_REPO_DIR\", \"\")).strip()\r\n    except Exception:\r\n        v = \"\"\r\n    if v:\r\n        tried.append((\"env:REVIT_FINGERPRINT_REPO_DIR\", v))\r\n\r\n    up = os.environ.get(\"USERPROFILE\", \"\")\r\n    if up:\r\n        tried.append((\"documents:current\", os.path.join(up, \"Documents\", ORG_DIR, APP_DIR, CHANNEL_DIR)))\r\n\r\n    lad = os.environ.get(\"LOCALAPPDATA\", \"\")\r\n    if lad:\r\n        tried.append((\"localappdata:current\", os.path.join(lad, ORG_DIR, APP_DIR, CHANNEL_DIR)))\r\n\r\n    if up:\r\n        tried.append((\"userprofile:RevitFingerprint_current\", os.path.join(up, \"RevitFingerprint\", \"current\")))\r\n        tried.append((\r\n            \"userprofile:stantec_general_code\",\r\n            os.path.join(up, \"Stantec\", \"Revit_Fingerprint - General\", \"Code\"),\r\n        ))\r\n\r\n    # Last resort: this file's own location, if the host ever does expose\r\n    # __file__ (some Dynamo hosts do for certain node types).\r\n    try:\r\n        here = os.path.dirname(os.path.abspath(__file__))\r\n        tried.append((\"file:runner_dir_parent\", os.path.dirname(here)))\r\n    except Exception:\r\n        pass\r\n\r\n    return tried\r\n\r\n\r\ndef _resolve_repo_dir(explicit_override):\r\n    tried_out = []\r\n    for src, p in _candidate_repo_dirs(explicit_override):\r\n        if not p:\r\n            continue\r\n        repo_dir = os.path.abspath(p)\r\n        tried_out.append({\"source\": src, \"path\": repo_dir})\r\n        if _looks_like_unc_path(repo_dir):\r\n            continue\r\n        if _is_probes_root(repo_dir):\r\n            warnings = []\r\n            if _is_probably_sync_path(repo_dir):\r\n                warnings.append(\"repo_dir_looks_like_sharepoint_onedrive_sync\")\r\n            return {\"repo_dir\": repo_dir, \"source\": src, \"warnings\": warnings}, tried_out\r\n    return None, tried_out\r\n\r\n\r\ndef _read_tool_version(repo_root):\r\n    try:\r\n        p = os.path.join(repo_root, \"VERSION.txt\")\r\n        if not os.path.exists(p):\r\n            return None\r\n        with open(p, \"r\") as f:\r\n            s = f.read().strip()\r\n        return s if s else None\r\n    except Exception:\r\n        return None\r\n\r\n\r\n# ---------------------------------------------------------------------------\r\n# Input parsing\r\n# ---------------------------------------------------------------------------\r\n\r\ndef _get_in(idx, default=None):\r\n    try:\r\n        if IN is not None and len(IN) > idx and IN[idx] is not None:\r\n            return IN[idx]\r\n    except Exception:\r\n        pass\r\n    return default\r\n\r\n\r\noutput_directory = _get_in(0, None)\r\ndomain_filter_raw = _get_in(1, None)\r\nprobe_inputs = _get_in(2, {}) or {}\r\nrepo_dir_override = _get_in(3, None)\r\nfail_fast = bool(_get_in(4, False))\r\n\r\nif isinstance(domain_filter_raw, str):\r\n    domain_filter = [s.strip() for s in domain_filter_raw.split(\",\") if s.strip()]\r\nelif isinstance(domain_filter_raw, (list, tuple)):\r\n    domain_filter = [str(s).strip() for s in domain_filter_raw if str(s).strip()]\r\nelse:\r\n    domain_filter = None\r\n\r\nif not isinstance(probe_inputs, dict):\r\n    probe_inputs = {}\r\n\r\n_selected, _tried = _resolve_repo_dir(repo_dir_override)\r\n\r\nif _selected is None:\r\n    OUT = json.dumps(\r\n        {\r\n            \"status\": \"blocked\",\r\n            \"error\": \"Local install not found (repo root must contain tools/probes/).\",\r\n            \"tried\": _tried,\r\n            \"notes\": [\r\n                \"Install the code locally (same convention as runner/thin_runner.py), \"\r\n                \"or set REVIT_FINGERPRINT_REPO_DIR, or pass IN[3] explicitly.\",\r\n            ],\r\n        },\r\n        indent=2,\r\n        sort_keys=True,\r\n    )\r\n    raise SystemExit\r\n\r\nREPO_DIR = _selected[\"repo_dir\"]\r\nPROBES_DIR = os.path.join(REPO_DIR, \"tools\", \"probes\")\r\n\r\nif REPO_DIR not in sys.path:\r\n    sys.path.insert(0, REPO_DIR)\r\n\r\n# ---------------------------------------------------------------------------\r\n# Run-level metadata (computed once for the whole batch, not per probe)\r\n# ---------------------------------------------------------------------------\r\n\r\ndef _safe(fn, default=None):\r\n    try:\r\n        return fn()\r\n    except Exception:\r\n        return default\r\n\r\n\r\ndef _revit_version():\r\n    try:\r\n        uiapp = DocumentManager.Instance.CurrentUIApplication  # noqa: F821\r\n        app = uiapp.Application if uiapp is not None else None\r\n        v = _safe(lambda: app.VersionNumber, None)\r\n        return str(v) if v else None\r\n    except Exception:\r\n        return None\r\n\r\n\r\ndef _document_identity():\r\n    try:\r\n        doc = DocumentManager.Instance.CurrentDBDocument  # noqa: F821\r\n    except Exception:\r\n        return {\"title\": None, \"path_name\": None, \"is_workshared\": None}\r\n    return {\r\n        \"title\": _safe(lambda: doc.Title, None),\r\n        \"path_name\": _safe(lambda: doc.PathName, None),\r\n        \"is_workshared\": _safe(lambda: bool(doc.IsWorkshared), None),\r\n    }\r\n\r\n\r\nRUN_ID = datetime.now().strftime(\"%Y%m%dT%H%M%S\") + \"-\" + uuid.uuid4().hex[:6]\r\nREVIT_VERSION = _revit_version() or \"unknown\"\r\nTOOL_VERSION = _read_tool_version(REPO_DIR)\r\nEXTRACTION_DATE = datetime.now().isoformat()\r\nDOCUMENT_IDENTITY = _document_identity()\r\n\r\n# ---------------------------------------------------------------------------\r\n# Probe discovery\r\n# ---------------------------------------------------------------------------\r\n\r\n# Excluded: not domain breadth probes (different OUT contract, or a one-off\r\n# import-availability smoke test rather than a document-scoped inventory).\r\n_NON_DOMAIN_PROBE_STEMS = set([\"probe_roof_type_import\"])\r\n\r\n\r\ndef _discover_probe_files():\r\n    try:\r\n        names = sorted(os.listdir(PROBES_DIR))\r\n    except OSError as ex:\r\n        return [], \"could not list {}: {}\".format(PROBES_DIR, ex)\r\n\r\n    files = []\r\n    for name in names:\r\n        if not (name.startswith(\"probe_\") and name.endswith(\".py\")):\r\n            continue\r\n        stem = name[:-3]\r\n        if stem in _NON_DOMAIN_PROBE_STEMS:\r\n            continue\r\n        files.append(os.path.join(PROBES_DIR, name))\r\n    return files, None\r\n\r\n\r\ndef _matches_filter(stem, declared_domains):\r\n    if domain_filter is None:\r\n        return True\r\n    candidates = set([stem, stem.replace(\"probe_\", \"\", 1)])\r\n    candidates.update(declared_domains or [])\r\n    for want in domain_filter:\r\n        if want in candidates:\r\n            return True\r\n        if fnmatch.fnmatch(stem, want) or any(fnmatch.fnmatch(d, want) for d in (declared_domains or [])):\r\n            return True\r\n    return False\r\n\r\n\r\ndef _probe_in_for(stem, domain_guess):\r\n    for key in (domain_guess, stem, stem.replace(\"probe_\", \"\", 1)):\r\n        if key and key in probe_inputs:\r\n            v = probe_inputs[key]\r\n            return list(v) if isinstance(v, (list, tuple)) else []\r\n    return []\r\n\r\n\r\ndef _default_output_dir():\r\n    if output_directory:\r\n        return str(output_directory)\r\n    pn = DOCUMENT_IDENTITY.get(\"path_name\")\r\n    if pn:\r\n        d = os.path.dirname(pn)\r\n        if d:\r\n            return d\r\n    return os.environ.get(\"TEMP\") or os.environ.get(\"TMP\") or os.getcwd()\r\n\r\n\r\ndef _run_one_probe(path):\r\n    \"\"\"Executes a single probe_*.py file's source in an isolated namespace\r\n    and returns (stem, domain_guess, ok, out_value, error_or_None).\"\"\"\r\n    stem = os.path.splitext(os.path.basename(path))[0]\r\n    domain_guess = stem[len(\"probe_\"):] if stem.startswith(\"probe_\") else stem\r\n\r\n    try:\r\n        with open(path, \"r\", encoding=\"utf-8\") as f:\r\n            source = f.read()\r\n    except Exception as ex:\r\n        return stem, domain_guess, False, None, \"read failed: {}: {}\".format(type(ex).__name__, ex)\r\n\r\n    ns = {\"__name__\": \"__main__\", \"__file__\": path}\r\n    ns[\"IN\"] = _probe_in_for(stem, domain_guess)\r\n\r\n    try:\r\n        code = compile(source, path, \"exec\")\r\n        exec(code, ns)\r\n    except SystemExit:\r\n        pass\r\n    except Exception as ex:\r\n        err = \"{}: {}\\n{}\".format(type(ex).__name__, ex, traceback.format_exc())\r\n        return stem, domain_guess, False, None, err\r\n\r\n    return stem, domain_guess, True, ns.get(\"OUT\"), None\r\n\r\n\r\ndef _domains_declared_in_out(out_value):\r\n    if not isinstance(out_value, list):\r\n        return []\r\n    domains = []\r\n    for entry in out_value:\r\n        if isinstance(entry, dict) and entry.get(\"domain\"):\r\n            d = entry[\"domain\"]\r\n            if d not in domains:\r\n                domains.append(d)\r\n    return domains\r\n\r\n\r\n# ---------------------------------------------------------------------------\r\n# Run\r\n# ---------------------------------------------------------------------------\r\n\r\nprobe_files, discover_err = _discover_probe_files()\r\nout_dir = _default_output_dir()\r\n\r\nif discover_err:\r\n    OUT = json.dumps(\r\n        {\"status\": \"failed\", \"error\": discover_err, \"repo_dir\": REPO_DIR},\r\n        indent=2, sort_keys=True,\r\n    )\r\n    raise SystemExit\r\n\r\nresults = []\r\ncombined_domains = {}\r\nok_count = 0\r\nfailed_count = 0\r\nprobes_run_names = []\r\n\r\nfor path in probe_files:\r\n    stem, domain_guess, ok, out_value, err = None, None, None, None, None\r\n    try:\r\n        stem, domain_guess, ok, out_value, err = _run_one_probe(path)\r\n    except Exception as ex:\r\n        # Defensive: _run_one_probe itself should not raise, but never let\r\n        # one probe take down the whole sweep.\r\n        stem = os.path.splitext(os.path.basename(path))[0]\r\n        domain_guess = stem[len(\"probe_\"):] if stem.startswith(\"probe_\") else stem\r\n        ok = False\r\n        err = \"runner-level failure: {}: {}\".format(type(ex).__name__, ex)\r\n\r\n    if not _matches_filter(stem, _domains_declared_in_out(out_value) if ok else [domain_guess]):\r\n        continue\r\n\r\n    record = {\"probe_file\": os.path.basename(path), \"domain_guess\": domain_guess, \"status\": None, \"error\": None}\r\n\r\n    if not ok:\r\n        record[\"status\"] = \"failed\"\r\n        record[\"error\"] = err\r\n        failed_count += 1\r\n        results.append(record)\r\n        if fail_fast:\r\n            break\r\n        continue\r\n\r\n    if out_value is None:\r\n        record[\"status\"] = \"failed\"\r\n        record[\"error\"] = \"probe produced no OUT\"\r\n        failed_count += 1\r\n        results.append(record)\r\n        if fail_fast:\r\n            break\r\n        continue\r\n\r\n    declared_domains = _domains_declared_in_out(out_value)\r\n\r\n    if declared_domains:\r\n        # Standard probe contract: OUT is a list of {\"kind\":..., \"domain\":...}\r\n        # entries. Merge per declared domain (normally just one per probe)\r\n        # into the shared combined_domains dict.\r\n        for domain in declared_domains:\r\n            domain_entries = [e for e in out_value if isinstance(e, dict) and e.get(\"domain\") == domain]\r\n            combined_domains.setdefault(domain, []).extend(domain_entries)\r\n        record[\"status\"] = \"ok\"\r\n        record[\"domains_written\"] = declared_domains\r\n    else:\r\n        # Non-standard OUT shape (e.g. a findings dict rather than a\r\n        # domain-tagged list). Still capture it rather than dropping it,\r\n        # tagged under the probe's own filename stem so nothing is lost.\r\n        combined_domains.setdefault(domain_guess, []).append(out_value)\r\n        record[\"status\"] = \"ok_nonstandard_shape\"\r\n        record[\"domains_written\"] = [domain_guess]\r\n\r\n    ok_count += 1\r\n    probes_run_names.append(domain_guess)\r\n    results.append(record)\r\n\r\nstatus = \"ok\" if failed_count == 0 else (\"degraded\" if ok_count > 0 else \"failed\")\r\n\r\ncombined_payload = {\r\n    \"run_metadata\": {\r\n        \"run_id\": RUN_ID,\r\n        \"extraction_date\": EXTRACTION_DATE,\r\n        \"revit_version\": REVIT_VERSION,\r\n        \"tool_version\": TOOL_VERSION,\r\n        \"document\": DOCUMENT_IDENTITY,\r\n        \"source\": \"thin_runner\",\r\n        \"probes_run\": sorted(probes_run_names),\r\n    },\r\n    \"domains\": combined_domains,\r\n}\r\n\r\nfile_written = None\r\nwrite_error = None\r\nif ok_count > 0:\r\n    try:\r\n        if not os.path.exists(out_dir):\r\n            os.makedirs(out_dir)\r\n        fname = \"probes_{}_{}.json\".format(REVIT_VERSION, RUN_ID)\r\n        target = os.path.join(out_dir, fname)\r\n        with open(target, \"w\", encoding=\"utf-8\") as f:\r\n            json.dump(combined_payload, f, indent=2, sort_keys=True)\r\n        file_written = target\r\n    except Exception as ex:\r\n        write_error = \"{}: {}\".format(type(ex).__name__, ex)\r\n        status = \"degraded\" if status == \"ok\" else status\r\n\r\nOUT = json.dumps(\r\n    {\r\n        \"status\": status,\r\n        \"run_id\": RUN_ID,\r\n        \"revit_version\": REVIT_VERSION,\r\n        \"extraction_date\": EXTRACTION_DATE,\r\n        \"output_directory\": out_dir,\r\n        \"file_written\": file_written,\r\n        \"file_write_error\": write_error,\r\n        \"probes_discovered\": len(probe_files),\r\n        \"probes_run\": len(results),\r\n        \"probes_ok\": ok_count,\r\n        \"probes_failed\": failed_count,\r\n        \"results\": results,\r\n        \"repo_resolution\": {\r\n            \"selected\": _selected,\r\n            \"tried\": _tried,\r\n        },\r\n    },\r\n    indent=2,\r\n    sort_keys=True,\r\n)\r\n",
+      "Engine": "CPython3",
+      "VariableInputPorts": true,
+      "Id": "03100bfe7cdf49aa89386f2432534e63",
+      "NodeType": "PythonScriptNode",
+      "Inputs": [
+        {
+          "Id": "384cc592a14c45a8a41d55ceadae9263",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "c1ee50fadc5849098cdd9a62f1f501bc",
+          "Name": "IN[1]",
+          "Description": "Input #1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "e24560bcb15c4677b26e3d26fa379e58",
+          "Name": "IN[2]",
+          "Description": "Input #2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "a968c166168c48f99bebf2fc6b832837",
+          "Name": "IN[3]",
+          "Description": "Input #3",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "cece25d7a30b412d9c0eb00d42699c7f",
+          "Name": "IN[4]",
+          "Description": "Input #4",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "e2c120f59cf544d782c4533fb8d99174",
+          "Name": "IN[5]",
+          "Description": "Input #5",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "2f1320af74744c3ab75c8a2515d1222e",
+          "Name": "OUT",
+          "Description": "Result of the python script",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Runs an embedded Python script."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.Directory, CoreNodeModels",
+      "Id": "e076d917032b4daeabd9027b4d3984e6",
+      "NodeType": "ExtensionNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "d409b1ac19a44e2180d264bedfe2dc81",
+          "Name": "",
+          "Description": "Directory path",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows you to select a directory on the system and returns its path",
+      "HintPath": "C:\\Users\\gmcdowell\\Documents\\Revit_Fingerprint\\tools\\probes\\Exports",
+      "InputValue": "C:\\Users\\gmcdowell\\Documents\\Revit_Fingerprint\\tools\\probes\\Exports"
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.Directory, CoreNodeModels",
+      "Id": "52adac4effec4fd3ab1aa0ebabfdc752",
+      "NodeType": "ExtensionNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "5b47ba0b2b704945a50f935108ee2692",
+          "Name": "",
+          "Description": "Directory path",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows you to select a directory on the system and returns its path",
+      "HintPath": "C:\\Users\\gmcdowell\\Documents\\Revit_Fingerprint",
+      "InputValue": "C:\\Users\\gmcdowell\\Documents\\Revit_Fingerprint"
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "Id": "53a291088c494b0594575f668a91da2e",
+      "NodeType": "BooleanInputNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "7f688889846449bdbed6f491516ac620",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Enables selection between True and False",
+      "InputValue": true
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Watch, CoreNodeModels",
+      "WatchWidth": 420.0,
+      "WatchHeight": 200.0,
+      "Id": "256b1a490ed04542a6cbbf3a8c8c1997",
+      "NodeType": "ExtensionNode",
+      "Inputs": [
+        {
+          "Id": "d3646c7569b6455c84633a478edde99e",
+          "Name": "",
+          "Description": "Node to show output from",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "0cba5ae60fa64b41b2885873648d3ca6",
+          "Name": "",
+          "Description": "Node output",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Visualizes a node's output"
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "Id": "60b0563789674781abe8420018b6f25d",
+      "NodeType": "BooleanInputNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "b47bf1b4d6ab4173ac5d70f9b63a4854",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Enables selection between True and False",
+      "InputValue": false
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "2f1320af74744c3ab75c8a2515d1222e",
+      "End": "d3646c7569b6455c84633a478edde99e",
+      "Id": "f5faf18268ac4a548e2a72a26ee8a840",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "d409b1ac19a44e2180d264bedfe2dc81",
+      "End": "384cc592a14c45a8a41d55ceadae9263",
+      "Id": "6cc58506bcc54b67a72d5a6d706addbe",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "5b47ba0b2b704945a50f935108ee2692",
+      "End": "a968c166168c48f99bebf2fc6b832837",
+      "Id": "87a51cb4d088415cbbd04254892ad2e0",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "7f688889846449bdbed6f491516ac620",
+      "End": "cece25d7a30b412d9c0eb00d42699c7f",
+      "Id": "bf40507779294d0d84b3cfd0a94e853e",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "b47bf1b4d6ab4173ac5d70f9b63a4854",
+      "End": "e2c120f59cf544d782c4533fb8d99174",
+      "Id": "47fad6eca4e04252960dd262173bf3cb",
+      "IsHidden": "False"
+    }
+  ],
+  "Dependencies": [],
+  "NodeLibraryDependencies": [],
+  "EnableLegacyPolyCurveBehavior": null,
+  "Thumbnail": "",
+  "GraphDocumentationURL": null,
+  "ExtensionWorkspaceData": [
+    {
+      "ExtensionGuid": "28992e1d-abb9-417f-8b1b-05e053bee670",
+      "Name": "Properties",
+      "Version": "3.3",
+      "Data": {}
+    },
+    {
+      "ExtensionGuid": "DFBD9CC0-DB40-457A-939E-8C8555555A9D",
+      "Name": "Generative Design",
+      "Version": "8.2",
+      "Data": {}
+    }
+  ],
+  "Author": "",
+  "Linting": {
+    "activeLinter": "None",
+    "activeLinterId": "7b75fb44-43fd-4631-a878-29f4d5d8399a",
+    "warningCount": 0,
+    "errorCount": 0
+  },
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": true,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "3.3.0.6316",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "_Background Preview",
+      "EyeX": -17.0,
+      "EyeY": 24.0,
+      "EyeZ": 50.0,
+      "LookX": 12.0,
+      "LookY": -13.0,
+      "LookZ": -58.0,
+      "UpX": 0.0,
+      "UpY": 1.0,
+      "UpZ": 0.0
+    },
+    "ConnectorPins": [],
+    "NodeViews": [
+      {
+        "Id": "03100bfe7cdf49aa89386f2432534e63",
+        "Name": "Python Script",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 255.2,
+        "Y": 39.2
+      },
+      {
+        "Id": "e076d917032b4daeabd9027b4d3984e6",
+        "Name": "export path",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": -171.19999999999993,
+        "Y": 14.399999999999977
+      },
+      {
+        "Id": "52adac4effec4fd3ab1aa0ebabfdc752",
+        "Name": "tools root",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": -308.79999999999995,
+        "Y": 193.59999999999997
+      },
+      {
+        "Id": "53a291088c494b0594575f668a91da2e",
+        "Name": "Fail Fast",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": -114.39999999999998,
+        "Y": 382.40000000000003
+      },
+      {
+        "Id": "256b1a490ed04542a6cbbf3a8c8c1997",
+        "Name": "Watch",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 532.8,
+        "Y": 124.79999999999995
+      },
+      {
+        "Id": "60b0563789674781abe8420018b6f25d",
+        "Name": "Run Toggle",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": -84.76297904780711,
+        "Y": 535.3270281133149
+      }
+    ],
+    "Annotations": [],
+    "X": 148.2063997796772,
+    "Y": 84.21641651487354,
+    "Zoom": 0.6748316584268645
+  }
+}
