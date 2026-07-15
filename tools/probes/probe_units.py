@@ -34,7 +34,7 @@
 #
 #   IN[3] output_directory (str|None)
 #        Directory where JSON will be written; filename fixed:
-#        probe_units_YYYY-MM-DD.json
+#        probes_<revit_version>_<run_id>.json
 #
 # Notes:
 #   - Discovery is category-free: reflects SpecTypeId public members to gather ForgeTypeId specs.def _unitutils_get_dis
@@ -500,9 +500,14 @@ for (suffix, kind, accessor) in UNITS_GLOBAL_SURFACE:
     pv = _pv_from_prop_any(u, accessor)
     _touch_param(pk, pv, "(global)", "(global)")
 
+_reflect_fmt_samples = []
+
 # Per-spec FormatOptions surface
 for (label, spec_id, spec_sid, disc) in selected_specs:
     fmt, fmt_q = _units_get_format_options(u, spec_id)
+
+    if fmt is not None and len(_reflect_fmt_samples) < 60:
+        _reflect_fmt_samples.append(fmt)
 
     # Spec diagnostics (useful when format options aren't reachable)
     _touch_param(
@@ -542,7 +547,153 @@ for pk in sorted(param_index.keys()):
 
 optional_crosswalk = crosswalk_records
 
+
+# -------------------------
+# Reflection sweep (breadth): non-Parameter .NET members via reflection
+# -------------------------
+# Complements the curated/dynamic capture above with a breadth-only sweep of
+# the sampled objects' .NET properties and zero-arg methods. This is
+# diagnostics/breadth, not identity -- it surfaces members a fixed/curated
+# key list or a Parameters-only walk could otherwise miss.
+
+_REFLECTION_SKIP = set([
+    "Equals", "GetHashCode", "GetType", "ToString", "MemberwiseClone",
+    "Dispose", "GetEnumerator", "Clone",
+])
+
+def _reflect_member_names(obj):
+    out = []
+    if obj is None:
+        return out
+    try:
+        t = obj.GetType()
+    except:
+        return out
+    try:
+        for p in t.GetProperties():
+            try:
+                n = p.Name
+                if n in _REFLECTION_SKIP or n.startswith("_"):
+                    continue
+                if p.GetIndexParameters():
+                    continue
+                out.append(("property", n))
+            except:
+                pass
+    except:
+        pass
+    try:
+        for m in t.GetMethods():
+            try:
+                n = m.Name
+                if n in _REFLECTION_SKIP or n.startswith("_"):
+                    continue
+                if n.startswith("get_") or n.startswith("set_") or n.startswith("add_") or n.startswith("remove_"):
+                    continue
+                if m.GetParameters().Length != 0:
+                    continue
+                if m.IsSpecialName:
+                    continue
+                out.append(("method", n))
+            except:
+                pass
+    except:
+        pass
+    seen = set()
+    uniq = []
+    for kind, n in out:
+        if n in seen:
+            continue
+        seen.add(n)
+        uniq.append((kind, n))
+    return sorted(uniq, key=lambda x: x[1])
+
+def _reflect_try_get(obj, member_kind, name):
+    if member_kind == "method":
+        # SAFETY: never invoke a reflection-discovered method. Revit API
+        # methods can have side effects (printing, export, regenerate,
+        # delete, transaction commits, ...) and there is no reliable way to
+        # tell a safe zero-arg query method from a side-effecting one by
+        # name alone. Record that the method exists without calling it.
+        return (True, "<method not invoked>", None)
+    try:
+        v = getattr(obj, name)
+    except Exception as ex:
+        return (False, None, "{}: {}".format(type(ex).__name__, ex))
+    return (True, v, None)
+
+def _reflect_contract(raw_v):
+    if raw_v is None:
+        return {"q": "missing", "storage": "None", "raw": None, "display": None, "norm": None}
+    if isinstance(raw_v, bool):
+        return {"q": "ok", "storage": "Integer", "raw": int(raw_v), "display": str(raw_v), "norm": int(raw_v)}
+    if isinstance(raw_v, int):
+        return {"q": "ok", "storage": "Integer", "raw": raw_v, "display": str(raw_v), "norm": raw_v}
+    if isinstance(raw_v, float):
+        return {"q": "ok", "storage": "Double", "raw": raw_v, "display": str(raw_v), "norm": raw_v}
+    if isinstance(raw_v, str):
+        return {"q": "ok", "storage": "String", "raw": raw_v, "display": raw_v, "norm": raw_v}
+    try:
+        if hasattr(raw_v, "IntegerValue"):
+            iv = int(raw_v.IntegerValue)
+            return {"q": "ok", "storage": "ElementId", "raw": iv, "display": str(iv), "norm": iv}
+    except:
+        pass
+    try:
+        if hasattr(raw_v, "ToString"):
+            s = raw_v.ToString()
+            if s and "Autodesk.Revit" not in s and "System." not in s:
+                return {"q": "ok", "storage": "None", "raw": None, "display": s, "norm": s}
+    except:
+        pass
+    return {"q": "unsupported", "storage": "None", "raw": None, "display": None, "norm": None}
+
+def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200):
+    idx = {}
+    for obj in sample_objs:
+        if obj is None:
+            continue
+        for member_kind, name in _reflect_member_names(obj)[:max_members]:
+            ok, raw_v, err = _reflect_try_get(obj, member_kind, name)
+            key = "refl.{}.{}".format(type_label, name)
+            if key not in idx:
+                idx[key] = {
+                    "domain": domain_name, "member_key": key, "member_kind": member_kind,
+                    "type_label": type_label, "example": None,
+                    "ok_count": 0, "error_count": 0, "unique_value_count": 0, "_seen": set(),
+                }
+            e = idx[key]
+            if not ok:
+                e["error_count"] += 1
+                continue
+            contract = _reflect_contract(raw_v)
+            e["ok_count"] += 1
+            sig = (str(contract.get("storage")), str(contract.get("norm")))
+            if sig not in e["_seen"]:
+                e["_seen"].add(sig)
+                e["unique_value_count"] += 1
+            if e["example"] is None or (contract.get("display") is not None and e["example"].get("display") is None):
+                e["example"] = contract
+    records = []
+    for key in sorted(idx.keys()):
+        e = idx[key]
+        records.append({
+            "domain": e["domain"], "member_key": e["member_key"], "member_kind": e["member_kind"],
+            "type_label": e["type_label"], "example": e["example"],
+            "observed": {"ok_count": e["ok_count"], "error_count": e["error_count"], "unique_value_count": e["unique_value_count"]},
+        })
+    return records
+
+_reflection_records_0 = _run_reflection_sweep(_reflect_fmt_samples, "FormatOptions", "units")
+_reflection_records_1 = _run_reflection_sweep([u] if u is not None else [], "Units", "units")
+_reflection_records = _reflection_records_0 + _reflection_records_1
+
 OUT_payload = [
+    {
+        "kind": "reflection",
+        "domain": "units",
+        "records": _reflection_records
+    },
     {
         "kind": "inventory",
         "domain": "units",
@@ -559,6 +710,56 @@ OUT_payload = [
 file_written = None
 write_error = None
 
+# -------------------------
+# Unified run metadata (release-separated, not date-filename-separated)
+# -------------------------
+# extraction_date lives as JSON metadata, not as a filename token; the
+# filename groups by Revit release (revit_version) plus an opaque run_id so
+# repeated runs don't collide. See tools/probes/build_probe_inventory.py,
+# which consumes this shape directly.
+
+import uuid as _uuid_mod
+
+def _probe_revit_version():
+    try:
+        _uiapp = DocumentManager.Instance.CurrentUIApplication
+        _app = _uiapp.Application if _uiapp is not None else None
+        v = _safe(lambda: _app.VersionNumber, None)
+        return str(v) if v else None
+    except:
+        return None
+
+def _probe_document_identity():
+    return {
+        "title": _safe(lambda: doc.Title, None),
+        "path_name": _safe(lambda: doc.PathName, None),
+        "is_workshared": _safe(lambda: bool(doc.IsWorkshared), None),
+    }
+
+def _probe_run_id():
+    try:
+        return datetime.now().strftime("%Y%m%dT%H%M%S") + "-" + _uuid_mod.uuid4().hex[:6]
+    except:
+        return _uuid_mod.uuid4().hex[:12]
+
+_PROBE_RUN_ID = _probe_run_id()
+_PROBE_REVIT_VERSION = _probe_revit_version() or "unknown"
+
+def _probe_wrap(domain, out_payload):
+    return {
+        "run_metadata": {
+            "run_id": _PROBE_RUN_ID,
+            "extraction_date": datetime.now().isoformat(),
+            "revit_version": _PROBE_REVIT_VERSION,
+            "tool_version": None,
+            "document": _probe_document_identity(),
+            "source": "single_probe",
+            "probe": domain,
+        },
+        "domains": {domain: out_payload},
+    }
+
+
 if write_json:
     try:
         rvt_path = _safe(lambda: doc.PathName, None)
@@ -571,7 +772,7 @@ if write_json:
             default_dir = os.environ.get("TEMP") or os.environ.get("TMP") or os.getcwd()
 
         date_stamp = datetime.now().strftime("%Y-%m-%d")
-        fixed_name = "probe_units_{}.json".format(date_stamp)
+        fixed_name = "probes_{}_{}.json".format(_PROBE_REVIT_VERSION, _PROBE_RUN_ID)
 
         target_dir = out_path if out_path else default_dir
         target_path = os.path.join(target_dir, fixed_name)
@@ -580,7 +781,7 @@ if write_json:
             os.makedirs(target_dir)
 
         with open(target_path, "w") as f:
-            json.dump(OUT_payload, f, indent=2, sort_keys=True)
+            json.dump(_probe_wrap("units", OUT_payload), f, indent=2, sort_keys=True)
 
         file_written = target_path
 

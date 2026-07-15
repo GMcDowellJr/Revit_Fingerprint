@@ -35,7 +35,7 @@
 #
 #   IN[4] output_directory (str)
 #        Directory path where JSON will be written.
-#        Filename is fixed as: probe_dimension_types_YYYY-MM-DD.json
+#        Filename is fixed as: probes_<revit_version>_<run_id>.json
 #        If None, falls back to RVT directory, then TEMP.
 
 
@@ -610,13 +610,22 @@ def _md5(s):
     except:
         return None
 
-def _try_call(obj, member_name):
+def _try_call(obj, member_name, allow_call=True):
     if obj is None or not member_name:
         return (False, None, "missing_target_or_member")
     try:
         if hasattr(obj, member_name):
             v = getattr(obj, member_name)
             if callable(v):
+                if not allow_call:
+                    # SAFETY: member_name came from open-ended reflection
+                    # (not the small hardcoded root_candidates getter list
+                    # below) -- never invoke it. Revit API methods can have
+                    # side effects (printing, export, regenerate, delete,
+                    # ...) and there is no reliable way to tell a safe
+                    # zero-arg query method from a side-effecting one by
+                    # name alone. Record that it exists without calling it.
+                    return (True, "<method not invoked>", None)
                 try:
                     return (True, v(), None)
                 except Exception as ex:
@@ -728,7 +737,7 @@ def _try_extract_format_surface(dim_type):
     if len(roots) == 0:
         out["found_members"] = _reflect_members(dim_type, ["alternate", "alt", "primary", "format", "unit"])
         for n in out["found_members"][:60]:
-            ok, v, err = _try_call(dim_type, n)
+            ok, v, err = _try_call(dim_type, n, allow_call=False)
             if ok:
                 key = "x.dim_type.{}".format(n)
                 out["values"][key] = _format_synth_contract(_kv_norm(n, v)[1])
@@ -745,7 +754,7 @@ def _try_extract_format_surface(dim_type):
             out["found_members"].append("{}::{}".format(root_name, ln))
 
         for ln in leaf_names[:60]:
-            ok, v, err = _try_call(root_obj, ln)
+            ok, v, err = _try_call(root_obj, ln, allow_call=False)
             if not ok:
                 continue
             k = ("x.alt_units.{}::{}".format(root_name, ln) if is_alt else "x.primary_units.{}::{}".format(root_name, ln))
@@ -1062,6 +1071,56 @@ OUT_payload = [
 file_written = None
 write_error = None
 
+# -------------------------
+# Unified run metadata (release-separated, not date-filename-separated)
+# -------------------------
+# extraction_date lives as JSON metadata, not as a filename token; the
+# filename groups by Revit release (revit_version) plus an opaque run_id so
+# repeated runs don't collide. See tools/probes/build_probe_inventory.py,
+# which consumes this shape directly.
+
+import uuid as _uuid_mod
+
+def _probe_revit_version():
+    try:
+        _uiapp = DocumentManager.Instance.CurrentUIApplication
+        _app = _uiapp.Application if _uiapp is not None else None
+        v = _safe(lambda: _app.VersionNumber, None)
+        return str(v) if v else None
+    except:
+        return None
+
+def _probe_document_identity():
+    return {
+        "title": _safe(lambda: doc.Title, None),
+        "path_name": _safe(lambda: doc.PathName, None),
+        "is_workshared": _safe(lambda: bool(doc.IsWorkshared), None),
+    }
+
+def _probe_run_id():
+    try:
+        return datetime.now().strftime("%Y%m%dT%H%M%S") + "-" + _uuid_mod.uuid4().hex[:6]
+    except:
+        return _uuid_mod.uuid4().hex[:12]
+
+_PROBE_RUN_ID = _probe_run_id()
+_PROBE_REVIT_VERSION = _probe_revit_version() or "unknown"
+
+def _probe_wrap(domain, out_payload):
+    return {
+        "run_metadata": {
+            "run_id": _PROBE_RUN_ID,
+            "extraction_date": datetime.now().isoformat(),
+            "revit_version": _PROBE_REVIT_VERSION,
+            "tool_version": None,
+            "document": _probe_document_identity(),
+            "source": "single_probe",
+            "probe": domain,
+        },
+        "domains": {domain: out_payload},
+    }
+
+
 if write_json:
     try:
         rvt_path = _safe(lambda: doc.PathName, None)
@@ -1077,7 +1136,7 @@ if write_json:
             default_dir = os.environ.get("TEMP") or os.environ.get("TMP") or os.getcwd()
 
         date_stamp = datetime.now().strftime("%Y-%m-%d")
-        fixed_name = "probe_dimension_types_{}.json".format(date_stamp)
+        fixed_name = "probes_{}_{}.json".format(_PROBE_REVIT_VERSION, _PROBE_RUN_ID)
 
         target_dir = out_path if out_path else default_dir
         target_path = os.path.join(target_dir, fixed_name)
@@ -1086,7 +1145,7 @@ if write_json:
             os.makedirs(target_dir)
 
         with open(target_path, "w") as f:
-            json.dump(OUT_payload, f, indent=2, sort_keys=True)
+            json.dump(_probe_wrap("dimension_types", OUT_payload), f, indent=2, sort_keys=True)
 
         file_written = target_path
 
