@@ -3,23 +3,46 @@
 probe_thin_runner.py
 
 Dynamo CPython3 thin runner that executes every breadth probe under
-tools/probes/ against the current Revit document in one pass, and writes
-each domain's result to tools/probes/probe_<domain>_<YYYY-MM-DD>.json --
-the same naming convention the probes already use when run individually
-with write_json=True.
+tools/probes/ against the current Revit document in one pass and writes a
+single combined result file:
 
-This does NOT replace running an individual probe by hand (each probe_*.py
-is still a self-contained, paste-able Dynamo Python node). It exists so a
-full breadth sweep across every domain can be captured in one Revit session
-without pasting/running 20 scripts one at a time, and so
-tools/probes/build_probe_inventory.py always has a fresh, complete set of
-dated JSON files to consolidate.
+    tools/probes/probes_<revit_version>_<run_id>.json
+
+    {
+      "run_metadata": {
+        "run_id": "...",
+        "extraction_date": "<ISO8601>",
+        "revit_version": "2025",
+        "tool_version": "<VERSION.txt contents, or null>",
+        "document": {"title":..., "path_name":..., "is_workshared":...},
+        "source": "thin_runner",
+        "probes_run": ["arrowheads", "dimension_types", ...]
+      },
+      "domains": {
+        "arrowheads": [ ...same per-domain entries a standalone probe run
+                         with write_json=True would have produced... ],
+        ...
+      }
+    }
+
+This is deliberately ONE file per batch run rather than one file per probe:
+tools/probes/build_probe_inventory.py consolidates across domains/runs
+anyway, so per-probe files were only ever an artifact of running probes one
+at a time by hand. The extraction date lives as JSON metadata here, not as
+a filename token -- the filename groups by Revit release (revit_version)
+plus an opaque run_id, so repeated runs against the same release don't
+collide but also aren't pretending the date is the meaningful axis.
+
+Each probe_*.py file is still a self-contained, paste-able Dynamo Python
+node in its own right (unchanged by this runner) -- this just orchestrates
+running all of them in one Revit session instead of pasting/running ~20
+scripts one at a time.
 
 Paste into a Dynamo Python Script node (CPython3 engine) and run.
 
 Inputs (IN):
   IN[0] output_directory (str)
-      Where to write the dated JSON files. Default: None -> same fallback
+      Where to write the combined JSON file. Default: None -> same fallback
       chain the individual probes use (current .rvt's folder, else TEMP/TMP,
       else cwd).
 
@@ -44,8 +67,8 @@ Inputs (IN):
       recording it and continuing. Default: False (fail-soft: one broken
       probe must not block the rest of the sweep).
 
-Output (OUT): a single JSON string summarizing the run -- per-probe status,
-files written, and repo-resolution diagnostics.
+Output (OUT): a JSON string summarizing the run -- per-probe status, the
+single combined file written, and repo-resolution diagnostics.
 """
 
 import fnmatch
@@ -53,6 +76,7 @@ import json
 import os
 import sys
 import traceback
+import uuid
 from datetime import datetime
 
 # ---------------------------------------------------------------------------
@@ -150,6 +174,18 @@ def _resolve_repo_dir(explicit_override):
     return None, tried_out
 
 
+def _read_tool_version(repo_root):
+    try:
+        p = os.path.join(repo_root, "VERSION.txt")
+        if not os.path.exists(p):
+            return None
+        with open(p, "r") as f:
+            s = f.read().strip()
+        return s if s else None
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Input parsing
 # ---------------------------------------------------------------------------
@@ -204,6 +240,45 @@ if REPO_DIR not in sys.path:
     sys.path.insert(0, REPO_DIR)
 
 # ---------------------------------------------------------------------------
+# Run-level metadata (computed once for the whole batch, not per probe)
+# ---------------------------------------------------------------------------
+
+def _safe(fn, default=None):
+    try:
+        return fn()
+    except Exception:
+        return default
+
+
+def _revit_version():
+    try:
+        uiapp = DocumentManager.Instance.CurrentUIApplication  # noqa: F821
+        app = uiapp.Application if uiapp is not None else None
+        v = _safe(lambda: app.VersionNumber, None)
+        return str(v) if v else None
+    except Exception:
+        return None
+
+
+def _document_identity():
+    try:
+        doc = DocumentManager.Instance.CurrentDBDocument  # noqa: F821
+    except Exception:
+        return {"title": None, "path_name": None, "is_workshared": None}
+    return {
+        "title": _safe(lambda: doc.Title, None),
+        "path_name": _safe(lambda: doc.PathName, None),
+        "is_workshared": _safe(lambda: bool(doc.IsWorkshared), None),
+    }
+
+
+RUN_ID = datetime.now().strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:6]
+REVIT_VERSION = _revit_version() or "unknown"
+TOOL_VERSION = _read_tool_version(REPO_DIR)
+EXTRACTION_DATE = datetime.now().isoformat()
+DOCUMENT_IDENTITY = _document_identity()
+
+# ---------------------------------------------------------------------------
 # Probe discovery
 # ---------------------------------------------------------------------------
 
@@ -253,20 +328,17 @@ def _probe_in_for(stem, domain_guess):
 def _default_output_dir():
     if output_directory:
         return str(output_directory)
-    try:
-        rvt_path = DocumentManager.Instance.CurrentDBDocument.PathName  # noqa: F821
-        if rvt_path:
-            d = os.path.dirname(rvt_path)
-            if d:
-                return d
-    except Exception:
-        pass
+    pn = DOCUMENT_IDENTITY.get("path_name")
+    if pn:
+        d = os.path.dirname(pn)
+        if d:
+            return d
     return os.environ.get("TEMP") or os.environ.get("TMP") or os.getcwd()
 
 
 def _run_one_probe(path):
     """Executes a single probe_*.py file's source in an isolated namespace
-    and returns (ok, out_value, error_or_None)."""
+    and returns (stem, domain_guess, ok, out_value, error_or_None)."""
     stem = os.path.splitext(os.path.basename(path))[0]
     domain_guess = stem[len("probe_"):] if stem.startswith("probe_") else stem
 
@@ -303,27 +375,12 @@ def _domains_declared_in_out(out_value):
     return domains
 
 
-def _write_domain_json(domain, out_value, out_dir, date_stamp):
-    fname = "probe_{}_{}.json".format(domain, date_stamp)
-    target = os.path.join(out_dir, fname)
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-    with open(target, "w", encoding="utf-8") as f:
-        json.dump(out_value, f, indent=2, sort_keys=True)
-    return target
-
-
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
 
 probe_files, discover_err = _discover_probe_files()
-date_stamp = datetime.now().strftime("%Y-%m-%d")
 out_dir = _default_output_dir()
-
-results = []
-ok_count = 0
-failed_count = 0
 
 if discover_err:
     OUT = json.dumps(
@@ -331,6 +388,12 @@ if discover_err:
         indent=2, sort_keys=True,
     )
     raise SystemExit
+
+results = []
+combined_domains = {}
+ok_count = 0
+failed_count = 0
+probes_run_names = []
 
 for path in probe_files:
     stem, domain_guess, ok, out_value, err = None, None, None, None, None
@@ -347,8 +410,7 @@ for path in probe_files:
     if not _matches_filter(stem, _domains_declared_in_out(out_value) if ok else [domain_guess]):
         continue
 
-    record = {"probe_file": os.path.basename(path), "domain_guess": domain_guess, "status": None,
-              "files_written": [], "error": None}
+    record = {"probe_file": os.path.basename(path), "domain_guess": domain_guess, "status": None, "error": None}
 
     if not ok:
         record["status"] = "failed"
@@ -370,42 +432,66 @@ for path in probe_files:
 
     declared_domains = _domains_declared_in_out(out_value)
 
-    try:
-        if declared_domains:
-            # Standard probe contract: OUT is a list of {"kind":..., "domain":...}
-            # entries. Split per declared domain (normally just one) so the
-            # output file naming/shape matches what write_json=True already
-            # produces when a probe is run individually.
-            for domain in declared_domains:
-                domain_entries = [e for e in out_value if isinstance(e, dict) and e.get("domain") == domain]
-                target = _write_domain_json(domain, domain_entries, out_dir, date_stamp)
-                record["files_written"].append(target)
-            record["status"] = "ok"
-        else:
-            # Non-standard OUT shape (e.g. a findings dict rather than a
-            # domain-tagged list). Still capture it rather than dropping it,
-            # tagged under the probe's own filename stem.
-            target = _write_domain_json(domain_guess, out_value, out_dir, date_stamp)
-            record["files_written"].append(target)
-            record["status"] = "ok_nonstandard_shape"
-        ok_count += 1
-    except Exception as ex:
-        record["status"] = "failed"
-        record["error"] = "write failed: {}: {}".format(type(ex).__name__, ex)
-        failed_count += 1
-        if fail_fast:
-            results.append(record)
-            break
+    if declared_domains:
+        # Standard probe contract: OUT is a list of {"kind":..., "domain":...}
+        # entries. Merge per declared domain (normally just one per probe)
+        # into the shared combined_domains dict.
+        for domain in declared_domains:
+            domain_entries = [e for e in out_value if isinstance(e, dict) and e.get("domain") == domain]
+            combined_domains.setdefault(domain, []).extend(domain_entries)
+        record["status"] = "ok"
+        record["domains_written"] = declared_domains
+    else:
+        # Non-standard OUT shape (e.g. a findings dict rather than a
+        # domain-tagged list). Still capture it rather than dropping it,
+        # tagged under the probe's own filename stem so nothing is lost.
+        combined_domains.setdefault(domain_guess, []).append(out_value)
+        record["status"] = "ok_nonstandard_shape"
+        record["domains_written"] = [domain_guess]
 
+    ok_count += 1
+    probes_run_names.append(domain_guess)
     results.append(record)
 
 status = "ok" if failed_count == 0 else ("degraded" if ok_count > 0 else "failed")
 
+combined_payload = {
+    "run_metadata": {
+        "run_id": RUN_ID,
+        "extraction_date": EXTRACTION_DATE,
+        "revit_version": REVIT_VERSION,
+        "tool_version": TOOL_VERSION,
+        "document": DOCUMENT_IDENTITY,
+        "source": "thin_runner",
+        "probes_run": sorted(probes_run_names),
+    },
+    "domains": combined_domains,
+}
+
+file_written = None
+write_error = None
+if ok_count > 0:
+    try:
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+        fname = "probes_{}_{}.json".format(REVIT_VERSION, RUN_ID)
+        target = os.path.join(out_dir, fname)
+        with open(target, "w", encoding="utf-8") as f:
+            json.dump(combined_payload, f, indent=2, sort_keys=True)
+        file_written = target
+    except Exception as ex:
+        write_error = "{}: {}".format(type(ex).__name__, ex)
+        status = "degraded" if status == "ok" else status
+
 OUT = json.dumps(
     {
         "status": status,
-        "date_stamp": date_stamp,
+        "run_id": RUN_ID,
+        "revit_version": REVIT_VERSION,
+        "extraction_date": EXTRACTION_DATE,
         "output_directory": out_dir,
+        "file_written": file_written,
+        "file_write_error": write_error,
         "probes_discovered": len(probe_files),
         "probes_run": len(results),
         "probes_ok": ok_count,

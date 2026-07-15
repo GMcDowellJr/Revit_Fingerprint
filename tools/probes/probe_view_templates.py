@@ -643,6 +643,56 @@ OUT_payload = [
 file_written = None
 write_error = None
 
+# -------------------------
+# Unified run metadata (release-separated, not date-filename-separated)
+# -------------------------
+# extraction_date lives as JSON metadata, not as a filename token; the
+# filename groups by Revit release (revit_version) plus an opaque run_id so
+# repeated runs don't collide. See tools/probes/build_probe_inventory.py,
+# which consumes this shape directly.
+
+import uuid as _uuid_mod
+
+def _probe_revit_version():
+    try:
+        _uiapp = DocumentManager.Instance.CurrentUIApplication
+        _app = _uiapp.Application if _uiapp is not None else None
+        v = _safe(lambda: _app.VersionNumber, None)
+        return str(v) if v else None
+    except:
+        return None
+
+def _probe_document_identity():
+    return {
+        "title": _safe(lambda: doc.Title, None),
+        "path_name": _safe(lambda: doc.PathName, None),
+        "is_workshared": _safe(lambda: bool(doc.IsWorkshared), None),
+    }
+
+def _probe_run_id():
+    try:
+        return datetime.now().strftime("%Y%m%dT%H%M%S") + "-" + _uuid_mod.uuid4().hex[:6]
+    except:
+        return _uuid_mod.uuid4().hex[:12]
+
+_PROBE_RUN_ID = _probe_run_id()
+_PROBE_REVIT_VERSION = _probe_revit_version() or "unknown"
+
+def _probe_wrap(domain, out_payload):
+    return {
+        "run_metadata": {
+            "run_id": _PROBE_RUN_ID,
+            "extraction_date": datetime.now().isoformat(),
+            "revit_version": _PROBE_REVIT_VERSION,
+            "tool_version": None,
+            "document": _probe_document_identity(),
+            "source": "single_probe",
+            "probe": domain,
+        },
+        "domains": {domain: out_payload},
+    }
+
+
 if write_json:
     try:
         # Choose default directory: RVT folder if possible, else temp
@@ -659,7 +709,7 @@ if write_json:
             default_dir = os.environ.get("TEMP") or os.environ.get("TMP") or os.getcwd()
 
         date_stamp = datetime.now().strftime("%Y-%m-%d")
-        fixed_name = "probe_view_templates_{}.json".format(date_stamp)
+        fixed_name = "probes_{}_{}.json".format(_PROBE_REVIT_VERSION, _PROBE_RUN_ID)
 
         # IN[4] is treated as an output directory (not a filename)
         target_dir = out_path if out_path else default_dir
@@ -669,7 +719,7 @@ if write_json:
             os.makedirs(target_dir)
 
         with open(target_path, "w") as f:
-            json.dump(OUT_payload, f, indent=2, sort_keys=True)
+            json.dump(_probe_wrap("view_templates", OUT_payload), f, indent=2, sort_keys=True)
 
         file_written = target_path
 

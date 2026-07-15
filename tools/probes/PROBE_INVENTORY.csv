@@ -1,196 +1,196 @@
-domain,key_kind,key,member_kind,type_label,storage_types,q_counts,unique_value_count,example_q,example_storage,example_raw,example_display,example_norm,first_seen_date,last_seen_date,run_count,source_files
-arrowheads,param,p.Arrow Closed,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
-arrowheads,param,p.Arrow Style,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,Diagonal,0,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
-arrowheads,param,p.Arrow Width Angle,,,Double,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Double,0.5235987755982984,30.000000000000°,30.0,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
-arrowheads,param,p.Fill Tick,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
-arrowheads,param,p.Heavy End Pen Weight,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,5,5,5,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
-arrowheads,param,p.Tick Mark Centered,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
-arrowheads,param,p.Tick Size,,,Double,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Double,0.0013020833333333333,"1/64""",0.0013020833333333333,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
-dimension_types,param,p.Alternate Units,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,None,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Alternate Units Format,,,None,missing=0;ok=0;unreadable=0;unsupported=2,2,unsupported,None,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Alternate Units Prefix,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Alternate Units Suffix,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Bold,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,No,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Bottom Coordinate,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,2,East / West,2,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Bottom Indicator,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,BOTTOM=,BOTTOM=,BOTTOM=,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Bottom Indicator as Prefix/Suffix,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Prefix,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Center Mark Size,,,Double,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,Double,0.00781266404199475,"3/32""",0.00781266404199475,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Center Marks,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,1,Yes,1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Centerline Pattern,,,ElementId,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,ElementId,-3000010,-3000010,-3000010,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Centerline Symbol,,,ElementId,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,ElementId,18922,Sym-Centerline-Stn,18922,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Centerline Tick Mark,,,ElementId,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,ElementId,-2,-2,-2,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Color,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,Integer,0,0,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Coordinate Base,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,Integer,1,Survey Point,1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Diameter Symbol Location,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,2,After Value,2,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Diameter Symbol Text,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,ø,ø,ø,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Dimension Line Extension,,,Double,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,Double,0.0,"0""",0.0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Dimension Line Snap Distance,,,Double,missing=0;ok=8;unreadable=0;unsupported=0,8,ok,Double,0.0,"0""",0.0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Dimension Prefix,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Dimension String Type,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,1,ok,Integer,1,Continuous,1,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Dimension Suffix,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.East / West Indicator,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,E,E,E,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Edited by,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,Greg.McDowellJr,Greg.McDowellJr,Greg.McDowellJr,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Elevation Base,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,Integer,1,Survey Point,1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Elevation Indicator,,,String,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,String,EL=,EL=,EL=,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Elevation Indicator as Prefix/Suffix,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Prefix,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Equality Formula,,,None,missing=0;ok=0;unreadable=0;unsupported=2,2,unsupported,None,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Equality Text,,,String,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,String,EQ,EQ,EQ,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Equality Witness Display,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Tick and Line,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Flipped Dimension Line Extension,,,Double,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,Double,0.005208333333333333,"1/16""",0.005208333333333333,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Include Elevation,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,1,Yes,1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Include Station,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,1,Yes,1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Indicator as Prefix / Suffix,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Prefix,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Interior Tick Mark,,,ElementId,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,ElementId,16144,Diagonal-Medium,16144,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Interior Tick Mark Display,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Dynamic,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Italic,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,No,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Leader Arrowhead,,,ElementId,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,ElementId,16298,Dot Filled-Small,16298,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Leader Arrowhead Line Weight,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,1,1,1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Leader Line Length,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Double,0.041666666666666664,"1/2""",0.041666666666666664,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Leader Line Weight,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,2,2,2,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Leader Tick Mark,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,ElementId,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Leader Type,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,1,Arc,1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Line Weight,,,Integer,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,Integer,2,2,2,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.North / South Indicator,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,N,N,N,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Ordinate Dimension Settings,,,None,missing=0;ok=0;unreadable=0;unsupported=1,1,unsupported,None,,,,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Radius Symbol Location,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,Integer,0,None,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Radius Symbol Text,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,R,R,R,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Read Convention,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,1,"Up, then Left",1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Rotate with Component,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,0,No,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Show Leader When Text Moves,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,Integer,1,Beyond Witness Lines,1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Show Opening Height,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,No,0,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Slope Direction,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,1,Down,1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Station Indicator,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,STA,STA,STA,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Suppress Spaces,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,0,No,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Symbol,,,ElementId,missing=0;ok=12;unreadable=0;unsupported=0,12,ok,ElementId,28925,Medium-Top,28925,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Text Background,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,0,Opaque,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Text Font,,,String,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,String,Arial Narrow,Arial Narrow,Arial Narrow,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Text Location,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,0,Above Leader,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Text Offset,,,Double,missing=0;ok=10;unreadable=0;unsupported=0,10,ok,Double,0.003906167979002625,"3/64""",0.003906167979002625,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Text Offset from Leader,,,Double,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,Double,0.0013021653543307085,"1/64""",0.0013021653543307085,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Text Offset from Symbol,,,Double,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Double,0.015625,"3/16""",0.015625,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Text Orientation,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Horizontal,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Text Size,,,Double,missing=0;ok=9;unreadable=0;unsupported=0,9,ok,Double,0.0078125,"3/32""",0.0078125,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Tick Mark,,,ElementId,missing=0;ok=12;unreadable=0;unsupported=0,12,ok,ElementId,2584,22 Degree Filled Arrow-Medium,2584,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Tick Mark Line Weight,,,Integer,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,Integer,1,1,1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Top Coordinate,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,1,North / South,1,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Top Indicator,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,TOP=,TOP=,TOP=,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Top Indicator as Prefix/Suffix,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Prefix,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Underline,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,No,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Units Format,,,None,missing=0;ok=0;unreadable=0;unsupported=2,2,unsupported,None,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Width Factor,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Double,1.0,1,1.0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Witness Line Control,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,Integer,0,Gap to Element,0,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Witness Line Extension,,,Double,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,Double,0.005208333333333333,"1/16""",0.005208333333333333,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Witness Line Gap to Element,,,Double,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Double,0.005208333333333333,"1/16""",0.005208333333333333,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Witness Line Length,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Double,0.0078125,"3/32""",0.0078125,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Witness Line Tick Mark,,,ElementId,missing=0;ok=1;unreadable=0;unsupported=0,1,ok,ElementId,,,,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
-dimension_types,param,p.Workset,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,23,Dimension Styles,23,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
-dimension_types,param,x.dim_type.family_name_param,,,String,missing=0;ok=8;unreadable=0;unsupported=0,8,ok,String,Linear Dimension Style,Linear Dimension Style,Linear Dimension Style,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
-fill_patterns,param,fp.grid_count,,,Integer,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
-fill_patterns,param,fp.grids.angles_deg,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,[],[],[],2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
-fill_patterns,param,fp.grids.line_pattern_ids,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,[],[],[],2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
-fill_patterns,param,fp.grids.offsets_in,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,[],[],[],2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
-fill_patterns,param,fp.grids.origins_in,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,[],[],[],2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
-fill_patterns,param,fp.grids.shifts_in,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,[],[],[],2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
-fill_patterns,param,fp.is_solid,,,Integer,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
-fill_patterns,param,fp.name,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,<Solid fill>,<Solid fill>,<Solid fill>,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
-fill_patterns,param,fp.target,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,Drafting,Drafting,Drafting,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
-identity,param,app.username,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Greg.McDowellJr,Greg.McDowellJr,Greg.McDowellJr,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,app.version_build,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,25.4.0.32,25.4.0.32,25.4.0.32,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,app.version_name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Autodesk Revit 2025,Autodesk Revit 2025,Autodesk Revit 2025,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,app.version_number,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,2025,2025,2025,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,doc.central_path,,,String,missing=1;ok=0;unreadable=0;unsupported=0,0,missing,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,doc.is_workshared,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,False,0,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,doc.path_name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,C:\Users\gmcdowell\Documents\containers\EN_0000_Stantec\stn_i_1779_arch_int_container_2025.rvt,C:\Users\gmcdowell\Documents\containers\EN_0000_Stantec\stn_i_1779_arch_int_container_2025.rvt,C:\Users\gmcdowell\Documents\containers\EN_0000_Stantec\stn_i_1779_arch_int_container_2025.rvt,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,doc.title,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,stn_i_1779_arch_int_container_2025,stn_i_1779_arch_int_container_2025,stn_i_1779_arch_int_container_2025,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.element_id,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,33144,33144,33144,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Acoustical Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Acoustical Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Author,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Building Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,BUILDING NAME,BUILDING NAME,BUILDING NAME,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Client Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Code Consultant Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Code Consultant Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Const. Manager Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Const. Manager Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.CvlSite Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.CvlSite Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Electrial Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Electrical Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Envelope Consultant Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Envelope Consultant Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Food Service Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Food Service Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.IfcBuilding GUID,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.IfcProject GUID,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.IfcSite GUID,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Lighting Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Lighting Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Lndscp Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Lndscp Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.MEP Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.MEP Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Philadelphia PA,Philadelphia PA,Philadelphia PA,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office Address Line 1,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,1779,1779,1779,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office Address Line 2,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office Address Line 3,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office Address Line 4,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office City,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office Country,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office Fax,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,(215) 665-7001,(215) 665-7001,(215) 665-7001,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office Legal Entity,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Stantec Consulting Services Inc.,Stantec Consulting Services Inc.,Stantec Consulting Services Inc.,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office State/Province,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office Telephone,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,(215) 665-7000,(215) 665-7000,(215) 665-7000,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Office Zip/Postal Code,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Organization Description,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Organization Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Stantec,Stantec,Stantec,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Other1 Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Other1 Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Other2 Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Other2 Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Other3 Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Other3 Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Owner Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Owner Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_01_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_01_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE A,PACKAGE A,PACKAGE A,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_02_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_02_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE B,PACKAGE B,PACKAGE B,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_03_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_03_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE C,PACKAGE C,PACKAGE C,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_04_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_04_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE D,PACKAGE D,PACKAGE D,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_05_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_05_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE E,PACKAGE E,PACKAGE E,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_06_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_06_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE F,PACKAGE F,PACKAGE F,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_07_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_07_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE G,PACKAGE G,PACKAGE G,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_Active_ApprovedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_Active_Date,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_Active_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_Active_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE A,PACKAGE A,PACKAGE A,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_Active_Number,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,01,01,01,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_SPFile,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,\\corp.ads\data\Content\CONTENT\SHARED\REVIT\SHARED PARAMETERS\STN_PE_Shared Parameters.txt,\\corp.ads\data\Content\CONTENT\SHARED\REVIT\SHARED PARAMETERS\STN_PE_Shared Parameters.txt,\\corp.ads\data\Content\CONTENT\SHARED\REVIT\SHARED PARAMETERS\STN_PE_Shared Parameters.txt,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_Symbol_Issued,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,●,●,●,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_Symbol_IssuedforRef,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,○,○,○,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.PE_Symbol_NotIssued,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,─,─,─,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Planning and Zoning Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Planning and Zoning Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Project Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Project Description,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Project Issue Date,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Project Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Project Number,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Project Status,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Project_Template_Revision_By,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,A.Engle,A.Engle,A.Engle,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Project_Template_Revision_Date,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,2023.04.02,2023.04.02,2023.04.02,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Route Analysis Settings,,,0,missing=0;ok=0;unreadable=0;unsupported=1,0,unsupported,0,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.SR Document GUID,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,9b41c4f9-eaf7-45d6-9293-b4606c1dface,9b41c4f9-eaf7-45d6-9293-b4606c1dface,9b41c4f9-eaf7-45d6-9293-b4606c1dface,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Struct Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Struct Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p.Total Number of Sheets,,,Double,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Double,99.0,99,99.0,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p._Company_Website,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,www.stantec.com,www.stantec.com,www.stantec.com,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+domain,key_kind,key,member_kind,type_label,storage_types,q_counts,unique_value_count,example_q,example_storage,example_raw,example_display,example_norm,revit_versions_seen,first_seen,last_seen,run_count,source_files
+arrowheads,param,p.Arrow Closed,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
+arrowheads,param,p.Arrow Style,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,Diagonal,0,,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
+arrowheads,param,p.Arrow Width Angle,,,Double,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Double,0.5235987755982984,30.000000000000°,30.0,,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
+arrowheads,param,p.Fill Tick,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
+arrowheads,param,p.Heavy End Pen Weight,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,5,5,5,,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
+arrowheads,param,p.Tick Mark Centered,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
+arrowheads,param,p.Tick Size,,,Double,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Double,0.0013020833333333333,"1/64""",0.0013020833333333333,,2026-02-04,2026-02-04,1,probe_arrowheads_2026-02-04.json
+dimension_types,param,p.Alternate Units,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,None,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Alternate Units Format,,,None,missing=0;ok=0;unreadable=0;unsupported=2,2,unsupported,None,,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Alternate Units Prefix,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Alternate Units Suffix,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Bold,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,No,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Bottom Coordinate,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,2,East / West,2,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Bottom Indicator,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,BOTTOM=,BOTTOM=,BOTTOM=,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Bottom Indicator as Prefix/Suffix,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Prefix,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Center Mark Size,,,Double,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,Double,0.00781266404199475,"3/32""",0.00781266404199475,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Center Marks,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,1,Yes,1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Centerline Pattern,,,ElementId,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,ElementId,-3000010,-3000010,-3000010,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Centerline Symbol,,,ElementId,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,ElementId,18922,Sym-Centerline-Stn,18922,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Centerline Tick Mark,,,ElementId,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,ElementId,-2,-2,-2,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Color,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,Integer,0,0,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Coordinate Base,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,Integer,1,Survey Point,1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Diameter Symbol Location,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,2,After Value,2,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Diameter Symbol Text,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,ø,ø,ø,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Dimension Line Extension,,,Double,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,Double,0.0,"0""",0.0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Dimension Line Snap Distance,,,Double,missing=0;ok=8;unreadable=0;unsupported=0,8,ok,Double,0.0,"0""",0.0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Dimension Prefix,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Dimension String Type,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,1,ok,Integer,1,Continuous,1,,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Dimension Suffix,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.East / West Indicator,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,E,E,E,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Edited by,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,Greg.McDowellJr,Greg.McDowellJr,Greg.McDowellJr,,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Elevation Base,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,Integer,1,Survey Point,1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Elevation Indicator,,,String,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,String,EL=,EL=,EL=,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Elevation Indicator as Prefix/Suffix,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Prefix,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Equality Formula,,,None,missing=0;ok=0;unreadable=0;unsupported=2,2,unsupported,None,,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Equality Text,,,String,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,String,EQ,EQ,EQ,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Equality Witness Display,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Tick and Line,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Flipped Dimension Line Extension,,,Double,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,Double,0.005208333333333333,"1/16""",0.005208333333333333,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Include Elevation,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,1,Yes,1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Include Station,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,1,Yes,1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Indicator as Prefix / Suffix,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Prefix,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Interior Tick Mark,,,ElementId,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,ElementId,16144,Diagonal-Medium,16144,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Interior Tick Mark Display,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Dynamic,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Italic,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,No,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Leader Arrowhead,,,ElementId,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,ElementId,16298,Dot Filled-Small,16298,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Leader Arrowhead Line Weight,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,1,1,1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Leader Line Length,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Double,0.041666666666666664,"1/2""",0.041666666666666664,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Leader Line Weight,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,2,2,2,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Leader Tick Mark,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,ElementId,,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Leader Type,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,1,Arc,1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Line Weight,,,Integer,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,Integer,2,2,2,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.North / South Indicator,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,N,N,N,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Ordinate Dimension Settings,,,None,missing=0;ok=0;unreadable=0;unsupported=1,1,unsupported,None,,,,,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Radius Symbol Location,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,Integer,0,None,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Radius Symbol Text,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,R,R,R,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Read Convention,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,1,"Up, then Left",1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Rotate with Component,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,0,No,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Show Leader When Text Moves,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,Integer,1,Beyond Witness Lines,1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Show Opening Height,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,No,0,,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Slope Direction,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,1,Down,1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Station Indicator,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,STA,STA,STA,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Suppress Spaces,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,0,No,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Symbol,,,ElementId,missing=0;ok=12;unreadable=0;unsupported=0,12,ok,ElementId,28925,Medium-Top,28925,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Text Background,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,0,Opaque,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Text Font,,,String,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,String,Arial Narrow,Arial Narrow,Arial Narrow,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Text Location,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Integer,0,Above Leader,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Text Offset,,,Double,missing=0;ok=10;unreadable=0;unsupported=0,10,ok,Double,0.003906167979002625,"3/64""",0.003906167979002625,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Text Offset from Leader,,,Double,missing=0;ok=5;unreadable=0;unsupported=0,5,ok,Double,0.0013021653543307085,"1/64""",0.0013021653543307085,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Text Offset from Symbol,,,Double,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Double,0.015625,"3/16""",0.015625,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Text Orientation,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Horizontal,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Text Size,,,Double,missing=0;ok=9;unreadable=0;unsupported=0,9,ok,Double,0.0078125,"3/32""",0.0078125,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Tick Mark,,,ElementId,missing=0;ok=12;unreadable=0;unsupported=0,12,ok,ElementId,2584,22 Degree Filled Arrow-Medium,2584,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Tick Mark Line Weight,,,Integer,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,Integer,1,1,1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Top Coordinate,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,1,North / South,1,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Top Indicator,,,String,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,String,TOP=,TOP=,TOP=,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Top Indicator as Prefix/Suffix,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,Prefix,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Underline,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,0,No,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Units Format,,,None,missing=0;ok=0;unreadable=0;unsupported=2,2,unsupported,None,,,,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Width Factor,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Double,1.0,1,1.0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Witness Line Control,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,3,ok,Integer,0,Gap to Element,0,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Witness Line Extension,,,Double,missing=0;ok=6;unreadable=0;unsupported=0,6,ok,Double,0.005208333333333333,"1/16""",0.005208333333333333,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Witness Line Gap to Element,,,Double,missing=0;ok=4;unreadable=0;unsupported=0,4,ok,Double,0.005208333333333333,"1/16""",0.005208333333333333,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Witness Line Length,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Double,0.0078125,"3/32""",0.0078125,,2026-02-04,2026-03-19,2,probe_dimension_types_2026-02-04.json;probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Witness Line Tick Mark,,,ElementId,missing=0;ok=1;unreadable=0;unsupported=0,1,ok,ElementId,,,,,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
+dimension_types,param,p.Workset,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,2,ok,Integer,23,Dimension Styles,23,,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
+dimension_types,param,x.dim_type.family_name_param,,,String,missing=0;ok=8;unreadable=0;unsupported=0,8,ok,String,Linear Dimension Style,Linear Dimension Style,Linear Dimension Style,,2026-03-19,2026-03-19,1,probe_dimension_types_2026-03-19.json
+fill_patterns,param,fp.grid_count,,,Integer,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
+fill_patterns,param,fp.grids.angles_deg,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,[],[],[],,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
+fill_patterns,param,fp.grids.line_pattern_ids,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,[],[],[],,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
+fill_patterns,param,fp.grids.offsets_in,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,[],[],[],,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
+fill_patterns,param,fp.grids.origins_in,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,[],[],[],,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
+fill_patterns,param,fp.grids.shifts_in,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,[],[],[],,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
+fill_patterns,param,fp.is_solid,,,Integer,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
+fill_patterns,param,fp.name,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,<Solid fill>,<Solid fill>,<Solid fill>,,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
+fill_patterns,param,fp.target,,,String,missing=0;ok=99;unreadable=0;unsupported=0,0,ok,String,Drafting,Drafting,Drafting,,2026-02-04,2026-02-04,1,probe_fill_patterns_2026-02-04.json
+identity,param,app.username,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Greg.McDowellJr,Greg.McDowellJr,Greg.McDowellJr,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,app.version_build,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,25.4.0.32,25.4.0.32,25.4.0.32,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,app.version_name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Autodesk Revit 2025,Autodesk Revit 2025,Autodesk Revit 2025,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,app.version_number,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,2025,2025,2025,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,doc.central_path,,,String,missing=1;ok=0;unreadable=0;unsupported=0,0,missing,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,doc.is_workshared,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,False,0,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,doc.path_name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,C:\Users\gmcdowell\Documents\containers\EN_0000_Stantec\stn_i_1779_arch_int_container_2025.rvt,C:\Users\gmcdowell\Documents\containers\EN_0000_Stantec\stn_i_1779_arch_int_container_2025.rvt,C:\Users\gmcdowell\Documents\containers\EN_0000_Stantec\stn_i_1779_arch_int_container_2025.rvt,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,doc.title,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,stn_i_1779_arch_int_container_2025,stn_i_1779_arch_int_container_2025,stn_i_1779_arch_int_container_2025,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.element_id,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,33144,33144,33144,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Acoustical Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Acoustical Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Author,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Building Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,BUILDING NAME,BUILDING NAME,BUILDING NAME,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Client Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Code Consultant Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Code Consultant Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Const. Manager Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Const. Manager Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.CvlSite Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.CvlSite Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Electrial Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Electrical Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Envelope Consultant Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Envelope Consultant Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Food Service Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Food Service Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.IfcBuilding GUID,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.IfcProject GUID,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.IfcSite GUID,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Lighting Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Lighting Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Lndscp Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Lndscp Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.MEP Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.MEP Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Philadelphia PA,Philadelphia PA,Philadelphia PA,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office Address Line 1,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,1779,1779,1779,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office Address Line 2,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office Address Line 3,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office Address Line 4,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office City,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office Country,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office Fax,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,(215) 665-7001,(215) 665-7001,(215) 665-7001,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office Legal Entity,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Stantec Consulting Services Inc.,Stantec Consulting Services Inc.,Stantec Consulting Services Inc.,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office State/Province,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office Telephone,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,(215) 665-7000,(215) 665-7000,(215) 665-7000,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Office Zip/Postal Code,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Organization Description,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Organization Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Stantec,Stantec,Stantec,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Other1 Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Other1 Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Other2 Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Other2 Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Other3 Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Other3 Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Owner Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Owner Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_01_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_01_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE A,PACKAGE A,PACKAGE A,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_02_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_02_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE B,PACKAGE B,PACKAGE B,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_03_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_03_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE C,PACKAGE C,PACKAGE C,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_04_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_04_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE D,PACKAGE D,PACKAGE D,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_05_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_05_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE E,PACKAGE E,PACKAGE E,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_06_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_06_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE F,PACKAGE F,PACKAGE F,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_07_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_07_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE G,PACKAGE G,PACKAGE G,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_Active_ApprovedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_Active_Date,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_Active_IssuedBy,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_Active_Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,PACKAGE A,PACKAGE A,PACKAGE A,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_Active_Number,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,01,01,01,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_SPFile,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,\\corp.ads\data\Content\CONTENT\SHARED\REVIT\SHARED PARAMETERS\STN_PE_Shared Parameters.txt,\\corp.ads\data\Content\CONTENT\SHARED\REVIT\SHARED PARAMETERS\STN_PE_Shared Parameters.txt,\\corp.ads\data\Content\CONTENT\SHARED\REVIT\SHARED PARAMETERS\STN_PE_Shared Parameters.txt,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_Symbol_Issued,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,●,●,●,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_Symbol_IssuedforRef,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,○,○,○,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.PE_Symbol_NotIssued,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,─,─,─,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Planning and Zoning Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Planning and Zoning Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Project Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Project Description,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Project Issue Date,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Project Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Project Number,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Project Status,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Project_Template_Revision_By,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,A.Engle,A.Engle,A.Engle,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Project_Template_Revision_Date,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,2023.04.02,2023.04.02,2023.04.02,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Route Analysis Settings,,,0,missing=0;ok=0;unreadable=0;unsupported=1,0,unsupported,0,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.SR Document GUID,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,9b41c4f9-eaf7-45d6-9293-b4606c1dface,9b41c4f9-eaf7-45d6-9293-b4606c1dface,9b41c4f9-eaf7-45d6-9293-b4606c1dface,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Struct Address,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Struct Name,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p.Total Number of Sheets,,,Double,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Double,99.0,99,99.0,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p._Company_Website,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,www.stantec.com,www.stantec.com,www.stantec.com,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
 identity,param,project_info.p._Important_Dates,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,"YYYY.MM.DD, Issued for SD
 YYYY.MM.DD, Issued for DD
 YYYY.MM.DD, Issued for 60% CD
@@ -203,321 +203,321 @@ YYYY.MM.DD, Issued for Construction/Tender","YYYY.MM.DD, Issued for SD
 YYYY.MM.DD, Issued for DD
 YYYY.MM.DD, Issued for 60% CD
 YYYY.MM.DD, Issued for 90% CD
-YYYY.MM.DD, Issued for Construction/Tender",2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+YYYY.MM.DD, Issued for Construction/Tender",,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
 identity,param,project_info.p._Linked_Model_Managers,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,"First Last, Phone, Timezone
 First Last, Phone, Timezone","First Last, Phone, Timezone
 First Last, Phone, Timezone","First Last, Phone, Timezone
-First Last, Phone, Timezone",2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p._Model_Description,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p._Model_File_Path,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,<Pick location in Project Information>,<Pick location in Project Information>,<Pick location in Project Information>,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-identity,param,project_info.p._Model_Manager,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,"First Last, Phone, Timezone","First Last, Phone, Timezone","First Last, Phone, Timezone",2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+First Last, Phone, Timezone",,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p._Model_Description,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p._Model_File_Path,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,<Pick location in Project Information>,<Pick location in Project Information>,<Pick location in Project Information>,,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+identity,param,project_info.p._Model_Manager,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,"First Last, Phone, Timezone","First Last, Phone, Timezone","First Last, Phone, Timezone",,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
 identity,param,project_info.p._Team_Members,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,"First Last, Phone, Timezone
 First Last, Phone, Timezone","First Last, Phone, Timezone
 First Last, Phone, Timezone","First Last, Phone, Timezone
-First Last, Phone, Timezone",2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
-line_patterns,param,prop.is_solid,,,Integer,missing=0;ok=19;unreadable=0;unsupported=0,0,ok,Integer,0,False,0,2026-02-04,2026-02-04,1,probe_line_patterns_2026-02-04.json
-line_patterns,param,prop.name,,,String,missing=0;ok=19;unreadable=0;unsupported=0,0,ok,String,Center,Center,Center,2026-02-04,2026-02-04,1,probe_line_patterns_2026-02-04.json
-line_patterns,param,prop.segment_count,,,Integer,missing=0;ok=19;unreadable=0;unsupported=0,0,ok,Integer,4,4,4,2026-02-04,2026-02-04,1,probe_line_patterns_2026-02-04.json
-line_patterns,param,prop.sequence,,,String,missing=0;ok=19;unreadable=0;unsupported=0,0,ok,String,seg[000].kind=0;len=0.250000|seg[001].kind=1;len=0.187500|seg[002].kind=0;len=0.625000|seg[003].kind=1;len=0.187500,seg[000].kind=0;len=0.250000|seg[001].kind=1;len=0.187500|seg[002].kind=0;len=0.625000|seg[003].kind=1;len=0.187500,seg[000].kind=0;len=0.250000|seg[001].kind=1;len=0.187500|seg[002].kind=0;len=0.625000|seg[003].kind=1;len=0.187500,2026-02-04,2026-02-04,1,probe_line_patterns_2026-02-04.json
-line_patterns,param,prop.sequence_hash,,,String,missing=0;ok=19;unreadable=0;unsupported=0,0,ok,String,f0fbd9ea7d28714fcc8b16a820d4ee7b,f0fbd9ea7d28714fcc8b16a820d4ee7b,f0fbd9ea7d28714fcc8b16a820d4ee7b,2026-02-04,2026-02-04,1,probe_line_patterns_2026-02-04.json
-line_styles,param,v.cat.id,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,Integer,-2009504,-2009504,-2009504,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-line_styles,param,v.cat.name,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,<Hidden Lines>,<Hidden Lines>,<Hidden Lines>,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-line_styles,param,v.gs.id,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,Integer,195,195,195,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-line_styles,param,v.gs.name,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,<Hidden Lines>,<Hidden Lines>,<Hidden Lines>,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-line_styles,param,v.gs.type,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,1,1,1,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-line_styles,param,v.line_color.hex,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,#00A600,#00A600,#00A600,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-line_styles,param,v.line_color.rgb,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,0|166|0,0|166|0,0|166|0,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-line_styles,param,v.line_pattern.id,,,ElementId,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,ElementId,27,27,27,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-line_styles,param,v.line_pattern.name,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,Dash,Dash,Dash,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-line_styles,param,v.line_weight.projection,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,Integer,2,2,2,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-line_styles,param,v.parent_cat.id,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,Integer,-2000051,-2000051,-2000051,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-line_styles,param,v.parent_cat.name,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,Lines,Lines,Lines,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
-object_styles,param,c.allows_visibility_control,,,Integer,missing=175;ok=0;unreadable=0;unsupported=0,0,missing,Integer,,,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.builtin_category,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,-2000223,-2000223,-2000223,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.can_add_subcategory,,,Integer,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.category_type,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,AnalyticalModel,AnalyticalModel,AnalyticalModel,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.has_material_quantities,,,Integer,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,Integer,0,False,0,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.is_cuttable,,,Integer,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,Integer,0,False,0,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.is_subcategory,,,Integer,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.line_color.hex,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,#000000,#000000,#000000,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.line_color.rgb,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,0|0|0,0|0|0,0|0|0,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.line_pattern_cut,,,ElementId,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.line_pattern_projection,,,ElementId,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,ElementId,27,Dash,27,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.line_weight_cut,,,Integer,missing=163;ok=12;unreadable=0;unsupported=0,0,ok,Integer,2,2,2,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.line_weight_projection,,,Integer,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,Integer,3,3,3,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.material,,,ElementId,missing=160;ok=15;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.name,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,Displacement Path,Displacement Path,Displacement Path,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.parent_name,,,String,missing=84;ok=91;unreadable=0;unsupported=0,0,ok,String,Electrical Fixtures,Electrical Fixtures,Electrical Fixtures,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-object_styles,param,c.tab,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,Analytical,Analytical,Analytical,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
-phase_filters,param,phase_filter.demolished.presentation_id,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,By Category,By Category,By Category,2026-02-04,2026-02-04,1,probe_phase_filters_2026-02-04.json
-phase_filters,param,phase_filter.existing.presentation_id,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Not Displayed,Not Displayed,Not Displayed,2026-02-04,2026-02-04,1,probe_phase_filters_2026-02-04.json
-phase_filters,param,phase_filter.name,,,String,missing=0;ok=7;unreadable=0;unsupported=0,0,ok,String,Show Previous Phase,Show Previous Phase,Show Previous Phase,2026-02-04,2026-02-04,1,probe_phase_filters_2026-02-04.json
-phase_filters,param,phase_filter.new.presentation_id,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Not Displayed,Not Displayed,Not Displayed,2026-02-04,2026-02-04,1,probe_phase_filters_2026-02-04.json
-phase_filters,param,phase_filter.temporary.presentation_id,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,By Category,By Category,By Category,2026-02-04,2026-02-04,1,probe_phase_filters_2026-02-04.json
-phase_graphics,param,p.Annotation Crop,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Appearance,,,None,missing=0;ok=6;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Appears In Sheet List,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Approved By,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Approver,Approver,Approver,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Associated Level,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,Level 1,Level 1,Level 1,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Checked By,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Checker,Checker,Checker,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Color Scheme,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Color Scheme Location,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,1,Background,1,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Column Symbolic Offset,,,Double,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Double,1.0,"1'-0""",11.999999999999998,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Crop Region Visible,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Crop View,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Current Revision,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Current Revision Date,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Current Revision Description,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Current Revision Issued,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Current Revision Issued By,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Current Revision Issued To,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Default Analysis Display Style,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Dependency,,,String,missing=0;ok=28;unreadable=0;unsupported=0,0,ok,String,Independent,Independent,Independent,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Depth Clipping,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Designed By,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Designer,Designer,Designer,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Detail Level,,,Integer,missing=0;ok=11;unreadable=0;unsupported=0,0,ok,Integer,1,Coarse,1,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Discipline,,,Integer;String,missing=0;ok=20;unreadable=0;unsupported=0,0,ok,Integer,4095,Coordination,4095,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Discipline Sort Order,,,Double,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Double,0.0,0,0.0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Discipline Sub-Sort Order,,,Double,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Double,0.0,0,0.0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Display Model,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,0,Normal,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Drawing Number Levels/Locations,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Drawing Number Originator,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Drawing Number Project Number,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Drawing Number Role,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Drawing Number Status Code,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Drawing Number Status Description,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Drawing Number Type,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Drawing Number Volume/System,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Drawing_Included_In_Set,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Drawn By,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Author,Author,Author,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Export to IFC,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,Integer,0,By Type,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Fields,,,None,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.File Path,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Y:\content\shared\Revit\2025\NA-EN\Project_Templates\01_Generic\stn_i_generic_2025.rte,Y:\content\shared\Revit\2025\NA-EN\Project_Templates\01_Generic\stn_i_generic_2025.rte,Y:\content\shared\Revit\2025\NA-EN\Project_Templates\01_Generic\stn_i_generic_2025.rte,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Filter,,,None,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Formatting,,,None,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Graphic Display Options,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Guide Grid,,,ElementId,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Lighting,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Model Display,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.None,,,ElementId,missing=0;ok=28;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Orientation,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,0,Project North,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.PE_01_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.PE_02_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.PE_03_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.PE_04_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.PE_05_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.PE_06_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.PE_07_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Parts Visibility,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,1,Show Original,1,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Phase,,,ElementId,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,ElementId,3,New Construction,3,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Phase Filter,,,ElementId,missing=0;ok=7;unreadable=0;unsupported=0,0,ok,ElementId,1912,Show All,1912,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Photographic Exposure,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Range: Base Level,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Range: Top Level,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Referencing Detail,,,String,missing=0;ok=18;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Referencing Sheet,,,String,missing=0;ok=18;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Referencing Sheet Collection,,,ElementId,missing=0;ok=18;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Revisions on Sheet,,,None,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Scale,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String, , , ,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Scale Value    1:,,,Integer,missing=0;ok=13;unreadable=0;unsupported=0,0,ok,Integer,96,96,96,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Scope Box,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Shadows,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sheet Classification,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,99-Stantec Information Sheets,99-Stantec Information Sheets,99-Stantec Information Sheets,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sheet Collection,,,ElementId,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sheet Issue Date,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,04/11/15,04/11/15,04/11/15,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sheet Name,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Sync with Central View (SWC),Sync with Central View (SWC),Sync with Central View (SWC),2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sheet Number,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,0000,0000,0000,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sheet Number Of,,,Double,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Double,0.0,0,0.0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sheet Sub-Classification,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Show Hidden Lines,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,1,By Discipline,1,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sketch Reference Sheet,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sketch Submission Description,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sketchy Lines,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sorting/Grouping,,,None,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Sun Path,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.System Color Schemes,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Title on Sheet,,,String,missing=0;ok=11;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Underlay Orientation,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,0,Look down,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.V/G Overrides Analytical Model,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.V/G Overrides Annotation,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.V/G Overrides Filters,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.V/G Overrides Import,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.V/G Overrides Model,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.View Classification,,,String,missing=0;ok=16;unreadable=0;unsupported=0,0,ok,String,~Do Not Rename,~Do Not Rename,~Do Not Rename,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.View Name,,,String,missing=0;ok=16;unreadable=0;unsupported=0,0,ok,String,???,???,???,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.View Range,,,None,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.View Scale,,,Integer,missing=0;ok=13;unreadable=0;unsupported=0,0,ok,Integer,96," 1/8"" = 1'-0"" ",96,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.View Sub-Classification,,,String,missing=0;ok=16;unreadable=0;unsupported=0,0,ok,String,~Coordination,~Coordination,~Coordination,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.View Template,,,ElementId,missing=0;ok=14;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Visibility/Graphics Overrides,,,None,missing=0;ok=21;unreadable=0;unsupported=0,0,ok,None,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Visual Style,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,2,Hidden Line,2,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p.Wall Join Display,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,Clean all wall joins,0,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phase_graphics,param,p._Not_To_Scale_Text,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
-phases,param,phase.name,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,Existing,Existing,Existing,2026-02-04,2026-02-04,1,probe_phases_2026-02-04.json
-phases,param,phase.sequence_number,,,Integer,missing=0;ok=0;unreadable=2;unsupported=0,0,unreadable,Integer,1,1,1,2026-02-04,2026-02-04,1,probe_phases_2026-02-04.json
-phases,param,phase.uid,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001,e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001,e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001,2026-02-04,2026-02-04,1,probe_phases_2026-02-04.json
-text_types,param,p.Background,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,Opaque,0,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Bold,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Color,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Italic,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Leader Arrowhead,,,ElementId,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,ElementId,2584,22 Degree Filled Arrow-Medium,2584,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Leader/Border Offset,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Double,0.002604166666666667,"1/32""",0.002604166666666667,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Line Weight,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,4,4,4,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Show Border,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Tab Size,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Double,0.020833333333333336,"1/4""",0.020833333333333336,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Text Font,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,Arial Narrow,Arial Narrow,Arial Narrow,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Text Size,,,Double,missing=0;ok=7;unreadable=0;unsupported=0,0,ok,Double,0.0078125,"3/32""",0.0078125,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Underline,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,p.Width Factor,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Double,1.0,1,1.0,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,v.color.color.hex_bbgrr,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,#000000,#000000,#000000,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,v.color.color.hex_rrggbb,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,#000000,#000000,#000000,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,v.color.color.raw_hex32,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,0x00000000,0x00000000,0x00000000,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,v.color.color.rgb_bbgrr,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,0|0|0,0|0|0,0|0|0,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-text_types,param,v.color.color.rgb_rrggbb,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,0|0|0,0|0|0,0|0|0,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
-units,param,p.debug.format_options_status,,,String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,String,ok,ok,ok,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.format.accuracy,,,Double;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Double,1.0,1.0,1.0,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.format.rounding_method,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.format.suppress_leading_zeros,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.format.suppress_spaces,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.format.suppress_trailing_zeros,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.format.suppress_unit_symbol,,,String,missing=0;ok=0;unreadable=151;unsupported=0,0,unreadable,String,AttributeError: 'FormatOptions' object has no attribute 'SuppressUnitSymbol',AttributeError: 'FormatOptions' object has no attribute 'SuppressUnitSymbol',AttributeError: 'FormatOptions' object has no attribute 'SuppressUnitSymbol',2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.format.symbol_type_id,,,String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,String,autodesk.unit.symbol:vA-1.0.1,autodesk.unit.symbol:vA-1.0.1,autodesk.unit.symbol:vA-1.0.1,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.format.unit_type_id,,,String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,String,autodesk.unit.unit:voltAmperes-1.0.1,autodesk.unit.unit:voltAmperes-1.0.1,autodesk.unit.unit:voltAmperes-1.0.1,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.format.use_default,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.format.use_digit_grouping,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.format.use_plus_prefix,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.units.decimal_symbol,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.units.digit_grouping_amount,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1,1,1,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-units,param,p.units.digit_grouping_symbol,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1,1,1,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
-view_category_overrides,param,api.get_category_overrides,,,None,missing=0;ok=0;unreadable=21318;unsupported=0,0,unreadable,None,,,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,delta.cut_line_color.rgb,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,delta.cut_line_pattern,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,delta.cut_line_weight,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,delta.halftone,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,delta.projection_line_color.rgb,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,delta.projection_line_pattern,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,delta.projection_line_weight,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,delta.transparency,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,diag.include_subcategories,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1,1,1,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,diag.max_categories_to_inspect,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,diag.non_templated_views_found,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1545,1545,1545,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,diag.selected_views,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,50,50,50,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,diag.templates_found,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,54,54,54,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,diag.total_categories_found,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,2885,2885,2885,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,diag.total_views_found,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1855,1855,1855,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,eff.cut_line_color.rgb,,,String,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,String,0|0|0,0|0|0,0|0|0,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,eff.cut_line_pattern,,,ElementId,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,eff.cut_line_weight,,,Integer,missing=50505;ok=25077;unreadable=0;unsupported=0,0,ok,Integer,6,6,6,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,eff.halftone,,,Integer;None,missing=75547;ok=35;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,eff.projection_line_color.rgb,,,String,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,String,0|0|0,0|0|0,0|0|0,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,eff.projection_line_pattern,,,ElementId,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,eff.projection_line_weight,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,4,4,4,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_category_overrides,param,eff.transparency,,,Integer;None,missing=75563;ok=19;unreadable=0;unsupported=0,0,ok,Integer,75,75,75,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
-view_filter_applications,param,vfa.filter.id,,,ElementId,missing=0;ok=32;unreadable=0;unsupported=0,0,ok,ElementId,68527,Fire Rated Partitions - 1 Hour,68527,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.filter.name,,,String,missing=0;ok=32;unreadable=0;unsupported=0,0,ok,String,Fire Rated Partitions - 1 Hour,Fire Rated Partitions - 1 Hour,Fire Rated Partitions - 1 Hour,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.filter.order_index,,,Integer,missing=0;ok=10;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.filter.visibility,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.filter_stack.count,,,Integer,missing=0;ok=7;unreadable=0;unsupported=0,0,ok,Integer,9,9,9,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.cut_bg_pattern_color.hex,,,String,missing=1;ok=0;unreadable=0;unsupported=0,0,missing,String,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.cut_bg_pattern_color.rgb,,,String,missing=1;ok=0;unreadable=0;unsupported=0,0,missing,String,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.cut_bg_pattern_id,,,ElementId,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.cut_fg_pattern_color.hex,,,String,missing=1;ok=5;unreadable=0;unsupported=0,0,ok,String,#FF0000,#FF0000,#FF0000,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.cut_fg_pattern_color.rgb,,,String,missing=1;ok=5;unreadable=0;unsupported=0,0,ok,String,255|0|0,255|0|0,255|0|0,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.cut_fg_pattern_id,,,ElementId,missing=0;ok=6;unreadable=0;unsupported=0,0,ok,ElementId,19,<Solid fill>,19,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.cut_line_color.hex,,,String,missing=1;ok=4;unreadable=0;unsupported=0,0,ok,String,#FF0000,#FF0000,#FF0000,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.cut_line_color.rgb,,,String,missing=1;ok=4;unreadable=0;unsupported=0,0,ok,String,255|0|0,255|0|0,255|0|0,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.cut_line_pattern_id,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.cut_line_weight,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,-1,-1,-1,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.halftone,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,False,0,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.has_any_override,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.present,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.proj_line_color.hex,,,String,missing=1;ok=12;unreadable=0;unsupported=0,0,ok,String,#FF0000,#FF0000,#FF0000,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.proj_line_color.rgb,,,String,missing=1;ok=12;unreadable=0;unsupported=0,0,ok,String,255|0|0,255|0|0,255|0|0,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.proj_line_pattern_id,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.proj_line_weight,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,0,ok,Integer,-1,-1,-1,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.sig_hash,,,String,missing=0;ok=27;unreadable=0;unsupported=0,0,ok,String,1775967146b97e6cc2293a2883359ba7a68f699a,1775967146b97e6cc2293a2883359ba7a68f699a,1775967146b97e6cc2293a2883359ba7a68f699a,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.surf_bg_pattern_color.hex,,,String,missing=1;ok=0;unreadable=0;unsupported=0,0,missing,String,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.surf_bg_pattern_color.rgb,,,String,missing=1;ok=0;unreadable=0;unsupported=0,0,missing,String,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.surf_bg_pattern_id,,,ElementId,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.surf_fg_pattern_color.hex,,,String,missing=1;ok=7;unreadable=0;unsupported=0,0,ok,String,#E43F3F,#E43F3F,#E43F3F,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.surf_fg_pattern_color.rgb,,,String,missing=1;ok=7;unreadable=0;unsupported=0,0,ok,String,228|63|63,228|63|63,228|63|63,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.surf_fg_pattern_id,,,ElementId,missing=0;ok=3;unreadable=0;unsupported=0,0,ok,ElementId,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.ogs.transparency,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.view.is_template,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.view.name,,,String,missing=0;ok=16;unreadable=0;unsupported=0,0,ok,String,z_Filters - Fire Rated Wall/Door Check,z_Filters - Fire Rated Wall/Door Check,z_Filters - Fire Rated Wall/Door Check,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_applications,param,vfa.view.view_type,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,1,1,1,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
-view_filter_definitions,param,v.filter.category_count,,,Integer,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,Integer,1,1,1,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
-view_filter_definitions,param,v.filter.category_ids,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,[-2000011],-2000011,-2000011,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
-view_filter_definitions,param,v.filter.category_names,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,['Walls'],Walls,Walls,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
-view_filter_definitions,param,v.filter.id,,,Integer,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,Integer,68527,68527,68527,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
-view_filter_definitions,param,v.filter.logic,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,and,and,and,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
-view_filter_definitions,param,v.filter.name,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,Fire Rated Partitions - 1 Hour,Fire Rated Partitions - 1 Hour,Fire Rated Partitions - 1 Hour,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
-view_filter_definitions,param,v.filter.rule_count,,,Integer,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,Integer,1,1,1,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
-view_filter_definitions,param,v.filter.rule_param_ids,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,68760,68760,68760,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
-view_filter_definitions,param,v.filter.rule_sig_hash,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,101cd30531197e2efcc19eb7408896fe1ab4dabd,101cd30531197e2efcc19eb7408896fe1ab4dabd,101cd30531197e2efcc19eb7408896fe1ab4dabd,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
-view_filter_definitions,param,v.filter.rule_types,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,FilterDoubleRule,FilterDoubleRule,FilterDoubleRule,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
-view_templates,param,p.001_ViewCategory,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.001_ViewSubCategory,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Appearance,,,None,missing=0;ok=0;unreadable=0;unsupported=10,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Background,,,None,missing=0;ok=0;unreadable=0;unsupported=10,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Browser_View Category,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Browser_View Group,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Browser_View Sub Series,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Browser_View Subcategory,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Color Scheme,,,None,missing=0;ok=0;unreadable=0;unsupported=37,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Color Scheme Location,,,Integer,missing=0;ok=37;unreadable=0;unsupported=0,0,ok,Integer,1,Background,1,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Column Symbolic Offset,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Double,1.0,"1'-0""",11.999999999999998,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Depth Clipping,,,Integer,missing=0;ok=33;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Depth Cueing,,,None,missing=0;ok=0;unreadable=0;unsupported=9,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Detail Level,,,Integer,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,Integer,2,Medium,2,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Discipline,,,Integer,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,Integer,1,Architectural,1,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Display Model,,,Integer,missing=0;ok=42;unreadable=0;unsupported=0,0,ok,Integer,0,Normal,0,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Far Clipping,,,Integer,missing=0;ok=9;unreadable=0;unsupported=0,0,ok,Integer,2,2,2,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Fields,,,None,missing=0;ok=0;unreadable=0;unsupported=2,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Filter,,,None,missing=0;ok=0;unreadable=0;unsupported=2,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Folder,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Formatting,,,None,missing=0;ok=0;unreadable=0;unsupported=2,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Lighting,,,None,missing=0;ok=0;unreadable=0;unsupported=43,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Model Display,,,None,missing=0;ok=0;unreadable=0;unsupported=43,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Orientation,,,Integer,missing=0;ok=33;unreadable=0;unsupported=0,0,ok,Integer,1,True North,1,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Parts Visibility,,,Integer,missing=0;ok=43;unreadable=0;unsupported=0,0,ok,Integer,1,Show Original,1,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Phase Filter,,,ElementId,missing=0;ok=53;unreadable=0;unsupported=0,0,ok,ElementId,1912,Show All,1912,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Photographic Exposure,,,None,missing=0;ok=0;unreadable=0;unsupported=43,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Project Identification,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Rendering Settings,,,None,missing=0;ok=0;unreadable=0;unsupported=1,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.SR View Calculation Settings,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Scale Value    1:,,,Integer,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,Integer,96,96,96,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Shadows,,,None,missing=0;ok=0;unreadable=0;unsupported=43,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Sheet Discipline #,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Sheet Series #,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Show Hidden Lines,,,Integer,missing=0;ok=43;unreadable=0;unsupported=0,0,ok,Integer,1,By Discipline,1,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Sketchy Lines,,,None,missing=0;ok=0;unreadable=0;unsupported=43,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Sorting/Grouping,,,None,missing=0;ok=0;unreadable=0;unsupported=2,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Sub Discipline,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Sun Path,,,Integer,missing=0;ok=43;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.System Color Schemes,,,None,missing=0;ok=0;unreadable=0;unsupported=28,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Underlay Orientation,,,Integer,missing=0;ok=33;unreadable=0;unsupported=0,0,ok,Integer,0,Look down,0,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.V/G Overrides Analytical Model,,,None,missing=0;ok=0;unreadable=0;unsupported=44,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.V/G Overrides Annotation,,,None,missing=0;ok=0;unreadable=0;unsupported=44,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.V/G Overrides Filters,,,None,missing=0;ok=0;unreadable=0;unsupported=44,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.V/G Overrides Import,,,None,missing=0;ok=0;unreadable=0;unsupported=44,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.V/G Overrides Model,,,None,missing=0;ok=0;unreadable=0;unsupported=44,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.VIEWS_Package,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.VIEWS_View Type,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.View Category,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.View Classification,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.View Group,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.View Range,,,None,missing=0;ok=0;unreadable=0;unsupported=33,0,unsupported,None,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.View Scale,,,Integer,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,Integer,96," 1/8"" = 1'-0"" ",96,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.View Sheet Group,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.View Sub Cat,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.View Sub-Classification,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.View Sub-Discipline,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.View Subtype,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.View Type,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Vistas_Capitulo,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Vistas_Subcapítulo,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.Visual Style,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,2,Hidden Line,2,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.WIP/PUBLISH/OLD,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.WW-ViewCategory,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
-view_templates,param,p.WW-ViewSubCategory,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+First Last, Phone, Timezone",,2026-02-04,2026-02-04,1,probe_identity_2026-02-04.json
+line_patterns,param,prop.is_solid,,,Integer,missing=0;ok=19;unreadable=0;unsupported=0,0,ok,Integer,0,False,0,,2026-02-04,2026-02-04,1,probe_line_patterns_2026-02-04.json
+line_patterns,param,prop.name,,,String,missing=0;ok=19;unreadable=0;unsupported=0,0,ok,String,Center,Center,Center,,2026-02-04,2026-02-04,1,probe_line_patterns_2026-02-04.json
+line_patterns,param,prop.segment_count,,,Integer,missing=0;ok=19;unreadable=0;unsupported=0,0,ok,Integer,4,4,4,,2026-02-04,2026-02-04,1,probe_line_patterns_2026-02-04.json
+line_patterns,param,prop.sequence,,,String,missing=0;ok=19;unreadable=0;unsupported=0,0,ok,String,seg[000].kind=0;len=0.250000|seg[001].kind=1;len=0.187500|seg[002].kind=0;len=0.625000|seg[003].kind=1;len=0.187500,seg[000].kind=0;len=0.250000|seg[001].kind=1;len=0.187500|seg[002].kind=0;len=0.625000|seg[003].kind=1;len=0.187500,seg[000].kind=0;len=0.250000|seg[001].kind=1;len=0.187500|seg[002].kind=0;len=0.625000|seg[003].kind=1;len=0.187500,,2026-02-04,2026-02-04,1,probe_line_patterns_2026-02-04.json
+line_patterns,param,prop.sequence_hash,,,String,missing=0;ok=19;unreadable=0;unsupported=0,0,ok,String,f0fbd9ea7d28714fcc8b16a820d4ee7b,f0fbd9ea7d28714fcc8b16a820d4ee7b,f0fbd9ea7d28714fcc8b16a820d4ee7b,,2026-02-04,2026-02-04,1,probe_line_patterns_2026-02-04.json
+line_styles,param,v.cat.id,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,Integer,-2009504,-2009504,-2009504,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+line_styles,param,v.cat.name,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,<Hidden Lines>,<Hidden Lines>,<Hidden Lines>,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+line_styles,param,v.gs.id,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,Integer,195,195,195,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+line_styles,param,v.gs.name,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,<Hidden Lines>,<Hidden Lines>,<Hidden Lines>,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+line_styles,param,v.gs.type,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,1,1,1,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+line_styles,param,v.line_color.hex,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,#00A600,#00A600,#00A600,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+line_styles,param,v.line_color.rgb,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,0|166|0,0|166|0,0|166|0,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+line_styles,param,v.line_pattern.id,,,ElementId,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,ElementId,27,27,27,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+line_styles,param,v.line_pattern.name,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,Dash,Dash,Dash,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+line_styles,param,v.line_weight.projection,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,Integer,2,2,2,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+line_styles,param,v.parent_cat.id,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,Integer,-2000051,-2000051,-2000051,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+line_styles,param,v.parent_cat.name,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,Lines,Lines,Lines,,2026-02-04,2026-02-04,1,probe_line_styles_2026-02-04.json
+object_styles,param,c.allows_visibility_control,,,Integer,missing=175;ok=0;unreadable=0;unsupported=0,0,missing,Integer,,,,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.builtin_category,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,-2000223,-2000223,-2000223,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.can_add_subcategory,,,Integer,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.category_type,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,AnalyticalModel,AnalyticalModel,AnalyticalModel,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.has_material_quantities,,,Integer,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,Integer,0,False,0,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.is_cuttable,,,Integer,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,Integer,0,False,0,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.is_subcategory,,,Integer,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.line_color.hex,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,#000000,#000000,#000000,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.line_color.rgb,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,0|0|0,0|0|0,0|0|0,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.line_pattern_cut,,,ElementId,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.line_pattern_projection,,,ElementId,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,ElementId,27,Dash,27,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.line_weight_cut,,,Integer,missing=163;ok=12;unreadable=0;unsupported=0,0,ok,Integer,2,2,2,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.line_weight_projection,,,Integer,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,Integer,3,3,3,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.material,,,ElementId,missing=160;ok=15;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.name,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,Displacement Path,Displacement Path,Displacement Path,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.parent_name,,,String,missing=84;ok=91;unreadable=0;unsupported=0,0,ok,String,Electrical Fixtures,Electrical Fixtures,Electrical Fixtures,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+object_styles,param,c.tab,,,String,missing=0;ok=175;unreadable=0;unsupported=0,0,ok,String,Analytical,Analytical,Analytical,,2026-02-04,2026-02-04,1,probe_object_styles_2026-02-04.json
+phase_filters,param,phase_filter.demolished.presentation_id,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,By Category,By Category,By Category,,2026-02-04,2026-02-04,1,probe_phase_filters_2026-02-04.json
+phase_filters,param,phase_filter.existing.presentation_id,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Not Displayed,Not Displayed,Not Displayed,,2026-02-04,2026-02-04,1,probe_phase_filters_2026-02-04.json
+phase_filters,param,phase_filter.name,,,String,missing=0;ok=7;unreadable=0;unsupported=0,0,ok,String,Show Previous Phase,Show Previous Phase,Show Previous Phase,,2026-02-04,2026-02-04,1,probe_phase_filters_2026-02-04.json
+phase_filters,param,phase_filter.new.presentation_id,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,Not Displayed,Not Displayed,Not Displayed,,2026-02-04,2026-02-04,1,probe_phase_filters_2026-02-04.json
+phase_filters,param,phase_filter.temporary.presentation_id,,,String,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,String,By Category,By Category,By Category,,2026-02-04,2026-02-04,1,probe_phase_filters_2026-02-04.json
+phase_graphics,param,p.Annotation Crop,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Appearance,,,None,missing=0;ok=6;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Appears In Sheet List,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Approved By,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Approver,Approver,Approver,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Associated Level,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,Level 1,Level 1,Level 1,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Checked By,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Checker,Checker,Checker,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Color Scheme,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Color Scheme Location,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,1,Background,1,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Column Symbolic Offset,,,Double,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Double,1.0,"1'-0""",11.999999999999998,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Crop Region Visible,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Crop View,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Current Revision,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Current Revision Date,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Current Revision Description,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Current Revision Issued,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Current Revision Issued By,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Current Revision Issued To,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Default Analysis Display Style,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Dependency,,,String,missing=0;ok=28;unreadable=0;unsupported=0,0,ok,String,Independent,Independent,Independent,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Depth Clipping,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Designed By,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Designer,Designer,Designer,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Detail Level,,,Integer,missing=0;ok=11;unreadable=0;unsupported=0,0,ok,Integer,1,Coarse,1,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Discipline,,,Integer;String,missing=0;ok=20;unreadable=0;unsupported=0,0,ok,Integer,4095,Coordination,4095,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Discipline Sort Order,,,Double,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Double,0.0,0,0.0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Discipline Sub-Sort Order,,,Double,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Double,0.0,0,0.0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Display Model,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,0,Normal,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Drawing Number Levels/Locations,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Drawing Number Originator,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Drawing Number Project Number,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Drawing Number Role,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Drawing Number Status Code,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Drawing Number Status Description,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Drawing Number Type,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Drawing Number Volume/System,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Drawing_Included_In_Set,,,Integer,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Drawn By,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Author,Author,Author,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Export to IFC,,,Integer,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,Integer,0,By Type,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Fields,,,None,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.File Path,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Y:\content\shared\Revit\2025\NA-EN\Project_Templates\01_Generic\stn_i_generic_2025.rte,Y:\content\shared\Revit\2025\NA-EN\Project_Templates\01_Generic\stn_i_generic_2025.rte,Y:\content\shared\Revit\2025\NA-EN\Project_Templates\01_Generic\stn_i_generic_2025.rte,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Filter,,,None,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Formatting,,,None,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Graphic Display Options,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Guide Grid,,,ElementId,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Lighting,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Model Display,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.None,,,ElementId,missing=0;ok=28;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Orientation,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,0,Project North,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.PE_01_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.PE_02_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.PE_03_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.PE_04_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.PE_05_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.PE_06_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.PE_07_IssueStatus,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Parts Visibility,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,1,Show Original,1,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Phase,,,ElementId,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,ElementId,3,New Construction,3,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Phase Filter,,,ElementId,missing=0;ok=7;unreadable=0;unsupported=0,0,ok,ElementId,1912,Show All,1912,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Photographic Exposure,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Range: Base Level,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Range: Top Level,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Referencing Detail,,,String,missing=0;ok=18;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Referencing Sheet,,,String,missing=0;ok=18;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Referencing Sheet Collection,,,ElementId,missing=0;ok=18;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Revisions on Sheet,,,None,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Scale,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String, , , ,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Scale Value    1:,,,Integer,missing=0;ok=13;unreadable=0;unsupported=0,0,ok,Integer,96,96,96,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Scope Box,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Shadows,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sheet Classification,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,99-Stantec Information Sheets,99-Stantec Information Sheets,99-Stantec Information Sheets,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sheet Collection,,,ElementId,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sheet Issue Date,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,04/11/15,04/11/15,04/11/15,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sheet Name,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,Sync with Central View (SWC),Sync with Central View (SWC),Sync with Central View (SWC),,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sheet Number,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,0000,0000,0000,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sheet Number Of,,,Double,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,Double,0.0,0,0.0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sheet Sub-Classification,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Show Hidden Lines,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,1,By Discipline,1,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sketch Reference Sheet,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sketch Submission Description,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sketchy Lines,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sorting/Grouping,,,None,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Sun Path,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.System Color Schemes,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Title on Sheet,,,String,missing=0;ok=11;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Underlay Orientation,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,0,Look down,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.V/G Overrides Analytical Model,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.V/G Overrides Annotation,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.V/G Overrides Filters,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.V/G Overrides Import,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.V/G Overrides Model,,,None,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.View Classification,,,String,missing=0;ok=16;unreadable=0;unsupported=0,0,ok,String,~Do Not Rename,~Do Not Rename,~Do Not Rename,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.View Name,,,String,missing=0;ok=16;unreadable=0;unsupported=0,0,ok,String,???,???,???,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.View Range,,,None,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.View Scale,,,Integer,missing=0;ok=13;unreadable=0;unsupported=0,0,ok,Integer,96," 1/8"" = 1'-0"" ",96,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.View Sub-Classification,,,String,missing=0;ok=16;unreadable=0;unsupported=0,0,ok,String,~Coordination,~Coordination,~Coordination,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.View Template,,,ElementId,missing=0;ok=14;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Visibility/Graphics Overrides,,,None,missing=0;ok=21;unreadable=0;unsupported=0,0,ok,None,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Visual Style,,,Integer,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,Integer,2,Hidden Line,2,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p.Wall Join Display,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,Clean all wall joins,0,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phase_graphics,param,p._Not_To_Scale_Text,,,String,missing=0;ok=12;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-04,2026-02-04,1,probe_phase_graphics_2026-02-04.json
+phases,param,phase.name,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,Existing,Existing,Existing,,2026-02-04,2026-02-04,1,probe_phases_2026-02-04.json
+phases,param,phase.sequence_number,,,Integer,missing=0;ok=0;unreadable=2;unsupported=0,0,unreadable,Integer,1,1,1,,2026-02-04,2026-02-04,1,probe_phases_2026-02-04.json
+phases,param,phase.uid,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001,e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001,e41ae548-9ec9-4c6f-93f1-7d90b77a99cf-00000001,,2026-02-04,2026-02-04,1,probe_phases_2026-02-04.json
+text_types,param,p.Background,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,Opaque,0,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Bold,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Color,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Italic,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Leader Arrowhead,,,ElementId,missing=0;ok=4;unreadable=0;unsupported=0,0,ok,ElementId,2584,22 Degree Filled Arrow-Medium,2584,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Leader/Border Offset,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Double,0.002604166666666667,"1/32""",0.002604166666666667,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Line Weight,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,4,4,4,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Show Border,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Tab Size,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Double,0.020833333333333336,"1/4""",0.020833333333333336,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Text Font,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,Arial Narrow,Arial Narrow,Arial Narrow,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Text Size,,,Double,missing=0;ok=7;unreadable=0;unsupported=0,0,ok,Double,0.0078125,"3/32""",0.0078125,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Underline,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,p.Width Factor,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Double,1.0,1,1.0,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,v.color.color.hex_bbgrr,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,#000000,#000000,#000000,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,v.color.color.hex_rrggbb,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,#000000,#000000,#000000,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,v.color.color.raw_hex32,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,0x00000000,0x00000000,0x00000000,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,v.color.color.rgb_bbgrr,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,0|0|0,0|0|0,0|0|0,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+text_types,param,v.color.color.rgb_rrggbb,,,String,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,String,0|0|0,0|0|0,0|0|0,,2026-02-04,2026-02-04,1,probe_text_types_2026-02-04.json
+units,param,p.debug.format_options_status,,,String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,String,ok,ok,ok,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.format.accuracy,,,Double;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Double,1.0,1.0,1.0,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.format.rounding_method,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.format.suppress_leading_zeros,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.format.suppress_spaces,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.format.suppress_trailing_zeros,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.format.suppress_unit_symbol,,,String,missing=0;ok=0;unreadable=151;unsupported=0,0,unreadable,String,AttributeError: 'FormatOptions' object has no attribute 'SuppressUnitSymbol',AttributeError: 'FormatOptions' object has no attribute 'SuppressUnitSymbol',AttributeError: 'FormatOptions' object has no attribute 'SuppressUnitSymbol',,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.format.symbol_type_id,,,String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,String,autodesk.unit.symbol:vA-1.0.1,autodesk.unit.symbol:vA-1.0.1,autodesk.unit.symbol:vA-1.0.1,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.format.unit_type_id,,,String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,String,autodesk.unit.unit:voltAmperes-1.0.1,autodesk.unit.unit:voltAmperes-1.0.1,autodesk.unit.unit:voltAmperes-1.0.1,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.format.use_default,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.format.use_digit_grouping,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.format.use_plus_prefix,,,Integer;String,missing=0;ok=150;unreadable=1;unsupported=0,0,ok,Integer,0,False,0,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.units.decimal_symbol,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.units.digit_grouping_amount,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1,1,1,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+units,param,p.units.digit_grouping_symbol,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1,1,1,,2026-02-04,2026-02-04,1,probe_units_2026-02-04.json
+view_category_overrides,param,api.get_category_overrides,,,None,missing=0;ok=0;unreadable=21318;unsupported=0,0,unreadable,None,,,,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,delta.cut_line_color.rgb,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,delta.cut_line_pattern,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,delta.cut_line_weight,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,delta.halftone,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,delta.projection_line_color.rgb,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,delta.projection_line_pattern,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,delta.projection_line_weight,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,delta.transparency,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,diag.include_subcategories,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1,1,1,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,diag.max_categories_to_inspect,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,diag.non_templated_views_found,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1545,1545,1545,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,diag.selected_views,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,50,50,50,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,diag.templates_found,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,54,54,54,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,diag.total_categories_found,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,2885,2885,2885,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,diag.total_views_found,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1855,1855,1855,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,eff.cut_line_color.rgb,,,String,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,String,0|0|0,0|0|0,0|0|0,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,eff.cut_line_pattern,,,ElementId,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,eff.cut_line_weight,,,Integer,missing=50505;ok=25077;unreadable=0;unsupported=0,0,ok,Integer,6,6,6,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,eff.halftone,,,Integer;None,missing=75547;ok=35;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,eff.projection_line_color.rgb,,,String,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,String,0|0|0,0|0|0,0|0|0,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,eff.projection_line_pattern,,,ElementId,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,eff.projection_line_weight,,,Integer,missing=0;ok=75582;unreadable=0;unsupported=0,0,ok,Integer,4,4,4,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_category_overrides,param,eff.transparency,,,Integer;None,missing=75563;ok=19;unreadable=0;unsupported=0,0,ok,Integer,75,75,75,,2026-02-04,2026-02-04,1,probe_view_category_overrides_2026-02-04.json
+view_filter_applications,param,vfa.filter.id,,,ElementId,missing=0;ok=32;unreadable=0;unsupported=0,0,ok,ElementId,68527,Fire Rated Partitions - 1 Hour,68527,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.filter.name,,,String,missing=0;ok=32;unreadable=0;unsupported=0,0,ok,String,Fire Rated Partitions - 1 Hour,Fire Rated Partitions - 1 Hour,Fire Rated Partitions - 1 Hour,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.filter.order_index,,,Integer,missing=0;ok=10;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.filter.visibility,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.filter_stack.count,,,Integer,missing=0;ok=7;unreadable=0;unsupported=0,0,ok,Integer,9,9,9,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.cut_bg_pattern_color.hex,,,String,missing=1;ok=0;unreadable=0;unsupported=0,0,missing,String,,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.cut_bg_pattern_color.rgb,,,String,missing=1;ok=0;unreadable=0;unsupported=0,0,missing,String,,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.cut_bg_pattern_id,,,ElementId,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.cut_fg_pattern_color.hex,,,String,missing=1;ok=5;unreadable=0;unsupported=0,0,ok,String,#FF0000,#FF0000,#FF0000,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.cut_fg_pattern_color.rgb,,,String,missing=1;ok=5;unreadable=0;unsupported=0,0,ok,String,255|0|0,255|0|0,255|0|0,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.cut_fg_pattern_id,,,ElementId,missing=0;ok=6;unreadable=0;unsupported=0,0,ok,ElementId,19,<Solid fill>,19,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.cut_line_color.hex,,,String,missing=1;ok=4;unreadable=0;unsupported=0,0,ok,String,#FF0000,#FF0000,#FF0000,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.cut_line_color.rgb,,,String,missing=1;ok=4;unreadable=0;unsupported=0,0,ok,String,255|0|0,255|0|0,255|0|0,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.cut_line_pattern_id,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.cut_line_weight,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,-1,-1,-1,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.halftone,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,0,False,0,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.has_any_override,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.present,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.proj_line_color.hex,,,String,missing=1;ok=12;unreadable=0;unsupported=0,0,ok,String,#FF0000,#FF0000,#FF0000,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.proj_line_color.rgb,,,String,missing=1;ok=12;unreadable=0;unsupported=0,0,ok,String,255|0|0,255|0|0,255|0|0,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.proj_line_pattern_id,,,ElementId,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.proj_line_weight,,,Integer,missing=0;ok=3;unreadable=0;unsupported=0,0,ok,Integer,-1,-1,-1,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.sig_hash,,,String,missing=0;ok=27;unreadable=0;unsupported=0,0,ok,String,1775967146b97e6cc2293a2883359ba7a68f699a,1775967146b97e6cc2293a2883359ba7a68f699a,1775967146b97e6cc2293a2883359ba7a68f699a,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.surf_bg_pattern_color.hex,,,String,missing=1;ok=0;unreadable=0;unsupported=0,0,missing,String,,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.surf_bg_pattern_color.rgb,,,String,missing=1;ok=0;unreadable=0;unsupported=0,0,missing,String,,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.surf_bg_pattern_id,,,ElementId,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.surf_fg_pattern_color.hex,,,String,missing=1;ok=7;unreadable=0;unsupported=0,0,ok,String,#E43F3F,#E43F3F,#E43F3F,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.surf_fg_pattern_color.rgb,,,String,missing=1;ok=7;unreadable=0;unsupported=0,0,ok,String,228|63|63,228|63|63,228|63|63,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.surf_fg_pattern_id,,,ElementId,missing=0;ok=3;unreadable=0;unsupported=0,0,ok,ElementId,,,,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.ogs.transparency,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.view.is_template,,,Integer,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Integer,1,True,1,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.view.name,,,String,missing=0;ok=16;unreadable=0;unsupported=0,0,ok,String,z_Filters - Fire Rated Wall/Door Check,z_Filters - Fire Rated Wall/Door Check,z_Filters - Fire Rated Wall/Door Check,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_applications,param,vfa.view.view_type,,,String,missing=0;ok=5;unreadable=0;unsupported=0,0,ok,String,1,1,1,,2026-02-05,2026-02-05,1,probe_view_filter_applications_2026-02-05.json
+view_filter_definitions,param,v.filter.category_count,,,Integer,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,Integer,1,1,1,,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
+view_filter_definitions,param,v.filter.category_ids,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,[-2000011],-2000011,-2000011,,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
+view_filter_definitions,param,v.filter.category_names,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,['Walls'],Walls,Walls,,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
+view_filter_definitions,param,v.filter.id,,,Integer,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,Integer,68527,68527,68527,,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
+view_filter_definitions,param,v.filter.logic,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,and,and,and,,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
+view_filter_definitions,param,v.filter.name,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,Fire Rated Partitions - 1 Hour,Fire Rated Partitions - 1 Hour,Fire Rated Partitions - 1 Hour,,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
+view_filter_definitions,param,v.filter.rule_count,,,Integer,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,Integer,1,1,1,,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
+view_filter_definitions,param,v.filter.rule_param_ids,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,68760,68760,68760,,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
+view_filter_definitions,param,v.filter.rule_sig_hash,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,101cd30531197e2efcc19eb7408896fe1ab4dabd,101cd30531197e2efcc19eb7408896fe1ab4dabd,101cd30531197e2efcc19eb7408896fe1ab4dabd,,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
+view_filter_definitions,param,v.filter.rule_types,,,String,missing=0;ok=45;unreadable=0;unsupported=0,0,ok,String,FilterDoubleRule,FilterDoubleRule,FilterDoubleRule,,2026-02-05,2026-02-05,1,probe_view_filter_definitions_2026-02-05.json
+view_templates,param,p.001_ViewCategory,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.001_ViewSubCategory,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Appearance,,,None,missing=0;ok=0;unreadable=0;unsupported=10,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Background,,,None,missing=0;ok=0;unreadable=0;unsupported=10,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Browser_View Category,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Browser_View Group,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Browser_View Sub Series,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Browser_View Subcategory,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Color Scheme,,,None,missing=0;ok=0;unreadable=0;unsupported=37,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Color Scheme Location,,,Integer,missing=0;ok=37;unreadable=0;unsupported=0,0,ok,Integer,1,Background,1,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Column Symbolic Offset,,,Double,missing=0;ok=2;unreadable=0;unsupported=0,0,ok,Double,1.0,"1'-0""",11.999999999999998,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Depth Clipping,,,Integer,missing=0;ok=33;unreadable=0;unsupported=0,0,ok,Integer,0,0,0,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Depth Cueing,,,None,missing=0;ok=0;unreadable=0;unsupported=9,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Detail Level,,,Integer,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,Integer,2,Medium,2,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Discipline,,,Integer,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,Integer,1,Architectural,1,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Display Model,,,Integer,missing=0;ok=42;unreadable=0;unsupported=0,0,ok,Integer,0,Normal,0,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Far Clipping,,,Integer,missing=0;ok=9;unreadable=0;unsupported=0,0,ok,Integer,2,2,2,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Fields,,,None,missing=0;ok=0;unreadable=0;unsupported=2,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Filter,,,None,missing=0;ok=0;unreadable=0;unsupported=2,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Folder,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Formatting,,,None,missing=0;ok=0;unreadable=0;unsupported=2,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Lighting,,,None,missing=0;ok=0;unreadable=0;unsupported=43,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Model Display,,,None,missing=0;ok=0;unreadable=0;unsupported=43,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Orientation,,,Integer,missing=0;ok=33;unreadable=0;unsupported=0,0,ok,Integer,1,True North,1,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Parts Visibility,,,Integer,missing=0;ok=43;unreadable=0;unsupported=0,0,ok,Integer,1,Show Original,1,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Phase Filter,,,ElementId,missing=0;ok=53;unreadable=0;unsupported=0,0,ok,ElementId,1912,Show All,1912,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Photographic Exposure,,,None,missing=0;ok=0;unreadable=0;unsupported=43,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Project Identification,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Rendering Settings,,,None,missing=0;ok=0;unreadable=0;unsupported=1,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.SR View Calculation Settings,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Scale Value    1:,,,Integer,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,Integer,96,96,96,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Shadows,,,None,missing=0;ok=0;unreadable=0;unsupported=43,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Sheet Discipline #,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Sheet Series #,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Show Hidden Lines,,,Integer,missing=0;ok=43;unreadable=0;unsupported=0,0,ok,Integer,1,By Discipline,1,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Sketchy Lines,,,None,missing=0;ok=0;unreadable=0;unsupported=43,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Sorting/Grouping,,,None,missing=0;ok=0;unreadable=0;unsupported=2,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Sub Discipline,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Sun Path,,,Integer,missing=0;ok=43;unreadable=0;unsupported=0,0,ok,Integer,0,No,0,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.System Color Schemes,,,None,missing=0;ok=0;unreadable=0;unsupported=28,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Underlay Orientation,,,Integer,missing=0;ok=33;unreadable=0;unsupported=0,0,ok,Integer,0,Look down,0,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.V/G Overrides Analytical Model,,,None,missing=0;ok=0;unreadable=0;unsupported=44,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.V/G Overrides Annotation,,,None,missing=0;ok=0;unreadable=0;unsupported=44,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.V/G Overrides Filters,,,None,missing=0;ok=0;unreadable=0;unsupported=44,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.V/G Overrides Import,,,None,missing=0;ok=0;unreadable=0;unsupported=44,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.V/G Overrides Model,,,None,missing=0;ok=0;unreadable=0;unsupported=44,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.VIEWS_Package,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.VIEWS_View Type,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.View Category,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.View Classification,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.View Group,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.View Range,,,None,missing=0;ok=0;unreadable=0;unsupported=33,0,unsupported,None,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.View Scale,,,Integer,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,Integer,96," 1/8"" = 1'-0"" ",96,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.View Sheet Group,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.View Sub Cat,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.View Sub-Classification,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.View Sub-Discipline,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.View Subtype,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.View Type,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Vistas_Capitulo,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Vistas_Subcapítulo,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.Visual Style,,,Integer,missing=0;ok=1;unreadable=0;unsupported=0,0,ok,Integer,2,Hidden Line,2,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.WIP/PUBLISH/OLD,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.WW-ViewCategory,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json
+view_templates,param,p.WW-ViewSubCategory,,,String,missing=0;ok=44;unreadable=0;unsupported=0,0,ok,String,,,,,2026-02-05,2026-02-05,1,probe_view_templates_2026-02-05.json

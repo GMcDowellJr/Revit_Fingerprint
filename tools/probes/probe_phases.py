@@ -499,6 +499,56 @@ OUT = [
 file_written = None
 file_write_error = None
 
+# -------------------------
+# Unified run metadata (release-separated, not date-filename-separated)
+# -------------------------
+# extraction_date lives as JSON metadata, not as a filename token; the
+# filename groups by Revit release (revit_version) plus an opaque run_id so
+# repeated runs don't collide. See tools/probes/build_probe_inventory.py,
+# which consumes this shape directly.
+
+import uuid as _uuid_mod
+
+def _probe_revit_version():
+    try:
+        _uiapp = DocumentManager.Instance.CurrentUIApplication
+        _app = _uiapp.Application if _uiapp is not None else None
+        v = _safe(lambda: _app.VersionNumber, None)
+        return str(v) if v else None
+    except:
+        return None
+
+def _probe_document_identity():
+    return {
+        "title": _safe(lambda: doc.Title, None),
+        "path_name": _safe(lambda: doc.PathName, None),
+        "is_workshared": _safe(lambda: bool(doc.IsWorkshared), None),
+    }
+
+def _probe_run_id():
+    try:
+        return datetime.now().strftime("%Y%m%dT%H%M%S") + "-" + _uuid_mod.uuid4().hex[:6]
+    except:
+        return _uuid_mod.uuid4().hex[:12]
+
+_PROBE_RUN_ID = _probe_run_id()
+_PROBE_REVIT_VERSION = _probe_revit_version() or "unknown"
+
+def _probe_wrap(domain, out_payload):
+    return {
+        "run_metadata": {
+            "run_id": _PROBE_RUN_ID,
+            "extraction_date": datetime.now().isoformat(),
+            "revit_version": _PROBE_REVIT_VERSION,
+            "tool_version": None,
+            "document": _probe_document_identity(),
+            "source": "single_probe",
+            "probe": domain,
+        },
+        "domains": {domain: out_payload},
+    }
+
+
 if write_json:
     try:
         # Prefer explicit folder
@@ -519,11 +569,11 @@ if write_json:
             os.makedirs(target_dir)
 
         stamp = datetime.now().strftime("%Y-%m-%d")
-        filename = "probe_phases_{}.json".format(stamp)
+        filename = "probes_{}_{}.json".format(_PROBE_REVIT_VERSION, _PROBE_RUN_ID)
         target_path = os.path.join(target_dir, filename)
 
         with open(target_path, "w") as f:
-            json.dump(OUT, f, indent=2, sort_keys=True)
+            json.dump(_probe_wrap("phases", OUT), f, indent=2, sort_keys=True)
 
         file_written = target_path
 

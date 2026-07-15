@@ -142,3 +142,134 @@ def test_empty_probes_dir_does_not_crash(tmp_path):
     rows = _read_csv_rows(out_csv)
     assert rows == []
     assert out_md.exists()
+
+
+def _run_shaped_payload(revit_version, run_id, extraction_date, domains):
+    return {
+        "run_metadata": {
+            "run_id": run_id,
+            "extraction_date": extraction_date,
+            "revit_version": revit_version,
+            "tool_version": "1.2.3",
+            "document": {"title": "sample.rvt", "path_name": None, "is_workshared": False},
+            "source": "thin_runner",
+            "probes_run": sorted(domains.keys()),
+        },
+        "domains": domains,
+    }
+
+
+def test_merges_run_shaped_files_and_tracks_revit_version(tmp_path):
+    probes_dir = tmp_path / "probes"
+    probes_dir.mkdir()
+
+    run_a = _run_shaped_payload(
+        "2025", "20260101T000000-aaaaaa", "2026-01-01T00:00:00",
+        {
+            "sprockets": [
+                {
+                    "kind": "inventory",
+                    "domain": "sprockets",
+                    "records": [
+                        {
+                            "domain": "sprockets",
+                            "param_key": "p.Size",
+                            "example": {"q": "missing", "storage": "Integer", "raw": None, "display": None, "norm": None},
+                            "observed": {"storage_types": ["Integer"], "q_counts": {"missing": 1}, "unique_value_count": 1},
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    run_b = _run_shaped_payload(
+        "2026", "20260201T000000-bbbbbb", "2026-02-01T00:00:00",
+        {
+            "sprockets": [
+                {
+                    "kind": "inventory",
+                    "domain": "sprockets",
+                    "records": [
+                        {
+                            "domain": "sprockets",
+                            "param_key": "p.Size",
+                            "example": {"q": "ok", "storage": "Integer", "raw": 4, "display": "4", "norm": 4},
+                            "observed": {"storage_types": ["Integer"], "q_counts": {"ok": 1}, "unique_value_count": 1},
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    (probes_dir / "probes_2025_20260101T000000-aaaaaa.json").write_text(json.dumps(run_a), encoding="utf-8")
+    (probes_dir / "probes_2026_20260201T000000-bbbbbb.json").write_text(json.dumps(run_b), encoding="utf-8")
+
+    out_md = tmp_path / "out" / "PROBE_INVENTORY.md"
+    out_csv = tmp_path / "out" / "PROBE_INVENTORY.csv"
+    _run(probes_dir, out_md, out_csv)
+
+    rows = _read_csv_rows(out_csv)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["domain"] == "sprockets"
+    assert row["key"] == "p.Size"
+    assert row["example_q"] == "ok"  # higher-scored example wins across runs
+    assert row["run_count"] == "2"
+    assert set(row["revit_versions_seen"].split(";")) == {"2025", "2026"}
+
+    md_text = out_md.read_text(encoding="utf-8")
+    assert "## domain — `sprockets`" in md_text
+    assert "revit_versions_seen" in md_text
+
+
+def test_merges_across_legacy_and_run_shapes_for_same_domain(tmp_path):
+    probes_dir = tmp_path / "probes"
+    probes_dir.mkdir()
+
+    legacy = [
+        {
+            "kind": "inventory",
+            "domain": "gizmos",
+            "records": [
+                {
+                    "domain": "gizmos",
+                    "param_key": "p.Color",
+                    "example": {"q": "ok", "storage": "String", "raw": "Red", "display": "Red", "norm": "Red"},
+                    "observed": {"storage_types": ["String"], "q_counts": {"ok": 1}, "unique_value_count": 1},
+                }
+            ],
+        }
+    ]
+    (probes_dir / "probe_gizmos_2025-06-01.json").write_text(json.dumps(legacy), encoding="utf-8")
+
+    run = _run_shaped_payload(
+        "2025", "20260301T000000-cccccc", "2026-03-01T00:00:00",
+        {
+            "gizmos": [
+                {
+                    "kind": "inventory",
+                    "domain": "gizmos",
+                    "records": [
+                        {
+                            "domain": "gizmos",
+                            "param_key": "p.Weight",
+                            "example": {"q": "ok", "storage": "Double", "raw": 1.5, "display": "1.5", "norm": 1.5},
+                            "observed": {"storage_types": ["Double"], "q_counts": {"ok": 1}, "unique_value_count": 1},
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    (probes_dir / "probes_2025_20260301T000000-cccccc.json").write_text(json.dumps(run), encoding="utf-8")
+
+    out_md = tmp_path / "out" / "PROBE_INVENTORY.md"
+    out_csv = tmp_path / "out" / "PROBE_INVENTORY.csv"
+    result_proc = _run(probes_dir, out_md, out_csv)
+    assert "run files matched    : 1" in result_proc.stdout
+    assert "legacy files matched : 1" in result_proc.stdout
+
+    rows = _read_csv_rows(out_csv)
+    keys = {(r["domain"], r["key"]) for r in rows}
+    assert ("gizmos", "p.Color") in keys
+    assert ("gizmos", "p.Weight") in keys

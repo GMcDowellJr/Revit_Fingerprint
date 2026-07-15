@@ -2,20 +2,36 @@
 """
 build_probe_inventory.py
 
-Consolidates raw tools/probes/probe_*.json breadth-probe output into a single
-curated, cross-domain inventory: one representative row per (domain, key),
-deduped/merged across however many dated probe runs exist for that domain.
+Consolidates raw tools/probes/ breadth-probe output into a single curated,
+cross-domain inventory: one representative row per (domain, key), deduped
+and merged across however many probe runs exist for that domain.
 
-This replaces the hand-assembled, single-snapshot
-tools/probes/domain_probe_inventory_2024-02-05.md, which goes stale every
-time a probe is rerun or a new probe is added (nothing regenerated it).
+Two file shapes are understood:
 
-Each probe_<domain>_<date>.json already dedupes *within* a single run down to
-one entry per param_key/member_key (see e.g. probe_dimension_types.py's
-param_index). This tool performs the second layer of dedupe: merging those
-per-run entries *across* runs/dates for the same domain, picking one
-representative example per key using the same scoring heuristic the probes
-already use internally.
+  "run" files -- probes_<revit_version>_<run_id>.json
+      The current shape, written by runner/probe_thin_runner.py (a batch
+      run covering every probe) or by an individual probe_*.py run with
+      write_json=True. Structure:
+          {"run_metadata": {"run_id":..., "extraction_date":...,
+                             "revit_version":..., "tool_version":...,
+                             "document": {...}, "probes_run": [...]},
+           "domains": {"<domain>": [...same per-probe records as before...]}}
+      extraction_date/revit_version/run_id live as JSON metadata here, not
+      as filename tokens -- the filename only groups by Revit release
+      (revit_version) plus an opaque run_id.
+
+  "legacy" files -- probe_<domain>_<YYYY-MM-DD>.json
+      The older shape, one file per probe per manual run, with the date
+      baked into the filename and no run_metadata inside the JSON at all.
+      Still supported here so historical probe data isn't orphaned; new
+      runs should use the "run" shape above.
+
+Each probe already dedupes *within* a single run down to one entry per
+param_key/member_key (see e.g. probe_dimension_types.py's param_index).
+This tool performs the second layer of dedupe: merging those per-run
+entries *across* runs for the same domain, picking one representative
+example per key using the same scoring heuristic the probes already use
+internally.
 
 This tool is pure Python 3 (no Revit/CLR dependency) and is meant to be run
 from a developer machine against the probe JSON files checked into
@@ -36,7 +52,8 @@ import re
 import sys
 from collections import OrderedDict
 
-_FILENAME_RE = re.compile(r"^probe_(?P<domain>.+)_(?P<date>\d{4}-\d{2}-\d{2})\.json$")
+_LEGACY_FILENAME_RE = re.compile(r"^probe_(?P<domain>.+)_(?P<date>\d{4}-\d{2}-\d{2})\.json$")
+_RUN_FILENAME_RE = re.compile(r"^probes_(?P<revit_version>.+)_(?P<run_id>.+)\.json$")
 
 # Record "kinds" this tool treats as key/value inventories to merge.
 # "crosswalk" and any other kind are counted as diagnostics only.
@@ -61,23 +78,31 @@ def _example_score(example):
 
 
 def discover_probe_files(probes_dir):
-    """Return (matched, skipped) lists. matched = [(path, domain, date)]."""
-    matched = []
+    """Returns (run_files, legacy_files, skipped).
+    run_files/legacy_files: [(path, meta_from_filename_dict)]
+    skipped: [(name, reason)]
+    """
+    run_files = []
+    legacy_files = []
     skipped = []
     try:
         names = sorted(os.listdir(probes_dir))
     except OSError as ex:
-        return [], [("<probes_dir>", "could not list directory: {}".format(ex))]
+        return [], [], [("<probes_dir>", "could not list directory: {}".format(ex))]
 
     for name in names:
         if not name.endswith(".json"):
             continue
-        m = _FILENAME_RE.match(name)
-        if not m:
-            skipped.append((name, "does not match probe_<domain>_<YYYY-MM-DD>.json"))
+        m_run = _RUN_FILENAME_RE.match(name)
+        if m_run:
+            run_files.append((os.path.join(probes_dir, name), m_run.groupdict()))
             continue
-        matched.append((os.path.join(probes_dir, name), m.group("domain"), m.group("date")))
-    return matched, skipped
+        m_legacy = _LEGACY_FILENAME_RE.match(name)
+        if m_legacy:
+            legacy_files.append((os.path.join(probes_dir, name), m_legacy.groupdict()))
+            continue
+        skipped.append((name, "does not match probes_<revit_version>_<run_id>.json or probe_<domain>_<YYYY-MM-DD>.json"))
+    return run_files, legacy_files, skipped
 
 
 def load_payload(path):
@@ -104,15 +129,122 @@ def _merge_observed(agg, record_observed):
             agg[count_field] = agg.get(count_field, 0) + int(v)
 
 
-def merge_probe_files(matched, warnings):
+def _new_agg():
+    return {
+        "storage_types": set(),
+        "q_counts": {},
+        "example": None,
+        "seen_tags": set(),  # human-readable "extraction_date|revit_version" or "date" tags
+        "revit_versions": set(),
+        "source_files": set(),
+        "member_kind": None,
+        "type_label": None,
+    }
+
+
+def _merge_entries_for_domain(domains, diagnostics, domain, entries, basename, seen_tag, revit_version, warn_prefix, warnings):
+    diag = diagnostics.setdefault(domain, {"crosswalk_count": 0, "opaque_count": 0, "unrecognized_entry_count": 0, "seen_tags": []})
+    if seen_tag not in diag["seen_tags"]:
+        diag["seen_tags"].append(seen_tag)
+
+    if not isinstance(entries, list):
+        diag["unrecognized_entry_count"] += 1
+        warnings.append("{}: domain '{}' entries is not a list; skipped".format(warn_prefix, domain))
+        return
+
+    for entry in entries:
+        if not isinstance(entry, dict):
+            diag["unrecognized_entry_count"] += 1
+            continue
+
+        kind = entry.get("kind")
+        if kind == "crosswalk":
+            diag["crosswalk_count"] += len(entry.get("records") or [])
+            continue
+
+        if kind not in _MERGE_KINDS:
+            # Either an unrecognized "kind", or (in the "run" shape) a
+            # nonstandard-shape probe's raw OUT dict with no "kind" at all
+            # (e.g. a findings-style probe). Count it so it isn't silently
+            # dropped without a trace, but there is nothing key-shaped to
+            # merge.
+            diag["unrecognized_entry_count"] += 1
+            continue
+
+        bucket = "param" if kind == "inventory" else "reflection"
+        records = entry.get("records") or []
+
+        for rec in records:
+            if not isinstance(rec, dict):
+                continue
+            key = rec.get("param_key") or rec.get("member_key")
+            if not key:
+                diag["opaque_count"] += 1
+                continue
+
+            dbucket = domains.setdefault(domain, OrderedDict())
+            bkeys = dbucket.setdefault(bucket, OrderedDict())
+            agg = bkeys.get(key)
+            if agg is None:
+                agg = _new_agg()
+                bkeys[key] = agg
+
+            agg["seen_tags"].add(seen_tag)
+            if revit_version:
+                agg["revit_versions"].add(revit_version)
+            agg["source_files"].add(basename)
+            if rec.get("member_kind"):
+                agg["member_kind"] = rec.get("member_kind")
+            if rec.get("type_label"):
+                agg["type_label"] = rec.get("type_label")
+
+            _merge_observed(agg, rec.get("observed"))
+
+            candidate = rec.get("example")
+            if _example_score(candidate) > _example_score(agg["example"]):
+                agg["example"] = candidate
+
+
+def merge_probe_files(run_files, legacy_files, warnings):
     """
-    Returns an OrderedDict keyed by domain -> bucket -> key -> aggregate dict.
-    bucket is one of "param", "reflection", "opaque".
+    Returns (domains, diagnostics).
+    domains: OrderedDict domain -> bucket ("param"|"reflection") -> key -> aggregate dict.
+    diagnostics: OrderedDict domain -> {"crosswalk_count", "opaque_count",
+                 "unrecognized_entry_count", "seen_tags": [...]}
     """
     domains = OrderedDict()
-    diagnostics = OrderedDict()  # domain -> {"crosswalk_count": int, "runs": [...]}
+    diagnostics = OrderedDict()
 
-    for path, fname_domain, date in matched:
+    for path, fname_meta in run_files:
+        basename = os.path.basename(path)
+        try:
+            payload = load_payload(path)
+        except (OSError, ValueError) as ex:
+            warnings.append("{}: failed to parse JSON ({})".format(basename, ex))
+            continue
+
+        if not isinstance(payload, dict) or "domains" not in payload:
+            warnings.append("{}: does not look like a run-shaped file (missing 'domains'); skipped".format(basename))
+            continue
+
+        run_meta = payload.get("run_metadata") or {}
+        revit_version = run_meta.get("revit_version") or fname_meta.get("revit_version")
+        extraction_date = run_meta.get("extraction_date")
+        run_id = run_meta.get("run_id") or fname_meta.get("run_id")
+        seen_tag = extraction_date or run_id or basename
+
+        domains_payload = payload.get("domains")
+        if not isinstance(domains_payload, dict):
+            warnings.append("{}: 'domains' is not an object; skipped".format(basename))
+            continue
+
+        for domain, entries in domains_payload.items():
+            _merge_entries_for_domain(
+                domains, diagnostics, domain, entries, basename, seen_tag, revit_version,
+                warn_prefix=basename, warnings=warnings,
+            )
+
+    for path, fname_meta in legacy_files:
         basename = os.path.basename(path)
         try:
             payload = load_payload(path)
@@ -121,70 +253,33 @@ def merge_probe_files(matched, warnings):
             continue
 
         if not isinstance(payload, list):
-            warnings.append("{}: top-level JSON is not a list; skipped".format(basename))
+            warnings.append("{}: top-level JSON is not a list (legacy shape expected); skipped".format(basename))
             continue
 
+        fname_domain = fname_meta.get("domain")
+        date = fname_meta.get("date")
+
+        # Legacy files are a flat list of {"kind":..., "domain":..., "records":[...]}
+        # entries (no separate "domains" dict) -- group them by declared
+        # domain (falling back to the filename domain) before merging.
+        by_domain = OrderedDict()
         for entry in payload:
             if not isinstance(entry, dict):
                 continue
-            kind = entry.get("kind")
-            domain = entry.get("domain") or fname_domain
+            d = entry.get("domain") or fname_domain
             if entry.get("domain") and entry.get("domain") != fname_domain:
                 warnings.append(
                     "{}: declared domain '{}' != filename domain '{}'; using declared domain".format(
                         basename, entry.get("domain"), fname_domain
                     )
                 )
+            by_domain.setdefault(d, []).append(entry)
 
-            diag = diagnostics.setdefault(domain, {"crosswalk_count": 0, "opaque_count": 0, "runs": []})
-            if date not in diag["runs"]:
-                diag["runs"].append(date)
-
-            if kind == "crosswalk":
-                diag["crosswalk_count"] += len(entry.get("records") or [])
-                continue
-
-            if kind not in _MERGE_KINDS:
-                continue
-
-            bucket = "param" if kind == "inventory" else "reflection"
-            records = entry.get("records") or []
-
-            for rec in records:
-                if not isinstance(rec, dict):
-                    continue
-                key = rec.get("param_key") or rec.get("member_key")
-                if not key:
-                    diag["opaque_count"] += 1
-                    continue
-
-                dbucket = domains.setdefault(domain, OrderedDict())
-                bkeys = dbucket.setdefault(bucket, OrderedDict())
-                agg = bkeys.get(key)
-                if agg is None:
-                    agg = {
-                        "storage_types": set(),
-                        "q_counts": {},
-                        "example": None,
-                        "dates_seen": set(),
-                        "source_files": set(),
-                        "member_kind": rec.get("member_kind"),
-                        "type_label": rec.get("type_label"),
-                    }
-                    bkeys[key] = agg
-
-                agg["dates_seen"].add(date)
-                agg["source_files"].add(basename)
-                if rec.get("member_kind"):
-                    agg["member_kind"] = rec.get("member_kind")
-                if rec.get("type_label"):
-                    agg["type_label"] = rec.get("type_label")
-
-                _merge_observed(agg, rec.get("observed"))
-
-                candidate = rec.get("example")
-                if _example_score(candidate) > _example_score(agg["example"]):
-                    agg["example"] = candidate
+        for domain, entries in by_domain.items():
+            _merge_entries_for_domain(
+                domains, diagnostics, domain, entries, basename, date, None,
+                warn_prefix=basename, warnings=warnings,
+            )
 
     return domains, diagnostics
 
@@ -226,9 +321,10 @@ def write_csv(domains, out_csv, warnings):
                         "example_raw": ex.get("raw"),
                         "example_display": ex.get("display"),
                         "example_norm": ex.get("norm"),
-                        "first_seen_date": min(agg["dates_seen"]) if agg["dates_seen"] else "",
-                        "last_seen_date": max(agg["dates_seen"]) if agg["dates_seen"] else "",
-                        "run_count": len(agg["dates_seen"]),
+                        "revit_versions_seen": ";".join(sorted(agg["revit_versions"])),
+                        "first_seen": min(agg["seen_tags"]) if agg["seen_tags"] else "",
+                        "last_seen": max(agg["seen_tags"]) if agg["seen_tags"] else "",
+                        "run_count": len(agg["seen_tags"]),
                         "source_files": ";".join(sorted(agg["source_files"])),
                     }
                 )
@@ -237,7 +333,7 @@ def write_csv(domains, out_csv, warnings):
         "domain", "key_kind", "key", "member_kind", "type_label",
         "storage_types", "q_counts", "unique_value_count",
         "example_q", "example_storage", "example_raw", "example_display", "example_norm",
-        "first_seen_date", "last_seen_date", "run_count", "source_files",
+        "revit_versions_seen", "first_seen", "last_seen", "run_count", "source_files",
     ]
     try:
         os.makedirs(os.path.dirname(os.path.abspath(out_csv)), exist_ok=True)
@@ -263,39 +359,50 @@ def scan_domain_coverage(domains_dir):
     return names
 
 
-def write_markdown(domains, diagnostics, out_md, matched, skipped, warnings, domain_module_names):
+def write_markdown(domains, diagnostics, out_md, skipped, warnings, domain_module_names, run_file_count, legacy_file_count):
     lines = []
     lines.append("# Probe Inventory (auto-generated)")
     lines.append("")
     lines.append(
-        "Generated by `tools/probes/build_probe_inventory.py`. Do not hand-edit — "
-        "rerun the script after adding/updating `probe_*.json` files. This "
-        "supersedes the manually-assembled `domain_probe_inventory_2024-02-05.md`, "
-        "which is not kept in sync."
+        "Generated by `tools/probes/build_probe_inventory.py`. Do not hand-edit -- "
+        "rerun the script after adding/updating probe output files."
     )
     lines.append("")
     lines.append(
         "Each row is one representative observation per `(domain, key)`, merged "
-        "across every dated probe run found for that domain. `key_kind=param` rows "
-        "come from a probe's dynamic/curated Parameter or property capture; "
+        "across every probe run found for that domain -- both current "
+        "`probes_<revit_version>_<run_id>.json` run files ({} found) and legacy "
+        "`probe_<domain>_<date>.json` files ({} found). `key_kind=param` rows come "
+        "from a probe's dynamic/curated Parameter or property capture; "
         "`key_kind=reflection` rows come from a `.NET` reflection sweep "
-        "(properties/zero-arg methods) layered on top, where present."
+        "(properties/zero-arg methods) layered on top, where present.".format(
+            run_file_count, legacy_file_count
+        )
     )
     lines.append("")
 
     lines.append("## Source runs")
     lines.append("")
-    lines.append("| domain | runs | dates | crosswalk records | opaque records |")
-    lines.append("|---|---|---|---|---|")
+    lines.append("| domain | runs | revit versions seen | crosswalk records | opaque records | unrecognized entries |")
+    lines.append("|---|---|---|---|---|---|")
     for domain in sorted(diagnostics.keys()):
         diag = diagnostics[domain]
-        dates = ", ".join(sorted(diag["runs"]))
+        tags = ", ".join(sorted(diag["seen_tags"]))
+        versions = set()
+        for bucket in ("param", "reflection"):
+            for agg in domains.get(domain, {}).get(bucket, {}).values():
+                versions.update(agg.get("revit_versions") or [])
         lines.append(
-            "| `{}` | {} | {} | {} | {} |".format(
-                domain, len(diag["runs"]), dates, diag["crosswalk_count"], diag["opaque_count"]
+            "| `{}` | {} | {} | {} | {} | {} |".format(
+                domain, len(diag["seen_tags"]),
+                ", ".join(sorted(versions)) or "(unknown)",
+                diag["crosswalk_count"], diag["opaque_count"], diag["unrecognized_entry_count"],
             )
         )
     lines.append("")
+    if diagnostics:
+        lines.append("`runs` counts distinct `extraction_date`/legacy-filename-date tags seen for that domain; see the CSV's `first_seen`/`last_seen` columns for the actual timestamps.")
+        lines.append("")
 
     if domain_module_names is not None:
         probed = set(diagnostics.keys())
@@ -303,15 +410,15 @@ def write_markdown(domains, diagnostics, out_md, matched, skipped, warnings, dom
         lines.append("## Domain coverage")
         lines.append("")
         lines.append(
-            "Active domain modules under `domains/` with **no** probe JSON present at all "
-            "(nothing to curate from — not the same as \"probed and found empty\"):"
+            "Active domain modules under `domains/` with **no** probe data present at all "
+            "(nothing to curate from -- not the same as \"probed and found empty\"):"
         )
         lines.append("")
         if missing:
             for m in missing:
                 lines.append("- `{}`".format(m))
         else:
-            lines.append("- (none — every domain module has at least one probe run)")
+            lines.append("- (none -- every domain module has at least one probe run)")
         lines.append("")
 
     if skipped or warnings:
@@ -346,10 +453,11 @@ def write_markdown(domains, diagnostics, out_md, matched, skipped, warnings, dom
                 lines.append("  - example — q=`{}` storage=`{}` raw=`{}` display=`{}` norm=`{}`".format(
                     ex.get("q"), ex.get("storage"), ex.get("raw"), ex.get("display"), ex.get("norm")
                 ))
+                lines.append("  - revit_versions_seen — `{}`".format(", ".join(sorted(agg["revit_versions"])) or "(unknown)"))
                 lines.append("  - seen — {} run(s), {}–{}".format(
-                    len(agg["dates_seen"]),
-                    min(agg["dates_seen"]) if agg["dates_seen"] else "?",
-                    max(agg["dates_seen"]) if agg["dates_seen"] else "?",
+                    len(agg["seen_tags"]),
+                    min(agg["seen_tags"]) if agg["seen_tags"] else "?",
+                    max(agg["seen_tags"]) if agg["seen_tags"] else "?",
                 ))
                 lines.append("")
 
@@ -363,13 +471,14 @@ def write_markdown(domains, diagnostics, out_md, matched, skipped, warnings, dom
 
 def build(probes_dir, out_md, out_csv, domains_dir):
     warnings = []
-    matched, skipped = discover_probe_files(probes_dir)
-    domains, diagnostics = merge_probe_files(matched, warnings)
+    run_files, legacy_files, skipped = discover_probe_files(probes_dir)
+    domains, diagnostics = merge_probe_files(run_files, legacy_files, warnings)
     domain_module_names = scan_domain_coverage(domains_dir) if domains_dir else None
     row_count = write_csv(domains, out_csv, warnings)
-    write_markdown(domains, diagnostics, out_md, matched, skipped, warnings, domain_module_names)
+    write_markdown(domains, diagnostics, out_md, skipped, warnings, domain_module_names, len(run_files), len(legacy_files))
     return {
-        "files_matched": len(matched),
+        "run_files_matched": len(run_files),
+        "legacy_files_matched": len(legacy_files),
         "files_skipped": len(skipped),
         "domains": len(domains),
         "csv_rows": row_count,
@@ -404,14 +513,15 @@ def main(argv=None):
     result = build(probes_dir, out_md, out_csv, domains_dir)
 
     print("Probe inventory build complete.")
-    print("  probe files matched : {}".format(result["files_matched"]))
-    print("  probe files skipped : {}".format(result["files_skipped"]))
-    print("  domains covered     : {}".format(result["domains"]))
-    print("  csv rows written    : {}".format(result["csv_rows"]))
-    print("  markdown            : {}".format(out_md))
-    print("  csv                 : {}".format(out_csv))
+    print("  run files matched    : {}".format(result["run_files_matched"]))
+    print("  legacy files matched : {}".format(result["legacy_files_matched"]))
+    print("  files skipped        : {}".format(result["files_skipped"]))
+    print("  domains covered      : {}".format(result["domains"]))
+    print("  csv rows written     : {}".format(result["csv_rows"]))
+    print("  markdown             : {}".format(out_md))
+    print("  csv                  : {}".format(out_csv))
     if result["warnings"]:
-        print("  warnings            : {}".format(len(result["warnings"])))
+        print("  warnings             : {}".format(len(result["warnings"])))
         for w in result["warnings"][:10]:
             print("    - {}".format(w))
     return 0
