@@ -472,16 +472,20 @@ def write_markdown(domains, diagnostics, out_md, skipped, warnings, domain_modul
 def build(probes_dir, out_md, out_csv, domains_dir, force=False):
     warnings = []
     run_files, legacy_files, skipped = discover_probe_files(probes_dir)
+    domains, diagnostics = merge_probe_files(run_files, legacy_files, warnings)
 
-    if not run_files and not legacy_files and not force:
-        # Refuse to clobber a populated CSV/Markdown with empty output just
-        # because no probe_*.json/probes_*.json inputs are present (e.g. the
-        # source files were deleted/moved and this ran from the wrong
-        # --probes-dir). Pass force=True (--force on the CLI) if an empty
+    if not domains and not force:
+        # Refuse to clobber a populated CSV/Markdown with empty output.
+        # This covers two cases: (a) no probe_*.json/probes_*.json inputs
+        # were found at all, and (b) inputs were found by filename but every
+        # one of them failed to parse/validate (e.g. a truncated or
+        # wrong-shaped probes_*.json) -- merge_probe_files() only records a
+        # warning for (b) and would otherwise return empty domains here just
+        # the same as (a). Pass force=True (--force on the CLI) if an empty
         # inventory is actually intended (e.g. a brand-new repo).
         return {
-            "run_files_matched": 0,
-            "legacy_files_matched": 0,
+            "run_files_matched": len(run_files),
+            "legacy_files_matched": len(legacy_files),
             "files_skipped": len(skipped),
             "domains": 0,
             "csv_rows": None,
@@ -490,7 +494,6 @@ def build(probes_dir, out_md, out_csv, domains_dir, force=False):
             "refused_empty_rebuild": True,
         }
 
-    domains, diagnostics = merge_probe_files(run_files, legacy_files, warnings)
     domain_module_names = scan_domain_coverage(domains_dir) if domains_dir else None
     row_count = write_csv(domains, out_csv, warnings)
     write_markdown(domains, diagnostics, out_md, skipped, warnings, domain_module_names, len(run_files), len(legacy_files))
@@ -539,12 +542,23 @@ def main(argv=None):
     result = build(probes_dir, out_md, out_csv, domains_dir, force=args.force)
 
     if result.get("refused_empty_rebuild"):
-        print("Refused: no probe_*.json/probes_*.json inputs found under {}.".format(probes_dir))
+        matched = result["run_files_matched"] + result["legacy_files_matched"]
+        if matched == 0:
+            print("Refused: no probe_*.json/probes_*.json inputs found under {}.".format(probes_dir))
+        else:
+            print(
+                "Refused: {} input file(s) matched under {} but none parsed into usable "
+                "domain data (see warnings below).".format(matched, probes_dir)
+            )
         print("Not overwriting {} / {} with empty output.".format(out_md, out_csv))
         if result["skipped"]:
             print("  files skipped         : {}".format(len(result["skipped"])))
             for name, reason in result["skipped"][:10]:
                 print("    - {}: {}".format(name, reason))
+        if result["warnings"]:
+            print("  warnings              : {}".format(len(result["warnings"])))
+            for w in result["warnings"][:10]:
+                print("    - {}".format(w))
         print("Pass --force if an empty inventory is actually intended.")
         return 1
 

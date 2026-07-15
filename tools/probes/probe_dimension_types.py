@@ -610,13 +610,22 @@ def _md5(s):
     except:
         return None
 
-def _try_call(obj, member_name):
+def _try_call(obj, member_name, allow_call=True):
     if obj is None or not member_name:
         return (False, None, "missing_target_or_member")
     try:
         if hasattr(obj, member_name):
             v = getattr(obj, member_name)
             if callable(v):
+                if not allow_call:
+                    # SAFETY: member_name came from open-ended reflection
+                    # (not the small hardcoded root_candidates getter list
+                    # below) -- never invoke it. Revit API methods can have
+                    # side effects (printing, export, regenerate, delete,
+                    # ...) and there is no reliable way to tell a safe
+                    # zero-arg query method from a side-effecting one by
+                    # name alone. Record that it exists without calling it.
+                    return (True, "<method not invoked>", None)
                 try:
                     return (True, v(), None)
                 except Exception as ex:
@@ -728,7 +737,7 @@ def _try_extract_format_surface(dim_type):
     if len(roots) == 0:
         out["found_members"] = _reflect_members(dim_type, ["alternate", "alt", "primary", "format", "unit"])
         for n in out["found_members"][:60]:
-            ok, v, err = _try_call(dim_type, n)
+            ok, v, err = _try_call(dim_type, n, allow_call=False)
             if ok:
                 key = "x.dim_type.{}".format(n)
                 out["values"][key] = _format_synth_contract(_kv_norm(n, v)[1])
@@ -745,7 +754,7 @@ def _try_extract_format_surface(dim_type):
             out["found_members"].append("{}::{}".format(root_name, ln))
 
         for ln in leaf_names[:60]:
-            ok, v, err = _try_call(root_obj, ln)
+            ok, v, err = _try_call(root_obj, ln, allow_call=False)
             if not ok:
                 continue
             k = ("x.alt_units.{}::{}".format(root_name, ln) if is_alt else "x.primary_units.{}::{}".format(root_name, ln))

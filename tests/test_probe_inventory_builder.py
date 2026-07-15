@@ -154,6 +154,30 @@ def test_empty_probes_dir_refuses_to_overwrite_by_default(tmp_path):
     assert rows == [{"domain": "widgets", "key_kind": "param", "key": "p.Foo"}]
 
 
+def test_all_inputs_invalid_refuses_to_overwrite_by_default(tmp_path):
+    # Files match the expected naming pattern but none of them parse into
+    # usable domain data (e.g. truncated/malformed JSON, or valid JSON in
+    # the wrong shape) -- this must refuse the same way as the zero-files
+    # case, not silently clobber the inventory with empty output.
+    probes_dir = tmp_path / "probes"
+    probes_dir.mkdir()
+    (probes_dir / "probes_2025_bad.json").write_text("{not valid json", encoding="utf-8")
+    (probes_dir / "probe_widgets_2026-01-01.json").write_text('{"oops": "not a list"}', encoding="utf-8")
+
+    out_md = tmp_path / "out.md"
+    out_csv = tmp_path / "out.csv"
+    out_md.write_text("# populated\n", encoding="utf-8")
+    out_csv.write_text("domain,key_kind,key\nwidgets,param,p.Foo\n", encoding="utf-8")
+
+    proc = _run(probes_dir, out_md, out_csv, expect_returncode=1)
+    assert "Refused" in proc.stdout
+    assert "2 input file(s) matched" in proc.stdout
+
+    assert out_md.read_text(encoding="utf-8") == "# populated\n"
+    rows = _read_csv_rows(out_csv)
+    assert rows == [{"domain": "widgets", "key_kind": "param", "key": "p.Foo"}]
+
+
 def test_empty_probes_dir_with_force_writes_empty_inventory(tmp_path):
     probes_dir = tmp_path / "probes"
     probes_dir.mkdir()

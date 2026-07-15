@@ -79,6 +79,10 @@ import traceback
 import uuid
 from datetime import datetime
 
+import clr
+clr.AddReference("RevitServices")
+from RevitServices.Persistence import DocumentManager
+
 # ---------------------------------------------------------------------------
 # Repo discovery (mirrors runner/thin_runner.py's approach: no __file__
 # reliance, since this is pasted into a Dynamo node; conventional per-user
@@ -252,7 +256,7 @@ def _safe(fn, default=None):
 
 def _revit_version():
     try:
-        uiapp = DocumentManager.Instance.CurrentUIApplication  # noqa: F821
+        uiapp = DocumentManager.Instance.CurrentUIApplication
         app = uiapp.Application if uiapp is not None else None
         v = _safe(lambda: app.VersionNumber, None)
         return str(v) if v else None
@@ -262,7 +266,7 @@ def _revit_version():
 
 def _document_identity():
     try:
-        doc = DocumentManager.Instance.CurrentDBDocument  # noqa: F821
+        doc = DocumentManager.Instance.CurrentDBDocument
     except Exception:
         return {"title": None, "path_name": None, "is_workshared": None}
     return {

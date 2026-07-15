@@ -641,15 +641,17 @@ def _reflect_member_names(obj):
     return sorted(uniq, key=lambda x: x[1])
 
 def _reflect_try_get(obj, member_kind, name):
+    if member_kind == "method":
+        # SAFETY: never invoke a reflection-discovered method. Revit API
+        # methods can have side effects (printing, export, regenerate,
+        # delete, transaction commits, ...) and there is no reliable way to
+        # tell a safe zero-arg query method from a side-effecting one by
+        # name alone. Record that the method exists without calling it.
+        return (True, "<method not invoked>", None)
     try:
         v = getattr(obj, name)
     except Exception as ex:
         return (False, None, "{}: {}".format(type(ex).__name__, ex))
-    if member_kind == "method":
-        try:
-            return (True, v(), None)
-        except Exception as ex:
-            return (False, None, "{}: {}".format(type(ex).__name__, ex))
     return (True, v, None)
 
 def _reflect_contract(raw_v):
