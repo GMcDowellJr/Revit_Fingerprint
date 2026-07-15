@@ -458,6 +458,8 @@ if len(selected_views) == 0:
 if len(all_cats) == 0:
     _touch_diag("diag.ERROR_no_categories", _contract_int(1, display="1", norm=1))
 
+_reflect_ogs_samples = []
+
 for v in selected_views:
     v_bucket = _bucket_for_view(v)
     v_id = _eid_int(_safe(lambda: v.Id, None))
@@ -478,6 +480,9 @@ for v in selected_views:
             ogs = v.GetCategoryOverrides(cat.Id)
         except:
             ogs = None
+
+        if ogs is not None and len(_reflect_ogs_samples) < 60:
+            _reflect_ogs_samples.append(ogs)
 
         if ogs is None:
             _touch_param(SENTINEL, _contract_unreadable("None"), v_bucket)
@@ -583,9 +588,149 @@ for pk in sorted(param_index.keys()):
         }
     })
 
+
+# -------------------------
+# Reflection sweep (breadth): non-Parameter .NET members via reflection
+# -------------------------
+# Complements the curated/dynamic capture above with a breadth-only sweep of
+# the sampled objects' .NET properties and zero-arg methods. This is
+# diagnostics/breadth, not identity -- it surfaces members a fixed/curated
+# key list or a Parameters-only walk could otherwise miss.
+
+_REFLECTION_SKIP = set([
+    "Equals", "GetHashCode", "GetType", "ToString", "MemberwiseClone",
+    "Dispose", "GetEnumerator", "Clone",
+])
+
+def _reflect_member_names(obj):
+    out = []
+    if obj is None:
+        return out
+    try:
+        t = obj.GetType()
+    except:
+        return out
+    try:
+        for p in t.GetProperties():
+            try:
+                n = p.Name
+                if n in _REFLECTION_SKIP or n.startswith("_"):
+                    continue
+                if p.GetIndexParameters():
+                    continue
+                out.append(("property", n))
+            except:
+                pass
+    except:
+        pass
+    try:
+        for m in t.GetMethods():
+            try:
+                n = m.Name
+                if n in _REFLECTION_SKIP or n.startswith("_"):
+                    continue
+                if n.startswith("get_") or n.startswith("set_") or n.startswith("add_") or n.startswith("remove_"):
+                    continue
+                if m.GetParameters().Length != 0:
+                    continue
+                if m.IsSpecialName:
+                    continue
+                out.append(("method", n))
+            except:
+                pass
+    except:
+        pass
+    seen = set()
+    uniq = []
+    for kind, n in out:
+        if n in seen:
+            continue
+        seen.add(n)
+        uniq.append((kind, n))
+    return sorted(uniq, key=lambda x: x[1])
+
+def _reflect_try_get(obj, member_kind, name):
+    try:
+        v = getattr(obj, name)
+    except Exception as ex:
+        return (False, None, "{}: {}".format(type(ex).__name__, ex))
+    if member_kind == "method":
+        try:
+            return (True, v(), None)
+        except Exception as ex:
+            return (False, None, "{}: {}".format(type(ex).__name__, ex))
+    return (True, v, None)
+
+def _reflect_contract(raw_v):
+    if raw_v is None:
+        return {"q": "missing", "storage": "None", "raw": None, "display": None, "norm": None}
+    if isinstance(raw_v, bool):
+        return {"q": "ok", "storage": "Integer", "raw": int(raw_v), "display": str(raw_v), "norm": int(raw_v)}
+    if isinstance(raw_v, int):
+        return {"q": "ok", "storage": "Integer", "raw": raw_v, "display": str(raw_v), "norm": raw_v}
+    if isinstance(raw_v, float):
+        return {"q": "ok", "storage": "Double", "raw": raw_v, "display": str(raw_v), "norm": raw_v}
+    if isinstance(raw_v, str):
+        return {"q": "ok", "storage": "String", "raw": raw_v, "display": raw_v, "norm": raw_v}
+    try:
+        if hasattr(raw_v, "IntegerValue"):
+            iv = int(raw_v.IntegerValue)
+            return {"q": "ok", "storage": "ElementId", "raw": iv, "display": str(iv), "norm": iv}
+    except:
+        pass
+    try:
+        if hasattr(raw_v, "ToString"):
+            s = raw_v.ToString()
+            if s and "Autodesk.Revit" not in s and "System." not in s:
+                return {"q": "ok", "storage": "None", "raw": None, "display": s, "norm": s}
+    except:
+        pass
+    return {"q": "unsupported", "storage": "None", "raw": None, "display": None, "norm": None}
+
+def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200):
+    idx = {}
+    for obj in sample_objs:
+        if obj is None:
+            continue
+        for member_kind, name in _reflect_member_names(obj)[:max_members]:
+            ok, raw_v, err = _reflect_try_get(obj, member_kind, name)
+            key = "refl.{}.{}".format(type_label, name)
+            if key not in idx:
+                idx[key] = {
+                    "domain": domain_name, "member_key": key, "member_kind": member_kind,
+                    "type_label": type_label, "example": None,
+                    "ok_count": 0, "error_count": 0, "unique_value_count": 0, "_seen": set(),
+                }
+            e = idx[key]
+            if not ok:
+                e["error_count"] += 1
+                continue
+            contract = _reflect_contract(raw_v)
+            e["ok_count"] += 1
+            sig = (str(contract.get("storage")), str(contract.get("norm")))
+            if sig not in e["_seen"]:
+                e["_seen"].add(sig)
+                e["unique_value_count"] += 1
+            if e["example"] is None or (contract.get("display") is not None and e["example"].get("display") is None):
+                e["example"] = contract
+    records = []
+    for key in sorted(idx.keys()):
+        e = idx[key]
+        records.append({
+            "domain": e["domain"], "member_key": e["member_key"], "member_kind": e["member_kind"],
+            "type_label": e["type_label"], "example": e["example"],
+            "observed": {"ok_count": e["ok_count"], "error_count": e["error_count"], "unique_value_count": e["unique_value_count"]},
+        })
+    return records
+
+_reflection_records_0 = _run_reflection_sweep(_reflect_ogs_samples, "OverrideGraphicSettings", "view_category_overrides")
+_reflection_records_1 = _run_reflection_sweep([c for (c, _, _) in all_cats], "Category", "view_category_overrides")
+_reflection_records = _reflection_records_0 + _reflection_records_1
+
 OUT_payload = [
     {"kind": "inventory", "domain": "view_category_overrides", "records": param_inventory},
     {"kind": "crosswalk", "domain": "view_category_overrides", "records": optional_crosswalk},
+    {"kind": "reflection", "domain": "view_category_overrides", "records": _reflection_records},
 ]
 
 # -------------------------
