@@ -396,19 +396,23 @@ failed_count = 0
 probes_run_names = []
 
 for path in probe_files:
-    stem, domain_guess, ok, out_value, err = None, None, None, None, None
+    # Filter on the filename/domain guess BEFORE executing: a probe can do a
+    # full FilteredElementCollector scan of the document, so a filtered run
+    # (e.g. domain_filter=["units"]) must not still execute every other
+    # probe just to discard the result afterward.
+    stem = os.path.splitext(os.path.basename(path))[0]
+    domain_guess = stem[len("probe_"):] if stem.startswith("probe_") else stem
+    if not _matches_filter(stem, [domain_guess]):
+        continue
+
+    ok, out_value, err = None, None, None
     try:
         stem, domain_guess, ok, out_value, err = _run_one_probe(path)
     except Exception as ex:
         # Defensive: _run_one_probe itself should not raise, but never let
         # one probe take down the whole sweep.
-        stem = os.path.splitext(os.path.basename(path))[0]
-        domain_guess = stem[len("probe_"):] if stem.startswith("probe_") else stem
         ok = False
         err = "runner-level failure: {}: {}".format(type(ex).__name__, ex)
-
-    if not _matches_filter(stem, _domains_declared_in_out(out_value) if ok else [domain_guess]):
-        continue
 
     record = {"probe_file": os.path.basename(path), "domain_guess": domain_guess, "status": None, "error": None}
 

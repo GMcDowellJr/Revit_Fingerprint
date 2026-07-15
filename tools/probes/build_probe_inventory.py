@@ -469,9 +469,27 @@ def write_markdown(domains, diagnostics, out_md, skipped, warnings, domain_modul
         f.write("\n".join(lines) + "\n")
 
 
-def build(probes_dir, out_md, out_csv, domains_dir):
+def build(probes_dir, out_md, out_csv, domains_dir, force=False):
     warnings = []
     run_files, legacy_files, skipped = discover_probe_files(probes_dir)
+
+    if not run_files and not legacy_files and not force:
+        # Refuse to clobber a populated CSV/Markdown with empty output just
+        # because no probe_*.json/probes_*.json inputs are present (e.g. the
+        # source files were deleted/moved and this ran from the wrong
+        # --probes-dir). Pass force=True (--force on the CLI) if an empty
+        # inventory is actually intended (e.g. a brand-new repo).
+        return {
+            "run_files_matched": 0,
+            "legacy_files_matched": 0,
+            "files_skipped": len(skipped),
+            "domains": 0,
+            "csv_rows": None,
+            "warnings": warnings,
+            "skipped": skipped,
+            "refused_empty_rebuild": True,
+        }
+
     domains, diagnostics = merge_probe_files(run_files, legacy_files, warnings)
     domain_module_names = scan_domain_coverage(domains_dir) if domains_dir else None
     row_count = write_csv(domains, out_csv, warnings)
@@ -484,6 +502,7 @@ def build(probes_dir, out_md, out_csv, domains_dir):
         "csv_rows": row_count,
         "warnings": warnings,
         "skipped": skipped,
+        "refused_empty_rebuild": False,
     }
 
 
@@ -499,6 +518,13 @@ def main(argv=None):
         help="Optional path to the domains/ directory, used only for the coverage "
         "appendix (which active domains have zero probe runs). Best-effort.",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Write out_md/out_csv even when zero probe_*.json/probes_*.json inputs "
+        "are found. Without this, a no-input run is refused (exit code 1) instead "
+        "of silently overwriting a previously-populated inventory with an empty one.",
+    )
     args = parser.parse_args(argv)
 
     probes_dir = os.path.abspath(args.probes_dir)
@@ -510,7 +536,17 @@ def main(argv=None):
         candidate = os.path.abspath(os.path.join(probes_dir, "..", "..", "domains"))
         domains_dir = candidate if os.path.isdir(candidate) else None
 
-    result = build(probes_dir, out_md, out_csv, domains_dir)
+    result = build(probes_dir, out_md, out_csv, domains_dir, force=args.force)
+
+    if result.get("refused_empty_rebuild"):
+        print("Refused: no probe_*.json/probes_*.json inputs found under {}.".format(probes_dir))
+        print("Not overwriting {} / {} with empty output.".format(out_md, out_csv))
+        if result["skipped"]:
+            print("  files skipped         : {}".format(len(result["skipped"])))
+            for name, reason in result["skipped"][:10]:
+                print("    - {}: {}".format(name, reason))
+        print("Pass --force if an empty inventory is actually intended.")
+        return 1
 
     print("Probe inventory build complete.")
     print("  run files matched    : {}".format(result["run_files_matched"]))

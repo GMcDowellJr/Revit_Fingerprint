@@ -7,7 +7,7 @@ from pathlib import Path
 SCRIPT = Path("tools/probes/build_probe_inventory.py")
 
 
-def _run(probes_dir, out_md, out_csv, domains_dir=None):
+def _run(probes_dir, out_md, out_csv, domains_dir=None, force=False, expect_returncode=0):
     cmd = [
         sys.executable,
         str(SCRIPT),
@@ -17,8 +17,10 @@ def _run(probes_dir, out_md, out_csv, domains_dir=None):
     ]
     if domains_dir is not None:
         cmd += ["--domains-dir", str(domains_dir)]
+    if force:
+        cmd += ["--force"]
     proc = subprocess.run(cmd, capture_output=True, text=True)
-    assert proc.returncode == 0, proc.stderr
+    assert proc.returncode == expect_returncode, proc.stderr
     return proc
 
 
@@ -133,12 +135,31 @@ def test_merges_and_dedupes_across_dated_runs(tmp_path):
     assert "probe_bad.json" in md_text
 
 
-def test_empty_probes_dir_does_not_crash(tmp_path):
+def test_empty_probes_dir_refuses_to_overwrite_by_default(tmp_path):
     probes_dir = tmp_path / "probes"
     probes_dir.mkdir()
     out_md = tmp_path / "out.md"
     out_csv = tmp_path / "out.csv"
-    _run(probes_dir, out_md, out_csv)
+    # Simulate a previously-populated inventory sitting at the output paths --
+    # a no-input run must not silently clobber it (PR #358 review comment).
+    out_md.write_text("# populated\n", encoding="utf-8")
+    out_csv.write_text("domain,key_kind,key\nwidgets,param,p.Foo\n", encoding="utf-8")
+
+    proc = _run(probes_dir, out_md, out_csv, expect_returncode=1)
+    assert "Refused" in proc.stdout
+
+    # Untouched -- still the "populated" content from before the run.
+    assert out_md.read_text(encoding="utf-8") == "# populated\n"
+    rows = _read_csv_rows(out_csv)
+    assert rows == [{"domain": "widgets", "key_kind": "param", "key": "p.Foo"}]
+
+
+def test_empty_probes_dir_with_force_writes_empty_inventory(tmp_path):
+    probes_dir = tmp_path / "probes"
+    probes_dir.mkdir()
+    out_md = tmp_path / "out.md"
+    out_csv = tmp_path / "out.csv"
+    _run(probes_dir, out_md, out_csv, force=True)
     rows = _read_csv_rows(out_csv)
     assert rows == []
     assert out_md.exists()
