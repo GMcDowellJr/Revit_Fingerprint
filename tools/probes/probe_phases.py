@@ -25,9 +25,9 @@
 #
 #   IN[3] write_json (bool)
 #        When True, writes a JSON artifact named:
-#          probe_phases_YYYY-MM-DD.json
+#          probes_<revit_version>_<run_id>.json
 #        When False, no file is written (OUT is still returned).
-#        Default: True
+#        Default: False
 #
 # Notes:
 #   - Modeled after exporter domain behavior: phases are global, order matters, and name+sequence are the main
@@ -65,7 +65,7 @@ include_phase_parameters = IN[1] if len(IN) > 1 and IN[1] is not None else True
 # IN[2] output_directory (str) — target folder for JSON
 # IN[3] write_json (bool) — enable/disable file write
 output_directory = IN[2] if len(IN) > 2 and IN[2] is not None else None
-write_json = IN[3] if len(IN) > 3 and IN[3] is not None else True
+write_json = IN[3] if len(IN) > 3 and IN[3] is not None else False
 
 
 # -------------------------

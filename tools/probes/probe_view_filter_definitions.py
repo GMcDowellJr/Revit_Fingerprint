@@ -32,7 +32,7 @@
 #
 #   IN[3] output_directory (str)
 #        Directory path where JSON will be written.
-#        Filename is fixed as: probe_view_filter_definitions_YYYY-MM-DD.json
+#        Filename is fixed as: probes_<revit_version>_<run_id>.json
 #        If None, falls back to RVT directory, then TEMP.
 #
 #   IN[4] max_rules_to_read_per_filter (int)

@@ -34,7 +34,7 @@
 #
 #   IN[3] output_directory (str|None)
 #        Directory where JSON will be written; filename fixed:
-#        probe_units_YYYY-MM-DD.json
+#        probes_<revit_version>_<run_id>.json
 #
 # Notes:
 #   - Discovery is category-free: reflects SpecTypeId public members to gather ForgeTypeId specs.def _unitutils_get_dis
