@@ -54,14 +54,13 @@ def _population_hash(export_run_ids: List[str]) -> str:
 
 _UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]')
 # A cut dimension explicitly selected in a subset with a blank value
-# (client_label and business_center_label — see _build_segments()'s
-# _FORCE_BLANK_PARTICIPATION) renders in segment_id as an empty part between
-# pipes (e.g. "imperial|Template|" or "imperial|Container||architectural").
-# That part is rendered as this token in the derived folder name, matching
-# the "enterprise" scope-level term compare_cross_segment.py already uses for
-# "no client, no bc" rows — a bare "_" (or "__") there reads as a naming
-# mistake rather than the intentional "no client/BC selected" segment it
-# actually is.
+# (currently only client_label — see _build_segments()'s blank-client
+# handling) renders in segment_id as an empty part between pipes (e.g.
+# "imperial|Template|" or "imperial|Container||architectural"). That part is
+# rendered as this token in the derived folder name, matching the "enterprise"
+# scope-level term compare_cross_segment.py already uses for "no client, no
+# bc" rows — a bare "_" (or "__") there reads as a naming mistake rather than
+# the intentional "no client selected" segment it actually is.
 _BLANK_SELECTED_FOLDER_TOKEN = "enterprise"
 def _sanitize_folder(segment_id:str)->str:
     # No "+" quantifier on _UNSAFE_FOLDER_CHARS and no .strip("_") at the end:
@@ -210,16 +209,6 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     governance_field = gov_dims[0]["field"]
     client_field = "client_label"
     cfg_fields = [d["field"] for d in DIMENSION_CONFIG]
-    # Fields that participate in subset generation even when blank — i.e. a
-    # blank value contributes an explicit (field, "") pair to non_root_pairs
-    # instead of being silently absent from the key. Without this, "field
-    # omitted from the key" (pools every value of that field, blank included)
-    # and "field explicitly selected as blank" collapse into the same subset
-    # keys, making it impossible to construct a disjoint blank-only segment —
-    # e.g. an Enterprise bucket (business_center_label blank) whose population
-    # must exclude every real BC's rows, not pool them in. Any future
-    # dimension needing its own exclusive-scope bucket belongs in this set.
-    _FORCE_BLANK_PARTICIPATION = {client_field, "business_center_label"}
 
     populations = defaultdict(list)
     seed_pops = defaultdict(list)
@@ -303,22 +292,18 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             value = (row.get(field) or "").strip()
             if value:
                 dim_values[field] = value
-            elif field in _FORCE_BLANK_PARTICIPATION:
+            elif field == client_field:
                 dim_values[field] = ""
         root_value = dim_values.get(root_field, "")
         if not root_value:
             continue
-        # Blank client_label/business_center_label each participate in subset
-        # generation like any other value (as the pair (field, "")) — neither
-        # is special-cased to strip the other cut dimensions out of
-        # non_root_pairs. Previously (client_label only), a blank-client row
-        # only ever populated the root and root+client("") keys, so it was
-        # invisible to every role-scoped and business-center-scoped segment
-        # and only ever landed in one governance-agnostic pool at
-        # (root, client=""). business_center_label now gets the same
-        # treatment, so a blank-BC row is likewise visible to its own
-        # (root, governance, business_center_label="") subset instead of only
-        # ever appearing pooled into whichever segment omitted BC from its key.
+        # Blank client_label participates in subset generation like any other
+        # value (as the pair (client_field, "")) — it is not special-cased to
+        # strip governance_role/discipline_label/business_center_label out of
+        # non_root_pairs. Previously, a blank-client row only ever populated
+        # the root and root+client("") keys, so it was invisible to every
+        # role-scoped and business-center-scoped segment and only ever landed
+        # in one governance-agnostic pool at (root, client="").
         non_root_pairs = [(f, dim_values[f]) for f in cfg_fields if f != root_field and f in dim_values]
         for size in range(len(non_root_pairs) + 1):
             for subset in combinations(non_root_pairs, size):
@@ -358,16 +343,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             if d["field"] == client_field:
                 continue
             if d["field"] in dim_map:
-                value = dim_map[d["field"]]
-                # business_center_label is force-blank-participating like
-                # client_label (see _FORCE_BLANK_PARTICIPATION above), so an
-                # explicitly-selected blank BC must not surface here as a
-                # noisy "business_center_label=" entry — it already has its
-                # own dedicated top-level manifest column. A real (non-blank)
-                # business_center_label still appears here exactly as before.
-                if not value and d["field"] in _FORCE_BLANK_PARTICIPATION:
-                    continue
-                extra.append(f"{d['field']}={value}")
+                extra.append(f"{d['field']}={dim_map[d['field']]}")
         row = {
             "segment_id": segment_id,
             "parent_segment_id": parent_id,
@@ -486,21 +462,6 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         # {role, client=""} produced by client_label's always-present-even-
         # blank dim_values treatment (see non_root_pairs comment above).
         is_role_alone=bool(not disc and not bc and not coll and not r["client_label"])
-        # Enterprise = client_label AND business_center_label both explicitly
-        # blank — the same boolean signature as is_role_alone, but only at the
-        # level(s) reachable exclusively by selecting BOTH forced-blank pairs
-        # ({client_label: ""} and {business_center_label: ""}) together as
-        # key members. Level 2/3 combos that produce this same blank
-        # signature (root+governance alone, or with only one of the two
-        # blank dims selected/omitted) are true pooled rollups — is_role_alone
-        # already covers those unchanged. Level 4 (no discipline) and level 5
-        # (with discipline) are unreachable any other way once both blank
-        # dims are selected together, since discipline_label/collection_label
-        # have no forced-blank participation of their own and can only enter
-        # a subset with a real value — so these two levels unambiguously mean
-        # "no client, no BC", never a partial pool.
-        is_enterprise_cut=bool(not bc and not r["client_label"] and not coll and not disc)
-        is_enterprise_disc_cut=bool(not bc and not r["client_label"] and not coll and disc)
         # collection_label alone, or combined with discipline/business_center,
         # never with client_label. Level ranges mirror the
         # business_center_label branches one dimension over, for the same
@@ -550,12 +511,6 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         elif lev in (3,4) and is_bc_cut and role=="Project": pur="business_center_practice" if rt=="bundle" else "insufficient_population"
         elif lev in (3,4) and is_bc_cut and role=="Container": pur="business_center_coordination"
         elif lev in (3,4) and is_bc_cut and role=="Generic" and rt=="reference": pur="business_center_reference"
-        # Disjoint Enterprise bucket: no role-specific sub-purposes here,
-        # unlike the client/bc branches above — "no client, no BC" is one
-        # governance-agnostic population regardless of
-        # Template/Project/Container/Generic.
-        elif lev==4 and is_enterprise_cut and role: pur="enterprise_population"
-        elif lev==5 and is_enterprise_disc_cut and role: pur="enterprise_population"
         elif lev==3 and role=="Template" and r["client_label"] and rt in {"bundle","reference"}: pur="client_standard_anchor"
         elif lev==3 and role=="Project" and r["client_label"]: pur="client_practice" if rt=="bundle" else "insufficient_population"
         elif lev==3 and role=="Container" and r["client_label"]: pur="client_coordination"
@@ -596,7 +551,7 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         elif lev in (5,6) and is_bc_coll_disc_cut and role=="Generic" and rt=="reference": pur="business_center_collection_discipline_reference"
         r["segment_purpose"]=pur
         unit=r["unit_system"].title(); client=r["client_label"]; sid=r["segment_id"]
-        templates={"population_denominator":f"All {unit} files","cross_org_template_pool":f"{unit} templates — all organisations (registration only)","cross_template_agreement":f"{unit} templates — cross-template agreement","practiced_standards_corpus":f"{unit} projects — full corpus","cross_project_practice":f"{unit} projects — cross-project practice","coordination_corpus":f"{unit} coordination files","generic_reference_corpus":f"{unit} generic reference","client_population":f"{client} — all roles combined","client_standard_anchor":f"{client} templates — standards as authored","client_practice":f"{client} projects — standards as practiced","client_coordination":f"{client} coordination files","client_reference":f"{client} generic reference","insufficient_population":f"{sid} — below minimum file threshold","discipline_practice":f"{disc} projects — standards as practiced","discipline_templates":f"{disc} templates — standards as authored","discipline_coordination":f"{disc} coordination files","discipline_reference":f"{disc} generic reference","client_discipline_standard_anchor":f"{client} {disc} templates — standards as authored","client_discipline_practice":f"{client} {disc} projects — standards as practiced","client_discipline_coordination":f"{client} {disc} coordination files","client_discipline_reference":f"{client} {disc} generic reference","business_center_population":f"{bc} — all roles combined","business_center_standard_anchor":f"{bc} templates — standards as authored","business_center_practice":f"{bc} projects — standards as practiced","business_center_coordination":f"{bc} coordination files","business_center_reference":f"{bc} generic reference","business_center_discipline_standard_anchor":f"{bc} {disc} templates — standards as authored","business_center_discipline_practice":f"{bc} {disc} projects — standards as practiced","business_center_discipline_coordination":f"{bc} {disc} coordination files","business_center_discipline_reference":f"{bc} {disc} generic reference","collection_population":f"{coll} — all roles combined","collection_standard_anchor":f"{coll} templates — standards as authored","collection_practice":f"{coll} projects — standards as practiced","collection_coordination":f"{coll} coordination files","collection_reference":f"{coll} generic reference","collection_discipline_standard_anchor":f"{coll} {disc} templates — standards as authored","collection_discipline_practice":f"{coll} {disc} projects — standards as practiced","collection_discipline_coordination":f"{coll} {disc} coordination files","collection_discipline_reference":f"{coll} {disc} generic reference","business_center_collection_standard_anchor":f"{bc} — {coll} templates — standards as authored","business_center_collection_practice":f"{bc} — {coll} projects — standards as practiced","business_center_collection_coordination":f"{bc} — {coll} coordination files","business_center_collection_reference":f"{bc} — {coll} generic reference","business_center_collection_discipline_standard_anchor":f"{bc} — {coll} {disc} templates — standards as authored","business_center_collection_discipline_practice":f"{bc} — {coll} {disc} projects — standards as practiced","business_center_collection_discipline_coordination":f"{bc} — {coll} {disc} coordination files","business_center_collection_discipline_reference":f"{bc} — {coll} {disc} generic reference","client_collection_standard_anchor":f"{client} — {coll} templates — standards as authored","client_collection_practice":f"{client} — {coll} projects — standards as practiced","client_collection_coordination":f"{client} — {coll} coordination files","client_collection_reference":f"{client} — {coll} generic reference","client_collection_discipline_standard_anchor":f"{client} — {coll} {disc} templates — standards as authored","client_collection_discipline_practice":f"{client} — {coll} {disc} projects — standards as practiced","client_collection_discipline_coordination":f"{client} — {coll} {disc} coordination files","client_collection_discipline_reference":f"{client} — {coll} {disc} generic reference","enterprise_population":f"Enterprise — {role} {(disc + ' ') if disc else ''}files (no client, no BC)"}
+        templates={"population_denominator":f"All {unit} files","cross_org_template_pool":f"{unit} templates — all organisations (registration only)","cross_template_agreement":f"{unit} templates — cross-template agreement","practiced_standards_corpus":f"{unit} projects — full corpus","cross_project_practice":f"{unit} projects — cross-project practice","coordination_corpus":f"{unit} coordination files","generic_reference_corpus":f"{unit} generic reference","client_population":f"{client} — all roles combined","client_standard_anchor":f"{client} templates — standards as authored","client_practice":f"{client} projects — standards as practiced","client_coordination":f"{client} coordination files","client_reference":f"{client} generic reference","insufficient_population":f"{sid} — below minimum file threshold","discipline_practice":f"{disc} projects — standards as practiced","discipline_templates":f"{disc} templates — standards as authored","discipline_coordination":f"{disc} coordination files","discipline_reference":f"{disc} generic reference","client_discipline_standard_anchor":f"{client} {disc} templates — standards as authored","client_discipline_practice":f"{client} {disc} projects — standards as practiced","client_discipline_coordination":f"{client} {disc} coordination files","client_discipline_reference":f"{client} {disc} generic reference","business_center_population":f"{bc} — all roles combined","business_center_standard_anchor":f"{bc} templates — standards as authored","business_center_practice":f"{bc} projects — standards as practiced","business_center_coordination":f"{bc} coordination files","business_center_reference":f"{bc} generic reference","business_center_discipline_standard_anchor":f"{bc} {disc} templates — standards as authored","business_center_discipline_practice":f"{bc} {disc} projects — standards as practiced","business_center_discipline_coordination":f"{bc} {disc} coordination files","business_center_discipline_reference":f"{bc} {disc} generic reference","collection_population":f"{coll} — all roles combined","collection_standard_anchor":f"{coll} templates — standards as authored","collection_practice":f"{coll} projects — standards as practiced","collection_coordination":f"{coll} coordination files","collection_reference":f"{coll} generic reference","collection_discipline_standard_anchor":f"{coll} {disc} templates — standards as authored","collection_discipline_practice":f"{coll} {disc} projects — standards as practiced","collection_discipline_coordination":f"{coll} {disc} coordination files","collection_discipline_reference":f"{coll} {disc} generic reference","business_center_collection_standard_anchor":f"{bc} — {coll} templates — standards as authored","business_center_collection_practice":f"{bc} — {coll} projects — standards as practiced","business_center_collection_coordination":f"{bc} — {coll} coordination files","business_center_collection_reference":f"{bc} — {coll} generic reference","business_center_collection_discipline_standard_anchor":f"{bc} — {coll} {disc} templates — standards as authored","business_center_collection_discipline_practice":f"{bc} — {coll} {disc} projects — standards as practiced","business_center_collection_discipline_coordination":f"{bc} — {coll} {disc} coordination files","business_center_collection_discipline_reference":f"{bc} — {coll} {disc} generic reference","client_collection_standard_anchor":f"{client} — {coll} templates — standards as authored","client_collection_practice":f"{client} — {coll} projects — standards as practiced","client_collection_coordination":f"{client} — {coll} coordination files","client_collection_reference":f"{client} — {coll} generic reference","client_collection_discipline_standard_anchor":f"{client} — {coll} {disc} templates — standards as authored","client_collection_discipline_practice":f"{client} — {coll} {disc} projects — standards as practiced","client_collection_discipline_coordination":f"{client} — {coll} {disc} coordination files","client_collection_discipline_reference":f"{client} — {coll} {disc} generic reference"}
         if r["segment_purpose"]:
             r["segment_label"]=templates.get(r["segment_purpose"],sid)
         else:
