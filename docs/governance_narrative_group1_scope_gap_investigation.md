@@ -1,6 +1,6 @@
 # Investigation: Group 1 (`tc`/`cp`/`tp`) scope-gating gap in `build_cascade()`
 
-**Status:** Investigation only. No code was changed as part of this document.
+**Status:** Historical investigation — findings partially implemented; consult current code and tests for active behavior. No code was changed as part of this document.
 **Scope:** `tools/generate_governance_narrative.py` — `_is_unscoped_segment()`, the
 Group 1 dispatch block in `build_cascade()`, and `assign_tier()`. Group 2
 (`gt`/`gc`/`gp`) and its `_by_scope` machinery are read only as a reference
