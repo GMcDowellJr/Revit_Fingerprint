@@ -8,6 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Primary runtime**: Dynamo CPython3 (via `runner/run_dynamo.py`)
 
+The repo has two halves that share almost no runtime dependency:
+- **Extraction** (`core/`, `domains/`, `runner/`, `validators/`) — runs inside Revit/Dynamo, produces `*.details.json` / `*.index.json` exports.
+- **Analysis** (`tools/`) — runs on a developer machine against exported JSON/CSV, has no Revit dependency, and is where most active development currently happens (see `tools/` below).
+
 ## Commands
 
 ```bash
@@ -21,11 +25,13 @@ pytest tests/test_hashing_incremental.py
 FINGERPRINT_JSON_PATH=/path/to/export.json pytest tests/test_record_contract_v2.py
 ```
 
-No `requirements.txt` or `pyproject.toml` exists. The only external dependency for development is `pytest` (`pip install pytest`). CI runs Python 3.9–3.12 via `.github/workflows/ci.yml`.
+No `requirements.txt` or `pyproject.toml` exists. The only external dependency for development is `pytest` (`pip install pytest`). `.github/workflows/ci.yml` runs `pytest tests/ -v` on Python 3.9–3.12 for every push/PR to `main`. A second workflow, `.github/workflows/graphify.yml`, keeps the `graphify-out/` knowledge graph in sync.
+
+Analysis tools are stdlib-only (no pandas/numpy) as a rule — `tools/` code reads/writes CSV via `csv.DictReader`/`csv.DictWriter` by convention; don't introduce a new dependency there without a strong reason. Known exceptions that already require `pandas`/`numpy`/`scipy`: `tools/patterns_analysis/split_detection.py`, `split_detection_file_level.py`, `split_detection_element_level.py`, and `tools/pareto_joinkey_search.py`.
 
 ## Architecture
 
-The system follows a domain-driven, layered architecture:
+The extraction system is domain-driven and layered:
 
 ```
 Layer 0 - Core (Pure Python)     → core/
@@ -38,6 +44,8 @@ Layer 3 - Host-specific Runners  → runner/
 
 Reverse dependencies are forbidden. Domains do NOT import each other.
 
+`tools/` (analysis) sits downstream of exported JSON and is architecturally separate — it does not import from `domains/`/`runner/`, and extraction code must never import from `tools/`.
+
 ## Directory Structure
 
 ```
@@ -46,108 +54,161 @@ core/                   Pure Python utilities (no Revit API calls)
   canon.py              Canonicalization + sentinels (<MISSING>, <UNREADABLE>, <NOT_APPLICABLE>)
   contracts.py          Contract envelopes, status rollups, bounded errors
   record_v2.py          record.v2 schema utilities & canonicalization
-  phase2.py             Phase-2 join-key/join-hash helpers
+  phase2.py             Phase-2 join-key/join-hash helpers (semantic/cosmetic/coordination/unknown buckets)
+  canonical_items.py    Canonical flat `items:[{k,v,q}]` helpers — migration path off the phase2 bucket shape
+  sig_hash_policy.py    Loads/validates policies/domain_sig_hash_policies.json
+  sig_hash_builder.py   Policy-driven sig_hash computation from flat items (analysis-side; see below)
   context.py            View-scoped context (ViewInfo, DocViewContext)
   deps.py               Dependency enforcement (Blocked exception, require_domain)
   rows.py               Parameter reading, unit conversion
-  collect.py            FilteredElementCollector caching
+  collect.py             FilteredElementCollector caching
   join_key_builder.py   Build join keys from policies with shape-gating
   join_key_policy.py    Load & validate join-key policies
   graphic_overrides.py  Shared helpers for graphics extraction
   features.py           Cohort-analysis feature surface
   naming.py             Document-derived naming helpers
-  manifest.py           Stable manifest surface for comparison
+  manifest.py            Stable manifest surface for comparison
   dimension_type_helpers.py  Shape constants, detection, and reading helpers (shared by dimension_types)
   timing_collector.py   Extraction profiling instrumentation
-  vg_sig.py             VG signature helpers for view_templates
+  vg_sig.py              VG signature helpers for view_templates
 
 domains/                One extract(doc, ctx) function per domain (active)
-  identity.py           Project metadata (NO HASH - metadata only)
-  units.py              Length/area/volume format options
-  object_styles.py      Object style definitions (model/annotation/analytical/imported partitions)
-  line_patterns.py      Line pattern definitions
-  line_styles.py        Line style definitions
-  fill_patterns.py      Fill pattern definitions (drafting/model partitions)
-  text_types.py         Text type definitions
-  arrowheads.py         Arrowhead definitions with shape-gating
-  dimension_types.py    Dimension type definitions (7 partitions: linear/angular/radial/diameter/
-                          spot_elevation/spot_coordinate/spot_slope)
-  phases.py             Phase inventory & sequence
-  phase_filters.py      Phase filter definitions
-  phase_graphics.py     Phase graphic overrides (DISABLED - API limitation, D-013)
+  identity.py            Project metadata (NO HASH - metadata only)
+  units.py                Length/area/volume format options
+  object_styles.py        Object style definitions (model/annotation/analytical/imported partitions)
+  line_patterns.py        Line pattern definitions (scale-invariant normalized-segment join key, D-017)
+  line_styles.py          Line style definitions
+  fill_patterns.py        Fill pattern definitions (drafting/model partitions)
+  text_types.py            Text type definitions (piloting canonical flat `items` shape via core/canonical_items.py)
+  arrowheads.py            Arrowhead definitions with shape-gating
+  dimension_types.py      Dimension type definitions (7 partitions: linear/angular/radial/diameter/
+                            spot_elevation/spot_coordinate/spot_slope)
+  phases.py                Phase inventory & sequence
+  phase_filters.py        Phase filter definitions
+  phase_graphics.py       Phase graphic overrides (DISABLED - API limitation, D-013)
   view_filter_definitions.py        Detailed filter rule extraction
   view_filter_applications_view_templates.py  Filter application stacks
-  view_templates.py     Template definitions (5 partitions by ViewType family)
+  view_templates.py       Template definitions (5 partitions by ViewType family)
   view_category_overrides.py        VCO coordinator
   view_category_overrides_model.py      Model category override partition
   view_category_overrides_annotation.py Annotation category override partition
-  materials.py          Materials domain (identity + graphics state; v1)
-  compound_types.py     Compound type family (wall_types active; floor/roof/ceiling stubs)
+  materials.py             Materials domain (identity + graphics state; also populates ctx lookup maps)
+  compound_types.py       Compound type family (wall_types active; floor/roof/ceiling stubs; D-018 notes the gap)
+  loaded_family_types.py  FamilySymbol (loaded family) types, parameter-schema evidence model (lft.*/lftp.*); scoped
+                            to user-loaded families only — system families pass through but aren't governed (D-018)
+  graph_2024.json, graph_2025.json, graph_2026.json
+                            NOT extractor code — cached Revit-API relationship graphs (per Revit version) generated
+                            by sync_revitlookup_reference.py / the RevitLookup sync tooling, used as reference data
+                            for REVIT_LOOKUP_DOMAIN_MAP.md. Do not import these from a domain extractor.
 
 runner/                 Host-specific entry points
-  run_dynamo.py         Primary Dynamo CPython3 runner (M5 implementation)
-  thin_runner.py        Lightweight wrapper for Dynamo environment control
+  run_dynamo.py          Primary Dynamo CPython3 runner
+  thin_runner.py          Lightweight wrapper for Dynamo environment control
+  probe_thin_runner.py    Probe-mode variant of the thin runner
+  purge_sys_modules_standalone.py  Clears cached Revit-side module imports between runs (Dynamo re-run hygiene)
 
 validators/             Output validation
-  record_v2.py          record.v2 schema validation
+  record_v2.py           record.v2 schema validation
 
-policies/               Join-key policies and alignment keys
-  domain_join_key_policies.json  Per-domain join-key policies with shape-gating
+policies/               Join-key, sig-hash, and governance-classification policies
+  domain_join_key_policies.json     Per-domain join-key policies with shape-gating
+  domain_sig_hash_policies.json     Per-domain sig_hash policy (generated from contracts/domain_identity_keys_v2.json
+                                       via tools/generate_sig_hash_policy.py); consumed by core/sig_hash_builder.py
   cross_domain_alignment_keys.json  Domain family registry and alignment key definitions
+  governance_role_path_patterns.json  Ordered path-substring rules that infer governance_role
+                                       (Template/Container/Project/Generic) from central_path_norm
+  placeholder_known_defaults.json   Per-domain known-default/placeholder name patterns used by the `placeholders` stage
+  client_sector.csv                 client_label → sector classification, used by generate_governance_narrative.py
 
-tools/                  Analysis & comparison utilities
-  run_extract_all.py    Primary orchestrator (stage-machine: flatten→discover→apply→analyze)
-  run_config.json       Phase-1 configuration (domains_in_scope, thresholds, seed_baseline_id)
+config/
+  archetype/archetype_definitions.json   Human-curated (DP1) archetype definitions consumed by archetype tooling
+  archetype/static_edges_seed.json        Seed edges for archetype signal graph construction
 
-  v21_emit.py           v2.1 export emitter
-  v21_discover_join_policy.py   Discover join-key policy candidates
-  v21_apply_join_policy.py      Apply policy to flatten outputs
-  validate_v21_contract.py      Validate v2.1 contract compliance
+reference/
+  revit_lookup/Descriptors/*.cs     RevitLookup C# descriptor source, synced via sync_revitlookup_reference.py
+                                       (root script; GitHub API fetch, no git clone). Ground truth for what the
+                                       Revit API actually exposes per type — cross-reference when auditing an
+                                       extractor; see REVIT_LOOKUP_DOMAIN_MAP.md for the domain → descriptor map.
 
-  export_to_flat_tables.py      Phase-0: Flatten record.v2 details → CSV tables
-  merge_split_exports.py        Merge split export artifacts
-  details_to_csv.py             Details extraction to CSV
+tools/                  Analysis & comparison utilities (no Revit dependency; stdlib CSV/JSON only)
+  run_extract_all.py     Primary orchestrator — explicit stage machine (see Analysis Pipeline below)
+  run_config.json        Phase-1 configuration (domains_in_scope, thresholds, seed_baseline_id)
 
-  phase1_domain_authority.py    Phase-1: Domain authority clustering
-  phase1_population_framing.py  Phase-1: Coverage/adoption framing
-  phase1_pairwise_analysis.py   Phase-1: Project-vs-project summaries
+  export_to_flat_tables.py   Phase-0: Flatten record.v2 details → CSV tables (records, identity_items, etc.)
+  discover_join_policy.py / apply_join_policy.py   Join-key policy discovery/apply (T1/T2 stages)
+  discover_hash_policy.py / generate_sig_hash_policy.py   sig_hash policy discovery/generation (see below)
+  join_key_discovery/     Greedy/scored join-key candidate search shared by discover_join_policy.py and
+                            discover_hash_policy.py (eval.py, greedy.py)
+  join_key_derivation.py, compute_governance_thresholds.py, compute_latent_purgeable.py
 
-  phase2_analysis/              Phase-2 analysis package
-    io.py                       IO contract (must prefer *.details.json)
-    run_joinhash_label_population.py
-    run_joinhash_parameter_population.py
-    run_candidate_joinkey_simulation.py
-    run_population_stability.py
-    run_identity_collision_diagnostics.py
-    run_collision_differencing.py
-    run_change_type.py          ⚠ Requires Phase-2 baseline
-    run_attribute_stress.py     ⚠ Requires Phase-2 baseline
-    run_dimension_types_by_family.py  (probe or baseline-anchored)
-    run_view_templates_joinkey_analysis.py
-    run_view_category_overrides_joinkey_analysis.py
-    run_text_types_candidate_joinkey_simulation.py
-    split_detection.py, split_detection_element_level.py, split_detection_file_level.py
-    pareto_join_keys_by_ids.py, pareto_with_splits.py
-    annotate_cluster_labels.py, build_reference_standards.py
-    domain_identity_contract.py, intradomain_summary.py
+  domain_authority.py, population_framing.py, pairwise_analysis.py
+                          Phase-1 style authority/coverage/pairwise summaries (formerly `phase1_*.py`)
 
-  join_key_discovery/           Phase-1.5: Join-key discovery (eval.py, greedy.py)
-  label_synthesis/              Label synthesis and fragmentation repair
-  bundle_analysis/              Placeholder/exclusion analysis
-  governance/                   Standards governance reporting
-  probes/                       API probes (15 domain-specific probes)
+  bundle_analysis/        Placeholder/bundle pipeline: step0 (discover populations) → step1 (membership matrix)
+                            → step2/2b (find bundles, share profile) → step3 (DAG) → step4 (difference sets)
+                            → step5/6 (classify patterns/files) → step7 (overlap report). run_bundle_analysis.py
+                            drives the full sequence; placeholder_exclusions.py implements the placeholder heuristic.
+  patterns_analysis/       Split-detection analysis (file-level and element-level)
+    _archive/              NOT confirmed-dead despite the name — the old tools/phase2_analysis/ package was moved
+                            here wholesale. Most of it is still live: run_split_detection_all.py invokes 9 of its
+                            modules directly (split_detection_file_level, build_reference_standards,
+                            intradomain_summary, emit_intradomain_definition, derive_join_keys_by_ids,
+                            apply_join_keys_by_ids, calibrate_join_key_gates, pareto_join_keys_by_ids,
+                            split_detection_element_level), and tests import _archive.io directly. The unreferenced
+                            remainder (run_change_type.py, run_attribute_stress*.py, etc.) is intentionally-paused
+                            Phase-2-baseline tooling (see "Two distinct baseline concepts" below), not dead code —
+                            do not delete without re-verifying against live call sites first.
+  label_synthesis/         Label synthesis / fragmentation repair for domain patterns (build_label_population.py,
+                            synthesize_fragmented_labels.py, domain_prompts/, synopsis_formatters/)
+  probes/                  ~25 domain-specific Revit API probe scripts + PROBE_INVENTORY.md/.csv (measure-first
+                            inputs to domain design decisions)
+  migration/               One-off/point-in-time data migration scripts (reformat_to_flat_items.py,
+                            migrate_materials_identity_items.py, compress_fingerprint_json.py)
+  lib/                     Shared library code for tools/ (diff_engine.py, domain_profile.py, vt_profile.py)
 
-  compare_manifest.py           Diff two manifests
-  pairwise_drift.py             Cross-project drift scoring
-  score_drift.py                Drift score vs baseline using stable surfaces
-  similarity_compare.py         Similarity comparison [DEPRECATED May 2026 — superseded by compare_cross_segment.py; see docs/tools_DEPRECATED.md]
-  pareto_joinkey_search.py      Join-key optimization (Pareto front)
-  pareto_make_shape_inputs.py   Shape-based input prep
-  compute_governance_thresholds.py
-  compute_synthetic_keys.py
-  run_split_detection_all.py    Split detection over all domains
+  build_segment_manifest.py     Build the corpus segmentation lattice (segment_manifest.csv / registry / membership)
+                                  from file_metadata.csv — every subset of (unit_system, governance_role,
+                                  client_label, discipline_label, business_center_label, collection_label)
+  run_segment_orchestrator.py   Reads segment_manifest.csv + run_registry.csv; runs patterns → bundle_analysis
+                                  stages per segment in level order; writes per-segment output folders
+  extract_segment_subtree.py    Pulls one segment + its ancestors' cross_segment_*.csv rows into a standalone subset
+  governance_manifest.py        Builds disjoint governance populations (Enterprise / each business center /
+                                  each client / each named project / Generic) directly from file_metadata.csv —
+                                  deliberately NOT built on the segment lattice's powerset (see file docstring)
+  compare_cross_segment.py      Cross-segment comparison using join_hash as the identity unit (Jaccard/containment);
+                                  supersedes tools/similarity_compare.py (deprecated in place, not archived — see
+                                  docs/tools_DEPRECATED.md for the specific correctness bugs that motivated this)
+  compare_governance_populations.py   Same containment/Jaccard mechanics as compare_cross_segment.py, applied to
+                                  governance_manifest.py's disjoint populations (imports rather than reimplements)
+  generate_governance_narrative.py    Deterministic (no-LLM) governance_narrative_context.md renderer from the
+                                  compare_cross_segment.py / bundle pipeline CSV outputs
+  governance/standards_governance_report.py   Standards governance report generator
 
-tests/                  pytest test suite (38+ test files + fixtures)
+  archetype/               Archetype candidate generation & DP1 (Decision Point 1) human-curation workflow:
+                            discover_vfd_edges.py → build_cross_domain_items.py → compute_cross_domain_cooccurrence.py
+                            → cluster_archetype_signals.py → generate_archetype_candidates.py → human review
+                            (review/) → assign_archetype_classifications.py; validated against
+                            config/archetype/archetype_definitions.json
+  compare_templates_stand-alone/   Standalone view-template comparison tool + HTML report (independent of the
+                            segment/governance pipeline above)
+
+  na_token.py             Shared "N/A"-spelling detection used by segment/governance tooling
+  jenks_utils.py           Jenks natural-breaks helper for threshold computation
+  pareto_joinkey_search.py  Pareto-front join-key search; backs discover_join_policy.py's pareto/"harsh" mode
+                            and tests/test_pareto_shape_gating.py. Known issue: throws `KeyError: 'max_sigcnt'`
+                            under pandas on at least minimal synthetic inputs — pre-existing algorithm bug,
+                            not a location/import problem (see docs/tools_DEPRECATED.md).
+  run_split_detection_all.py   Split detection over all domains
+  Powershell Commands.txt  Informal operator runbook (hardcoded paths) — closest thing to a runbook; not automated
+
+  _archive/                Confirmed-superseded tools, pruned down to only what's still load-bearing:
+                            join_key_derivation_phase05.py (still `import *`-ed live by join_key_derivation.py).
+                            Everything else with zero remaining references (compare_manifest.py, merge_split_exports.py,
+                            score_drift.py, pairwise_drift.py, validate_v21_contract.py, etc.) was deleted outright —
+                            see docs/tools_DEPRECATED.md for the full list and the 2026-07-16 cleanup note.
+                            Do not build new work on top of anything here without checking CHANGELOG.md first.
+
+tests/                  pytest test suite (70+ test files)
   test_sentinel_policy.py            Enforce only 3 allowed sentinels
   test_hashing_incremental.py        Hash determinism
   test_contracts_run_status.py       Status rollup (failed > degraded > ok)
@@ -156,27 +217,26 @@ tests/                  pytest test suite (38+ test files + fixtures)
   test_record_v2_utils.py            record.v2 utility tests
   test_no_direct_filtered_element_collector_in_domains.py  Architecture enforcement
   test_deps_require_domain.py        Dependency blocking
-  test_arrowheads_shape_gating.py    Arrowhead shape-gating validation
-  test_dimension_types_shape_gating.py  Dimension type shape-gating
-  test_join_key_policy_validation.py Join-key policy rule enforcement
-  test_join_key_builder_shape_gating_dedupe.py  Join-key deduplication
-  test_pareto_shape_gating.py        Pareto shape-gating analysis
-  test_split_export.py               Split export functionality
-  test_record_id_determinism.py      record_id generation stability
-  test_timing_collector.py           Extraction profiling
-  test_graphic_overrides.py          VG signature extraction
-  test_collect.py                    Element collection cache behavior
-  test_join_key_discovery_shape_matching.py  Shape matching in join-key discovery
-  test_join_key_migration.py         Join-key policy migration validation
-  test_v21_join_policy_compat.py     Version 2.1 join policy compatibility
-  test_*_canonical_selectors.py      Domain-specific canonical selector tests (14 domains)
-  revit/                             Revit integration harness (requires Revit)
-  golden/                            Golden file comparisons
+  test_arrowheads_shape_gating.py / test_dimension_types_shape_gating.py / test_pareto_shape_gating.py
+  test_join_key_policy_validation.py / test_join_key_builder_shape_gating_dedupe.py / test_join_key_migration.py
+  test_sig_hash_policy_builder.py    Sig-hash policy builder tests
+  test_canonical_items_migration.py  core/canonical_items.py flat-items migration tests
+  test_split_export.py, test_record_id_determinism.py, test_timing_collector.py, test_graphic_overrides.py, test_collect.py
+  test_*_canonical_selectors.py      Domain-specific canonical selector tests (one per active domain)
+  test_build_segment_manifest.py, test_compare_cross_segment_*.py, test_compare_governance_populations.py,
+  test_governance_manifest.py, test_governance_field_completeness_gate.py, test_generate_governance_narrative_*.py,
+  test_run_segment_orchestrator_worker_split.py, test_bundle_pattern_classification_roles.py,
+  test_placeholder_exclusions.py, test_reference_bundle.py, test_label_synthesis_domain_prompt_loader.py,
+  test_discover_hash_policy.py, test_discover_vfd_edges.py, test_na_token.py, test_probe_inventory_builder.py
+                                       Coverage for the newer segment/governance/archetype tooling
+  revit/                              Revit integration harness (requires Revit)
+  golden/                             Golden file comparisons
 
 contracts/              Machine-readable contracts
   record_contract_v2.md              record.v2 schema documentation
   record_contract_v2.schema.json     JSON schema for validation
-  domain_identity_keys_v2.json       Per-domain key registry with minima
+  domain_identity_keys_v2.json       Per-domain key registry with minima — source of truth generate_sig_hash_policy.py
+                                       compiles into policies/domain_sig_hash_policies.json
   phase2_join_keys.md                Phase-2 join key specification
 
 docs/                   Technical documentation
@@ -185,8 +245,24 @@ docs/                   Technical documentation
   phase2-identity-and-semantic-plan.md  Phase-2 contract design
   phase_2_join-key_discovery.md      Join-key discovery methodology
   fingerprint_hashing_rules.md       Hashing rule documentation
-  tools_PHASE0_1_2_MAP.md            Tool categorization by phase
+  hash_discovery_tooling.md          discover_hash_policy.py / generate_sig_hash_policy.py usage
+  extract_stage_matrix.md            Authoritative stage-machine reference for run_extract_all.py (current)
+  CSV_CONTRACT_v2.1.md               v2.1 CSV output contract
+  V21_PHASE0_EXPORT_SCHEMA.md        v2.1 Phase-0 export schema
+  V21_ANALYSIS_SCHEMA.md             v2.1 analysis output schema (Results_v21/analysis_v21/)
+  V21_DETERMINISM_AND_IDENTITY.md    v2.1 determinism rules + pattern-id derivation
+  CENTRAL_PATH_NORM_RULE.md          Canonical file-path normalization rule (feeds governance_role inference)
+  PATTERN_ID_AND_LABEL_RULES.md      Pattern id / label derivation rules
+  cross_segment_comparison.md        compare_cross_segment.py methodology
+  governance_narrative_scope_gap_audit.md   Known gaps in governance narrative scope coverage
+  METRICS.md                         Concentration metric contracts (HHI / effective clusters)
   analysis-phases-question-map.md    Analysis questions mapped to phases
+  tools_PHASE0_1_2_MAP.md            ⚠ Dated 2026-01-29; still references a `tools/phase2_analysis/` package
+                                       path that no longer exists (superseded by the segment/governance tools
+                                       above). Treat as historical context, not a current tool index.
+  tools_DEPRECATED.md                ⚠ Same staleness caveat — deprecation reasoning is still valid, but some
+                                       "replacement" commands reference the same removed `phase2_analysis/` path.
+  research/                          RevitLookup API concept-mapping working files
 
 legacy/                 MVP implementation (preserved reference)
   fingerprint_mvp.py
@@ -246,6 +322,7 @@ Consolidated extractors route records internally by record class (Revit system f
 | `dimension_types.py` | `dimension_types_linear`, `_angular`, `_radial`, `_diameter`, `_spot_elevation`, `_spot_coordinate`, `_spot_slope` |
 | `view_templates.py` | `view_templates_floor_structural_area_plans`, `_ceiling_plans`, `_elevations_sections_detail`, `_renderings_drafting`, `_schedules` |
 | `view_category_overrides*.py` | Routed via `view_category_overrides.py`; model and annotation in separate files |
+| `compound_types.py` | `wall_types` active; `floor_types`/`roof_types`/`ceiling_types` stubs (D-018 notes the coverage gap) |
 
 For consolidated extractors, `extract()` returns a list of per-partition result dicts, each with its own `domain` key.
 
@@ -269,6 +346,20 @@ Records partition their items into four buckets:
 - `sig_hash` is authoritative and UID-free by contract
 - `identity_basis.items` contains the full behavioral definition and drives `sig_hash`
 
+**Migration in progress**: `core/canonical_items.py` introduces a flatter, role-agnostic shape (`items: [{k, v, q}]`) where the semantic/cosmetic/coordination/unknown role is resolved **at runtime from policy**, not baked into the extracted JSON. `text_types.py` is the pilot domain; `runner/run_dynamo.py` and `tools/migration/reformat_to_flat_items.py` also consume it. Don't assume every domain still emits the four-bucket shape directly — check whether the domain has migrated before writing bucket-shape-dependent tooling.
+
+## Sig-Hash Policy System (Analysis-Side)
+
+A second, policy-driven hash-computation path exists alongside the inline `sig_hash` every domain already computes during extraction:
+
+- `contracts/domain_identity_keys_v2.json` (the per-domain key registry) is the source of truth.
+- `tools/generate_sig_hash_policy.py` compiles it into `policies/domain_sig_hash_policies.json` (per-domain `allowed_items`/`required_items`/`hash_alg`).
+- `core/sig_hash_policy.py` loads/validates that policy file; `core/sig_hash_builder.py` (`build_sig_hash_from_policy` / `apply_sig_hash_policy_to_record`) recomputes `sig_hash`/`status`/`sig_basis` from a record's flat `items` against the policy.
+- `tools/run_extract_all.py`'s `sig_hash` stage (T0.5, runs after `flatten`, before `discover`) applies this to flattened rows — it does **not** run inside the live Dynamo extraction path. Domains still compute their own `sig_hash` inline via `core/record_v2.py` during extraction.
+- `tools/discover_hash_policy.py` uses the same greedy/scored candidate search as join-key discovery (`tools/join_key_discovery/`) to help derive sig-hash policy candidates empirically. See `docs/hash_discovery_tooling.md`.
+
+Treat this as the analysis-side reconstruction/audit layer for sig_hash, not (yet) a replacement for the extractor's own hash computation.
+
 ## Shape-Gating System
 
 Shape-gating enables conditional join-key composition based on discriminator values. Supported domains: `arrowheads` (by ArrowheadStyle) and `dimension_types_*` partitions. Policy lives in `policies/domain_join_key_policies.json`. See `docs/join_key_shape_gating.md` for schema details.
@@ -286,6 +377,7 @@ The runner populates `ctx` for domain cross-references:
 - `line_pattern_uid_to_hash` — line_patterns → object_styles, line_styles
 - `object_style_model_row_key_to_sig_hash` — object_styles_model → view_category_overrides
 - `object_style_annotation_row_key_to_sig_hash` — object_styles_annotation → view_category_overrides
+- `material_uid_to_name` / `material_uid_to_class` — materials → compound_types
 
 ## Development Workflow
 
@@ -300,7 +392,7 @@ fix:      bug fix that changes behavior
 Every commit message MUST state "no semantic change" OR describe the semantic change.
 
 ### CHANGELOG Discipline
-Log ONLY semantic changes (signature composition, ordering rules, identity rules, fail-soft behavior). Do NOT log pure refactors.
+Log ONLY semantic changes (signature composition, ordering rules, identity rules, fail-soft behavior). Do NOT log pure refactors. `CHANGELOG.md`'s `[Unreleased]` section is actively maintained with detailed entries — read recent entries before making a change in an area to understand the last-decided behavior and its rationale.
 
 ### Domain Development Pattern
 
@@ -366,7 +458,7 @@ For consolidated extractors that emit multiple partitions, `extract()` returns a
 2. Verify ordering (order-sensitive vs. sorted)
 3. Check for sentinel handling differences
 4. Check shape-gating discriminator values if applicable
-5. Use `tools/compare_manifest.py` for diff analysis
+5. For extraction-side mismatches, diff `record_rows`/`identity_basis.items` directly; for analysis-side reconstruction, use `tools/discover_hash_policy.py` / `core/sig_hash_builder.py` against flattened CSV
 
 ## Analysis Pipeline
 
@@ -375,21 +467,40 @@ The analysis side of the codebase is separate from extraction. Exports flow thro
 ```
 Extraction (Dynamo)
   → *.details.json / *.index.json
-    → Phase 0: Flatten to CSV (export_to_flat_tables.py)
-      → Phase 1: Authority/probe clustering (phase1_*.py)
-      → Phase 2: Join-key & stability analysis (phase2_analysis/)
+    → tools/run_extract_all.py stage machine (flatten → sig_hash → discover → apply → ...)
+      → segment/governance comparison tools
+        → deterministic governance narrative
 ```
 
-The primary orchestrator is `tools/run_extract_all.py`, which implements a stage machine:
+The primary orchestrator is `tools/run_extract_all.py`, an explicit stage machine. `docs/extract_stage_matrix.md` is the authoritative reference (source of truth is the code — `run_extract_all.py`'s `stage_names`):
 
-| Stage | Purpose | Default |
-|-------|---------|---------|
-| `flatten` (T0) | Emit v2.1 flatten outputs to `Results_v21/phase0_v21/` | ✅ |
-| `discover` (T1) | Explore join-key policy candidates per domain | ✅ |
-| `apply` (T2) | Apply policy and overwrite join fields | ❌ opt-in |
-| `placeholders` (T2b) | Generate placeholder exclusion CSVs (human review required) | ❌ opt-in |
-| `split` | Split detection analysis | ❌ opt-in |
-| `analyze1` / `analyze2` | Phase-1/2 analysis packets | ❌ opt-in |
+| Stage | T-label | Purpose | Default in `--stages` |
+|-------|---------|---------|------------------------|
+| `flatten` | T0 | Emit v2.1 flatten outputs to `Results_v21/phase0_v21/` (identity-mode join fields) | ✅ |
+| `sig_hash` | T0.5 | Recompute `sig_hash`/`status` from policy over flattened rows (`core/sig_hash_builder.py`) | ✅ (auto-inserted before `discover`/`apply` if selected) |
+| `discover` | T1 | Explore per-domain join-key policy candidates from flatten identity items | ✅ |
+| `apply` | T2 | Apply policy and overwrite flatten `phase0_records.csv` join fields | ❌ opt-in |
+| `placeholders` | T2b | Generate per-domain placeholder exclusion CSVs (purgeable heuristics + `policies/placeholder_known_defaults.json`); human review required | ❌ opt-in; requires `apply` |
+| `split` | — | Split detection analysis over selected domains | ❌ opt-in; requires policy-applied join keys |
+| `authority` | — | v2.1 authority analysis output | ❌ opt-in; requires policy-applied join keys |
+| `patterns` | — | v2.1 per-domain patterns analysis output | ❌ opt-in; requires policy-applied join keys |
+| `flat_tables` | — | Write flat CSV tables (layer stacks etc.) via `export_to_flat_tables.py` | ❌ opt-in |
+
+Stages gated on policy-applied join keys fail by default if `join_key_schema == sig_hash_as_join_key.v1` (identity-mode clustering — degraded for governance conclusions); override explicitly with `--allow-sig-hash-join-key` only for exploratory/non-governance analysis.
+
+### Segment & governance comparison (downstream of the stage machine)
+
+A separate layer builds comparable populations across the whole model corpus and compares them:
+
+1. `tools/build_segment_manifest.py` — builds the full segmentation lattice (every subset of unit_system/governance_role/client/discipline/business_center/collection) from `file_metadata.csv`.
+2. `tools/run_segment_orchestrator.py` — runs `patterns_analysis` then `bundle_analysis` stages per segment, in level order, writing per-segment output folders.
+3. `tools/governance_manifest.py` — builds a **disjoint** partition (Enterprise / each business center / each client / each named project / Generic) directly from `file_metadata.csv`. This is intentionally separate from the segment lattice's powerset — see the file's own docstring.
+4. `tools/compare_cross_segment.py` (segments) / `tools/compare_governance_populations.py` (disjoint populations) — Jaccard + containment comparisons using `join_hash` as the cross-population identity unit; bundle membership from `bundle_analysis/` is annotated on afterward.
+5. `tools/generate_governance_narrative.py` — deterministic, template-driven `governance_narrative_context.md` from the CSV outputs above. No LLM in the loop.
+6. `tools/governance/standards_governance_report.py` — standards governance report generation.
+7. `tools/archetype/` — separate DP1 (Decision Point 1) workflow that clusters cross-domain co-occurrence signals into candidate "archetypes" for human curation against `config/archetype/archetype_definitions.json`.
+
+`tools/similarity_compare.py`-style whole-file similarity scoring is deprecated in favor of `compare_cross_segment.py` (see `docs/tools_DEPRECATED.md` for the specific correctness bugs that motivated the deprecation — historical similarity scores are not salvageable).
 
 ### Input format priority
 
@@ -404,25 +515,26 @@ Never implicitly load `*.legacy.json`. Tools that glob `*.json` without filterin
 
 **Seed-baseline** (Phase-1 only) — a labeling bias for authority framing. Set via `seed_baseline_id` in `run_config.json`. Does NOT define correctness or affect Phase-2 identity. **Do not use yet — authority has not been established.**
 
-**Phase-2 baseline** — a comparison anchor for change analysis (`run_change_type`, `run_attribute_stress`). Requires stable join keys and accepted authority. **Do not use yet — pairwise + population mode is correct.**
+**Phase-2 baseline** — a comparison anchor for change analysis. Requires stable join keys and accepted authority. **Do not use yet — pairwise + population mode is correct.**
 
 ### Current operating mode
 
 This project is in **pre-authority probe mode**:
 - Use Phase-0 flattening and Phase-2 population/pairwise analysis freely
 - Use Phase-1 with `domains_in_scope` populated but no `seed_baseline_id`
-- Do NOT use seed-baseline, Phase-2 baselines, or change-type narratives
-- Phase-2 runners that require a baseline (`run_change_type`, `run_attribute_stress`) should not be run
+- Do NOT use seed-baseline or Phase-2 baselines/change-type narratives
 
 ### Phase-1 configuration
 
 Phase-1 behavior is entirely governed by `tools/run_config.json`. If `domains_in_scope` is empty (`[]`), Phase-1 is disabled (headers-only output — this is intentional, not an error).
 
 ### Key docs for analysis work
-- `docs/tools_PHASE0_1_2_MAP.md` — authoritative per-tool reference with inputs, outputs, and commands
+- `docs/extract_stage_matrix.md` — current, authoritative orchestrator stage-machine reference
+- `docs/hash_discovery_tooling.md` — sig-hash/join-key discovery tooling usage
+- `docs/cross_segment_comparison.md` — `compare_cross_segment.py` methodology
 - `docs/analysis-phases-question-map.md` — which questions each phase can answer
-- `docs/extract_stage_matrix.md` — full orchestrator stage-machine semantics
 - `docs/V21_ANALYSIS_SCHEMA.md` — v2.1 output schema (`Results_v21/analysis_v21/`)
+- `docs/tools_PHASE0_1_2_MAP.md` / `docs/tools_DEPRECATED.md` — useful for deprecation *reasoning*, but dated 2026-01-29 and reference a `tools/phase2_analysis/` package path that no longer exists on disk; don't treat their command examples as current without checking the actual file first
 
 ## Files to Read First
 
@@ -432,11 +544,12 @@ When working on **extraction**:
 3. `ARCHITECTURE.md` - Layered design
 4. `contracts/record_contract_v2.md` - Record schema
 5. `docs/join_key_shape_gating.md` - Shape-gating system
+6. `REVIT_LOOKUP_DOMAIN_MAP.md` + `reference/revit_lookup/Descriptors/` - ground-truth Revit API surface per domain
 
 When working on **analysis**:
-1. `docs/tools_PHASE0_1_2_MAP.md` - Per-tool reference with commands
+1. `docs/extract_stage_matrix.md` - Orchestrator stage semantics (current)
 2. `docs/analysis-phases-question-map.md` - Phase question map
-3. `docs/extract_stage_matrix.md` - Orchestrator stage semantics
+3. `docs/cross_segment_comparison.md` / relevant tool's own module docstring - the segment/governance tools are heavily self-documenting; read the target script's top-of-file docstring before modifying it
 
 ## Key Decisions Reference
 
@@ -455,11 +568,13 @@ When working on **analysis**:
 | D-011 | Domain-driven architecture |
 | D-012 | Markdown portability rule (no nested fenced blocks) |
 | D-013 | `phase_graphics` disabled (API limitation) |
-| D-014 | **COMPLETED (2026-02-10)**: Semantic (record.v2) hashing is now the only mode; legacy removed |
+| D-014 | **COMPLETED**: Semantic (record.v2) hashing is now the only mode; legacy removed |
 | D-015 | Domain family architecture — Revit system family boundary is partition criterion; consolidated extractors with internal routing |
 | D-016 | VCO scope — categories 1 (template-controlled) and 2 (latent) implemented; category 3 (view-local) deferred |
+| D-017 | `line_patterns` join key upgraded to scale-invariant normalized segments (structural equivalence, not absolute scale) |
+| D-018 | `loaded_family_types` scoped to user-loaded families only; system families pass through unfiltered but ungoverned |
 
-See `DECISIONS.md` for full rationale.
+`DECISIONS.md` is append-only; a couple of decision numbers (D-014, D-015) have more than one entry as the decision was revised/completed in place — the latest entry for a given number is authoritative. See `DECISIONS.md` for full rationale.
 
 ## Warnings
 
@@ -472,6 +587,10 @@ See `DECISIONS.md` for full rationale.
 - Phase names ARE included in hashes (D-010 revised) - this is intentional for cross-project comparison
 - The D-015 domain family splits are hash-breaking — previous exports are obsolete and require full re-extraction
 - Consolidated extractors emit multiple partition domains; do not add a new flat domain for what should be a partition
+- `domains/graph_2024.json` / `graph_2025.json` / `graph_2026.json` are cached RevitLookup reference graphs, not part of the extraction runtime — never import them from a domain or the runner
+- `tools/_archive/` holds confirmed-superseded tools; don't build new work on top of anything in it without first checking `docs/tools_DEPRECATED.md` and `CHANGELOG.md` for the replacement
+- `docs/tools_PHASE0_1_2_MAP.md` and `docs/tools_DEPRECATED.md` are dated 2026-01-29 and reference a `tools/phase2_analysis/` path that no longer exists — verify any command from them against the actual file before running it
+- `core/sig_hash_builder.py` / `core/sig_hash_policy.py` are analysis-side only (the `sig_hash` stage in `run_extract_all.py`); they are not wired into the live Dynamo extraction path — don't assume changing `policies/domain_sig_hash_policies.json` changes what a domain extractor emits
 
 ## graphify
 

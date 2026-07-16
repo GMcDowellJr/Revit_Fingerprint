@@ -1,8 +1,46 @@
 # Deprecated / Legacy Tools (tools/)
 
-Status date: 2026-01-29  
+Status date: 2026-07-16  
 Scope: `tools/` only (external entrypoints / CLIs).  
 Default assumption: split export surfaces exist (`*.index.json`, `*.details.json`), and legacy is opt-in (`*.legacy.json`).
+
+**2026-07-16 archive cleanup**: `tools/_archive/` was audited file-by-file against the live
+codebase. Files with zero remaining references anywhere (superseded duplicates, one-off
+diagnostics) were deleted outright rather than kept as dead weight: `compare_manifest.py`,
+`compare_view_templates.py` (superseded by `tools/compare_templates_stand-alone/`),
+`compute_synthetic_keys.py`, `details_to_csv.py`, `diagnose_phase1_empty.py`,
+`emit_element_dominance.py` (a stale duplicate — the live version has always been
+`tools/emit_element_dominance.py`, not the `_archive` copy), `example_use_split_export.py`,
+`merge_split_exports.py`, `pairwise_drift.py`, `pareto_make_shape_inputs.py`, `score_drift.py`,
+`step_template_governance_discovery.py`, `validate_v21_contract.py`, and a personal
+hardcoded-path command scratchpad (`split analysis.txt`).
+
+Two files that *looked* archived were not: `join_key_derivation_phase05.py` is still
+`import *`-ed live by `tools/join_key_derivation.py`, so it stays in `_archive/`. And
+`tools/pareto_joinkey_search.py` had been left behind in `_archive/` during an earlier
+`tools/` reorg while `tools/discover_join_policy.py`'s pareto adapter and
+`tests/test_pareto_shape_gating.py` still expected it at the `tools/` top level — both call
+sites were silently degraded (the adapter always returned
+`{"error": "pareto_dependency_missing"}`; the test only ever ran when `pandas` was absent,
+which masked the break). It has been moved back to `tools/pareto_joinkey_search.py`, fixing
+both call sites. **Known separate issue**: the restored module itself throws
+`KeyError: 'max_sigcnt'` under pandas on at least the test's minimal synthetic dataset — a
+pre-existing bug in the pareto-search implementation, unrelated to the file's location, not
+fixed as part of this pass.
+
+`tools/patterns_analysis/_archive/` is a different situation and was deliberately **not**
+touched by this cleanup despite the name: most of it is live, invoked directly by
+`tools/run_split_detection_all.py` (`split_detection_file_level`, `build_reference_standards`,
+`intradomain_summary`, `emit_intradomain_definition`, `derive_join_keys_by_ids`,
+`apply_join_keys_by_ids`, `calibrate_join_key_gates`, `pareto_join_keys_by_ids`,
+`split_detection_element_level`) and by `tests/test_fingerprint_export_discovery.py`
+(`_archive.io`). The remaining unreferenced files in that directory
+(`run_change_type.py`, `run_attribute_stress.py`, `run_attribute_stress_all_joinable.py`,
+and the rest of the `run_dimension_types_by_family.py` cluster, plus
+`annotate_cluster_labels.py`, `backfill_cluster_label_inputs.py`, `pareto_with_splits.py`)
+are intentionally-paused Phase-2 tooling gated on Phase-2 baseline authority (see
+`CLAUDE.md`'s "Two distinct baseline concepts" / "Current operating mode"), not abandoned
+code — left in place on purpose.
 
 ---
 
@@ -50,37 +88,25 @@ A tool is marked **KEEP (Docs-only)** if it’s useful as an example but not as 
 
 ---
 
-### tools/phase1_semantic_sig_dimension_types.py
-**Why deprecated**
-- Broad JSON discovery patterns (often `**/*.json` style) are incompatible with split exports.
-- Functionally superseded by Phase-2 population + candidate join-key simulation (and flat tables if needed).
-
-**Replacement**
-- `python -m tools.phase2_analysis.run_joinhash_label_population ...`
-- `python -m tools.phase2_analysis.run_joinhash_parameter_population ...`
-- `python -m tools.phase2_analysis.run_candidate_joinkey_simulation ...`
+### tools/phase1_semantic_sig_dimension_types.py — REMOVED
+This file no longer exists in the repo (already gone before the 2026-07-16 cleanup).
+Its replacements, for reference, now live under `tools/patterns_analysis/_archive/`
+(the old `tools/phase2_analysis/` package was renamed wholesale into this directory
+during the `tools/` reorg — see the note above; despite the `_archive` name most of
+this package is still live):
+- `python -m tools.patterns_analysis._archive.run_joinhash_label_population ...`
+- `python -m tools.patterns_analysis._archive.run_joinhash_parameter_population ...`
+- `python -m tools.patterns_analysis._archive.run_candidate_joinkey_simulation ...`
 - `python tools/export_to_flat_tables.py ...` (when you need CSV-level analysis)
 
 ---
 
-## CONDITIONAL / OPTIONAL (use only if you explicitly need it)
+## REMOVED (2026-07-16 archive cleanup)
 
-### tools/details_to_csv.py
-**Why optional**
-- Useful if you still consume similarity/compare JSON outputs and want quick CSV conversion.
-- Not required for the Phase-2 pipeline if you already use `export_to_flat_tables.py`.
-
-**Prefer**
-- `tools/export_to_flat_tables.py` for standardized CSV surfaces.
-
----
-
-## KEEP (Docs-only / Example)
-
-### tools/example_use_split_export.py
-**Why docs-only**
-- Not a production dependency; keep as “how to invoke split export correctly”.
-- Should not be referenced as an operational entrypoint in pipelines.
+`tools/details_to_csv.py` and `tools/example_use_split_export.py` were deleted outright
+(previously marked CONDITIONAL/KEEP-docs-only below, but had zero remaining references
+anywhere in the repo). Use `tools/export_to_flat_tables.py` for standardized CSV surfaces;
+see `docs/SPLIT_EXPORT.md` for split-export usage guidance.
 
 ---
 

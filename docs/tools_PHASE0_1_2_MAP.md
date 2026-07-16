@@ -1,8 +1,22 @@
 # Phase 0 / Phase 1 / Phase 2 Tools Map (tools/)
 
-Status date: 2026-01-29  
+Status date: 2026-07-16 (paths corrected; see note below)  
 Scope: `tools/` entrypoints only  
 Audience: Phase-0/1/2 analysis users (no exporter changes implied)
+
+**2026-07-16 correction**: this document originally referenced `tools/phase1_*.py`
+and `tools/phase2_analysis/*` paths that no longer exist on disk. The Phase-1 runners
+were renamed (`phase1_domain_authority.py` → `domain_authority.py`,
+`phase1_population_framing.py` → `population_framing.py`,
+`phase1_pairwise_analysis.py` → `pairwise_analysis.py`), and the whole
+`tools/phase2_analysis/` package was moved wholesale into
+`tools/patterns_analysis/_archive/` during a later `tools/` reorg. Despite the
+`_archive` name, most of that directory is still live — see `docs/tools_DEPRECATED.md`
+for exactly which parts. Paths below have been updated to match; the phase concepts
+and recommendations (baseline-free vs. baseline-anchored, current operating mode)
+are otherwise unchanged. For the current segment/governance comparison layer that
+has grown up alongside this Phase-0/1/2 model, see `CLAUDE.md`'s "Segment & governance
+comparison" section and `docs/cross_segment_comparison.md`.
 
 Assumed exporter behavior:
 - Legacy bundle: OFF by default (`*.legacy.json` opt-in only)
@@ -126,7 +140,7 @@ Characteristics:
 ---
 
 ## 1.1 Domain authority clustering
-### tools/phase1_domain_authority.py  (KEEP)
+### tools/domain_authority.py  (KEEP)
 
 **Purpose**
 - Cluster domain configurations across projects
@@ -148,7 +162,7 @@ Characteristics:
 ---
 
 ## 1.2 Population framing
-### tools/phase1_population_framing.py  (KEEP)
+### tools/population_framing.py  (KEEP)
 
 **Purpose**
 - Translate domain clusters into coverage / adoption framing
@@ -159,7 +173,7 @@ Characteristics:
 ---
 
 ## 1.3 Pairwise summaries
-### tools/phase1_pairwise_analysis.py  (KEEP)
+### tools/pairwise_analysis.py  (KEEP)
 
 **Purpose**
 - Project-vs-project summaries
@@ -178,7 +192,7 @@ There are **two different “baselines”**, used in different phases.
 - A *labeling bias* for authority framing
 
 **Used by**
-- `phase1_domain_authority.py`
+- `domain_authority.py`
 
 **What it means**
 - “If this configuration appears, treat it as the named reference”
@@ -229,7 +243,7 @@ Phase-2 is valid **without any baseline**.
 ---
 
 ## 2.0 Phase-2 IO contract
-### tools/phase2_analysis/io.py  (INTERNAL)
+### tools/patterns_analysis/_archive/io.py  (INTERNAL)
 
 **Requirements**
 - Must prefer `*.details.json`
@@ -250,7 +264,7 @@ These require **no baseline**.
 ---
 
 ## 2.2 Stability
-### tools/phase2_analysis/run_population_stability.py
+### tools/patterns_analysis/_archive/run_population_stability.py
 
 Population-wide stability metrics.  
 Baseline-free and safe.
@@ -276,7 +290,7 @@ Do not run yet.
 ---
 
 ## 2.5 Domain-specific decomposition
-### tools/phase2_analysis/run_dimension_types_by_family.py
+### tools/patterns_analysis/_archive/run_dimension_types_by_family.py
 
 **Two modes**
 - Baseline-free (probe):
