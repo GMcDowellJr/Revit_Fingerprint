@@ -4,7 +4,12 @@ Given a seed segment (by --segment-id) or a text search against
 segment_manifest.csv (--search-term), walks parent_segment_id up to
 --ancestor-depth generations, then pulls every cross_segment_*.csv /
 comparison_registry.csv row touching the selected segments into two
-clearly separated output shapes:
+clearly separated output shapes. By default a pairwise row counts as
+"touching" if EITHER endpoint is selected — compare_cross_segment.py's
+own lineage guard means an ancestor and its own descendant rarely appear
+paired directly, so requiring both sides selected would drop most rows
+that actually involve the seed (pass --require-both-endpoints for a
+strict induced-subtree extract instead):
 
   detail/    filtered rows, copied through verbatim (source schema preserved)
   summary/   the same rows rolled up (count/mean/min/max on numeric fields),
@@ -209,9 +214,29 @@ def resolve_endpoint_columns(columns: Iterable[str]) -> Tuple[str, ...]:
     return tuple()
 
 
-def row_matches(row: Dict[str, str], endpoints: Tuple[str, ...], selected_ids: Set[str]) -> bool:
+def row_matches(
+    row: Dict[str, str],
+    endpoints: Tuple[str, ...],
+    selected_ids: Set[str],
+    require_both_endpoints: bool = False,
+) -> bool:
+    """Match rows for the "touches a selected segment" contract.
+
+    Default is an either-endpoint (neighborhood) match: a comparison row
+    counts if any selected segment appears on either side, so rows where the
+    seed is compared against something outside its own ancestor chain (a
+    sibling project, a template it's governed by, etc.) are not silently
+    dropped. compare_cross_segment.py's lineage guard already means an
+    ancestor and its own descendant rarely appear paired directly against
+    each other, so requiring both endpoints selected would otherwise exclude
+    most of the rows that actually involve the requested segment.
+    Pass require_both_endpoints=True for a strict induced-subtree extract
+    (both sides must be in the selected set).
+    """
     if len(endpoints) == 2:
-        return norm(row.get(endpoints[0])) in selected_ids and norm(row.get(endpoints[1])) in selected_ids
+        left = norm(row.get(endpoints[0])) in selected_ids
+        right = norm(row.get(endpoints[1])) in selected_ids
+        return (left and right) if require_both_endpoints else (left or right)
     if len(endpoints) == 1:
         return norm(row.get(endpoints[0])) in selected_ids
     return False
@@ -389,6 +414,7 @@ def process_file(
     max_output_rows: int,
     max_output_gb: float,
     progress_interval: int,
+    require_both_endpoints: bool = False,
 ) -> ProcessResult:
     with source.open("r", encoding="utf-8-sig", newline="") as f:
         header_reader = csv.reader(f)
@@ -420,7 +446,7 @@ def process_file(
 
             for row in reader:
                 rows_scanned += 1
-                if not row_matches(row, endpoints, selected_ids):
+                if not row_matches(row, endpoints, selected_ids, require_both_endpoints):
                     if rows_scanned % progress_interval == 0:
                         print(f"{source.name}: scanned {rows_scanned:,}; selected {rows_written:,}")
                     continue
@@ -471,12 +497,17 @@ def process_file(
 
     print(f"{source.name}: done — scanned {rows_scanned:,}; selected {rows_written:,}; summary_rows {summary_rows_count:,}")
 
+    if len(endpoints) == 2:
+        mode_prefix = "both_sides" if require_both_endpoints else "either_side"
+    else:
+        mode_prefix = "single_segment"
+
     return ProcessResult(
         status="ok" if rows_written > 0 else "degraded",
         rows_scanned=rows_scanned,
         rows_written=rows_written,
         summary_rows=summary_rows_count,
-        selection_mode=("both_sides:" if len(endpoints) == 2 else "single_segment:") + "&".join(endpoints),
+        selection_mode=f"{mode_prefix}:" + "&".join(endpoints),
         detail_file=detail_path.name if detail_path is not None else "",
         summary_file=summary_path.name if summary_path is not None else "",
         reason="" if rows_written > 0 else "no rows had a selected segment on the required endpoint(s)",
@@ -502,6 +533,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--segment-id", action="append", dest="segment_ids", default=None, help="Seed segment id. Repeat for multiple seeds.")
     parser.add_argument("--search-term", action="append", dest="search_terms", default=None, help="Case-insensitive substring matched against every segment_manifest.csv column. Repeat for multiple terms.")
     parser.add_argument("--ancestor-depth", type=int, default=2)
+    parser.add_argument(
+        "--require-both-endpoints", action="store_true",
+        help=(
+            "For pairwise files, only keep rows where BOTH segment endpoints are "
+            "in the seed+ancestor set (strict induced-subtree extract). Default "
+            "keeps a row if EITHER endpoint is selected, so comparisons where the "
+            "seed is measured against something outside its own ancestor chain "
+            "(a sibling project, its governing template, etc.) are not dropped."
+        ),
+    )
     parser.add_argument("--mode", choices=("detail", "summary", "both"), default="both")
     parser.add_argument("--file", action="append", dest="files", default=None, help="Override the default cross-segment filename list. Repeat to extract more than one.")
     parser.add_argument("--max-output-rows", type=int, default=0, help="Per-file hard row limit. 0 disables. Hitting it blocks that file's output rather than truncating.")
@@ -564,24 +605,41 @@ def main() -> int:
     want_summary = args.mode in ("summary", "both")
 
     specs_by_name = {spec.filename: spec for spec in FILE_SPECS}
-    target_filenames = tuple(args.files) if args.files else DEFAULT_FILENAMES
+    explicit_files = bool(args.files)
+    target_filenames = tuple(args.files) if explicit_files else DEFAULT_FILENAMES
 
     manifest_rows: List[Dict[str, object]] = []
     blocked = False
+    any_found = False
 
     for filename in target_filenames:
         spec = specs_by_name.get(filename, FileSpec(filename))
         source = args.cross_segment_dir / filename
 
         if not source.is_file():
+            # compare_cross_segment.py writes most of these files only when the
+            # relevant rows/mode exist (e.g. cross_segment_delta.csv is skipped
+            # entirely under --no-delta, governance-state/pooled outputs only
+            # when that mode produced rows) — so a missing *default* file is
+            # normal and not a run failure. A file named explicitly via --file
+            # is a real miss and still blocks.
             manifest_rows.append({
-                "source_file": filename, "status": "blocked", "rows_scanned": "", "rows_written": "",
-                "summary_rows": "", "selection_mode": "", "detail_file": "", "summary_file": "",
-                "reason": "source file not found",
+                "source_file": filename,
+                "status": "blocked" if explicit_files else "skipped",
+                "rows_scanned": "", "rows_written": "", "summary_rows": "",
+                "selection_mode": "", "detail_file": "", "summary_file": "",
+                "reason": (
+                    "source file not found (explicitly requested via --file)"
+                    if explicit_files else
+                    "optional cross_segment output not present in this run "
+                    "(e.g. --no-delta, or the producing mode wasn't run / produced no rows)"
+                ),
             })
-            blocked = True
+            if explicit_files:
+                blocked = True
             continue
 
+        any_found = True
         detail_path = detail_dir / filename if want_detail else None
         summary_path = summary_dir / f"{Path(filename).stem}.summary.csv" if (want_summary and spec.supports_summary) else None
 
@@ -595,6 +653,7 @@ def main() -> int:
                 max_output_rows=args.max_output_rows,
                 max_output_gb=args.max_output_gb,
                 progress_interval=args.progress_interval,
+                require_both_endpoints=args.require_both_endpoints,
             )
             manifest_rows.append({"source_file": filename, **vars(result)})
         except Blocked as exc:
@@ -619,6 +678,13 @@ def main() -> int:
         ["source_file", "status", "rows_scanned", "rows_written", "summary_rows", "selection_mode", "detail_file", "summary_file", "reason"],
         manifest_rows,
     )
+
+    if not any_found:
+        print(
+            f"[warn] none of {target_filenames!r} were found under {args.cross_segment_dir} — "
+            "check --cross-segment-dir",
+            file=sys.stderr,
+        )
 
     print()
     print(f"Label: {label}")
