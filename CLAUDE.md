@@ -149,6 +149,15 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             → step5/6 (classify patterns/files) → step7 (overlap report). run_bundle_analysis.py
                             drives the full sequence; placeholder_exclusions.py implements the placeholder heuristic.
   patterns_analysis/       Split-detection analysis (file-level and element-level)
+    _archive/              NOT confirmed-dead despite the name — the old tools/phase2_analysis/ package was moved
+                            here wholesale. Most of it is still live: run_split_detection_all.py invokes 9 of its
+                            modules directly (split_detection_file_level, build_reference_standards,
+                            intradomain_summary, emit_intradomain_definition, derive_join_keys_by_ids,
+                            apply_join_keys_by_ids, calibrate_join_key_gates, pareto_join_keys_by_ids,
+                            split_detection_element_level), and tests import _archive.io directly. The unreferenced
+                            remainder (run_change_type.py, run_attribute_stress*.py, etc.) is intentionally-paused
+                            Phase-2-baseline tooling (see "Two distinct baseline concepts" below), not dead code —
+                            do not delete without re-verifying against live call sites first.
   label_synthesis/         Label synthesis / fragmentation repair for domain patterns (build_label_population.py,
                             synthesize_fragmented_labels.py, domain_prompts/, synopsis_formatters/)
   probes/                  ~25 domain-specific Revit API probe scripts + PROBE_INVENTORY.md/.csv (measure-first
@@ -167,7 +176,8 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                                   each client / each named project / Generic) directly from file_metadata.csv —
                                   deliberately NOT built on the segment lattice's powerset (see file docstring)
   compare_cross_segment.py      Cross-segment comparison using join_hash as the identity unit (Jaccard/containment);
-                                  supersedes tools/_archive/similarity_compare.py (see docs/tools_DEPRECATED.md)
+                                  supersedes tools/similarity_compare.py (deprecated in place, not archived — see
+                                  docs/tools_DEPRECATED.md for the specific correctness bugs that motivated this)
   compare_governance_populations.py   Same containment/Jaccard mechanics as compare_cross_segment.py, applied to
                                   governance_manifest.py's disjoint populations (imports rather than reimplements)
   generate_governance_narrative.py    Deterministic (no-LLM) governance_narrative_context.md renderer from the
@@ -184,14 +194,19 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
 
   na_token.py             Shared "N/A"-spelling detection used by segment/governance tooling
   jenks_utils.py           Jenks natural-breaks helper for threshold computation
+  pareto_joinkey_search.py  Pareto-front join-key search; backs discover_join_policy.py's pareto/"harsh" mode
+                            and tests/test_pareto_shape_gating.py. Known issue: throws `KeyError: 'max_sigcnt'`
+                            under pandas on at least minimal synthetic inputs — pre-existing algorithm bug,
+                            not a location/import problem (see docs/tools_DEPRECATED.md).
   run_split_detection_all.py   Split detection over all domains
   Powershell Commands.txt  Informal operator runbook (hardcoded paths) — closest thing to a runbook; not automated
 
-  _archive/                Confirmed-superseded tools kept for reference only (compare_manifest.py,
-                            similarity_compare.py's predecessors, pairwise_drift.py, score_drift.py,
-                            pareto_joinkey_search.py, merge_split_exports.py, validate_v21_contract.py, etc.).
-                            Do not build new work on top of anything here — check docs/tools_DEPRECATED.md
-                            and CHANGELOG.md for the current replacement before reusing.
+  _archive/                Confirmed-superseded tools, pruned down to only what's still load-bearing:
+                            join_key_derivation_phase05.py (still `import *`-ed live by join_key_derivation.py).
+                            Everything else with zero remaining references (compare_manifest.py, merge_split_exports.py,
+                            score_drift.py, pairwise_drift.py, validate_v21_contract.py, etc.) was deleted outright —
+                            see docs/tools_DEPRECATED.md for the full list and the 2026-07-16 cleanup note.
+                            Do not build new work on top of anything here without checking CHANGELOG.md first.
 
 tests/                  pytest test suite (70+ test files)
   test_sentinel_policy.py            Enforce only 3 allowed sentinels
