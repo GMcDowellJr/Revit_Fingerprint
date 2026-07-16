@@ -322,6 +322,64 @@ def _target_scope_label(row: dict, suffix: str) -> str:
     return "_".join(parts) if parts else "other_scoped"
 
 
+# Maps a _target_scope_label() shape to the field(s) that make it up, so
+# _group1_scope_pair() can verify VALUE equality (not just shape equality)
+# when both sides land on the same shape. "enterprise" and "other_scoped"
+# are intentionally absent: "enterprise" means every one of these fields is
+# blank on both sides (nothing to compare), and "other_scoped" is the
+# collection-only-scoped catch-all -- collection_label is still not a
+# SUMMARY_FIELDS column (residual B6 gap noted in _target_scope_label()'s own
+# docstring), so its value can't be verified with the columns available today.
+_SCOPE_DIMENSION_FIELDS = {
+    "client": ("client_label",),
+    "bc": ("business_center_label",),
+    "discipline": ("discipline_label",),
+    "client_bc": ("client_label", "business_center_label"),
+    "client_discipline": ("client_label", "discipline_label"),
+    "bc_discipline": ("business_center_label", "discipline_label"),
+    "client_bc_discipline": ("client_label", "business_center_label", "discipline_label"),
+}
+
+
+def _group1_scope_pair(row: dict) -> tuple[str, str, str]:
+    """Classify a Group 1 row's two sides into (scope_a, scope_b, scope_pair_key).
+
+    Reuses _target_scope_label() for each side's SHAPE (which dimensions are
+    populated) -- unlike Group 2, BOTH sides matter here, since neither side
+    of a Group 1 pair is gated to a fixed role population. But
+    _target_scope_label() alone only tells you the shape, not the VALUE: two
+    segments that are both e.g. "bc"-shaped (business_center_label populated,
+    client/discipline blank) could have DIFFERENT business_center_label
+    values -- discover_within_segment() in compare_cross_segment.py pairs
+    same-parent, same-unit Template/Container/Project segments without
+    checking that scope label values match, so a BC_1-scoped segment paired
+    against a BC_2-scoped segment is a real, producer-side-reachable shape,
+    not just a hypothetical. Silently bucketing that under "bc::bc" would
+    corrupt _has_group1_bc_pooled_evidence()'s "same business center" check
+    (compares mismatched-value rows as if they were one converged reading)
+    and mislabel the same disagreement as "business-center" evidence in
+    render_group1_scope_section()/detect_anomalies() when it's actually a
+    cross-value comparison.
+
+    When both sides share an identical shape AND every field making up that
+    shape has an equal value on both sides, the pair is genuine same-value
+    evidence and gets the normal f"{scope_a}::{scope_b}" key (e.g. "bc::bc").
+    When the shapes match but any field's value differs, the pair is
+    captured under a distinct f"{scope_a}!cross::{scope_b}!cross" key instead
+    -- never discarded (this file's fail-soft-in-narrative posture), but
+    never conflated with same-value pooled evidence either. "!cross" cannot
+    collide with any of _target_scope_label()'s own outputs or the plain
+    "::"-joined keys (verified: it never appears in any of the 9 possible
+    _target_scope_label() return values).
+    """
+    scope_a = _target_scope_label(row, "a")
+    scope_b = _target_scope_label(row, "b")
+    fields = _SCOPE_DIMENSION_FIELDS.get(scope_a) if scope_a == scope_b else None
+    if fields and any(row.get(f"{f}_a", "") != row.get(f"{f}_b", "") for f in fields):
+        return scope_a, scope_b, f"{scope_a}!cross::{scope_b}!cross"
+    return scope_a, scope_b, f"{scope_a}::{scope_b}"
+
+
 # Default location for the optional client_sector.csv, resolved relative to this
 # script's own directory (tools/) rather than the CWD -- so existing invocations
 # that don't pass --client-sector still pick up the shipped classification and
@@ -507,7 +565,18 @@ _CASCADE_RENDERABLE_SIGNAL_KEYS = ("tc", "cp", "tp", "xc", "wp_all", "tw", "gt",
 
 
 def _has_renderable_cascade_signal(d: dict) -> bool:
-    return any(d.get(k) is not None for k in _CASCADE_RENDERABLE_SIGNAL_KEYS)
+    if any(d.get(k) is not None for k in _CASCADE_RENDERABLE_SIGNAL_KEYS):
+        return True
+    # tc_by_scope/cp_by_scope/tp_by_scope are always present as (possibly
+    # empty) dicts, never None, so they can't reuse the "is not None" check
+    # above -- that would trivially return True for every domain, including
+    # Group-3-only ones this function exists to exclude. A domain whose ONLY
+    # Group 1 signal is scoped (e.g. bc::bc) evidence -- no enterprise
+    # tc/cp/tp and no other Group 1/2 signal -- must still be renderable, or
+    # its TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE classification (see
+    # assign_tier()/_has_group1_bc_pooled_evidence()) would be computed but
+    # never shown in render_domain_tiers()/the domain summary CSV.
+    return any(d.get(k) for k in ("tc_by_scope", "cp_by_scope", "tp_by_scope"))
 
 
 def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -> dict:
@@ -632,15 +701,16 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
         if ct == "template_to_container":
             # Group 1 bc-pooled fallback: classify BOTH sides (unlike Group 2,
             # neither side of a Group 1 pair is gated to a fixed role population)
-            # and bucket into every (scope_a, scope_b) pair observed. tc itself is
-            # promoted only from "enterprise::enterprise" -- exactly the same
-            # condition as today's _is_unscoped_segment(r,"a") and (r,"b") gate,
-            # since _target_scope_label() returns "enterprise" iff
+            # and bucket into every (scope_a, scope_b) pair observed, verifying
+            # VALUE equality (not just shape equality) via _group1_scope_pair()
+            # so a mismatched-value pair (e.g. BC_1 vs BC_2) never lands in the
+            # same bucket as genuine same-value evidence. tc itself is promoted
+            # only from "enterprise::enterprise" -- exactly the same condition
+            # as today's _is_unscoped_segment(r,"a") and (r,"b") gate, since
+            # _target_scope_label() returns "enterprise" iff
             # _is_unscoped_segment() is True for that side -- so tc is
             # byte-for-byte unchanged.
-            scope_a = _target_scope_label(r, "a")
-            scope_b = _target_scope_label(r, "b")
-            scope_pair = f"{scope_a}::{scope_b}"
+            scope_a, scope_b, scope_pair = _group1_scope_pair(r)
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 tc_by_scope[dom][scope_pair].append(v)
@@ -653,9 +723,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
                     tc_used[dom].append(vu)
 
         elif ct == "container_to_project":
-            scope_a = _target_scope_label(r, "a")
-            scope_b = _target_scope_label(r, "b")
-            scope_pair = f"{scope_a}::{scope_b}"
+            scope_a, scope_b, scope_pair = _group1_scope_pair(r)
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 cp_by_scope[dom][scope_pair].append(v)
@@ -668,9 +736,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
                     cp_used[dom].append(vu)
 
         elif ct in ("template_to_project", "parent_sibling_roles"):
-            scope_a = _target_scope_label(r, "a")
-            scope_b = _target_scope_label(r, "b")
-            scope_pair = f"{scope_a}::{scope_b}"
+            scope_a, scope_b, scope_pair = _group1_scope_pair(r)
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 tp_by_scope[dom][scope_pair].append(v)
@@ -2242,14 +2308,17 @@ def render_group1_scope_section(cascade: dict) -> str:
         "down by the (a-side scope, b-side scope) pair of each comparison, instead "
         "of only the single broadest (enterprise-wide) pair. "
         "**enterprise::enterprise** is the same value already shown as T→Container/"
-        "T→Project/C→Project above; the other rows (typically **bc::bc** — both "
-        "sides scoped to the same business center) are pooled business-center-level "
-        "evidence that a prior pass discarded whenever no fully enterprise-wide pair "
-        "existed, which is why most domains previously showed as Insufficient "
-        "Evidence despite this evidence being present. This is business-center-level "
-        "evidence, not an enterprise reading — see the "
-        "**Insufficient Evidence — Enterprise; BC-Level Evidence Available** tier "
-        "above.\n",
+        "T→Project/C→Project above; every other row is scoped evidence that a prior "
+        "pass discarded whenever no fully enterprise-wide pair existed, which is why "
+        "most domains previously showed as Insufficient Evidence despite this "
+        "evidence being present. The scope on each side is not always "
+        "business-center: it can be client-, discipline-, business-center-scoped, "
+        "or a combination — read the scope label itself (e.g. `client::bc`, "
+        "`bc_discipline::bc`) to see which. Only a domain with a genuine "
+        "**bc::bc** row (both sides scoped to the SAME business center) reaches "
+        "the **Insufficient Evidence — Enterprise; BC-Level Evidence Available** "
+        "tier above; other scope pairs are real evidence in their own right but do "
+        "not by themselves place a domain into that tier.\n",
         "| Domain | Scope | T→Container | T→Project | C→Project |",
         "|---|---|---:|---:|---:|",
     ]

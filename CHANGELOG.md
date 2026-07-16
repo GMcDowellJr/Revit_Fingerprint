@@ -89,6 +89,44 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   business-center pairs" unconditionally, which was accurate only for the
   `"bc::bc"` case and misleading for every other scope_pair.
 
+- Four PR-review findings on the Group 1 bc-pooled fallback above, all
+  confirmed against the real `cross_segment_summary.csv`/`segment_manifest.csv`
+  export supplied during review:
+  1. **Value-mismatch guard (new `_group1_scope_pair()`)**: `_target_scope_label()`
+     only records SHAPE (which dimensions are populated), not VALUE.
+     `discover_within_segment()` in `compare_cross_segment.py` pairs same-parent,
+     same-unit Template/Container/Project segments without checking that scope
+     label VALUES match, so a `BC_1`-scoped segment paired against a
+     `BC_2`-scoped segment was silently bucketed as `"bc::bc"` — the same key as
+     genuine same-business-center evidence. Confirmed reachable in the real
+     export: one real row (`client_bc_discipline` shape on both sides, one field
+     mismatched) was landing in a merged bucket, corrupting 20 domains'
+     `tc_by_scope` entries. New `_group1_scope_pair()` verifies every field
+     making up a shared shape actually matches before using the plain
+     `f"{scope_a}::{scope_b}"` key; a same-shape-different-value pair now gets a
+     distinct `f"{scope_a}!cross::{scope_b}!cross"` key instead — captured, not
+     discarded, but never conflated with same-value pooled evidence. `tc`/`cp`/`tp`
+     remain byte-for-byte unchanged (re-verified: 0 mismatches across all 32 real
+     domains).
+  2. **`_has_renderable_cascade_signal()` scope-only gap**: a domain whose ONLY
+     Group 1 signal is scoped evidence (e.g. `tp_by_scope["bc::bc"]` populated
+     but no enterprise `tc`/`cp`/`tp` and no `wp_all`/Group 2 signal) would get
+     `TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE` from `assign_tier()` but never
+     appear in `render_domain_tiers()`/the domain CSV, since
+     `_has_renderable_cascade_signal()`'s key list didn't include
+     `tc_by_scope`/`cp_by_scope`/`tp_by_scope` (which are always non-`None`
+     dicts, so they can't reuse the existing `is not None` check). Now also
+     checks for a non-empty by-scope dict.
+  3. **`render_group1_scope_section()` prose overclaimed "business-center-level"**:
+     the section's intro described every non-enterprise row as "pooled
+     business-center-level evidence," but it renders every scope_pair, most of
+     which (`client::bc`, `client_bc::discipline`, etc.) are not business-center
+     evidence at all. Reworded to name only `"bc::bc"` as business-center-level
+     and tier-relevant; other scope pairs are described as real evidence in
+     their own right that does not by itself grant the new tier. (The
+     equivalent `detect_anomalies()` wording was already fixed in the prior
+     commit.)
+
 ### Fixed
 - `tools/archetype/generate_archetype_candidates.py`'s `_governance_question_hint()`
   only ever inspected `target_domain`, so it couldn't distinguish a dynamic

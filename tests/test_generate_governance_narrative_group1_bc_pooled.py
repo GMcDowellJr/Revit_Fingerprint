@@ -27,7 +27,9 @@ from generate_governance_narrative import (  # noqa: E402
     TIER_INSUFFICIENT,
     TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE,
     TIER_ORDER,
+    _group1_scope_pair,
     _has_group1_bc_pooled_evidence,
+    _has_renderable_cascade_signal,
     assign_tier,
     build_cascade,
     detect_anomalies,
@@ -164,6 +166,100 @@ def test_scope_pair_separator_does_not_collide_across_multi_dimension_labels():
         "client_bc::discipline": 0.20,
         "client::bc_discipline": 0.90,
     }
+
+
+def test_group1_scope_pair_rejects_mismatched_bc_values():
+    """_target_scope_label() only records SHAPE (which dimensions are
+    populated), not VALUE -- discover_within_segment() in
+    compare_cross_segment.py pairs same-parent, same-unit Template/Container/
+    Project segments without checking that scope label values match, so a
+    BC_1-scoped segment paired against a BC_2-scoped segment is a real,
+    producer-reachable shape. Must NOT land in "bc::bc" (which would silently
+    treat two different business centers as if they were one converged
+    reading) -- must land in a distinct "bc!cross::bc!cross" bucket instead."""
+    rows = [
+        _row(segment_id_a="imperial|Template|BC_1", segment_id_b="imperial|Project|BC_2",
+             governance_role_a="Template", governance_role_b="Project",
+             business_center_label_a="BC_1", business_center_label_b="BC_2",
+             comparison_type="template_to_project", domain="mismatch_domain",
+             all_containment_a_in_b_mean="0.42", n_files_a="2", n_files_b="3"),
+    ]
+    normalise_summary_schema(rows)
+    d = build_cascade(rows)["mismatch_domain"]
+    assert d["tp_by_scope"] == {"bc!cross::bc!cross": 0.42}
+    assert "bc::bc" not in d["tp_by_scope"]
+    assert _has_group1_bc_pooled_evidence(d) is False
+
+
+def test_group1_scope_pair_accepts_matching_bc_values():
+    """Same shape (both "bc") AND same value must still land in "bc::bc" --
+    the value-match guard must not reject genuine same-bc evidence."""
+    row = _row(segment_id_a="imperial|Template|BC_1", segment_id_b="imperial|Project|BC_1",
+               governance_role_a="Template", governance_role_b="Project",
+               business_center_label_a="BC_1", business_center_label_b="BC_1",
+               comparison_type="template_to_project", domain="match_domain",
+               all_containment_a_in_b_mean="0.77", n_files_a="2", n_files_b="3")
+    scope_a, scope_b, scope_pair = _group1_scope_pair(row)
+    assert scope_pair == "bc::bc"
+
+
+def test_group1_scope_pair_mismatched_client_bc_combo():
+    """The value-match guard applies to every multi-dimension shape, not just
+    bare "bc" -- a "client_bc" vs "client_bc" pair with the SAME client but
+    DIFFERENT business centers must also be rejected from the plain key."""
+    row = _row(segment_id_a="imperial|Template|Kaiser|BC_1", segment_id_b="imperial|Project|Kaiser|BC_2",
+               governance_role_a="Template", governance_role_b="Project",
+               client_label_a="Kaiser", business_center_label_a="BC_1",
+               client_label_b="Kaiser", business_center_label_b="BC_2",
+               comparison_type="template_to_project", domain="combo_mismatch_domain",
+               all_containment_a_in_b_mean="0.55", n_files_a="2", n_files_b="3")
+    scope_a, scope_b, scope_pair = _group1_scope_pair(row)
+    assert scope_pair == "client_bc!cross::client_bc!cross"
+
+
+# ---------------------------------------------------------------------------
+# _has_renderable_cascade_signal(): scope-only Group 1 evidence must render
+# ---------------------------------------------------------------------------
+
+def test_has_renderable_cascade_signal_true_for_scope_only_evidence():
+    """A domain whose ONLY signal is scoped Group 1 evidence (no enterprise
+    tc/cp/tp, no wp_all, no Group 2 signal) must still be renderable, or its
+    TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE classification would be computed
+    by assign_tier() but never surfaced in render_domain_tiers()/the domain
+    CSV, per review feedback on this exact gap."""
+    d = {
+        "tc": None, "cp": None, "tp": None, "xc": None, "wp_all": None, "tw": None,
+        "gt": None, "gc": None, "gp": None,
+        "tc_by_scope": {}, "cp_by_scope": {}, "tp_by_scope": {"bc::bc": 0.6},
+    }
+    assert _has_renderable_cascade_signal(d) is True
+
+
+def test_has_renderable_cascade_signal_false_when_by_scope_dicts_all_empty():
+    d = {
+        "tc": None, "cp": None, "tp": None, "xc": None, "wp_all": None, "tw": None,
+        "gt": None, "gc": None, "gp": None,
+        "tc_by_scope": {}, "cp_by_scope": {}, "tp_by_scope": {},
+    }
+    assert _has_renderable_cascade_signal(d) is False
+
+
+def test_scope_only_domain_reaches_bc_evidence_tier_in_full_pipeline():
+    """End-to-end: a domain with ONLY a bc-scoped-both-sides template_to_project
+    row (no within_project, no enterprise anything) must both (a) be assigned
+    the new tier by assign_tier(), and (b) actually be included in cascade's
+    renderable set via _has_renderable_cascade_signal()."""
+    rows = [
+        _row(segment_id_a="imperial|Template|BC_1", segment_id_b="imperial|Project|BC_1",
+             governance_role_a="Template", governance_role_b="Project",
+             business_center_label_a="BC_1", business_center_label_b="BC_1",
+             comparison_type="template_to_project", domain="scope_only_domain",
+             all_containment_a_in_b_mean="0.6", n_files_a="2", n_files_b="3"),
+    ]
+    normalise_summary_schema(rows)
+    d = build_cascade(rows)["scope_only_domain"]
+    assert _has_renderable_cascade_signal(d) is True
+    assert assign_tier(d) == TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE
 
 
 def test_domain_with_no_group1_rows_at_all_absent():
