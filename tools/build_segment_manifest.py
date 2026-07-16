@@ -57,11 +57,25 @@ _UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]')
 # (currently only client_label — see _build_segments()'s blank-client
 # handling) renders in segment_id as an empty part between pipes (e.g.
 # "imperial|Template|" or "imperial|Container||architectural"). That part is
-# rendered as this token in the derived folder name, matching the "enterprise"
-# scope-level term compare_cross_segment.py already uses for "no client, no
-# bc" rows — a bare "_" (or "__") there reads as a naming mistake rather than
-# the intentional "no client selected" segment it actually is.
-_BLANK_SELECTED_FOLDER_TOKEN = "enterprise"
+# rendered as this token in the derived folder name — a bare "_" (or "__")
+# there reads as a naming mistake rather than the intentional "no client
+# selected" segment it actually is.
+#
+# This used to be "enterprise", matching compare_cross_segment.py's
+# "enterprise" scope-level term. That was misleading here: this token fires
+# for every blank-client segment regardless of whether the segment also has
+# a real business_center_label, so a Stantec-internal segment scoped to a
+# specific business center (e.g. "imperial|Container||architectural|1779")
+# rendered as "..._enterprise_architectural_1779...", implying a truly
+# enterprise-wide (no client, no bc) scope it doesn't actually have. Renamed
+# to "stantec" to describe what this token actually always means here
+# ("no external client" — governance_manifest.py's stricter enterprise
+# definition, which additionally requires no real bc, lives in that module's
+# scope_key/scope_level instead). Existing on-disk segment folders built
+# under the old token keep their old names until they are next rebuilt
+# (population change or -ForceAll); this only affects newly (re)built
+# segments going forward.
+_BLANK_SELECTED_FOLDER_TOKEN = "stantec"
 def _sanitize_folder(segment_id:str)->str:
     # No "+" quantifier on _UNSAFE_FOLDER_CHARS and no .strip("_") at the end:
     # both are deliberate. An empty part between/after separator pipes is

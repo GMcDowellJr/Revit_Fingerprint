@@ -1,8 +1,8 @@
 # collection_label vs. governance_role (manual file_metadata.csv entry)
 # ------------------------------------------------------------------------
-# collection_label answers "why was this file captured" — the standards/
+# collection_label answers "why was this file captured" - the standards/
 # resource collection it was pulled for (e.g. "BC_2270 Standards", "Sutter
-# Standards"). governance_role answers "what does this file do" — its
+# Standards"). governance_role answers "what does this file do" - its
 # behavioral function (Template / Container / Project / Generic). The two
 # are independent and must both be set on their own merits: a
 # governance_role=Project file can still carry a collection_label if it is
@@ -50,7 +50,7 @@ if ($Run -eq "") {
     Write-Host "    collection_label      ->  standards/resource collection this file belongs to (optional; independent of governance_role - see header comment)"
     Write-Host "    unit_system           ->  imperial | metric"
     Write-Host ""
-    Write-Host "  Run B hard-fails if client_label or business_center_label is blank or an N/A spelling — see"
+    Write-Host "  Run B hard-fails if client_label or business_center_label is blank or an N/A spelling - see"
     Write-Host "  run_extract_all.py's _check_governance_field_completeness()."
     Write-Host ""
     exit 0

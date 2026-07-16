@@ -263,18 +263,20 @@ def test_sanitize_folder_preserves_selected_blank_vs_unselected_dimension():
     )
 
 
-def test_sanitize_folder_renders_selected_blank_as_enterprise_token():
+def test_sanitize_folder_renders_selected_blank_as_stantec_token():
     # A bare "_" (trailing) or "__" (embedded) reads as a naming mistake, not
-    # an intentional "no client selected" segment. Render it as "enterprise"
-    # instead — the same scope-level term compare_cross_segment.py already
-    # uses for "no client, no bc" rows — so the folder name is
-    # self-explanatory.
+    # an intentional "no client selected" segment. Render it as "stantec"
+    # instead, so the folder name is self-explanatory. Not "enterprise" —
+    # this token fires for every blank-client segment regardless of whether
+    # it also has a real business_center_label, so it does not mean "no
+    # client, no bc" the way compare_cross_segment.py's/governance_manifest.
+    # py's "enterprise" scope level does.
     from build_segment_manifest import _sanitize_folder
 
-    assert _sanitize_folder("imperial|Template|") == "imperial_template_enterprise"
+    assert _sanitize_folder("imperial|Template|") == "imperial_template_stantec"
     assert (
         _sanitize_folder("imperial|Container||architectural")
-        == "imperial_container_enterprise_architectural"
+        == "imperial_container_stantec_architectural"
     )
     # A segment with no blank-selected dimension at all is untouched.
     assert _sanitize_folder("imperial|Template") == "imperial_template"
