@@ -136,13 +136,13 @@ def test_manifest_records_output_sizes(tmp_path):
     out_csv = tmp_path / "governance_domain_summary.csv"
     out_csv.write_text("domain,tier\nline_styles,strong\n", encoding="utf-8")
     m = _manifest(
-        output_paths={"domain_summary_csv": out_csv},
-        output_types={"domain_summary_csv": "csv"},
-        output_authority={"domain_summary_csv": "authoritative_deterministic_evidence"},
-        output_context_role={"domain_summary_csv": "primary tier/score rollup"},
+        output_paths={"governance_domain_summary": out_csv},
+        output_types={"governance_domain_summary": "csv"},
+        output_authority={"governance_domain_summary": "authoritative_deterministic_evidence"},
+        output_context_role={"governance_domain_summary": "primary tier/score rollup"},
     )
     out = m["outputs"][0]
-    assert out["artifact_id"] == "domain_summary_csv"
+    assert out["artifact_id"] == "governance_domain_summary"
     assert out["present"] is True
     assert out["size_bytes"] == out_csv.stat().st_size
 
@@ -255,7 +255,7 @@ def _evidence_map(**overrides):
         schema_version=EVIDENCE_MAP_SCHEMA_VERSION,
         input_paths={"summary": Path("cross_segment_summary.csv"), "pooled": Path("cross_segment_pooled.csv")},
         input_present={"summary": True, "pooled": True},
-        output_paths={"domain_summary_csv": Path("governance_domain_summary.csv")},
+        output_paths={"governance_domain_summary": Path("governance_domain_summary.csv")},
         sibling_paths={
             "file_pairs": Path("cross_segment_file_pairs.csv"),
             "comparison_registry": Path("comparison_registry.csv"),

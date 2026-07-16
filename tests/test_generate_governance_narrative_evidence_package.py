@@ -235,6 +235,27 @@ def test_no_emit_evidence_package_suppresses_json_but_not_existing_outputs(tmp_p
     assert (tmp_path / "governance_narrative_context.md").exists()
 
 
+def test_no_emit_removes_stale_evidence_package_files_from_prior_run(tmp_path, monkeypatch):
+    """Regression test for a PR review finding: rerunning with
+    --no-emit-evidence-package over an --out directory that already has
+    package JSONs from an earlier default (emit-on) run must not leave those
+    stale files in place -- the narrative just rendered says no package
+    health/evidence-map file exists for this run, so leaving old ones would
+    let a downstream reader pick up out-of-date provenance/health data."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    assert (tmp_path / "governance_package_manifest.json").exists()
+    assert (tmp_path / "governance_package_health.json").exists()
+    assert (tmp_path / "governance_evidence_map.json").exists()
+
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(tmp_path), "--no-emit-evidence-package"])
+    assert not (tmp_path / "governance_package_manifest.json").exists()
+    assert not (tmp_path / "governance_package_health.json").exists()
+    assert not (tmp_path / "governance_evidence_map.json").exists()
+    assert (tmp_path / "governance_domain_summary.csv").exists()
+
+
 def test_emit_and_no_emit_produce_identical_csvs(tmp_path, monkeypatch):
     """The two CSV outputs are unaffected by --emit-evidence-package -- only
     the narrative's authority-header package-pointer section differs (see
@@ -283,7 +304,7 @@ def test_package_manifest_records_inputs_and_outputs(tmp_path, monkeypatch):
     assert by_id["summary"]["present"] is True
     assert by_id["union_inventory"]["present"] is False
     out_by_id = {o["artifact_id"]: o for o in manifest["outputs"]}
-    assert out_by_id["domain_summary_csv"]["size_bytes"] > 0
+    assert out_by_id["governance_domain_summary"]["size_bytes"] > 0
     assert manifest["generator"]["name"] == GENERATOR_IDENTITY
     assert manifest["package_status"] == "complete"
 
@@ -300,13 +321,13 @@ def test_package_manifest_reports_sibling_json_outputs_as_present_with_real_size
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
     out_by_id = {o["artifact_id"]: o for o in manifest["outputs"]}
-    assert "package_manifest_json" not in out_by_id
-    for artifact_id in ("package_health_json", "evidence_map_json"):
+    assert "governance_package_manifest" not in out_by_id
+    for artifact_id in ("governance_package_health", "governance_evidence_map"):
         assert out_by_id[artifact_id]["present"] is True, artifact_id
         assert out_by_id[artifact_id]["size_bytes"] > 0, artifact_id
         expected_path = tmp_path / {
-            "package_health_json": "governance_package_health.json",
-            "evidence_map_json": "governance_evidence_map.json",
+            "governance_package_health": "governance_package_health.json",
+            "governance_evidence_map": "governance_evidence_map.json",
         }[artifact_id]
         assert out_by_id[artifact_id]["size_bytes"] == expected_path.stat().st_size
 
@@ -348,6 +369,22 @@ def test_evidence_map_lists_eighteen_artifacts_with_required_fields(tmp_path, mo
     assert len(ids) == len(set(ids))
     narrative = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_narrative_context")
     assert narrative["authority_level"] != "authoritative_deterministic_evidence"
+
+
+def test_manifest_output_artifact_ids_match_evidence_map_artifact_ids(tmp_path, monkeypatch):
+    """Regression test for a PR review finding: governance_package_manifest.json's
+    outputs[].artifact_id values (e.g. "domain_summary_csv") used a different
+    vocabulary than governance_evidence_map.json's artifacts[].artifact_id
+    values (e.g. "governance_domain_summary") for the exact same files, so a
+    consumer joining provenance/size data from the manifest to navigation
+    metadata in the evidence map by artifact_id could not resolve them."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    manifest_output_ids = {o["artifact_id"] for o in manifest["outputs"]}
+    evidence_map_ids = {a["artifact_id"] for a in evidence_map["artifacts"]}
+    assert manifest_output_ids <= evidence_map_ids, manifest_output_ids - evidence_map_ids
 
 
 def test_evidence_map_related_artifacts_use_artifact_ids_not_filenames(tmp_path, monkeypatch):

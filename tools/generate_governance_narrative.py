@@ -3376,32 +3376,32 @@ def main():
         input_present = {k: bool(v) and v.exists() for k, v in input_paths.items()}
 
         output_paths = {
-            "domain_summary_csv": domain_csv_path,
-            "client_summary_csv": client_csv_path,
-            "narrative_md": out_path,
-            "package_manifest_json": out_dir / "governance_package_manifest.json",
-            "package_health_json": out_dir / "governance_package_health.json",
-            "evidence_map_json": out_dir / "governance_evidence_map.json",
+            "governance_domain_summary": domain_csv_path,
+            "governance_client_summary": client_csv_path,
+            "governance_narrative_context": out_path,
+            "governance_package_manifest": out_dir / "governance_package_manifest.json",
+            "governance_package_health": out_dir / "governance_package_health.json",
+            "governance_evidence_map": out_dir / "governance_evidence_map.json",
         }
         output_types = {
-            "domain_summary_csv": "csv", "client_summary_csv": "csv", "narrative_md": "markdown",
-            "package_manifest_json": "json", "package_health_json": "json", "evidence_map_json": "json",
+            "governance_domain_summary": "csv", "governance_client_summary": "csv", "governance_narrative_context": "markdown",
+            "governance_package_manifest": "json", "governance_package_health": "json", "governance_evidence_map": "json",
         }
         output_authority = {
-            "domain_summary_csv": "authoritative_deterministic_evidence",
-            "client_summary_csv": "authoritative_deterministic_evidence",
-            "narrative_md": "controlled_interpretation",
-            "package_manifest_json": "authoritative_deterministic_evidence",
-            "package_health_json": "controlled_interpretation",
-            "evidence_map_json": "authoritative_deterministic_evidence",
+            "governance_domain_summary": "authoritative_deterministic_evidence",
+            "governance_client_summary": "authoritative_deterministic_evidence",
+            "governance_narrative_context": "controlled_interpretation",
+            "governance_package_manifest": "authoritative_deterministic_evidence",
+            "governance_package_health": "controlled_interpretation",
+            "governance_evidence_map": "authoritative_deterministic_evidence",
         }
         output_context_role = {
-            "domain_summary_csv": "primary tier/score rollup",
-            "client_summary_csv": "primary client alignment/onboarding rollup",
-            "narrative_md": "human-readable synthesis",
-            "package_manifest_json": "provenance record",
-            "package_health_json": "coverage/health signal",
-            "evidence_map_json": "artifact navigation index",
+            "governance_domain_summary": "primary tier/score rollup",
+            "governance_client_summary": "primary client alignment/onboarding rollup",
+            "governance_narrative_context": "human-readable synthesis",
+            "governance_package_manifest": "provenance record",
+            "governance_package_health": "coverage/health signal",
+            "governance_evidence_map": "artifact navigation index",
         }
 
         comparison_run_ids = sorted({r.get("comparison_run_id", "") for r in summary_rows} - {""})
@@ -3462,12 +3462,12 @@ def main():
 
         # Built and written last, now that governance_package_health.json and
         # governance_evidence_map.json are actually on disk and stat correctly.
-        # Excludes "package_manifest_json" from the paths it stats about
+        # Excludes "governance_package_manifest" from the paths it stats about
         # itself -- see the comment above for why.
-        manifest_output_paths = {k: v for k, v in output_paths.items() if k != "package_manifest_json"}
-        manifest_output_types = {k: v for k, v in output_types.items() if k != "package_manifest_json"}
-        manifest_output_authority = {k: v for k, v in output_authority.items() if k != "package_manifest_json"}
-        manifest_output_context_role = {k: v for k, v in output_context_role.items() if k != "package_manifest_json"}
+        manifest_output_paths = {k: v for k, v in output_paths.items() if k != "governance_package_manifest"}
+        manifest_output_types = {k: v for k, v in output_types.items() if k != "governance_package_manifest"}
+        manifest_output_authority = {k: v for k, v in output_authority.items() if k != "governance_package_manifest"}
+        manifest_output_context_role = {k: v for k, v in output_context_role.items() if k != "governance_package_manifest"}
         manifest = build_package_manifest(
             generator_identity=GENERATOR_IDENTITY,
             generator_role=GENERATOR_ROLE,
@@ -3488,6 +3488,25 @@ def main():
 
         print(f"  → wrote governance_package_health.json, governance_evidence_map.json, "
               f"governance_package_manifest.json to {out_dir}")
+    else:
+        # A previous run over this same --out directory may have written
+        # package JSONs with --emit-evidence-package (the default). The
+        # narrative just rendered above states plainly that no package
+        # health/evidence-map file exists for this run (see
+        # render_evidence_authority_header's emit_evidence_package gating) --
+        # leaving stale files from an earlier run in place would contradict
+        # that claim and let a downstream reader pick up out-of-date
+        # provenance/health data alongside the freshly-written CSV/MD.
+        stale_names = (
+            "governance_package_manifest.json",
+            "governance_package_health.json",
+            "governance_evidence_map.json",
+        )
+        removed = [name for name in stale_names if (out_dir / name).exists()]
+        for name in removed:
+            (out_dir / name).unlink()
+        if removed:
+            print(f"  → removed stale evidence-package file(s) from a prior run: {', '.join(removed)}")
 
 
 if __name__ == "__main__":

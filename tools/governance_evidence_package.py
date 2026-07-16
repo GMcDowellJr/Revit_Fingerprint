@@ -575,7 +575,7 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "governance_domain_summary", p(output_paths, "domain_summary_csv"), "csv", True, True,
+        "governance_domain_summary", p(output_paths, "governance_domain_summary"), "csv", True, True,
         GENERATOR_IDENTITY, AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "primary tier/score rollup, one row per domain",
         "one row per domain with a renderable cascade signal (domains failing "
@@ -599,7 +599,7 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "governance_client_summary", p(output_paths, "client_summary_csv"), "csv", True, True,
+        "governance_client_summary", p(output_paths, "governance_client_summary"), "csv", True, True,
         GENERATOR_IDENTITY, AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "primary client alignment/onboarding rollup, one row per client",
         "one row per client with at least one Project file discovered via "
@@ -615,7 +615,7 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "governance_narrative_context", p(output_paths, "narrative_md"), "markdown", True, True,
+        "governance_narrative_context", p(output_paths, "governance_narrative_context"), "markdown", True, True,
         GENERATOR_IDENTITY, AUTHORITY_CONTROLLED_INTERPRETATION,
         "human-readable synthesis; sections list assembled from render_* functions",
         "one markdown document per run", [], [], [],
@@ -632,7 +632,7 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "governance_package_manifest", p(output_paths, "package_manifest_json"), "json", False, True,
+        "governance_package_manifest", p(output_paths, "governance_package_manifest"), "json", False, True,
         GENERATOR_IDENTITY, AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "provenance record: which inputs were provided/found, which outputs "
         "were written and their sizes, comparison_run_id(s)/executed_utc "
@@ -647,7 +647,7 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "governance_package_health", p(output_paths, "package_health_json"), "json", False, True,
+        "governance_package_health", p(output_paths, "governance_package_health"), "json", False, True,
         GENERATOR_IDENTITY, AUTHORITY_CONTROLLED_INTERPRETATION,
         "aggregated data-quality/coverage signal: schema detection, used-view "
         "fallback, comparison_type coverage, which optional CSVs were present",
@@ -662,7 +662,7 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "governance_evidence_map", p(output_paths, "evidence_map_json"), "json", False, True,
+        "governance_evidence_map", p(output_paths, "governance_evidence_map"), "json", False, True,
         GENERATOR_IDENTITY, AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "index of every artifact in the package, this file included, so a "
         "downstream consumer can discover what exists and what it can/cannot "
