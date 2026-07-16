@@ -86,6 +86,45 @@ def test_same_role_peer_excludes_project_and_generic():
         assert pop_b["scope_level"] != "generic"
 
 
+def test_same_role_peer_excludes_project_scoped_template_or_container():
+    # Regression: a Template/Container population can itself land at
+    # scope_level "project" (real external client + real bc together, e.g.
+    # a Template scoped to one specific client+bc combination -- this shape
+    # occurs in production data). Peer-comparing it against a "bc"-scoped
+    # sibling of the same role would produce "bc_to_project", colliding with
+    # the directed Template/Container -> Project containment comparison's
+    # identical type name.
+    rows = [
+        _row("t_proj", "Template", "Sutter", "2014"),  # scope_level "project"
+        _row("t_bc", "Template", "Stantec", "2014"),   # scope_level "bc"
+    ]
+    manifest_rows, _membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    pairs = discover_same_role_peer_pairs(manifest_rows)
+    assert pairs == []
+
+
+def test_comparison_type_still_unambiguous_with_project_scoped_template():
+    rows = [
+        _row("t_proj", "Template", "Sutter", "2014"),
+        _row("t_bc", "Template", "Stantec", "2014"),
+        _row("p1", "Project", "Stantec", "2014"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    records_rows = _records_rows({
+        "t_proj": {"h1"}, "t_bc": {"h1"}, "p1": {"h1"},
+    })
+    out_rows = run_comparisons(manifest_rows, membership_rows, records_rows)
+    shape_by_type = {}
+    for row in out_rows:
+        has_jaccard = bool(row.get("all_jaccard_mean"))
+        ctype = row["comparison_type"]
+        assert shape_by_type.setdefault(ctype, has_jaccard) == has_jaccard, (
+            f"comparison_type {ctype!r} mixes symmetric and directed rows"
+        )
+
+
 def test_generic_pairs_unconditionally_against_every_tc_project_population():
     manifest_rows, _membership_rows = _synthetic_manifest()
     pairs = discover_generic_pairs(manifest_rows)

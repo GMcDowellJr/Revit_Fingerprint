@@ -135,19 +135,28 @@ def discover_same_role_peer_pairs(
     manifest_rows: List[Dict[str, str]],
 ) -> List[Tuple[Dict[str, str], Dict[str, str], str]]:
     """Any two populations sharing (unit_system, governance_role), regardless
-    of scope_key. Generic/Generic-Host is excluded — it has no scope_key and
-    is compared separately via discover_generic_pairs(). Project is also
-    excluded: Project populations are consumption-end outputs, not
-    standards-authority pools, and are only ever the target side of the
-    directed Template/Container -> Project containment comparison (see
-    discover_directed_tc_to_project_pairs()). Peer-comparing two Project
-    populations of different scope levels would produce the exact same
-    comparison_type string (e.g. "bc_to_project") as that directed
-    comparison, making the output ambiguous without also keying off
-    governance_role_a/governance_role_b."""
+    of scope_key, EXCEPT scope_level "generic" or "project". Generic/Generic-
+    Host has no scope_key at all and is compared separately via discover_
+    generic_pairs(). "project" scope is excluded on both counts:
+
+      - Project-role populations are consumption-end outputs, not standards-
+        authority pools, and are only ever the target side of the directed
+        Template/Container -> Project containment comparison (see discover_
+        directed_tc_to_project_pairs()).
+      - A Template/Container population can itself land at scope_level
+        "project" (a row tagged with both a real external client AND a real
+        business_center_label — narrow but real; it occurs in production
+        data, e.g. a Template scoped to one specific client+bc combination).
+
+    Either case peer-compared against a "bc"/"enterprise"/"client"-scoped
+    population of the same role would produce the exact same comparison_type
+    string (e.g. "bc_to_project") as the directed comparison, silently
+    mixing symmetric (Jaccard) and directed (containment-only) rows under
+    one label — making the output ambiguous without also keying off
+    governance_role_a/governance_role_b and checking which side is which."""
     by_key: Dict[Tuple[str, str], List[Dict[str, str]]] = defaultdict(list)
     for row in manifest_rows:
-        if row.get("scope_level") == "generic" or row["governance_role"] == "Project":
+        if row.get("scope_level") in ("generic", "project") or row["governance_role"] == "Project":
             continue
         by_key[(row["unit_system"], row["governance_role"])].append(row)
 
