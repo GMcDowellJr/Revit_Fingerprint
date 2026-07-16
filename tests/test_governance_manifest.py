@@ -123,6 +123,35 @@ def test_generic_host_role_treated_same_as_generic():
     assert manifest_rows[0]["scope_level"] == "generic"
 
 
+def test_case_variant_role_merges_into_canonical_population():
+    # A manual-edit case variant ("container") must merge with "Container",
+    # not fragment into its own governance_id — otherwise downstream pair
+    # discovery's exact-string role checks silently drop it.
+    rows = [
+        _row("e1", "Container", "Stantec", "2014"),
+        _row("e2", "container", "Stantec", "2014"),
+        _row("e3", "CONTAINER", "Stantec", "2014"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    assert len(manifest_rows) == 1
+    pop = manifest_rows[0]
+    assert pop["governance_role"] == "Container"
+    assert _members(pop["governance_id"], membership_rows) == ["e1", "e2", "e3"]
+
+
+def test_generic_host_case_variant_folds_to_generic_role_label():
+    rows = [
+        _row("e1", "Generic", "Stantec", "0000"),
+        _row("e2", "generic-host", "Stantec", "0000"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    assert len(manifest_rows) == 1
+    assert manifest_rows[0]["governance_role"] == "Generic"
+    assert _members(manifest_rows[0]["governance_id"], membership_rows) == ["e1", "e2"]
+
+
 def test_unrecognized_role_excluded_with_loud_report(capsys):
     rows = [
         _row("e1", "Container", "Stantec", "0000"),

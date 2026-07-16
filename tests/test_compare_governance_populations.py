@@ -107,17 +107,58 @@ def test_directed_enterprise_to_project_is_unconditional_on_scope():
         assert t == "enterprise_to_project"
 
 
-def test_directed_bc_to_project_requires_matching_scope_key():
+def test_directed_bc_to_project_matches_by_business_center_label_alone():
     manifest_rows, _membership_rows = _synthetic_manifest()
     pairs = discover_directed_tc_to_project_pairs(manifest_rows)
     bc_pairs = [(a, b, t) for a, b, t in pairs if a["scope_level"] == "bc"]
     for a, b, t in bc_pairs:
-        assert a["scope_key"] == b["scope_key"]
+        assert a["business_center_label"] == b["business_center_label"]
         assert t == "bc_to_project"
-    # bc:2014 Container has a matching-scope Project population in this
-    # fixture (proj_bc2014 also resolves to scope_key "bc:2014"); bc:2270
+    # bc:2014 Container has a matching-bc Project population in this fixture
+    # (proj_bc2014 also resolves to business_center_label "2014"); bc:2270
     # does not have a matching Project population, so it produces no pair.
     assert len(bc_pairs) == 1
+
+
+def test_directed_bc_to_project_matches_regardless_of_differing_client():
+    # Regression: a bc-scoped Container (Stantec-internal, real bc) must
+    # still pair with an external-client Project that shares that bc — an
+    # exact scope_key match would wrongly exclude this, since the Container's
+    # scope_key is "bc:2014" while an external-client project in that same
+    # bc is "project:Acme:2014". Mirrors compare_cross_segment.py's
+    # discover_governance_chain() bc_standards loop, which matches Project
+    # rows by _bc_of() alone, ignoring client_label entirely.
+    rows = [
+        _row("bc1", "Container", "Stantec", "2014"),
+        _row("proj_ext", "Project", "Acme", "2014"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    pairs = discover_directed_tc_to_project_pairs(manifest_rows)
+    types = {t for _a, _b, t in pairs}
+    assert "bc_to_project" in types
+    bc_pair = next((a, b, t) for a, b, t in pairs if t == "bc_to_project")
+    assert bc_pair[0]["scope_key"] == "bc:2014"
+    assert bc_pair[1]["scope_key"] == "project:Acme:2014"
+
+
+def test_directed_client_to_project_matches_by_client_label_alone():
+    # Symmetric case to the bc fix above: a client-scoped Container/Template
+    # (external client, no real bc — enterprise-bookkeeping tag) should pair
+    # with any Project sharing that client, regardless of the project's own
+    # business_center_label.
+    rows = [
+        _row("cl1", "Template", "Acme", "0000"),
+        _row("proj_bc", "Project", "Acme", "2270"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    pairs = discover_directed_tc_to_project_pairs(manifest_rows)
+    assert len(pairs) == 1
+    a, b, t = pairs[0]
+    assert t == "client_to_project"
+    assert a["scope_key"] == "client:Acme"
+    assert b["scope_key"] == "project:Acme:2270"
 
 
 def test_comparison_type_never_mixes_symmetric_and_directed_metric_shape():

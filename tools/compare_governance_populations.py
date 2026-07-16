@@ -165,9 +165,21 @@ def discover_directed_tc_to_project_pairs(
     manifest_rows: List[Dict[str, str]],
 ) -> List[Tuple[Dict[str, str], Dict[str, str], str]]:
     """Template/Container populations vs. Project populations sharing the
-    same scope_key (client/bc identity) — or an Enterprise-scoped Template/
-    Container population against every Project population, unconditionally,
-    mirroring enterprise_to_project/bc_to_project's existing intent."""
+    same client/bc identity, matched by the identity value that scope level
+    actually carries — an Enterprise-scoped Template/Container population
+    against every Project population, unconditionally; a bc-scoped one
+    against any Project whose own business_center_label normalizes to the
+    same value, regardless of that project's client (a Project can carry a
+    real external client_label AND a real business_center_label together,
+    landing it at scope_level "project" rather than "bc" — an exact
+    scope_key match would incorrectly exclude it); a client-scoped one
+    against any Project sharing that client_label, regardless of bc; and a
+    project-scoped one (the narrow case of a Template/Container itself
+    tagged with both a real client and a real bc) against an exact scope_key
+    match, its most specific available identity. This mirrors compare_cross_
+    segment.py's discover_governance_chain()'s bc_standards loop, which
+    matches Project rows by _bc_of() alone rather than segment_id/scope
+    equality."""
     tc_pops = [r for r in manifest_rows if r["governance_role"] in ("Template", "Container")]
     project_pops = [r for r in manifest_rows if r["governance_role"] == "Project"]
 
@@ -178,9 +190,18 @@ def discover_directed_tc_to_project_pairs(
                 continue
             if not _disc_match(tc["discipline_label"], proj["discipline_label"]):
                 continue
-            if tc["scope_level"] != "enterprise" and tc["scope_key"] != proj["scope_key"]:
+            level = tc["scope_level"]
+            if level == "enterprise":
+                matches = True
+            elif level == "bc":
+                matches = bool(tc["business_center_label"]) and tc["business_center_label"] == proj["business_center_label"]
+            elif level == "client":
+                matches = bool(tc["client_label"]) and tc["client_label"] == proj["client_label"]
+            else:  # "project" — most specific identity available; require exact scope match
+                matches = tc["scope_key"] == proj["scope_key"]
+            if not matches:
                 continue
-            pairs.append((tc, proj, f"{tc['scope_level']}_to_project"))
+            pairs.append((tc, proj, f"{level}_to_project"))
     return pairs
 
 

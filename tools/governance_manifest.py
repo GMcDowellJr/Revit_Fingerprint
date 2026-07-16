@@ -50,6 +50,23 @@ from bundle_analysis.common import atomic_write_csv, read_csv_rows
 KNOWN_TCP_ROLES = {"template", "container", "project"}
 GENERIC_ROLE_KEYS = {"generic", "generic-host", "generic_host"}
 
+# Canonical casing for recognized roles, mirroring build_segment_manifest.py's
+# _GOVERNANCE_ROLE_CANONICAL fold (a manual-edit case variant like "container"
+# must not silently fragment into a population separate from "Container").
+# Generic-Host variants fold all the way to "Generic" — this module already
+# treats every generic-role spelling identically everywhere downstream (no
+# scope_key, scope_level == "generic", unconditional pairing against every
+# Template/Container/Project population), so there is no behavior a distinct
+# "Generic-Host" label would preserve.
+_GOVERNANCE_ROLE_CANONICAL = {
+    "template": "Template",
+    "container": "Container",
+    "project": "Project",
+    "generic": "Generic",
+    "generic-host": "Generic",
+    "generic_host": "Generic",
+}
+
 MANIFEST_FIELDNAMES = [
     "governance_id", "unit_system", "governance_role", "discipline_label",
     "scope_key", "scope_level", "client_label", "business_center_label",
@@ -192,7 +209,13 @@ def build_governance_populations(
             })
             continue
 
-        dim_key = (unit_system, role, discipline_label, scope_key)
+        # Canonicalize casing (e.g. "container" -> "Container") before it enters
+        # the population key or the manifest output — otherwise a manual-edit
+        # case variant fragments into a separate governance_id, and downstream
+        # pair discovery's exact-string role checks ("Template"/"Container"/
+        # "Project") silently drop the lower-case population entirely.
+        canonical_role = _GOVERNANCE_ROLE_CANONICAL[role_key]
+        dim_key = (unit_system, canonical_role, discipline_label, scope_key)
         bucket = groups.setdefault(dim_key, {
             "export_run_ids": [],
             "client_label": norm_client,
