@@ -337,6 +337,22 @@ def test_evidence_map_sibling_artifacts_present_flag_reflects_filesystem(tmp_pat
     assert by_id["comparison_registry"]["required"] is False
 
 
+def test_evidence_map_uses_overridden_package_schema_version_for_manifest_and_health_entries():
+    em = _evidence_map(package_schema_version="2.0")
+    by_id = {a["artifact_id"]: a for a in em["artifacts"]}
+    assert by_id["governance_package_manifest"]["schema_version"] == "2.0"
+    assert by_id["governance_package_health"]["schema_version"] == "2.0"
+    # The evidence map's own schema (a separate versioning axis) is unaffected.
+    assert by_id["governance_evidence_map"]["schema_version"] == EVIDENCE_MAP_SCHEMA_VERSION
+
+
+def test_evidence_map_defaults_manifest_and_health_schema_version_to_package_default():
+    em = _evidence_map()
+    by_id = {a["artifact_id"]: a for a in em["artifacts"]}
+    assert by_id["governance_package_manifest"]["schema_version"] == PACKAGE_SCHEMA_VERSION
+    assert by_id["governance_package_health"]["schema_version"] == PACKAGE_SCHEMA_VERSION
+
+
 def test_evidence_map_known_limitations_text_has_no_severity_language():
     em = _evidence_map()
     denylist = ("may cause", "risk", "misleading", "could lead to", "concerning", "problematic")

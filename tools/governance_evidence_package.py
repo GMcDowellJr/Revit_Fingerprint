@@ -343,6 +343,13 @@ def build_evidence_map(
     output_paths: dict,         # artifact_id -> Path
     sibling_paths: dict,        # artifact_id -> Path (inferred, not CLI args)
     sibling_present: dict,      # artifact_id -> bool
+    package_schema_version: str = PACKAGE_SCHEMA_VERSION,
+    # The actual schema_version governance_package_manifest.json and
+    # governance_package_health.json were written with -- i.e. the runtime
+    # value (args.package_schema_version), not the module default. Those two
+    # files may be written with an overridden --package-schema-version; their
+    # evidence-map entries must declare the same value they actually contain,
+    # not PACKAGE_SCHEMA_VERSION unconditionally.
 ) -> dict:
     artifacts = []
 
@@ -635,7 +642,7 @@ def build_evidence_map(
         ["input CSV content correctness -- only presence/path/size is validated, "
          "never parsed content"],
         [], {}, ["governance_package_health.json", "governance_evidence_map.json"],
-        schema_version=PACKAGE_SCHEMA_VERSION,
+        schema_version=package_schema_version,
     ))
 
     artifacts.append(_artifact(
@@ -650,7 +657,7 @@ def build_evidence_map(
          "Analytical Notes and Limitations section -- this is a machine-readable "
          "companion, not a superseding source"],
         [], {}, ["governance_package_manifest.json", "governance_evidence_map.json"],
-        schema_version=PACKAGE_SCHEMA_VERSION,
+        schema_version=package_schema_version,
     ))
 
     artifacts.append(_artifact(

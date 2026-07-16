@@ -3442,6 +3442,7 @@ def main():
             output_paths=output_paths,
             sibling_paths=sibling_paths,
             sibling_present=sibling_present,
+            package_schema_version=args.package_schema_version,
         )
         write_json(out_dir / "governance_evidence_map.json", evidence_map)
 

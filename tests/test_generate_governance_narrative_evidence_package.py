@@ -334,3 +334,28 @@ def test_cli_accepts_policy_dir_and_package_schema_version_as_inert(tmp_path, mo
     assert manifest["package_schema_version"] == "2.0"
     # No crash, and the domain/client CSV outputs are still produced normally.
     assert (tmp_path / "governance_domain_summary.csv").exists()
+
+
+def test_package_schema_version_override_is_consistent_across_manifest_health_and_evidence_map(tmp_path, monkeypatch):
+    """Regression test for a PR review finding: --package-schema-version was
+    reflected in governance_package_manifest.json/_health.json's own top-level
+    schema fields, but governance_evidence_map.json's entries describing those
+    two files hard-coded the module default (PACKAGE_SCHEMA_VERSION) instead
+    of the actual runtime override -- so a consumer following the evidence
+    map to select a schema contract would pick the wrong one."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(tmp_path), "--package-schema-version", "2.0"])
+    manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
+    health = json.loads((tmp_path / "governance_package_health.json").read_text(encoding="utf-8"))
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    by_id = {a["artifact_id"]: a for a in evidence_map["artifacts"]}
+
+    assert manifest["package_schema_version"] == "2.0"
+    assert health["schema_version"] == "2.0"
+    assert by_id["governance_package_manifest"]["schema_version"] == "2.0"
+    assert by_id["governance_package_health"]["schema_version"] == "2.0"
+    # governance_evidence_map.json's own schema (EVIDENCE_MAP_SCHEMA_VERSION) is a
+    # separate versioning axis with no CLI override -- it must stay at its default.
+    assert evidence_map["schema_version"] == "1.0"
+    assert by_id["governance_evidence_map"]["schema_version"] == "1.0"
