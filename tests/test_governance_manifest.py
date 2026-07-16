@@ -152,6 +152,71 @@ def test_generic_host_case_variant_folds_to_generic_role_label():
     assert _members(manifest_rows[0]["governance_id"], membership_rows) == ["e1", "e2"]
 
 
+def test_unit_system_case_variants_merge_to_lowercase():
+    rows = [
+        _row("e1", "Container", "Stantec", "2014", unit="imperial"),
+        _row("e2", "Container", "Stantec", "2014", unit="Imperial"),
+        _row("e3", "Container", "Stantec", "2014", unit="IMPERIAL"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    assert len(manifest_rows) == 1
+    assert manifest_rows[0]["unit_system"] == "imperial"
+    assert _members(manifest_rows[0]["governance_id"], membership_rows) == ["e1", "e2", "e3"]
+
+
+def test_client_label_case_variants_merge_to_first_seen_casing():
+    rows = [
+        _row("e1", "Container", "Acme", "2014"),
+        _row("e2", "Container", "acme", "2014"),
+        _row("e3", "Container", "ACME", "2014"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    assert len(manifest_rows) == 1
+    assert manifest_rows[0]["client_label"] == "Acme"  # first occurrence wins
+    assert manifest_rows[0]["scope_key"] == "project:Acme:2014"
+    assert _members(manifest_rows[0]["governance_id"], membership_rows) == ["e1", "e2", "e3"]
+
+
+def test_discipline_label_case_variants_merge():
+    rows = [
+        _row("e1", "Container", "Stantec", "2014", discipline="architectural"),
+        _row("e2", "Container", "Stantec", "2014", discipline="Architectural"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    assert len(manifest_rows) == 1
+    assert manifest_rows[0]["discipline_label"] == "architectural"
+
+
+def test_business_center_label_case_variants_merge_after_prefix_strip():
+    # "Page" is a real, non-numeric legacy business_center_label in current
+    # data (no special-casing per the "no Page-specific branch" rule) -- its
+    # casing must fold the same way a numeric BC's would.
+    rows = [
+        _row("e1", "Container", "Stantec", "Page"),
+        _row("e2", "Container", "Stantec", "page"),
+        _row("e3", "Container", "Stantec", "PAGE"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    assert len(manifest_rows) == 1
+    assert manifest_rows[0]["business_center_label"] == "Page"  # first occurrence wins
+
+
+def test_enterprise_bookkeeping_casing_still_recognized_after_normalization():
+    rows = [
+        _row("e1", "Container", "Stantec", "0000"),
+        _row("e2", "Container", "Stantec", "BC_0000"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    assert len(manifest_rows) == 1
+    assert manifest_rows[0]["scope_level"] == "enterprise"
+    assert _members(manifest_rows[0]["governance_id"], membership_rows) == ["e1", "e2"]
+
+
 def test_unrecognized_role_excluded_with_loud_report(capsys):
     rows = [
         _row("e1", "Container", "Stantec", "0000"),

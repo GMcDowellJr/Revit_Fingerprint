@@ -161,6 +161,51 @@ def test_directed_client_to_project_matches_by_client_label_alone():
     assert b["scope_key"] == "project:Acme:2270"
 
 
+def test_files_with_no_inventory_for_domain_are_excluded_not_zero_padded():
+    # Regression: a file with zero records for a domain must not be counted
+    # in n_files/n_pairs or contribute a spurious zero-overlap pair that
+    # drags the Jaccard/containment mean toward 0.
+    rows = [
+        _row("a1", "Container", "Stantec", "2014"),
+        _row("a2", "Container", "Stantec", "2014"),
+        _row("b1", "Container", "Stantec", "2270"),
+        _row("b2", "Container", "Stantec", "2270"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+
+    records_rows = [
+        {"export_run_id": "a1", "domain": "domain_x", "join_hash": "h1"},
+        # a2 has no records for domain_x at all.
+        {"export_run_id": "b1", "domain": "domain_x", "join_hash": "h1"},
+        {"export_run_id": "b2", "domain": "domain_x", "join_hash": "h1"},
+    ]
+    out_rows = run_comparisons(manifest_rows, membership_rows, records_rows)
+    bc_bc_rows = [r for r in out_rows if r["comparison_type"] == "bc_to_bc"]
+    assert len(bc_bc_rows) == 1
+    row = bc_bc_rows[0]
+    assert row["n_files_a"] == "1"
+    assert float(row["all_jaccard_mean"]) == 1.0
+
+
+def test_zero_inventory_domain_produces_no_row():
+    # If neither population has any file with inventory for a domain, no row
+    # should be emitted for that (pair, domain) at all -- a row of blank/
+    # zero aggregates would just be noise.
+    rows = [
+        _row("a1", "Container", "Stantec", "2014"),
+        _row("b1", "Container", "Stantec", "2270"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    records_rows = [
+        {"export_run_id": "a1", "domain": "domain_y", "join_hash": "h1"},
+        # b1 has no records in any domain at all.
+    ]
+    out_rows = run_comparisons(manifest_rows, membership_rows, records_rows)
+    assert out_rows == []
+
+
 def test_comparison_type_never_mixes_symmetric_and_directed_metric_shape():
     manifest_rows, membership_rows = _synthetic_manifest()
     records_rows = _records_rows(_JH_MAP)

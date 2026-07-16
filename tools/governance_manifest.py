@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import sys
+from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -155,6 +156,54 @@ def _population_hash(export_run_ids: List[str]) -> str:
     return hashlib.sha1(token.encode("utf-8")).hexdigest()
 
 
+def _normalize_manual_metadata(meta_rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Case-fold manually-entered file_metadata.csv fields before they enter
+    scope_key/population-key construction, mirroring build_segment_manifest.
+    py's _normalize_rows(): the Run A -> B annotation pause is manual, so a
+    casing variant like "Imperial" vs "imperial" or "Acme" vs "acme" must not
+    silently fragment one population into two governance_ids, and later
+    exact-string unit/client/discipline matching in compare_governance_
+    populations.py's pair discovery must not miss a valid pair over a casing
+    difference alone.
+
+      - unit_system: folds to lowercase, the canonical form used throughout
+        the pipeline (same fixed rule build_segment_manifest.py applies).
+      - client_label / discipline_label: no fixed enum. Case-insensitive
+        fold to the casing of the first occurrence in row order — same rule,
+        same tie-break, as build_segment_manifest.py's _normalize_rows().
+      - business_center_label: the same first-seen-casing fold, applied
+        AFTER normalize_business_center_label()'s BC_-prefix strip (so
+        "BC_2014"/"bc_2014"/"2014" already collapse regardless of this fold)
+        and skipped entirely for enterprise-bookkeeping tokens (those are
+        already recognized case-insensitively by compute_scope_key() and
+        never appear in scope_key verbatim, so folding their casing here
+        would be a no-op at best).
+
+    governance_role is intentionally not handled here — it already folds to
+    a small fixed canonical set (_GOVERNANCE_ROLE_CANONICAL), not a first-
+    seen casing, since it is a closed enum, not free text.
+    """
+    first_seen: Dict[str, Dict[str, str]] = defaultdict(dict)
+    normalized_rows: List[Dict[str, str]] = []
+    for row in meta_rows:
+        new_row = dict(row)
+        new_row["unit_system"] = row.get("unit_system", "").strip().lower()
+
+        for field in ("client_label", "discipline_label"):
+            raw = row.get(field, "").strip()
+            if raw:
+                new_row[field] = first_seen[field].setdefault(raw.lower(), raw)
+
+        raw_bc = row.get("business_center_label", "").strip()
+        stripped_bc, is_enterprise_bc = normalize_business_center_label(raw_bc)
+        if stripped_bc and not is_enterprise_bc:
+            stripped_bc = first_seen["business_center_label"].setdefault(stripped_bc.lower(), stripped_bc)
+        new_row["business_center_label"] = raw_bc if is_enterprise_bc else stripped_bc
+
+        normalized_rows.append(new_row)
+    return normalized_rows
+
+
 # ---------------------------------------------------------------------------
 # Population builder (Changes A, B, D)
 # ---------------------------------------------------------------------------
@@ -180,6 +229,7 @@ def build_governance_populations(
         silently dropped or guessed into a bucket.
     """
     _check_governance_field_completeness(meta_rows)
+    meta_rows = _normalize_manual_metadata(meta_rows)
 
     groups: Dict[Tuple[str, str, str, str], Dict[str, object]] = {}
     excluded_rows: List[Dict[str, str]] = []

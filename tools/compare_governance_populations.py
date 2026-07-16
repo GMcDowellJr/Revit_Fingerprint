@@ -111,7 +111,14 @@ def load_join_hashes_by_domain(records_rows: List[Dict[str, str]]) -> Dict[str, 
 def _files_for_population(
     export_run_ids: List[str], jh_by_eid: Dict[str, Set[str]]
 ) -> Dict[str, Set[str]]:
-    return {eid: jh_by_eid.get(eid, set()) for eid in export_run_ids}
+    """Only files with at least one record for this domain, matching
+    compare_cross_segment.py's membership_matrix.csv-backed load_file_join_
+    hashes(): a file with zero rows for a domain never gets a dict entry
+    there either. Including zero-inventory files as empty sets would count
+    them in n_files/n_pairs and contribute spurious zero-overlap pairs to
+    the Jaccard/containment mean/min, understating scores for sparse
+    domains."""
+    return {eid: jh_by_eid[eid] for eid in export_run_ids if eid in jh_by_eid}
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +286,12 @@ def run_comparisons(
         for domain in domains:
             files_a = _files_for_population(eids_a, jh_by_domain[domain])
             files_b = _files_for_population(eids_b, jh_by_domain[domain])
+            if not files_a or not files_b:
+                # Neither side has any file with inventory for this domain —
+                # nothing to measure, and compare_symmetric_file would just
+                # emit a row of blank/zero aggregates that adds noise rather
+                # than information.
+                continue
             metrics, _pair_rows = compare_symmetric_file(files_a, files_b)
             row = _base_row(pop_a, pop_b, comparison_type, domain)
             row.update(metrics)
@@ -290,6 +303,8 @@ def run_comparisons(
         for domain in domains:
             files_a = _files_for_population(eids_a, jh_by_domain[domain])
             files_b = _files_for_population(eids_b, jh_by_domain[domain])
+            if not files_a or not files_b:
+                continue
             metrics = compare_directed_file(files_a, files_b)
             row = _base_row(pop_a, pop_b, comparison_type, domain)
             row.update(metrics)
