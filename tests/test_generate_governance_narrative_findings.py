@@ -99,13 +99,27 @@ def test_high_fragmentation_finding():
 
 def test_missing_or_degraded_evidence_when_primary_metric_absent():
     """DoD requirement: no baseline finding is emitted when required
-    supporting metrics are unavailable."""
-    cascade = {"line_styles": _min_domain_dict(tc=None, cp=None, tp=None)}
+    supporting metrics are unavailable. wp_all is set (a plausible real case:
+    within-project data exists but no upstream template/container/enterprise
+    comparison is available) so the domain still has a renderable signal and
+    a real governance_domain_summary.csv row for this finding to reference."""
+    cascade = {"line_styles": _min_domain_dict(tc=None, cp=None, tp=None, wp_all=0.30)}
     findings = build_structured_findings(cascade, [], None)
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert ("line_styles", "missing_or_degraded_evidence") in types
     assert ("line_styles", "baseline_candidate") not in types
     assert ("line_styles", "strong_baseline_candidate") not in types
+
+
+def test_missing_or_degraded_evidence_not_emitted_for_non_renderable_domain():
+    """Regression test for a PR review finding: a domain whose only signal is
+    Group-3 scope-level data is retained in `cascade` but never gets a
+    governance_domain_summary.csv row (_has_renderable_cascade_signal() is
+    False). No finding should reference that nonexistent row."""
+    cascade = {"line_styles": _min_domain_dict()}  # every key None/empty -- zero signal
+    findings = build_structured_findings(cascade, [], None)
+    assert findings == build_structured_findings({}, [], None)  # only leadership questions
+    assert not any(f["subject"].get("id") == "line_styles" for f in findings)
 
 
 def test_cross_client_convergence_finding_independent_of_tier():
@@ -119,24 +133,27 @@ def test_cross_client_convergence_finding_independent_of_tier():
 
 
 def test_passive_inheritance_risk_finding_for_risk_domain_dual_schema():
-    cascade = {_RISK_DOMAIN: _min_domain_dict(bundle_schema="dual", passive_indicator=0.25)}
+    cascade = {_RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="dual", passive_indicator=0.25)}
     findings = build_structured_findings(cascade, [], None)
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert (_RISK_DOMAIN, "passive_inheritance_risk") in types
 
 
 def test_passive_inheritance_risk_not_flagged_for_non_risk_domain():
-    cascade = {_NON_RISK_DOMAIN: _min_domain_dict(bundle_schema="dual", passive_indicator=0.25)}
+    cascade = {_NON_RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="dual", passive_indicator=0.25)}
     findings = build_structured_findings(cascade, [], None)
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert (_NON_RISK_DOMAIN, "passive_inheritance_risk") not in types
+    # Confirm the domain was actually classified (renderable), not just absent.
+    assert any(f["subject"].get("id") == _NON_RISK_DOMAIN for f in findings)
 
 
 def test_passive_inheritance_risk_not_flagged_below_threshold():
-    cascade = {_RISK_DOMAIN: _min_domain_dict(bundle_schema="dual", passive_indicator=0.05)}
+    cascade = {_RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="dual", passive_indicator=0.05)}
     findings = build_structured_findings(cascade, [], None)
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert (_RISK_DOMAIN, "passive_inheritance_risk") not in types
+    assert any(f["subject"].get("id") == _RISK_DOMAIN for f in findings)
 
 
 def test_low_client_coherence_finding():
@@ -165,7 +182,7 @@ def test_leadership_questions_are_questions_not_claims():
 def test_every_finding_has_provenance_and_limits():
     cascade = {
         "line_styles": _min_domain_dict(tc=0.90, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95, xc=0.80),
-        _RISK_DOMAIN: _min_domain_dict(bundle_schema="dual", passive_indicator=0.25),
+        _RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="dual", passive_indicator=0.25),
     }
     client_rows = [_client_row(client="acme", wp_mean=0.30)]
     findings = build_structured_findings(cascade, client_rows, None)
@@ -196,7 +213,7 @@ def test_findings_do_not_reference_nonexistent_artifact_ids():
 def test_finding_ids_are_unique_and_stable_order():
     cascade = {
         "line_styles": _min_domain_dict(tc=0.90, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95),
-        _RISK_DOMAIN: _min_domain_dict(bundle_schema="dual", passive_indicator=0.25),
+        _RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="dual", passive_indicator=0.25),
     }
     findings_a = build_structured_findings(cascade, [], None)
     findings_b = build_structured_findings(cascade, [], None)

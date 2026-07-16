@@ -2924,9 +2924,18 @@ def _classify_domains_for_findings(cascade: dict, state_summary: Optional[dict] 
     build_structured_findings() and render_findings_and_recommendations() so
     the two never drift into independent implementations of the same rule --
     see docs/governance_evidence_package.md.
+
+    Restricted to domains passing _has_renderable_cascade_signal() -- the
+    same gate main() applies before writing a governance_domain_summary.csv
+    row. A domain whose only signal is Group-3 scope-level data (
+    enterprise_to_project/bc_to_project/enterprise_to_bc/enterprise_to_client)
+    is captured in `cascade` but never gets a CSV row; a finding whose
+    support[].selector points at that (nonexistent) row would be unresolvable.
+    Findings and the CSV must agree on which domains exist.
     """
     state_summary = state_summary or {}
-    tiers = {dom: assign_tier(d, state_summary.get(dom)) for dom, d in cascade.items()}
+    renderable = {dom: d for dom, d in cascade.items() if _has_renderable_cascade_signal(d)}
+    tiers = {dom: assign_tier(d, state_summary.get(dom)) for dom, d in renderable.items()}
     return {
         "strong_baseline_candidate": sorted(
             dom for dom, t in tiers.items() if t == TIER_STRONG_BASELINE
@@ -2946,7 +2955,7 @@ def _classify_domains_for_findings(cascade: dict, state_summary: Optional[dict] 
             if t in (TIER_INSUFFICIENT, TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE, TIER_SPARSE_LIMITED)
         ),
         "cross_client_convergence": sorted(
-            dom for dom, d in cascade.items() if d["xc"] is not None and d["xc"] >= 0.70
+            dom for dom, d in renderable.items() if d["xc"] is not None and d["xc"] >= 0.70
         ),
     }
 
@@ -2957,10 +2966,13 @@ def _passive_inheritance_risk_domains(cascade: dict) -> list:
     detect_anomalies()'s bundle/passive-inheritance fallback block (lines
     ~1311-1343) -- mirrored rather than shared because detect_anomalies()
     returns rendered prose strings, not a reusable boolean/value pair.
+
+    Restricted to domains passing _has_renderable_cascade_signal(), matching
+    _classify_domains_for_findings() -- see that function's docstring.
     """
     flagged = []
     for dom, d in cascade.items():
-        if dom not in PASSIVE_INHERITANCE_RISK_DOMAINS:
+        if dom not in PASSIVE_INHERITANCE_RISK_DOMAINS or not _has_renderable_cascade_signal(d):
             continue
         bundle_schema = d.get("bundle_schema", "none")
         if bundle_schema == "dual":
