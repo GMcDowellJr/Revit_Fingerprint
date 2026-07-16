@@ -19,6 +19,15 @@ Optional inputs (enrich state, delta, and pattern sections when available):
                                                           cross-client convergence and
                                                           non-comparable-sector tiering;
                                                           absent = every client unclassified)
+  --union-inventory         cross_segment_union_inventory.csv
+  --reuse-distribution      pattern_reuse_distribution.csv
+  --matrix-manifest         matrix_output_manifest.csv
+
+Not yet consumed directly; see docs/governance_generator_cross_compare_coverage.md
+for recommended integration points:
+  comparison_registry.csv, cross_segment_file_pairs.csv,
+  pattern_reuse_summary_by_domain.csv, pattern_reuse_summary_by_client.csv,
+  project_*_matrix.csv, and project_fragmentation_diagnostic.csv
 
 Output:
   --out          governance_narrative_context.md  (default)
@@ -2979,7 +2988,10 @@ def main():
     parser.add_argument("--reuse-distribution",
                         help="pattern_reuse_distribution.csv (optional)")
     parser.add_argument("--matrix-manifest",
-                        help="matrix_output_manifest.csv (optional)")
+                        help="matrix_output_manifest.csv (optional). This is currently metadata-only; "
+                             "see docs/governance_generator_cross_compare_coverage.md for where "
+                             "the project_* matrices and fragmentation diagnostic should enter "
+                             "the narrative.")
     parser.add_argument("--out", default="governance_narrative_context.md")
     parser.add_argument("--date", default=str(date.today()),
                         help="Analysis date string (default: today)")
