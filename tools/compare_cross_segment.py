@@ -545,7 +545,18 @@ def load_manifest(records_dir: Path) -> Dict[str, Dict[str, str]]:
     path = records_dir / "segment_manifest.csv"
     if not path.exists():
         sys.exit(f"[error] segment_manifest.csv not found at {path}")
-    return {row["segment_id"]: row for row in read_csv_rows(path)}
+    manifest: Dict[str, Dict[str, str]] = {}
+    for row in read_csv_rows(path):
+        sid = row["segment_id"]
+        prior = manifest.get(sid)
+        if prior is not None and prior != row:
+            sys.exit(
+                f"[error] Blocked: segment_manifest.csv has conflicting rows for "
+                f"segment_id={sid!r} — this file must not be trusted as an "
+                "authoritative hierarchy until the duplicate is resolved"
+            )
+        manifest[sid] = row
+    return manifest
 
 
 def load_registry(records_dir: Path) -> Dict[str, Dict[str, str]]:
@@ -1741,7 +1752,14 @@ def _build_ancestor_map(manifest: Dict[str, Dict[str, str]]) -> Dict[str, Set[st
             return ancestors[sid]
         parent = manifest.get(sid, {}).get("parent_segment_id", "").strip()
         result: Set[str] = set()
-        if parent and parent != sid and parent not in seen:
+        if parent:
+            if parent == sid or parent in seen:
+                sys.exit(
+                    "[error] Blocked: cyclic segment ancestry detected — "
+                    f"{sid!r} revisits already-seen segment {parent!r} while "
+                    "walking parent_segment_id; segment_manifest.csv cannot be "
+                    "trusted for lineage exclusion until this is fixed"
+                )
             result.add(parent)
             result |= _walk(parent, seen | {sid})
         ancestors[sid] = result
