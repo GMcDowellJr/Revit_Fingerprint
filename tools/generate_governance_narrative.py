@@ -3349,29 +3349,29 @@ def main():
         print("Writing evidence package (manifest/health/evidence_map)...")
 
         input_paths = {
-            "summary": Path(args.summary),
-            "pooled": Path(args.pooled),
-            "governance_states": Path(args.governance_states) if args.governance_states else None,
-            "governance_state_summary": Path(args.governance_state_summary) if args.governance_state_summary else None,
-            "delta": Path(args.delta) if args.delta else None,
-            "file_meta": Path(args.file_meta) if args.file_meta else None,
+            "cross_segment_summary": Path(args.summary),
+            "cross_segment_pooled": Path(args.pooled),
+            "cross_segment_governance_states": Path(args.governance_states) if args.governance_states else None,
+            "cross_segment_governance_state_summary": Path(args.governance_state_summary) if args.governance_state_summary else None,
+            "cross_segment_delta": Path(args.delta) if args.delta else None,
+            "file_metadata": Path(args.file_meta) if args.file_meta else None,
             "client_sector": Path(_client_sector_path_str) if _client_sector_path_str else None,
-            "union_inventory": Path(args.union_inventory) if args.union_inventory else None,
-            "reuse_distribution": Path(args.reuse_distribution) if args.reuse_distribution else None,
-            "matrix_manifest": Path(args.matrix_manifest) if args.matrix_manifest else None,
+            "cross_segment_union_inventory": Path(args.union_inventory) if args.union_inventory else None,
+            "pattern_reuse_distribution": Path(args.reuse_distribution) if args.reuse_distribution else None,
+            "matrix_output_manifest": Path(args.matrix_manifest) if args.matrix_manifest else None,
         }
-        input_required = {"summary": True, "pooled": True}
+        input_required = {"cross_segment_summary": True, "cross_segment_pooled": True}
         input_roles = {
-            "summary": "authoritative_deterministic_evidence",
-            "pooled": "authoritative_deterministic_evidence",
-            "governance_states": "authoritative_deterministic_evidence",
-            "governance_state_summary": "authoritative_deterministic_evidence",
-            "delta": "authoritative_deterministic_evidence",
-            "file_meta": "authoritative_deterministic_evidence",
+            "cross_segment_summary": "authoritative_deterministic_evidence",
+            "cross_segment_pooled": "authoritative_deterministic_evidence",
+            "cross_segment_governance_states": "authoritative_deterministic_evidence",
+            "cross_segment_governance_state_summary": "authoritative_deterministic_evidence",
+            "cross_segment_delta": "authoritative_deterministic_evidence",
+            "file_metadata": "authoritative_deterministic_evidence",
             "client_sector": "user_provided_note",
-            "union_inventory": "authoritative_deterministic_evidence",
-            "reuse_distribution": "authoritative_deterministic_evidence",
-            "matrix_manifest": "convenience_summary",
+            "cross_segment_union_inventory": "authoritative_deterministic_evidence",
+            "pattern_reuse_distribution": "authoritative_deterministic_evidence",
+            "matrix_output_manifest": "convenience_summary",
         }
         input_present = {k: bool(v) and v.exists() for k, v in input_paths.items()}
 

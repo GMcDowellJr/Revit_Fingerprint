@@ -301,8 +301,8 @@ def test_package_manifest_records_inputs_and_outputs(tmp_path, monkeypatch):
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
     by_id = {i["artifact_id"]: i for i in manifest["inputs"]}
-    assert by_id["summary"]["present"] is True
-    assert by_id["union_inventory"]["present"] is False
+    assert by_id["cross_segment_summary"]["present"] is True
+    assert by_id["cross_segment_union_inventory"]["present"] is False
     out_by_id = {o["artifact_id"]: o for o in manifest["outputs"]}
     assert out_by_id["governance_domain_summary"]["size_bytes"] > 0
     assert manifest["generator"]["name"] == GENERATOR_IDENTITY
@@ -356,8 +356,8 @@ def test_package_health_optional_inputs_present_reflects_cli_flags(tmp_path, mon
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
                             "--out", str(tmp_path), "--file-meta", str(file_meta_path)])
     health = json.loads((tmp_path / "governance_package_health.json").read_text(encoding="utf-8"))
-    assert health["optional_inputs"]["file_meta"] is True
-    assert health["optional_inputs"]["union_inventory"] is False
+    assert health["optional_inputs"]["file_metadata"] is True
+    assert health["optional_inputs"]["cross_segment_union_inventory"] is False
 
 
 def test_evidence_map_lists_eighteen_artifacts_with_required_fields(tmp_path, monkeypatch):
@@ -385,6 +385,24 @@ def test_manifest_output_artifact_ids_match_evidence_map_artifact_ids(tmp_path, 
     manifest_output_ids = {o["artifact_id"] for o in manifest["outputs"]}
     evidence_map_ids = {a["artifact_id"] for a in evidence_map["artifacts"]}
     assert manifest_output_ids <= evidence_map_ids, manifest_output_ids - evidence_map_ids
+
+
+def test_manifest_input_artifact_ids_match_evidence_map_artifact_ids(tmp_path, monkeypatch):
+    """Regression test for a PR review finding: governance_package_manifest.json's
+    inputs[].artifact_id values used short CLI-flag-derived names ("summary",
+    "pooled", "union_inventory", etc.) while governance_evidence_map.json uses
+    the canonical artifact_id for the same source CSVs ("cross_segment_summary",
+    "cross_segment_pooled", "cross_segment_union_inventory", etc.), so a
+    consumer joining manifest input provenance to evidence-map navigation
+    metadata by artifact_id could not resolve them, even though the output
+    side had already been made canonical."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    manifest_input_ids = {i["artifact_id"] for i in manifest["inputs"]}
+    evidence_map_ids = {a["artifact_id"] for a in evidence_map["artifacts"]}
+    assert manifest_input_ids <= evidence_map_ids, manifest_input_ids - evidence_map_ids
 
 
 def test_evidence_map_related_artifacts_use_artifact_ids_not_filenames(tmp_path, monkeypatch):

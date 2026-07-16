@@ -358,8 +358,8 @@ def build_evidence_map(
         return str(v) if v else None
 
     artifacts.append(_artifact(
-        "cross_segment_summary", p(input_paths, "summary"), "csv", True,
-        input_present.get("summary", False), "compare_cross_segment.py",
+        "cross_segment_summary", p(input_paths, "cross_segment_summary"), "csv", True,
+        input_present.get("cross_segment_summary", False), "compare_cross_segment.py",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "primary pairwise comparison evidence -- feeds build_cascade(), "
         "build_client_summary(), render_discipline_section()",
@@ -382,8 +382,8 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "cross_segment_pooled", p(input_paths, "pooled"), "csv", True,
-        input_present.get("pooled", False), "compare_cross_segment.py",
+        "cross_segment_pooled", p(input_paths, "cross_segment_pooled"), "csv", True,
+        input_present.get("cross_segment_pooled", False), "compare_cross_segment.py",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "focal-vs-pool containment evidence for client/business-center rollups "
         "-- feeds build_client_summary() and gt_by_scope/gc_by_scope/gp_by_scope",
@@ -403,8 +403,8 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "cross_segment_governance_states", p(input_paths, "governance_states"), "csv", False,
-        input_present.get("governance_states", False), "compare_cross_segment.py",
+        "cross_segment_governance_states", p(input_paths, "cross_segment_governance_states"), "csv", False,
+        input_present.get("cross_segment_governance_states", False), "compare_cross_segment.py",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "row-level provided/used/passive/missing/local-active classification, "
         "detail grain behind cross_segment_governance_state_summary.csv",
@@ -422,8 +422,8 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "cross_segment_governance_state_summary", p(input_paths, "governance_state_summary"), "csv", False,
-        input_present.get("governance_state_summary", False), "compare_cross_segment.py",
+        "cross_segment_governance_state_summary", p(input_paths, "cross_segment_governance_state_summary"), "csv", False,
+        input_present.get("cross_segment_governance_state_summary", False), "compare_cross_segment.py",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "compact per-domain governance-state aggregate consumed by build_governance_state_summary()",
         "one row per (domain, comparison_type) compact aggregate",
@@ -438,8 +438,8 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "cross_segment_delta", p(input_paths, "delta"), "csv", False,
-        input_present.get("delta", False), "compare_cross_segment.py",
+        "cross_segment_delta", p(input_paths, "cross_segment_delta"), "csv", False,
+        input_present.get("cross_segment_delta", False), "compare_cross_segment.py",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "legacy delta-pattern summary, only consulted when "
         "cross_segment_governance_state_summary.csv is absent (main()'s "
@@ -455,8 +455,8 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "file_metadata", p(input_paths, "file_meta"), "csv", False,
-        input_present.get("file_meta", False), "fingerprint pipeline (file_metadata.csv export)",
+        "file_metadata", p(input_paths, "file_metadata"), "csv", False,
+        input_present.get("file_metadata", False), "fingerprint pipeline (file_metadata.csv export)",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "corpus composition (file counts by role/discipline/client) via load_corpus_counts()",
         "one row per Revit file", ["governance_role", "discipline_label", "client_label"],
@@ -489,8 +489,8 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "cross_segment_union_inventory", p(input_paths, "union_inventory"), "csv", False,
-        input_present.get("union_inventory", False), "compare_cross_segment.py",
+        "cross_segment_union_inventory", p(input_paths, "cross_segment_union_inventory"), "csv", False,
+        input_present.get("cross_segment_union_inventory", False), "compare_cross_segment.py",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "feeds render_union_reuse_summary() alongside reuse-distribution/matrix-manifest",
         "one row per union-inventory grain (view_scope/unit_system/domain)",
@@ -505,8 +505,8 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "pattern_reuse_distribution", p(input_paths, "reuse_distribution"), "csv", False,
-        input_present.get("reuse_distribution", False), "compare_cross_segment.py",
+        "pattern_reuse_distribution", p(input_paths, "pattern_reuse_distribution"), "csv", False,
+        input_present.get("pattern_reuse_distribution", False), "compare_cross_segment.py",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         "feeds render_union_reuse_summary()'s top-20 reuse bucket table by domain",
         "one row per reuse bucket", ["domain", "reuse_bucket"], [], [],
@@ -518,8 +518,8 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "matrix_output_manifest", p(input_paths, "matrix_manifest"), "csv", False,
-        input_present.get("matrix_manifest", False), "compare_cross_segment.py",
+        "matrix_output_manifest", p(input_paths, "matrix_output_manifest"), "csv", False,
+        input_present.get("matrix_output_manifest", False), "compare_cross_segment.py",
         AUTHORITY_CONVENIENCE_SUMMARY,
         "metadata-only today -- not integrated into narrative content beyond "
         "descriptive bullets; see docs/governance_generator_cross_compare_coverage.md",
