@@ -68,8 +68,15 @@ from governance_evidence_package import (
     GENERATOR_ROLE,
     PACKAGE_SCHEMA_VERSION,
     EVIDENCE_MAP_SCHEMA_VERSION,
+    FINDINGS_SCHEMA_VERSION,
     AUTHORITY_CONTROLLED_INTERPRETATION,
+    AUTHORITY_CONVENIENCE_SUMMARY,
+    FINDING_ORIGIN_DETERMINISTIC_COMPUTATION,
+    FINDING_FIDELITY_EXACT,
+    FINDING_STATUS_SUPPORTED,
+    FINDING_STATUS_QUESTION_NOT_CLAIM,
     build_evidence_map,
+    build_findings_document,
     build_package_health,
     build_package_manifest,
     comparison_type_coverage as _comparison_type_coverage,
@@ -2074,22 +2081,24 @@ def render_evidence_authority_header(
 ) -> str:
     """States this document's own epistemic role and authority ordering within
     the governance evidence package. Added alongside governance_package_manifest.json/
-    _health.json/_evidence_map.json (see docs/governance_evidence_package.md) -- this
-    document remains a controlled_interpretation artifact, not authoritative evidence,
-    and no LLM is involved in producing it or any other artifact in this package.
+    _health.json/_evidence_map.json/_findings.json (see docs/governance_evidence_package.md)
+    -- this document remains a controlled_interpretation artifact, not authoritative
+    evidence, and no LLM is involved in producing it or any other artifact in this package.
 
-    The health/evidence-map pointer lines are gated on emit_evidence_package --
-    when a caller passes --no-emit-evidence-package, those files are never
+    The health/findings/evidence-map pointer lines are gated on emit_evidence_package --
+    when a caller passes --no-emit-evidence-package, those three files are never
     written, so this document must not point readers at files that don't exist.
     """
     package_pointers = (
         f"""
 > **Package health:** `governance_package_health.json` (schema {package_schema_version})
+> **Structured findings:** `governance_findings.json`
 > **Evidence navigation:** `governance_evidence_map.json`
 """
         if emit_evidence_package else
         "\n> This run was generated with `--no-emit-evidence-package`, so no "
-        "package health or evidence-map file exists alongside this document.\n"
+        "package health, structured findings, or evidence-map file exists "
+        "alongside this document.\n"
     )
     return f"""> **Artifact role:** Convenience summary and controlled interpretation
 > (`authority_level: {AUTHORITY_CONTROLLED_INTERPRETATION}`). This document is
@@ -2881,49 +2890,307 @@ def render_union_reuse_summary(
     return "\n".join(lines)
 
 
+# Cross-client-convergence "strong" and client-coherence "low" thresholds are
+# intentionally the same literal values (0.70 / 0.45) already used in
+# detect_anomalies() (lines ~1438-1442) and the client-tier assignment inside
+# build_client_summary() -- duplicated here as in those places rather than
+# centralized, matching this generator's current state (policy/threshold
+# externalization is deferred to a later PR; see docs/governance_evidence_package.md
+# and CLAUDE.md's Sig-Hash/Shape-Gating precedent for the externalization pattern
+# this will eventually follow).
 
-def render_findings_and_recommendations(cascade: dict, client_rows: list[dict], state_summary: Optional[dict] = None) -> str:
+_RULE_STRONG_BASELINE = "GOV-TIER-STRONG-BASELINE"
+_RULE_BASELINE_CANDIDATE = "GOV-TIER-BASELINE-CANDIDATE"
+_RULE_LOCAL_REVIEW_REQUIRED = "GOV-TIER-LOCAL-REVIEW-REQUIRED"
+_RULE_ACTIVE_LOCAL_PRACTICE = "GOV-TIER-ACTIVE-LOCAL-PRACTICE"
+_RULE_HIGH_FRAGMENTATION = "GOV-TIER-HIGH-FRAGMENTATION"
+_RULE_INSUFFICIENT_EVIDENCE = "GOV-TIER-INSUFFICIENT-EVIDENCE"
+_RULE_XC_STRONG_CONVERGENCE = "GOV-XC-STRONG-CONVERGENCE"
+_RULE_PASSIVE_INHERITANCE_RISK = "GOV-PASSIVE-INHERITANCE-RISK"
+_RULE_CLIENT_LOW_COHERENCE = "GOV-CLIENT-LOW-COHERENCE"
+_RULE_LEADERSHIP_QUESTION = "GOV-LEADERSHIP-QUESTION"
+
+_FINDING_LIMITS_STANDARD = [
+    "Evidence posture only -- does not approve standards, assign ownership, "
+    "measure compliance, or label teams as compliant/non-compliant "
+    "(governance_narrative_context.md's own stated scope boundary).",
+    "Does not establish organizational intent.",
+]
+
+
+def _classify_domains_for_findings(cascade: dict, state_summary: Optional[dict] = None) -> dict:
+    """Single source of truth for domain-tier-derived classification buckets,
+    keyed by raw domain id (not DOMAIN_LABELS display text). Shared by
+    build_structured_findings() and render_findings_and_recommendations() so
+    the two never drift into independent implementations of the same rule --
+    see docs/governance_evidence_package.md.
+    """
     state_summary = state_summary or {}
+    tiers = {dom: assign_tier(d, state_summary.get(dom)) for dom, d in cascade.items()}
+    return {
+        "strong_baseline_candidate": sorted(
+            dom for dom, t in tiers.items() if t == TIER_STRONG_BASELINE
+        ),
+        "baseline_candidate": sorted(
+            dom for dom, t in tiers.items()
+            if t in (TIER_STRONG_BASELINE, TIER_BASELINE_LOCAL_REVIEW, TIER_BASELINE_CONTAINER_GAP)
+        ),
+        "local_review_required": sorted(
+            dom for dom, t in tiers.items()
+            if t in (TIER_BASELINE_LOCAL_REVIEW, TIER_INVESTIGATE, TIER_ACTIVE_LOCAL)
+        ),
+        "active_local_practice": sorted(dom for dom, t in tiers.items() if t == TIER_ACTIVE_LOCAL),
+        "high_fragmentation": sorted(dom for dom, t in tiers.items() if t == TIER_HIGH_FRAGMENTATION),
+        "missing_or_degraded_evidence": sorted(
+            dom for dom, t in tiers.items()
+            if t in (TIER_INSUFFICIENT, TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE, TIER_SPARSE_LIMITED)
+        ),
+        "cross_client_convergence": sorted(
+            dom for dom, d in cascade.items() if d["xc"] is not None and d["xc"] >= 0.70
+        ),
+    }
 
-    baseline_candidates = [
-        DOMAIN_LABELS.get(dom, dom)
-        for dom, d in cascade.items()
-        if assign_tier(d, state_summary.get(dom)) in (
-            TIER_STRONG_BASELINE,
-            TIER_BASELINE_LOCAL_REVIEW,
-            TIER_BASELINE_CONTAINER_GAP,
-        )
-    ]
-    clean_baseline = [
-        DOMAIN_LABELS.get(dom, dom)
-        for dom, d in cascade.items()
-        if assign_tier(d, state_summary.get(dom)) == TIER_STRONG_BASELINE
-    ]
-    needs_review = [
-        DOMAIN_LABELS.get(dom, dom)
-        for dom, d in cascade.items()
-        if assign_tier(d, state_summary.get(dom)) in (
-            TIER_BASELINE_LOCAL_REVIEW,
-            TIER_INVESTIGATE,
-            TIER_ACTIVE_LOCAL,
-        )
-    ]
-    high_frag = [
-        DOMAIN_LABELS.get(dom, dom)
-        for dom, d in cascade.items()
-        if assign_tier(d, state_summary.get(dom)) == TIER_HIGH_FRAGMENTATION
-    ]
 
-    universal = [
-        DOMAIN_LABELS.get(dom, dom)
-        for dom, d in cascade.items()
-        if d["xc"] is not None and d["xc"] >= 0.70
-    ]
+def _passive_inheritance_risk_domains(cascade: dict) -> list:
+    """Domains in PASSIVE_INHERITANCE_RISK_DOMAINS showing a material passive
+    signal, using the same thresholds and dual/single-schema branching as
+    detect_anomalies()'s bundle/passive-inheritance fallback block (lines
+    ~1311-1343) -- mirrored rather than shared because detect_anomalies()
+    returns rendered prose strings, not a reusable boolean/value pair.
+    """
+    flagged = []
+    for dom, d in cascade.items():
+        if dom not in PASSIVE_INHERITANCE_RISK_DOMAINS:
+            continue
+        bundle_schema = d.get("bundle_schema", "none")
+        if bundle_schema == "dual":
+            passive_ind = d.get("passive_indicator")
+            if passive_ind is not None and passive_ind >= 0.20:
+                flagged.append(dom)
+        elif bundle_schema == "single":
+            bundle_share = d.get("bundle_share_all")
+            if bundle_share is not None and bundle_share < 0.25:
+                flagged.append(dom)
+    return sorted(flagged)
 
-    low_coherence = [
+
+def _low_coherence_clients(client_rows: list[dict]) -> list:
+    return sorted(
         r["client"] for r in client_rows
         if r["wp_mean"] is not None and r["wp_mean"] < 0.45
-    ]
+    )
+
+
+_LEADERSHIP_QUESTIONS = [
+    ("Which baseline candidates should enter ratification review?",
+     "Confirm intent, portability, active-use evidence, and whether local-active "
+     "variants need separate handling before approval."),
+    ("Where should governance use an approved-list or starter-content model "
+     "instead of full convergence?",
+     "This is especially relevant for families, materials, and domains with "
+     "project-specific vocabulary."),
+    ("Which active local practices deserve roll-up or documentation?",
+     "Decide whether they are firmwide candidates, client/discipline playbook "
+     "content, permitted variants, or project exceptions."),
+    ("Which missing or passive inherited content is intentional?",
+     "Distinguish deliberate pruning, unused starter stock, role-specific "
+     "specialization, and propagation failure."),
+    ("What additional segmentation is needed before stronger claims are made?",
+     "Project type, business center, region, and larger segment samples remain "
+     "future enhancements unless supplied upstream."),
+]
+
+
+def build_structured_findings(
+    cascade: dict,
+    client_rows: list[dict],
+    state_summary: Optional[dict] = None,
+) -> list[dict]:
+    """Build the structured findings list backing governance_findings.json,
+    reusing the exact same classification buckets render_findings_and_recommendations()
+    renders as prose (see _classify_domains_for_findings()) so the two never
+    diverge. finding_id assignment order is fixed (category, then sorted
+    domain/client id) for run-to-run determinism.
+
+    Only emits a finding when the underlying tier/metric already gates on
+    sufficient evidence -- e.g. baseline_candidate/strong_baseline_candidate
+    can never fire for a domain whose primary metric is None, because
+    assign_tier() itself routes that domain to TIER_INSUFFICIENT instead.
+    """
+    domain_buckets = _classify_domains_for_findings(cascade, state_summary)
+    passive_risk_domains = _passive_inheritance_risk_domains(cascade)
+    low_coherence_clients = _low_coherence_clients(client_rows)
+
+    findings: list[dict] = []
+    counter = [0]
+
+    def next_id() -> str:
+        counter[0] += 1
+        return f"GF-{counter[0]:03d}"
+
+    def domain_support(dom: str, fields: list) -> list:
+        return [{
+            "artifact_id": "governance_domain_summary",
+            "selector": {"domain": dom},
+            "fields": fields,
+        }]
+
+    def add_domain_finding(dom: str, finding_type: str, summary: str, rule_id: str, fields: list) -> None:
+        findings.append({
+            "finding_id": next_id(),
+            "subject": {"type": "domain", "id": dom},
+            "finding_type": finding_type,
+            "status": FINDING_STATUS_SUPPORTED,
+            "origin": FINDING_ORIGIN_DETERMINISTIC_COMPUTATION,
+            "fidelity": FINDING_FIDELITY_EXACT,
+            "authority_level": AUTHORITY_CONTROLLED_INTERPRETATION,
+            "summary": summary,
+            "support": domain_support(dom, fields),
+            "rule_ids": [rule_id],
+            "limits": list(_FINDING_LIMITS_STANDARD),
+        })
+
+    label = lambda dom: DOMAIN_LABELS.get(dom, dom)
+
+    for dom in domain_buckets["strong_baseline_candidate"]:
+        add_domain_finding(
+            dom, "strong_baseline_candidate",
+            f"{label(dom)} meets the strong-baseline-candidate rule (governance_tier: "
+            f"{TIER_STRONG_BASELINE}).",
+            _RULE_STRONG_BASELINE,
+            ["governance_tier", "template_to_project", "container_to_project"],
+        )
+    for dom in domain_buckets["baseline_candidate"]:
+        tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
+        add_domain_finding(
+            dom, "baseline_candidate",
+            f"{label(dom)} meets the baseline-candidate rule (governance_tier: {tier}).",
+            _RULE_BASELINE_CANDIDATE,
+            ["governance_tier", "template_to_project", "container_to_project"],
+        )
+    for dom in domain_buckets["local_review_required"]:
+        tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
+        add_domain_finding(
+            dom, "local_review_required",
+            f"{label(dom)} requires local/use review before baseline language is "
+            f"safe (governance_tier: {tier}).",
+            _RULE_LOCAL_REVIEW_REQUIRED,
+            ["governance_tier", "local_active_share", "provided_to_used_containment"],
+        )
+    for dom in domain_buckets["active_local_practice"]:
+        add_domain_finding(
+            dom, "active_local_practice",
+            f"{label(dom)} shows material active local practice (governance_tier: "
+            f"{TIER_ACTIVE_LOCAL}).",
+            _RULE_ACTIVE_LOCAL_PRACTICE,
+            ["governance_tier", "local_active_share"],
+        )
+    for dom in domain_buckets["high_fragmentation"]:
+        add_domain_finding(
+            dom, "high_fragmentation",
+            f"{label(dom)} is classified {TIER_HIGH_FRAGMENTATION} and is not a "
+            "single-standard candidate in this run.",
+            _RULE_HIGH_FRAGMENTATION,
+            ["governance_tier", "template_to_project", "container_to_project"],
+        )
+    for dom in domain_buckets["missing_or_degraded_evidence"]:
+        tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
+        add_domain_finding(
+            dom, "missing_or_degraded_evidence",
+            f"{label(dom)} has insufficient or degraded evidence for governance "
+            f"classification (governance_tier: {tier}).",
+            _RULE_INSUFFICIENT_EVIDENCE,
+            ["governance_tier", "score_reliability"],
+        )
+    for dom in domain_buckets["cross_client_convergence"]:
+        add_domain_finding(
+            dom, "cross_client_convergence",
+            f"{label(dom)} shows strong cross-client convergence "
+            f"({pct(cascade[dom]['xc'])}) -- a natural common-base candidate.",
+            _RULE_XC_STRONG_CONVERGENCE,
+            ["cross_client_convergence"],
+        )
+    for dom in passive_risk_domains:
+        d = cascade[dom]
+        detail = (
+            f"passive_inheritance_indicator={fmt(d.get('passive_indicator'))}"
+            if d.get("bundle_schema") == "dual"
+            else f"bundle_share_all={fmt(d.get('bundle_share_all'))}"
+        )
+        add_domain_finding(
+            dom, "passive_inheritance_risk",
+            f"{label(dom)} is in the passive-inheritance risk group and shows a "
+            f"material passive signal ({detail}).",
+            _RULE_PASSIVE_INHERITANCE_RISK,
+            ["passive_inheritance_indicator", "bundle_share_all", "passive_inheritance_risk"],
+        )
+
+    for client in low_coherence_clients:
+        row = next(r for r in client_rows if r["client"] == client)
+        findings.append({
+            "finding_id": next_id(),
+            "subject": {"type": "client", "id": client},
+            "finding_type": "low_client_coherence",
+            "status": FINDING_STATUS_SUPPORTED,
+            "origin": FINDING_ORIGIN_DETERMINISTIC_COMPUTATION,
+            "fidelity": FINDING_FIDELITY_EXACT,
+            "authority_level": AUTHORITY_CONTROLLED_INTERPRETATION,
+            "summary": (
+                f"{client} shows high within-client variation "
+                f"(within_project_coherence: {fmt(row['wp_mean'])})."
+            ),
+            "support": [{
+                "artifact_id": "governance_client_summary",
+                "selector": {"client": client},
+                "fields": ["within_project_coherence", "n_project_files"],
+            }],
+            "rule_ids": [_RULE_CLIENT_LOW_COHERENCE],
+            "limits": list(_FINDING_LIMITS_STANDARD) + [
+                "Where file counts are small, treat as a signal for further "
+                "sampling rather than a definitive client judgement.",
+            ],
+        })
+
+    for question, framing in _LEADERSHIP_QUESTIONS:
+        findings.append({
+            "finding_id": next_id(),
+            "subject": {"type": "package", "id": "governance_evidence_package"},
+            "finding_type": "leadership_question",
+            "status": FINDING_STATUS_QUESTION_NOT_CLAIM,
+            "origin": FINDING_ORIGIN_DETERMINISTIC_COMPUTATION,
+            "fidelity": FINDING_FIDELITY_EXACT,
+            "authority_level": AUTHORITY_CONVENIENCE_SUMMARY,
+            "summary": question,
+            "support": [],
+            "rule_ids": [_RULE_LEADERSHIP_QUESTION],
+            "limits": [
+                "This is a suggested question for human leadership review, not "
+                "an observed result or a claim.",
+                framing,
+            ],
+        })
+
+    return findings
+
+
+def render_findings_and_recommendations(
+    cascade: dict,
+    client_rows: list[dict],
+    state_summary: Optional[dict] = None,
+    findings: Optional[list] = None,
+) -> str:
+    state_summary = state_summary or {}
+    findings = findings if findings is not None else build_structured_findings(cascade, client_rows, state_summary)
+
+    def _domain_ids(finding_type: str) -> list:
+        return [f["subject"]["id"] for f in findings if f["finding_type"] == finding_type]
+
+    baseline_candidates = [DOMAIN_LABELS.get(dom, dom) for dom in _domain_ids("baseline_candidate")]
+    clean_baseline = [DOMAIN_LABELS.get(dom, dom) for dom in _domain_ids("strong_baseline_candidate")]
+    needs_review = [DOMAIN_LABELS.get(dom, dom) for dom in _domain_ids("local_review_required")]
+    high_frag = [DOMAIN_LABELS.get(dom, dom) for dom in _domain_ids("high_fragmentation")]
+    universal = [DOMAIN_LABELS.get(dom, dom) for dom in _domain_ids("cross_client_convergence")]
+    low_coherence = [f["subject"]["id"] for f in findings if f["finding_type"] == "low_client_coherence"]
 
     lines = [
         "## Key Findings and Governance Questions\n",
@@ -3180,6 +3447,9 @@ def main():
         r.get("matrix_name", "") for r in matrix_manifest_rows if r.get("matrix_name")
     })
 
+    print("Building structured findings...")
+    findings = build_structured_findings(cascade, client_rows, governance_state_summary)
+
     # ── Resolve output paths ───────────────────────────────────────────────────
     # If --out is a directory (or has no .md suffix), treat it as the output
     # directory and write governance_narrative_context.md inside it.
@@ -3333,7 +3603,7 @@ def main():
     if union_reuse_section:
         sections.append(union_reuse_section)
     sections += [
-        render_findings_and_recommendations(cascade, client_rows, governance_state_summary),
+        render_findings_and_recommendations(cascade, client_rows, governance_state_summary, findings),
         render_limitations(corpus, legacy_fallback, bool(governance_state_summary)),
     ]
 
@@ -3382,10 +3652,12 @@ def main():
             "governance_package_manifest": out_dir / "governance_package_manifest.json",
             "governance_package_health": out_dir / "governance_package_health.json",
             "governance_evidence_map": out_dir / "governance_evidence_map.json",
+            "governance_findings": out_dir / "governance_findings.json",
         }
         output_types = {
             "governance_domain_summary": "csv", "governance_client_summary": "csv", "governance_narrative_context": "markdown",
             "governance_package_manifest": "json", "governance_package_health": "json", "governance_evidence_map": "json",
+            "governance_findings": "json",
         }
         output_authority = {
             "governance_domain_summary": "authoritative_deterministic_evidence",
@@ -3394,6 +3666,7 @@ def main():
             "governance_package_manifest": "authoritative_deterministic_evidence",
             "governance_package_health": "controlled_interpretation",
             "governance_evidence_map": "authoritative_deterministic_evidence",
+            "governance_findings": "controlled_interpretation",
         }
         output_context_role = {
             "governance_domain_summary": "primary tier/score rollup",
@@ -3402,6 +3675,7 @@ def main():
             "governance_package_manifest": "provenance record",
             "governance_package_health": "coverage/health signal",
             "governance_evidence_map": "artifact navigation index",
+            "governance_findings": "structured, rule-derived findings",
         }
 
         comparison_run_ids = sorted(
@@ -3455,6 +3729,9 @@ def main():
         )
         write_json(out_dir / "governance_package_health.json", health)
 
+        findings_document = build_findings_document(findings, schema_version=FINDINGS_SCHEMA_VERSION)
+        write_json(out_dir / "governance_findings.json", findings_document)
+
         sibling_paths = {
             "file_pairs": Path(args.summary).parent / "cross_segment_file_pairs.csv",
             "comparison_registry": Path(args.summary).parent / "comparison_registry.csv",
@@ -3498,21 +3775,22 @@ def main():
         )
         write_json(out_dir / "governance_package_manifest.json", manifest)
 
-        print(f"  → wrote governance_package_health.json, governance_evidence_map.json, "
-              f"governance_package_manifest.json to {out_dir}")
+        print(f"  → wrote governance_package_health.json, governance_findings.json, "
+              f"governance_evidence_map.json, governance_package_manifest.json to {out_dir}")
     else:
         # A previous run over this same --out directory may have written
         # package JSONs with --emit-evidence-package (the default). The
         # narrative just rendered above states plainly that no package
-        # health/evidence-map file exists for this run (see
+        # health/findings/evidence-map file exists for this run (see
         # render_evidence_authority_header's emit_evidence_package gating) --
         # leaving stale files from an earlier run in place would contradict
         # that claim and let a downstream reader pick up out-of-date
-        # provenance/health data alongside the freshly-written CSV/MD.
+        # provenance/health/findings data alongside the freshly-written CSV/MD.
         stale_names = (
             "governance_package_manifest.json",
             "governance_package_health.json",
             "governance_evidence_map.json",
+            "governance_findings.json",
         )
         removed = [name for name in stale_names if (out_dir / name).exists()]
         for name in removed:
