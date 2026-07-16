@@ -314,6 +314,15 @@ def test_evidence_map_client_sector_is_user_provided_note():
     assert entry["authority_level"] == "user_provided_note"
 
 
+def test_evidence_map_related_artifacts_are_valid_artifact_ids():
+    em = _evidence_map()
+    ids = {a["artifact_id"] for a in em["artifacts"]}
+    for a in em["artifacts"]:
+        for related in a["related_artifacts"]:
+            assert related in ids, f"{a['artifact_id']} -> unknown related_artifacts entry {related!r}"
+            assert "." not in related, f"{a['artifact_id']} -> related_artifacts entry looks like a filename: {related!r}"
+
+
 def test_evidence_map_self_lists_all_other_artifacts():
     em = _evidence_map()
     self_entry = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_evidence_map")

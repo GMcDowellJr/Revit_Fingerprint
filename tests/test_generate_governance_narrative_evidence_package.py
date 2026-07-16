@@ -235,7 +235,10 @@ def test_no_emit_evidence_package_suppresses_json_but_not_existing_outputs(tmp_p
     assert (tmp_path / "governance_narrative_context.md").exists()
 
 
-def test_emit_and_no_emit_produce_identical_csv_and_md_content(tmp_path, monkeypatch):
+def test_emit_and_no_emit_produce_identical_csvs(tmp_path, monkeypatch):
+    """The two CSV outputs are unaffected by --emit-evidence-package -- only
+    the narrative's authority-header package-pointer section differs (see
+    test_no_emit_narrative_does_not_point_at_missing_package_files)."""
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     out_a = tmp_path / "a"
     out_b = tmp_path / "b"
@@ -244,8 +247,32 @@ def test_emit_and_no_emit_produce_identical_csv_and_md_content(tmp_path, monkeyp
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(out_a)])
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
                             "--out", str(out_b), "--no-emit-evidence-package"])
-    for name in ("governance_domain_summary.csv", "governance_client_summary.csv", "governance_narrative_context.md"):
+    for name in ("governance_domain_summary.csv", "governance_client_summary.csv"):
         assert (out_a / name).read_bytes() == (out_b / name).read_bytes(), name
+
+
+def test_no_emit_narrative_does_not_point_at_missing_package_files(tmp_path, monkeypatch):
+    """Regression test for a PR review finding: the narrative's authority
+    header unconditionally referenced governance_package_health.json/
+    governance_evidence_map.json even when --no-emit-evidence-package means
+    those files are never written."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(tmp_path), "--no-emit-evidence-package"])
+    md = (tmp_path / "governance_narrative_context.md").read_text(encoding="utf-8")
+    assert "governance_package_health.json" not in md
+    assert "governance_evidence_map.json" not in md
+    assert "--no-emit-evidence-package" in md
+    assert "## Key Findings and Governance Questions" in md
+    assert f"`{GENERATOR_IDENTITY}`" in md
+
+
+def test_emit_narrative_points_at_package_files(tmp_path, monkeypatch):
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    md = (tmp_path / "governance_narrative_context.md").read_text(encoding="utf-8")
+    assert "governance_package_health.json" in md
+    assert "governance_evidence_map.json" in md
 
 
 def test_package_manifest_records_inputs_and_outputs(tmp_path, monkeypatch):
@@ -321,6 +348,24 @@ def test_evidence_map_lists_eighteen_artifacts_with_required_fields(tmp_path, mo
     assert len(ids) == len(set(ids))
     narrative = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_narrative_context")
     assert narrative["authority_level"] != "authoritative_deterministic_evidence"
+
+
+def test_evidence_map_related_artifacts_use_artifact_ids_not_filenames(tmp_path, monkeypatch):
+    """Regression test for a PR review finding: related_artifacts entries
+    hard-coded filenames-with-extension (e.g. 'cross_segment_pooled.csv')
+    instead of the corresponding artifact_id ('cross_segment_pooled'), so a
+    consumer traversing the evidence map by artifact_id could not resolve
+    the links."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    ids = {a["artifact_id"] for a in evidence_map["artifacts"]}
+    for a in evidence_map["artifacts"]:
+        for related in a["related_artifacts"]:
+            assert related in ids, f"{a['artifact_id']}.related_artifacts references unknown id {related!r}"
+            assert not related.endswith((".csv", ".json", ".md")), (
+                f"{a['artifact_id']}.related_artifacts contains a filename, not an artifact_id: {related!r}"
+            )
 
 
 def test_cli_accepts_policy_dir_and_package_schema_version_as_inert(tmp_path, monkeypatch):

@@ -378,7 +378,7 @@ def build_evidence_map(
          "and only surfaces via governance_package_health.json's comparison_type_coverage, "
          "not via this CSV itself."],
         _BLANK_STRING_NULL_SEMANTICS,
-        ["cross_segment_pooled.csv", "governance_domain_summary.csv", "governance_client_summary.csv"],
+        ["cross_segment_pooled", "governance_domain_summary", "governance_client_summary"],
     ))
 
     artifacts.append(_artifact(
@@ -399,7 +399,7 @@ def build_evidence_map(
          "only because those two fields are pool-scope-invariant, not because "
          "pool_scope is checked at the read site."],
         _BLANK_STRING_NULL_SEMANTICS,
-        ["cross_segment_summary.csv", "governance_client_summary.csv"],
+        ["cross_segment_summary", "governance_client_summary"],
     ))
 
     artifacts.append(_artifact(
@@ -418,7 +418,7 @@ def build_evidence_map(
          "are absent, render_header()'s state_note says provided/used/passive/"
          "missing/local signals are inferred only indirectly."],
         _BLANK_STRING_NULL_SEMANTICS,
-        ["cross_segment_governance_state_summary.csv", "governance_domain_summary.csv"],
+        ["cross_segment_governance_state_summary", "governance_domain_summary"],
     ))
 
     artifacts.append(_artifact(
@@ -434,7 +434,7 @@ def build_evidence_map(
          "(provided_and_used_count etc.) should be read as comparison-state rows, "
          "not unique-pattern counts -- see render_limitations()'s state_note."],
         _BLANK_STRING_NULL_SEMANTICS,
-        ["cross_segment_governance_states.csv", "governance_domain_summary.csv"],
+        ["cross_segment_governance_states", "governance_domain_summary"],
     ))
 
     artifacts.append(_artifact(
@@ -451,7 +451,7 @@ def build_evidence_map(
          "delta_summary: ...` -- this file's section is never rendered when "
          "governance-state outputs are also supplied, even if both are passed on the CLI."],
         _BLANK_STRING_NULL_SEMANTICS,
-        ["cross_segment_governance_state_summary.csv"],
+        ["cross_segment_governance_state_summary"],
     ))
 
     artifacts.append(_artifact(
@@ -466,7 +466,7 @@ def build_evidence_map(
         ["if absent, corpus counts default to zero and disc/client lists render "
          "as 'Unknown' in render_header()."],
         _BLANK_STRING_NULL_SEMANTICS,
-        ["governance_narrative_context.md"],
+        ["governance_narrative_context"],
     ))
 
     artifacts.append(_artifact(
@@ -485,7 +485,7 @@ def build_evidence_map(
          "for the explicit/default/missing distinction. See "
          "docs/governance_narrative_scope_gap_audit.md finding C7."],
         {"*": "Missing client_label from this file simply means unclassified sector, not an error."},
-        ["governance_client_summary.csv"],
+        ["governance_client_summary"],
     ))
 
     artifacts.append(_artifact(
@@ -501,7 +501,7 @@ def build_evidence_map(
              "render_union_reuse_summary() returns None, not an empty string, "
              "in that case."],
         _BLANK_STRING_NULL_SEMANTICS,
-        ["pattern_reuse_distribution.csv", "matrix_output_manifest.csv"],
+        ["pattern_reuse_distribution", "matrix_output_manifest"],
     ))
 
     artifacts.append(_artifact(
@@ -514,7 +514,7 @@ def build_evidence_map(
         [], ["render_union_reuse_summary() consumes this via a top-20 bucket table "
              "only; full distribution detail beyond that is not summarized."],
         _BLANK_STRING_NULL_SEMANTICS,
-        ["cross_segment_union_inventory.csv", "matrix_output_manifest.csv"],
+        ["cross_segment_union_inventory", "matrix_output_manifest"],
     ))
 
     artifacts.append(_artifact(
@@ -531,7 +531,7 @@ def build_evidence_map(
          "(MATRIX_MANIFEST_FIELDS has no status/blocked field) -- see "
          "governance_package_health.json's matrix_manifest.note."],
         _BLANK_STRING_NULL_SEMANTICS,
-        ["cross_segment_union_inventory.csv", "pattern_reuse_distribution.csv"],
+        ["cross_segment_union_inventory", "pattern_reuse_distribution"],
     ))
 
     artifacts.append(_artifact(
@@ -551,7 +551,7 @@ def build_evidence_map(
          "docs/governance_generator_cross_compare_coverage.md's suggested "
          "'drill-through only' integration point"],
         {},
-        ["cross_segment_summary.csv"],
+        ["cross_segment_summary"],
     ))
 
     artifacts.append(_artifact(
@@ -571,7 +571,7 @@ def build_evidence_map(
          "than distinguished from not-run/stale comparisons; see "
          "docs/governance_generator_cross_compare_coverage.md."],
         {},
-        ["cross_segment_summary.csv"],
+        ["cross_segment_summary"],
     ))
 
     artifacts.append(_artifact(
@@ -594,7 +594,7 @@ def build_evidence_map(
             "*(fmt/pct-formatted columns)": "'-' means the field exists in the schema but has no data for this domain.",
             "*(governance-state columns)": "'' (empty string) means governance_state_summary has no entry for this domain at all -- a different condition than a present-but-None value.",
         },
-        ["cross_segment_summary.csv", "cross_segment_pooled.csv", "cross_segment_governance_state_summary.csv"],
+        ["cross_segment_summary", "cross_segment_pooled", "cross_segment_governance_state_summary"],
     ))
 
     artifacts.append(_artifact(
@@ -610,7 +610,7 @@ def build_evidence_map(
         ["inherits the cross_segment_pooled.csv A2 pool_scope caveat -- see that "
          "artifact's known_limitations."],
         {"*(fmt-formatted columns)": "'-' means the field exists but has no data for this client."},
-        ["cross_segment_summary.csv", "cross_segment_pooled.csv", "client_sector.csv"],
+        ["cross_segment_summary", "cross_segment_pooled", "client_sector"],
     ))
 
     artifacts.append(_artifact(
@@ -626,8 +626,8 @@ def build_evidence_map(
          "is entirely omitted, not blank-rendered, when all three of its inputs "
          "are absent."],
         {},
-        ["governance_domain_summary.csv", "governance_client_summary.csv",
-         "governance_package_health.json", "governance_evidence_map.json"],
+        ["governance_domain_summary", "governance_client_summary",
+         "governance_package_health", "governance_evidence_map"],
     ))
 
     artifacts.append(_artifact(
@@ -641,7 +641,7 @@ def build_evidence_map(
          "optional inputs were actually supplied"],
         ["input CSV content correctness -- only presence/path/size is validated, "
          "never parsed content"],
-        [], {}, ["governance_package_health.json", "governance_evidence_map.json"],
+        [], {}, ["governance_package_health", "governance_evidence_map"],
         schema_version=package_schema_version,
     ))
 
@@ -656,7 +656,7 @@ def build_evidence_map(
         ["does not repeat or replace governance_narrative_context.md's own "
          "Analytical Notes and Limitations section -- this is a machine-readable "
          "companion, not a superseding source"],
-        [], {}, ["governance_package_manifest.json", "governance_evidence_map.json"],
+        [], {}, ["governance_package_manifest", "governance_evidence_map"],
         schema_version=package_schema_version,
     ))
 

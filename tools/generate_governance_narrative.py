@@ -2067,13 +2067,30 @@ Active Project Use
 """
 
 
-def render_evidence_authority_header(package_schema_version: str, generator_identity: str) -> str:
+def render_evidence_authority_header(
+    package_schema_version: str,
+    generator_identity: str,
+    emit_evidence_package: bool = True,
+) -> str:
     """States this document's own epistemic role and authority ordering within
     the governance evidence package. Added alongside governance_package_manifest.json/
     _health.json/_evidence_map.json (see docs/governance_evidence_package.md) -- this
     document remains a controlled_interpretation artifact, not authoritative evidence,
     and no LLM is involved in producing it or any other artifact in this package.
+
+    The health/evidence-map pointer lines are gated on emit_evidence_package --
+    when a caller passes --no-emit-evidence-package, those files are never
+    written, so this document must not point readers at files that don't exist.
     """
+    package_pointers = (
+        f"""
+> **Package health:** `governance_package_health.json` (schema {package_schema_version})
+> **Evidence navigation:** `governance_evidence_map.json`
+"""
+        if emit_evidence_package else
+        "\n> This run was generated with `--no-emit-evidence-package`, so no "
+        "package health or evidence-map file exists alongside this document.\n"
+    )
     return f"""> **Artifact role:** Convenience summary and controlled interpretation
 > (`authority_level: {AUTHORITY_CONTROLLED_INTERPRETATION}`). This document is
 > template-rendered from the deterministic CSVs below by `{generator_identity}` --
@@ -2084,10 +2101,7 @@ def render_evidence_authority_header(package_schema_version: str, generator_iden
 > deterministic rollups below them (`governance_domain_summary.csv`,
 > `governance_client_summary.csv`), which in turn outrank this narrative's prose.
 > If this document disagrees with a rollup CSV or a source CSV, the CSV wins.
->
-> **Package health:** `governance_package_health.json` (schema {package_schema_version})
-> **Evidence navigation:** `governance_evidence_map.json`
-"""
+{package_pointers}"""
 
 
 def render_governance_state_model(has_state_outputs: bool) -> str:
@@ -3294,7 +3308,7 @@ def main():
     print("Rendering narrative...")
     sections = [
         render_header(args.date, corpus, bool(governance_state_summary), legacy_fallback),
-        render_evidence_authority_header(args.package_schema_version, GENERATOR_IDENTITY),
+        render_evidence_authority_header(args.package_schema_version, GENERATOR_IDENTITY, args.emit_evidence_package),
         render_governance_state_model(bool(governance_state_summary)),
         render_domain_tiers(cascade, governance_state_summary),
     ]
