@@ -1,6 +1,6 @@
 # Investigation: `generate_governance_narrative.py` — Scope-Level Gap & Hardcoding Audit
 
-**Status:** Investigation only. No code was changed as part of this document.
+**Status:** Historical investigation — findings partially implemented; consult current code and tests for active behavior. No code was changed as part of this document.
 **Scope:** `tools/generate_governance_narrative.py` vs. `tools/compare_cross_segment.py`
 as of this audit's HEAD.
 
