@@ -3393,24 +3393,18 @@ def main():
         comparison_run_ids = sorted({r.get("comparison_run_id", "") for r in summary_rows} - {""})
         source_executed_utc = sorted({r.get("executed_utc", "") for r in summary_rows} - {""})
 
-        manifest = build_package_manifest(
-            generator_identity=GENERATOR_IDENTITY,
-            generator_role=GENERATOR_ROLE,
-            package_schema_version=args.package_schema_version,
-            analysis_date=args.date,
-            input_paths=input_paths,
-            input_required=input_required,
-            input_roles=input_roles,
-            output_paths=output_paths,
-            output_types=output_types,
-            output_authority=output_authority,
-            output_context_role=output_context_role,
-            policy_dir=Path(args.policy_dir) if args.policy_dir else None,
-            comparison_run_ids=comparison_run_ids,
-            source_executed_utc=source_executed_utc,
-        )
-        write_json(out_dir / "governance_package_manifest.json", manifest)
-
+        # health.json and evidence_map.json are built and written *before* the
+        # manifest, and the manifest is built from an output_paths view that
+        # excludes its own file. build_package_manifest() stats each entry in
+        # output_paths via Path.exists()/Path.stat() at call time -- if the
+        # manifest were built (and therefore stat its sibling JSON outputs)
+        # before those files existed on disk, it would permanently record them
+        # as present: false/size_bytes: null once written. A manifest also
+        # cannot accurately stat itself before it has been written -- that
+        # self-description job already belongs to governance_evidence_map.json
+        # (see its self-entry, related_artifacts). Writing health/evidence_map
+        # first, then the manifest last with a self-excluded output_paths view,
+        # avoids both problems without a two-pass write.
         health = build_package_health(
             schema_version=args.package_schema_version,
             schema_detection=schema_detection,
@@ -3451,8 +3445,34 @@ def main():
         )
         write_json(out_dir / "governance_evidence_map.json", evidence_map)
 
-        print(f"  → wrote governance_package_manifest.json, governance_package_health.json, "
-              f"governance_evidence_map.json to {out_dir}")
+        # Built and written last, now that governance_package_health.json and
+        # governance_evidence_map.json are actually on disk and stat correctly.
+        # Excludes "package_manifest_json" from the paths it stats about
+        # itself -- see the comment above for why.
+        manifest_output_paths = {k: v for k, v in output_paths.items() if k != "package_manifest_json"}
+        manifest_output_types = {k: v for k, v in output_types.items() if k != "package_manifest_json"}
+        manifest_output_authority = {k: v for k, v in output_authority.items() if k != "package_manifest_json"}
+        manifest_output_context_role = {k: v for k, v in output_context_role.items() if k != "package_manifest_json"}
+        manifest = build_package_manifest(
+            generator_identity=GENERATOR_IDENTITY,
+            generator_role=GENERATOR_ROLE,
+            package_schema_version=args.package_schema_version,
+            analysis_date=args.date,
+            input_paths=input_paths,
+            input_required=input_required,
+            input_roles=input_roles,
+            output_paths=manifest_output_paths,
+            output_types=manifest_output_types,
+            output_authority=manifest_output_authority,
+            output_context_role=manifest_output_context_role,
+            policy_dir=Path(args.policy_dir) if args.policy_dir else None,
+            comparison_run_ids=comparison_run_ids,
+            source_executed_utc=source_executed_utc,
+        )
+        write_json(out_dir / "governance_package_manifest.json", manifest)
+
+        print(f"  → wrote governance_package_health.json, governance_evidence_map.json, "
+              f"governance_package_manifest.json to {out_dir}")
 
 
 if __name__ == "__main__":

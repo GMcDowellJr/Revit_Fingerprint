@@ -261,6 +261,29 @@ def test_package_manifest_records_inputs_and_outputs(tmp_path, monkeypatch):
     assert manifest["package_status"] == "complete"
 
 
+def test_package_manifest_reports_sibling_json_outputs_as_present_with_real_sizes(tmp_path, monkeypatch):
+    """Regression test for a PR review finding: the manifest is built (and
+    stats its output_paths) after governance_package_health.json and
+    governance_evidence_map.json are already written to disk, so it must not
+    report them as present=False/size_bytes=None. The manifest also does not
+    describe its own file (see build_package_manifest's manifest_output_paths
+    exclusion in main()) -- self-description is governance_evidence_map.json's
+    job, not the manifest's."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
+    out_by_id = {o["artifact_id"]: o for o in manifest["outputs"]}
+    assert "package_manifest_json" not in out_by_id
+    for artifact_id in ("package_health_json", "evidence_map_json"):
+        assert out_by_id[artifact_id]["present"] is True, artifact_id
+        assert out_by_id[artifact_id]["size_bytes"] > 0, artifact_id
+        expected_path = tmp_path / {
+            "package_health_json": "governance_package_health.json",
+            "evidence_map_json": "governance_evidence_map.json",
+        }[artifact_id]
+        assert out_by_id[artifact_id]["size_bytes"] == expected_path.stat().st_size
+
+
 def test_package_manifest_records_comparison_run_ids(tmp_path, monkeypatch):
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
