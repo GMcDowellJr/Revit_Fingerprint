@@ -674,7 +674,7 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
-        "governance_findings", p(output_paths, "findings_json"), "json", False, True,
+        "governance_findings", p(output_paths, "governance_findings"), "json", False, True,
         GENERATOR_IDENTITY, AUTHORITY_CONTROLLED_INTERPRETATION,
         "structured, rule-derived findings (tier/anomaly/onboarding classifications) "
         "with provenance -- origin, fidelity, authority, and limits per finding, "

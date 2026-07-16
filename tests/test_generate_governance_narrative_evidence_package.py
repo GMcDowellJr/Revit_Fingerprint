@@ -409,6 +409,22 @@ def test_evidence_map_lists_nineteen_artifacts_with_required_fields(tmp_path, mo
     assert narrative["authority_level"] != "authoritative_deterministic_evidence"
 
 
+def test_evidence_map_findings_entry_has_a_real_path(tmp_path, monkeypatch):
+    """Regression test for a PR review finding: build_evidence_map() looked up
+    output_paths["findings_json"], but main() writes that entry under the key
+    "governance_findings" -- the evidence-map entry for governance_findings
+    reported path: null and present: true simultaneously, since the .get()
+    silently returned nothing for the mismatched key. path must resolve to
+    the real governance_findings.json file that was actually written."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    entry = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_findings")
+    assert entry["path"] is not None
+    assert Path(entry["path"]).name == "governance_findings.json"
+    assert Path(entry["path"]).exists()
+
+
 def test_manifest_output_artifact_ids_match_evidence_map_artifact_ids(tmp_path, monkeypatch):
     """Regression test for a PR review finding: governance_package_manifest.json's
     outputs[].artifact_id values (e.g. "domain_summary_csv") used a different
