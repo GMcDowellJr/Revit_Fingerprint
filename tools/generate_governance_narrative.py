@@ -3078,7 +3078,17 @@ def build_structured_findings(
             dom, "baseline_candidate",
             f"{label(dom)} meets the baseline-candidate rule (governance_tier: {tier}).",
             _RULE_BASELINE_CANDIDATE,
-            ["governance_tier", "template_to_project", "container_to_project"],
+            # template_to_project/container_to_project drive the primary tier
+            # band; local_active_share/provided_passive_share/provided_missing_share
+            # are the three fields _has_material_state_exception() checks to
+            # downgrade a >=0.90 domain into Baseline Candidate -- Local/Use
+            # Review instead of Strong Baseline, and provided_to_used_containment
+            # is the separate active-use-floor check assign_tier() applies at
+            # that same threshold -- all four can be the reason a domain in
+            # this bucket isn't also strong_baseline_candidate.
+            ["governance_tier", "template_to_project", "container_to_project",
+             "local_active_share", "provided_passive_share", "provided_missing_share",
+             "provided_to_used_containment"],
         )
     for dom in domain_buckets["local_review_required"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
@@ -3087,7 +3097,12 @@ def build_structured_findings(
             f"{label(dom)} requires local/use review before baseline language is "
             f"safe (governance_tier: {tier}).",
             _RULE_LOCAL_REVIEW_REQUIRED,
-            ["governance_tier", "local_active_share", "provided_to_used_containment"],
+            # Any of these three state fields (see _has_material_state_exception())
+            # or a below-floor provided_to_used_containment can be the reason a
+            # domain lands in this tier -- list all four triggering fields, not
+            # just the ones a specific instance happened to cross.
+            ["governance_tier", "local_active_share", "provided_passive_share",
+             "provided_missing_share", "provided_to_used_containment"],
         )
     for dom in domain_buckets["active_local_practice"]:
         add_domain_finding(

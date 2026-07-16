@@ -89,6 +89,28 @@ def test_active_local_practice_and_local_review_required():
     assert ("line_styles", "local_review_required") in types
 
 
+def test_local_review_required_via_passive_or_missing_share_lists_all_triggering_fields():
+    """Regression test for a PR review finding: a domain can land in
+    Baseline Candidate -- Local/Use Review via _has_material_state_exception()
+    tripping on provided_passive_share or provided_missing_share, not just
+    local_active_share -- the finding's support fields must list all three
+    state fields (plus provided_to_used_containment) regardless of which one
+    actually triggered this instance, so drill-through is never incomplete."""
+    cascade = {"line_styles": _min_domain_dict(tc=0.90, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95)}
+    # local_active_share is absent/low; provided_passive_share alone crosses
+    # the PASSIVE_MATERIAL_THRESHOLD (0.20) that _has_material_state_exception()
+    # checks, downgrading an otherwise->=0.90 domain out of strong baseline.
+    state = {"line_styles": {"provided_passive_share": 0.25}}
+    findings = build_structured_findings(cascade, [], state)
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "local_review_required")
+    fields = finding["support"][0]["fields"]
+    assert "local_active_share" in fields
+    assert "provided_passive_share" in fields
+    assert "provided_missing_share" in fields
+    assert "provided_to_used_containment" in fields
+
+
 def test_high_fragmentation_finding():
     cascade = {"line_styles": _min_domain_dict(tc=0.10, cp=0.20, tp=0.30, wp_p10=0.30, wp_p90=0.35)}
     findings = build_structured_findings(cascade, [], None)
