@@ -530,6 +530,23 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
         EVERY target scope level compare_cross_segment.py emits (client/bc/
         discipline and combinations thereof, plus "enterprise" itself) -- see
         _target_scope_label(). Mirrors wp_disc's per-discipline breakdown pattern.
+      tc_by_scope/cp_by_scope/tp_by_scope: {scope_pair: mean_containment} for
+        EVERY (a-side scope, b-side scope) pair compare_cross_segment.py emits for
+        Group 1 (template_to_container/container_to_project/template_to_project),
+        keyed as f"{scope_a}_{scope_b}" (e.g. "enterprise_enterprise", "bc_bc") --
+        see _target_scope_label(). Unlike Group 2 (where only the target/b side is
+        classified, since the reference/a side is always gated to enterprise-only),
+        BOTH sides matter here, since neither side of a Group 1 pair is gated to a
+        fixed role population. tc/cp/tp themselves are UNCHANGED: still populated
+        only from the "enterprise_enterprise" pair (both sides pass
+        _is_unscoped_segment), matching today's behavior exactly. This mirrors
+        gt_by_scope/gc_by_scope/gp_by_scope's Option C precedent for the Group 1
+        gap documented in docs/governance_narrative_group1_scope_gap_investigation.md.
+      tc_by_scope_spread/cp_by_scope_spread/tp_by_scope_spread: {scope_pair:
+        (min, max)} for any scope_pair backed by >=2 rows -- lets detect_anomalies
+        flag a scope_pair (typically "bc_bc") whose pooled mean hides sharp
+        disagreement between individual business-center pairs, instead of only
+        ever reporting the mean.
       ep/bp/eb/ec: enterprise->project / bc->project / enterprise->bc / enterprise->client
         containment_a_in_b_mean (Group 3 — scope-level fan-out, captured but not yet
         rendered/tiered/anomaly-detected; see CASCADE_GROUP3_TYPES)
@@ -551,6 +568,17 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     wp_used = defaultdict(list)   # within-project used-view Jaccard
     wp_used_p10 = {}
     wp_used_p90 = {}
+
+    # Group 1 bc-pooled fallback -- per-(a-scope, b-scope)-pair breakdown mirroring
+    # Group 2's Option C (gt_by_scope/etc.), see docs/governance_narrative_group1_scope_gap_investigation.md.
+    # tc/cp/tp themselves stay gated to the "enterprise_enterprise" pair only --
+    # unchanged from today.
+    tc_by_scope = defaultdict(lambda: defaultdict(list))
+    cp_by_scope = defaultdict(lambda: defaultdict(list))
+    tp_by_scope = defaultdict(lambda: defaultdict(list))
+    tc_used_by_scope = defaultdict(lambda: defaultdict(list))
+    cp_used_by_scope = defaultdict(lambda: defaultdict(list))
+    tp_used_by_scope = defaultdict(lambda: defaultdict(list))
 
     # Group 2 — generic->template/container/project containment (all-view + used-view).
     # gt/gc/gp remain the "enterprise" scope-level slice only (Option A -- one clean
@@ -597,29 +625,58 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
         if dom in EXCLUDED_FROM_SCORING:
             continue
 
-        if ct == "template_to_container" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+        if ct == "template_to_container":
+            # Group 1 bc-pooled fallback: classify BOTH sides (unlike Group 2,
+            # neither side of a Group 1 pair is gated to a fixed role population)
+            # and bucket into every (scope_a, scope_b) pair observed. tc itself is
+            # promoted only from "enterprise_enterprise" -- exactly the same
+            # condition as today's _is_unscoped_segment(r,"a") and (r,"b") gate,
+            # since _target_scope_label() returns "enterprise" iff
+            # _is_unscoped_segment() is True for that side -- so tc is
+            # byte-for-byte unchanged.
+            scope_a = _target_scope_label(r, "a")
+            scope_b = _target_scope_label(r, "b")
+            scope_pair = f"{scope_a}_{scope_b}"
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
-                tc[dom].append(v)
+                tc_by_scope[dom][scope_pair].append(v)
+                if scope_a == "enterprise" and scope_b == "enterprise":
+                    tc[dom].append(v)
             vu = pf(_col(r, "used_containment_a_in_b_mean"))
             if vu is not None:
-                tc_used[dom].append(vu)
+                tc_used_by_scope[dom][scope_pair].append(vu)
+                if scope_a == "enterprise" and scope_b == "enterprise":
+                    tc_used[dom].append(vu)
 
-        elif ct == "container_to_project" and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+        elif ct == "container_to_project":
+            scope_a = _target_scope_label(r, "a")
+            scope_b = _target_scope_label(r, "b")
+            scope_pair = f"{scope_a}_{scope_b}"
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
-                cp[dom].append(v)
+                cp_by_scope[dom][scope_pair].append(v)
+                if scope_a == "enterprise" and scope_b == "enterprise":
+                    cp[dom].append(v)
             vu = pf(_col(r, "used_containment_a_in_b_mean"))
             if vu is not None:
-                cp_used[dom].append(vu)
+                cp_used_by_scope[dom][scope_pair].append(vu)
+                if scope_a == "enterprise" and scope_b == "enterprise":
+                    cp_used[dom].append(vu)
 
-        elif ct in ("template_to_project", "parent_sibling_roles") and _is_unscoped_segment(r, "a") and _is_unscoped_segment(r, "b"):
+        elif ct in ("template_to_project", "parent_sibling_roles"):
+            scope_a = _target_scope_label(r, "a")
+            scope_b = _target_scope_label(r, "b")
+            scope_pair = f"{scope_a}_{scope_b}"
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
-                tp[dom].append(v)
+                tp_by_scope[dom][scope_pair].append(v)
+                if scope_a == "enterprise" and scope_b == "enterprise":
+                    tp[dom].append(v)
             vu = pf(_col(r, "used_containment_a_in_b_mean"))
             if vu is not None:
-                tp_used[dom].append(vu)
+                tp_used_by_scope[dom][scope_pair].append(vu)
+                if scope_a == "enterprise" and scope_b == "enterprise":
+                    tp_used[dom].append(vu)
 
         elif ct == "sibling_projects":
             ca = _pick(r, "client_label_a")
@@ -818,6 +875,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
         set(tc) | set(cp) | set(tp) | set(xc) | set(wp_all) | set(tw)
         | set(gt) | set(gc) | set(gp)
         | set(gt_by_scope) | set(gc_by_scope) | set(gp_by_scope)
+        | set(tc_by_scope) | set(cp_by_scope) | set(tp_by_scope)
         | set(ep) | set(bp) | set(eb) | set(ec)
     )
     for dom in all_domains:
@@ -878,6 +936,23 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             "gt_used_by_scope": {s: statistics.mean(v) for s, v in gt_used_by_scope[dom].items() if v},
             "gc_used_by_scope": {s: statistics.mean(v) for s, v in gc_used_by_scope[dom].items() if v},
             "gp_used_by_scope": {s: statistics.mean(v) for s, v in gp_used_by_scope[dom].items() if v},
+            # Group 1 bc-pooled fallback -- per-(scope_a, scope_b)-pair breakdown
+            # mirroring Group 2's Option C above. "enterprise_enterprise" always
+            # equals the tc/cp/tp value above (same source data); every other key
+            # (typically "bc_bc") is scoped evidence that used to be silently
+            # discarded. See docs/governance_narrative_group1_scope_gap_investigation.md.
+            "tc_by_scope": {s: statistics.mean(v) for s, v in tc_by_scope[dom].items() if v},
+            "cp_by_scope": {s: statistics.mean(v) for s, v in cp_by_scope[dom].items() if v},
+            "tp_by_scope": {s: statistics.mean(v) for s, v in tp_by_scope[dom].items() if v},
+            "tc_used_by_scope": {s: statistics.mean(v) for s, v in tc_used_by_scope[dom].items() if v},
+            "cp_used_by_scope": {s: statistics.mean(v) for s, v in cp_used_by_scope[dom].items() if v},
+            "tp_used_by_scope": {s: statistics.mean(v) for s, v in tp_used_by_scope[dom].items() if v},
+            # Intra-bucket spread (min, max) for any scope_pair backed by >=2 rows --
+            # lets detect_anomalies flag a pooled mean (typically "bc_bc") that hides
+            # sharp per-business-center disagreement rather than genuine convergence.
+            "tc_by_scope_spread": {s: (min(v), max(v)) for s, v in tc_by_scope[dom].items() if len(v) > 1},
+            "cp_by_scope_spread": {s: (min(v), max(v)) for s, v in cp_by_scope[dom].items() if len(v) > 1},
+            "tp_by_scope_spread": {s: (min(v), max(v)) for s, v in tp_by_scope[dom].items() if len(v) > 1},
             # Group 3 — scope-level fan-out containment. Captured only; NOT rendered,
             # tiered, or anomaly-detected in this pass — pending a future
             # business-center-section design decision (see
@@ -971,6 +1046,7 @@ TIER_ACTIVE_LOCAL = "Active Local Practice Review"
 TIER_MODERATE_VARIATION = "Moderate Variation"
 TIER_HIGH_FRAGMENTATION = "High Fragmentation"
 TIER_SPARSE_LIMITED = "Sparse / Presence-Limited"
+TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE = "Insufficient Evidence — Enterprise; BC-Level Evidence Available"
 TIER_INSUFFICIENT = "Insufficient Evidence"
 
 # Deterministic materiality thresholds used to keep baseline language conservative.
@@ -1004,6 +1080,24 @@ def _has_material_state_exception(state: Optional[dict]) -> bool:
     return False
 
 
+def _has_group1_bc_pooled_evidence(d: dict) -> bool:
+    """True when a same-bc-both-sides ("bc_bc") pooled containment value exists
+    in tp_by_scope or cp_by_scope, even though the enterprise-only tp/cp is None.
+
+    This is deliberately a presence check only, not a score-magnitude check --
+    assign_tier() must not blend this pooled value into `primary` (see
+    docs/governance_narrative_group1_scope_gap_investigation.md, Q2/Q3): a
+    domain with bc-pooled evidence gets a distinct tier
+    (TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE), not a score-banded promotion
+    into TIER_STRONG_BASELINE/TIER_INVESTIGATE/etc., which would imply
+    enterprise-level evidence that doesn't exist.
+    """
+    return (
+        (d.get("tp_by_scope") or {}).get("bc_bc") is not None
+        or (d.get("cp_by_scope") or {}).get("bc_bc") is not None
+    )
+
+
 def assign_tier(d: dict, state: Optional[dict] = None) -> str:
     """Assign a DoD-safe governance classification.
 
@@ -1017,6 +1111,8 @@ def assign_tier(d: dict, state: Optional[dict] = None) -> str:
     reliability = score_reliability(d)
 
     if primary is None:
+        if _has_group1_bc_pooled_evidence(d):
+            return TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE
         return TIER_INSUFFICIENT
 
     local_active = _state_value(state, "local_active_share")
@@ -1067,7 +1163,8 @@ TIER_ORDER = {
     TIER_MODERATE_VARIATION: 5,
     TIER_SPARSE_LIMITED: 6,
     TIER_HIGH_FRAGMENTATION: 7,
-    TIER_INSUFFICIENT: 8,
+    TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE: 8,
+    TIER_INSUFFICIENT: 9,
 }
 
 
@@ -1189,6 +1286,33 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
                 f"scoped mean — {detail}). Review whether client-/business-center-/discipline-"
                 "specific practice is diverging from or exceeding the enterprise baseline."
             )
+
+    # Group 1 bc-pooled intra-bucket divergence — a distinct governance question
+    # from Group 2's enterprise-vs-scoped check above: Group 1 (tc/cp/tp) usually
+    # has NO enterprise-level reading to compare against at all (that's the gap
+    # tc_by_scope/cp_by_scope/tp_by_scope exists to fill — see
+    # docs/governance_narrative_group1_scope_gap_investigation.md), so the risk
+    # here isn't "enterprise differs from scoped" but "the bc-pooled MEAN itself
+    # hides sharp disagreement between individual business-center pairs." Uses
+    # the same >=0.25 absolute-gap materiality threshold as the Group 2 check
+    # above, applied to each scope_pair's own (min, max) spread instead of an
+    # enterprise-vs-mean comparison.
+    for cascade_label, by_scope_spread, by_scope_mean in (
+        ("Template→Container", d.get("tc_by_scope_spread") or {}, d.get("tc_by_scope") or {}),
+        ("Container→Project", d.get("cp_by_scope_spread") or {}, d.get("cp_by_scope") or {}),
+        ("Template→Project", d.get("tp_by_scope_spread") or {}, d.get("tp_by_scope") or {}),
+    ):
+        for scope_pair, (lo, hi) in sorted(by_scope_spread.items()):
+            if scope_pair == "enterprise_enterprise":
+                continue
+            if hi - lo >= 0.25:
+                notes.append(
+                    f"{cascade_label} pooled evidence for scope '{scope_pair}' spans "
+                    f"{pct(lo)}–{pct(hi)} across individual business-center pairs "
+                    f"(pooled mean {pct(by_scope_mean.get(scope_pair))}). This is not a "
+                    "converged bc-level standard — review per-business-center variation "
+                    "before treating the pooled mean as a single reading."
+                )
 
     if tc is not None and tp is not None and tp > tc + 0.25:
         notes.append(
@@ -1916,6 +2040,12 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
         TIER_HIGH_FRAGMENTATION: (
             "These domains show high variation. A single baseline is not supported by the current data."
         ),
+        TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE: (
+            "These domains have no enterprise-wide (fully unscoped) evidence, but DO have pooled "
+            "same-business-center-pair evidence (see the Group 1 Propagation by Scope section below). "
+            "This is business-center-level evidence only — not an enterprise reading — and should not "
+            "be treated as equivalent to the tiers above it."
+        ),
         TIER_INSUFFICIENT: (
             "These domains have too little usable evidence in the current corpus for a reliable governance read."
         ),
@@ -1941,6 +2071,7 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
         TIER_MODERATE_VARIATION,
         TIER_SPARSE_LIMITED,
         TIER_HIGH_FRAGMENTATION,
+        TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE,
         TIER_INSUFFICIENT,
     ]
 
@@ -2054,6 +2185,67 @@ def render_generic_baseline_scope_section(cascade: dict) -> str:
         lines.append(
             f"| {DOMAIN_LABELS.get(dom, dom)} | {scope} "
             f"| {fmt(gt_v)} | {fmt(gc_v)} | {fmt(gp_v)} |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_group1_scope_section(cascade: dict) -> str:
+    """Render the bc-pooled fallback per-scope-pair breakdown for tc/cp/tp.
+
+    Mirrors render_generic_baseline_scope_section() (Group 2's Option C
+    section) exactly, adapted for Group 1's two-sided scope key: each row is
+    keyed by a (scope_a, scope_b) PAIR (e.g. "enterprise_enterprise", "bc_bc"),
+    not a single target scope label, since neither side of a Group 1
+    comparison is gated to a fixed role population the way Group 2's Generic
+    reference side is. "enterprise_enterprise" is the same value already shown
+    as T→Container/T→Project/C→Project in the Domain Governance Classification
+    table above; every other row (typically "bc_bc") is the pooled evidence
+    that used to be silently discarded -- see
+    docs/governance_narrative_group1_scope_gap_investigation.md. Rendered only
+    for domains that actually have by-scope data; omitted entirely otherwise.
+    """
+    rows = []
+    for dom, d in cascade.items():
+        scope_pairs = (
+            set(d.get("tc_by_scope") or {})
+            | set(d.get("cp_by_scope") or {})
+            | set(d.get("tp_by_scope") or {})
+        )
+        for scope_pair in scope_pairs:
+            rows.append((
+                dom, scope_pair,
+                (d.get("tc_by_scope") or {}).get(scope_pair),
+                (d.get("tp_by_scope") or {}).get(scope_pair),
+                (d.get("cp_by_scope") or {}).get(scope_pair),
+            ))
+    if not rows:
+        return ""
+
+    lines = [
+        "## Group 1 Propagation by Scope\n",
+        "Breaks the Template → Coordination File → Project cascade (T→Container, "
+        "T→Project, C→Project in the Domain Governance Classification table above) "
+        "down by the (a-side scope, b-side scope) pair of each comparison, instead "
+        "of only the single broadest (enterprise-wide) pair. "
+        "**enterprise_enterprise** is the same value already shown as T→Container/"
+        "T→Project/C→Project above; the other rows (typically **bc_bc** — both "
+        "sides scoped to the same business center) are pooled business-center-level "
+        "evidence that a prior pass discarded whenever no fully enterprise-wide pair "
+        "existed, which is why most domains previously showed as Insufficient "
+        "Evidence despite this evidence being present. This is business-center-level "
+        "evidence, not an enterprise reading — see the "
+        "**Insufficient Evidence — Enterprise; BC-Level Evidence Available** tier "
+        "above.\n",
+        "| Domain | Scope | T→Container | T→Project | C→Project |",
+        "|---|---|---:|---:|---:|",
+    ]
+    for dom, scope_pair, tc_v, tp_v, cp_v in sorted(
+        rows, key=lambda r: (DOMAIN_LABELS.get(r[0], r[0]), r[1] != "enterprise_enterprise", r[1])
+    ):
+        lines.append(
+            f"| {DOMAIN_LABELS.get(dom, dom)} | {scope_pair} "
+            f"| {fmt(tc_v)} | {fmt(tp_v)} | {fmt(cp_v)} |"
         )
     lines.append("")
     return "\n".join(lines)
@@ -2862,7 +3054,7 @@ def main():
             "notable_anomalies": " | ".join(anomalies) if anomalies else "",
         })
 
-    tier_order_key = lambda r: (TIER_ORDER.get(r["governance_tier"], 9), r["template_to_project"])
+    tier_order_key = lambda r: (TIER_ORDER.get(r["governance_tier"], 10), r["template_to_project"])
     domain_csv_rows.sort(key=tier_order_key)
 
     with open(domain_csv_path, "w", newline="", encoding="utf-8") as f:
@@ -2916,6 +3108,9 @@ def main():
     generic_scope_section = render_generic_baseline_scope_section(cascade)
     if generic_scope_section:
         sections.append(generic_scope_section)
+    group1_scope_section = render_group1_scope_section(cascade)
+    if group1_scope_section:
+        sections.append(group1_scope_section)
     sections += [
         render_discipline_section(cascade, summary_rows),
         render_client_section(client_rows),

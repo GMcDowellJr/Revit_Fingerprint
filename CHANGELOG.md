@@ -41,6 +41,40 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   etc.), not a small fixed set like disciplines. The section is omitted
   entirely when no domain has any scope-breakdown data.
 
+- `tools/generate_governance_narrative.py`'s Group 1 dispatch (`tc`/`cp`/`tp`
+  from `template_to_container`/`container_to_project`/`template_to_project`)
+  gets the same Option C treatment Group 2 (`gt`/`gc`/`gp`) got above, closing
+  the gap documented in
+  `docs/governance_narrative_group1_scope_gap_investigation.md`: since
+  `business_center_label` became a real segmentation cut, almost no segment is
+  fully unscoped anymore, so `tp`/`cp` were `None` for effectively every
+  domain and `assign_tier()` always fell to `TIER_INSUFFICIENT` regardless of
+  real bc-pooled evidence sitting unused in `cross_segment_summary.csv`. `tc`/
+  `cp`/`tp` themselves are unchanged — still populated only from the
+  `"enterprise_enterprise"` (both sides pass `_is_unscoped_segment()`) pair —
+  but new `tc_by_scope`/`cp_by_scope`/`tp_by_scope` (`{scope_pair:
+  mean_containment}`, keyed `f"{scope_a}_{scope_b}"` since, unlike Group 2,
+  neither side of a Group 1 pair is gated to a fixed role population) now
+  capture every other `(scope_a, scope_b)` pair instead of discarding it.
+
+  A same-bc-both-sides (`"bc_bc"`) pooled value gives `assign_tier()` a new,
+  distinctly-named fallback tier, `TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE`
+  (ordered directly before `TIER_INSUFFICIENT`, i.e. the weakest tier that
+  still has *some* evidence), when `tp`/`cp` are both `None` — deliberately
+  NOT blended into the existing enterprise-only `primary`/score-banded tiers,
+  since bc-pooled evidence is not enterprise-level evidence. The `T→Container`/
+  `T→Project`/`C→Project` columns in `render_domain_tiers()` stay `—` for
+  domains in the new tier (never silently repointed at a pooled number); a new
+  `render_group1_scope_section()` (mirroring `render_generic_baseline_scope_section()`)
+  renders the per-`(domain, scope_pair)` detail instead. `detect_anomalies()`
+  gained a Group 1 analog of the existing scope-divergence note: since Group 1
+  usually has no enterprise reading to diverge from (that's the gap this fix
+  closes), the check instead flags when a pooled bucket's own intra-bucket
+  spread (min/max across the individual business-center pairs backing it) is
+  ≥0.25 absolute — the same materiality threshold as Group 2's check — meaning
+  the pooled mean is hiding sharp per-bc disagreement rather than reflecting
+  genuine convergence.
+
 ### Fixed
 - `tools/archetype/generate_archetype_candidates.py`'s `_governance_question_hint()`
   only ever inspected `target_domain`, so it couldn't distinguish a dynamic
