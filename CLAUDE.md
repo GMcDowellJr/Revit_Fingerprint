@@ -27,7 +27,7 @@ FINGERPRINT_JSON_PATH=/path/to/export.json pytest tests/test_record_contract_v2.
 
 No `requirements.txt` or `pyproject.toml` exists. The only external dependency for development is `pytest` (`pip install pytest`). `.github/workflows/ci.yml` runs `pytest tests/ -v` on Python 3.9–3.12 for every push/PR to `main`. A second workflow, `.github/workflows/graphify.yml`, keeps the `graphify-out/` knowledge graph in sync.
 
-Analysis tools are stdlib-only (no pandas/numpy) — `tools/` code reads/writes CSV via `csv.DictReader`/`csv.DictWriter` by convention; don't introduce a new dependency there without a strong reason.
+Analysis tools are stdlib-only (no pandas/numpy) as a rule — `tools/` code reads/writes CSV via `csv.DictReader`/`csv.DictWriter` by convention; don't introduce a new dependency there without a strong reason. Known exceptions that already require `pandas`/`numpy`/`scipy`: `tools/patterns_analysis/split_detection.py`, `split_detection_file_level.py`, `split_detection_element_level.py`, and `tools/pareto_joinkey_search.py`.
 
 ## Architecture
 
