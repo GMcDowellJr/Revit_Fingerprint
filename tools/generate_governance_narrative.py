@@ -533,18 +533,18 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
       tc_by_scope/cp_by_scope/tp_by_scope: {scope_pair: mean_containment} for
         EVERY (a-side scope, b-side scope) pair compare_cross_segment.py emits for
         Group 1 (template_to_container/container_to_project/template_to_project),
-        keyed as f"{scope_a}_{scope_b}" (e.g. "enterprise_enterprise", "bc_bc") --
+        keyed as f"{scope_a}::{scope_b}" (e.g. "enterprise::enterprise", "bc::bc") --
         see _target_scope_label(). Unlike Group 2 (where only the target/b side is
         classified, since the reference/a side is always gated to enterprise-only),
         BOTH sides matter here, since neither side of a Group 1 pair is gated to a
         fixed role population. tc/cp/tp themselves are UNCHANGED: still populated
-        only from the "enterprise_enterprise" pair (both sides pass
+        only from the "enterprise::enterprise" pair (both sides pass
         _is_unscoped_segment), matching today's behavior exactly. This mirrors
         gt_by_scope/gc_by_scope/gp_by_scope's Option C precedent for the Group 1
         gap documented in docs/governance_narrative_group1_scope_gap_investigation.md.
       tc_by_scope_spread/cp_by_scope_spread/tp_by_scope_spread: {scope_pair:
         (min, max)} for any scope_pair backed by >=2 rows -- lets detect_anomalies
-        flag a scope_pair (typically "bc_bc") whose pooled mean hides sharp
+        flag a scope_pair (typically "bc::bc") whose pooled mean hides sharp
         disagreement between individual business-center pairs, instead of only
         ever reporting the mean.
       ep/bp/eb/ec: enterprise->project / bc->project / enterprise->bc / enterprise->client
@@ -571,7 +571,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
 
     # Group 1 bc-pooled fallback -- per-(a-scope, b-scope)-pair breakdown mirroring
     # Group 2's Option C (gt_by_scope/etc.), see docs/governance_narrative_group1_scope_gap_investigation.md.
-    # tc/cp/tp themselves stay gated to the "enterprise_enterprise" pair only --
+    # tc/cp/tp themselves stay gated to the "enterprise::enterprise" pair only --
     # unchanged from today.
     tc_by_scope = defaultdict(lambda: defaultdict(list))
     cp_by_scope = defaultdict(lambda: defaultdict(list))
@@ -629,14 +629,14 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             # Group 1 bc-pooled fallback: classify BOTH sides (unlike Group 2,
             # neither side of a Group 1 pair is gated to a fixed role population)
             # and bucket into every (scope_a, scope_b) pair observed. tc itself is
-            # promoted only from "enterprise_enterprise" -- exactly the same
+            # promoted only from "enterprise::enterprise" -- exactly the same
             # condition as today's _is_unscoped_segment(r,"a") and (r,"b") gate,
             # since _target_scope_label() returns "enterprise" iff
             # _is_unscoped_segment() is True for that side -- so tc is
             # byte-for-byte unchanged.
             scope_a = _target_scope_label(r, "a")
             scope_b = _target_scope_label(r, "b")
-            scope_pair = f"{scope_a}_{scope_b}"
+            scope_pair = f"{scope_a}::{scope_b}"
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 tc_by_scope[dom][scope_pair].append(v)
@@ -651,7 +651,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
         elif ct == "container_to_project":
             scope_a = _target_scope_label(r, "a")
             scope_b = _target_scope_label(r, "b")
-            scope_pair = f"{scope_a}_{scope_b}"
+            scope_pair = f"{scope_a}::{scope_b}"
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 cp_by_scope[dom][scope_pair].append(v)
@@ -666,7 +666,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
         elif ct in ("template_to_project", "parent_sibling_roles"):
             scope_a = _target_scope_label(r, "a")
             scope_b = _target_scope_label(r, "b")
-            scope_pair = f"{scope_a}_{scope_b}"
+            scope_pair = f"{scope_a}::{scope_b}"
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 tp_by_scope[dom][scope_pair].append(v)
@@ -937,9 +937,9 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             "gc_used_by_scope": {s: statistics.mean(v) for s, v in gc_used_by_scope[dom].items() if v},
             "gp_used_by_scope": {s: statistics.mean(v) for s, v in gp_used_by_scope[dom].items() if v},
             # Group 1 bc-pooled fallback -- per-(scope_a, scope_b)-pair breakdown
-            # mirroring Group 2's Option C above. "enterprise_enterprise" always
+            # mirroring Group 2's Option C above. "enterprise::enterprise" always
             # equals the tc/cp/tp value above (same source data); every other key
-            # (typically "bc_bc") is scoped evidence that used to be silently
+            # (typically "bc::bc") is scoped evidence that used to be silently
             # discarded. See docs/governance_narrative_group1_scope_gap_investigation.md.
             "tc_by_scope": {s: statistics.mean(v) for s, v in tc_by_scope[dom].items() if v},
             "cp_by_scope": {s: statistics.mean(v) for s, v in cp_by_scope[dom].items() if v},
@@ -948,7 +948,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             "cp_used_by_scope": {s: statistics.mean(v) for s, v in cp_used_by_scope[dom].items() if v},
             "tp_used_by_scope": {s: statistics.mean(v) for s, v in tp_used_by_scope[dom].items() if v},
             # Intra-bucket spread (min, max) for any scope_pair backed by >=2 rows --
-            # lets detect_anomalies flag a pooled mean (typically "bc_bc") that hides
+            # lets detect_anomalies flag a pooled mean (typically "bc::bc") that hides
             # sharp per-business-center disagreement rather than genuine convergence.
             "tc_by_scope_spread": {s: (min(v), max(v)) for s, v in tc_by_scope[dom].items() if len(v) > 1},
             "cp_by_scope_spread": {s: (min(v), max(v)) for s, v in cp_by_scope[dom].items() if len(v) > 1},
@@ -1081,7 +1081,7 @@ def _has_material_state_exception(state: Optional[dict]) -> bool:
 
 
 def _has_group1_bc_pooled_evidence(d: dict) -> bool:
-    """True when a same-bc-both-sides ("bc_bc") pooled containment value exists
+    """True when a same-bc-both-sides ("bc::bc") pooled containment value exists
     in tp_by_scope or cp_by_scope, even though the enterprise-only tp/cp is None.
 
     This is deliberately a presence check only, not a score-magnitude check --
@@ -1093,8 +1093,8 @@ def _has_group1_bc_pooled_evidence(d: dict) -> bool:
     enterprise-level evidence that doesn't exist.
     """
     return (
-        (d.get("tp_by_scope") or {}).get("bc_bc") is not None
-        or (d.get("cp_by_scope") or {}).get("bc_bc") is not None
+        (d.get("tp_by_scope") or {}).get("bc::bc") is not None
+        or (d.get("cp_by_scope") or {}).get("bc::bc") is not None
     )
 
 
@@ -1303,7 +1303,7 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
         ("Template→Project", d.get("tp_by_scope_spread") or {}, d.get("tp_by_scope") or {}),
     ):
         for scope_pair, (lo, hi) in sorted(by_scope_spread.items()):
-            if scope_pair == "enterprise_enterprise":
+            if scope_pair == "enterprise::enterprise":
                 continue
             if hi - lo >= 0.25:
                 notes.append(
@@ -2195,12 +2195,12 @@ def render_group1_scope_section(cascade: dict) -> str:
 
     Mirrors render_generic_baseline_scope_section() (Group 2's Option C
     section) exactly, adapted for Group 1's two-sided scope key: each row is
-    keyed by a (scope_a, scope_b) PAIR (e.g. "enterprise_enterprise", "bc_bc"),
+    keyed by a (scope_a, scope_b) PAIR (e.g. "enterprise::enterprise", "bc::bc"),
     not a single target scope label, since neither side of a Group 1
     comparison is gated to a fixed role population the way Group 2's Generic
-    reference side is. "enterprise_enterprise" is the same value already shown
+    reference side is. "enterprise::enterprise" is the same value already shown
     as T→Container/T→Project/C→Project in the Domain Governance Classification
-    table above; every other row (typically "bc_bc") is the pooled evidence
+    table above; every other row (typically "bc::bc") is the pooled evidence
     that used to be silently discarded -- see
     docs/governance_narrative_group1_scope_gap_investigation.md. Rendered only
     for domains that actually have by-scope data; omitted entirely otherwise.
@@ -2228,8 +2228,8 @@ def render_group1_scope_section(cascade: dict) -> str:
         "T→Project, C→Project in the Domain Governance Classification table above) "
         "down by the (a-side scope, b-side scope) pair of each comparison, instead "
         "of only the single broadest (enterprise-wide) pair. "
-        "**enterprise_enterprise** is the same value already shown as T→Container/"
-        "T→Project/C→Project above; the other rows (typically **bc_bc** — both "
+        "**enterprise::enterprise** is the same value already shown as T→Container/"
+        "T→Project/C→Project above; the other rows (typically **bc::bc** — both "
         "sides scoped to the same business center) are pooled business-center-level "
         "evidence that a prior pass discarded whenever no fully enterprise-wide pair "
         "existed, which is why most domains previously showed as Insufficient "
@@ -2241,7 +2241,7 @@ def render_group1_scope_section(cascade: dict) -> str:
         "|---|---|---:|---:|---:|",
     ]
     for dom, scope_pair, tc_v, tp_v, cp_v in sorted(
-        rows, key=lambda r: (DOMAIN_LABELS.get(r[0], r[0]), r[1] != "enterprise_enterprise", r[1])
+        rows, key=lambda r: (DOMAIN_LABELS.get(r[0], r[0]), r[1] != "enterprise::enterprise", r[1])
     ):
         lines.append(
             f"| {DOMAIN_LABELS.get(dom, dom)} | {scope_pair} "

@@ -51,13 +51,20 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   domain and `assign_tier()` always fell to `TIER_INSUFFICIENT` regardless of
   real bc-pooled evidence sitting unused in `cross_segment_summary.csv`. `tc`/
   `cp`/`tp` themselves are unchanged — still populated only from the
-  `"enterprise_enterprise"` (both sides pass `_is_unscoped_segment()`) pair —
+  `"enterprise::enterprise"` (both sides pass `_is_unscoped_segment()`) pair —
   but new `tc_by_scope`/`cp_by_scope`/`tp_by_scope` (`{scope_pair:
-  mean_containment}`, keyed `f"{scope_a}_{scope_b}"` since, unlike Group 2,
+  mean_containment}`, keyed `f"{scope_a}::{scope_b}"` since, unlike Group 2,
   neither side of a Group 1 pair is gated to a fixed role population) now
-  capture every other `(scope_a, scope_b)` pair instead of discarding it.
+  capture every other `(scope_a, scope_b)` pair instead of discarding it. The
+  separator is `"::"`, not a bare `"_"`, because `_target_scope_label()`'s own
+  multi-dimension labels (e.g. `"bc_discipline"`, `"client_bc"`) already
+  contain underscores — joining two such labels with `"_"` is ambiguous
+  (`("client", "bc_discipline")` and `("client_bc", "discipline")` both
+  produce the literal string `"client_bc_discipline"`) and this was confirmed
+  to actually occur against a real `cross_segment_summary.csv` export during
+  review, not just a theoretical edge case.
 
-  A same-bc-both-sides (`"bc_bc"`) pooled value gives `assign_tier()` a new,
+  A same-bc-both-sides (`"bc::bc"`) pooled value gives `assign_tier()` a new,
   distinctly-named fallback tier, `TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE`
   (ordered directly before `TIER_INSUFFICIENT`, i.e. the weakest tier that
   still has *some* evidence), when `tp`/`cp` are both `None` — deliberately

@@ -7,10 +7,10 @@ for effectively every domain and assign_tier() always falls to
 TIER_INSUFFICIENT regardless of real bc-pooled evidence sitting unused in
 cross_segment_summary.csv. This mirrors Group 2's Option C precedent
 (gt_by_scope/gc_by_scope/gp_by_scope, tests/test_generate_governance_narrative_scope_breakdown.py):
-tc/cp/tp themselves stay gated to the single "enterprise_enterprise" pair
+tc/cp/tp themselves stay gated to the single "enterprise::enterprise" pair
 (unchanged), while tc_by_scope/cp_by_scope/tp_by_scope capture every other
 (scope_a, scope_b) pair instead of discarding it. A same-bc-both-sides
-("bc_bc") pooled value gives assign_tier() a new, explicitly-named fallback
+("bc::bc") pooled value gives assign_tier() a new, explicitly-named fallback
 tier (TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE) instead of blending into the
 existing enterprise-only `primary` -- see
 docs/governance_narrative_group1_scope_gap_investigation.md (Q2/Q3).
@@ -48,7 +48,7 @@ def _row(**overrides):
 
 def test_tc_enterprise_slice_unchanged_by_bc_scoped_rows():
     """tc (the rendered headline number) must equal exactly the
-    enterprise_enterprise-scope mean, regardless of how many bc-scoped rows
+    enterprise::enterprise-scope mean, regardless of how many bc-scoped rows
     exist alongside it -- Option A is preserved even though Option C now
     captures the rest. This is the byte-for-byte-unchanged guarantee the
     investigation's fix explicitly requires."""
@@ -73,8 +73,8 @@ def test_tc_enterprise_slice_unchanged_by_bc_scoped_rows():
 
     assert d["tc"] == 0.80
     assert d["tc_by_scope"] == {
-        "enterprise_enterprise": 0.80,
-        "bc_bc": 0.50,
+        "enterprise::enterprise": 0.80,
+        "bc::bc": 0.50,
     }
 
 
@@ -94,7 +94,7 @@ def test_tp_by_scope_absent_when_no_group1_rows():
 def test_tp_bc_pooled_when_both_sides_same_bc_no_enterprise_pair():
     """The core gap scenario: no fully-unscoped pair exists at all for this
     domain (tp/cp stay None), but two bc-scoped-both-sides pairs exist and are
-    captured under the "bc_bc" key instead of being discarded."""
+    captured under the "bc::bc" key instead of being discarded."""
     rows = [
         _row(segment_id_a="imperial|Template|BC_1", segment_id_b="imperial|Project|BC_1",
              governance_role_a="Template", governance_role_b="Project",
@@ -111,15 +111,15 @@ def test_tp_bc_pooled_when_both_sides_same_bc_no_enterprise_pair():
     d = build_cascade(rows)["materials"]
 
     assert d["tp"] is None
-    assert d["tp_by_scope"] == {"bc_bc": (0.18 + 0.995) / 2}
-    assert d["tp_by_scope_spread"] == {"bc_bc": (0.18, 0.995)}
+    assert d["tp_by_scope"] == {"bc::bc": (0.18 + 0.995) / 2}
+    assert d["tp_by_scope_spread"] == {"bc::bc": (0.18, 0.995)}
 
 
 def test_group1_scope_pair_uses_both_sides_unlike_group2():
     """Unlike Group 2 (only the target/b side is classified, since the
     reference/a side is always gated to enterprise-only), Group 1 has no
     fixed-role side -- a client-scoped 'a' paired with a bc-scoped 'b' must
-    produce a "client_bc" key, not silently collapse to one side's label."""
+    produce a "client::bc" key, not silently collapse to one side's label."""
     rows = [
         _row(segment_id_a="imperial|Template|Kaiser", segment_id_b="imperial|Container|BC_1",
              governance_role_a="Template", governance_role_b="Container",
@@ -129,8 +129,41 @@ def test_group1_scope_pair_uses_both_sides_unlike_group2():
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["ghost_domain"]
-    assert d["tc_by_scope"] == {"client_bc": 0.33}
+    assert d["tc_by_scope"] == {"client::bc": 0.33}
     assert d["tc"] is None
+
+
+def test_scope_pair_separator_does_not_collide_across_multi_dimension_labels():
+    """_target_scope_label() already joins multi-dimension side labels with "_"
+    (e.g. "bc_discipline", "client_bc"), so joining scope_a/scope_b with the
+    SAME character would be ambiguous: ("client", "bc_discipline") and
+    ("client_bc", "discipline") both concatenate to the literal string
+    "client_bc_discipline" under a bare "_" join -- confirmed to actually occur
+    in real cross_segment_summary.csv data (Container/Project rows scoped by
+    client+business-center on one side, discipline-only on the other, vs.
+    client-only on one side, business-center+discipline on the other). The "::"
+    separator (a token _target_scope_label() never produces on its own) keeps
+    these two semantically distinct pairs in separate buckets."""
+    rows = [
+        _row(segment_id_a="imperial|Container|Kaiser|BC_1", segment_id_b="imperial|Project|architectural",
+             governance_role_a="Container", governance_role_b="Project",
+             client_label_a="Kaiser", business_center_label_a="BC_1",
+             discipline_label_b="architectural",
+             comparison_type="container_to_project", domain="collision_domain",
+             all_containment_a_in_b_mean="0.20", n_files_a="2", n_files_b="3"),
+        _row(segment_id_a="imperial|Container|Kaiser", segment_id_b="imperial|Project|BC_1|architectural",
+             governance_role_a="Container", governance_role_b="Project",
+             client_label_a="Kaiser",
+             business_center_label_b="BC_1", discipline_label_b="architectural",
+             comparison_type="container_to_project", domain="collision_domain",
+             all_containment_a_in_b_mean="0.90", n_files_a="2", n_files_b="3"),
+    ]
+    normalise_summary_schema(rows)
+    d = build_cascade(rows)["collision_domain"]
+    assert d["cp_by_scope"] == {
+        "client_bc::discipline": 0.20,
+        "client::bc_discipline": 0.90,
+    }
 
 
 def test_domain_with_no_group1_rows_at_all_absent():
@@ -168,19 +201,19 @@ def _bc_pooled_dict(tp_by_scope=None, cp_by_scope=None, tc=None, cp=None, tp=Non
 
 
 def test_has_group1_bc_pooled_evidence_true_for_tp_bc_bc():
-    d = _bc_pooled_dict(tp_by_scope={"bc_bc": 0.5})
+    d = _bc_pooled_dict(tp_by_scope={"bc::bc": 0.5})
     assert _has_group1_bc_pooled_evidence(d) is True
 
 
 def test_has_group1_bc_pooled_evidence_true_for_cp_bc_bc():
-    d = _bc_pooled_dict(cp_by_scope={"bc_bc": 0.5})
+    d = _bc_pooled_dict(cp_by_scope={"bc::bc": 0.5})
     assert _has_group1_bc_pooled_evidence(d) is True
 
 
 def test_has_group1_bc_pooled_evidence_false_when_only_other_scope_pairs():
-    """A "client_bc" or "client_client" bucket is not "same-bc-both-sides" --
-    only the literal "bc_bc" key counts."""
-    d = _bc_pooled_dict(tp_by_scope={"client_bc": 0.5, "client_client": 0.9})
+    """A "client::bc" or "client::client" bucket is not "same-bc-both-sides" --
+    only the literal "bc::bc" key counts."""
+    d = _bc_pooled_dict(tp_by_scope={"client::bc": 0.5, "client::client": 0.9})
     assert _has_group1_bc_pooled_evidence(d) is False
 
 
@@ -190,7 +223,7 @@ def test_has_group1_bc_pooled_evidence_false_when_empty():
 
 
 def test_assign_tier_returns_bc_evidence_tier_when_primary_none_and_bc_pooled_present():
-    d = _bc_pooled_dict(tp_by_scope={"bc_bc": 0.6})
+    d = _bc_pooled_dict(tp_by_scope={"bc::bc": 0.6})
     assert assign_tier(d) == TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE
 
 
@@ -206,7 +239,7 @@ def test_assign_tier_enterprise_primary_path_unaffected_by_bc_data():
     as before -- bc-pooled data present alongside it must not change the
     outcome. (Uses tp=0.95, cp=0.95 -> TIER_STRONG_BASELINE-eligible path,
     with no state exceptions.)"""
-    d = _bc_pooled_dict(tc=0.90, cp=0.95, tp=0.95, tp_by_scope={"enterprise_enterprise": 0.95, "bc_bc": 0.10})
+    d = _bc_pooled_dict(tc=0.90, cp=0.95, tp=0.95, tp_by_scope={"enterprise::enterprise": 0.95, "bc::bc": 0.10})
     tier = assign_tier(d)
     assert tier != TIER_INSUFFICIENT
     assert tier != TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE
@@ -240,7 +273,7 @@ def test_detect_anomalies_flags_material_bc_divergence():
     normalise_summary_schema(rows)
     d = build_cascade(rows)["materials"]
     notes = detect_anomalies("materials", d, None)
-    matches = [n for n in notes if "bc_bc" in n and "not a converged bc-level standard" in n]
+    matches = [n for n in notes if "bc::bc" in n and "not a converged bc-level standard" in n]
     assert matches, f"expected a bc-pooled divergence note, got: {notes}"
     assert "18%" in matches[0] and "100%" in matches[0]
 
@@ -280,7 +313,7 @@ def test_render_group1_scope_section_includes_bc_bc_row():
     cascade = build_cascade(rows)
     section = render_group1_scope_section(cascade)
     assert "## Group 1 Propagation by Scope" in section
-    assert "| Materials | bc_bc | — | 0.588 | — |" in section  # mean of 0.18/0.995
+    assert "| Materials | bc::bc | — | 0.588 | — |" in section  # mean of 0.18/0.995
 
 
 def test_render_group1_scope_section_empty_when_only_enterprise_pair():
@@ -293,7 +326,7 @@ def test_render_group1_scope_section_empty_when_only_enterprise_pair():
     normalise_summary_schema(rows)
     cascade = build_cascade(rows)
     section = render_group1_scope_section(cascade)
-    assert "| Arrowheads | enterprise_enterprise |" in section
+    assert "| Arrowheads | enterprise::enterprise |" in section
 
 
 def test_render_group1_scope_section_empty_when_no_group1_data():
