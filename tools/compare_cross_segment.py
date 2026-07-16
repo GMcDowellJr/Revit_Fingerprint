@@ -1752,8 +1752,8 @@ def _build_ancestor_map(manifest: Dict[str, Dict[str, str]]) -> Dict[str, Set[st
             return ancestors[sid]
         parent = manifest.get(sid, {}).get("parent_segment_id", "").strip()
         result: Set[str] = set()
-        if parent and parent != sid:
-            if parent in seen:
+        if parent:
+            if parent == sid or parent in seen:
                 sys.exit(
                     "[error] Blocked: cyclic segment ancestry detected — "
                     f"{sid!r} revisits already-seen segment {parent!r} while "

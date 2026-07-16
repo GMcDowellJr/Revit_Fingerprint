@@ -680,9 +680,15 @@ def main() -> int:
     )
 
     if not any_found:
+        # Every default file being individually "optional to skip" is fine —
+        # but all of them missing at once almost certainly means
+        # --cross-segment-dir is wrong or empty, not a legitimately sparse
+        # run. Block instead of reporting a clean "ok" with zero extracted
+        # data, so automation doesn't mistake this for a successful extract.
+        blocked = True
         print(
-            f"[warn] none of {target_filenames!r} were found under {args.cross_segment_dir} — "
-            "check --cross-segment-dir",
+            f"[error] Blocked: none of {target_filenames!r} were found under "
+            f"{args.cross_segment_dir} — check --cross-segment-dir",
             file=sys.stderr,
         )
 
