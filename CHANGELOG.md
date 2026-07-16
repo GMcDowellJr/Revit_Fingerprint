@@ -41,6 +41,92 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   etc.), not a small fixed set like disciplines. The section is omitted
   entirely when no domain has any scope-breakdown data.
 
+- `tools/generate_governance_narrative.py`'s Group 1 dispatch (`tc`/`cp`/`tp`
+  from `template_to_container`/`container_to_project`/`template_to_project`)
+  gets the same Option C treatment Group 2 (`gt`/`gc`/`gp`) got above, closing
+  the gap documented in
+  `docs/governance_narrative_group1_scope_gap_investigation.md`: since
+  `business_center_label` became a real segmentation cut, almost no segment is
+  fully unscoped anymore, so `tp`/`cp` were `None` for effectively every
+  domain and `assign_tier()` always fell to `TIER_INSUFFICIENT` regardless of
+  real bc-pooled evidence sitting unused in `cross_segment_summary.csv`. `tc`/
+  `cp`/`tp` themselves are unchanged — still populated only from the
+  `"enterprise::enterprise"` (both sides pass `_is_unscoped_segment()`) pair —
+  but new `tc_by_scope`/`cp_by_scope`/`tp_by_scope` (`{scope_pair:
+  mean_containment}`, keyed `f"{scope_a}::{scope_b}"` since, unlike Group 2,
+  neither side of a Group 1 pair is gated to a fixed role population) now
+  capture every other `(scope_a, scope_b)` pair instead of discarding it. The
+  separator is `"::"`, not a bare `"_"`, because `_target_scope_label()`'s own
+  multi-dimension labels (e.g. `"bc_discipline"`, `"client_bc"`) already
+  contain underscores — joining two such labels with `"_"` is ambiguous
+  (`("client", "bc_discipline")` and `("client_bc", "discipline")` both
+  produce the literal string `"client_bc_discipline"`) and this was confirmed
+  to actually occur against a real `cross_segment_summary.csv` export during
+  review, not just a theoretical edge case.
+
+  A same-bc-both-sides (`"bc::bc"`) pooled value gives `assign_tier()` a new,
+  distinctly-named fallback tier, `TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE`
+  (ordered directly before `TIER_INSUFFICIENT`, i.e. the weakest tier that
+  still has *some* evidence), when `tp`/`cp` are both `None` — deliberately
+  NOT blended into the existing enterprise-only `primary`/score-banded tiers,
+  since bc-pooled evidence is not enterprise-level evidence. The `T→Container`/
+  `T→Project`/`C→Project` columns in `render_domain_tiers()` stay `—` for
+  domains in the new tier (never silently repointed at a pooled number); a new
+  `render_group1_scope_section()` (mirroring `render_generic_baseline_scope_section()`)
+  renders the per-`(domain, scope_pair)` detail instead. `detect_anomalies()`
+  gained a Group 1 analog of the existing scope-divergence note: since Group 1
+  usually has no enterprise reading to diverge from (that's the gap this fix
+  closes), the check instead flags when a pooled bucket's own intra-bucket
+  spread (min/max across the individual rows pooled into it) is ≥0.25
+  absolute — the same materiality threshold as Group 2's check — meaning the
+  pooled mean is hiding sharp disagreement rather than reflecting genuine
+  convergence. The note's wording is deliberately scope-neutral rather than
+  always saying "business-center": validating against a real
+  `cross_segment_summary.csv` showed most divergence notes actually fire for
+  scope pairs like `client_bc::client_discipline`, where the client and
+  business center are held constant and only the discipline varies across the
+  pooled rows — an earlier wording draft said "across individual
+  business-center pairs" unconditionally, which was accurate only for the
+  `"bc::bc"` case and misleading for every other scope_pair.
+
+- Four PR-review findings on the Group 1 bc-pooled fallback above, all
+  confirmed against the real `cross_segment_summary.csv`/`segment_manifest.csv`
+  export supplied during review:
+  1. **Value-mismatch guard (new `_group1_scope_pair()`)**: `_target_scope_label()`
+     only records SHAPE (which dimensions are populated), not VALUE.
+     `discover_within_segment()` in `compare_cross_segment.py` pairs same-parent,
+     same-unit Template/Container/Project segments without checking that scope
+     label VALUES match, so a `BC_1`-scoped segment paired against a
+     `BC_2`-scoped segment was silently bucketed as `"bc::bc"` — the same key as
+     genuine same-business-center evidence. Confirmed reachable in the real
+     export: one real row (`client_bc_discipline` shape on both sides, one field
+     mismatched) was landing in a merged bucket, corrupting 20 domains'
+     `tc_by_scope` entries. New `_group1_scope_pair()` verifies every field
+     making up a shared shape actually matches before using the plain
+     `f"{scope_a}::{scope_b}"` key; a same-shape-different-value pair now gets a
+     distinct `f"{scope_a}!cross::{scope_b}!cross"` key instead — captured, not
+     discarded, but never conflated with same-value pooled evidence. `tc`/`cp`/`tp`
+     remain byte-for-byte unchanged (re-verified: 0 mismatches across all 32 real
+     domains).
+  2. **`_has_renderable_cascade_signal()` scope-only gap**: a domain whose ONLY
+     Group 1 signal is scoped evidence (e.g. `tp_by_scope["bc::bc"]` populated
+     but no enterprise `tc`/`cp`/`tp` and no `wp_all`/Group 2 signal) would get
+     `TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE` from `assign_tier()` but never
+     appear in `render_domain_tiers()`/the domain CSV, since
+     `_has_renderable_cascade_signal()`'s key list didn't include
+     `tc_by_scope`/`cp_by_scope`/`tp_by_scope` (which are always non-`None`
+     dicts, so they can't reuse the existing `is not None` check). Now also
+     checks for a non-empty by-scope dict.
+  3. **`render_group1_scope_section()` prose overclaimed "business-center-level"**:
+     the section's intro described every non-enterprise row as "pooled
+     business-center-level evidence," but it renders every scope_pair, most of
+     which (`client::bc`, `client_bc::discipline`, etc.) are not business-center
+     evidence at all. Reworded to name only `"bc::bc"` as business-center-level
+     and tier-relevant; other scope pairs are described as real evidence in
+     their own right that does not by itself grant the new tier. (The
+     equivalent `detect_anomalies()` wording was already fixed in the prior
+     commit.)
+
 ### Fixed
 - `tools/archetype/generate_archetype_candidates.py`'s `_governance_question_hint()`
   only ever inspected `target_domain`, so it couldn't distinguish a dynamic
