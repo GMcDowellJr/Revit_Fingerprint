@@ -340,6 +340,40 @@ def test_package_manifest_records_comparison_run_ids(tmp_path, monkeypatch):
     assert manifest["corpus_scope"]["source_executed_utc"] == ["2026-07-16T00:00:00Z"]
 
 
+def test_package_manifest_comparison_run_ids_include_pooled_only_values(tmp_path, monkeypatch):
+    """If --summary and --pooled are accidentally taken from different runs,
+    the manifest's provenance sets must surface both run ids / timestamps,
+    not just summary's -- otherwise a mixed-run package looks single-run."""
+    summary_rows = [
+        _summary_row(
+            comparison_run_id="run1", segment_id_a="imperial|Template",
+            segment_id_b="imperial|Project|acme", governance_role_a="Template",
+            governance_role_b="Project", client_label_b="acme",
+            comparison_type="template_to_project", domain="line_styles",
+            all_containment_a_in_b_mean="0.8", all_jaccard_mean="0.5",
+            n_files_a="3", n_files_b="10", data_sufficient="true",
+            executed_utc="2026-07-16T00:00:00Z", unit_system="imperial",
+        ),
+    ]
+    pooled_rows = [
+        _pooled_row(
+            comparison_run_id="run2", segment_id="imperial|Project|acme",
+            client_label="acme", governance_role="Project", pool_scope="parent_sibling",
+            domain="line_styles", n_files_focal="10", n_files_pool="30",
+            data_sufficient="true", executed_utc="2026-07-15T00:00:00Z",
+        ),
+    ]
+    summary_path = tmp_path / "cross_segment_summary.csv"
+    pooled_path = tmp_path / "cross_segment_pooled.csv"
+    _write_csv(summary_path, SUMMARY_FIELDS, summary_rows)
+    _write_csv(pooled_path, POOLED_FIELDS, pooled_rows)
+
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["corpus_scope"]["comparison_run_ids"] == ["run1", "run2"]
+    assert manifest["corpus_scope"]["source_executed_utc"] == ["2026-07-15T00:00:00Z", "2026-07-16T00:00:00Z"]
+
+
 def test_package_health_schema_detection_dual_for_dual_view_rows(tmp_path, monkeypatch):
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])

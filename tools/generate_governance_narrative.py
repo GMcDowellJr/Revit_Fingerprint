@@ -3404,8 +3404,20 @@ def main():
             "governance_evidence_map": "artifact navigation index",
         }
 
-        comparison_run_ids = sorted({r.get("comparison_run_id", "") for r in summary_rows} - {""})
-        source_executed_utc = sorted({r.get("executed_utc", "") for r in summary_rows} - {""})
+        comparison_run_ids = sorted(
+            (
+                {r.get("comparison_run_id", "") for r in summary_rows}
+                | {r.get("comparison_run_id", "") for r in pooled_rows}
+            )
+            - {""}
+        )
+        source_executed_utc = sorted(
+            (
+                {r.get("executed_utc", "") for r in summary_rows}
+                | {r.get("executed_utc", "") for r in pooled_rows}
+            )
+            - {""}
+        )
 
         # health.json and evidence_map.json are built and written *before* the
         # manifest, and the manifest is built from an output_paths view that
