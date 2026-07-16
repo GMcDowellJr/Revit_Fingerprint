@@ -586,12 +586,13 @@ def build_evidence_map(
          "and the narrative's discipline section"],
         ["excludes EXCLUDED_FROM_SCORING domains from aggregate framing (still "
          "listed as a row); fmt()/pct() render a present-but-None numeric field "
-         "as the em-dash '-' string, while a governance-state column for a "
-         "domain with no governance_state_summary entry at all renders as '' "
-         "(empty string) -- two different 'missing' states use two different "
-         "cell conventions in this CSV, documented but not unified in PR1."],
+         "as the em-dash — string (not an ASCII hyphen), while a governance-state "
+         "column for a domain with no governance_state_summary entry at all "
+         "renders as '' (empty string) -- two different 'missing' states use "
+         "two different cell conventions in this CSV, documented but not "
+         "unified in PR1."],
         {
-            "*(fmt/pct-formatted columns)": "'-' means the field exists in the schema but has no data for this domain.",
+            "*(fmt/pct-formatted columns)": "— (em dash, U+2014 -- not an ASCII hyphen) means the field exists in the schema but has no data for this domain.",
             "*(governance-state columns)": "'' (empty string) means governance_state_summary has no entry for this domain at all -- a different condition than a present-but-None value.",
         },
         ["cross_segment_summary", "cross_segment_pooled", "cross_segment_governance_state_summary"],
@@ -609,7 +610,7 @@ def build_evidence_map(
         ["per-domain detail -- see governance_domain_summary.csv"],
         ["inherits the cross_segment_pooled.csv A2 pool_scope caveat -- see that "
          "artifact's known_limitations."],
-        {"*(fmt-formatted columns)": "'-' means the field exists but has no data for this client."},
+        {"*(fmt-formatted columns)": "— (em dash, U+2014 -- not an ASCII hyphen) means the field exists but has no data for this client."},
         ["cross_segment_summary", "cross_segment_pooled", "client_sector"],
     ))
 

@@ -370,3 +370,16 @@ def test_evidence_map_known_limitations_text_has_no_severity_language():
         lowered = text.lower()
         for term in denylist:
             assert term not in lowered, f"severity language '{term}' found in {a['artifact_id']}: {text}"
+
+
+def test_domain_and_client_summary_null_semantics_cite_the_actual_em_dash():
+    """Regression test for a PR review finding: null_semantics claimed an
+    ASCII hyphen '-' is the missing-value marker, but fmt()/pct() in
+    generate_governance_narrative.py actually write the em dash '—'
+    (U+2014) for a present-but-None numeric cell. A consumer normalizing the
+    CSV by this metadata must be told the real character."""
+    em = _evidence_map()
+    for artifact_id in ("governance_domain_summary", "governance_client_summary"):
+        entry = next(a for a in em["artifacts"] if a["artifact_id"] == artifact_id)
+        text = " ".join(entry["null_semantics"].values())
+        assert "—" in text, f"{artifact_id}.null_semantics does not mention the actual em dash: {text}"
