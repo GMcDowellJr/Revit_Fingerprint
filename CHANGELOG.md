@@ -77,10 +77,17 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   gained a Group 1 analog of the existing scope-divergence note: since Group 1
   usually has no enterprise reading to diverge from (that's the gap this fix
   closes), the check instead flags when a pooled bucket's own intra-bucket
-  spread (min/max across the individual business-center pairs backing it) is
-  ≥0.25 absolute — the same materiality threshold as Group 2's check — meaning
-  the pooled mean is hiding sharp per-bc disagreement rather than reflecting
-  genuine convergence.
+  spread (min/max across the individual rows pooled into it) is ≥0.25
+  absolute — the same materiality threshold as Group 2's check — meaning the
+  pooled mean is hiding sharp disagreement rather than reflecting genuine
+  convergence. The note's wording is deliberately scope-neutral rather than
+  always saying "business-center": validating against a real
+  `cross_segment_summary.csv` showed most divergence notes actually fire for
+  scope pairs like `client_bc::client_discipline`, where the client and
+  business center are held constant and only the discipline varies across the
+  pooled rows — an earlier wording draft said "across individual
+  business-center pairs" unconditionally, which was accurate only for the
+  `"bc::bc"` case and misleading for every other scope_pair.
 
 ### Fixed
 - `tools/archetype/generate_archetype_candidates.py`'s `_governance_question_hint()`

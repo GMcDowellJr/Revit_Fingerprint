@@ -544,9 +544,13 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
         gap documented in docs/governance_narrative_group1_scope_gap_investigation.md.
       tc_by_scope_spread/cp_by_scope_spread/tp_by_scope_spread: {scope_pair:
         (min, max)} for any scope_pair backed by >=2 rows -- lets detect_anomalies
-        flag a scope_pair (typically "bc::bc") whose pooled mean hides sharp
-        disagreement between individual business-center pairs, instead of only
-        ever reporting the mean.
+        flag a scope_pair whose pooled mean hides sharp disagreement between the
+        individual rows pooled into it, instead of only ever reporting the mean.
+        The varying dimension depends on which scope_pair fired: "bc::bc" pools
+        distinct business centers, but e.g. "client_bc::client_discipline" pools
+        rows that share the same client/bc and vary only by discipline -- see
+        detect_anomalies()'s note text, which is deliberately scope-neutral
+        rather than always saying "business-center."
       ep/bp/eb/ec: enterprise->project / bc->project / enterprise->bc / enterprise->client
         containment_a_in_b_mean (Group 3 — scope-level fan-out, captured but not yet
         rendered/tiered/anomaly-detected; see CASCADE_GROUP3_TYPES)
@@ -1287,16 +1291,24 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
                 "specific practice is diverging from or exceeding the enterprise baseline."
             )
 
-    # Group 1 bc-pooled intra-bucket divergence — a distinct governance question
+    # Group 1 by-scope intra-bucket divergence — a distinct governance question
     # from Group 2's enterprise-vs-scoped check above: Group 1 (tc/cp/tp) usually
     # has NO enterprise-level reading to compare against at all (that's the gap
     # tc_by_scope/cp_by_scope/tp_by_scope exists to fill — see
     # docs/governance_narrative_group1_scope_gap_investigation.md), so the risk
-    # here isn't "enterprise differs from scoped" but "the bc-pooled MEAN itself
-    # hides sharp disagreement between individual business-center pairs." Uses
-    # the same >=0.25 absolute-gap materiality threshold as the Group 2 check
-    # above, applied to each scope_pair's own (min, max) spread instead of an
-    # enterprise-vs-mean comparison.
+    # here isn't "enterprise differs from scoped" but "the pooled MEAN itself
+    # hides sharp disagreement between the individual rows pooled into it."
+    # Deliberately scope-neutral wording: a scope_pair like "bc::bc" pools
+    # multiple DISTINCT business centers when more than one exists, but a
+    # scope_pair like "client_bc::client_discipline" pools rows that share the
+    # same client/bc and vary only by discipline (confirmed against real
+    # cross_segment_summary.csv data -- see docs/governance_narrative_group1_scope_gap_investigation.md
+    # follow-up) -- the note must not claim "business-center" divergence when
+    # the actual varying dimension for that particular scope_pair could be
+    # client or discipline instead. Uses the same >=0.25 absolute-gap
+    # materiality threshold as the Group 2 check above, applied to each
+    # scope_pair's own (min, max) spread instead of an enterprise-vs-mean
+    # comparison.
     for cascade_label, by_scope_spread, by_scope_mean in (
         ("Template→Container", d.get("tc_by_scope_spread") or {}, d.get("tc_by_scope") or {}),
         ("Container→Project", d.get("cp_by_scope_spread") or {}, d.get("cp_by_scope") or {}),
@@ -1308,10 +1320,11 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
             if hi - lo >= 0.25:
                 notes.append(
                     f"{cascade_label} pooled evidence for scope '{scope_pair}' spans "
-                    f"{pct(lo)}–{pct(hi)} across individual business-center pairs "
-                    f"(pooled mean {pct(by_scope_mean.get(scope_pair))}). This is not a "
-                    "converged bc-level standard — review per-business-center variation "
-                    "before treating the pooled mean as a single reading."
+                    f"{pct(lo)}–{pct(hi)} across the individual rows pooled into this "
+                    f"bucket (pooled mean {pct(by_scope_mean.get(scope_pair))}). This "
+                    "scope level is not a single converged reading — review the "
+                    "underlying per-row variation before treating the pooled mean as "
+                    "one number."
                 )
 
     if tc is not None and tp is not None and tp > tc + 0.25:

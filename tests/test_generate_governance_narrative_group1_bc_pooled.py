@@ -273,7 +273,7 @@ def test_detect_anomalies_flags_material_bc_divergence():
     normalise_summary_schema(rows)
     d = build_cascade(rows)["materials"]
     notes = detect_anomalies("materials", d, None)
-    matches = [n for n in notes if "bc::bc" in n and "not a converged bc-level standard" in n]
+    matches = [n for n in notes if "bc::bc" in n and "scope level is not a single converged reading" in n]
     assert matches, f"expected a bc-pooled divergence note, got: {notes}"
     assert "18%" in matches[0] and "100%" in matches[0]
 
@@ -283,7 +283,7 @@ def test_detect_anomalies_silent_when_bc_pairs_agree():
     normalise_summary_schema(rows)
     d = build_cascade(rows)["materials"]
     notes = detect_anomalies("materials", d, None)
-    assert not any("not a converged bc-level standard" in n for n in notes)
+    assert not any("scope level is not a single converged reading" in n for n in notes)
 
 
 def test_detect_anomalies_silent_when_only_one_bc_pair():
@@ -300,7 +300,7 @@ def test_detect_anomalies_silent_when_only_one_bc_pair():
     d = build_cascade(rows)["materials"]
     assert d["tp_by_scope_spread"] == {}
     notes = detect_anomalies("materials", d, None)
-    assert not any("not a converged bc-level standard" in n for n in notes)
+    assert not any("scope level is not a single converged reading" in n for n in notes)
 
 
 # ---------------------------------------------------------------------------
