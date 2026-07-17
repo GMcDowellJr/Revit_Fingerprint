@@ -74,11 +74,20 @@ def test_strong_baseline_candidate_finding():
 
 
 def test_baseline_candidate_without_strong_for_container_gap():
+    """Regression test for a PR review finding: TIER_BASELINE_CONTAINER_GAP
+    (primary >= 0.90 but template_to_container < 0.60) is the fourth possible
+    reason a domain in baseline_candidate isn't also strong_baseline_candidate
+    -- template_to_container must be listed in support fields, not just the
+    other three primary/state drivers."""
     cascade = {"line_styles": _min_domain_dict(tc=0.30, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95)}
     findings = build_structured_findings(cascade, [], None)
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert ("line_styles", "baseline_candidate") in types
     assert ("line_styles", "strong_baseline_candidate") not in types
+
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "baseline_candidate")
+    assert "template_to_container" in finding["support"][0]["fields"]
 
 
 def test_active_local_practice_and_local_review_required():

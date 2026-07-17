@@ -3098,13 +3098,16 @@ def build_structured_findings(
             # band; local_active_share/provided_passive_share/provided_missing_share
             # are the three fields _has_material_state_exception() checks to
             # downgrade a >=0.90 domain into Baseline Candidate -- Local/Use
-            # Review instead of Strong Baseline, and provided_to_used_containment
+            # Review instead of Strong Baseline; provided_to_used_containment
             # is the separate active-use-floor check assign_tier() applies at
-            # that same threshold -- all four can be the reason a domain in
-            # this bucket isn't also strong_baseline_candidate.
+            # that same threshold; and template_to_container is the fourth
+            # possible reason -- TIER_BASELINE_CONTAINER_GAP fires when primary
+            # >= 0.90 but template_to_container < 0.60, independent of the state
+            # fields above. All five can be the reason a domain in this bucket
+            # isn't also strong_baseline_candidate.
             ["governance_tier", "template_to_project", "container_to_project",
-             "local_active_share", "provided_passive_share", "provided_missing_share",
-             "provided_to_used_containment"],
+             "template_to_container", "local_active_share", "provided_passive_share",
+             "provided_missing_share", "provided_to_used_containment"],
         )
     for dom in domain_buckets["local_review_required"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
