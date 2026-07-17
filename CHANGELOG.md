@@ -30,6 +30,25 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   source. Jaccard-based, undirected (mirrors `sibling_projects`'s scoring
   path); no governance-state rows are written for it (not in
   `GOVERNANCE_STATE_DIRECTED_TYPES`), matching `sibling_projects`.
+  `build_client_summary()`'s `xc_by_client`/`xc_dom_by_client` read
+  `client_label_a`/`client_label_b` directly rather than positionally parsing
+  `segment_id` (the old `len(pa) == 3` assumption only held for the
+  `unit|role|client`-shaped IDs `build_segment_manifest.py` happens to emit
+  for a client-only Project segment; `discover_cross_client()` places no such
+  constraint on `segment_id` shape), with an explicit `ca != cb` guard to
+  preserve the existing within-client-sibling exclusion the old check
+  enforced incidentally. `client_files`'s `n_project_files` backfill now also
+  recognizes `cross_client` rows (previously `sibling_projects`-only), so a
+  client discoverable only via a `cross_client` row no longer falsely reports
+  `n_project_files=0`. New `drop_legacy_sibling_projects_covered_by_cross_client()`
+  in `compare_cross_segment.py` drops a `sibling_projects` pair when
+  `cross_client` already covers the identical two segments (they can share an
+  immediate `parent_segment_id`, since `discover_sibling_segments()` groups
+  purely by parent/role/unit) -- otherwise both would double-count that one
+  pair in `xc`/`xc_by_client` and collide on `comparison_run_id`
+  (`make_comparison_run_id()` hashes only segment IDs + timestamp, not
+  comparison_type -- a broader, pre-existing characteristic of that
+  identifier, not changed here).
 - `governance_domain_summary.csv` gains `container_to_project_scoped` /
   `container_to_project_scoped_pair` columns in
   `tools/generate_governance_narrative.py`. Root cause: `container_to_project`

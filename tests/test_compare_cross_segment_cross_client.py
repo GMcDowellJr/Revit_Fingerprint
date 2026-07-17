@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 from compare_cross_segment import (  # noqa: E402
     _is_client_only_project_segment,
     discover_cross_client,
+    drop_legacy_sibling_projects_covered_by_cross_client,
 )
 
 
@@ -142,3 +143,62 @@ def test_discover_cross_client_no_self_pair_or_reverse_duplicate():
     pairs = discover_cross_client(manifest)
     assert ("p_b", "p_a", "cross_client") not in pairs
     assert ("p_a", "p_a", "cross_client") not in pairs
+
+
+# ---------------------------------------------------------------------------
+# drop_legacy_sibling_projects_covered_by_cross_client()
+# ---------------------------------------------------------------------------
+
+def test_drops_sibling_projects_when_same_pair_covered_by_cross_client():
+    """Regression for a Codex review finding on PR #370: when
+    discover_sibling_segments() and discover_cross_client() both fire for the
+    same two client-only Project segments (they share an immediate parent),
+    keeping both double-counts that pair in xc/xc_by_client and collides on
+    comparison_run_id. cross_client wins; the sibling_projects entry for that
+    exact pair is dropped."""
+    pairs = [
+        ("p_kaiser", "p_sutter", "sibling_projects"),
+        ("p_kaiser", "p_sutter", "cross_client"),
+    ]
+    result = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
+    assert result == [("p_kaiser", "p_sutter", "cross_client")]
+
+
+def test_drop_legacy_sibling_projects_is_order_independent():
+    pairs = [
+        ("p_sutter", "p_kaiser", "sibling_projects"),
+        ("p_kaiser", "p_sutter", "cross_client"),
+    ]
+    result = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
+    assert result == [("p_kaiser", "p_sutter", "cross_client")]
+
+
+def test_drop_legacy_sibling_projects_leaves_uncovered_pairs_untouched():
+    """A sibling_projects pair with no matching cross_client entry (e.g. two
+    discipline-scoped Project siblings, which discover_cross_client() never
+    emits) must be preserved."""
+    pairs = [
+        ("p_kaiser_arch", "p_kaiser_elec", "sibling_projects"),
+        ("p_kaiser", "p_sutter", "cross_client"),
+    ]
+    result = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
+    assert ("p_kaiser_arch", "p_kaiser_elec", "sibling_projects") in result
+    assert ("p_kaiser", "p_sutter", "cross_client") in result
+    assert len(result) == 2
+
+
+def test_drop_legacy_sibling_projects_leaves_other_types_untouched():
+    """Only sibling_projects is special-cased against cross_client -- other
+    comparison_types for the exact same pair (a real, expected scenario per
+    deduplicate_pairs()'s own docstring) must not be touched by this function."""
+    pairs = [
+        ("p_kaiser", "p_sutter", "template_to_project"),
+        ("p_kaiser", "p_sutter", "cross_client"),
+    ]
+    result = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
+    assert set(result) == set(pairs)
+
+
+def test_drop_legacy_sibling_projects_noop_when_no_cross_client_rows():
+    pairs = [("p_kaiser", "p_sutter", "sibling_projects")]
+    assert drop_legacy_sibling_projects_covered_by_cross_client(pairs) == pairs

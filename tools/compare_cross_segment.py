@@ -2309,6 +2309,36 @@ def deduplicate_pairs(pairs: List[ComparisonPair]) -> List[ComparisonPair]:
     return result
 
 
+def drop_legacy_sibling_projects_covered_by_cross_client(
+    pairs: List[ComparisonPair],
+) -> List[ComparisonPair]:
+    """sibling_projects and cross_client can both fire for the exact same
+    (seg_a, seg_b) pair: discover_sibling_segments() groups Project-role
+    segments purely by (parent_segment_id, unit_system), so two client-only
+    Project segments discover_cross_client() already pairs can ALSO share an
+    immediate parent (e.g. an enterprise-wide "unit|Project" rollup) and get
+    re-paired as sibling_projects. Unlike deduplicate_pairs()'s general case
+    (different comparison_types for the same pair are usually distinct
+    analytical questions and must all be preserved), these two specifically
+    measure the identical underlying file-level comparison for the identical
+    two segments -- keeping both would double-count that one pair in
+    build_cascade()'s xc / build_client_summary()'s xc_by_client downstream,
+    and collide on compare_cross_segment_run_id (make_comparison_run_id()
+    hashes only segment IDs + timestamp, not comparison_type -- a broader,
+    pre-existing characteristic of that identifier not touched here).
+    cross_client is the purpose-built, unambiguous producer for this signal;
+    drop the sibling_projects entry (order-independent) for any pair
+    cross_client already covers, and leave every other pair/type untouched.
+    """
+    cross_client_pairs = {
+        frozenset((a, b)) for a, b, ctype in pairs if ctype == "cross_client"
+    }
+    return [
+        (a, b, ctype) for a, b, ctype in pairs
+        if not (ctype == "sibling_projects" and frozenset((a, b)) in cross_client_pairs)
+    ]
+
+
 # ---------------------------------------------------------------------------
 # comparison_run_id
 # ---------------------------------------------------------------------------
@@ -3639,6 +3669,7 @@ def main() -> int:
     if args.cross_client:
         pairs.extend(discover_cross_client(manifest))
 
+    pairs = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
     pairs = deduplicate_pairs(pairs)
 
     # Filter by --segment-a / --segment-b
