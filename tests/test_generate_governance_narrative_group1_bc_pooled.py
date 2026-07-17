@@ -262,6 +262,114 @@ def test_scope_only_domain_reaches_bc_evidence_tier_in_full_pipeline():
     assert assign_tier(d) == TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE
 
 
+def test_cp_scoped_fallback_populated_when_data_sufficient_and_no_enterprise_pair():
+    """The container_to_project rollup-gap fix: cp stays None (no enterprise::
+    enterprise pair), but a data_sufficient, non-enterprise-scoped row must
+    surface via cp_scoped/cp_scoped_pair instead of being silently dropped."""
+    rows = [
+        _row(segment_id_a="imperial|Container|2014", segment_id_b="imperial|Project|2014",
+             governance_role_a="Container", governance_role_b="Project",
+             comparison_type="container_to_project", domain="arrowheads",
+             all_containment_a_in_b_mean="0.95", n_files_a="30", n_files_b="40",
+             data_sufficient="true"),
+    ]
+    normalise_summary_schema(rows)
+    d = build_cascade(rows)["arrowheads"]
+    assert d["cp"] is None
+    assert d["cp_scoped"] == 0.95
+    assert d["cp_scoped_pair"] == "other_scoped::other_scoped"
+
+
+def test_cp_scoped_fallback_ignores_data_insufficient_rows():
+    """A row that fails compare_cross_segment.py's own data_sufficient rule
+    must not feed cp_scoped -- this fix must not invent evidence out of pairs
+    the producer itself flagged as too small to interpret."""
+    rows = [
+        _row(segment_id_a="imperial|Container|2014", segment_id_b="imperial|Project|2014",
+             governance_role_a="Container", governance_role_b="Project",
+             comparison_type="container_to_project", domain="arrowheads",
+             all_containment_a_in_b_mean="0.95", n_files_a="2", n_files_b="2",
+             data_sufficient="false"),
+    ]
+    normalise_summary_schema(rows)
+    d = build_cascade(rows)["arrowheads"]
+    assert d["cp_scoped"] is None
+    assert d["cp_scoped_pair"] is None
+    # existing cp_by_scope population is untouched by the data_sufficient gate
+    assert d["cp_by_scope"] == {"other_scoped::other_scoped": 0.95}
+
+
+def test_cp_scoped_fallback_does_not_change_cp_by_scope_population():
+    """cp_by_scope_suff is a separate accumulator, not a filtered view -- the
+    existing cp_by_scope consumers (_has_group1_bc_pooled_evidence(),
+    render_group1_scope_section()) must see exactly the same rows as before
+    this fix, regardless of data_sufficient."""
+    rows = [
+        _row(segment_id_a="imperial|Container|BC_1", segment_id_b="imperial|Project|BC_1",
+             governance_role_a="Container", governance_role_b="Project",
+             business_center_label_a="BC_1", business_center_label_b="BC_1",
+             comparison_type="container_to_project", domain="materials",
+             all_containment_a_in_b_mean="0.5", n_files_a="2", n_files_b="2",
+             data_sufficient="false"),
+    ]
+    normalise_summary_schema(rows)
+    d = build_cascade(rows)["materials"]
+    assert d["cp_by_scope"] == {"bc::bc": 0.5}
+    assert _has_group1_bc_pooled_evidence(d) is True
+    assert d["cp_scoped"] is None
+
+
+def test_cp_scoped_fallback_prefers_enterprise_pair_when_present():
+    """When a genuine enterprise::enterprise pair exists, cp is populated and
+    cp_scoped must stay None -- the scoped fallback only fires when cp itself
+    is empty, never alongside it."""
+    rows = [
+        _row(segment_id_a="imperial|Container", segment_id_b="imperial|Project",
+             governance_role_a="Container", governance_role_b="Project",
+             comparison_type="container_to_project", domain="arrowheads",
+             all_containment_a_in_b_mean="0.85", n_files_a="10", n_files_b="10",
+             data_sufficient="true"),
+        _row(segment_id_a="imperial|Container|2014", segment_id_b="imperial|Project|2014",
+             governance_role_a="Container", governance_role_b="Project",
+             comparison_type="container_to_project", domain="arrowheads",
+             all_containment_a_in_b_mean="0.10", n_files_a="30", n_files_b="40",
+             data_sufficient="true"),
+    ]
+    normalise_summary_schema(rows)
+    d = build_cascade(rows)["arrowheads"]
+    assert d["cp"] == 0.85
+    assert d["cp_scoped"] is None
+
+
+def test_cp_scoped_fallback_picks_bucket_with_most_rows():
+    """When more than one non-enterprise, data_sufficient scope_pair exists,
+    the largest (most rows) bucket wins, deterministically."""
+    rows = [
+        _row(segment_id_a="imperial|Container|Kaiser", segment_id_b="imperial|Project|Kaiser",
+             governance_role_a="Container", governance_role_b="Project",
+             client_label_a="Kaiser", client_label_b="Kaiser",
+             comparison_type="container_to_project", domain="fill_patterns_model",
+             all_containment_a_in_b_mean="0.30", n_files_a="10", n_files_b="10",
+             data_sufficient="true"),
+        _row(segment_id_a="imperial|Container|BC_1", segment_id_b="imperial|Project|BC_1",
+             governance_role_a="Container", governance_role_b="Project",
+             business_center_label_a="BC_1", business_center_label_b="BC_1",
+             comparison_type="container_to_project", domain="fill_patterns_model",
+             all_containment_a_in_b_mean="0.70", n_files_a="10", n_files_b="10",
+             data_sufficient="true"),
+        _row(segment_id_a="imperial|Container|BC_2", segment_id_b="imperial|Project|BC_2",
+             governance_role_a="Container", governance_role_b="Project",
+             business_center_label_a="BC_2", business_center_label_b="BC_2",
+             comparison_type="container_to_project", domain="fill_patterns_model",
+             all_containment_a_in_b_mean="0.90", n_files_a="10", n_files_b="10",
+             data_sufficient="true"),
+    ]
+    normalise_summary_schema(rows)
+    d = build_cascade(rows)["fill_patterns_model"]
+    assert d["cp_scoped_pair"] == "bc::bc"
+    assert d["cp_scoped"] == (0.70 + 0.90) / 2
+
+
 def test_domain_with_no_group1_rows_at_all_absent():
     """A domain with no template_to_container/container_to_project/
     template_to_project/parent_sibling_roles rows at all must not appear in

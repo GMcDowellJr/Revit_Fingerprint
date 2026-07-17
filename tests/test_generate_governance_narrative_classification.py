@@ -239,6 +239,76 @@ def test_within_client_sibling_projects_excluded_from_cross_client_xc():
     assert cascade["arrowheads"]["xc"] == 0.5
 
 
+# ---------------------------------------------------------------------------
+# cross_client comparison type (governance pipeline gap fix)
+# ---------------------------------------------------------------------------
+
+def test_cascade_cross_client_feeds_xc_without_sector_gate():
+    """Unlike sibling_projects (gated to both-healthcare pairs), the purpose-
+    built cross_client type must feed xc regardless of sector -- sector
+    filtering, if wanted, is a downstream/consumer concern, not baked into
+    build_cascade()'s own accumulation for this type."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Intel", segment_id_b="imperial|Project|Acme",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Intel", client_label_b="Acme",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.7", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    # No sector_map at all -- neither client classified.
+    cascade = build_cascade(rows)
+    assert cascade["arrowheads"]["xc"] == 0.7
+
+
+def test_cascade_cross_client_and_sibling_projects_both_feed_xc():
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="sibling_projects", domain="arrowheads",
+            all_jaccard_mean="0.5", n_files_a="10", n_files_b="10",
+        ),
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Intel",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Intel",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.9", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    cascade = build_cascade(rows, sector_map)
+    # sibling_projects (Kaiser/Sutter, both healthcare) = 0.5, cross_client
+    # (Kaiser/Intel, no sector gate) = 0.9 -- both land in the same xc bucket.
+    assert cascade["arrowheads"]["xc"] == (0.5 + 0.9) / 2
+
+
+def test_build_client_summary_xc_mean_uses_cross_client_rows():
+    """governance_client_summary.csv's cross_client_similarity_mean must be
+    populated from cross_client rows even when no sibling_projects rows exist
+    for these clients at all."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.6", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    client_rows = build_client_summary(rows, [], {})
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    sutter = next(r for r in client_rows if r["client"] == "Sutter")
+    assert kaiser["xc_mean"] == 0.6
+    assert sutter["xc_mean"] == 0.6
+
+
 def test_non_project_within_project_rows_excluded_from_client_summary():
     """discover_within_project() can emit within_project rows for any non-skip/
     non-registration segment, not just Project-role ones (e.g. a client-scoped

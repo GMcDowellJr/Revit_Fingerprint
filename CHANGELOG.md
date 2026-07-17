@@ -12,6 +12,42 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- New `cross_client` comparison type in `tools/compare_cross_segment.py`
+  (`discover_cross_client()`, `--cross-client` CLI flag, default-on): pairs
+  each client's own broadest (client-only-scoped) Project population against
+  every other client's, within the same unit_system, independent of segment
+  lineage. Fixes `cross_client_convergence` (governance_domain_summary.csv)
+  and `cross_client_similarity_mean` (governance_client_summary.csv) being
+  blank for every row -- the only prior source for those columns was
+  `sibling_projects`, which only pairs Project segments sharing an immediate
+  `parent_segment_id` and is additionally sector-gated (both clients must be
+  tagged `healthcare` in `policies/client_sector.csv`) in
+  `build_cascade()`'s `xc` accumulation. `cross_client` has no shared-parent
+  requirement and no hardcoded sector gate (sector filtering, where wanted,
+  is left to downstream consumers). `tools/generate_governance_narrative.py`'s
+  `build_cascade()` and `build_client_summary()` now also accumulate `xc`/
+  `xc_mean` from `cross_client` rows alongside the existing `sibling_projects`
+  source. Jaccard-based, undirected (mirrors `sibling_projects`'s scoring
+  path); no governance-state rows are written for it (not in
+  `GOVERNANCE_STATE_DIRECTED_TYPES`), matching `sibling_projects`.
+- `governance_domain_summary.csv` gains `container_to_project_scoped` /
+  `container_to_project_scoped_pair` columns in
+  `tools/generate_governance_narrative.py`. Root cause: `container_to_project`
+  (`cp`) is populated only from rows where BOTH sides are the fully unscoped
+  ("enterprise::enterprise") segment -- real Project segments are almost never
+  fully unscoped, so `cp` stayed empty for effectively every domain even
+  though real, `data_sufficient == "true"` container_to_project evidence
+  existed at other scope levels (`cp_by_scope`, already computed but never
+  surfaced in this CSV). The new columns report the mean of the largest
+  (most rows) non-enterprise, `data_sufficient` scope_pair bucket, plus which
+  scope_pair it came from, and are populated only when `container_to_project`
+  itself is empty -- `container_to_project`'s own enterprise-only meaning is
+  unchanged, so this never competes with or is mistaken for enterprise-level
+  evidence (same posture as `TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE`).
+  Sourced from a new, separate accumulator (`cp_by_scope_suff`) rather than a
+  filtered view of `cp_by_scope`, so `_has_group1_bc_pooled_evidence()`/
+  `render_group1_scope_section()` (existing `cp_by_scope` consumers) are
+  unaffected. No other comparison type's `data_sufficient` handling changed.
 - `tools/generate_governance_narrative.py` now emits an interpretation/
   routing layer: `docs/governance_interpretation_guide.md` (stable,
   package-type-level -- what each metric/tier means, comparability rules,

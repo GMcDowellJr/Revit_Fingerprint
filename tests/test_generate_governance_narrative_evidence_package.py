@@ -188,7 +188,9 @@ def test_unrecognized_comparison_type_still_warns_to_stderr(capsys, tmp_path, mo
 _EXPECTED_DOMAIN_COLUMNS = [
     "domain", "domain_label", "governance_tier", "score_reliability",
     "cascade_generic_to_template", "cascade_generic_to_container", "cascade_generic_to_project",
-    "template_to_container", "container_to_project", "template_to_project",
+    "template_to_container", "container_to_project",
+    "container_to_project_scoped", "container_to_project_scoped_pair",
+    "template_to_project",
     "cross_client_convergence", "within_project_all", "within_project_p10", "within_project_p90",
     "within_project_spread", "within_project_architectural", "within_project_mechanical_plumbing",
     "within_project_electrical", "within_project_structural", "bundle_schema",

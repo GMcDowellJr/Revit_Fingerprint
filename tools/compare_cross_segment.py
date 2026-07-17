@@ -77,7 +77,7 @@ Usage:
         --records-dir   results/records/ \\
         --out-dir       results/cross_segment/ \\
         [--within-segment] [--sibling-segments] [--parent-siblings] \\
-        [--within-project] [--governance-chain] \\
+        [--within-project] [--governance-chain] [--cross-client] \\
         [--domain DOMAIN] [--segment-a ID] [--segment-b ID] \\
         [--min-patterns INT] [--dry-run] [--no-delta]
 """
@@ -485,7 +485,7 @@ def _usage_interpretable_for_role(role: str) -> bool:
 
 
 def _recommended_primary_view(role_a: str, role_b: str, comparison_type: str) -> str:
-    if comparison_type == "sibling_projects" or _role_key(role_b) == "project":
+    if comparison_type in ("sibling_projects", "cross_client") or _role_key(role_b) == "project":
         return "used"
     return "all"
 
@@ -497,6 +497,8 @@ def _comparison_role_semantics(role_a: str, role_b: str, comparison_type: str) -
         return "directed_governance: reference and target are provided-vocabulary inventories; all-view is primary"
     if comparison_type == "sibling_projects":
         return "sibling_projects: used-view is active practice; all-view is configured/inherited context"
+    if comparison_type == "cross_client":
+        return "cross_client: used-view is active practice; all-view is configured/inherited context (same semantics as sibling_projects, across clients rather than within one)"
     if comparison_type == "sibling_templates":
         return "sibling_templates: all-view is primary; used-view must not be interpreted as bloat"
     if comparison_type == "sibling_containers":
@@ -1870,6 +1872,76 @@ def discover_sibling_segments(
         }.get(role, "sibling_segments")
         for a, b in combinations(sorted(members), 2):
             pairs.append((a, b, ctype))
+    return pairs
+
+
+def _is_client_only_project_segment(row: Dict[str, str]) -> bool:
+    """True for a Project-role segment scoped by client_label alone -- no
+    discipline/business_center/collection narrowing -- the "client-level pooled
+    vocabulary" population discover_cross_client() compares peer-to-peer.
+
+    Deliberately stricter than _scope_level(row) == "client" (which only checks
+    client-set/bc-blank): a client's own discipline- or collection-scoped
+    Project child would also pass that check but is a narrower population than
+    the client's full portfolio, and comparing a narrower slice for one client
+    against a broader one for another would silently mix comparison grains --
+    exactly the anti-pattern documented on CASCADE_GROUP2_TYPES in
+    generate_governance_narrative.py.
+    """
+    role = row.get("governance_role", "").strip().lower()
+    if role != "project":
+        return False
+    client = row.get("client_label", "").strip()
+    if is_blank_or_na(client):
+        return False
+    return (
+        is_blank_or_na(row.get("discipline_label", ""))
+        and is_blank_or_na(row.get("business_center_label", ""))
+        and is_blank_or_na(row.get("collection_label", ""))
+    )
+
+
+def discover_cross_client(
+    manifest: Dict[str, Dict[str, str]],
+) -> List[ComparisonPair]:
+    """Purpose-built client-vs-client comparison: each client's own broadest
+    (client-only-scoped) Project population, paired against every OTHER
+    client's, within the same unit_system.
+
+    Unlike discover_sibling_segments()'s "sibling_projects" -- which only pairs
+    Project segments sharing an immediate parent_segment_id, an accident of the
+    segment lattice's hierarchy that a corpus with client-scoped Project
+    segments nested straight under one enterprise-wide "Project" parent may
+    still satisfy, but is not guaranteed to -- this function groups purely by
+    (client_label, unit_system) and pairs every distinct client combination.
+    No shared-parent requirement, no hardcoded sector restriction (sector
+    filtering, where wanted, is a downstream concern of the comparison_type's
+    consumers -- see policies/client_sector.csv).
+    """
+    by_client_unit: Dict[Tuple[str, str], str] = {}
+    for sid, row in manifest.items():
+        if row.get("run_type", "").strip().lower() not in ("bundle", "reference"):
+            continue
+        if not _is_client_only_project_segment(row):
+            continue
+        client = row.get("client_label", "").strip()
+        unit = row.get("unit_system", "").strip()
+        if not unit:
+            continue
+        # First-seen wins if the manifest somehow carries more than one
+        # client-only Project segment for the same (client, unit) -- shouldn't
+        # happen given build_segment_manifest.py's one-row-per-subset-key
+        # contract, but a silent duplicate overwrite would be worse than a
+        # deterministic pick.
+        by_client_unit.setdefault((client, unit), sid)
+
+    pairs: List[ComparisonPair] = []
+    items = sorted(by_client_unit.items())
+    for i, ((_client_a, unit_a), sid_a) in enumerate(items):
+        for (_client_b, unit_b), sid_b in items[i + 1:]:
+            if unit_a != unit_b:
+                continue
+            pairs.append((sid_a, sid_b, "cross_client"))
     return pairs
 
 
@@ -3512,6 +3584,8 @@ def main() -> int:
                     help="Mode D: file pairs within same project_label within a single segment")
     ap.add_argument("--governance-chain", action="store_true",
                     help="Mode E: directed governance pairs scoped by client_label and discipline_label")
+    ap.add_argument("--cross-client", action="store_true",
+                    help="Mode F: each client's client-level pooled Project vocabulary vs. every other client's, same unit_system")
 
     # Filters
     ap.add_argument("--domain", metavar="DOMAIN",
@@ -3540,11 +3614,11 @@ def main() -> int:
     # Default: all modes if none specified
     any_mode = any([
         args.within_segment, args.sibling_segments, args.parent_siblings,
-        args.within_project, args.governance_chain,
+        args.within_project, args.governance_chain, args.cross_client,
     ])
     if not any_mode:
         args.within_segment = args.sibling_segments = args.parent_siblings = True
-        args.within_project = args.governance_chain = True
+        args.within_project = args.governance_chain = args.cross_client = True
 
     manifest = load_manifest(records_dir)
     registry = load_registry(records_dir)
@@ -3562,6 +3636,8 @@ def main() -> int:
         pairs.extend(discover_governance_chain(manifest))
     if args.within_project:
         pairs.extend(discover_within_project(manifest, registry, file_metadata, segments_root))
+    if args.cross_client:
+        pairs.extend(discover_cross_client(manifest))
 
     pairs = deduplicate_pairs(pairs)
 
