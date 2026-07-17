@@ -33,6 +33,7 @@ from generate_governance_narrative import (  # noqa: E402
     TIER_BASELINE_LOCAL_REVIEW,
     TIER_HIGH_FRAGMENTATION,
     TIER_STRONG_BASELINE,
+    _TIER_DRIVER_SUPPORT_FIELDS,
     build_structured_findings,
     render_findings_and_recommendations,
 )
@@ -182,6 +183,38 @@ def test_high_fragmentation_finding():
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert ("line_styles", "high_fragmentation") in types
     assert ("line_styles", "baseline_candidate") not in types
+
+
+def test_tier_based_findings_use_the_shared_driver_field_list():
+    """Consolidation regression lock: after five separate PR review findings
+    each flagged a different tier-based finding type missing one of
+    assign_tier()'s driver/exception fields, strong_baseline_candidate/
+    baseline_candidate/local_review_required/high_fragmentation/
+    missing_or_degraded_evidence were consolidated onto one shared
+    _TIER_DRIVER_SUPPORT_FIELDS list. This locks in that every one of those
+    finding types' support fields are exactly that shared list (as a set --
+    order isn't semantically meaningful), so a future edit narrowing one
+    finding type's fields without updating the shared constant fails here
+    immediately instead of waiting for another bot-reported drill-through gap."""
+    cascade = {
+        "line_styles": _min_domain_dict(tc=0.90, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95),
+        "text_types": _min_domain_dict(tc=0.30, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95),
+        "arrowheads": _min_domain_dict(tc=0.10, cp=0.20, tp=0.30, wp_p10=0.30, wp_p90=0.35),
+        "phases": _min_domain_dict(tc=None, cp=None, tp=None, wp_all=0.30),
+    }
+    state = {"text_types": {"provided_passive_share": 0.25}}
+    findings = build_structured_findings(cascade, [], state)
+
+    checked_types = {
+        "strong_baseline_candidate", "baseline_candidate", "local_review_required",
+        "high_fragmentation", "missing_or_degraded_evidence",
+    }
+    seen_types = set()
+    for f in findings:
+        if f["finding_type"] in checked_types:
+            seen_types.add(f["finding_type"])
+            assert set(f["support"][0]["fields"]) == set(_TIER_DRIVER_SUPPORT_FIELDS), f["finding_type"]
+    assert seen_types == checked_types
 
 
 def test_missing_or_degraded_evidence_when_primary_metric_absent():

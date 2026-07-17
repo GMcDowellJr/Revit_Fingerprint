@@ -2917,6 +2917,23 @@ _FINDING_LIMITS_STANDARD = [
     "Does not establish organizational intent.",
 ]
 
+# Every governance_domain_summary.csv column assign_tier() can read to decide
+# among strong_baseline_candidate/baseline_candidate/local_review_required/
+# missing_or_degraded_evidence/high_fragmentation. Consolidated into one list
+# (rather than a hand-curated subset per finding type) after five separate PR
+# review findings each flagged a different finding type missing one of these
+# fields -- every tier-based finding needs the full set to let drill-through
+# verify not just why its own tier's primary threshold matched, but why every
+# *other* tier's exception/threshold did NOT fire. Some fields are irrelevant
+# to a given instance (e.g. template_to_container never drives
+# high_fragmentation), but including them is harmless and this list only ever
+# needs to grow when assign_tier() itself grows, not per finding type.
+_TIER_DRIVER_SUPPORT_FIELDS = [
+    "governance_tier", "template_to_project", "container_to_project",
+    "template_to_container", "score_reliability", "local_active_share",
+    "provided_passive_share", "provided_missing_share", "provided_to_used_containment",
+]
+
 
 def _classify_domains_for_findings(cascade: dict, state_summary: Optional[dict] = None) -> dict:
     """Single source of truth for domain-tier-derived classification buckets,
@@ -3096,16 +3113,7 @@ def build_structured_findings(
             f"{label(dom)} meets the strong-baseline-candidate rule (governance_tier: "
             f"{TIER_STRONG_BASELINE}).",
             _RULE_STRONG_BASELINE,
-            # A domain only reaches TIER_STRONG_BASELINE after clearing every
-            # exception assign_tier() checks at primary >= 0.90: no material
-            # state exception, provided_to_used_containment at/above the
-            # active-use floor, and template_to_container >= 0.60 (not a
-            # container-gap driver). List the same exception fields as
-            # baseline_candidate so drill-through can verify why none of them
-            # fired, not just that the primary threshold was met.
-            ["governance_tier", "template_to_project", "container_to_project",
-             "template_to_container", "local_active_share", "provided_passive_share",
-             "provided_missing_share", "provided_to_used_containment"],
+            list(_TIER_DRIVER_SUPPORT_FIELDS),
         )
     for dom in domain_buckets["baseline_candidate"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
@@ -3113,20 +3121,7 @@ def build_structured_findings(
             dom, "baseline_candidate",
             f"{label(dom)} meets the baseline-candidate rule (governance_tier: {tier}).",
             _RULE_BASELINE_CANDIDATE,
-            # template_to_project/container_to_project drive the primary tier
-            # band; local_active_share/provided_passive_share/provided_missing_share
-            # are the three fields _has_material_state_exception() checks to
-            # downgrade a >=0.90 domain into Baseline Candidate -- Local/Use
-            # Review instead of Strong Baseline; provided_to_used_containment
-            # is the separate active-use-floor check assign_tier() applies at
-            # that same threshold; and template_to_container is the fourth
-            # possible reason -- TIER_BASELINE_CONTAINER_GAP fires when primary
-            # >= 0.90 but template_to_container < 0.60, independent of the state
-            # fields above. All five can be the reason a domain in this bucket
-            # isn't also strong_baseline_candidate.
-            ["governance_tier", "template_to_project", "container_to_project",
-             "template_to_container", "local_active_share", "provided_passive_share",
-             "provided_missing_share", "provided_to_used_containment"],
+            list(_TIER_DRIVER_SUPPORT_FIELDS),
         )
     for dom in domain_buckets["local_review_required"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
@@ -3135,19 +3130,7 @@ def build_structured_findings(
             f"{label(dom)} requires local/use review before baseline language is "
             f"safe (governance_tier: {tier}).",
             _RULE_LOCAL_REVIEW_REQUIRED,
-            # This bucket covers three distinct tiers with different drivers:
-            # TIER_BASELINE_LOCAL_REVIEW/TIER_ACTIVE_LOCAL are driven by the state
-            # fields below (see _has_material_state_exception() / the
-            # provided_to_used_containment floor check), but TIER_INVESTIGATE fires
-            # purely from primary containment landing in [0.75, 0.90) with no
-            # material state exception at all -- for that case the state fields are
-            # blank/irrelevant and the real drivers are template_to_project/
-            # container_to_project (primary) and score_reliability. List both sets
-            # of fields so drill-through is complete regardless of which tier a
-            # given instance actually landed in.
-            ["governance_tier", "local_active_share", "provided_passive_share",
-             "provided_missing_share", "provided_to_used_containment",
-             "template_to_project", "container_to_project", "score_reliability"],
+            list(_TIER_DRIVER_SUPPORT_FIELDS),
         )
     for dom in domain_buckets["active_local_practice"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
@@ -3164,7 +3147,7 @@ def build_structured_findings(
             f"{label(dom)} is classified {TIER_HIGH_FRAGMENTATION} and is not a "
             "single-standard candidate in this run.",
             _RULE_HIGH_FRAGMENTATION,
-            ["governance_tier", "template_to_project", "container_to_project"],
+            list(_TIER_DRIVER_SUPPORT_FIELDS),
         )
     for dom in domain_buckets["missing_or_degraded_evidence"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
@@ -3173,16 +3156,12 @@ def build_structured_findings(
             f"{label(dom)} has insufficient or degraded evidence for governance "
             f"classification (governance_tier: {tier}).",
             _RULE_INSUFFICIENT_EVIDENCE,
-            # This bucket covers three tiers: TIER_INSUFFICIENT (primary is None,
-            # visible as blank template_to_project/container_to_project),
-            # TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE (primary is None but
-            # _has_group1_bc_pooled_evidence() found bc-pooled tp_by_scope/
-            # cp_by_scope data -- not itself a scalar governance_domain_summary.csv
-            # column, so it isn't listed here as a support field), and
-            # TIER_SPARSE_LIMITED (score_reliability is sparse AND primary < 0.75).
-            # template_to_project/container_to_project explain the first and third
-            # cases; score_reliability explains the third.
-            ["governance_tier", "score_reliability", "template_to_project", "container_to_project"],
+            # Note: TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE (one of the three
+            # tiers in this bucket) is driven by _has_group1_bc_pooled_evidence()
+            # finding bc-pooled tp_by_scope/cp_by_scope data -- not itself a
+            # scalar governance_domain_summary.csv column, so it can't be listed
+            # in _TIER_DRIVER_SUPPORT_FIELDS.
+            list(_TIER_DRIVER_SUPPORT_FIELDS),
         )
     for dom in domain_buckets["cross_client_convergence"]:
         add_domain_finding(
