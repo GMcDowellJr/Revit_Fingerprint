@@ -48,7 +48,20 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   pair in `xc`/`xc_by_client` and collide on `comparison_run_id`
   (`make_comparison_run_id()` hashes only segment IDs + timestamp, not
   comparison_type -- a broader, pre-existing characteristic of that
-  identifier, not changed here).
+  identifier, not changed here). `cross_client`'s contribution to `xc`
+  (`build_cascade()`) is gated to both-healthcare pairs, matching
+  `sibling_projects`'s existing gate -- `xc` is documented and consumed
+  elsewhere (client-tier "Non-comparable (different sector)" logic) as a
+  healthcare-cohort metric; `discover_cross_client()` itself is unaffected and
+  still emits every client pair into `cross_segment_summary.csv` regardless
+  of sector. `xc_by_client`/`xc_dom_by_client` (`build_client_summary()`,
+  feeding `cross_client_similarity_mean`) gain a softer, consumer-appropriate
+  exclusion -- a pair is dropped only when a side has a CONFIRMED
+  non-healthcare sector (`sector not in ("unknown", "healthcare")`), matching
+  this function's own definition of "comparable"; an unclassified client
+  still counts. This closes a pre-existing gap (this rollup never filtered by
+  sector for either source type) that `cross_client` being default-on and
+  pairing every client made routinely consequential.
 - `governance_domain_summary.csv` gains `container_to_project_scoped` /
   `container_to_project_scoped_pair` columns in
   `tools/generate_governance_narrative.py`. Root cause: `container_to_project`

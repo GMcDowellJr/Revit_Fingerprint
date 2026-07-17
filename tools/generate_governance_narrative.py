@@ -900,12 +900,22 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             # compare_cross_segment.py): each side is already that client's own
             # broadest (client-only-scoped) Project population, paired against
             # every OTHER client sharing the same unit_system -- no shared-parent
-            # requirement (unlike sibling_projects) and no hardcoded sector gate.
+            # requirement (unlike sibling_projects). discover_cross_client()
+            # itself has no hardcoded sector gate (it emits every client pair
+            # into cross_segment_summary.csv, regardless of sector) -- but xc
+            # is documented and consumed elsewhere as a healthcare-cohort
+            # metric (see this function's own docstring, and the client-tier
+            # "Non-comparable (different sector)" logic in
+            # build_client_summary()), and sibling_projects's contribution to
+            # this exact bucket is already gated to both-healthcare pairs. Gate
+            # cross_client's contribution the same way for consistency, per
+            # the original cross_client design note that sector filtering is
+            # "left to downstream consumers" rather than baked into discovery.
             # ca != cb is defense-in-depth; discover_cross_client() only emits
             # distinct-client pairs by construction.
             ca = _pick(r, "client_label_a")
             cb = _pick(r, "client_label_b")
-            if ca != cb:
+            if ca != cb and sector_map.get(ca) == "healthcare" and sector_map.get(cb) == "healthcare":
                 v = pf(_col(r, "jaccard_mean"))
                 if v is not None:
                     xc[dom].append(v)
@@ -1926,17 +1936,34 @@ def build_client_summary(
     # discipline-scoped within-client sibling's segment_id has 4 parts), so
     # this guard is required to preserve that exclusion now that segment_id
     # shape is no longer being read at all.
+    #
+    # A pair is excluded here if EITHER side has a CONFIRMED non-comparable
+    # sector -- sector_map.get(c, "unknown") not in ("unknown", "healthcare") --
+    # matching this exact function's own tier definition of "comparable"
+    # below ("Non-comparable (different sector)" fires only for a KNOWN
+    # non-healthcare sector, never for "unknown"). Without this, cross_client
+    # being default-on and pairing every client regardless of sector means a
+    # healthcare client's xc_mean/tier can be driven by a comparison against a
+    # client whose OWN row is separately (and correctly) marked
+    # non-comparable -- a real contamination risk this loop had no defense
+    # against for either source type before.
+    def _confirmed_non_healthcare(client: str) -> bool:
+        return sector_map.get(client, "unknown") not in ("unknown", "healthcare")
+
     xc_by_client = defaultdict(list)
     for r in summary_rows:
         if r["comparison_type"] not in ("sibling_projects", "cross_client"):
             continue
         ca = _pick(r, "client_label_a")
         cb = _pick(r, "client_label_b")
-        if ca != cb and ca in all_clients and cb in all_clients:
-            v = pf(_col(r, "jaccard_mean"))
-            if v is not None:
-                xc_by_client[ca].append(v)
-                xc_by_client[cb].append(v)
+        if ca == cb or ca not in all_clients or cb not in all_clients:
+            continue
+        if _confirmed_non_healthcare(ca) or _confirmed_non_healthcare(cb):
+            continue
+        v = pf(_col(r, "jaccard_mean"))
+        if v is not None:
+            xc_by_client[ca].append(v)
+            xc_by_client[cb].append(v)
 
     # Within-project coherence. Gated on governance_role_a == "Project" for the
     # same reason as the all_clients fallback above -- within_project rows exist
@@ -1980,19 +2007,23 @@ def build_client_summary(
                 if c and (c not in client_files or nf > client_files[c]):
                     client_files[c] = nf
 
-    # Domain-level xc means. Same client_label_a/b-direct-read fix (and same
-    # ca != cb within-client exclusion) as xc_by_client above.
+    # Domain-level xc means. Same client_label_a/b-direct-read fix, same
+    # ca != cb within-client exclusion, and same confirmed-non-healthcare
+    # exclusion as xc_by_client above.
     xc_dom_by_client = defaultdict(lambda: defaultdict(list))
     for r in summary_rows:
         if r["comparison_type"] not in ("sibling_projects", "cross_client"):
             continue
         ca = _pick(r, "client_label_a")
         cb = _pick(r, "client_label_b")
-        if ca != cb and ca in all_clients and cb in all_clients:
-            v = pf(_col(r, "jaccard_mean"))
-            if v is not None and r["domain"] not in EXCLUDED_FROM_SCORING:
-                xc_dom_by_client[ca][r["domain"]].append(v)
-                xc_dom_by_client[cb][r["domain"]].append(v)
+        if ca == cb or ca not in all_clients or cb not in all_clients:
+            continue
+        if _confirmed_non_healthcare(ca) or _confirmed_non_healthcare(cb):
+            continue
+        v = pf(_col(r, "jaccard_mean"))
+        if v is not None and r["domain"] not in EXCLUDED_FROM_SCORING:
+            xc_dom_by_client[ca][r["domain"]].append(v)
+            xc_dom_by_client[cb][r["domain"]].append(v)
 
     rows_out = []
     for client in sorted(all_clients):
