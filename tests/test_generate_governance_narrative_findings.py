@@ -221,6 +221,24 @@ def test_passive_inheritance_risk_not_flagged_below_threshold():
     assert any(f["subject"].get("id") == _RISK_DOMAIN for f in findings)
 
 
+def test_passive_inheritance_risk_finding_from_state_signal_without_bundle_data():
+    """Regression test for a PR review finding: a risk-group domain with
+    material provided_passive_share from --governance-state-summary must be
+    flagged even when it has no matching bundle/passive-indicator data in
+    cascade (bundle_schema == 'none') -- detect_anomalies() already treats
+    the state signal as material on its own, independent of bundle data."""
+    cascade = {_RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="none")}
+    state = {_RISK_DOMAIN: {"provided_passive_share": 0.30}}
+    findings = build_structured_findings(cascade, [], state)
+    types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
+    assert (_RISK_DOMAIN, "passive_inheritance_risk") in types
+
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == _RISK_DOMAIN and f["finding_type"] == "passive_inheritance_risk")
+    assert "provided_passive_share" in finding["summary"]
+    assert "provided_passive_share" in finding["support"][0]["fields"]
+
+
 def test_low_client_coherence_finding():
     cascade = {}
     client_rows = [_client_row(client="acme", wp_mean=0.30), _client_row(client="beta", wp_mean=0.90)]

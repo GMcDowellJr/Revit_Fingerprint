@@ -2965,19 +2965,30 @@ def _classify_domains_for_findings(cascade: dict, state_summary: Optional[dict] 
     }
 
 
-def _passive_inheritance_risk_domains(cascade: dict) -> list:
+def _passive_inheritance_risk_domains(cascade: dict, state_summary: Optional[dict] = None) -> list:
     """Domains in PASSIVE_INHERITANCE_RISK_DOMAINS showing a material passive
     signal, using the same thresholds and dual/single-schema branching as
     detect_anomalies()'s bundle/passive-inheritance fallback block (lines
     ~1311-1343) -- mirrored rather than shared because detect_anomalies()
     returns rendered prose strings, not a reusable boolean/value pair.
 
+    Also checks state_summary's provided_passive_share directly (mirroring
+    detect_anomalies()'s state-based material-passive note, lines
+    ~1302-1306), since that explicit state signal is available whenever
+    --governance-state-summary is supplied, independent of whether the
+    domain also has matching bundle/passive-indicator data in cascade.
+
     Restricted to domains passing _has_renderable_cascade_signal(), matching
     _classify_domains_for_findings() -- see that function's docstring.
     """
+    state_summary = state_summary or {}
     flagged = []
     for dom, d in cascade.items():
         if dom not in PASSIVE_INHERITANCE_RISK_DOMAINS or not _has_renderable_cascade_signal(d):
+            continue
+        passive_state = _state_value(state_summary.get(dom), "provided_passive_share")
+        if passive_state is not None and passive_state >= PASSIVE_MATERIAL_THRESHOLD:
+            flagged.append(dom)
             continue
         bundle_schema = d.get("bundle_schema", "none")
         if bundle_schema == "dual":
@@ -3035,7 +3046,7 @@ def build_structured_findings(
     assign_tier() itself routes that domain to TIER_INSUFFICIENT instead.
     """
     domain_buckets = _classify_domains_for_findings(cascade, state_summary)
-    passive_risk_domains = _passive_inheritance_risk_domains(cascade)
+    passive_risk_domains = _passive_inheritance_risk_domains(cascade, state_summary)
     low_coherence_clients = _low_coherence_clients(client_rows)
 
     findings: list[dict] = []
@@ -3152,17 +3163,20 @@ def build_structured_findings(
         )
     for dom in passive_risk_domains:
         d = cascade[dom]
-        detail = (
-            f"passive_inheritance_indicator={fmt(d.get('passive_indicator'))}"
-            if d.get("bundle_schema") == "dual"
-            else f"bundle_share_all={fmt(d.get('bundle_share_all'))}"
-        )
+        passive_state = _state_value((state_summary or {}).get(dom), "provided_passive_share")
+        if passive_state is not None and passive_state >= PASSIVE_MATERIAL_THRESHOLD:
+            detail = f"provided_passive_share={fmt(passive_state)}"
+        elif d.get("bundle_schema") == "dual":
+            detail = f"passive_inheritance_indicator={fmt(d.get('passive_indicator'))}"
+        else:
+            detail = f"bundle_share_all={fmt(d.get('bundle_share_all'))}"
         add_domain_finding(
             dom, "passive_inheritance_risk",
             f"{label(dom)} is in the passive-inheritance risk group and shows a "
             f"material passive signal ({detail}).",
             _RULE_PASSIVE_INHERITANCE_RISK,
-            ["passive_inheritance_indicator", "bundle_share_all", "passive_inheritance_risk"],
+            ["passive_inheritance_indicator", "bundle_share_all", "provided_passive_share",
+             "passive_inheritance_risk"],
         )
 
     for client in low_coherence_clients:
