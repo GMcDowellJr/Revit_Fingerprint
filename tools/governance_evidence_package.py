@@ -129,12 +129,22 @@ def build_package_manifest(
     policy_dir: Optional[Path],
     comparison_run_ids: list,
     source_executed_utc: list,
+    policy_profiles: Optional[dict] = None,
 ) -> dict:
     """Pure function: reads only Path.exists()/Path.stat() for already-written
     output files. Does not open or parse any input CSV. Never claims a content
     hash or source-run identifier that isn't actually present in the loaded
     rows (comparison_run_ids/source_executed_utc are read from those rows by
     the caller, not invented here).
+
+    policy_profiles: optional {"thresholds": {"profile_id":..., "schema_version":...,
+    "source": "policy_file"|"built_in_default"}, "domain_policy": {...}, ...} --
+    the resolved profile_id/schema_version/source tools/governance_policy.py's
+    load_governance_policy() actually used for this run, one entry per policy
+    profile (thresholds, domain_policy, client_onboarding, finding_rules).
+    Omitted (None) reproduces PR1's original "not yet read" wording for a
+    caller that hasn't adopted policy loading -- callers built on
+    generate_governance_narrative.py's PR3 always pass this.
     """
     inputs = []
     for artifact_id, path in input_paths.items():
@@ -179,7 +189,21 @@ def build_package_manifest(
         },
         "policy_profiles": {
             "policy_dir": str(policy_dir) if policy_dir else None,
+            "profiles": policy_profiles or {},
             "note": (
+                "Governance thresholds, domain-governance policy (excluded/"
+                "passive-inheritance-risk domains, domain guidance text), "
+                "client-onboarding interpretation thresholds, and finding-rule "
+                "documentation are loaded from --policy-dir (default: "
+                "policies/governance/) via tools/governance_policy.py at run "
+                "time -- see the `profiles` field above for which profile_id/"
+                "schema_version/source (policy_file vs. built_in_default) was "
+                "actually used for each of the four profiles this run. "
+                "policies/governance/*.json ship with values that reproduce "
+                "this generator's pre-externalization Python literals exactly; "
+                "overriding --policy-dir with a different profile set changes "
+                "classification output."
+            ) if policy_profiles else (
                 "Policy externalization (thresholds, domain-governance policy, "
                 "onboarding rules) is not yet implemented in this generator -- "
                 "deferred to a future PR. This field records the --policy-dir "
@@ -236,8 +260,17 @@ def build_package_health(
     unit_systems_seen: list,
     matrix_manifest_row_count: int,
     matrix_names_seen: list,
+    policy_load_status: Optional[dict] = None,  # tools/governance_policy.py's load_status
 ) -> dict:
-    """All text below is mechanical/factual only -- see module docstring."""
+    """All text below is mechanical/factual only -- see module docstring.
+
+    policy_load_status: optional {"thresholds": {"source": "policy_file"|
+    "built_in_default", "path":..., "reason":...}, "domain_policy": {...}, ...}
+    -- load_governance_policy()'s per-profile load_status for this run.
+    Omitted (None, the default) adds no policy-related warning, so a caller
+    that hasn't adopted policy loading gets identical health output to
+    before this parameter existed.
+    """
     blocking_conditions = []
     missing_required = sorted(k for k, present in required_inputs.items() if not present)
     if missing_required:
@@ -286,6 +319,24 @@ def build_package_health(
             ),
         })
 
+    policy_load_status = policy_load_status or {}
+    policy_profiles_defaulted = sorted(
+        name for name, status in policy_load_status.items()
+        if status.get("source") == "built_in_default"
+    )
+    if policy_profiles_defaulted:
+        fallbacks_used.append("governance_policy_built_in_default")
+        warnings.append({
+            "condition": "governance_policy_profile_defaulted",
+            "detail": (
+                "Governance policy profile(s) not found under --policy-dir; "
+                f"this generator's own built-in default was used instead: "
+                f"{policy_profiles_defaulted}. See governance_package_manifest.json's "
+                "policy_profiles.profiles for the resolved profile_id/schema_version "
+                "of each profile actually applied."
+            ),
+        })
+
     if missing_required:
         overall_status = "invalid"
     elif warnings:
@@ -303,6 +354,7 @@ def build_package_health(
         "fallbacks_used": fallbacks_used,
         "comparison_type_coverage": comparison_type_coverage_by_fn,
         "client_sector_status": client_sector_status,
+        "policy_load_status": policy_load_status,
         "scope_coverage": {
             "unit_systems_seen": unit_systems_seen,
             "note": (

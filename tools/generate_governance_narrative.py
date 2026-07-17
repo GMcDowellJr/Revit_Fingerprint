@@ -83,6 +83,17 @@ from governance_evidence_package import (
     write_json,
 )
 
+# governance_policy.py is a sibling module providing the generic JSON
+# policy-profile loader (mechanical load/fallback only) for the externalized
+# governance thresholds / domain-governance policy / client-onboarding policy /
+# finding-rule documentation profiles in policies/governance/*.json. The
+# default profile VALUES and domain-governance business logic stay in this
+# file -- see apply_governance_policy() below and docs/governance_evidence_package.md.
+from governance_policy import (
+    DEFAULT_POLICY_DIR as _DEFAULT_POLICY_DIR,
+    load_governance_policy,
+)
+
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -162,8 +173,16 @@ DOMAIN_LABELS = {
     "view_templates_schedules": "View Templates — Schedules",
 }
 
-# Domains excluded from aggregate governance scoring (structurally anomalous)
-EXCLUDED_FROM_SCORING = {"view_templates_renderings_drafting"}
+# Domains excluded from aggregate governance scoring (structurally anomalous).
+# Default value, used as the fallback when domain_governance_policy.json is
+# absent from --policy-dir; apply_governance_policy() below reassigns
+# EXCLUDED_FROM_SCORING from the resolved policy at runtime. Kept as a plain
+# module global (not threaded through function signatures) so every existing
+# reference in this file -- and every existing test importing
+# EXCLUDED_FROM_SCORING directly -- keeps working unchanged; see
+# docs/governance_evidence_package.md.
+_DEFAULT_EXCLUDED_FROM_SCORING = {"view_templates_renderings_drafting"}
+EXCLUDED_FROM_SCORING = set(_DEFAULT_EXCLUDED_FROM_SCORING)
 
 DISC_LABELS = {
     "architectural": "Architectural",
@@ -189,12 +208,41 @@ def _disc_label(disc: str) -> str:
 
 # Domains where passive inheritance is most likely to inflate all-view scores.
 # These domains are often fully inherited from templates but rarely customised.
-PASSIVE_INHERITANCE_RISK_DOMAINS = {
+# Same default/override pattern as EXCLUDED_FROM_SCORING above.
+_DEFAULT_PASSIVE_INHERITANCE_RISK_DOMAINS = {
     "arrowheads", "fill_patterns_drafting", "fill_patterns_model",
     "line_patterns", "dimension_types_diameter", "dimension_types_radial",
     "dimension_types_spot_coordinate", "dimension_types_spot_elevation",
     "dimension_types_spot_slope", "object_styles_analytical",
 }
+PASSIVE_INHERITANCE_RISK_DOMAINS = set(_DEFAULT_PASSIVE_INHERITANCE_RISK_DOMAINS)
+
+# Fixed editorial guidance text tied to a specific domain (rendered by
+# detect_anomalies() when that domain's own data-dependent condition also
+# fires), and guidance always rendered once in the findings section
+# regardless of domain. Same default/override pattern as above; sourced from
+# domain_governance_policy.json's domain_guidance/static_findings_guidance.
+_DEFAULT_DOMAIN_GUIDANCE = {
+    "phases": (
+        "Templates are internally consistent on phases but projects carry "
+        "phases not defined in templates — project teams are adding "
+        "project-specific phases."
+    ),
+    "loaded_family_types": (
+        "Family loading is inherently project-specific. "
+        "Template governance establishes a floor, not a ceiling. "
+        "Consider approved-list governance rather than full vocabulary convergence."
+    ),
+}
+DOMAIN_GUIDANCE = dict(_DEFAULT_DOMAIN_GUIDANCE)
+
+_DEFAULT_STATIC_FINDINGS_GUIDANCE = [
+    "Loaded family types and materials should not be governed like object "
+    "styles. These domains are often project-specific. Review them for "
+    "approved lists, starter content, exception rules, or documentation "
+    "rather than full vocabulary convergence.",
+]
+STATIC_FINDINGS_GUIDANCE = list(_DEFAULT_STATIC_FINDINGS_GUIDANCE)
 
 
 def detect_bundle_schema(rows: list) -> str:
@@ -1082,16 +1130,38 @@ RELIABILITY_SPARSE       = "Sparse"         # p10 near 0, mean < 0.40 — minori
                                              # the domain at all; mean understates fragmentation
 RELIABILITY_UNKNOWN      = "Unknown"        # no p10/p90 data
 
+# Reliability-band thresholds. Defaults reproduce the comments above exactly;
+# apply_governance_policy() overrides these module globals from
+# governance_thresholds.json at runtime (see main()).
+_DEFAULT_RELIABILITY_TIGHT_P10 = 0.85
+_DEFAULT_RELIABILITY_CONVERGENT_P10 = 0.50
+_DEFAULT_RELIABILITY_CONVERGENT_SPREAD_MAX = 0.40
+_DEFAULT_RELIABILITY_LOW_P10_MAX = 0.20
+_DEFAULT_RELIABILITY_PRESENCE_P90_MIN = 0.85
+_DEFAULT_RELIABILITY_SPARSE_MEAN_MAX = 0.40
+RELIABILITY_TIGHT_P10 = _DEFAULT_RELIABILITY_TIGHT_P10
+RELIABILITY_CONVERGENT_P10 = _DEFAULT_RELIABILITY_CONVERGENT_P10
+RELIABILITY_CONVERGENT_SPREAD_MAX = _DEFAULT_RELIABILITY_CONVERGENT_SPREAD_MAX
+RELIABILITY_LOW_P10_MAX = _DEFAULT_RELIABILITY_LOW_P10_MAX
+RELIABILITY_PRESENCE_P90_MIN = _DEFAULT_RELIABILITY_PRESENCE_P90_MIN
+RELIABILITY_SPARSE_MEAN_MAX = _DEFAULT_RELIABILITY_SPARSE_MEAN_MAX
+
 
 def score_reliability(d: dict) -> str:
     """
     Classify mean score reliability from within-project p10/p90 spread.
 
-    Tight:          p10 >= 0.85  — floor is high; mean trustworthy
-    Convergent:     p10 >= 0.50, spread < 0.40  — solid core, some tail variation
-    Presence-based: p10 < 0.20 AND p90 >= 0.85  — binary optional domain;
-                    mean reflects how many files carry it, not how well they agree
-    Sparse:         p10 < 0.20 AND mean < 0.40  — domain rarely present at all
+    Tight:          p10 >= reliability_tight_p10  — floor is high; mean trustworthy
+    Convergent:     p10 >= reliability_convergent_p10, spread < reliability_convergent_spread_max
+                    — solid core, some tail variation
+    Presence-based: p10 < reliability_low_p10_max AND p90 >= reliability_presence_p90_min
+                    — binary optional domain; mean reflects how many files carry it,
+                    not how well they agree
+    Sparse:         p10 < reliability_low_p10_max AND mean < reliability_sparse_mean_max
+                    — domain rarely present at all
+
+    Threshold values come from policies/governance/governance_thresholds.json
+    (see apply_governance_policy()); the names above are that profile's keys.
     """
     p10 = d.get("wp_p10")
     p90 = d.get("wp_p90")
@@ -1102,13 +1172,13 @@ def score_reliability(d: dict) -> str:
 
     spread = p90 - p10
 
-    if p10 >= 0.85:
+    if p10 >= RELIABILITY_TIGHT_P10:
         return RELIABILITY_TIGHT
-    if p10 >= 0.50 and spread < 0.40:
+    if p10 >= RELIABILITY_CONVERGENT_P10 and spread < RELIABILITY_CONVERGENT_SPREAD_MAX:
         return RELIABILITY_CONVERGENT
-    if p10 < 0.20 and p90 >= 0.85:
+    if p10 < RELIABILITY_LOW_P10_MAX and p90 >= RELIABILITY_PRESENCE_P90_MIN:
         return RELIABILITY_PRESENCE
-    if p10 < 0.20 and (mean is None or mean < 0.40):
+    if p10 < RELIABILITY_LOW_P10_MAX and (mean is None or mean < RELIABILITY_SPARSE_MEAN_MAX):
         return RELIABILITY_SPARSE
     # Moderate spread with moderate floor — convergent with meaningful tail
     return RELIABILITY_CONVERGENT
@@ -1153,12 +1223,244 @@ TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE = "Insufficient Evidence — Enterprise
 TIER_INSUFFICIENT = "Insufficient Evidence"
 
 # Deterministic materiality thresholds used to keep baseline language conservative.
-# These are narrative thresholds, not governance policy. They decide when the
-# renderer must add review language rather than presenting a cleaner baseline read.
-LOCAL_ACTIVE_MATERIAL_THRESHOLD = 0.15
-PASSIVE_MATERIAL_THRESHOLD = 0.20
-MISSING_MATERIAL_THRESHOLD = 0.20
-ACTIVE_USE_MIN_FOR_STRONG_BASELINE = 0.75
+# These are narrative/classification thresholds, not governance policy
+# approvals. They decide when the renderer must add review language rather
+# than presenting a cleaner baseline read. Defaults reproduce this file's
+# pre-externalization literals; apply_governance_policy() overrides these
+# module globals from governance_thresholds.json at runtime (see main()).
+_DEFAULT_LOCAL_ACTIVE_MATERIAL_THRESHOLD = 0.15
+_DEFAULT_PASSIVE_MATERIAL_THRESHOLD = 0.20
+_DEFAULT_MISSING_MATERIAL_THRESHOLD = 0.20
+_DEFAULT_ACTIVE_USE_MIN_FOR_STRONG_BASELINE = 0.75
+_DEFAULT_TIER_SPARSE_PRIMARY_MAX = 0.75
+_DEFAULT_TIER_ACTIVE_LOCAL_PRIMARY_MAX = 0.90
+_DEFAULT_TIER_STRONG_BASELINE_MIN = 0.90
+_DEFAULT_TIER_CONTAINER_GAP_TC_MAX = 0.60
+_DEFAULT_TIER_INVESTIGATE_MIN = 0.75
+_DEFAULT_TIER_MODERATE_VARIATION_MIN = 0.55
+
+LOCAL_ACTIVE_MATERIAL_THRESHOLD = _DEFAULT_LOCAL_ACTIVE_MATERIAL_THRESHOLD
+PASSIVE_MATERIAL_THRESHOLD = _DEFAULT_PASSIVE_MATERIAL_THRESHOLD
+MISSING_MATERIAL_THRESHOLD = _DEFAULT_MISSING_MATERIAL_THRESHOLD
+ACTIVE_USE_MIN_FOR_STRONG_BASELINE = _DEFAULT_ACTIVE_USE_MIN_FOR_STRONG_BASELINE
+TIER_SPARSE_PRIMARY_MAX = _DEFAULT_TIER_SPARSE_PRIMARY_MAX
+TIER_ACTIVE_LOCAL_PRIMARY_MAX = _DEFAULT_TIER_ACTIVE_LOCAL_PRIMARY_MAX
+TIER_STRONG_BASELINE_MIN = _DEFAULT_TIER_STRONG_BASELINE_MIN
+TIER_CONTAINER_GAP_TC_MAX = _DEFAULT_TIER_CONTAINER_GAP_TC_MAX
+TIER_INVESTIGATE_MIN = _DEFAULT_TIER_INVESTIGATE_MIN
+TIER_MODERATE_VARIATION_MIN = _DEFAULT_TIER_MODERATE_VARIATION_MIN
+
+# Cross-client convergence and client-tier/confidence thresholds, used by
+# detect_anomalies(), build_client_summary(), _low_coherence_clients(), and
+# _classify_domains_for_findings(). Same default/override pattern as above;
+# sourced from governance_thresholds.json.
+_DEFAULT_XC_STRONG_CONVERGENCE = 0.70
+_DEFAULT_XC_LOW_THRESHOLD = 0.15
+_DEFAULT_XC_LOW_TP_MIN = 0.70
+_DEFAULT_CLIENT_ALIGNMENT_HIGH = 0.45
+_DEFAULT_CLIENT_ALIGNMENT_MODERATE = 0.33
+_DEFAULT_CLIENT_CONFIDENCE_LOW_MAX_FILES = 10
+_DEFAULT_CLIENT_CONFIDENCE_MODERATE_MAX_FILES = 25
+_DEFAULT_CLIENT_COHERENCE_LOW = 0.45
+
+XC_STRONG_CONVERGENCE = _DEFAULT_XC_STRONG_CONVERGENCE
+XC_LOW_THRESHOLD = _DEFAULT_XC_LOW_THRESHOLD
+XC_LOW_TP_MIN = _DEFAULT_XC_LOW_TP_MIN
+CLIENT_ALIGNMENT_HIGH = _DEFAULT_CLIENT_ALIGNMENT_HIGH
+CLIENT_ALIGNMENT_MODERATE = _DEFAULT_CLIENT_ALIGNMENT_MODERATE
+CLIENT_CONFIDENCE_LOW_MAX_FILES = _DEFAULT_CLIENT_CONFIDENCE_LOW_MAX_FILES
+CLIENT_CONFIDENCE_MODERATE_MAX_FILES = _DEFAULT_CLIENT_CONFIDENCE_MODERATE_MAX_FILES
+CLIENT_COHERENCE_LOW = _DEFAULT_CLIENT_COHERENCE_LOW
+
+# Client-onboarding-interpretation thresholds (_client_onboarding_profile()).
+# Kept as a separate profile (client_onboarding_policy.json) from the
+# governance-tier thresholds above even where a default value numerically
+# coincides, since these gate onboarding narrative text, not governance_tier.
+_DEFAULT_ONBOARD_WP_STABLE_MIN = 0.75
+_DEFAULT_ONBOARD_WP_MIXED_MIN = 0.55
+_DEFAULT_ONBOARD_XC_HIGH_PORTABILITY_MIN = 0.45
+_DEFAULT_ONBOARD_XC_MODERATE_PORTABILITY_MIN = 0.33
+_DEFAULT_ONBOARD_N_FILES_LOW_MAX = 10
+_DEFAULT_ONBOARD_N_FILES_MODERATE_MAX = 25
+
+ONBOARD_WP_STABLE_MIN = _DEFAULT_ONBOARD_WP_STABLE_MIN
+ONBOARD_WP_MIXED_MIN = _DEFAULT_ONBOARD_WP_MIXED_MIN
+ONBOARD_XC_HIGH_PORTABILITY_MIN = _DEFAULT_ONBOARD_XC_HIGH_PORTABILITY_MIN
+ONBOARD_XC_MODERATE_PORTABILITY_MIN = _DEFAULT_ONBOARD_XC_MODERATE_PORTABILITY_MIN
+ONBOARD_N_FILES_LOW_MAX = _DEFAULT_ONBOARD_N_FILES_LOW_MAX
+ONBOARD_N_FILES_MODERATE_MAX = _DEFAULT_ONBOARD_N_FILES_MODERATE_MAX
+
+
+# ── policy externalization: default profiles + runtime application ─────────
+#
+# _POLICY_DEFAULTS mirrors policies/governance/*.json exactly, built from the
+# same _DEFAULT_* constants the module-level names above were initialized
+# from -- so there is exactly one Python-side source of truth for each
+# default value, not two that could drift apart. load_governance_policy()
+# (tools/governance_policy.py) uses these as the per-file fallback when a
+# profile file is absent from --policy-dir; apply_governance_policy() below
+# then reassigns the module globals every function in this file already
+# reads (EXCLUDED_FROM_SCORING, PASSIVE_INHERITANCE_RISK_DOMAINS,
+# DOMAIN_GUIDANCE, STATIC_FINDINGS_GUIDANCE, and every threshold constant
+# above) from whatever load_governance_policy() actually resolved.
+_POLICY_DEFAULTS = {
+    "thresholds": {
+        "profile_id": "governance-thresholds-v1",
+        "schema_version": "0.1",
+        "thresholds": {
+            "reliability_tight_p10": _DEFAULT_RELIABILITY_TIGHT_P10,
+            "reliability_convergent_p10": _DEFAULT_RELIABILITY_CONVERGENT_P10,
+            "reliability_convergent_spread_max": _DEFAULT_RELIABILITY_CONVERGENT_SPREAD_MAX,
+            "reliability_low_p10_max": _DEFAULT_RELIABILITY_LOW_P10_MAX,
+            "reliability_presence_p90_min": _DEFAULT_RELIABILITY_PRESENCE_P90_MIN,
+            "reliability_sparse_mean_max": _DEFAULT_RELIABILITY_SPARSE_MEAN_MAX,
+            "local_active_material_threshold": _DEFAULT_LOCAL_ACTIVE_MATERIAL_THRESHOLD,
+            "passive_material_threshold": _DEFAULT_PASSIVE_MATERIAL_THRESHOLD,
+            "missing_material_threshold": _DEFAULT_MISSING_MATERIAL_THRESHOLD,
+            "active_use_min_for_strong_baseline": _DEFAULT_ACTIVE_USE_MIN_FOR_STRONG_BASELINE,
+            "tier_sparse_primary_max": _DEFAULT_TIER_SPARSE_PRIMARY_MAX,
+            "tier_active_local_primary_max": _DEFAULT_TIER_ACTIVE_LOCAL_PRIMARY_MAX,
+            "tier_strong_baseline_min": _DEFAULT_TIER_STRONG_BASELINE_MIN,
+            "tier_container_gap_tc_max": _DEFAULT_TIER_CONTAINER_GAP_TC_MAX,
+            "tier_investigate_min": _DEFAULT_TIER_INVESTIGATE_MIN,
+            "tier_moderate_variation_min": _DEFAULT_TIER_MODERATE_VARIATION_MIN,
+            "cross_client_convergence_strong": _DEFAULT_XC_STRONG_CONVERGENCE,
+            "cross_client_convergence_low": _DEFAULT_XC_LOW_THRESHOLD,
+            "cross_client_low_tp_min": _DEFAULT_XC_LOW_TP_MIN,
+            "client_alignment_high": _DEFAULT_CLIENT_ALIGNMENT_HIGH,
+            "client_alignment_moderate": _DEFAULT_CLIENT_ALIGNMENT_MODERATE,
+            "client_confidence_low_max_files": _DEFAULT_CLIENT_CONFIDENCE_LOW_MAX_FILES,
+            "client_confidence_moderate_max_files": _DEFAULT_CLIENT_CONFIDENCE_MODERATE_MAX_FILES,
+            "client_coherence_low": _DEFAULT_CLIENT_COHERENCE_LOW,
+        },
+    },
+    "domain_policy": {
+        "profile_id": "domain-governance-policy-v1",
+        "schema_version": "0.1",
+        "excluded_from_scoring": sorted(_DEFAULT_EXCLUDED_FROM_SCORING),
+        "passive_inheritance_risk_domains": sorted(_DEFAULT_PASSIVE_INHERITANCE_RISK_DOMAINS),
+        "domain_guidance": dict(_DEFAULT_DOMAIN_GUIDANCE),
+        "static_findings_guidance": list(_DEFAULT_STATIC_FINDINGS_GUIDANCE),
+    },
+    "client_onboarding": {
+        "profile_id": "client-onboarding-policy-v1",
+        "schema_version": "0.1",
+        "thresholds": {
+            "wp_stable_min": _DEFAULT_ONBOARD_WP_STABLE_MIN,
+            "wp_mixed_min": _DEFAULT_ONBOARD_WP_MIXED_MIN,
+            "xc_high_portability_min": _DEFAULT_ONBOARD_XC_HIGH_PORTABILITY_MIN,
+            "xc_moderate_portability_min": _DEFAULT_ONBOARD_XC_MODERATE_PORTABILITY_MIN,
+            "n_files_low_max": _DEFAULT_ONBOARD_N_FILES_LOW_MAX,
+            "n_files_moderate_max": _DEFAULT_ONBOARD_N_FILES_MODERATE_MAX,
+        },
+    },
+    "finding_rules": {
+        "profile_id": "finding-rules-v1",
+        "schema_version": "0.1",
+        "rules": {},
+        "note": (
+            "No built-in Python default rule descriptions -- this profile is "
+            "documentation-only (never drives classification logic; the "
+            "rule_id constants and the classification rules themselves live "
+            "in this file). See policies/governance/finding_rules.json for "
+            "the shipped descriptions."
+        ),
+    },
+}
+
+# Populated by apply_governance_policy() with whichever finding_rules profile
+# was actually resolved -- {rule_id: {"finding_type":..., "description":...}}.
+# Documentation-only: no classification logic reads this.
+FINDING_RULE_DESCRIPTIONS: dict = {}
+
+# Populated by main() with the raw return value of load_governance_policy() --
+# {"policy_dir":..., "profiles": {...}, "load_status": {...}} -- so
+# governance_package_manifest.json/governance_package_health.json can report
+# exactly which profile_id/schema_version/source was used for this run.
+LOADED_GOVERNANCE_POLICY: Optional[dict] = None
+
+
+def apply_governance_policy(policy: dict) -> None:
+    """Reassign this module's threshold/domain-policy globals from a
+    load_governance_policy() result. Every function in this file already
+    reads these names as plain module globals (see the _DEFAULT_*/name
+    pairs above) -- this is the one place that makes them policy-driven
+    instead of hardcoded, without threading a policy object through every
+    call site. Falls back to this module's own _DEFAULT_* value, per key,
+    if a resolved profile is missing an expected key (e.g. a hand-edited
+    --policy-dir file that only overrides some thresholds).
+    """
+    global LOADED_GOVERNANCE_POLICY, FINDING_RULE_DESCRIPTIONS
+    global EXCLUDED_FROM_SCORING, PASSIVE_INHERITANCE_RISK_DOMAINS
+    global DOMAIN_GUIDANCE, STATIC_FINDINGS_GUIDANCE
+    global RELIABILITY_TIGHT_P10, RELIABILITY_CONVERGENT_P10, RELIABILITY_CONVERGENT_SPREAD_MAX
+    global RELIABILITY_LOW_P10_MAX, RELIABILITY_PRESENCE_P90_MIN, RELIABILITY_SPARSE_MEAN_MAX
+    global LOCAL_ACTIVE_MATERIAL_THRESHOLD, PASSIVE_MATERIAL_THRESHOLD, MISSING_MATERIAL_THRESHOLD
+    global ACTIVE_USE_MIN_FOR_STRONG_BASELINE, TIER_SPARSE_PRIMARY_MAX, TIER_ACTIVE_LOCAL_PRIMARY_MAX
+    global TIER_STRONG_BASELINE_MIN, TIER_CONTAINER_GAP_TC_MAX, TIER_INVESTIGATE_MIN, TIER_MODERATE_VARIATION_MIN
+    global XC_STRONG_CONVERGENCE, XC_LOW_THRESHOLD, XC_LOW_TP_MIN
+    global CLIENT_ALIGNMENT_HIGH, CLIENT_ALIGNMENT_MODERATE
+    global CLIENT_CONFIDENCE_LOW_MAX_FILES, CLIENT_CONFIDENCE_MODERATE_MAX_FILES, CLIENT_COHERENCE_LOW
+    global ONBOARD_WP_STABLE_MIN, ONBOARD_WP_MIXED_MIN
+    global ONBOARD_XC_HIGH_PORTABILITY_MIN, ONBOARD_XC_MODERATE_PORTABILITY_MIN
+    global ONBOARD_N_FILES_LOW_MAX, ONBOARD_N_FILES_MODERATE_MAX
+
+    LOADED_GOVERNANCE_POLICY = policy
+    profiles = policy["profiles"]
+
+    t = profiles["thresholds"].get("thresholds", {})
+
+    def th(key: str, default):
+        return t.get(key, default)
+
+    RELIABILITY_TIGHT_P10 = th("reliability_tight_p10", _DEFAULT_RELIABILITY_TIGHT_P10)
+    RELIABILITY_CONVERGENT_P10 = th("reliability_convergent_p10", _DEFAULT_RELIABILITY_CONVERGENT_P10)
+    RELIABILITY_CONVERGENT_SPREAD_MAX = th("reliability_convergent_spread_max", _DEFAULT_RELIABILITY_CONVERGENT_SPREAD_MAX)
+    RELIABILITY_LOW_P10_MAX = th("reliability_low_p10_max", _DEFAULT_RELIABILITY_LOW_P10_MAX)
+    RELIABILITY_PRESENCE_P90_MIN = th("reliability_presence_p90_min", _DEFAULT_RELIABILITY_PRESENCE_P90_MIN)
+    RELIABILITY_SPARSE_MEAN_MAX = th("reliability_sparse_mean_max", _DEFAULT_RELIABILITY_SPARSE_MEAN_MAX)
+
+    LOCAL_ACTIVE_MATERIAL_THRESHOLD = th("local_active_material_threshold", _DEFAULT_LOCAL_ACTIVE_MATERIAL_THRESHOLD)
+    PASSIVE_MATERIAL_THRESHOLD = th("passive_material_threshold", _DEFAULT_PASSIVE_MATERIAL_THRESHOLD)
+    MISSING_MATERIAL_THRESHOLD = th("missing_material_threshold", _DEFAULT_MISSING_MATERIAL_THRESHOLD)
+    ACTIVE_USE_MIN_FOR_STRONG_BASELINE = th("active_use_min_for_strong_baseline", _DEFAULT_ACTIVE_USE_MIN_FOR_STRONG_BASELINE)
+    TIER_SPARSE_PRIMARY_MAX = th("tier_sparse_primary_max", _DEFAULT_TIER_SPARSE_PRIMARY_MAX)
+    TIER_ACTIVE_LOCAL_PRIMARY_MAX = th("tier_active_local_primary_max", _DEFAULT_TIER_ACTIVE_LOCAL_PRIMARY_MAX)
+    TIER_STRONG_BASELINE_MIN = th("tier_strong_baseline_min", _DEFAULT_TIER_STRONG_BASELINE_MIN)
+    TIER_CONTAINER_GAP_TC_MAX = th("tier_container_gap_tc_max", _DEFAULT_TIER_CONTAINER_GAP_TC_MAX)
+    TIER_INVESTIGATE_MIN = th("tier_investigate_min", _DEFAULT_TIER_INVESTIGATE_MIN)
+    TIER_MODERATE_VARIATION_MIN = th("tier_moderate_variation_min", _DEFAULT_TIER_MODERATE_VARIATION_MIN)
+
+    XC_STRONG_CONVERGENCE = th("cross_client_convergence_strong", _DEFAULT_XC_STRONG_CONVERGENCE)
+    XC_LOW_THRESHOLD = th("cross_client_convergence_low", _DEFAULT_XC_LOW_THRESHOLD)
+    XC_LOW_TP_MIN = th("cross_client_low_tp_min", _DEFAULT_XC_LOW_TP_MIN)
+    CLIENT_ALIGNMENT_HIGH = th("client_alignment_high", _DEFAULT_CLIENT_ALIGNMENT_HIGH)
+    CLIENT_ALIGNMENT_MODERATE = th("client_alignment_moderate", _DEFAULT_CLIENT_ALIGNMENT_MODERATE)
+    CLIENT_CONFIDENCE_LOW_MAX_FILES = th("client_confidence_low_max_files", _DEFAULT_CLIENT_CONFIDENCE_LOW_MAX_FILES)
+    CLIENT_CONFIDENCE_MODERATE_MAX_FILES = th("client_confidence_moderate_max_files", _DEFAULT_CLIENT_CONFIDENCE_MODERATE_MAX_FILES)
+    CLIENT_COHERENCE_LOW = th("client_coherence_low", _DEFAULT_CLIENT_COHERENCE_LOW)
+
+    dp = profiles["domain_policy"]
+    EXCLUDED_FROM_SCORING = set(dp.get("excluded_from_scoring", sorted(_DEFAULT_EXCLUDED_FROM_SCORING)))
+    PASSIVE_INHERITANCE_RISK_DOMAINS = set(
+        dp.get("passive_inheritance_risk_domains", sorted(_DEFAULT_PASSIVE_INHERITANCE_RISK_DOMAINS))
+    )
+    DOMAIN_GUIDANCE = dict(dp.get("domain_guidance", _DEFAULT_DOMAIN_GUIDANCE))
+    STATIC_FINDINGS_GUIDANCE = list(dp.get("static_findings_guidance", _DEFAULT_STATIC_FINDINGS_GUIDANCE))
+
+    co = profiles["client_onboarding"].get("thresholds", {})
+
+    def ct(key: str, default):
+        return co.get(key, default)
+
+    ONBOARD_WP_STABLE_MIN = ct("wp_stable_min", _DEFAULT_ONBOARD_WP_STABLE_MIN)
+    ONBOARD_WP_MIXED_MIN = ct("wp_mixed_min", _DEFAULT_ONBOARD_WP_MIXED_MIN)
+    ONBOARD_XC_HIGH_PORTABILITY_MIN = ct("xc_high_portability_min", _DEFAULT_ONBOARD_XC_HIGH_PORTABILITY_MIN)
+    ONBOARD_XC_MODERATE_PORTABILITY_MIN = ct("xc_moderate_portability_min", _DEFAULT_ONBOARD_XC_MODERATE_PORTABILITY_MIN)
+    ONBOARD_N_FILES_LOW_MAX = ct("n_files_low_max", _DEFAULT_ONBOARD_N_FILES_LOW_MAX)
+    ONBOARD_N_FILES_MODERATE_MAX = ct("n_files_moderate_max", _DEFAULT_ONBOARD_N_FILES_MODERATE_MAX)
+
+    FINDING_RULE_DESCRIPTIONS = dict(profiles["finding_rules"].get("rules", {}))
 
 
 def _state_value(state: Optional[dict], key: str) -> Optional[float]:
@@ -1225,29 +1527,29 @@ def assign_tier(d: dict, state: Optional[dict] = None) -> str:
 
     # Sparse or binary-presence domains are not safe to present as converged
     # standards unless they also have strong explicit active-use evidence.
-    if reliability == RELIABILITY_SPARSE and primary < 0.75:
+    if reliability == RELIABILITY_SPARSE and primary < TIER_SPARSE_PRIMARY_MAX:
         return TIER_SPARSE_LIMITED
 
-    if local_active is not None and local_active >= LOCAL_ACTIVE_MATERIAL_THRESHOLD and primary < 0.90:
+    if local_active is not None and local_active >= LOCAL_ACTIVE_MATERIAL_THRESHOLD and primary < TIER_ACTIVE_LOCAL_PRIMARY_MAX:
         return TIER_ACTIVE_LOCAL
 
-    if primary >= 0.90:
+    if primary >= TIER_STRONG_BASELINE_MIN:
         if _has_material_state_exception(state):
             return TIER_BASELINE_LOCAL_REVIEW
         if provided_used is not None and provided_used < ACTIVE_USE_MIN_FOR_STRONG_BASELINE:
             return TIER_BASELINE_LOCAL_REVIEW
-        if tc is not None and tc < 0.60:
+        if tc is not None and tc < TIER_CONTAINER_GAP_TC_MAX:
             return TIER_BASELINE_CONTAINER_GAP
         return TIER_STRONG_BASELINE
 
-    if primary >= 0.75:
+    if primary >= TIER_INVESTIGATE_MIN:
         if _has_material_state_exception(state):
             return TIER_BASELINE_LOCAL_REVIEW
         if reliability in (RELIABILITY_PRESENCE, RELIABILITY_SPARSE):
             return TIER_INVESTIGATE
         return TIER_INVESTIGATE
 
-    if primary >= 0.55:
+    if primary >= TIER_MODERATE_VARIATION_MIN:
         if local_active is not None and local_active >= LOCAL_ACTIVE_MATERIAL_THRESHOLD:
             return TIER_ACTIVE_LOCAL
         if reliability == RELIABILITY_SPARSE:
@@ -1442,12 +1744,12 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
             f"Coordination-file-to-project cascade is weak (C→P = {pct(cp)}). "
             "Project teams are diverging from coordination file vocabulary."
         )
-    if xc is not None and xc >= 0.70:
+    if xc is not None and xc >= XC_STRONG_CONVERGENCE:
         notes.append(
             f"Strong cross-client convergence ({pct(xc)}) — natural baseline candidate "
             "for governance review regardless of formal template propagation."
         )
-    if xc is not None and xc < 0.15 and tp is not None and tp > 0.70:
+    if xc is not None and xc < XC_LOW_THRESHOLD and tp is not None and tp > XC_LOW_TP_MIN:
         notes.append(
             "Template floor propagates well but cross-client convergence is low — "
             "clients are inheriting the template floor while adding client-specific vocabulary."
@@ -1460,18 +1762,11 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
                 f"Architecturally specific — near-zero within-project coherence for: "
                 f"{', '.join(zero_discs)}. These disciplines require separate view template governance."
             )
-    if dom == "phases":
+    if dom == "phases" and "phases" in DOMAIN_GUIDANCE:
         if tp is not None and tp < 0.85 and d["tw"] is not None and d["tw"] > 0.80:
-            notes.append(
-                "Templates are internally consistent on phases but projects carry "
-                "phases not defined in templates — project teams are adding project-specific phases."
-            )
-    if dom == "loaded_family_types":
-        notes.append(
-            "Family loading is inherently project-specific. "
-            "Template governance establishes a floor, not a ceiling. "
-            "Consider approved-list governance rather than full vocabulary convergence."
-        )
+            notes.append(DOMAIN_GUIDANCE["phases"])
+    if dom == "loaded_family_types" and "loaded_family_types" in DOMAIN_GUIDANCE:
+        notes.append(DOMAIN_GUIDANCE["loaded_family_types"])
     return notes
 
 def build_client_summary(
@@ -1617,17 +1912,17 @@ def build_client_summary(
             tier = "Non-comparable (different sector)"
         elif xc_mean is None:
             tier = "Insufficient Data"
-        elif xc_mean >= 0.45:
+        elif xc_mean >= CLIENT_ALIGNMENT_HIGH:
             tier = "High Cross-Client Alignment"
-        elif xc_mean >= 0.33:
+        elif xc_mean >= CLIENT_ALIGNMENT_MODERATE:
             tier = "Moderate Cross-Client Alignment"
         else:
             tier = "Low Cross-Client Alignment"
 
         # Confidence note based on file count
-        if n_files < 10:
+        if n_files < CLIENT_CONFIDENCE_LOW_MAX_FILES:
             conf = f"Low corpus confidence — only {n_files} project files"
-        elif n_files < 25:
+        elif n_files < CLIENT_CONFIDENCE_MODERATE_MAX_FILES:
             conf = f"Moderate corpus ({n_files} files)"
         else:
             conf = f"Good corpus ({n_files} files)"
@@ -2486,25 +2781,25 @@ def _client_onboarding_profile(r: dict) -> dict:
 
     if wp is None:
         internal_read = "Internal coherence is unavailable; onboarding should not rely on this run alone."
-    elif wp >= 0.75:
+    elif wp >= ONBOARD_WP_STABLE_MIN:
         internal_read = "Stable internal portfolio; a new team member can likely rely on a repeatable client/project vocabulary."
-    elif wp >= 0.55:
+    elif wp >= ONBOARD_WP_MIXED_MIN:
         internal_read = "Mixed internal portfolio; a new team member needs a client orientation plus project-specific checks."
     else:
         internal_read = "High internal variation; learning this client likely means learning several local variants."
 
     if xc is None:
         portability_read = "Cross-client portability is unavailable from this run."
-    elif xc >= 0.45:
+    elif xc >= ONBOARD_XC_HIGH_PORTABILITY_MIN:
         portability_read = "High portability from the wider corpus is plausible, subject to domain-level review."
-    elif xc >= 0.33:
+    elif xc >= ONBOARD_XC_MODERATE_PORTABILITY_MIN:
         portability_read = "Some common base is portable, but client-specific departures should be documented."
     else:
         portability_read = "Client-specific orientation is required; wider-corpus assumptions may not transfer cleanly."
 
-    if n < 10:
+    if n < ONBOARD_N_FILES_LOW_MAX:
         confidence_read = "Low sample size; treat as a prompt for review, not a settled client profile."
-    elif n < 25:
+    elif n < ONBOARD_N_FILES_MODERATE_MAX:
         confidence_read = "Moderate sample size; useful for orientation but still sensitive to project mix."
     else:
         confidence_read = "Good sample size for an initial onboarding read."
@@ -2521,15 +2816,15 @@ def _client_onboarding_profile(r: dict) -> dict:
         operating_implication = (
             "Do not use healthcare baseline assumptions as the default. Treat this as a separate sector profile."
         )
-    elif wp is not None and wp < 0.55:
+    elif wp is not None and wp < ONBOARD_WP_MIXED_MIN:
         operating_implication = (
             "Create project-start reference material and review local variants before assigning staff across projects."
         )
-    elif xc is not None and xc < 0.33:
+    elif xc is not None and xc < ONBOARD_XC_MODERATE_PORTABILITY_MIN:
         operating_implication = (
             "Document client-specific departures from the wider corpus before using firmwide playbooks unchanged."
         )
-    elif wp is not None and wp >= 0.75:
+    elif wp is not None and wp >= ONBOARD_WP_STABLE_MIN:
         operating_implication = (
             "A compact client playbook is likely useful: capture the common base and the recurring exceptions."
         )
@@ -2960,7 +3255,7 @@ def _classify_domains_for_findings(cascade: dict, state_summary: Optional[dict] 
             if t in (TIER_INSUFFICIENT, TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE, TIER_SPARSE_LIMITED)
         ),
         "cross_client_convergence": sorted(
-            dom for dom, d in renderable.items() if d["xc"] is not None and d["xc"] >= 0.70
+            dom for dom, d in renderable.items() if d["xc"] is not None and d["xc"] >= XC_STRONG_CONVERGENCE
         ),
     }
 
@@ -2994,7 +3289,7 @@ def _passive_inheritance_risk_domains(cascade: dict) -> list:
 def _low_coherence_clients(client_rows: list[dict]) -> list:
     return sorted(
         r["client"] for r in client_rows
-        if r["wp_mean"] is not None and r["wp_mean"] < 0.45
+        if r["wp_mean"] is not None and r["wp_mean"] < CLIENT_COHERENCE_LOW
     )
 
 
@@ -3242,7 +3537,7 @@ def render_findings_and_recommendations(
     if universal:
         lines.append(
             f"**Some natural common-base candidates are visible.** "
-            f"{', '.join(universal)} show strong cross-client convergence (>70%). "
+            f"{', '.join(universal)} show strong cross-client convergence (>{pct(XC_STRONG_CONVERGENCE)}). "
             "This supports governance review, but still requires a decision about whether the convergence is intentional, portable, and worth formalising.\n"
         )
 
@@ -3259,10 +3554,8 @@ def render_findings_and_recommendations(
                 "**Phases show project-level extension.** Templates are internally consistent on phase definitions, but projects carry phases not defined in templates. The governance question is whether those additions are intentional project practice, client-specific vocabulary, or unmanaged accumulation.\n"
             )
 
-    lines.append(
-        "**Loaded family types and materials should not be governed like object styles.** "
-        "These domains are often project-specific. Review them for approved lists, starter content, exception rules, or documentation rather than full vocabulary convergence.\n"
-    )
+    for guidance in STATIC_FINDINGS_GUIDANCE:
+        lines.append(f"**{guidance}**\n")
 
     if needs_review:
         lines.append(
@@ -3347,13 +3640,19 @@ def main():
                              "see docs/governance_generator_cross_compare_coverage.md for where "
                              "the project_* matrices and fragmentation diagnostic should enter "
                              "the narrative.")
-    parser.add_argument("--policy-dir", default=None,
-                        help="Directory of externalized governance policy files (optional). "
-                             "Not yet consumed by this generator -- reserved for a future PR "
-                             "that externalizes DOMAIN_LABELS/PASSIVE_INHERITANCE_RISK_DOMAINS/ "
-                             "tier thresholds (see docs/governance_evidence_package.md). Recorded "
-                             "in governance_package_manifest.json for forward-compatibility "
-                             "auditing only.")
+    parser.add_argument("--policy-dir", default=str(_DEFAULT_POLICY_DIR),
+                        help="Directory of externalized governance policy files: "
+                             "governance_thresholds.json, domain_governance_policy.json, "
+                             "client_onboarding_policy.json, finding_rules.json (see "
+                             "docs/governance_evidence_package.md). Defaults to "
+                             f"{_DEFAULT_POLICY_DIR}, so existing invocations keep today's "
+                             "threshold/domain-policy values without needing to pass this "
+                             "flag -- the shipped defaults there reproduce this generator's "
+                             "pre-externalization Python literals exactly. A missing profile "
+                             "file within the directory falls back to this generator's own "
+                             "built-in default for that profile only (reported in "
+                             "governance_package_health.json); pass a nonexistent path to run "
+                             "with every profile at its built-in default.")
     parser.add_argument("--package-schema-version", default=PACKAGE_SCHEMA_VERSION,
                         help=f"Override the emitted package_schema_version "
                              f"(default {PACKAGE_SCHEMA_VERSION}).")
@@ -3371,6 +3670,23 @@ def main():
     parser.add_argument("--date", default=str(date.today()),
                         help="Analysis date string (default: today)")
     args = parser.parse_args()
+
+    policy_dir_arg = Path(args.policy_dir) if args.policy_dir else None
+    governance_policy = load_governance_policy(policy_dir_arg, _POLICY_DEFAULTS)
+    apply_governance_policy(governance_policy)
+    _policy_files_used = sorted(
+        name for name, status in governance_policy["load_status"].items()
+        if status["source"] == "policy_file"
+    )
+    _policy_files_defaulted = sorted(
+        name for name, status in governance_policy["load_status"].items()
+        if status["source"] == "built_in_default"
+    )
+    if _policy_files_used:
+        print(f"Loaded governance policy profile(s) from {args.policy_dir}: {_policy_files_used}")
+    if _policy_files_defaulted:
+        print(f"[info] Using built-in default for governance policy profile(s) not found "
+              f"under {args.policy_dir}: {_policy_files_defaulted}", file=sys.stderr)
 
     print(f"Loading {args.summary}...")
     summary_rows = read_csv(Path(args.summary))
@@ -3759,6 +4075,7 @@ def main():
             unit_systems_seen=unit_systems_seen,
             matrix_manifest_row_count=len(matrix_manifest_rows),
             matrix_names_seen=matrix_names_seen,
+            policy_load_status=governance_policy["load_status"],
         )
         write_json(out_dir / "governance_package_health.json", health)
 
@@ -3790,6 +4107,14 @@ def main():
         manifest_output_types = {k: v for k, v in output_types.items() if k != "governance_package_manifest"}
         manifest_output_authority = {k: v for k, v in output_authority.items() if k != "governance_package_manifest"}
         manifest_output_context_role = {k: v for k, v in output_context_role.items() if k != "governance_package_manifest"}
+        policy_profile_ids = {
+            profile_key: {
+                "profile_id": profile.get("profile_id"),
+                "schema_version": profile.get("schema_version"),
+                "source": governance_policy["load_status"][profile_key]["source"],
+            }
+            for profile_key, profile in governance_policy["profiles"].items()
+        }
         manifest = build_package_manifest(
             generator_identity=GENERATOR_IDENTITY,
             generator_role=GENERATOR_ROLE,
@@ -3805,6 +4130,7 @@ def main():
             policy_dir=Path(args.policy_dir) if args.policy_dir else None,
             comparison_run_ids=comparison_run_ids,
             source_executed_utc=source_executed_utc,
+            policy_profiles=policy_profile_ids,
         )
         write_json(out_dir / "governance_package_manifest.json", manifest)
 

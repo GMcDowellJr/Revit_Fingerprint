@@ -613,6 +613,154 @@ any of its deterministic calculations, thresholds, or CSV columns:
 
 ---
 
+## D-020 — Governance narrative evidence-package layer (Phase 2: structured findings)
+
+### Status
+Accepted (2026-07-16)
+
+### Context
+D-019's package manifest/health/evidence-map layer made the governance
+package's provenance and coverage machine-legible, but the actual
+classification conclusions (which domains are baseline candidates, which
+show high fragmentation or passive-inheritance risk, which clients have low
+coherence) still existed only as prose sentences inside
+`governance_narrative_context.md`'s "Key Findings and Governance
+Recommendations" section, generated independently of any structured data
+model. A downstream reader (human or LLM) could not enumerate "every domain
+currently classified `baseline_candidate`" without parsing narrative text.
+
+### Decision
+Add `governance_findings.json`: one structured finding per (subject, rule)
+match, covering the ten required categories (`baseline_candidate`,
+`strong_baseline_candidate`, `local_review_required`, `high_fragmentation`,
+`active_local_practice`, `cross_client_convergence`, `low_client_coherence`,
+`passive_inheritance_risk`, `missing_or_degraded_evidence`,
+`leadership_question`). Each finding carries `finding_id`, `subject`
+(`type`/`id`), `finding_type`, `status`, `origin`, `fidelity`,
+`authority_level`, `summary`, `support[]` (`artifact_id` + `selector` +
+`fields`), `rule_ids[]`, and `limits[]` — the origin/fidelity/authority/
+limits fields are this repo's own vocabulary (`tools/governance_evidence_package.py`),
+modeled on but independent of the design-reference `llm_evidence_framework`
+repo's stated epistemic-provenance components.
+
+A new `_classify_domains_for_findings()` in `generate_governance_narrative.py`
+is the single source of truth for tier-derived classification buckets,
+shared by `build_structured_findings()` (which produces the JSON) and
+`render_findings_and_recommendations()` (which now consumes the same
+findings list instead of recomputing an independent classification) — the
+two can no longer drift into disagreeing readings of the same underlying
+data. Leadership questions are marked `status: question_not_claim` /
+`authority_level: convenience_summary`, distinct from evidence findings
+(`status: supported`), so a suggested review question is never mistaken for
+an observed result.
+
+### Consequences
+- `governance_findings.json` becomes the 19th evidence-package artifact
+  (added to `governance_evidence_map.json`); no existing CSV column,
+  classification/scoring logic, or threshold changed.
+- A finding's `support[].artifact_id` always resolves to a real artifact and
+  `selector`/`fields` that exist on it — enforced by construction, since
+  both consumers read from the same `cascade`/`client_rows`/
+  `governance_state_summary` inputs used to write `governance_domain_summary.csv`/
+  `governance_client_summary.csv`.
+- No baseline finding is ever emitted for a domain whose primary metric is
+  unavailable: `assign_tier()` itself routes that domain to
+  `TIER_INSUFFICIENT` before `_classify_domains_for_findings()` runs, so
+  the gate is structural, not a separate check that could be forgotten.
+
+---
+
+## D-021 — Governance narrative evidence-package layer (Phase 3: policy externalization)
+
+### Status
+Accepted (2026-07-17)
+
+### Context
+D-019/D-020 made the governance package's provenance, health, and findings
+machine-legible, but the actual governance judgments underneath those
+findings — tier-assignment thresholds, reliability-band cutoffs,
+cross-client convergence/coherence thresholds, which domains are excluded
+from aggregate scoring, which are flagged as passive-inheritance risk, fixed
+editorial guidance text for specific domains, and client-onboarding
+interpretation thresholds — were still Python literals scattered across
+`generate_governance_narrative.py`. These are deterministic classification
+rules, not raw corpus observations, and the task's own framing distinguishes
+"authoritative deterministic evidence" from "controlled interpretation"
+(rule-derived classification on top of that evidence) — a rule's threshold
+value is itself part of the interpretation layer, not something a reader
+can audit or override without reading Python source.
+
+### Decision
+Move these values into four JSON policy profiles under
+`policies/governance/`: `governance_thresholds.json` (reliability bands,
+tier-assignment bands, cross-client convergence/coherence thresholds, client
+confidence bands), `domain_governance_policy.json`
+(`excluded_from_scoring`, `passive_inheritance_risk_domains`, per-domain
+`domain_guidance` text, and `static_findings_guidance` always rendered in
+the findings section), `client_onboarding_policy.json`
+(`_client_onboarding_profile()`'s interpretation thresholds — kept as a
+separate profile from `governance_thresholds.json` even where a default
+value numerically coincides, since these gate onboarding narrative text, not
+`governance_tier`), and `finding_rules.json` (documentation-only
+`rule_id → {finding_type, description}` metadata for D-020's `rule_ids`).
+
+A new sibling module, `tools/governance_policy.py`, is a generic JSON
+policy-profile loader (mechanical load/fallback only — no governance
+business content of its own, mirroring `tools/governance_evidence_package.py`'s
+separation of the generic envelope layer from the domain-governance logic
+that stays in `generate_governance_narrative.py`). `--policy-dir` (accepted
+but inert since D-019) now defaults to `policies/governance/` and is
+actually read: `apply_governance_policy()` reassigns every module-level
+threshold/domain-policy constant this file's existing functions already
+read as plain globals (`EXCLUDED_FROM_SCORING`, `PASSIVE_INHERITANCE_RISK_DOMAINS`,
+`DOMAIN_GUIDANCE`, `STATIC_FINDINGS_GUIDANCE`, and ~25 threshold constants)
+from the resolved policy at the start of `main()`, so no existing function
+body or call site needed to change — only the *source* of each constant's
+value changed, from a Python literal to a policy-file-or-fallback lookup.
+The shipped `policies/governance/*.json` files reproduce this generator's
+pre-externalization Python literals value-for-value (verified by a
+regression test comparing on-disk JSON against the module's own
+`_POLICY_DEFAULTS`), so no existing invocation's output changes by default.
+A profile file missing from `--policy-dir` falls back, per file, to this
+generator's own built-in default for that profile only — reported in
+`governance_package_health.json`'s `policy_load_status`/`fallbacks_used`/
+`warnings` (a `governance_policy_profile_defaulted` warning degrades
+`overall_status`) and in `governance_package_manifest.json`'s
+`policy_profiles.profiles` (resolved `profile_id`/`schema_version`/`source`
+per profile).
+
+### Consequences
+- No governance classification output (tier assignment, reliability
+  banding, cross-client convergence/coherence tiering, onboarding narrative
+  text, excluded/passive-inheritance-risk domain sets, or the two
+  domain-specific/static findings-guidance sentences) changed for any
+  existing invocation — locked in by a regression test running `main()`
+  twice (default vs. explicit `--policy-dir policies/governance/`) and
+  asserting byte-identical `governance_domain_summary.csv` output.
+- A governance threshold, excluded/passive-inheritance-risk domain set, or
+  guidance sentence can now be changed by editing JSON under
+  `--policy-dir`, without a code change — verified with tests that override
+  one policy file and observe the corresponding classification/prose output
+  change (e.g. lowering `tier_strong_baseline_min` promotes a previously
+  `Investigate Before Baseline` domain to `Strong Baseline Candidate`).
+- Because the overridden constants are process-global module attributes
+  (not threaded through function signatures), every test that calls
+  `apply_governance_policy()` with a non-default policy must reset it
+  afterward (an autouse pytest fixture in
+  `tests/test_generate_governance_narrative_policy.py` does this) — a test
+  that forgot to reset could leak an overridden threshold into an unrelated
+  test file running later in the same pytest session. This is a known
+  trade-off of the "reassign existing module globals" approach chosen to
+  avoid threading a policy object through dozens of existing call sites in
+  one pass; a future phase may thread policy explicitly instead if this
+  proves fragile in practice.
+- `DOMAIN_LABELS` (human-readable domain display names) is **not**
+  externalized in this phase — it is a display-name contract issue (see the
+  evidence map's existing C8 known-limitation note), not a governance
+  threshold or policy rule, and remains a Python literal.
+
+---
+
 ## Notes
 
 - This document is **append-only**.

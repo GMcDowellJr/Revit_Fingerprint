@@ -12,6 +12,48 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- `tools/generate_governance_narrative.py`'s governance thresholds, excluded/
+  passive-inheritance-risk domain lists, per-domain guidance text, and
+  client-onboarding interpretation thresholds are now loaded from JSON policy
+  profiles under `policies/governance/` (`governance_thresholds.json`,
+  `domain_governance_policy.json`, `client_onboarding_policy.json`,
+  `finding_rules.json`), via a new sibling module `tools/governance_policy.py`
+  (generic load/fallback loader; no governance business content of its own).
+  `--policy-dir` (accepted but inert since the Phase 1 evidence-package work)
+  now defaults to `policies/governance/` and is actually read: a new
+  `apply_governance_policy()` reassigns every module-level threshold/domain-
+  policy constant this file's existing functions already read as plain
+  globals, so no existing function body changed -- only the source of each
+  constant's value did. The shipped JSON files reproduce this generator's
+  pre-externalization Python literals value-for-value, so no existing
+  invocation's classification output changes by default (locked in by a
+  regression test running the CLI twice -- default vs. explicit
+  `--policy-dir policies/governance/` -- and asserting byte-identical
+  `governance_domain_summary.csv`). A profile file missing from `--policy-dir`
+  falls back, per file, to this generator's own built-in default for that
+  profile only, reported in `governance_package_health.json`'s new
+  `policy_load_status`/a `governance_policy_profile_defaulted` warning
+  (degrades `overall_status` to `degraded`) and in
+  `governance_package_manifest.json`'s `policy_profiles.profiles` (resolved
+  `profile_id`/`schema_version`/`source` per profile). See D-021 and
+  `docs/governance_evidence_package.md`.
+- `tools/generate_governance_narrative.py` now emits `governance_findings.json`:
+  structured, rule-derived governance findings (`baseline_candidate`,
+  `strong_baseline_candidate`, `local_review_required`, `high_fragmentation`,
+  `active_local_practice`, `cross_client_convergence`, `low_client_coherence`,
+  `passive_inheritance_risk`, `missing_or_degraded_evidence`,
+  `leadership_question`) with epistemic provenance (`origin`/`fidelity`/
+  `authority_level`/`limits`) and `support[]` references back to specific
+  `governance_domain_summary.csv`/`governance_client_summary.csv` rows and
+  fields, via a new `build_structured_findings()`. `render_findings_and_recommendations()`
+  now consumes the same structured findings instead of independently
+  recomputing the classification, via a new shared
+  `_classify_domains_for_findings()`, so the narrative's prose and the JSON
+  findings can no longer disagree. Leadership questions are marked
+  `status: question_not_claim` / `authority_level: convenience_summary`,
+  distinct from evidence findings (`status: supported`). No existing CSV
+  column, classification/scoring logic, or threshold changed. See D-020 and
+  `docs/governance_evidence_package.md`.
 - `tools/generate_governance_narrative.py` now emits a governance evidence-package
   layer alongside its existing outputs: `governance_package_manifest.json`
   (provenance -- which inputs were provided/found, which outputs were written and

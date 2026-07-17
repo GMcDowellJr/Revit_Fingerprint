@@ -1,0 +1,35 @@
+{
+  "profile_id": "governance-thresholds-v1",
+  "schema_version": "0.1",
+  "notes": "Deterministic materiality/classification thresholds consumed by tools/generate_governance_narrative.py's score_reliability(), assign_tier(), build_client_summary(), and _low_coherence_clients(). Values here reproduce the generator's own pre-externalization Python literals exactly (see docs/governance_evidence_package.md) -- this profile does not change any classification output by itself. These are narrative/classification thresholds, not governance policy approvals.",
+  "thresholds": {
+    "reliability_tight_p10": 0.85,
+    "reliability_convergent_p10": 0.50,
+    "reliability_convergent_spread_max": 0.40,
+    "reliability_low_p10_max": 0.20,
+    "reliability_presence_p90_min": 0.85,
+    "reliability_sparse_mean_max": 0.40,
+
+    "local_active_material_threshold": 0.15,
+    "passive_material_threshold": 0.20,
+    "missing_material_threshold": 0.20,
+    "active_use_min_for_strong_baseline": 0.75,
+
+    "tier_sparse_primary_max": 0.75,
+    "tier_active_local_primary_max": 0.90,
+    "tier_strong_baseline_min": 0.90,
+    "tier_container_gap_tc_max": 0.60,
+    "tier_investigate_min": 0.75,
+    "tier_moderate_variation_min": 0.55,
+
+    "cross_client_convergence_strong": 0.70,
+    "cross_client_convergence_low": 0.15,
+    "cross_client_low_tp_min": 0.70,
+
+    "client_alignment_high": 0.45,
+    "client_alignment_moderate": 0.33,
+    "client_confidence_low_max_files": 10,
+    "client_confidence_moderate_max_files": 25,
+    "client_coherence_low": 0.45
+  }
+}
