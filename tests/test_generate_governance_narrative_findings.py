@@ -322,6 +322,37 @@ def test_passive_inheritance_risk_not_flagged_below_threshold():
     assert any(f["subject"].get("id") == _RISK_DOMAIN for f in findings)
 
 
+def test_passive_inheritance_risk_defers_to_clean_explicit_state_over_bundle_signal():
+    """Regression test for a PR review finding: when explicit governance-state
+    data is available for a domain, detect_anomalies() trusts the state's own
+    provided_passive_share and skips the bundle/passive_indicator fallback
+    entirely (`if not state:`). _passive_inheritance_risk_domains() must mirror
+    that same gating -- a domain whose bundle signal alone looks risky but
+    whose authoritative state says passive share is clean must NOT get a
+    passive_inheritance_risk finding, or governance_findings.json would
+    contradict the narrative for the same domain in the same run."""
+    cascade = {_RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="dual", passive_indicator=0.90)}
+    state = {_RISK_DOMAIN: {"provided_passive_share": 0.01}}
+    findings = build_structured_findings(cascade, [], state)
+    types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
+    assert (_RISK_DOMAIN, "passive_inheritance_risk") not in types
+
+
+def test_passive_inheritance_risk_flagged_from_explicit_state_when_material():
+    """The state-aware path must still flag a real state-reported passive
+    signal, using provided_passive_share (not the bundle heuristic) as the
+    finding's own support field/detail."""
+    cascade = {_RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="dual", passive_indicator=0.0)}
+    state = {_RISK_DOMAIN: {"provided_passive_share": 0.35}}
+    findings = build_structured_findings(cascade, [], state)
+    finding = next(
+        f for f in findings
+        if f["subject"]["id"] == _RISK_DOMAIN and f["finding_type"] == "passive_inheritance_risk"
+    )
+    assert "provided_passive_share" in finding["support"][0]["fields"]
+    assert "provided_passive_share=0.350" in finding["summary"]
+
+
 def test_passive_inheritance_risk_finding_from_state_signal_without_bundle_data():
     """Regression test for a PR review finding: a risk-group domain with
     material provided_passive_share from --governance-state-summary must be

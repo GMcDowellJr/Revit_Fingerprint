@@ -152,6 +152,26 @@ def test_manifest_records_policy_dir_as_inert_field():
     assert m["policy_profiles"]["policy_dir"] == "/some/policy/dir"
 
 
+def test_manifest_without_policy_profiles_kwarg_keeps_pr1_not_yet_implemented_note():
+    """A caller that hasn't adopted policy loading (policy_profiles omitted)
+    must get PR1's original wording back -- this is generate_governance_narrative.py's
+    own contract before PR3 wired --policy-dir in, and any other future caller
+    of build_package_manifest() that doesn't pass policy_profiles."""
+    m = _manifest()
+    assert m["policy_profiles"]["profiles"] == {}
+    assert "not yet implemented" in m["policy_profiles"]["note"]
+
+
+def test_manifest_records_policy_profiles_when_supplied():
+    policy_profiles = {
+        "thresholds": {"profile_id": "governance-thresholds-v1", "schema_version": "0.1", "source": "policy_file"},
+        "domain_policy": {"profile_id": "domain-governance-policy-v1", "schema_version": "0.1", "source": "built_in_default"},
+    }
+    m = _manifest(policy_dir=Path("/some/policy/dir"), policy_profiles=policy_profiles)
+    assert m["policy_profiles"]["profiles"] == policy_profiles
+    assert "not yet implemented" not in m["policy_profiles"]["note"]
+
+
 # ---------------------------------------------------------------------------
 # build_package_health
 # ---------------------------------------------------------------------------
@@ -217,6 +237,35 @@ def test_health_reports_client_sector_explicit_missing():
     assert "client_sector_explicit_path_missing" in conditions
 
 
+def test_health_omitted_policy_load_status_adds_no_warning_and_stays_complete():
+    """A caller that hasn't adopted policy loading (policy_load_status
+    omitted) must get identical health output to before this parameter
+    existed."""
+    h = _health()
+    assert h["policy_load_status"] == {}
+    assert h["overall_status"] == "complete"
+
+
+def test_health_reports_policy_profile_defaulted_as_warning_and_degraded():
+    h = _health(policy_load_status={
+        "thresholds": {"source": "policy_file", "path": "/x/governance_thresholds.json", "reason": None},
+        "domain_policy": {"source": "built_in_default", "path": "/x/domain_governance_policy.json", "reason": "file_not_found"},
+    })
+    assert h["overall_status"] == "degraded"
+    assert "governance_policy_built_in_default" in h["fallbacks_used"]
+    conditions = [w["condition"] for w in h["warnings"]]
+    assert "governance_policy_profile_defaulted" in conditions
+
+
+def test_health_all_policy_profiles_from_file_adds_no_warning():
+    h = _health(policy_load_status={
+        "thresholds": {"source": "policy_file", "path": "/x/governance_thresholds.json", "reason": None},
+        "domain_policy": {"source": "policy_file", "path": "/x/domain_governance_policy.json", "reason": None},
+    })
+    assert h["overall_status"] == "complete"
+    assert h["fallbacks_used"] == []
+
+
 def test_health_does_not_warn_when_client_sector_explicitly_provided():
     h = _health(client_sector_status="explicit_path")
     conditions = [w["condition"] for w in h["warnings"]]
@@ -266,10 +315,10 @@ def _evidence_map(**overrides):
     return build_evidence_map(**kwargs)
 
 
-def test_evidence_map_has_nineteen_unique_artifacts():
+def test_evidence_map_has_twenty_two_unique_artifacts():
     em = _evidence_map()
     ids = [a["artifact_id"] for a in em["artifacts"]]
-    assert len(ids) == 19
+    assert len(ids) == 22
     assert "governance_findings" in ids
     assert len(ids) == len(set(ids))
 

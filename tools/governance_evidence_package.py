@@ -129,12 +129,22 @@ def build_package_manifest(
     policy_dir: Optional[Path],
     comparison_run_ids: list,
     source_executed_utc: list,
+    policy_profiles: Optional[dict] = None,
 ) -> dict:
     """Pure function: reads only Path.exists()/Path.stat() for already-written
     output files. Does not open or parse any input CSV. Never claims a content
     hash or source-run identifier that isn't actually present in the loaded
     rows (comparison_run_ids/source_executed_utc are read from those rows by
     the caller, not invented here).
+
+    policy_profiles: optional {"thresholds": {"profile_id":..., "schema_version":...,
+    "source": "policy_file"|"built_in_default"}, "domain_policy": {...}, ...} --
+    the resolved profile_id/schema_version/source tools/governance_policy.py's
+    load_governance_policy() actually used for this run, one entry per policy
+    profile (thresholds, domain_policy, client_onboarding, finding_rules).
+    Omitted (None) reproduces PR1's original "not yet read" wording for a
+    caller that hasn't adopted policy loading -- callers built on
+    generate_governance_narrative.py's PR3 always pass this.
     """
     inputs = []
     for artifact_id, path in input_paths.items():
@@ -179,7 +189,21 @@ def build_package_manifest(
         },
         "policy_profiles": {
             "policy_dir": str(policy_dir) if policy_dir else None,
+            "profiles": policy_profiles or {},
             "note": (
+                "Governance thresholds, domain-governance policy (excluded/"
+                "passive-inheritance-risk domains, domain guidance text), "
+                "client-onboarding interpretation thresholds, and finding-rule "
+                "documentation are loaded from --policy-dir (default: "
+                "policies/governance/) via tools/governance_policy.py at run "
+                "time -- see the `profiles` field above for which profile_id/"
+                "schema_version/source (policy_file vs. built_in_default) was "
+                "actually used for each of the four profiles this run. "
+                "policies/governance/*.json ship with values that reproduce "
+                "this generator's pre-externalization Python literals exactly; "
+                "overriding --policy-dir with a different profile set changes "
+                "classification output."
+            ) if policy_profiles else (
                 "Policy externalization (thresholds, domain-governance policy, "
                 "onboarding rules) is not yet implemented in this generator -- "
                 "deferred to a future PR. This field records the --policy-dir "
@@ -236,8 +260,17 @@ def build_package_health(
     unit_systems_seen: list,
     matrix_manifest_row_count: int,
     matrix_names_seen: list,
+    policy_load_status: Optional[dict] = None,  # tools/governance_policy.py's load_status
 ) -> dict:
-    """All text below is mechanical/factual only -- see module docstring."""
+    """All text below is mechanical/factual only -- see module docstring.
+
+    policy_load_status: optional {"thresholds": {"source": "policy_file"|
+    "built_in_default", "path":..., "reason":...}, "domain_policy": {...}, ...}
+    -- load_governance_policy()'s per-profile load_status for this run.
+    Omitted (None, the default) adds no policy-related warning, so a caller
+    that hasn't adopted policy loading gets identical health output to
+    before this parameter existed.
+    """
     blocking_conditions = []
     missing_required = sorted(k for k, present in required_inputs.items() if not present)
     if missing_required:
@@ -286,6 +319,24 @@ def build_package_health(
             ),
         })
 
+    policy_load_status = policy_load_status or {}
+    policy_profiles_defaulted = sorted(
+        name for name, status in policy_load_status.items()
+        if status.get("source") == "built_in_default"
+    )
+    if policy_profiles_defaulted:
+        fallbacks_used.append("governance_policy_built_in_default")
+        warnings.append({
+            "condition": "governance_policy_profile_defaulted",
+            "detail": (
+                "Governance policy profile(s) not found under --policy-dir; "
+                f"this generator's own built-in default was used instead: "
+                f"{policy_profiles_defaulted}. See governance_package_manifest.json's "
+                "policy_profiles.profiles for the resolved profile_id/schema_version "
+                "of each profile actually applied."
+            ),
+        })
+
     if missing_required:
         overall_status = "invalid"
     elif warnings:
@@ -303,6 +354,7 @@ def build_package_health(
         "fallbacks_used": fallbacks_used,
         "comparison_type_coverage": comparison_type_coverage_by_fn,
         "client_sector_status": client_sector_status,
+        "policy_load_status": policy_load_status,
         "scope_coverage": {
             "unit_systems_seen": unit_systems_seen,
             "note": (
@@ -670,7 +722,8 @@ def build_evidence_map(
          "are absent."],
         {},
         ["governance_domain_summary", "governance_client_summary",
-         "governance_package_health", "governance_evidence_map", "governance_findings"],
+         "governance_package_health", "governance_evidence_map", "governance_findings",
+         "governance_brief", "governance_interpretation_guide", "governance_question_routes"],
     ))
 
     artifacts.append(_artifact(
@@ -695,6 +748,80 @@ def build_evidence_map(
         {},
         ["governance_domain_summary", "governance_client_summary", "governance_narrative_context"],
         schema_version=FINDINGS_SCHEMA_VERSION,
+    ))
+
+    # governance_brief.md is the only PR4 artifact that may genuinely be
+    # absent even when this whole function runs (gated by its own
+    # --emit-interpretation-layer flag, independent of --emit-evidence-package)
+    # -- unlike the artifacts above, whose "present: True" is hardcoded because
+    # build_evidence_map() only ever runs after they're already written.
+    _brief_path = output_paths.get("governance_brief")
+    _brief_present = bool(_brief_path) and Path(_brief_path).exists()
+    artifacts.append(_artifact(
+        "governance_brief", p(output_paths, "governance_brief") if _brief_present else None,
+        "markdown", False, _brief_present,
+        GENERATOR_IDENTITY, AUTHORITY_CONVENIENCE_SUMMARY,
+        "narrower, run-specific digest of governance_findings.json -- a quick "
+        "top-line read, not a new source of evidence",
+        "one markdown document per run (when --emit-interpretation-layer is on)",
+        [], [], [],
+        ["a capped, categorized list of this run's findings by finding_type "
+         "(baseline candidates, high fragmentation, passive-inheritance risk, "
+         "low client coherence), plus the leadership questions"],
+        ["anything beyond what governance_findings.json already contains -- "
+         "this is a distillation, computed from the same findings list, never "
+         "an independent computation"],
+        ["each finding-type section is capped (10-15 items) with a pointer to "
+         "governance_findings.json for the full list; absent entirely when "
+         "--no-emit-interpretation-layer was passed for this run -- check this "
+         "artifact's own present field, not just governance_package_manifest's "
+         "policy_profiles, to know whether it exists for a given run."],
+        {},
+        ["governance_findings", "governance_domain_summary", "governance_client_summary",
+         "governance_interpretation_guide", "governance_question_routes"],
+    ))
+
+    artifacts.append(_artifact(
+        "governance_interpretation_guide", p(sibling_paths, "interpretation_guide"),
+        "markdown", False, sibling_present.get("interpretation_guide", False),
+        "human/LLM-authored (docs/governance_interpretation_guide.md)",
+        AUTHORITY_CONTROLLED_INTERPRETATION,
+        "package-specific interpretation layer: what each metric/tier means, "
+        "comparability rules, missing-value semantics, authority ordering, "
+        "known bad inferences -- read this before reasoning from the rest of "
+        "the package",
+        "one document per package_type (not per-run; not regenerated by this "
+        "generator)",
+        [], [], [],
+        ["what a metric or governance_tier value means and does not mean; how "
+         "to read missing values and comparability caveats for this package type"],
+        ["this run's actual data -- it explains semantics, not this run's results"],
+        ["not written or validated by this generator; presence is a real "
+         "Path.exists() check against the checked-in repo doc, not a per-run "
+         "guarantee -- a package copied without the repo's docs/ directory "
+         "would show present: false here"],
+        {},
+        ["governance_question_routes", "governance_brief", "governance_narrative_context"],
+    ))
+
+    artifacts.append(_artifact(
+        "governance_question_routes", p(sibling_paths, "question_routes"),
+        "markdown", False, sibling_present.get("question_routes", False),
+        "human/LLM-authored discovery scaffold (docs/governance_question_routes.md)",
+        AUTHORITY_CONVENIENCE_SUMMARY,
+        "candidate catalog of recurring question types and which artifact/"
+        "fields answer them -- navigational only, not evidence",
+        "one document per package_type (not per-run; not regenerated by this "
+        "generator)",
+        [], [], [],
+        ["which artifact to check first for a specific recurring question type"],
+        ["the answer itself -- follow the route to the named artifact"],
+        ["every route in this document is at 'candidate' maturity (see the "
+         "document's own maturity-level scale) -- none has a proven history "
+         "of repeated use for this package type yet; not an exhaustive list "
+         "of every possible question"],
+        {},
+        ["governance_interpretation_guide", "governance_brief", "governance_findings"],
     ))
 
     artifacts.append(_artifact(

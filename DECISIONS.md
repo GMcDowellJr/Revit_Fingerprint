@@ -613,6 +613,238 @@ any of its deterministic calculations, thresholds, or CSV columns:
 
 ---
 
+## D-020 — Governance narrative evidence-package layer (Phase 2: structured findings)
+
+### Status
+Accepted (2026-07-16)
+
+### Context
+D-019's package manifest/health/evidence-map layer made the governance
+package's provenance and coverage machine-legible, but the actual
+classification conclusions (which domains are baseline candidates, which
+show high fragmentation or passive-inheritance risk, which clients have low
+coherence) still existed only as prose sentences inside
+`governance_narrative_context.md`'s "Key Findings and Governance
+Recommendations" section, generated independently of any structured data
+model. A downstream reader (human or LLM) could not enumerate "every domain
+currently classified `baseline_candidate`" without parsing narrative text.
+
+### Decision
+Add `governance_findings.json`: one structured finding per (subject, rule)
+match, covering the ten required categories (`baseline_candidate`,
+`strong_baseline_candidate`, `local_review_required`, `high_fragmentation`,
+`active_local_practice`, `cross_client_convergence`, `low_client_coherence`,
+`passive_inheritance_risk`, `missing_or_degraded_evidence`,
+`leadership_question`). Each finding carries `finding_id`, `subject`
+(`type`/`id`), `finding_type`, `status`, `origin`, `fidelity`,
+`authority_level`, `summary`, `support[]` (`artifact_id` + `selector` +
+`fields`), `rule_ids[]`, and `limits[]` — the origin/fidelity/authority/
+limits fields are this repo's own vocabulary (`tools/governance_evidence_package.py`),
+modeled on but independent of the design-reference `llm_evidence_framework`
+repo's stated epistemic-provenance components.
+
+A new `_classify_domains_for_findings()` in `generate_governance_narrative.py`
+is the single source of truth for tier-derived classification buckets,
+shared by `build_structured_findings()` (which produces the JSON) and
+`render_findings_and_recommendations()` (which now consumes the same
+findings list instead of recomputing an independent classification) — the
+two can no longer drift into disagreeing readings of the same underlying
+data. Leadership questions are marked `status: question_not_claim` /
+`authority_level: convenience_summary`, distinct from evidence findings
+(`status: supported`), so a suggested review question is never mistaken for
+an observed result.
+
+### Consequences
+- `governance_findings.json` becomes the 19th evidence-package artifact
+  (added to `governance_evidence_map.json`); no existing CSV column,
+  classification/scoring logic, or threshold changed.
+- A finding's `support[].artifact_id` always resolves to a real artifact and
+  `selector`/`fields` that exist on it — enforced by construction, since
+  both consumers read from the same `cascade`/`client_rows`/
+  `governance_state_summary` inputs used to write `governance_domain_summary.csv`/
+  `governance_client_summary.csv`.
+- No baseline finding is ever emitted for a domain whose primary metric is
+  unavailable: `assign_tier()` itself routes that domain to
+  `TIER_INSUFFICIENT` before `_classify_domains_for_findings()` runs, so
+  the gate is structural, not a separate check that could be forgotten.
+
+---
+
+## D-021 — Governance narrative evidence-package layer (Phase 3: policy externalization)
+
+### Status
+Accepted (2026-07-17)
+
+### Context
+D-019/D-020 made the governance package's provenance, health, and findings
+machine-legible, but the actual governance judgments underneath those
+findings — tier-assignment thresholds, reliability-band cutoffs,
+cross-client convergence/coherence thresholds, which domains are excluded
+from aggregate scoring, which are flagged as passive-inheritance risk, fixed
+editorial guidance text for specific domains, and client-onboarding
+interpretation thresholds — were still Python literals scattered across
+`generate_governance_narrative.py`. These are deterministic classification
+rules, not raw corpus observations, and the task's own framing distinguishes
+"authoritative deterministic evidence" from "controlled interpretation"
+(rule-derived classification on top of that evidence) — a rule's threshold
+value is itself part of the interpretation layer, not something a reader
+can audit or override without reading Python source.
+
+### Decision
+Move these values into four JSON policy profiles under
+`policies/governance/`: `governance_thresholds.json` (reliability bands,
+tier-assignment bands, cross-client convergence/coherence thresholds, client
+confidence bands), `domain_governance_policy.json`
+(`excluded_from_scoring`, `passive_inheritance_risk_domains`, per-domain
+`domain_guidance` text, and `static_findings_guidance` always rendered in
+the findings section), `client_onboarding_policy.json`
+(`_client_onboarding_profile()`'s interpretation thresholds — kept as a
+separate profile from `governance_thresholds.json` even where a default
+value numerically coincides, since these gate onboarding narrative text, not
+`governance_tier`), and `finding_rules.json` (documentation-only
+`rule_id → {finding_type, description}` metadata for D-020's `rule_ids`).
+
+A new sibling module, `tools/governance_policy.py`, is a generic JSON
+policy-profile loader (mechanical load/fallback only — no governance
+business content of its own, mirroring `tools/governance_evidence_package.py`'s
+separation of the generic envelope layer from the domain-governance logic
+that stays in `generate_governance_narrative.py`). `--policy-dir` (accepted
+but inert since D-019) now defaults to `policies/governance/` and is
+actually read: `apply_governance_policy()` reassigns every module-level
+threshold/domain-policy constant this file's existing functions already
+read as plain globals (`EXCLUDED_FROM_SCORING`, `PASSIVE_INHERITANCE_RISK_DOMAINS`,
+`DOMAIN_GUIDANCE`, `STATIC_FINDINGS_GUIDANCE`, and ~25 threshold constants)
+from the resolved policy at the start of `main()`, so no existing function
+body or call site needed to change — only the *source* of each constant's
+value changed, from a Python literal to a policy-file-or-fallback lookup.
+The shipped `policies/governance/*.json` files reproduce this generator's
+pre-externalization Python literals value-for-value (verified by a
+regression test comparing on-disk JSON against the module's own
+`_POLICY_DEFAULTS`), so no existing invocation's output changes by default.
+A profile file missing from `--policy-dir` falls back, per file, to this
+generator's own built-in default for that profile only — reported in
+`governance_package_health.json`'s `policy_load_status`/`fallbacks_used`/
+`warnings` (a `governance_policy_profile_defaulted` warning degrades
+`overall_status`) and in `governance_package_manifest.json`'s
+`policy_profiles.profiles` (resolved `profile_id`/`schema_version`/`source`
+per profile).
+
+### Consequences
+- No governance classification output (tier assignment, reliability
+  banding, cross-client convergence/coherence tiering, onboarding narrative
+  text, excluded/passive-inheritance-risk domain sets, or the two
+  domain-specific/static findings-guidance sentences) changed for any
+  existing invocation — locked in by a regression test running `main()`
+  twice (default vs. explicit `--policy-dir policies/governance/`) and
+  asserting byte-identical `governance_domain_summary.csv` output.
+- A governance threshold, excluded/passive-inheritance-risk domain set, or
+  guidance sentence can now be changed by editing JSON under
+  `--policy-dir`, without a code change — verified with tests that override
+  one policy file and observe the corresponding classification/prose output
+  change (e.g. lowering `tier_strong_baseline_min` promotes a previously
+  `Investigate Before Baseline` domain to `Strong Baseline Candidate`).
+- Because the overridden constants are process-global module attributes
+  (not threaded through function signatures), every test that calls
+  `apply_governance_policy()` with a non-default policy must reset it
+  afterward (an autouse pytest fixture in
+  `tests/test_generate_governance_narrative_policy.py` does this) — a test
+  that forgot to reset could leak an overridden threshold into an unrelated
+  test file running later in the same pytest session. This is a known
+  trade-off of the "reassign existing module globals" approach chosen to
+  avoid threading a policy object through dozens of existing call sites in
+  one pass; a future phase may thread policy explicitly instead if this
+  proves fragile in practice.
+- `DOMAIN_LABELS` (human-readable domain display names) is **not**
+  externalized in this phase — it is a display-name contract issue (see the
+  evidence map's existing C8 known-limitation note), not a governance
+  threshold or policy rule, and remains a Python literal.
+
+---
+
+## D-022 — Governance narrative evidence-package layer (Phase 4: interpretation guide, question routes, governance brief)
+
+### Status
+Accepted (2026-07-17)
+
+### Context
+D-019/D-020/D-021 made the governance package's provenance, health,
+findings, and classification thresholds machine-legible and externally
+editable, but a reader (human or LLM) still had no dedicated place to learn
+*how to interpret* the package's metrics and classifications (what a tier
+does and doesn't mean, comparability rules, missing-value semantics,
+known bad inferences), no catalog of where to look for a recurring
+question, and no artifact shorter than the full `governance_narrative_context.md`
+for a quick top-line read of a specific run.
+
+The design-reference `GMcDowellJr/llm_evidence_framework` repository
+(explicitly provisional, no runtime dependency) documents this gap as the
+"interpretation layer" and "question routing" artifact roles
+(`patterns/deterministic_to_llm_boundary.md`, `notes/current_thesis.md`),
+and a discovery scaffold for capturing question routes as they recur rather
+than inventing them upfront (`discovery/question_route_discovery.md`,
+`discovery/script_recipe_discovery.md`): "a route should not be codified
+just because it was imagined."
+
+### Decision
+Add three artifacts:
+
+- `docs/governance_interpretation_guide.md` — a **stable, package-type-level**
+  document (not regenerated per run, versioned via its own
+  `interpretation_guide_version` header) explaining cascade-field and
+  `governance_tier`/`score_reliability` semantics, comparability rules
+  (sector, unit system, all-view/used-view), missing-value conventions,
+  authority ordering, and a "known bad inferences" section specific to this
+  package type.
+- `docs/governance_question_routes.md` — a **candidate** question-route
+  catalog (all routes at "candidate" maturity per the reference framework's
+  own maturity scale — none has a proven history of repeated use for this
+  package type yet), following that framework's discovery scaffold
+  (Status / Question forms / Intent / Primary+Secondary artifacts /
+  Relevant fields / Evidence type / Supported+Unsupported conclusion types /
+  Comparability requirements / Common traps / Escalation). Seeded from
+  questions this generator already treats as recurring (the leadership
+  questions rendered in the narrative, and the ten `governance_findings.json`
+  finding types) rather than invented from nothing.
+- `governance_brief.md` — the one new **generated, per-run** artifact:
+  built by `render_governance_brief()`, which consumes the already-computed
+  `findings` list and `governance_package_health.json` directly (no new
+  classification logic — the same "consume, not recompute" discipline
+  D-020 established), rendering package status, corpus counts, each
+  finding category capped at 10–15 items with a pointer to
+  `governance_findings.json` for the full list, and the leadership
+  questions as a distinctly-marked numbered list. `authority_level:
+  convenience_summary`, subordinate to package health, the source CSVs,
+  the rollup CSVs, and `governance_findings.json`.
+
+A new `--emit-interpretation-layer`/`--no-emit-interpretation-layer` CLI
+flag (default: on) controls `governance_brief.md` only, independently of
+`--emit-evidence-package` (but only takes effect when that flag is also
+on, since the brief depends on findings/health). The two static docs are
+unaffected by either flag — they are always listed in
+`governance_evidence_map.json` with real `Path.exists()`-based presence,
+since they are checked-in repo docs, not per-run outputs.
+`governance_narrative_context.md` is retained unchanged as a compatibility
+artifact; its authority header gains pointers to all three new artifacts.
+
+### Consequences
+- `governance_evidence_map.json` grows from 19 to 22 artifacts.
+- No existing classification, scoring, CSV column, or narrative section
+  changed — `governance_brief.md` computes nothing new, and the two static
+  docs are pure documentation.
+- Unlike every other "generated this run" evidence-map entry (whose
+  `present` is asserted `True` by construction), `governance_brief.md`'s
+  `present` is a genuine per-run check, since `--no-emit-interpretation-layer`
+  can suppress it while the rest of the package still generates normally —
+  a consumer must check this artifact's own `present` field, not just
+  package-level flags, before assuming it exists for a given run.
+- Script recipes and deterministic extractors (the next two rungs on the
+  reference framework's promotion ladder: ad hoc question → candidate route
+  → active route → recipe → extractor) are explicitly out of scope for this
+  phase — no route in `docs/governance_question_routes.md` has earned
+  promotion past "candidate" yet.
+
+---
+
 ## Notes
 
 - This document is **append-only**.

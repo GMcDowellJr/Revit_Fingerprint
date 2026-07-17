@@ -1,0 +1,47 @@
+{
+  "profile_id": "finding-rules-v1",
+  "schema_version": "0.1",
+  "notes": "Documentation-only metadata for the rule_ids emitted in governance_findings.json's support[].rule_ids by tools/generate_governance_narrative.py's build_structured_findings(). The rule_id constants and the classification logic itself stay in generate_governance_narrative.py/_classify_domains_for_findings() (domain-governance business logic, per D-019/D-020); this file only documents which finding_type each rule_id produces and a human-readable description, for a downstream reader who has a rule_id and wants to know what it means without reading the generator's source.",
+  "rules": {
+    "GOV-TIER-STRONG-BASELINE": {
+      "finding_type": "strong_baseline_candidate",
+      "description": "Domain assigned the Strong Baseline Candidate governance_tier by assign_tier() (primary containment >= tier_strong_baseline_min, no material state exception, no container gap)."
+    },
+    "GOV-TIER-BASELINE-CANDIDATE": {
+      "finding_type": "baseline_candidate",
+      "description": "Domain assigned a baseline-candidate governance_tier (Strong Baseline, Baseline Candidate — Local/Use Review, or Baseline Candidate — Container Gap) by assign_tier()."
+    },
+    "GOV-TIER-LOCAL-REVIEW-REQUIRED": {
+      "finding_type": "local_review_required",
+      "description": "Domain assigned a governance_tier requiring local/use review (Baseline Candidate — Local/Use Review, Investigate Before Baseline, or Active Local Practice Review) by assign_tier()."
+    },
+    "GOV-TIER-ACTIVE-LOCAL-PRACTICE": {
+      "finding_type": "active_local_practice",
+      "description": "Domain assigned the Active Local Practice Review governance_tier, or its local_active_share meets/exceeds local_active_material_threshold, by assign_tier()."
+    },
+    "GOV-TIER-HIGH-FRAGMENTATION": {
+      "finding_type": "high_fragmentation",
+      "description": "Domain assigned the High Fragmentation governance_tier by assign_tier() (primary containment below tier_moderate_variation_min)."
+    },
+    "GOV-TIER-INSUFFICIENT-EVIDENCE": {
+      "finding_type": "missing_or_degraded_evidence",
+      "description": "Domain assigned an insufficient-evidence governance_tier (Insufficient Evidence, Insufficient Evidence — Enterprise; BC-Level Evidence Available, or Sparse / Presence-Limited) by assign_tier()."
+    },
+    "GOV-XC-STRONG-CONVERGENCE": {
+      "finding_type": "cross_client_convergence",
+      "description": "Domain's cross-client Jaccard mean (xc) meets or exceeds cross_client_convergence_strong."
+    },
+    "GOV-PASSIVE-INHERITANCE-RISK": {
+      "finding_type": "passive_inheritance_risk",
+      "description": "Domain is in passive_inheritance_risk_domains (domain_governance_policy.json) and shows a material passive-inheritance signal (passive_indicator or bundle_share_all below the schema-appropriate threshold)."
+    },
+    "GOV-CLIENT-LOW-COHERENCE": {
+      "finding_type": "low_client_coherence",
+      "description": "Client's within-project coherence mean (wp_mean) is below client_coherence_low."
+    },
+    "GOV-LEADERSHIP-QUESTION": {
+      "finding_type": "leadership_question",
+      "description": "One of a fixed set of suggested leadership review questions -- a question for human review, not a computed classification of a specific domain or client."
+    }
+  }
+}

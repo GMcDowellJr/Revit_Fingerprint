@@ -1,0 +1,27 @@
+{
+  "profile_id": "domain-governance-policy-v1",
+  "schema_version": "0.1",
+  "notes": "Domain-level governance policy consumed by tools/generate_governance_narrative.py: which domains are excluded from aggregate scoring, which are flagged as passive-inheritance risk, and fixed editorial guidance text tied to specific domains or always rendered in the findings section. Values here reproduce the generator's own pre-externalization Python literals exactly (see docs/governance_evidence_package.md) -- this profile does not change any classification output by itself.",
+  "excluded_from_scoring": [
+    "view_templates_renderings_drafting"
+  ],
+  "passive_inheritance_risk_domains": [
+    "arrowheads",
+    "dimension_types_diameter",
+    "dimension_types_radial",
+    "dimension_types_spot_coordinate",
+    "dimension_types_spot_elevation",
+    "dimension_types_spot_slope",
+    "fill_patterns_drafting",
+    "fill_patterns_model",
+    "line_patterns",
+    "object_styles_analytical"
+  ],
+  "domain_guidance": {
+    "phases": "Templates are internally consistent on phases but projects carry phases not defined in templates — project teams are adding project-specific phases.",
+    "loaded_family_types": "Family loading is inherently project-specific. Template governance establishes a floor, not a ceiling. Consider approved-list governance rather than full vocabulary convergence."
+  },
+  "static_findings_guidance": [
+    "Loaded family types and materials should not be governed like object styles. These domains are often project-specific. Review them for approved lists, starter content, exception rules, or documentation rather than full vocabulary convergence."
+  ]
+}

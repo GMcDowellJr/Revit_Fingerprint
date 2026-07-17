@@ -1,0 +1,13 @@
+{
+  "profile_id": "client-onboarding-policy-v1",
+  "schema_version": "0.1",
+  "notes": "Thresholds consumed by tools/generate_governance_narrative.py's _client_onboarding_profile() to derive onboarding_internal_read/onboarding_portability_read/onboarding_operating_implication text. Kept as a separate profile from governance_thresholds.json (even where a value happens to numerically coincide with a governance-tier threshold today) because these gate interpretation-only narrative text, not governance_tier classification -- the two are allowed to diverge independently in a future change. Values here reproduce the generator's own pre-externalization Python literals exactly (see docs/governance_evidence_package.md).",
+  "thresholds": {
+    "wp_stable_min": 0.75,
+    "wp_mixed_min": 0.55,
+    "xc_high_portability_min": 0.45,
+    "xc_moderate_portability_min": 0.33,
+    "n_files_low_max": 10,
+    "n_files_moderate_max": 25
+  }
+}

@@ -119,6 +119,15 @@ policies/               Join-key, sig-hash, and governance-classification polici
                                        (Template/Container/Project/Generic) from central_path_norm
   placeholder_known_defaults.json   Per-domain known-default/placeholder name patterns used by the `placeholders` stage
   client_sector.csv                 client_label → sector classification, used by generate_governance_narrative.py
+  governance/                       Externalized governance-narrative policy profiles, loaded via
+                                       tools/governance_policy.py (D-021): governance_thresholds.json (tier/
+                                       reliability/convergence/coherence thresholds), domain_governance_policy.json
+                                       (excluded_from_scoring, passive_inheritance_risk_domains, domain guidance
+                                       text), client_onboarding_policy.json (onboarding-interpretation thresholds),
+                                       finding_rules.json (rule_id → finding_type/description documentation).
+                                       Shipped values reproduce generate_governance_narrative.py's
+                                       pre-externalization Python literals exactly -- see
+                                       docs/governance_evidence_package.md.
 
 config/
   archetype/archetype_definitions.json   Human-curated (DP1) archetype definitions consumed by archetype tooling
@@ -183,13 +192,21 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
   generate_governance_narrative.py    Deterministic (no-LLM) governance_narrative_context.md renderer from the
                                   compare_cross_segment.py / bundle pipeline CSV outputs; also emits a governance
                                   evidence-package layer (governance_package_manifest.json/_health.json/
-                                  _evidence_map.json) via governance_evidence_package.py -- see
-                                  docs/governance_evidence_package.md and D-019
-  governance_evidence_package.py    Package manifest/health/evidence-map builders for the governance narrative
-                                  evidence package (Phase 1 of a broader evidence-package refactor; see
-                                  docs/governance_evidence_package.md). Design-reference-only relationship to the
-                                  external GMcDowellJr/llm_evidence_framework repo -- no import from or runtime
-                                  dependency on it.
+                                  _evidence_map.json/_findings.json/governance_brief.md) via
+                                  governance_evidence_package.py, loads governance thresholds/domain policy/
+                                  onboarding policy from policies/governance/*.json via governance_policy.py,
+                                  and points readers at docs/governance_interpretation_guide.md /
+                                  docs/governance_question_routes.md -- see docs/governance_evidence_package.md
+                                  and D-019/D-020/D-021/D-022
+  governance_evidence_package.py    Package manifest/health/evidence-map/findings-document builders for the
+                                  governance narrative evidence package (see docs/governance_evidence_package.md).
+                                  Design-reference-only relationship to the external
+                                  GMcDowellJr/llm_evidence_framework repo -- no import from or runtime dependency
+                                  on it.
+  governance_policy.py            Generic JSON policy-profile loader (mechanical load/fallback only) for
+                                  policies/governance/*.json, used by generate_governance_narrative.py. Owns no
+                                  governance business content itself -- default threshold values and
+                                  domain-governance logic stay in generate_governance_narrative.py (D-021).
   governance/standards_governance_report.py   Standards governance report generator
 
   archetype/               Archetype candidate generation & DP1 (Decision Point 1) human-curation workflow:
@@ -504,7 +521,7 @@ A separate layer builds comparable populations across the whole model corpus and
 2. `tools/run_segment_orchestrator.py` — runs `patterns_analysis` then `bundle_analysis` stages per segment, in level order, writing per-segment output folders.
 3. `tools/governance_manifest.py` — builds a **disjoint** partition (Enterprise / each business center / each client / each named project / Generic) directly from `file_metadata.csv`. This is intentionally separate from the segment lattice's powerset — see the file's own docstring.
 4. `tools/compare_cross_segment.py` (segments) / `tools/compare_governance_populations.py` (disjoint populations) — Jaccard + containment comparisons using `join_hash` as the cross-population identity unit; bundle membership from `bundle_analysis/` is annotated on afterward.
-5. `tools/generate_governance_narrative.py` — deterministic, template-driven `governance_narrative_context.md` from the CSV outputs above. No LLM in the loop. Also emits a governance evidence package (`governance_package_manifest.json`/`_health.json`/`_evidence_map.json`, default on) — see `docs/governance_evidence_package.md`.
+5. `tools/generate_governance_narrative.py` — deterministic, template-driven `governance_narrative_context.md` from the CSV outputs above. No LLM in the loop. Also emits a governance evidence package (`governance_package_manifest.json`/`_health.json`/`_evidence_map.json`/`_findings.json`/`governance_brief.md`, default on) plus static interpretation-guide/question-route docs — see `docs/governance_evidence_package.md`.
 6. `tools/governance/standards_governance_report.py` — standards governance report generation.
 7. `tools/archetype/` — separate DP1 (Decision Point 1) workflow that clusters cross-domain co-occurrence signals into candidate "archetypes" for human curation against `config/archetype/archetype_definitions.json`.
 
@@ -542,7 +559,9 @@ Phase-1 behavior is entirely governed by `tools/run_config.json`. If `domains_in
 - `docs/cross_segment_comparison.md` — `compare_cross_segment.py` methodology
 - `docs/analysis-phases-question-map.md` — which questions each phase can answer
 - `docs/V21_ANALYSIS_SCHEMA.md` — v2.1 output schema (`Results_v21/analysis_v21/`)
-- `docs/governance_evidence_package.md` — `generate_governance_narrative.py`'s evidence-package layer (manifest/health/evidence-map artifact inventory, authority ordering, policy/threshold profiles once externalized)
+- `docs/governance_evidence_package.md` — `generate_governance_narrative.py`'s evidence-package layer (manifest/health/evidence-map/findings artifact inventory, authority ordering, policy/threshold profiles, interpretation guide/question routes/governance brief)
+- `docs/governance_interpretation_guide.md` — stable, package-type-level interpretation guide for a governance evidence package (metric semantics, comparability rules, known bad inferences)
+- `docs/governance_question_routes.md` — candidate question-route catalog (all at "candidate" maturity) for recurring governance-package questions
 - `docs/tools_PHASE0_1_2_MAP.md` / `docs/tools_DEPRECATED.md` — useful for deprecation *reasoning*, but dated 2026-01-29 and reference a `tools/phase2_analysis/` package path that no longer exists on disk; don't treat their command examples as current without checking the actual file first
 
 ## Files to Read First
@@ -582,6 +601,10 @@ When working on **analysis**:
 | D-016 | VCO scope — categories 1 (template-controlled) and 2 (latent) implemented; category 3 (view-local) deferred |
 | D-017 | `line_patterns` join key upgraded to scale-invariant normalized segments (structural equivalence, not absolute scale) |
 | D-018 | `loaded_family_types` scoped to user-loaded families only; system families pass through unfiltered but ungoverned |
+| D-019 | Governance narrative evidence-package layer, Phase 1 — package manifest/health/evidence-map JSON artifacts around `generate_governance_narrative.py`'s existing outputs |
+| D-020 | Governance narrative evidence-package layer, Phase 2 — structured findings (`governance_findings.json`) with epistemic provenance (origin/fidelity/authority/limits) |
+| D-021 | Governance narrative evidence-package layer, Phase 3 — policy externalization (`policies/governance/*.json`); thresholds/domain policy/onboarding rules loaded via `tools/governance_policy.py` instead of hardcoded, with defaults preserved exactly |
+| D-022 | Governance narrative evidence-package layer, Phase 4 — interpretation/routing split: `docs/governance_interpretation_guide.md` (stable), `docs/governance_question_routes.md` (candidate routes), `governance_brief.md` (per-run, generated, computes nothing new) |
 
 `DECISIONS.md` is append-only; a couple of decision numbers (D-014, D-015) have more than one entry as the decision was revised/completed in place — the latest entry for a given number is authoritative. See `DECISIONS.md` for full rationale.
 
@@ -599,6 +622,7 @@ When working on **analysis**:
 - `domains/graph_2024.json` / `graph_2025.json` / `graph_2026.json` are cached RevitLookup reference graphs, not part of the extraction runtime — never import them from a domain or the runner
 - `tools/_archive/` holds confirmed-superseded tools; don't build new work on top of anything in it without first checking `docs/tools_DEPRECATED.md` and `CHANGELOG.md` for the replacement
 - `docs/tools_PHASE0_1_2_MAP.md` and `docs/tools_DEPRECATED.md` are dated 2026-01-29 and reference a `tools/phase2_analysis/` path that no longer exists — verify any command from them against the actual file before running it
+- `generate_governance_narrative.py`'s governance thresholds, excluded/passive-inheritance-risk domain lists, domain guidance text, and onboarding-interpretation thresholds live in `policies/governance/*.json` (D-021), not as Python literals — module-level constants of the same name still exist (for backward-compatible imports) but are reassigned at runtime from the loaded policy in `apply_governance_policy()`; edit the JSON, not the `_DEFAULT_*` Python fallbacks, to change actual behavior
 - `core/sig_hash_builder.py` / `core/sig_hash_policy.py` are analysis-side only (the `sig_hash` stage in `run_extract_all.py`); they are not wired into the live Dynamo extraction path — don't assume changing `policies/domain_sig_hash_policies.json` changes what a domain extractor emits
 
 ## graphify
