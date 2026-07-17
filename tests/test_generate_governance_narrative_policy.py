@@ -200,6 +200,45 @@ def test_overriding_excluded_from_scoring_changes_build_cascade(tmp_path):
     assert "line_styles" not in cascade
 
 
+def test_overriding_excluded_from_scoring_changes_render_limitations_note(tmp_path):
+    """Regression test for a PR review finding: render_limitations()'s
+    'Excluded domain' note used to hardcode the literal
+    'view_templates_renderings_drafting' rather than reading the resolved
+    EXCLUDED_FROM_SCORING set -- a --policy-dir override that excludes a
+    different domain must be reflected in the narrative, not just in the
+    CSV/health output it's describing."""
+    custom = json.loads(json.dumps(g._POLICY_DEFAULTS["domain_policy"]))
+    custom["excluded_from_scoring"] = ["line_styles"]
+    (tmp_path / "domain_governance_policy.json").write_text(json.dumps(custom), encoding="utf-8")
+
+    g.apply_governance_policy(load_governance_policy(tmp_path, g._POLICY_DEFAULTS))
+    md = g.render_limitations({"Project": 10})
+    assert "`line_styles`" in md
+    assert "view_templates_renderings_drafting" not in md
+
+
+def test_render_limitations_excluded_note_pluralizes_for_multiple_domains(tmp_path):
+    custom = json.loads(json.dumps(g._POLICY_DEFAULTS["domain_policy"]))
+    custom["excluded_from_scoring"] = ["line_styles", "materials"]
+    (tmp_path / "domain_governance_policy.json").write_text(json.dumps(custom), encoding="utf-8")
+
+    g.apply_governance_policy(load_governance_policy(tmp_path, g._POLICY_DEFAULTS))
+    md = g.render_limitations({"Project": 10})
+    assert "**Excluded domains:**" in md
+    assert "`line_styles`" in md and "`materials`" in md
+    assert "are excluded" in md
+
+
+def test_render_limitations_handles_empty_excluded_set(tmp_path):
+    custom = json.loads(json.dumps(g._POLICY_DEFAULTS["domain_policy"]))
+    custom["excluded_from_scoring"] = []
+    (tmp_path / "domain_governance_policy.json").write_text(json.dumps(custom), encoding="utf-8")
+
+    g.apply_governance_policy(load_governance_policy(tmp_path, g._POLICY_DEFAULTS))
+    md = g.render_limitations({"Project": 10})
+    assert "**Excluded domains:** none for this run's policy profile." in md
+
+
 def test_overriding_domain_guidance_changes_detect_anomalies_text(tmp_path):
     custom = json.loads(json.dumps(g._POLICY_DEFAULTS["domain_policy"]))
     custom["domain_guidance"]["loaded_family_types"] = "CUSTOM GUIDANCE TEXT"

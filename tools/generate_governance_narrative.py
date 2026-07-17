@@ -3643,6 +3643,24 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
         if has_state_outputs else
         "\n- **Governance-state limitation:** Governance-state outputs were not provided. Inherited-but-unused and local-active findings are inferred indirectly."
     )
+    # Read from the resolved EXCLUDED_FROM_SCORING module global (set by
+    # apply_governance_policy() from domain_governance_policy.json before
+    # main() renders this section), not a hardcoded literal -- a --policy-dir
+    # override that changes which domain(s) are excluded must be reflected
+    # here, or this note would describe a different exclusion set than the
+    # one that actually produced the CSV/health output for this run.
+    excluded_domains = sorted(EXCLUDED_FROM_SCORING)
+    if excluded_domains:
+        excluded_note = (
+            f"- **Excluded domain{'s' if len(excluded_domains) != 1 else ''}:** "
+            f"{', '.join(f'`{d}`' for d in excluded_domains)} "
+            f"{'are' if len(excluded_domains) != 1 else 'is'} excluded from "
+            "aggregate governance scoring because "
+            f"{'they are' if len(excluded_domains) != 1 else 'it is'} "
+            "structurally anomalous in the current corpus."
+        )
+    else:
+        excluded_note = "- **Excluded domains:** none for this run's policy profile."
     return f"""---
 
 ## Analytical Notes and Limitations
@@ -3653,7 +3671,7 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
 - **Imperial/metric split:** All project files are imperial. Metric templates and coordination files exist but metric projects are not yet represented. Metric findings are limited to template-to-container comparisons only.
 - **Scores are means across file pairs.** Individual files may score substantially higher or lower than reported means.
 - **Patterns are normalised configuration fingerprints** (join_hash values) capturing the behavioural identity of a configuration record, independent of Revit element IDs. Two files sharing a pattern have identical or functionally equivalent configuration for that element.
-- **Excluded domain:** `view_templates_renderings_drafting` is excluded from aggregate governance scoring because it is structurally anomalous in the current corpus.{used_fallback_note}{state_note}
+{excluded_note}{used_fallback_note}{state_note}
 
 ---
 
