@@ -3154,7 +3154,16 @@ def build_structured_findings(
             f"{label(dom)} has insufficient or degraded evidence for governance "
             f"classification (governance_tier: {tier}).",
             _RULE_INSUFFICIENT_EVIDENCE,
-            ["governance_tier", "score_reliability"],
+            # This bucket covers three tiers: TIER_INSUFFICIENT (primary is None,
+            # visible as blank template_to_project/container_to_project),
+            # TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE (primary is None but
+            # _has_group1_bc_pooled_evidence() found bc-pooled tp_by_scope/
+            # cp_by_scope data -- not itself a scalar governance_domain_summary.csv
+            # column, so it isn't listed here as a support field), and
+            # TIER_SPARSE_LIMITED (score_reliability is sparse AND primary < 0.75).
+            # template_to_project/container_to_project explain the first and third
+            # cases; score_reliability explains the third.
+            ["governance_tier", "score_reliability", "template_to_project", "container_to_project"],
         )
     for dom in domain_buckets["cross_client_convergence"]:
         add_domain_finding(

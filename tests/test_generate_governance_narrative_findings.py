@@ -176,13 +176,44 @@ def test_missing_or_degraded_evidence_when_primary_metric_absent():
     supporting metrics are unavailable. wp_all is set (a plausible real case:
     within-project data exists but no upstream template/container/enterprise
     comparison is available) so the domain still has a renderable signal and
-    a real governance_domain_summary.csv row for this finding to reference."""
+    a real governance_domain_summary.csv row for this finding to reference.
+
+    Regression test for a PR review finding (same class as the
+    baseline_candidate/local_review_required cases): support fields must
+    include template_to_project/container_to_project so a consumer can see
+    that the primary metric was actually None (TIER_INSUFFICIENT), not just
+    the tier label and score_reliability."""
     cascade = {"line_styles": _min_domain_dict(tc=None, cp=None, tp=None, wp_all=0.30)}
     findings = build_structured_findings(cascade, [], None)
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert ("line_styles", "missing_or_degraded_evidence") in types
     assert ("line_styles", "baseline_candidate") not in types
     assert ("line_styles", "strong_baseline_candidate") not in types
+
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "missing_or_degraded_evidence")
+    fields = finding["support"][0]["fields"]
+    assert "template_to_project" in fields
+    assert "container_to_project" in fields
+
+
+def test_missing_or_degraded_evidence_for_sparse_tier_lists_primary_fields():
+    """TIER_SPARSE_LIMITED (reliability sparse AND primary < 0.75) is the
+    third tier in this bucket, driven by template_to_project/
+    container_to_project in addition to score_reliability -- must also be
+    listed in support fields."""
+    cascade = {"line_styles": _min_domain_dict(
+        tc=0.50, cp=0.50, tp=0.50, wp_p10=0.10, wp_p90=0.30, wp_all=0.30,
+    )}
+    findings = build_structured_findings(cascade, [], None)
+    types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
+    assert ("line_styles", "missing_or_degraded_evidence") in types
+
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "missing_or_degraded_evidence")
+    fields = finding["support"][0]["fields"]
+    assert "template_to_project" in fields
+    assert "container_to_project" in fields
 
 
 def test_missing_or_degraded_evidence_not_emitted_for_non_renderable_domain():
