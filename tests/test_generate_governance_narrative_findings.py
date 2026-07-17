@@ -33,6 +33,7 @@ from generate_governance_narrative import (  # noqa: E402
     TIER_BASELINE_LOCAL_REVIEW,
     TIER_HIGH_FRAGMENTATION,
     TIER_STRONG_BASELINE,
+    _TIER_DRIVER_SUPPORT_FIELDS,
     build_structured_findings,
     render_findings_and_recommendations,
 )
@@ -66,19 +67,41 @@ def _client_row(client="acme", wp_mean=None, xc_mean=None):
 # ---------------------------------------------------------------------------
 
 def test_strong_baseline_candidate_finding():
+    """Regression test for a PR review finding: strong_baseline_candidate's
+    support fields must include the same exception fields as
+    baseline_candidate (template_to_container, local_active_share,
+    provided_passive_share, provided_missing_share,
+    provided_to_used_containment), so drill-through can verify why none of
+    those exceptions fired -- not just that the primary threshold was met."""
     cascade = {"line_styles": _min_domain_dict(tc=0.90, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95)}
     findings = build_structured_findings(cascade, [], None)
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert ("line_styles", "strong_baseline_candidate") in types
     assert ("line_styles", "baseline_candidate") in types
 
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "strong_baseline_candidate")
+    fields = finding["support"][0]["fields"]
+    for expected in ("template_to_container", "local_active_share", "provided_passive_share",
+                      "provided_missing_share", "provided_to_used_containment"):
+        assert expected in fields
+
 
 def test_baseline_candidate_without_strong_for_container_gap():
+    """Regression test for a PR review finding: TIER_BASELINE_CONTAINER_GAP
+    (primary >= 0.90 but template_to_container < 0.60) is the fourth possible
+    reason a domain in baseline_candidate isn't also strong_baseline_candidate
+    -- template_to_container must be listed in support fields, not just the
+    other three primary/state drivers."""
     cascade = {"line_styles": _min_domain_dict(tc=0.30, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95)}
     findings = build_structured_findings(cascade, [], None)
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert ("line_styles", "baseline_candidate") in types
     assert ("line_styles", "strong_baseline_candidate") not in types
+
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "baseline_candidate")
+    assert "template_to_container" in finding["support"][0]["fields"]
 
 
 def test_active_local_practice_and_local_review_required():
@@ -136,6 +159,24 @@ def test_local_review_required_via_passive_or_missing_share_lists_all_triggering
     assert "provided_to_used_containment" in fields
 
 
+def test_local_review_required_via_investigate_tier_lists_primary_containment_fields():
+    """Regression test for a PR review finding: TIER_INVESTIGATE (primary
+    containment in [0.75, 0.90) with no material state exception at all) also
+    lands in local_review_required, but none of the state fields explain that
+    classification -- the real drivers are template_to_project/
+    container_to_project and score_reliability. Support fields must include
+    those too, not just the state-exception fields relevant to the other two
+    tiers sharing this bucket."""
+    cascade = {"line_styles": _min_domain_dict(tc=0.90, cp=0.80, tp=0.80, wp_p10=0.80, wp_p90=0.85)}
+    findings = build_structured_findings(cascade, [], None)
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "local_review_required")
+    fields = finding["support"][0]["fields"]
+    assert "template_to_project" in fields
+    assert "container_to_project" in fields
+    assert "score_reliability" in fields
+
+
 def test_high_fragmentation_finding():
     cascade = {"line_styles": _min_domain_dict(tc=0.10, cp=0.20, tp=0.30, wp_p10=0.30, wp_p90=0.35)}
     findings = build_structured_findings(cascade, [], None)
@@ -144,18 +185,81 @@ def test_high_fragmentation_finding():
     assert ("line_styles", "baseline_candidate") not in types
 
 
+def test_tier_based_findings_use_the_shared_driver_field_list():
+    """Consolidation regression lock: after five separate PR review findings
+    each flagged a different tier-based finding type missing one of
+    assign_tier()'s driver/exception fields, strong_baseline_candidate/
+    baseline_candidate/local_review_required/high_fragmentation/
+    missing_or_degraded_evidence were consolidated onto one shared
+    _TIER_DRIVER_SUPPORT_FIELDS list. This locks in that every one of those
+    finding types' support fields are exactly that shared list (as a set --
+    order isn't semantically meaningful), so a future edit narrowing one
+    finding type's fields without updating the shared constant fails here
+    immediately instead of waiting for another bot-reported drill-through gap."""
+    cascade = {
+        "line_styles": _min_domain_dict(tc=0.90, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95),
+        "text_types": _min_domain_dict(tc=0.30, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95),
+        "arrowheads": _min_domain_dict(tc=0.10, cp=0.20, tp=0.30, wp_p10=0.30, wp_p90=0.35),
+        "phases": _min_domain_dict(tc=None, cp=None, tp=None, wp_all=0.30),
+    }
+    state = {"text_types": {"provided_passive_share": 0.25}}
+    findings = build_structured_findings(cascade, [], state)
+
+    checked_types = {
+        "strong_baseline_candidate", "baseline_candidate", "local_review_required",
+        "high_fragmentation", "missing_or_degraded_evidence",
+    }
+    seen_types = set()
+    for f in findings:
+        if f["finding_type"] in checked_types:
+            seen_types.add(f["finding_type"])
+            assert set(f["support"][0]["fields"]) == set(_TIER_DRIVER_SUPPORT_FIELDS), f["finding_type"]
+    assert seen_types == checked_types
+
+
 def test_missing_or_degraded_evidence_when_primary_metric_absent():
     """DoD requirement: no baseline finding is emitted when required
     supporting metrics are unavailable. wp_all is set (a plausible real case:
     within-project data exists but no upstream template/container/enterprise
     comparison is available) so the domain still has a renderable signal and
-    a real governance_domain_summary.csv row for this finding to reference."""
+    a real governance_domain_summary.csv row for this finding to reference.
+
+    Regression test for a PR review finding (same class as the
+    baseline_candidate/local_review_required cases): support fields must
+    include template_to_project/container_to_project so a consumer can see
+    that the primary metric was actually None (TIER_INSUFFICIENT), not just
+    the tier label and score_reliability."""
     cascade = {"line_styles": _min_domain_dict(tc=None, cp=None, tp=None, wp_all=0.30)}
     findings = build_structured_findings(cascade, [], None)
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert ("line_styles", "missing_or_degraded_evidence") in types
     assert ("line_styles", "baseline_candidate") not in types
     assert ("line_styles", "strong_baseline_candidate") not in types
+
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "missing_or_degraded_evidence")
+    fields = finding["support"][0]["fields"]
+    assert "template_to_project" in fields
+    assert "container_to_project" in fields
+
+
+def test_missing_or_degraded_evidence_for_sparse_tier_lists_primary_fields():
+    """TIER_SPARSE_LIMITED (reliability sparse AND primary < 0.75) is the
+    third tier in this bucket, driven by template_to_project/
+    container_to_project in addition to score_reliability -- must also be
+    listed in support fields."""
+    cascade = {"line_styles": _min_domain_dict(
+        tc=0.50, cp=0.50, tp=0.50, wp_p10=0.10, wp_p90=0.30, wp_all=0.30,
+    )}
+    findings = build_structured_findings(cascade, [], None)
+    types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
+    assert ("line_styles", "missing_or_degraded_evidence") in types
+
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "missing_or_degraded_evidence")
+    fields = finding["support"][0]["fields"]
+    assert "template_to_project" in fields
+    assert "container_to_project" in fields
 
 
 def test_missing_or_degraded_evidence_not_emitted_for_non_renderable_domain():
@@ -195,6 +299,21 @@ def test_passive_inheritance_risk_not_flagged_for_non_risk_domain():
     assert any(f["subject"].get("id") == _NON_RISK_DOMAIN for f in findings)
 
 
+def test_passive_inheritance_risk_bundle_fallback_skipped_when_state_present_but_not_material():
+    """Regression test for a PR review finding: detect_anomalies() only runs
+    its bundle/passive fallback `if not state:` -- a present state row is
+    always authoritative for that domain, even when its provided_passive_share
+    doesn't cross the material threshold. Falling through to bundle data in
+    that case would make governance_findings.json disagree with the rendered
+    CSV/anomaly-note evidence, which reports nothing for a non-material
+    state row regardless of what the (now-superseded) bundle data says."""
+    cascade = {_RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="dual", passive_indicator=0.25)}
+    state = {_RISK_DOMAIN: {"provided_passive_share": 0.05}}  # present, below PASSIVE_MATERIAL_THRESHOLD
+    findings = build_structured_findings(cascade, [], state)
+    types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
+    assert (_RISK_DOMAIN, "passive_inheritance_risk") not in types
+
+
 def test_passive_inheritance_risk_not_flagged_below_threshold():
     cascade = {_RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="dual", passive_indicator=0.05)}
     findings = build_structured_findings(cascade, [], None)
@@ -232,6 +351,24 @@ def test_passive_inheritance_risk_flagged_from_explicit_state_when_material():
     )
     assert "provided_passive_share" in finding["support"][0]["fields"]
     assert "provided_passive_share=0.350" in finding["summary"]
+
+
+def test_passive_inheritance_risk_finding_from_state_signal_without_bundle_data():
+    """Regression test for a PR review finding: a risk-group domain with
+    material provided_passive_share from --governance-state-summary must be
+    flagged even when it has no matching bundle/passive-indicator data in
+    cascade (bundle_schema == 'none') -- detect_anomalies() already treats
+    the state signal as material on its own, independent of bundle data."""
+    cascade = {_RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="none")}
+    state = {_RISK_DOMAIN: {"provided_passive_share": 0.30}}
+    findings = build_structured_findings(cascade, [], state)
+    types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
+    assert (_RISK_DOMAIN, "passive_inheritance_risk") in types
+
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == _RISK_DOMAIN and f["finding_type"] == "passive_inheritance_risk")
+    assert "provided_passive_share" in finding["summary"]
+    assert "provided_passive_share" in finding["support"][0]["fields"]
 
 
 def test_low_client_coherence_finding():

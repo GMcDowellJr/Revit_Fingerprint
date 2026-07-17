@@ -3238,6 +3238,23 @@ _FINDING_LIMITS_STANDARD = [
     "Does not establish organizational intent.",
 ]
 
+# Every governance_domain_summary.csv column assign_tier() can read to decide
+# among strong_baseline_candidate/baseline_candidate/local_review_required/
+# missing_or_degraded_evidence/high_fragmentation. Consolidated into one list
+# (rather than a hand-curated subset per finding type) after five separate PR
+# review findings each flagged a different finding type missing one of these
+# fields -- every tier-based finding needs the full set to let drill-through
+# verify not just why its own tier's primary threshold matched, but why every
+# *other* tier's exception/threshold did NOT fire. Some fields are irrelevant
+# to a given instance (e.g. template_to_container never drives
+# high_fragmentation), but including them is harmless and this list only ever
+# needs to grow when assign_tier() itself grows, not per finding type.
+_TIER_DRIVER_SUPPORT_FIELDS = [
+    "governance_tier", "template_to_project", "container_to_project",
+    "template_to_container", "score_reliability", "local_active_share",
+    "provided_passive_share", "provided_missing_share", "provided_to_used_containment",
+]
+
 
 def _classify_domains_for_findings(cascade: dict, state_summary: Optional[dict] = None) -> dict:
     """Single source of truth for domain-tier-derived classification buckets,
@@ -3301,6 +3318,20 @@ def _passive_inheritance_risk_domains(cascade: dict, state_summary: Optional[dic
     passive_inheritance_risk here purely from a bundle-density signal the
     narrative itself would not have used for that same domain.
 
+    Also checks state_summary's provided_passive_share directly (mirroring
+    detect_anomalies()'s state-based material-passive note, lines
+    ~1302-1306), since that explicit state signal is available whenever
+    --governance-state-summary is supplied, independent of whether the
+    domain also has matching bundle/passive-indicator data in cascade.
+
+    When a state row is present for the domain, the bundle fallback is never
+    consulted, even if that state row's provided_passive_share isn't
+    material -- this mirrors detect_anomalies()'s own `if not state:` gate
+    (lines ~1323) around its bundle fallback block. A present-but-not-material
+    state row is the domain's authoritative signal for this domain, exactly
+    like the CSV/anomaly-note text; falling through to older bundle data
+    would make governance_findings.json disagree with the rendered evidence.
+
     Restricted to domains passing _has_renderable_cascade_signal(), matching
     _classify_domains_for_findings() -- see that function's docstring.
     """
@@ -3311,8 +3342,8 @@ def _passive_inheritance_risk_domains(cascade: dict, state_summary: Optional[dic
             continue
         state = state_summary.get(dom)
         if state:
-            passive = state.get("provided_passive_share")
-            if passive is not None and passive >= PASSIVE_MATERIAL_THRESHOLD:
+            passive_state = _state_value(state, "provided_passive_share")
+            if passive_state is not None and passive_state >= PASSIVE_MATERIAL_THRESHOLD:
                 flagged.append(dom)
             continue
         bundle_schema = d.get("bundle_schema", "none")
@@ -3411,7 +3442,7 @@ def build_structured_findings(
             f"{label(dom)} meets the strong-baseline-candidate rule (governance_tier: "
             f"{TIER_STRONG_BASELINE}).",
             _RULE_STRONG_BASELINE,
-            ["governance_tier", "template_to_project", "container_to_project"],
+            list(_TIER_DRIVER_SUPPORT_FIELDS),
         )
     for dom in domain_buckets["baseline_candidate"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
@@ -3419,17 +3450,7 @@ def build_structured_findings(
             dom, "baseline_candidate",
             f"{label(dom)} meets the baseline-candidate rule (governance_tier: {tier}).",
             _RULE_BASELINE_CANDIDATE,
-            # template_to_project/container_to_project drive the primary tier
-            # band; local_active_share/provided_passive_share/provided_missing_share
-            # are the three fields _has_material_state_exception() checks to
-            # downgrade a >=0.90 domain into Baseline Candidate -- Local/Use
-            # Review instead of Strong Baseline, and provided_to_used_containment
-            # is the separate active-use-floor check assign_tier() applies at
-            # that same threshold -- all four can be the reason a domain in
-            # this bucket isn't also strong_baseline_candidate.
-            ["governance_tier", "template_to_project", "container_to_project",
-             "local_active_share", "provided_passive_share", "provided_missing_share",
-             "provided_to_used_containment"],
+            list(_TIER_DRIVER_SUPPORT_FIELDS),
         )
     for dom in domain_buckets["local_review_required"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
@@ -3438,12 +3459,7 @@ def build_structured_findings(
             f"{label(dom)} requires local/use review before baseline language is "
             f"safe (governance_tier: {tier}).",
             _RULE_LOCAL_REVIEW_REQUIRED,
-            # Any of these three state fields (see _has_material_state_exception())
-            # or a below-floor provided_to_used_containment can be the reason a
-            # domain lands in this tier -- list all four triggering fields, not
-            # just the ones a specific instance happened to cross.
-            ["governance_tier", "local_active_share", "provided_passive_share",
-             "provided_missing_share", "provided_to_used_containment"],
+            list(_TIER_DRIVER_SUPPORT_FIELDS),
         )
     for dom in domain_buckets["active_local_practice"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
@@ -3460,7 +3476,7 @@ def build_structured_findings(
             f"{label(dom)} is classified {TIER_HIGH_FRAGMENTATION} and is not a "
             "single-standard candidate in this run.",
             _RULE_HIGH_FRAGMENTATION,
-            ["governance_tier", "template_to_project", "container_to_project"],
+            list(_TIER_DRIVER_SUPPORT_FIELDS),
         )
     for dom in domain_buckets["missing_or_degraded_evidence"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
@@ -3469,7 +3485,12 @@ def build_structured_findings(
             f"{label(dom)} has insufficient or degraded evidence for governance "
             f"classification (governance_tier: {tier}).",
             _RULE_INSUFFICIENT_EVIDENCE,
-            ["governance_tier", "score_reliability"],
+            # Note: TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE (one of the three
+            # tiers in this bucket) is driven by _has_group1_bc_pooled_evidence()
+            # finding bc-pooled tp_by_scope/cp_by_scope data -- not itself a
+            # scalar governance_domain_summary.csv column, so it can't be listed
+            # in _TIER_DRIVER_SUPPORT_FIELDS.
+            list(_TIER_DRIVER_SUPPORT_FIELDS),
         )
     for dom in domain_buckets["cross_client_convergence"]:
         add_domain_finding(
@@ -3481,22 +3502,20 @@ def build_structured_findings(
         )
     for dom in passive_risk_domains:
         d = cascade[dom]
-        dom_state = (state_summary or {}).get(dom)
-        if dom_state:
-            detail = f"provided_passive_share={fmt(dom_state.get('provided_passive_share'))}"
-            support_fields = ["provided_passive_share", "passive_inheritance_risk"]
+        passive_state = _state_value((state_summary or {}).get(dom), "provided_passive_share")
+        if passive_state is not None and passive_state >= PASSIVE_MATERIAL_THRESHOLD:
+            detail = f"provided_passive_share={fmt(passive_state)}"
         elif d.get("bundle_schema") == "dual":
             detail = f"passive_inheritance_indicator={fmt(d.get('passive_indicator'))}"
-            support_fields = ["passive_inheritance_indicator", "passive_inheritance_risk"]
         else:
             detail = f"bundle_share_all={fmt(d.get('bundle_share_all'))}"
-            support_fields = ["bundle_share_all", "passive_inheritance_risk"]
         add_domain_finding(
             dom, "passive_inheritance_risk",
             f"{label(dom)} is in the passive-inheritance risk group and shows a "
             f"material passive signal ({detail}).",
             _RULE_PASSIVE_INHERITANCE_RISK,
-            support_fields,
+            ["passive_inheritance_indicator", "bundle_share_all", "provided_passive_share",
+             "passive_inheritance_risk"],
         )
 
     for client in low_coherence_clients:
