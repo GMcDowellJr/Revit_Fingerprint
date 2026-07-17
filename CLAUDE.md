@@ -181,7 +181,15 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
   compare_governance_populations.py   Same containment/Jaccard mechanics as compare_cross_segment.py, applied to
                                   governance_manifest.py's disjoint populations (imports rather than reimplements)
   generate_governance_narrative.py    Deterministic (no-LLM) governance_narrative_context.md renderer from the
-                                  compare_cross_segment.py / bundle pipeline CSV outputs
+                                  compare_cross_segment.py / bundle pipeline CSV outputs; also emits a governance
+                                  evidence-package layer (governance_package_manifest.json/_health.json/
+                                  _evidence_map.json) via governance_evidence_package.py -- see
+                                  docs/governance_evidence_package.md and D-019
+  governance_evidence_package.py    Package manifest/health/evidence-map builders for the governance narrative
+                                  evidence package (Phase 1 of a broader evidence-package refactor; see
+                                  docs/governance_evidence_package.md). Design-reference-only relationship to the
+                                  external GMcDowellJr/llm_evidence_framework repo -- no import from or runtime
+                                  dependency on it.
   governance/standards_governance_report.py   Standards governance report generator
 
   archetype/               Archetype candidate generation & DP1 (Decision Point 1) human-curation workflow:
@@ -496,7 +504,7 @@ A separate layer builds comparable populations across the whole model corpus and
 2. `tools/run_segment_orchestrator.py` — runs `patterns_analysis` then `bundle_analysis` stages per segment, in level order, writing per-segment output folders.
 3. `tools/governance_manifest.py` — builds a **disjoint** partition (Enterprise / each business center / each client / each named project / Generic) directly from `file_metadata.csv`. This is intentionally separate from the segment lattice's powerset — see the file's own docstring.
 4. `tools/compare_cross_segment.py` (segments) / `tools/compare_governance_populations.py` (disjoint populations) — Jaccard + containment comparisons using `join_hash` as the cross-population identity unit; bundle membership from `bundle_analysis/` is annotated on afterward.
-5. `tools/generate_governance_narrative.py` — deterministic, template-driven `governance_narrative_context.md` from the CSV outputs above. No LLM in the loop.
+5. `tools/generate_governance_narrative.py` — deterministic, template-driven `governance_narrative_context.md` from the CSV outputs above. No LLM in the loop. Also emits a governance evidence package (`governance_package_manifest.json`/`_health.json`/`_evidence_map.json`, default on) — see `docs/governance_evidence_package.md`.
 6. `tools/governance/standards_governance_report.py` — standards governance report generation.
 7. `tools/archetype/` — separate DP1 (Decision Point 1) workflow that clusters cross-domain co-occurrence signals into candidate "archetypes" for human curation against `config/archetype/archetype_definitions.json`.
 
@@ -534,6 +542,7 @@ Phase-1 behavior is entirely governed by `tools/run_config.json`. If `domains_in
 - `docs/cross_segment_comparison.md` — `compare_cross_segment.py` methodology
 - `docs/analysis-phases-question-map.md` — which questions each phase can answer
 - `docs/V21_ANALYSIS_SCHEMA.md` — v2.1 output schema (`Results_v21/analysis_v21/`)
+- `docs/governance_evidence_package.md` — `generate_governance_narrative.py`'s evidence-package layer (manifest/health/evidence-map artifact inventory, authority ordering, policy/threshold profiles once externalized)
 - `docs/tools_PHASE0_1_2_MAP.md` / `docs/tools_DEPRECATED.md` — useful for deprecation *reasoning*, but dated 2026-01-29 and reference a `tools/phase2_analysis/` package path that no longer exists on disk; don't treat their command examples as current without checking the actual file first
 
 ## Files to Read First

@@ -542,6 +542,77 @@ worth the extraction investment.
 
 ---
 
+## D-019 — Governance narrative evidence-package layer (Phase 1: manifest/health/evidence-map)
+
+### Status
+Accepted (2026-07-16)
+
+### Context
+`tools/generate_governance_narrative.py` produced three outputs
+(`governance_domain_summary.csv`, `governance_client_summary.csv`,
+`governance_narrative_context.md`) that conflated multiple epistemic roles:
+deterministic evidence, package-health/coverage reporting, interpretation
+guide, findings store, and executive narrative, with no explicit statement
+of which output carries which kind of authority. The generator's own footer
+also referenced a stale producer filename
+(`generate_governance_narrative_dod_aligned_v2.py`) that never matched the
+actual script name.
+
+A companion discovery-scaffold repository (`GMcDowellJr/llm_evidence_framework`,
+explicitly not a finalized standard) documents a pattern for separating
+deterministic evidence from interpretation: an authority-level vocabulary
+(`authoritative_deterministic_evidence` / `controlled_interpretation` /
+`convenience_summary` / `user_provided_note` /
+`llm_generated_provisional_interpretation`) and an evidence-map shape
+(artifact_id/producer/authority_level/context_role/grain/can_answer/
+cannot_answer/known_limitations/null_semantics/related_artifacts).
+
+### Decision
+Add a package-boundary layer around the existing generator without changing
+any of its deterministic calculations, thresholds, or CSV columns:
+
+- A new sibling module, `tools/governance_evidence_package.py`, defines the
+  authority-level vocabulary (independently, as this repo's own constants —
+  no import from or runtime dependency on `llm_evidence_framework`) and
+  builds three new JSON artifacts: `governance_package_manifest.json`
+  (provenance: inputs/outputs/comparison_run_ids), `governance_package_health.json`
+  (schema detection, used-view fallback, comparison_type coverage, blocking
+  conditions, warnings — all mechanical/factual text, no severity judgment),
+  and `governance_evidence_map.json` (one entry per artifact — the 10 CSVs
+  the generator reads via CLI args, 2 sibling CSVs it produces but never
+  reads (`cross_segment_file_pairs.csv`, `comparison_registry.csv`), and its
+  6 own generated artifacts, 18 total).
+- The narrative gains a new authority-header section stating its own
+  `controlled_interpretation` role and the authority ordering (package
+  health and source CSVs outrank rollup CSVs, which outrank narrative
+  prose), and the stale producer-identity footer is corrected to reference
+  the real script name via a shared `GENERATOR_IDENTITY` constant.
+- Structured findings (`governance_findings.json`) and policy externalization
+  (thresholds, domain-governance policy, onboarding rules into
+  `policies/governance/`) are explicitly deferred to later PRs — this
+  decision covers Phase 1 only.
+- `--emit-evidence-package` defaults to **on**: every existing invocation of
+  the generator starts producing the three new JSON files with no CLI change
+  required. `--no-emit-evidence-package`, `--policy-dir` (recorded but not
+  yet read), and `--package-schema-version` are additive, backward-compatible
+  CLI flags.
+
+### Consequences
+- Every run of `generate_governance_narrative.py` now writes 3 additional
+  JSON files by default, alongside the unchanged CSV/MD outputs.
+- `governance_domain_summary.csv` and `governance_client_summary.csv`'s
+  column sets, and all classification/scoring logic, are unchanged (locked
+  in by regression tests asserting the exact column lists).
+- `docs/governance_evidence_package.md` documents the artifact inventory,
+  authority ordering, and the "documented but not fixed in this phase"
+  limitations (the `governance_narrative_scope_gap_audit.md` A2 pool_scope
+  caveat, the "—" vs "" missing-value inconsistency in `governance_domain_summary.csv`,
+  and the C8 missing domain-label contract).
+- Downstream tooling that reads `generate_governance_narrative.py`'s output
+  directory will now find three new JSON files unless it opts out.
+
+---
+
 ## Notes
 
 - This document is **append-only**.

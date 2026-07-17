@@ -12,6 +12,27 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- `tools/generate_governance_narrative.py` now emits a governance evidence-package
+  layer alongside its existing outputs: `governance_package_manifest.json`
+  (provenance -- which inputs were provided/found, which outputs were written and
+  their sizes, comparison_run_id(s)/executed_utc observed in the loaded rows),
+  `governance_package_health.json` (schema detection, used-view fallback,
+  comparison_type coverage, blocking conditions, warnings), and
+  `governance_evidence_map.json` (one entry per artifact -- the CSVs the
+  generator reads, two sibling CSVs it produces but never reads
+  (`cross_segment_file_pairs.csv`, `comparison_registry.csv`), and its own six
+  generated artifacts -- with authority_level/grain/can_answer/cannot_answer/
+  known_limitations per the new `tools/governance_evidence_package.py` module).
+  New CLI flags `--emit-evidence-package`/`--no-emit-evidence-package` (default:
+  on), `--policy-dir` (recorded, not yet read), and `--package-schema-version`.
+  The narrative gains a new authority-header section stating its own
+  `controlled_interpretation` role, and the previously-stale producer-identity
+  footer (`generate_governance_narrative_dod_aligned_v2.py`, which never matched
+  the actual script) now references the real generator name. No existing CSV
+  column, classification/scoring logic, or threshold changed -- see D-019 and
+  `docs/governance_evidence_package.md`. Structured findings
+  (`governance_findings.json`) and policy externalization are deferred to later
+  work.
 - `tools/generate_governance_narrative.py`'s `build_cascade()` now breaks
   `gt`/`gc`/`gp` (generic->template/container/project containment) down by the
   TARGET's own scope level, instead of discarding every row where the target
