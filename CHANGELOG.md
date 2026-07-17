@@ -12,6 +12,23 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- `tools/generate_governance_narrative.py` now emits an interpretation/
+  routing layer: `docs/governance_interpretation_guide.md` (stable,
+  package-type-level -- what each metric/tier means, comparability rules,
+  missing-value semantics, authority ordering, known bad inferences),
+  `docs/governance_question_routes.md` (a candidate question-route catalog,
+  all routes at "candidate" maturity, following the discovery scaffold in
+  the design-reference `llm_evidence_framework` repo's
+  `discovery/question_route_discovery.md`), and `governance_brief.md` (the
+  one new generated, per-run artifact -- a narrower digest built by a new
+  `render_governance_brief()`, which consumes the already-computed findings
+  list and package health directly, computing nothing new). New CLI flags
+  `--emit-interpretation-layer`/`--no-emit-interpretation-layer` (default:
+  on) control `governance_brief.md` only, independently of
+  `--emit-evidence-package`. `governance_evidence_map.json` grows from 19 to
+  22 artifacts; `governance_narrative_context.md`'s authority header gains
+  pointers to all three new artifacts. No existing classification, scoring,
+  or CSV column changed. See D-022 and `docs/governance_evidence_package.md`.
 - `tools/generate_governance_narrative.py`'s governance thresholds, excluded/
   passive-inheritance-risk domain lists, per-domain guidance text, and
   client-onboarding interpretation thresholds are now loaded from JSON policy

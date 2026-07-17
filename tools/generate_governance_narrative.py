@@ -469,6 +469,21 @@ def _group1_scope_pair(row: dict) -> tuple[str, str, str]:
 # path or a nonexistent one) always overrides this default.
 _DEFAULT_CLIENT_SECTOR_PATH = Path(__file__).resolve().parent.parent / "policies" / "client_sector.csv"
 
+# Interpretation-layer static reference docs (PR4 -- see D-022 and
+# docs/governance_evidence_package.md). Neither is written by this generator;
+# both are human/LLM-authored discovery-scaffold documents checked into the
+# repo, referenced from the evidence map/narrative as sibling artifacts
+# (never parsed -- presence is checked via Path.exists() only, same
+# convention as the never-consumed sibling CSVs cross_segment_file_pairs.csv/
+# comparison_registry.csv). Versions here must be bumped by hand alongside
+# the corresponding doc's own version header if its content changes in a way
+# that matters for a reader relying on a specific version.
+_DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
+INTERPRETATION_GUIDE_PATH = _DOCS_DIR / "governance_interpretation_guide.md"
+QUESTION_ROUTES_PATH = _DOCS_DIR / "governance_question_routes.md"
+INTERPRETATION_GUIDE_VERSION = "0.1"
+QUESTION_ROUTES_VERSION = "0.1"
+
 
 def load_client_sectors(client_sector_rows: Optional[list[dict]]) -> dict:
     """Build a {client_label: sector} map from an optional client_sector.csv
@@ -2373,6 +2388,7 @@ def render_evidence_authority_header(
     package_schema_version: str,
     generator_identity: str,
     emit_evidence_package: bool = True,
+    emit_interpretation_layer: bool = True,
 ) -> str:
     """States this document's own epistemic role and authority ordering within
     the governance evidence package. Added alongside governance_package_manifest.json/
@@ -2382,7 +2398,11 @@ def render_evidence_authority_header(
 
     The health/findings/evidence-map pointer lines are gated on emit_evidence_package --
     when a caller passes --no-emit-evidence-package, those three files are never
-    written, so this document must not point readers at files that don't exist.
+    written, so this document must not point readers at files that don't exist. The
+    governance_brief.md pointer is separately gated on emit_interpretation_layer (only
+    meaningful when emit_evidence_package is also on -- see main()). The interpretation
+    guide/question routes pointers are unconditional: they are static repo docs, not
+    per-run outputs, so they exist regardless of either flag.
     """
     package_pointers = (
         f"""
@@ -2395,6 +2415,10 @@ def render_evidence_authority_header(
         "package health, structured findings, or evidence-map file exists "
         "alongside this document.\n"
     )
+    brief_pointer = (
+        "> **Quick top-line read:** `governance_brief.md`\n"
+        if emit_evidence_package and emit_interpretation_layer else ""
+    )
     return f"""> **Artifact role:** Convenience summary and controlled interpretation
 > (`authority_level: {AUTHORITY_CONTROLLED_INTERPRETATION}`). This document is
 > template-rendered from the deterministic CSVs below by `{generator_identity}` --
@@ -2405,7 +2429,9 @@ def render_evidence_authority_header(
 > deterministic rollups below them (`governance_domain_summary.csv`,
 > `governance_client_summary.csv`), which in turn outrank this narrative's prose.
 > If this document disagrees with a rollup CSV or a source CSV, the CSV wins.
-{package_pointers}"""
+{package_pointers}{brief_pointer}> **Metric semantics and known bad inferences:** `{INTERPRETATION_GUIDE_PATH.name}`
+> **Where to look for a specific recurring question:** `{QUESTION_ROUTES_PATH.name}`
+"""
 
 
 def render_governance_state_model(has_state_outputs: bool) -> str:
@@ -3635,6 +3661,98 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
 *Supporting tables: governance_domain_summary.csv, governance_client_summary.csv.*
 """
 
+
+_BRIEF_FINDING_SECTIONS = (
+    # (finding_type, section heading, cap)
+    ("strong_baseline_candidate", "Strong baseline candidates", 15),
+    ("local_review_required", "Domains needing local/use review before baseline language is safe", 15),
+    ("high_fragmentation", "High-fragmentation domains", 15),
+    ("passive_inheritance_risk", "Passive-inheritance risk", 15),
+    ("cross_client_convergence", "Strong cross-client convergence (natural common-base candidates)", 10),
+    ("missing_or_degraded_evidence", "Insufficient or degraded evidence", 15),
+)
+
+
+def render_governance_brief(
+    findings: list,
+    health: dict,
+    corpus: dict,
+    package_schema_version: str,
+) -> str:
+    """A narrower, run-specific digest: consumes the already-built structured
+    findings list (built_structured_findings()) and package health -- it
+    computes nothing new and cannot drift from governance_findings.json,
+    the same discipline PR2's render_findings_and_recommendations() already
+    established for the full narrative. Deliberately short: each finding
+    category is capped and points back to governance_findings.json for the
+    complete list rather than reproducing it. See D-022 and
+    docs/governance_evidence_package.md.
+    """
+    by_type: dict = defaultdict(list)
+    for f in findings:
+        by_type[f["finding_type"]].append(f)
+
+    lines = [
+        "# Governance Brief\n",
+        "> **Artifact role:** Convenience summary -- a narrower, run-specific "
+        "digest of `governance_findings.json`, not a new source of evidence.\n"
+        "> **Authority:** Subordinate to `governance_package_health.json`, the "
+        "source comparison CSVs, `governance_domain_summary.csv`/"
+        "`governance_client_summary.csv`, and `governance_findings.json` -- "
+        "if this brief disagrees with any of those, they win.\n"
+        f"> **Metric semantics:** see `{INTERPRETATION_GUIDE_PATH.name}` "
+        f"(schema {INTERPRETATION_GUIDE_VERSION}).\n"
+        f"> **Where to look for a specific question:** see `{QUESTION_ROUTES_PATH.name}` "
+        f"(schema {QUESTION_ROUTES_VERSION}).\n"
+        "> **Full detail:** `governance_narrative_context.md`, "
+        "`governance_domain_summary.csv`, `governance_client_summary.csv`, "
+        "`governance_findings.json`.\n",
+        "## Package status\n",
+        f"- Package health: **{health.get('overall_status', 'unknown')}**"
+        + (f" ({len(health.get('warnings', []))} warning(s))" if health.get("warnings") else "")
+        + "\n",
+        f"- Corpus: **{corpus.get('Project', 0)}** project files, "
+        f"**{corpus.get('Template', 0)}** templates, **{corpus.get('Container', 0)}** coordination files\n",
+        f"- Structured findings this run: **{len(findings)}**\n",
+    ]
+
+    for finding_type, heading, cap in _BRIEF_FINDING_SECTIONS:
+        items = sorted(by_type.get(finding_type, []), key=lambda f: f["subject"]["id"])
+        if not items:
+            continue
+        lines.append(f"\n## {heading} ({len(items)})\n")
+        shown = items[:cap]
+        for f in shown:
+            label_text = DOMAIN_LABELS.get(f["subject"]["id"], f["subject"]["id"]) if f["subject"]["type"] == "domain" else f["subject"]["id"]
+            lines.append(f"- **{label_text}** -- {f['summary']}")
+        if len(items) > cap:
+            lines.append(f"- _...and {len(items) - cap} more -- see `governance_findings.json`._")
+
+    low_coherence = sorted(
+        (f for f in findings if f["finding_type"] == "low_client_coherence"),
+        key=lambda f: f["subject"]["id"],
+    )
+    if low_coherence:
+        lines.append(f"\n## Clients with low internal coherence ({len(low_coherence)})\n")
+        for f in low_coherence[:15]:
+            lines.append(f"- **{f['subject']['id']}** -- {f['summary']}")
+        if len(low_coherence) > 15:
+            lines.append(f"- _...and {len(low_coherence) - 15} more -- see `governance_findings.json`._")
+
+    leadership_questions = [f for f in findings if f["finding_type"] == "leadership_question"]
+    if leadership_questions:
+        lines.append("\n## Leadership questions\n")
+        for i, f in enumerate(leadership_questions, start=1):
+            lines.append(f"{i}. {f['summary']}")
+
+    lines.append(
+        f"\n---\n\n*Generated by `{GENERATOR_IDENTITY}` (package schema "
+        f"{package_schema_version}) as a distillation of `governance_findings.json` "
+        "and `governance_package_health.json` -- not an independent source.*\n"
+    )
+    return "\n".join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate governance narrative from pipeline CSVs.")
     parser.add_argument("--summary", required=True, help="cross_segment_summary.csv")
@@ -3686,6 +3804,22 @@ def main():
                         help="Suppress the evidence-package JSON outputs; existing CSV/MD "
                              "outputs are unaffected.")
     parser.set_defaults(emit_evidence_package=True)
+    parser.add_argument("--emit-interpretation-layer", dest="emit_interpretation_layer",
+                        action="store_true",
+                        help="Write governance_brief.md, and add the static "
+                             "docs/governance_interpretation_guide.md / "
+                             "docs/governance_question_routes.md as evidence-map "
+                             "entries (default: on). Only takes effect when "
+                             "--emit-evidence-package is also on, since the brief "
+                             "is built from governance_findings.json/"
+                             "governance_package_health.json.")
+    parser.add_argument("--no-emit-interpretation-layer", dest="emit_interpretation_layer",
+                        action="store_false",
+                        help="Suppress governance_brief.md and the interpretation-"
+                             "guide/question-routes evidence-map entries only; "
+                             "governance_package_manifest.json/_health.json/"
+                             "_evidence_map.json/governance_findings.json are unaffected.")
+    parser.set_defaults(emit_interpretation_layer=True)
     parser.add_argument("--out", default="governance_narrative_context.md")
     parser.add_argument("--date", default=str(date.today()),
                         help="Analysis date string (default: today)")
@@ -3947,7 +4081,7 @@ def main():
     print("Rendering narrative...")
     sections = [
         render_header(args.date, corpus, bool(governance_state_summary), legacy_fallback),
-        render_evidence_authority_header(args.package_schema_version, GENERATOR_IDENTITY, args.emit_evidence_package),
+        render_evidence_authority_header(args.package_schema_version, GENERATOR_IDENTITY, args.emit_evidence_package, args.emit_interpretation_layer),
         render_governance_state_model(bool(governance_state_summary)),
         render_domain_tiers(cascade, governance_state_summary),
     ]
@@ -4047,6 +4181,13 @@ def main():
             "governance_findings": "structured, rule-derived findings",
         }
 
+        if args.emit_interpretation_layer:
+            brief_path = out_dir / "governance_brief.md"
+            output_paths["governance_brief"] = brief_path
+            output_types["governance_brief"] = "markdown"
+            output_authority["governance_brief"] = "convenience_summary"
+            output_context_role["governance_brief"] = "narrower run-specific digest"
+
         # All loaded row sets that carry their own comparison_run_id/executed_utc
         # (per compare_cross_segment.py's own *_FIELDS definitions) -- not just
         # summary_rows/pooled_rows. An optional evidence file loaded from a
@@ -4116,9 +4257,37 @@ def main():
         findings_document = build_findings_document(findings, schema_version=FINDINGS_SCHEMA_VERSION)
         write_json(out_dir / "governance_findings.json", findings_document)
 
+        if args.emit_interpretation_layer:
+            print("Writing governance brief...")
+            brief_md = render_governance_brief(
+                findings=findings, health=health, corpus=corpus,
+                package_schema_version=args.package_schema_version,
+            )
+            brief_path.write_text(brief_md, encoding="utf-8")
+            print(f"  → {brief_path}")
+        elif (out_dir / "governance_brief.md").exists():
+            # Same staleness-prevention rationale as the emit_evidence_package
+            # opt-out branch below: a prior run may have written governance_brief.md
+            # with --emit-interpretation-layer (the default); if this run turned
+            # only that layer off, the stale brief must not survive alongside a
+            # freshly-written governance_findings.json/package_health.json that
+            # it was never actually built from.
+            (out_dir / "governance_brief.md").unlink()
+            print("  → removed stale governance_brief.md from a prior run "
+                  "(this run used --no-emit-interpretation-layer)")
+
+        # governance_interpretation_guide.md / governance_question_routes.md are
+        # human/LLM-authored static reference docs, never written by this
+        # generator -- always listed in the evidence map (like the never-consumed
+        # sibling CSVs below) with presence computed from real Path.exists(),
+        # independent of --emit-interpretation-layer (that flag controls the
+        # per-run governance_brief.md only, not whether these repo-level docs
+        # are acknowledged to exist).
         sibling_paths = {
             "file_pairs": Path(args.summary).parent / "cross_segment_file_pairs.csv",
             "comparison_registry": Path(args.summary).parent / "comparison_registry.csv",
+            "interpretation_guide": INTERPRETATION_GUIDE_PATH,
+            "question_routes": QUESTION_ROUTES_PATH,
         }
         sibling_present = {k: v.exists() for k, v in sibling_paths.items()}
 
@@ -4169,7 +4338,8 @@ def main():
         write_json(out_dir / "governance_package_manifest.json", manifest)
 
         print(f"  → wrote governance_package_health.json, governance_findings.json, "
-              f"governance_evidence_map.json, governance_package_manifest.json to {out_dir}")
+              f"governance_evidence_map.json, governance_package_manifest.json"
+              f"{', governance_brief.md' if args.emit_interpretation_layer else ''} to {out_dir}")
     else:
         # A previous run over this same --out directory may have written
         # package JSONs with --emit-evidence-package (the default). The
@@ -4184,6 +4354,7 @@ def main():
             "governance_package_health.json",
             "governance_evidence_map.json",
             "governance_findings.json",
+            "governance_brief.md",
         )
         removed = [name for name in stale_names if (out_dir / name).exists()]
         for name in removed:

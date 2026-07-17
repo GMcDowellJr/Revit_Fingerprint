@@ -9,23 +9,30 @@ statement of which part of the output carries which kind of authority.
 
 This document describes the **evidence-package layer** added around that
 generator: a package manifest, package health report, evidence map,
-structured findings, and externalized governance policy, emitted as
-machine-readable JSON alongside the existing CSV/Markdown outputs. See
-`DECISIONS.md` D-019 (package manifest/health/evidence-map), D-020
-(structured findings), and D-021 (policy externalization) for the decision
-records, and `CHANGELOG.md` `[Unreleased]` for the change entries.
+structured findings, externalized governance policy, and an interpretation/
+routing layer, emitted as machine-readable JSON/Markdown alongside the
+existing CSV/Markdown outputs. See `DECISIONS.md` D-019 (package manifest/
+health/evidence-map), D-020 (structured findings), D-021 (policy
+externalization), and D-022 (interpretation guide, question routes,
+governance brief) for the decision records, and `CHANGELOG.md`
+`[Unreleased]` for the change entries.
 
 **This is an incremental refactor, delivered in phases.** Phase 1 (D-019)
 added the package manifest/health/evidence-map. Phase 2 (D-020) added
 structured findings (`governance_findings.json`). Phase 3 (D-021) added
-policy externalization (`policies/governance/*.json`), described below.
-None of these phases changed any existing classification, scoring, or CSV
-column — every threshold/domain-list/guidance-text value the policy layer
-now reads from JSON reproduces this generator's pre-externalization Python
-literal exactly, so no existing invocation's output changes by default.
-Still deferred to a future phase: a stable interpretation guide, candidate
-question routes, and a narrower run-specific brief (see task section 17,
-"PR4").
+policy externalization (`policies/governance/*.json`). Phase 4 (D-022)
+added the interpretation/routing layer: a stable interpretation guide
+(`docs/governance_interpretation_guide.md`), a candidate question-route
+catalog (`docs/governance_question_routes.md`), and a narrower run-specific
+brief (`governance_brief.md`), described below. None of these phases
+changed any existing classification, scoring, or CSV column — every
+threshold/domain-list/guidance-text value the policy layer reads from JSON
+reproduces this generator's pre-externalization Python literal exactly, and
+the brief is a pure distillation of already-computed findings, so no
+existing invocation's classification output changes by default.
+`governance_narrative_context.md` is retained as a compatibility artifact —
+unchanged in content and role, just no longer the only carrier of
+findings/navigation/interpretation.
 
 ## Design reference, not a dependency
 
@@ -143,7 +150,7 @@ convention) and wrapped in a schema-versioned envelope by
 ### `governance_evidence_map.json`
 
 Authority: `authoritative_deterministic_evidence` (a structural fact about
-the package, not an interpretation). One entry per artifact, 19 total:
+the package, not an interpretation). One entry per artifact, 22 total:
 
 **Source artifacts consumed via CLI** (2 required, 8 optional):
 `cross_segment_summary.csv`, `cross_segment_pooled.csv`,
@@ -152,7 +159,7 @@ the package, not an interpretation). One entry per artifact, 19 total:
 `cross_segment_union_inventory.csv`, `pattern_reuse_distribution.csv`,
 `matrix_output_manifest.csv`.
 
-**Sibling artifacts, never consumed by this generator** (2): `cross_segment_file_pairs.csv`
+**Sibling artifacts, never consumed by this generator** (4): `cross_segment_file_pairs.csv`
 and `comparison_registry.csv` — both written by `compare_cross_segment.py`'s
 `main()` to the same run directory as `cross_segment_summary.csv`, but this
 generator has no CLI argument for either and never opens or parses them.
@@ -160,23 +167,34 @@ Their path is inferred as a sibling of `--summary`'s directory; `present` is
 computed via `Path.exists()` only. See
 `docs/governance_generator_cross_compare_coverage.md` for the recommended
 future integration points (drill-through appendix for file pairs;
-completeness/staleness reporting for the comparison registry).
+completeness/staleness reporting for the comparison registry). Also in this
+group (same "never parsed, presence checked via `Path.exists()` only"
+treatment): `docs/governance_interpretation_guide.md` and
+`docs/governance_question_routes.md` — human/LLM-authored static reference
+docs checked into the repo, not per-run outputs of this generator, and
+unconditional on `--emit-interpretation-layer` (see below).
 
-**Generated artifacts** (7): the three existing outputs
+**Generated artifacts** (8): the three existing outputs
 (`governance_domain_summary.csv`, `governance_client_summary.csv`,
-`governance_narrative_context.md`) plus the four new JSON artifacts
-described above (`governance_package_manifest.json`,
-`governance_package_health.json`, `governance_findings.json`,
-`governance_evidence_map.json`), including a self-entry for
-`governance_evidence_map.json` itself (`related_artifacts` lists all 18
-other artifact IDs).
+`governance_narrative_context.md`) plus the five new artifacts described
+above (`governance_package_manifest.json`, `governance_package_health.json`,
+`governance_findings.json`, `governance_evidence_map.json`,
+`governance_brief.md`), including a self-entry for
+`governance_evidence_map.json` itself (`related_artifacts` lists all 21
+other artifact IDs). Unlike the other generated artifacts (whose `present`
+is asserted `True`, since `build_evidence_map()` only ever runs after
+they're already written), `governance_brief.md`'s `present` is a real
+`Path.exists()`-style check against whether `--emit-interpretation-layer`
+was actually on for this run — it is the one generated artifact in this
+phase that can be legitimately absent even though the rest of the package
+was generated.
 
-The four `policies/governance/*.json` policy-profile files described below
-are **not** separate evidence-map entries in this phase — they are policy
-*inputs* to classification (recorded by `profile_id`/`schema_version`/
-`source` in `governance_package_manifest.json`'s `policy_profiles.profiles`
-and in `governance_package_health.json`'s `policy_load_status`), not
-per-run corpus evidence artifacts.
+The four `policies/governance/*.json` policy-profile files are **not**
+separate evidence-map entries — they are policy *inputs* to classification
+(recorded by `profile_id`/`schema_version`/`source` in
+`governance_package_manifest.json`'s `policy_profiles.profiles` and in
+`governance_package_health.json`'s `policy_load_status`), not per-run
+corpus evidence artifacts.
 
 Each entry carries `artifact_id`, `path`, `artifact_type`, `required`,
 `producer`, `authority_level`, `context_role`, `grain`, `key_fields`,
@@ -298,6 +316,73 @@ this phase — the phase's scope was the thresholds that directly gate
 `governance_tier`/structured findings, per the task's own incremental
 "do not attempt all of the following at once" guidance.
 
+## Interpretation guide, question routes, and governance brief
+
+Implemented (D-022). This is the "interpretation and routing split" phase:
+it does not change any classification output — `governance_brief.md` is a
+pure distillation of `governance_findings.json`/`governance_package_health.json`,
+computing nothing new.
+
+### `docs/governance_interpretation_guide.md`
+
+A **stable, package-type-level** document (not regenerated per run) that
+explains what this package's metrics and classifications mean: cascade
+field semantics, what `governance_tier`/`score_reliability` do and don't
+support, comparability rules (sector, unit system, all-view/used-view),
+missing-value semantics, authority ordering, and a "known bad inferences"
+section. Modeled on the "interpretation layer" concept in
+`GMcDowellJr/llm_evidence_framework`'s `notes/current_thesis.md` and
+`patterns/deterministic_to_llm_boundary.md` — design reference only, no
+runtime dependency. Versioned via a header (`interpretation_guide_version`)
+independently of `PACKAGE_SCHEMA_VERSION`.
+
+### `docs/governance_question_routes.md`
+
+A **candidate question-route catalog** — "where to look," not "what the
+answer is" (that's the artifact) or "how to extract it" (that would be a
+script recipe, not built in this phase). Follows the discovery scaffold in
+`llm_evidence_framework/discovery/question_route_discovery.md` (Status /
+Question forms / Intent / Primary+Secondary artifacts / Relevant fields /
+Evidence type / Supported+Unsupported conclusion types / Comparability
+requirements / Common traps / Escalation). Every route in this file is at
+**candidate** maturity (that framework's own maturity scale runs candidate →
+active → recipe-backed → extractor-backed) — none has a proven history of
+repeated use for this package type yet. Seeded from questions this
+generator already treats as recurring (the leadership questions rendered in
+`governance_narrative_context.md`, and the ten `governance_findings.json`
+finding types), not invented from nothing, per that framework's own
+"a route should not be codified just because it was imagined" guidance.
+
+### `governance_brief.md`
+
+A **narrower, run-specific** digest — the actual new *generated* artifact in
+this phase. Built by `render_governance_brief()`, which consumes the
+already-computed `findings` list and `governance_package_health.json`
+directly (no new classification logic, matching PR2's "consume, not
+recompute" discipline): package status, corpus counts, each finding
+category capped at 10–15 items with a pointer to `governance_findings.json`
+for the full list, and the leadership questions as a numbered list (marked
+distinctly from findings, since they carry `status: question_not_claim`).
+Its own header states `authority_level: convenience_summary`, subordinate
+to `governance_package_health.json`, the source CSVs, the rollup CSVs, and
+`governance_findings.json`.
+
+**`--emit-interpretation-layer` / `--no-emit-interpretation-layer`**
+(default: on) controls `governance_brief.md` only, independently of
+`--emit-evidence-package` — but only takes effect when
+`--emit-evidence-package` is also on, since the brief is built from
+`governance_findings.json`/`governance_package_health.json`. The two static
+docs are unaffected by either flag; they always appear in the evidence map
+(with real `Path.exists()`-based presence) since they are checked-in repo
+docs, not per-run outputs. A stale `governance_brief.md` from a prior run is
+removed if either flag is turned off between runs over the same `--out`
+directory, matching the existing staleness-prevention convention for the
+other evidence-package JSON files.
+
+`governance_narrative_context.md`'s authority header now also points to
+`governance_brief.md` (when present), `docs/governance_interpretation_guide.md`,
+and `docs/governance_question_routes.md`.
+
 ## CLI reference
 
 ```text
@@ -308,37 +393,55 @@ this phase — the phase's scope was the thresholds that directly gate
                                           (see "Policy profiles" above)
 --package-schema-version VERSION         optional; default 1.0
 --emit-evidence-package                  default: on
---no-emit-evidence-package               suppresses the 4 new JSON outputs only;
+--no-emit-evidence-package               suppresses the 4 new JSON outputs
+                                          (+ governance_brief.md) only;
                                           existing CSV/MD outputs are unaffected
+--emit-interpretation-layer              default: on; governance_brief.md only
+--no-emit-interpretation-layer           suppresses governance_brief.md only;
+                                          manifest/health/evidence-map/findings
+                                          and the static interpretation-guide/
+                                          question-routes evidence-map entries
+                                          are unaffected
 ```
 
-No existing invocation needs to change — `--emit-evidence-package` defaults
-to on, so every existing caller starts producing the four new JSON files
-(manifest, health, evidence map, findings) with no CLI change required, and
-`--policy-dir` defaults to the shipped `policies/governance/` profiles,
-which reproduce pre-externalization output exactly. Pass
-`--no-emit-evidence-package` to opt out of the JSON outputs, or
-`--policy-dir` to point at a different (or partial, or nonexistent) policy
-profile set.
+No existing invocation needs to change — `--emit-evidence-package` and
+`--emit-interpretation-layer` both default to on, so every existing caller
+starts producing the five new files (manifest, health, evidence map,
+findings, brief) with no CLI change required, and `--policy-dir` defaults
+to the shipped `policies/governance/` profiles, which reproduce
+pre-externalization output exactly. Pass `--no-emit-evidence-package` to
+opt out of the JSON/brief outputs entirely, `--no-emit-interpretation-layer`
+to opt out of just `governance_brief.md`, or `--policy-dir` to point at a
+different (or partial, or nonexistent) policy profile set.
 
 ## Recommended LLM navigation
 
 A human or LLM analyzing a governance package produced by this generator
-should normally load, in order:
+should normally load, in order — this mirrors the "context-budget pattern"
+in `llm_evidence_framework/notes/current_thesis.md` (reasoning guidance +
+package-specific interpretation guidance + manifest + health + evidence map
++ rollup/flags + the user's question, not the full archive):
 
-1. `governance_package_health.json` — is this package usable at face value?
+1. `docs/governance_interpretation_guide.md` — what do this package's
+   metrics/tiers mean, and what are the known bad inferences to avoid?
+   (Static; load once per package type, not per run.)
+2. `governance_package_health.json` — is this package usable at face value?
    (includes `policy_load_status` — did every policy profile actually load,
    or is a profile running on this generator's built-in default?)
-2. `governance_evidence_map.json` — which artifact answers the question at hand?
-3. `governance_package_manifest.json` — what inputs actually fed this run,
+3. `governance_evidence_map.json` — which artifact answers the question at
+   hand? If the question matches a recurring pattern, check
+   `docs/governance_question_routes.md` first for a candidate shortcut.
+4. `governance_package_manifest.json` — what inputs actually fed this run,
    and which `policy_profiles.profiles` (`profile_id`/`schema_version`/
    `source`) were applied?
-4. `governance_findings.json` — which domains/clients meet a specific named
-   rule, and what CSV rows/fields support that classification?
-5. Relevant rows from `governance_domain_summary.csv` / `governance_client_summary.csv`.
-6. `governance_narrative_context.md` only for framing/prose context — never
-   as the sole source for a claim that a CSV or `governance_findings.json`
-   can verify.
+5. `governance_brief.md` for a fast top-line read of this run's findings, or
+   `governance_findings.json` directly for the full, structured list —
+   which domains/clients meet a specific named rule, and what CSV rows/
+   fields support that classification.
+6. Relevant rows from `governance_domain_summary.csv` / `governance_client_summary.csv`.
+7. `governance_narrative_context.md` only for framing/prose context — never
+   as the sole source for a claim that a CSV, `governance_findings.json`, or
+   `governance_brief.md` can verify.
 
 The full evidence archive (source comparison CSVs, sibling
 `cross_segment_file_pairs.csv`/`comparison_registry.csv`) should be pulled

@@ -761,6 +761,90 @@ per profile).
 
 ---
 
+## D-022 — Governance narrative evidence-package layer (Phase 4: interpretation guide, question routes, governance brief)
+
+### Status
+Accepted (2026-07-17)
+
+### Context
+D-019/D-020/D-021 made the governance package's provenance, health,
+findings, and classification thresholds machine-legible and externally
+editable, but a reader (human or LLM) still had no dedicated place to learn
+*how to interpret* the package's metrics and classifications (what a tier
+does and doesn't mean, comparability rules, missing-value semantics,
+known bad inferences), no catalog of where to look for a recurring
+question, and no artifact shorter than the full `governance_narrative_context.md`
+for a quick top-line read of a specific run.
+
+The design-reference `GMcDowellJr/llm_evidence_framework` repository
+(explicitly provisional, no runtime dependency) documents this gap as the
+"interpretation layer" and "question routing" artifact roles
+(`patterns/deterministic_to_llm_boundary.md`, `notes/current_thesis.md`),
+and a discovery scaffold for capturing question routes as they recur rather
+than inventing them upfront (`discovery/question_route_discovery.md`,
+`discovery/script_recipe_discovery.md`): "a route should not be codified
+just because it was imagined."
+
+### Decision
+Add three artifacts:
+
+- `docs/governance_interpretation_guide.md` — a **stable, package-type-level**
+  document (not regenerated per run, versioned via its own
+  `interpretation_guide_version` header) explaining cascade-field and
+  `governance_tier`/`score_reliability` semantics, comparability rules
+  (sector, unit system, all-view/used-view), missing-value conventions,
+  authority ordering, and a "known bad inferences" section specific to this
+  package type.
+- `docs/governance_question_routes.md` — a **candidate** question-route
+  catalog (all routes at "candidate" maturity per the reference framework's
+  own maturity scale — none has a proven history of repeated use for this
+  package type yet), following that framework's discovery scaffold
+  (Status / Question forms / Intent / Primary+Secondary artifacts /
+  Relevant fields / Evidence type / Supported+Unsupported conclusion types /
+  Comparability requirements / Common traps / Escalation). Seeded from
+  questions this generator already treats as recurring (the leadership
+  questions rendered in the narrative, and the ten `governance_findings.json`
+  finding types) rather than invented from nothing.
+- `governance_brief.md` — the one new **generated, per-run** artifact:
+  built by `render_governance_brief()`, which consumes the already-computed
+  `findings` list and `governance_package_health.json` directly (no new
+  classification logic — the same "consume, not recompute" discipline
+  D-020 established), rendering package status, corpus counts, each
+  finding category capped at 10–15 items with a pointer to
+  `governance_findings.json` for the full list, and the leadership
+  questions as a distinctly-marked numbered list. `authority_level:
+  convenience_summary`, subordinate to package health, the source CSVs,
+  the rollup CSVs, and `governance_findings.json`.
+
+A new `--emit-interpretation-layer`/`--no-emit-interpretation-layer` CLI
+flag (default: on) controls `governance_brief.md` only, independently of
+`--emit-evidence-package` (but only takes effect when that flag is also
+on, since the brief depends on findings/health). The two static docs are
+unaffected by either flag — they are always listed in
+`governance_evidence_map.json` with real `Path.exists()`-based presence,
+since they are checked-in repo docs, not per-run outputs.
+`governance_narrative_context.md` is retained unchanged as a compatibility
+artifact; its authority header gains pointers to all three new artifacts.
+
+### Consequences
+- `governance_evidence_map.json` grows from 19 to 22 artifacts.
+- No existing classification, scoring, CSV column, or narrative section
+  changed — `governance_brief.md` computes nothing new, and the two static
+  docs are pure documentation.
+- Unlike every other "generated this run" evidence-map entry (whose
+  `present` is asserted `True` by construction), `governance_brief.md`'s
+  `present` is a genuine per-run check, since `--no-emit-interpretation-layer`
+  can suppress it while the rest of the package still generates normally —
+  a consumer must check this artifact's own `present` field, not just
+  package-level flags, before assuming it exists for a given run.
+- Script recipes and deterministic extractors (the next two rungs on the
+  reference framework's promotion ladder: ad hoc question → candidate route
+  → active route → recipe → extractor) are explicitly out of scope for this
+  phase — no route in `docs/governance_question_routes.md` has earned
+  promotion past "candidate" yet.
+
+---
+
 ## Notes
 
 - This document is **append-only**.
