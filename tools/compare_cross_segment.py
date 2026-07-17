@@ -45,10 +45,16 @@ signal for small segments where pairwise Jaccard is dominated by size asymmetry.
 Containment in both directions is reported for both all and used views; no
 Jaccard is computed on this file.
 
-data_sufficient flag
---------------------
-Scores are always computed and emitted. data_sufficient = "true" only when both
-sides have n_files >= 5. The flag signals interpretability, not validity.
+Sufficiency and ambiguity judgment
+-----------------------------------
+Scores are always computed and emitted, along with the raw counts
+(n_files_a/b, n_files_focal/pool, n_shared_join_hash, n_unique_patterns_*)
+needed to judge them. This file does not itself classify a comparison as
+interpretable, sufficient, or ambiguous — no data_sufficient flag, no
+score_ambiguity_band label. signal_spread is reported as a raw float
+(computed from the same shared/unique counts) for downstream banding;
+it is not itself a judgment. That interpretive layer belongs to
+generate_governance_narrative.py.
 
 Reference segment participation
 --------------------------------
@@ -57,8 +63,8 @@ generic_to_project, template_to_project, template_to_container, and
 container_to_project comparisons using their file inventories from
 membership_matrix.csv when present. Generic/reference provided-vocabulary sources
 may not emit bundle_analysis membership matrices; for all-view comparisons they
-fall back to domain_patterns.csv. They will have has_bundles = "false" and
-data_sufficient = "false" for most domains — this is expected and correct.
+fall back to domain_patterns.csv. They will have has_bundles = "false" for most
+domains, often alongside small n_files counts — this is expected and correct.
 
 Governance all/used semantics
 ------------------------------
@@ -151,7 +157,7 @@ SUMMARY_FIELDS: List[str] = [
     "domain",
     "n_patterns_a", "n_patterns_b", "n_shared_join_hash",
     "n_unique_patterns_a", "n_unique_patterns_b",
-    "signal_spread", "score_ambiguity_band",
+    "signal_spread",
     "all_containment_a_in_b_mean", "all_containment_a_in_b_min",
     "all_containment_b_in_a_mean", "all_containment_b_in_a_min",
     "all_jaccard_mean", "all_jaccard_p10", "all_jaccard_p90",
@@ -164,7 +170,6 @@ SUMMARY_FIELDS: List[str] = [
     "used_has_bundles_a", "used_has_bundles_b",
     "used_n_shared_bundle_both", "used_n_shared_bundle_a_only", "used_n_shared_bundle_b_only",
     "n_files_a", "n_files_b", "n_pairs",
-    "data_sufficient",
     "reference_usage_interpretable",
     "target_usage_interpretable",
     "recommended_primary_view",
@@ -221,13 +226,13 @@ POOLED_FIELDS: List[str] = [
     "pool_scope",
     "n_files_focal", "n_files_pool",
     "n_unique_patterns_focal", "n_unique_patterns_pool", "n_shared_join_hash",
+    "signal_spread",
     "all_containment_focal_in_pool", "all_containment_pool_in_focal",
     "used_containment_focal_in_pool", "used_containment_pool_in_focal",
     "all_has_bundles_focal", "all_has_bundles_pool",
     "all_n_shared_bundle_both", "all_n_shared_bundle_focal_only", "all_n_shared_bundle_pool_only",
     "used_has_bundles_focal", "used_has_bundles_pool",
     "used_n_shared_bundle_both", "used_n_shared_bundle_focal_only", "used_n_shared_bundle_pool_only",
-    "data_sufficient",
     "executed_utc",
 ]
 
@@ -2488,9 +2493,6 @@ def run_pair(
         all_has_bundles = "true" if bnd_a_wp_all else "false"
         used_has_bundles = "true" if bnd_a_wp_used else "false"
         n_unique_wp = len(total_jhs)
-        n_files_a_int = n_files
-        n_files_b_int = n_files
-        data_suff = "true" if (n_files_a_int >= 5 and n_files_b_int >= 5) else "false"
 
         summary_row = _build_summary_row(
             crid, seg_a, seg_b, comparison_type, domain,
@@ -2513,7 +2515,6 @@ def run_pair(
             used_jaccard_mean=_mean(used_jaccards_wp),
             used_jaccard_p10=_fmt(_pct(used_jaccards_wp, 10)) if used_jaccards_wp else "",
             used_jaccard_p90=_fmt(_pct(used_jaccards_wp, 90)) if used_jaccards_wp else "",
-            data_sufficient=data_suff,
             executed_utc=executed_utc,
         )
 
@@ -2659,10 +2660,6 @@ def run_pair(
     used_has_bundles_a = "true" if bnd_a_used else "false"
     used_has_bundles_b = "true" if bnd_b_used else "false"
 
-    n_files_a_int = len(files_a)
-    n_files_b_int = len(files_b)
-    data_suff = "true" if (n_files_a_int >= 5 and n_files_b_int >= 5) else "false"
-
     crid = make_comparison_run_id(seg_a, seg_b, executed_utc)
     summary = _build_summary_row(
         crid, seg_a, seg_b, comparison_type, domain,
@@ -2689,7 +2686,6 @@ def run_pair(
         used_containment_a_in_b_min=metrics_used.get("all_containment_a_in_b_min", ""),
         used_containment_b_in_a_mean=metrics_used.get("all_containment_b_in_a_mean", ""),
         used_containment_b_in_a_min=metrics_used.get("all_containment_b_in_a_min", ""),
-        data_sufficient=data_suff,
         executed_utc=executed_utc,
     )
     for r in pair_rows:
@@ -2748,7 +2744,6 @@ def _build_summary_row(
     used_n_shared_bundle_both: int,
     used_n_shared_bundle_a_only: int,
     used_n_shared_bundle_b_only: int,
-    data_sufficient: str,
     executed_utc: str,
     used_n_shared_join_hash: str = "",
     used_jaccard_mean: str = "",
@@ -2762,7 +2757,8 @@ def _build_summary_row(
     ma = manifest.get(seg_a, {})
     mb = manifest.get(seg_b, {})
 
-    # score_ambiguity_band: sensitivity of scores to segment size asymmetry
+    # signal_spread: raw containment-asymmetry measure (min-side minus max-side
+    # containment share of the shared set); no interpretive banding applied here.
     _n_shared_ss = int(float(metrics.get("n_shared_join_hash") or 0))
     _n_a_ss = int(n_unique_patterns_a) if n_unique_patterns_a else 0
     _n_b_ss = int(n_unique_patterns_b) if n_unique_patterns_b else 0
@@ -2770,14 +2766,9 @@ def _build_summary_row(
     _max_ss = max(_n_a_ss, _n_b_ss)
     if _min_ss > 0:
         _signal_spread = (_n_shared_ss / _min_ss) - (_n_shared_ss / _max_ss if _max_ss > 0 else 0.0)
-        _bands = [(0.1, "Unambiguous"), (0.3, "Low"), (0.6, "Moderate")]
-        _score_ambiguity_band = next(
-            (label for threshold, label in _bands if _signal_spread <= threshold), "High"
-        )
         _signal_spread_str = f"{_signal_spread:.4f}"
     else:
         _signal_spread_str = ""
-        _score_ambiguity_band = ""
 
     return {
         "comparison_run_id": crid,
@@ -2802,7 +2793,6 @@ def _build_summary_row(
         "n_unique_patterns_a": str(n_unique_patterns_a),
         "n_unique_patterns_b": str(n_unique_patterns_b),
         "signal_spread": _signal_spread_str,
-        "score_ambiguity_band": _score_ambiguity_band,
         "all_containment_a_in_b_mean": metrics.get("all_containment_a_in_b_mean", ""),
         "all_containment_a_in_b_min": metrics.get("all_containment_a_in_b_min", ""),
         "all_containment_b_in_a_mean": metrics.get("all_containment_b_in_a_mean", ""),
@@ -2831,7 +2821,6 @@ def _build_summary_row(
         "n_files_a": metrics.get("n_files_a", ""),
         "n_files_b": metrics.get("n_files_b", ""),
         "n_pairs": metrics.get("n_pairs", ""),
-        "data_sufficient": data_sufficient,
         "reference_usage_interpretable": _bool_str(_usage_interpretable_for_role(ma.get("governance_role", ""))),
         "target_usage_interpretable": _bool_str(_usage_interpretable_for_role(mb.get("governance_role", ""))),
         "recommended_primary_view": _recommended_primary_view(
@@ -3075,7 +3064,16 @@ def _build_pooled_row(
 
     n_files_focal = len(focal_files)
     n_files_pool = len(pool_files_keyed)
-    data_suff = "true" if (n_files_focal >= 5 and n_files_pool >= 5) else "false"
+
+    # signal_spread: raw containment-asymmetry measure, same formula as
+    # _build_summary_row; no interpretive banding applied here.
+    _min_pu = min(n_focal_unique, n_pool_unique)
+    _max_pu = max(n_focal_unique, n_pool_unique)
+    if _min_pu > 0:
+        _pooled_signal_spread = (n_shared / _min_pu) - (n_shared / _max_pu if _max_pu > 0 else 0.0)
+        _pooled_signal_spread_str = f"{_pooled_signal_spread:.4f}"
+    else:
+        _pooled_signal_spread_str = ""
 
     # Bundle annotation — dual-view
     focal_bundle_all = load_bundle_join_hash_set(
@@ -3124,6 +3122,7 @@ def _build_pooled_row(
         "n_unique_patterns_focal": str(n_focal_unique),
         "n_unique_patterns_pool": str(n_pool_unique),
         "n_shared_join_hash": str(n_shared),
+        "signal_spread": _pooled_signal_spread_str,
         "all_containment_focal_in_pool": _fmt(c_focal_in_pool),
         "all_containment_pool_in_focal": _fmt(c_pool_in_focal),
         "used_containment_focal_in_pool": _fmt(used_c_focal_in_pool),
@@ -3138,7 +3137,6 @@ def _build_pooled_row(
         "used_n_shared_bundle_both": str(n_both_used),
         "used_n_shared_bundle_focal_only": str(n_focal_only_used),
         "used_n_shared_bundle_pool_only": str(n_pool_only_used),
-        "data_sufficient": data_suff,
         "executed_utc": executed_utc,
     }
 
