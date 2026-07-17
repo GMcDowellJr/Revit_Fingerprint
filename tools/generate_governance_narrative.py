@@ -1914,17 +1914,29 @@ def build_client_summary(
 
     # Cross-client Jaccard. cross_client is the purpose-built comparison
     # (discover_cross_client() in compare_cross_segment.py); sibling_projects is
-    # kept alongside it for corpora that predate that producer change.
+    # kept alongside it for corpora that predate that producer change. Reads
+    # client_label_a/b directly rather than positionally parsing segment_id
+    # (the old "len(pa) == 3" assumption only holds for the
+    # unit|role|client-shaped IDs build_segment_manifest.py happens to emit for
+    # a client-only-scoped Project segment -- discover_cross_client() places no
+    # such constraint on segment_id shape, and the row already carries the
+    # client labels directly). ca != cb excludes within-client sibling_projects
+    # pairs (see discover_sibling_segments()'s own docstring on this) -- the
+    # old segment_id-length==3 check happened to reject these too (a
+    # discipline-scoped within-client sibling's segment_id has 4 parts), so
+    # this guard is required to preserve that exclusion now that segment_id
+    # shape is no longer being read at all.
     xc_by_client = defaultdict(list)
     for r in summary_rows:
         if r["comparison_type"] not in ("sibling_projects", "cross_client"):
             continue
-        pa, pb = r["segment_id_a"].split("|"), r["segment_id_b"].split("|")
-        if len(pa) == 3 and pa[2] in all_clients and len(pb) == 3 and pb[2] in all_clients:
+        ca = _pick(r, "client_label_a")
+        cb = _pick(r, "client_label_b")
+        if ca != cb and ca in all_clients and cb in all_clients:
             v = pf(_col(r, "jaccard_mean"))
             if v is not None:
-                xc_by_client[pa[2]].append(v)
-                xc_by_client[pb[2]].append(v)
+                xc_by_client[ca].append(v)
+                xc_by_client[cb].append(v)
 
     # Within-project coherence. Gated on governance_role_a == "Project" for the
     # same reason as the all_clients fallback above -- within_project rows exist
@@ -1961,24 +1973,26 @@ def build_client_summary(
             nf = int(r["n_files_a"]) if r.get("n_files_a") else 0
             if c and (c not in client_files or nf > client_files[c]):
                 client_files[c] = nf
-        elif r["comparison_type"] == "sibling_projects" and r["governance_role_a"] == "Project" and r["governance_role_b"] == "Project":
+        elif r["comparison_type"] in ("sibling_projects", "cross_client") and r["governance_role_a"] == "Project" and r["governance_role_b"] == "Project":
             for suffix in ("a", "b"):
                 c = _pick(r, f"client_label_{suffix}")
                 nf = int(r[f"n_files_{suffix}"]) if r.get(f"n_files_{suffix}") else 0
                 if c and (c not in client_files or nf > client_files[c]):
                     client_files[c] = nf
 
-    # Domain-level xc means
+    # Domain-level xc means. Same client_label_a/b-direct-read fix (and same
+    # ca != cb within-client exclusion) as xc_by_client above.
     xc_dom_by_client = defaultdict(lambda: defaultdict(list))
     for r in summary_rows:
         if r["comparison_type"] not in ("sibling_projects", "cross_client"):
             continue
-        pa, pb = r["segment_id_a"].split("|"), r["segment_id_b"].split("|")
-        if len(pa) == 3 and pa[2] in all_clients and len(pb) == 3 and pb[2] in all_clients:
+        ca = _pick(r, "client_label_a")
+        cb = _pick(r, "client_label_b")
+        if ca != cb and ca in all_clients and cb in all_clients:
             v = pf(_col(r, "jaccard_mean"))
             if v is not None and r["domain"] not in EXCLUDED_FROM_SCORING:
-                xc_dom_by_client[pa[2]][r["domain"]].append(v)
-                xc_dom_by_client[pb[2]][r["domain"]].append(v)
+                xc_dom_by_client[ca][r["domain"]].append(v)
+                xc_dom_by_client[cb][r["domain"]].append(v)
 
     rows_out = []
     for client in sorted(all_clients):

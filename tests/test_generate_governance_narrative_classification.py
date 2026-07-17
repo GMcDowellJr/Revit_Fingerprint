@@ -309,6 +309,83 @@ def test_build_client_summary_xc_mean_uses_cross_client_rows():
     assert sutter["xc_mean"] == 0.6
 
 
+def test_build_client_summary_xc_mean_uses_client_label_not_segment_id_shape():
+    """Regression for a Codex review finding on PR #370: xc_by_client/
+    xc_dom_by_client used to positionally parse segment_id ("len(pa) == 3")
+    to find the client name, which only holds for the unit|role|client-shaped
+    IDs build_segment_manifest.py happens to emit -- discover_cross_client()
+    places no such constraint on segment_id shape. A cross_client row with
+    non-standard segment_ids must still populate xc_mean via client_label_a/b."""
+    rows = [
+        _summary_row(
+            segment_id_a="p_kaiser", segment_id_b="p_sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.6", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    client_rows = build_client_summary(rows, [], {})
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    sutter = next(r for r in client_rows if r["client"] == "Sutter")
+    assert kaiser["xc_mean"] == 0.6
+    assert sutter["xc_mean"] == 0.6
+
+
+def test_build_client_summary_backfills_n_files_for_cross_client_only_clients():
+    """Regression for a second Codex review finding on PR #370: a client can
+    now be discovered purely from a cross_client row (no pooled/within_project/
+    sibling_projects rows at all). client_files must backfill from the
+    cross_client row's own n_files_a/b, or such a client falsely reports
+    n_project_files=0 / a low-confidence note despite the row carrying real
+    counts."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.6", n_files_a="42", n_files_b="17",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    client_rows = build_client_summary(rows, [], {})
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    sutter = next(r for r in client_rows if r["client"] == "Sutter")
+    assert kaiser["n_files"] == 42
+    assert sutter["n_files"] == 17
+
+
+def test_within_client_cross_client_like_pair_excluded_from_xc_mean():
+    """ca != cb must still exclude a within-client pair from xc_by_client/
+    xc_dom_by_client even though the segment_id-shape check that used to
+    incidentally enforce this (a 4-part discipline-scoped segment_id) is gone
+    now that client_label_a/b is read directly."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser|architectural", segment_id_b="imperial|Project|Kaiser|electrical",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Kaiser",
+            comparison_type="sibling_projects", domain="arrowheads",
+            all_jaccard_mean="0.95", n_files_a="5", n_files_b="5",
+        ),
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.5", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    client_rows = build_client_summary(rows, [], {})
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    # Only the Kaiser/Sutter cross_client pair (0.5) should count -- the
+    # within-client 0.95 sibling_projects pair must not blend in.
+    assert kaiser["xc_mean"] == 0.5
+
+
 def test_non_project_within_project_rows_excluded_from_client_summary():
     """discover_within_project() can emit within_project rows for any non-skip/
     non-registration segment, not just Project-role ones (e.g. a client-scoped
