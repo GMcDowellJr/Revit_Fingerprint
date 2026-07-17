@@ -66,11 +66,24 @@ def _client_row(client="acme", wp_mean=None, xc_mean=None):
 # ---------------------------------------------------------------------------
 
 def test_strong_baseline_candidate_finding():
+    """Regression test for a PR review finding: strong_baseline_candidate's
+    support fields must include the same exception fields as
+    baseline_candidate (template_to_container, local_active_share,
+    provided_passive_share, provided_missing_share,
+    provided_to_used_containment), so drill-through can verify why none of
+    those exceptions fired -- not just that the primary threshold was met."""
     cascade = {"line_styles": _min_domain_dict(tc=0.90, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95)}
     findings = build_structured_findings(cascade, [], None)
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert ("line_styles", "strong_baseline_candidate") in types
     assert ("line_styles", "baseline_candidate") in types
+
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "strong_baseline_candidate")
+    fields = finding["support"][0]["fields"]
+    for expected in ("template_to_container", "local_active_share", "provided_passive_share",
+                      "provided_missing_share", "provided_to_used_containment"):
+        assert expected in fields
 
 
 def test_baseline_candidate_without_strong_for_container_gap():

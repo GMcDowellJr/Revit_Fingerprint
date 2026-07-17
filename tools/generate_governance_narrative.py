@@ -3096,7 +3096,16 @@ def build_structured_findings(
             f"{label(dom)} meets the strong-baseline-candidate rule (governance_tier: "
             f"{TIER_STRONG_BASELINE}).",
             _RULE_STRONG_BASELINE,
-            ["governance_tier", "template_to_project", "container_to_project"],
+            # A domain only reaches TIER_STRONG_BASELINE after clearing every
+            # exception assign_tier() checks at primary >= 0.90: no material
+            # state exception, provided_to_used_containment at/above the
+            # active-use floor, and template_to_container >= 0.60 (not a
+            # container-gap driver). List the same exception fields as
+            # baseline_candidate so drill-through can verify why none of them
+            # fired, not just that the primary threshold was met.
+            ["governance_tier", "template_to_project", "container_to_project",
+             "template_to_container", "local_active_share", "provided_passive_share",
+             "provided_missing_share", "provided_to_used_containment"],
         )
     for dom in domain_buckets["baseline_candidate"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
