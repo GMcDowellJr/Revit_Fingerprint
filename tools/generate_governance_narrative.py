@@ -3102,12 +3102,19 @@ def build_structured_findings(
             f"{label(dom)} requires local/use review before baseline language is "
             f"safe (governance_tier: {tier}).",
             _RULE_LOCAL_REVIEW_REQUIRED,
-            # Any of these three state fields (see _has_material_state_exception())
-            # or a below-floor provided_to_used_containment can be the reason a
-            # domain lands in this tier -- list all four triggering fields, not
-            # just the ones a specific instance happened to cross.
+            # This bucket covers three distinct tiers with different drivers:
+            # TIER_BASELINE_LOCAL_REVIEW/TIER_ACTIVE_LOCAL are driven by the state
+            # fields below (see _has_material_state_exception() / the
+            # provided_to_used_containment floor check), but TIER_INVESTIGATE fires
+            # purely from primary containment landing in [0.75, 0.90) with no
+            # material state exception at all -- for that case the state fields are
+            # blank/irrelevant and the real drivers are template_to_project/
+            # container_to_project (primary) and score_reliability. List both sets
+            # of fields so drill-through is complete regardless of which tier a
+            # given instance actually landed in.
             ["governance_tier", "local_active_share", "provided_passive_share",
-             "provided_missing_share", "provided_to_used_containment"],
+             "provided_missing_share", "provided_to_used_containment",
+             "template_to_project", "container_to_project", "score_reliability"],
         )
     for dom in domain_buckets["active_local_practice"]:
         tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))

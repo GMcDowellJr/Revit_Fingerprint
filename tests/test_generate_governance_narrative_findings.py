@@ -136,6 +136,24 @@ def test_local_review_required_via_passive_or_missing_share_lists_all_triggering
     assert "provided_to_used_containment" in fields
 
 
+def test_local_review_required_via_investigate_tier_lists_primary_containment_fields():
+    """Regression test for a PR review finding: TIER_INVESTIGATE (primary
+    containment in [0.75, 0.90) with no material state exception at all) also
+    lands in local_review_required, but none of the state fields explain that
+    classification -- the real drivers are template_to_project/
+    container_to_project and score_reliability. Support fields must include
+    those too, not just the state-exception fields relevant to the other two
+    tiers sharing this bucket."""
+    cascade = {"line_styles": _min_domain_dict(tc=0.90, cp=0.80, tp=0.80, wp_p10=0.80, wp_p90=0.85)}
+    findings = build_structured_findings(cascade, [], None)
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "local_review_required")
+    fields = finding["support"][0]["fields"]
+    assert "template_to_project" in fields
+    assert "container_to_project" in fields
+    assert "score_reliability" in fields
+
+
 def test_high_fragmentation_finding():
     cascade = {"line_styles": _min_domain_dict(tc=0.10, cp=0.20, tp=0.30, wp_p10=0.30, wp_p90=0.35)}
     findings = build_structured_findings(cascade, [], None)
