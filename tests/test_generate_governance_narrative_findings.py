@@ -253,6 +253,21 @@ def test_passive_inheritance_risk_not_flagged_for_non_risk_domain():
     assert any(f["subject"].get("id") == _NON_RISK_DOMAIN for f in findings)
 
 
+def test_passive_inheritance_risk_bundle_fallback_skipped_when_state_present_but_not_material():
+    """Regression test for a PR review finding: detect_anomalies() only runs
+    its bundle/passive fallback `if not state:` -- a present state row is
+    always authoritative for that domain, even when its provided_passive_share
+    doesn't cross the material threshold. Falling through to bundle data in
+    that case would make governance_findings.json disagree with the rendered
+    CSV/anomaly-note evidence, which reports nothing for a non-material
+    state row regardless of what the (now-superseded) bundle data says."""
+    cascade = {_RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="dual", passive_indicator=0.25)}
+    state = {_RISK_DOMAIN: {"provided_passive_share": 0.05}}  # present, below PASSIVE_MATERIAL_THRESHOLD
+    findings = build_structured_findings(cascade, [], state)
+    types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
+    assert (_RISK_DOMAIN, "passive_inheritance_risk") not in types
+
+
 def test_passive_inheritance_risk_not_flagged_below_threshold():
     cascade = {_RISK_DOMAIN: _min_domain_dict(tp=0.85, bundle_schema="dual", passive_indicator=0.05)}
     findings = build_structured_findings(cascade, [], None)

@@ -2978,6 +2978,14 @@ def _passive_inheritance_risk_domains(cascade: dict, state_summary: Optional[dic
     --governance-state-summary is supplied, independent of whether the
     domain also has matching bundle/passive-indicator data in cascade.
 
+    When a state row is present for the domain, the bundle fallback is never
+    consulted, even if that state row's provided_passive_share isn't
+    material -- this mirrors detect_anomalies()'s own `if not state:` gate
+    (lines ~1323) around its bundle fallback block. A present-but-not-material
+    state row is the domain's authoritative signal for this domain, exactly
+    like the CSV/anomaly-note text; falling through to older bundle data
+    would make governance_findings.json disagree with the rendered evidence.
+
     Restricted to domains passing _has_renderable_cascade_signal(), matching
     _classify_domains_for_findings() -- see that function's docstring.
     """
@@ -2986,9 +2994,11 @@ def _passive_inheritance_risk_domains(cascade: dict, state_summary: Optional[dic
     for dom, d in cascade.items():
         if dom not in PASSIVE_INHERITANCE_RISK_DOMAINS or not _has_renderable_cascade_signal(d):
             continue
-        passive_state = _state_value(state_summary.get(dom), "provided_passive_share")
-        if passive_state is not None and passive_state >= PASSIVE_MATERIAL_THRESHOLD:
-            flagged.append(dom)
+        state = state_summary.get(dom)
+        if state:
+            passive_state = _state_value(state, "provided_passive_share")
+            if passive_state is not None and passive_state >= PASSIVE_MATERIAL_THRESHOLD:
+                flagged.append(dom)
             continue
         bundle_schema = d.get("bundle_schema", "none")
         if bundle_schema == "dual":
