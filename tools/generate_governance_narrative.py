@@ -307,8 +307,7 @@ def normalise_summary_schema(rows: list) -> None:
     alias("has_bundles_a", "all_has_bundles_a", "has_bundles_a")
     alias("has_bundles_b", "all_has_bundles_b", "has_bundles_b")
     # Signal ambiguity
-    alias("signal_spread",        "signal_spread",        "signal_spread")
-    alias("score_ambiguity_band", "score_ambiguity_band", "score_ambiguity_band")
+    alias("signal_spread", "signal_spread", "signal_spread")
 
 
 def _col(row: dict, canonical: str) -> str:
@@ -728,11 +727,13 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
         gated to the "enterprise::enterprise" pair only (unchanged). But unlike
         tc/tp, cp is essentially never populated in real corpora -- Project segments
         are rarely fully unscoped -- while its non-enterprise evidence (cp_by_scope)
-        is real, data_sufficient-passing signal that was previously computed and
+        is real, sufficiently-populated signal that was previously computed and
         then discarded before reaching governance_domain_summary.csv. cp_scoped is
         the mean of the largest (most rows) scope_pair bucket in cp_by_scope that
         (a) is not "enterprise::enterprise" (already covered by cp) and (b) is built
-        only from rows where compare_cross_segment.py's own data_sufficient == "true".
+        only from rows where n_files_a >= 5 and n_files_b >= 5 (the same threshold
+        compare_cross_segment.py used to compute as data_sufficient before that
+        field was removed in favor of downstream-owned interpretation).
         cp_scoped_pair names which scope_pair that was. Both are None whenever cp
         itself is non-None -- the scoped fallback only fires when there is no
         enterprise-level evidence to report, so a reader can never mistake it for a
@@ -776,10 +777,10 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     # render_group1_scope_section()'s narrative (both existing cp_by_scope
     # consumers) see byte-for-byte the same population as before this fix.
     # Populated only from rows that are both (a) not the "enterprise::enterprise"
-    # pair (that evidence already surfaces via cp itself) and (b)
-    # data_sufficient == "true" -- the one real sufficiency signal
-    # compare_cross_segment.py emits for this comparison_type, which nothing in
-    # this rollup previously consulted.
+    # pair (that evidence already surfaces via cp itself) and (b) pass
+    # n_files_a >= 5 and n_files_b >= 5 -- the same sufficiency threshold
+    # compare_cross_segment.py used to compute as data_sufficient for this
+    # comparison_type, which nothing in this rollup previously consulted.
     cp_by_scope_suff = defaultdict(lambda: defaultdict(list))
 
     # Group 2 — generic->template/container/project containment (all-view + used-view).
@@ -858,8 +859,14 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
                 cp_by_scope[dom][scope_pair].append(v)
                 if scope_a == "enterprise" and scope_b == "enterprise":
                     cp[dom].append(v)
-                elif r.get("data_sufficient") == "true":
-                    cp_by_scope_suff[dom][scope_pair].append(v)
+                else:
+                    # compare_cross_segment.py no longer emits data_sufficient;
+                    # this is the same n_files_a/b >= 5 threshold it used to
+                    # compute, now inlined at the point of use.
+                    nfa = int(r["n_files_a"]) if r.get("n_files_a") else 0
+                    nfb = int(r["n_files_b"]) if r.get("n_files_b") else 0
+                    if nfa >= 5 and nfb >= 5:
+                        cp_by_scope_suff[dom][scope_pair].append(v)
             vu = pf(_col(r, "used_containment_a_in_b_mean"))
             if vu is not None:
                 cp_used_by_scope[dom][scope_pair].append(vu)

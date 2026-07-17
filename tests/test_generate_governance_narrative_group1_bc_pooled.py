@@ -262,16 +262,18 @@ def test_scope_only_domain_reaches_bc_evidence_tier_in_full_pipeline():
     assert assign_tier(d) == TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE
 
 
-def test_cp_scoped_fallback_populated_when_data_sufficient_and_no_enterprise_pair():
+def test_cp_scoped_fallback_populated_when_n_files_sufficient_and_no_enterprise_pair():
     """The container_to_project rollup-gap fix: cp stays None (no enterprise::
-    enterprise pair), but a data_sufficient, non-enterprise-scoped row must
-    surface via cp_scoped/cp_scoped_pair instead of being silently dropped."""
+    enterprise pair), but a non-enterprise-scoped row with n_files_a/b >= 5
+    must surface via cp_scoped/cp_scoped_pair instead of being silently
+    dropped. (compare_cross_segment.py used to flag this via a data_sufficient
+    column; that field is gone, so the consumer now applies the same
+    n_files_a/b >= 5 threshold directly.)"""
     rows = [
         _row(segment_id_a="imperial|Container|2014", segment_id_b="imperial|Project|2014",
              governance_role_a="Container", governance_role_b="Project",
              comparison_type="container_to_project", domain="arrowheads",
-             all_containment_a_in_b_mean="0.95", n_files_a="30", n_files_b="40",
-             data_sufficient="true"),
+             all_containment_a_in_b_mean="0.95", n_files_a="30", n_files_b="40"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["arrowheads"]
@@ -280,22 +282,20 @@ def test_cp_scoped_fallback_populated_when_data_sufficient_and_no_enterprise_pai
     assert d["cp_scoped_pair"] == "other_scoped::other_scoped"
 
 
-def test_cp_scoped_fallback_ignores_data_insufficient_rows():
-    """A row that fails compare_cross_segment.py's own data_sufficient rule
-    must not feed cp_scoped -- this fix must not invent evidence out of pairs
-    the producer itself flagged as too small to interpret."""
+def test_cp_scoped_fallback_ignores_n_files_insufficient_rows():
+    """A row below the n_files_a/b >= 5 threshold must not feed cp_scoped --
+    this fix must not invent evidence out of pairs too small to interpret."""
     rows = [
         _row(segment_id_a="imperial|Container|2014", segment_id_b="imperial|Project|2014",
              governance_role_a="Container", governance_role_b="Project",
              comparison_type="container_to_project", domain="arrowheads",
-             all_containment_a_in_b_mean="0.95", n_files_a="2", n_files_b="2",
-             data_sufficient="false"),
+             all_containment_a_in_b_mean="0.95", n_files_a="2", n_files_b="2"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["arrowheads"]
     assert d["cp_scoped"] is None
     assert d["cp_scoped_pair"] is None
-    # existing cp_by_scope population is untouched by the data_sufficient gate
+    # existing cp_by_scope population is untouched by the n_files_a/b gate
     assert d["cp_by_scope"] == {"other_scoped::other_scoped": 0.95}
 
 
@@ -303,14 +303,13 @@ def test_cp_scoped_fallback_does_not_change_cp_by_scope_population():
     """cp_by_scope_suff is a separate accumulator, not a filtered view -- the
     existing cp_by_scope consumers (_has_group1_bc_pooled_evidence(),
     render_group1_scope_section()) must see exactly the same rows as before
-    this fix, regardless of data_sufficient."""
+    this fix, regardless of the n_files_a/b threshold."""
     rows = [
         _row(segment_id_a="imperial|Container|BC_1", segment_id_b="imperial|Project|BC_1",
              governance_role_a="Container", governance_role_b="Project",
              business_center_label_a="BC_1", business_center_label_b="BC_1",
              comparison_type="container_to_project", domain="materials",
-             all_containment_a_in_b_mean="0.5", n_files_a="2", n_files_b="2",
-             data_sufficient="false"),
+             all_containment_a_in_b_mean="0.5", n_files_a="2", n_files_b="2"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["materials"]
@@ -327,13 +326,11 @@ def test_cp_scoped_fallback_prefers_enterprise_pair_when_present():
         _row(segment_id_a="imperial|Container", segment_id_b="imperial|Project",
              governance_role_a="Container", governance_role_b="Project",
              comparison_type="container_to_project", domain="arrowheads",
-             all_containment_a_in_b_mean="0.85", n_files_a="10", n_files_b="10",
-             data_sufficient="true"),
+             all_containment_a_in_b_mean="0.85", n_files_a="10", n_files_b="10"),
         _row(segment_id_a="imperial|Container|2014", segment_id_b="imperial|Project|2014",
              governance_role_a="Container", governance_role_b="Project",
              comparison_type="container_to_project", domain="arrowheads",
-             all_containment_a_in_b_mean="0.10", n_files_a="30", n_files_b="40",
-             data_sufficient="true"),
+             all_containment_a_in_b_mean="0.10", n_files_a="30", n_files_b="40"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["arrowheads"]
@@ -342,27 +339,24 @@ def test_cp_scoped_fallback_prefers_enterprise_pair_when_present():
 
 
 def test_cp_scoped_fallback_picks_bucket_with_most_rows():
-    """When more than one non-enterprise, data_sufficient scope_pair exists,
-    the largest (most rows) bucket wins, deterministically."""
+    """When more than one non-enterprise scope_pair with n_files_a/b >= 5
+    exists, the largest (most rows) bucket wins, deterministically."""
     rows = [
         _row(segment_id_a="imperial|Container|Kaiser", segment_id_b="imperial|Project|Kaiser",
              governance_role_a="Container", governance_role_b="Project",
              client_label_a="Kaiser", client_label_b="Kaiser",
              comparison_type="container_to_project", domain="fill_patterns_model",
-             all_containment_a_in_b_mean="0.30", n_files_a="10", n_files_b="10",
-             data_sufficient="true"),
+             all_containment_a_in_b_mean="0.30", n_files_a="10", n_files_b="10"),
         _row(segment_id_a="imperial|Container|BC_1", segment_id_b="imperial|Project|BC_1",
              governance_role_a="Container", governance_role_b="Project",
              business_center_label_a="BC_1", business_center_label_b="BC_1",
              comparison_type="container_to_project", domain="fill_patterns_model",
-             all_containment_a_in_b_mean="0.70", n_files_a="10", n_files_b="10",
-             data_sufficient="true"),
+             all_containment_a_in_b_mean="0.70", n_files_a="10", n_files_b="10"),
         _row(segment_id_a="imperial|Container|BC_2", segment_id_b="imperial|Project|BC_2",
              governance_role_a="Container", governance_role_b="Project",
              business_center_label_a="BC_2", business_center_label_b="BC_2",
              comparison_type="container_to_project", domain="fill_patterns_model",
-             all_containment_a_in_b_mean="0.90", n_files_a="10", n_files_b="10",
-             data_sufficient="true"),
+             all_containment_a_in_b_mean="0.90", n_files_a="10", n_files_b="10"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["fill_patterns_model"]

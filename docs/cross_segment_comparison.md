@@ -187,8 +187,7 @@ One row per (segment_id_a, segment_id_b, domain, comparison_type).
 | `n_patterns_b` | Distinct join_hashes in segment B |
 | `n_shared_join_hash` | Intersection size |
 | `n_unique_patterns_a/b` | Deduplicated population-level join_hash counts per side |
-| `signal_spread` | `(n_shared/min(a,b)) − (n_shared/max(a,b))` — score sensitivity to size asymmetry |
-| `score_ambiguity_band` | One of: Unambiguous (≤0.1), Low (≤0.3), Moderate (≤0.6), High (>0.6) |
+| `signal_spread` | `(n_shared/min(a,b)) − (n_shared/max(a,b))` — score sensitivity to size asymmetry (raw float; no banding applied here) |
 | `all_containment_a_in_b_mean` | Mean all-view fraction of A's patterns found in each B unit (directed only) |
 | `all_containment_a_in_b_min` | Min across B units |
 | `all_containment_b_in_a_mean` | Mean all-view fraction of B's mandate covered by each A unit (directed only) |
@@ -210,7 +209,6 @@ One row per (segment_id_a, segment_id_b, domain, comparison_type).
 | `used_n_shared_bundle_both/a_only/b_only` | Used-view bundle overlap annotation buckets |
 | `n_files_a/b` | File count for each side |
 | `n_pairs` | Number of unit pairs that produced Jaccard values, or number of target units for directed |
-| `data_sufficient` | `"true"` only when both sides have `n_files >= 5` |
 | `reference_usage_interpretable` | Whether used-view is an active-practice signal for the A-side role |
 | `target_usage_interpretable` | Whether used-view is an active-practice signal for the B-side role |
 | `recommended_primary_view` | `all` or `used` — pipeline guidance on which view to use for this comparison type |
@@ -269,11 +267,11 @@ A segment can appear once per applicable pool grain — e.g. a Project with both
 | `n_files_focal` / `n_files_pool` | File counts for the focal segment and the aggregated pool |
 | `n_unique_patterns_focal` / `n_unique_patterns_pool` | Distinct join_hash counts |
 | `n_shared_join_hash` | Intersection size between focal and pool unions |
+| `signal_spread` | `(n_shared/min(focal,pool)) − (n_shared/max(focal,pool))` — same formula as the summary's `signal_spread`; raw float, no banding applied here |
 | `all_containment_focal_in_pool` / `all_containment_pool_in_focal` | All-view containment in both directions |
 | `used_containment_focal_in_pool` / `used_containment_pool_in_focal` | Used-view containment in both directions |
 | `all_has_bundles_focal/pool`, `all_n_shared_bundle_both/focal_only/pool_only` | All-view bundle overlap annotation |
 | `used_has_bundles_focal/pool`, `used_n_shared_bundle_both/focal_only/pool_only` | Used-view bundle overlap annotation |
-| `data_sufficient` | `"true"` only when both focal and pool have `n_files >= 5` |
 | `executed_utc` | ISO-8601 UTC timestamp |
 
 ### cross_segment_governance_states.csv
@@ -485,7 +483,7 @@ When `--no-delta` is set, `cross_segment_delta.csv` is not written and no role j
 
 ### Small-N caveats
 
-Jaccard is noisy when either segment has fewer than ~5 files. The `--min-patterns` flag helps suppress the noisiest cases, but the threshold applies to join_hash count, not file count. A single file with 50 join_hashes passes the filter; two files with 3 join_hashes each also pass. Interpret results for segments with fewer than 5 files cautiously; `data_sufficient` flags this directly.
+Jaccard is noisy when either segment has fewer than ~5 files. The `--min-patterns` flag helps suppress the noisiest cases, but the threshold applies to join_hash count, not file count. A single file with 50 join_hashes passes the filter; two files with 3 join_hashes each also pass. Interpret results for segments with fewer than 5 files cautiously; `n_files_a`/`n_files_b` (or `n_files_focal`/`n_files_pool` in the pooled output) are reported directly for this purpose — this file does not itself flag sufficiency; that judgment is downstream's responsibility.
 
 ### discipline_label sparsity
 

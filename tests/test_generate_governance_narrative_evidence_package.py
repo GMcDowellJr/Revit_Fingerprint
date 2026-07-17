@@ -72,7 +72,7 @@ def _minimal_fixture(tmp_path: Path) -> tuple[Path, Path]:
             governance_role_b="Project", client_label_b="acme",
             comparison_type="template_to_project", domain="line_styles",
             all_containment_a_in_b_mean="0.8", all_jaccard_mean="0.5",
-            n_files_a="3", n_files_b="10", data_sufficient="true",
+            n_files_a="3", n_files_b="10",
             executed_utc="2026-07-16T00:00:00Z", unit_system="imperial",
         ),
     ]
@@ -81,7 +81,7 @@ def _minimal_fixture(tmp_path: Path) -> tuple[Path, Path]:
             comparison_run_id="run1", segment_id="imperial|Project|acme",
             client_label="acme", governance_role="Project", pool_scope="parent_sibling",
             domain="line_styles", n_files_focal="10", n_files_pool="30",
-            data_sufficient="true", executed_utc="2026-07-16T00:00:00Z",
+            executed_utc="2026-07-16T00:00:00Z",
         ),
     ]
     summary_path = tmp_path / "cross_segment_summary.csv"
@@ -157,7 +157,7 @@ def test_unrecognized_comparison_type_still_warns_to_stderr(capsys, tmp_path, mo
             governance_role_b="Project", client_label_b="acme",
             comparison_type="totally_bogus_comparison_type", domain="line_styles",
             all_containment_a_in_b_mean="0.8", all_jaccard_mean="0.5",
-            n_files_a="3", n_files_b="10", data_sufficient="true",
+            n_files_a="3", n_files_b="10",
             executed_utc="2026-07-16T00:00:00Z", unit_system="imperial",
         ),
     ]
@@ -165,7 +165,7 @@ def test_unrecognized_comparison_type_still_warns_to_stderr(capsys, tmp_path, mo
         _pooled_row(comparison_run_id="run1", segment_id="imperial|Project|acme",
                     client_label="acme", governance_role="Project", pool_scope="parent_sibling",
                     domain="line_styles", n_files_focal="10", n_files_pool="30",
-                    data_sufficient="true", executed_utc="2026-07-16T00:00:00Z"),
+                    executed_utc="2026-07-16T00:00:00Z"),
     ]
     summary_path = tmp_path / "cross_segment_summary.csv"
     pooled_path = tmp_path / "cross_segment_pooled.csv"
@@ -370,7 +370,7 @@ def test_package_manifest_comparison_run_ids_include_pooled_only_values(tmp_path
             governance_role_b="Project", client_label_b="acme",
             comparison_type="template_to_project", domain="line_styles",
             all_containment_a_in_b_mean="0.8", all_jaccard_mean="0.5",
-            n_files_a="3", n_files_b="10", data_sufficient="true",
+            n_files_a="3", n_files_b="10",
             executed_utc="2026-07-16T00:00:00Z", unit_system="imperial",
         ),
     ]
@@ -379,7 +379,7 @@ def test_package_manifest_comparison_run_ids_include_pooled_only_values(tmp_path
             comparison_run_id="run2", segment_id="imperial|Project|acme",
             client_label="acme", governance_role="Project", pool_scope="parent_sibling",
             domain="line_styles", n_files_focal="10", n_files_pool="30",
-            data_sufficient="true", executed_utc="2026-07-15T00:00:00Z",
+            executed_utc="2026-07-15T00:00:00Z",
         ),
     ]
     summary_path = tmp_path / "cross_segment_summary.csv"
