@@ -1954,6 +1954,8 @@ def build_client_summary(
     for r in summary_rows:
         if r["comparison_type"] not in ("sibling_projects", "cross_client"):
             continue
+        if r["domain"] in EXCLUDED_FROM_SCORING:
+            continue
         ca = _pick(r, "client_label_a")
         cb = _pick(r, "client_label_b")
         if ca == cb or ca not in all_clients or cb not in all_clients:

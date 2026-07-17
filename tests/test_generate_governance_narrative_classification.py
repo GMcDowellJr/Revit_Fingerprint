@@ -17,6 +17,7 @@ from generate_governance_narrative import (  # noqa: E402
     _disc_label,
     build_cascade,
     build_client_summary,
+    EXCLUDED_FROM_SCORING,
     load_client_sectors,
     normalise_summary_schema,
     read_csv,
@@ -476,6 +477,41 @@ def test_build_client_summary_unclassified_partner_still_feeds_xc_mean():
     client_rows = build_client_summary(rows, [], sector_map)
     kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
     assert kaiser["xc_mean"] == 0.8
+
+
+def test_build_client_summary_excludes_policy_excluded_domain_from_xc_mean():
+    """Regression for a seventh Codex review finding on PR #370: xc_by_client
+    had no EXCLUDED_FROM_SCORING gate at all, unlike xc_dom_by_client right
+    below it and build_cascade()'s own per-domain xc accumulation -- a
+    cross_client row for a domain the governance policy excludes from scoring
+    (e.g. view_templates_renderings_drafting) could still classify a client
+    as highly aligned, disagreeing with the rest of the scoring policy.
+    cross_client being default-on and pairing every client for every domain
+    makes this routinely reachable."""
+    excluded_domain = next(iter(EXCLUDED_FROM_SCORING))
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain=excluded_domain,
+            all_jaccard_mean="0.95", n_files_a="10", n_files_b="10",
+        ),
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.3", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    client_rows = build_client_summary(rows, [], sector_map)
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    # Only the non-excluded arrowheads row (0.3) should count -- the excluded
+    # domain's 0.95 must not pull xc_mean up.
+    assert kaiser["xc_mean"] == 0.3
 
 
 def test_non_project_within_project_rows_excluded_from_client_summary():

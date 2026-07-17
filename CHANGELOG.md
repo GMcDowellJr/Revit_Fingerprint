@@ -96,6 +96,15 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   finding for a domain whose only evidence is the scoped fallback (i.e.
   `container_to_project` itself is blank) still points a consumer at the
   actual populated value instead of only the blank primary column.
+  `build_client_summary()`'s `xc_by_client` (feeding `cross_client_similarity_mean`)
+  now also skips rows for domains in `EXCLUDED_FROM_SCORING`, matching the
+  gate `xc_dom_by_client` (right below it) and `build_cascade()`'s own
+  per-domain `xc` already apply -- previously a `cross_client` row for a
+  policy-excluded domain (e.g. `view_templates_renderings_drafting`) could
+  still drive a client's overall alignment tier, disagreeing with the rest
+  of the scoring policy. Pre-existing gap for `sibling_projects` too; made
+  routinely reachable by `cross_client` pairing every client for every
+  domain by default.
 - `tools/generate_governance_narrative.py` now emits an interpretation/
   routing layer: `docs/governance_interpretation_guide.md` (stable,
   package-type-level -- what each metric/tier means, comparability rules,
