@@ -52,6 +52,7 @@ All-view is the full configured vocabulary for a segment. Used-view is the vocab
 | `parent_sibling_roles` | Directed | Template-role level-2 | Project-role level-2 | `containment_b_in_a` | Template efficacy at peer level within the hierarchy |
 | `sibling_templates` | Symmetric | Template segment | Template segment | `jaccard_mean` | Are template siblings converging? |
 | `sibling_projects` | Symmetric | Project segment | Project segment | `jaccard_mean` | Are project siblings consistent? |
+| `cross_client` | Symmetric | Client's client-level pooled Project segment | Another client's client-level pooled Project segment (same unit_system) | `jaccard_mean` | Do different clients converge on the same patterns, independent of any shared segment lineage? |
 | `sibling_containers` | Symmetric | Container segment | Container segment | `jaccard_mean` | Are container siblings aligned? |
 | `within_project` | Symmetric | File within segment | File within segment | `jaccard_mean` | Are files from the same project consistent with each other? |
 | `governance_chain` | Directed | Template / Container | Project / Container | `containment_b_in_a` | End-to-end governance chain coverage |

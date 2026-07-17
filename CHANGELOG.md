@@ -12,6 +12,99 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- New `cross_client` comparison type in `tools/compare_cross_segment.py`
+  (`discover_cross_client()`, `--cross-client` CLI flag, default-on): pairs
+  each client's own broadest (client-only-scoped) Project population against
+  every other client's, within the same unit_system, independent of segment
+  lineage. Fixes `cross_client_convergence` (governance_domain_summary.csv)
+  and `cross_client_similarity_mean` (governance_client_summary.csv) being
+  blank for every row -- the only prior source for those columns was
+  `sibling_projects`, which only pairs Project segments sharing an immediate
+  `parent_segment_id` and is additionally sector-gated (both clients must be
+  tagged `healthcare` in `policies/client_sector.csv`) in
+  `build_cascade()`'s `xc` accumulation. `cross_client` has no shared-parent
+  requirement and no hardcoded sector gate (sector filtering, where wanted,
+  is left to downstream consumers). `tools/generate_governance_narrative.py`'s
+  `build_cascade()` and `build_client_summary()` now also accumulate `xc`/
+  `xc_mean` from `cross_client` rows alongside the existing `sibling_projects`
+  source. Jaccard-based, undirected (mirrors `sibling_projects`'s scoring
+  path); no governance-state rows are written for it (not in
+  `GOVERNANCE_STATE_DIRECTED_TYPES`), matching `sibling_projects`.
+  `build_client_summary()`'s `xc_by_client`/`xc_dom_by_client` read
+  `client_label_a`/`client_label_b` directly rather than positionally parsing
+  `segment_id` (the old `len(pa) == 3` assumption only held for the
+  `unit|role|client`-shaped IDs `build_segment_manifest.py` happens to emit
+  for a client-only Project segment; `discover_cross_client()` places no such
+  constraint on `segment_id` shape), with an explicit `ca != cb` guard to
+  preserve the existing within-client-sibling exclusion the old check
+  enforced incidentally. `client_files`'s `n_project_files` backfill now also
+  recognizes `cross_client` rows (previously `sibling_projects`-only), so a
+  client discoverable only via a `cross_client` row no longer falsely reports
+  `n_project_files=0`. New `drop_legacy_sibling_projects_covered_by_cross_client()`
+  in `compare_cross_segment.py` drops a `sibling_projects` pair when
+  `cross_client` already covers the identical two segments (they can share an
+  immediate `parent_segment_id`, since `discover_sibling_segments()` groups
+  purely by parent/role/unit) -- otherwise both would double-count that one
+  pair in `xc`/`xc_by_client` and collide on `comparison_run_id`
+  (`make_comparison_run_id()` hashes only segment IDs + timestamp, not
+  comparison_type -- a broader, pre-existing characteristic of that
+  identifier, not changed here). `cross_client`'s contribution to `xc`
+  (`build_cascade()`) is gated to both-healthcare pairs, matching
+  `sibling_projects`'s existing gate -- `xc` is documented and consumed
+  elsewhere (client-tier "Non-comparable (different sector)" logic) as a
+  healthcare-cohort metric; `discover_cross_client()` itself is unaffected and
+  still emits every client pair into `cross_segment_summary.csv` regardless
+  of sector. `xc_by_client`/`xc_dom_by_client` (`build_client_summary()`,
+  feeding `cross_client_similarity_mean`) gain a softer, consumer-appropriate
+  exclusion -- a pair is dropped only when a side has a CONFIRMED
+  non-healthcare sector (`sector not in ("unknown", "healthcare")`), matching
+  this function's own definition of "comparable"; an unclassified client
+  still counts. This closes a pre-existing gap (this rollup never filtered by
+  sector for either source type) that `cross_client` being default-on and
+  pairing every client made routinely consequential. `main()` in
+  `compare_cross_segment.py` now applies `--segment-a`/`--segment-b`
+  filtering *before*
+  `drop_legacy_sibling_projects_covered_by_cross_client()` rather than after:
+  `discover_sibling_segments()` orders its pair by sorted segment ID while
+  `discover_cross_client()` orders by sorted client label, so the surviving
+  `cross_client` row replacing a dropped `sibling_projects` row can be in the
+  reverse orientation -- which the position-sensitive segment filters would
+  then also reject, making a scoped run silently report zero pairs for
+  segments that do have a comparison. No effect on the default (unscoped)
+  path.
+- `governance_domain_summary.csv` gains `container_to_project_scoped` /
+  `container_to_project_scoped_pair` columns in
+  `tools/generate_governance_narrative.py`. Root cause: `container_to_project`
+  (`cp`) is populated only from rows where BOTH sides are the fully unscoped
+  ("enterprise::enterprise") segment -- real Project segments are almost never
+  fully unscoped, so `cp` stayed empty for effectively every domain even
+  though real, `data_sufficient == "true"` container_to_project evidence
+  existed at other scope levels (`cp_by_scope`, already computed but never
+  surfaced in this CSV). The new columns report the mean of the largest
+  (most rows) non-enterprise, `data_sufficient` scope_pair bucket, plus which
+  scope_pair it came from, and are populated only when `container_to_project`
+  itself is empty -- `container_to_project`'s own enterprise-only meaning is
+  unchanged, so this never competes with or is mistaken for enterprise-level
+  evidence (same posture as `TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE`).
+  Sourced from a new, separate accumulator (`cp_by_scope_suff`) rather than a
+  filtered view of `cp_by_scope`, so `_has_group1_bc_pooled_evidence()`/
+  `render_group1_scope_section()` (existing `cp_by_scope` consumers) are
+  unaffected. No other comparison type's `data_sufficient` handling changed.
+  `_TIER_DRIVER_SUPPORT_FIELDS` (the shared list of `governance_domain_summary.csv`
+  columns every tier-based `governance_findings.json` finding's `support[].fields`
+  references) now includes both new columns, so a `missing_or_degraded_evidence`
+  finding for a domain whose only evidence is the scoped fallback (i.e.
+  `container_to_project` itself is blank) still points a consumer at the
+  actual populated value instead of only the blank primary column.
+  `build_client_summary()`'s `xc_by_client` (feeding `cross_client_similarity_mean`)
+  now also skips rows for domains in `EXCLUDED_FROM_SCORING`, matching the
+  gate `xc_dom_by_client` (right below it) and `build_cascade()`'s own
+  per-domain `xc` already apply -- previously a `cross_client` row for a
+  policy-excluded domain (e.g. `view_templates_renderings_drafting`) could
+  still drive a client's overall alignment tier, disagreeing with the rest
+  of the scoring policy. Pre-existing gap for `sibling_projects` too; made
+  routinely reachable by `cross_client` pairing every client for every
+  domain by default.
 - `tools/generate_governance_narrative.py` now emits an interpretation/
   routing layer: `docs/governance_interpretation_guide.md` (stable,
   package-type-level -- what each metric/tier means, comparability rules,

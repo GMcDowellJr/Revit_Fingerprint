@@ -17,6 +17,7 @@ from generate_governance_narrative import (  # noqa: E402
     _disc_label,
     build_cascade,
     build_client_summary,
+    EXCLUDED_FROM_SCORING,
     load_client_sectors,
     normalise_summary_schema,
     read_csv,
@@ -237,6 +238,280 @@ def test_within_client_sibling_projects_excluded_from_cross_client_xc():
     sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
     cascade = build_cascade(rows, sector_map)
     assert cascade["arrowheads"]["xc"] == 0.5
+
+
+# ---------------------------------------------------------------------------
+# cross_client comparison type (governance pipeline gap fix)
+# ---------------------------------------------------------------------------
+
+def test_cascade_cross_client_requires_both_healthcare_like_sibling_projects():
+    """cross_client's contribution to xc is gated to both-healthcare pairs,
+    the same as sibling_projects's existing gate -- xc is a healthcare-cohort
+    metric (see build_cascade()'s own docstring and the client-tier
+    "Non-comparable (different sector)" logic downstream); a pair with an
+    unclassified/non-healthcare side must not feed it, regardless of source
+    comparison_type. discover_cross_client() itself is unaffected -- it still
+    computes and emits every client pair into cross_segment_summary.csv
+    regardless of sector; this is purely a rollup-consumer filter."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Intel", segment_id_b="imperial|Project|Acme",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Intel", client_label_b="Acme",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.7", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    # No sector_map at all -- neither client classified as healthcare.
+    cascade = build_cascade(rows)
+    assert "arrowheads" not in cascade
+
+
+def test_cascade_cross_client_feeds_xc_when_both_sides_healthcare():
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.7", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    cascade = build_cascade(rows, sector_map)
+    assert cascade["arrowheads"]["xc"] == 0.7
+
+
+def test_cascade_cross_client_and_sibling_projects_both_feed_xc():
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="sibling_projects", domain="arrowheads",
+            all_jaccard_mean="0.5", n_files_a="10", n_files_b="10",
+        ),
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Acme",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Acme",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.9", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare", "Acme": "healthcare"}
+    cascade = build_cascade(rows, sector_map)
+    # sibling_projects (Kaiser/Sutter, both healthcare) = 0.5, cross_client
+    # (Kaiser/Acme, both healthcare) = 0.9 -- both land in the same xc bucket.
+    assert cascade["arrowheads"]["xc"] == (0.5 + 0.9) / 2
+
+
+def test_cascade_cross_client_excludes_pair_with_one_non_healthcare_side():
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="sibling_projects", domain="arrowheads",
+            all_jaccard_mean="0.5", n_files_a="10", n_files_b="10",
+        ),
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Intel",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Intel",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.9", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    # Intel is unclassified (not in sector_map) -- Kaiser/Intel must be excluded.
+    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    cascade = build_cascade(rows, sector_map)
+    assert cascade["arrowheads"]["xc"] == 0.5
+
+
+def test_build_client_summary_xc_mean_uses_cross_client_rows():
+    """governance_client_summary.csv's cross_client_similarity_mean must be
+    populated from cross_client rows even when no sibling_projects rows exist
+    for these clients at all."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.6", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    client_rows = build_client_summary(rows, [], {})
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    sutter = next(r for r in client_rows if r["client"] == "Sutter")
+    assert kaiser["xc_mean"] == 0.6
+    assert sutter["xc_mean"] == 0.6
+
+
+def test_build_client_summary_xc_mean_uses_client_label_not_segment_id_shape():
+    """Regression for a Codex review finding on PR #370: xc_by_client/
+    xc_dom_by_client used to positionally parse segment_id ("len(pa) == 3")
+    to find the client name, which only holds for the unit|role|client-shaped
+    IDs build_segment_manifest.py happens to emit -- discover_cross_client()
+    places no such constraint on segment_id shape. A cross_client row with
+    non-standard segment_ids must still populate xc_mean via client_label_a/b."""
+    rows = [
+        _summary_row(
+            segment_id_a="p_kaiser", segment_id_b="p_sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.6", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    client_rows = build_client_summary(rows, [], {})
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    sutter = next(r for r in client_rows if r["client"] == "Sutter")
+    assert kaiser["xc_mean"] == 0.6
+    assert sutter["xc_mean"] == 0.6
+
+
+def test_build_client_summary_backfills_n_files_for_cross_client_only_clients():
+    """Regression for a second Codex review finding on PR #370: a client can
+    now be discovered purely from a cross_client row (no pooled/within_project/
+    sibling_projects rows at all). client_files must backfill from the
+    cross_client row's own n_files_a/b, or such a client falsely reports
+    n_project_files=0 / a low-confidence note despite the row carrying real
+    counts."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.6", n_files_a="42", n_files_b="17",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    client_rows = build_client_summary(rows, [], {})
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    sutter = next(r for r in client_rows if r["client"] == "Sutter")
+    assert kaiser["n_files"] == 42
+    assert sutter["n_files"] == 17
+
+
+def test_within_client_cross_client_like_pair_excluded_from_xc_mean():
+    """ca != cb must still exclude a within-client pair from xc_by_client/
+    xc_dom_by_client even though the segment_id-shape check that used to
+    incidentally enforce this (a 4-part discipline-scoped segment_id) is gone
+    now that client_label_a/b is read directly."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser|architectural", segment_id_b="imperial|Project|Kaiser|electrical",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Kaiser",
+            comparison_type="sibling_projects", domain="arrowheads",
+            all_jaccard_mean="0.95", n_files_a="5", n_files_b="5",
+        ),
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.5", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    client_rows = build_client_summary(rows, [], {})
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    # Only the Kaiser/Sutter cross_client pair (0.5) should count -- the
+    # within-client 0.95 sibling_projects pair must not blend in.
+    assert kaiser["xc_mean"] == 0.5
+
+
+def test_build_client_summary_excludes_confirmed_non_healthcare_partner_from_xc_mean():
+    """Regression for a fourth Codex review finding on PR #370: cross_client
+    being default-on and pairing every client regardless of sector means a
+    healthcare client's xc_mean/tier could be driven by a comparison against a
+    client whose OWN row is separately (and correctly) marked
+    Non-comparable (different sector) -- xc_by_client/xc_dom_by_client had no
+    defense against this for either source comparison_type. A pair with a
+    CONFIRMED (not merely unclassified) non-healthcare side must not feed
+    either client's xc_mean."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Intel",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Intel",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.9", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    sector_map = {"Kaiser": "healthcare", "Intel": "semiconductor"}
+    client_rows = build_client_summary(rows, [], sector_map)
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    intel = next(r for r in client_rows if r["client"] == "Intel")
+    assert kaiser["xc_mean"] is None
+    assert intel["tier"] == "Non-comparable (different sector)"
+
+
+def test_build_client_summary_unclassified_partner_still_feeds_xc_mean():
+    """An UNCLASSIFIED client (absent from sector_map, not a KNOWN different
+    sector) must still count -- only a CONFIRMED non-healthcare sector is
+    excluded, matching this function's own tier definition of "comparable"
+    (sector in ("unknown", "healthcare"))."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|NewClient",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="NewClient",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.8", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    sector_map = {"Kaiser": "healthcare"}  # NewClient absent -- unclassified
+    client_rows = build_client_summary(rows, [], sector_map)
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    assert kaiser["xc_mean"] == 0.8
+
+
+def test_build_client_summary_excludes_policy_excluded_domain_from_xc_mean():
+    """Regression for a seventh Codex review finding on PR #370: xc_by_client
+    had no EXCLUDED_FROM_SCORING gate at all, unlike xc_dom_by_client right
+    below it and build_cascade()'s own per-domain xc accumulation -- a
+    cross_client row for a domain the governance policy excludes from scoring
+    (e.g. view_templates_renderings_drafting) could still classify a client
+    as highly aligned, disagreeing with the rest of the scoring policy.
+    cross_client being default-on and pairing every client for every domain
+    makes this routinely reachable."""
+    excluded_domain = next(iter(EXCLUDED_FROM_SCORING))
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain=excluded_domain,
+            all_jaccard_mean="0.95", n_files_a="10", n_files_b="10",
+        ),
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_jaccard_mean="0.3", n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    client_rows = build_client_summary(rows, [], sector_map)
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    # Only the non-excluded arrowheads row (0.3) should count -- the excluded
+    # domain's 0.95 must not pull xc_mean up.
+    assert kaiser["xc_mean"] == 0.3
 
 
 def test_non_project_within_project_rows_excluded_from_client_summary():

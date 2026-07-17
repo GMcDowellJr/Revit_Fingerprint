@@ -572,6 +572,11 @@ def load_corpus_counts(
 CASCADE_GROUP1_TYPES = {
     "template_to_container", "container_to_project", "template_to_project",
     "parent_sibling_roles", "sibling_projects", "within_project",
+    # cross_client: purpose-built client-vs-client peer comparison (see
+    # discover_cross_client() in compare_cross_segment.py) feeding the same xc
+    # bucket as sibling_projects's healthcare-gated cross-client accidental
+    # overload, without that gate or the shared-parent requirement.
+    "cross_client",
 }
 
 # Group 2 — one level up the cascade: Generic/Generic-Host (out-of-box Revit stock
@@ -719,6 +724,22 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
       ep/bp/eb/ec: enterprise->project / bc->project / enterprise->bc / enterprise->client
         containment_a_in_b_mean (Group 3 — scope-level fan-out, captured but not yet
         rendered/tiered/anomaly-detected; see CASCADE_GROUP3_TYPES)
+      cp_scoped/cp_scoped_pair: container_to_project rollup-gap fix. cp itself stays
+        gated to the "enterprise::enterprise" pair only (unchanged). But unlike
+        tc/tp, cp is essentially never populated in real corpora -- Project segments
+        are rarely fully unscoped -- while its non-enterprise evidence (cp_by_scope)
+        is real, data_sufficient-passing signal that was previously computed and
+        then discarded before reaching governance_domain_summary.csv. cp_scoped is
+        the mean of the largest (most rows) scope_pair bucket in cp_by_scope that
+        (a) is not "enterprise::enterprise" (already covered by cp) and (b) is built
+        only from rows where compare_cross_segment.py's own data_sufficient == "true".
+        cp_scoped_pair names which scope_pair that was. Both are None whenever cp
+        itself is non-None -- the scoped fallback only fires when there is no
+        enterprise-level evidence to report, so a reader can never mistake it for a
+        second, competing headline value. Populated from a SEPARATE accumulator
+        (cp_by_scope_suff), not a filtered view of cp_by_scope, so existing
+        cp_by_scope consumers (_has_group1_bc_pooled_evidence(),
+        render_group1_scope_section()) are unaffected.
     """
     tc = defaultdict(list)
     cp = defaultdict(list)
@@ -748,6 +769,18 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     tc_used_by_scope = defaultdict(lambda: defaultdict(list))
     cp_used_by_scope = defaultdict(lambda: defaultdict(list))
     tp_used_by_scope = defaultdict(lambda: defaultdict(list))
+
+    # container_to_project scoped fallback (governance_domain_summary.csv
+    # rollup gap fix) -- a SEPARATE accumulator from cp_by_scope above, not a
+    # filtered view of it, so _has_group1_bc_pooled_evidence()'s tier check and
+    # render_group1_scope_section()'s narrative (both existing cp_by_scope
+    # consumers) see byte-for-byte the same population as before this fix.
+    # Populated only from rows that are both (a) not the "enterprise::enterprise"
+    # pair (that evidence already surfaces via cp itself) and (b)
+    # data_sufficient == "true" -- the one real sufficiency signal
+    # compare_cross_segment.py emits for this comparison_type, which nothing in
+    # this rollup previously consulted.
+    cp_by_scope_suff = defaultdict(lambda: defaultdict(list))
 
     # Group 2 — generic->template/container/project containment (all-view + used-view).
     # gt/gc/gp remain the "enterprise" scope-level slice only (Option A -- one clean
@@ -825,6 +858,8 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
                 cp_by_scope[dom][scope_pair].append(v)
                 if scope_a == "enterprise" and scope_b == "enterprise":
                     cp[dom].append(v)
+                elif r.get("data_sufficient") == "true":
+                    cp_by_scope_suff[dom][scope_pair].append(v)
             vu = pf(_col(r, "used_containment_a_in_b_mean"))
             if vu is not None:
                 cp_used_by_scope[dom][scope_pair].append(vu)
@@ -855,6 +890,31 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             # cross-client convergence. The old segment_id-length==3 guard
             # incidentally excluded these (they render with >3 parts); requiring
             # distinct clients here is the direct, column-based replacement.
+            if ca != cb and sector_map.get(ca) == "healthcare" and sector_map.get(cb) == "healthcare":
+                v = pf(_col(r, "jaccard_mean"))
+                if v is not None:
+                    xc[dom].append(v)
+
+        elif ct == "cross_client":
+            # Purpose-built cross-client comparison (discover_cross_client() in
+            # compare_cross_segment.py): each side is already that client's own
+            # broadest (client-only-scoped) Project population, paired against
+            # every OTHER client sharing the same unit_system -- no shared-parent
+            # requirement (unlike sibling_projects). discover_cross_client()
+            # itself has no hardcoded sector gate (it emits every client pair
+            # into cross_segment_summary.csv, regardless of sector) -- but xc
+            # is documented and consumed elsewhere as a healthcare-cohort
+            # metric (see this function's own docstring, and the client-tier
+            # "Non-comparable (different sector)" logic in
+            # build_client_summary()), and sibling_projects's contribution to
+            # this exact bucket is already gated to both-healthcare pairs. Gate
+            # cross_client's contribution the same way for consistency, per
+            # the original cross_client design note that sector filtering is
+            # "left to downstream consumers" rather than baked into discovery.
+            # ca != cb is defense-in-depth; discover_cross_client() only emits
+            # distinct-client pairs by construction.
+            ca = _pick(r, "client_label_a")
+            cb = _pick(r, "client_label_b")
             if ca != cb and sector_map.get(ca) == "healthcare" and sector_map.get(cb) == "healthcare":
                 v = pf(_col(r, "jaccard_mean"))
                 if v is not None:
@@ -1036,6 +1096,19 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     def mean_or_none(lst):
         return statistics.mean(lst) if lst else None
 
+    def _largest_scope_bucket(buckets: dict):
+        """Pick the (scope_pair, mean) backed by the most rows; deterministic
+        tie-break on scope_pair name. (None, None) when buckets is empty.
+
+        Used only for the container_to_project scoped fallback -- the fallback
+        surfaces exactly one number, so ties must resolve the same way on every
+        run rather than depend on dict/insertion order.
+        """
+        if not buckets:
+            return None, None
+        key = max(buckets, key=lambda k: (len(buckets[k]), k))
+        return key, statistics.mean(buckets[key])
+
     result = {}
     all_domains = (
         set(tc) | set(cp) | set(tp) | set(xc) | set(wp_all) | set(tw)
@@ -1047,6 +1120,14 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     for dom in all_domains:
         bs_all = mean_or_none(bshare_all[dom])
         bs_used = mean_or_none(bshare_used[dom])
+        cp_mean = mean_or_none(cp[dom])
+        # Only compute the scoped fallback when there's no enterprise::enterprise
+        # evidence to report -- cp_scoped must never coexist with cp itself, or a
+        # reader could mistake the fallback for a second, competing headline value.
+        if cp_mean is None:
+            cp_scoped_pair, cp_scoped_mean = _largest_scope_bucket(cp_by_scope_suff[dom])
+        else:
+            cp_scoped_pair, cp_scoped_mean = None, None
 
         # Passive inheritance indicator: prefer containment-based delta (more direct signal)
         # over bundle-density delta. All-view containment - used-view containment = passive floor.
@@ -1064,7 +1145,14 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
 
         result[dom] = {
             "tc": mean_or_none(tc[dom]),
-            "cp": mean_or_none(cp[dom]),
+            "cp": cp_mean,
+            # Rollup-gap fix: best-available data_sufficient scoped bucket when
+            # cp (enterprise::enterprise) is empty. Kept as its own pair of
+            # fields rather than blended into "cp" so a reader can never mistake
+            # scoped evidence for enterprise-level evidence (same posture as
+            # _has_group1_bc_pooled_evidence()/TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE).
+            "cp_scoped": cp_scoped_mean,
+            "cp_scoped_pair": cp_scoped_pair,
             "tp": tp_all_m,
             "tp_used": tp_used_m,
             "tc_used": mean_or_none(tc_used[dom]),
@@ -1828,23 +1916,56 @@ def build_client_summary(
             c = _pick(r, "client_label_a")
             if c:
                 all_clients.add(c)
-        elif r["comparison_type"] == "sibling_projects" and r["governance_role_a"] == "Project" and r["governance_role_b"] == "Project":
+        elif r["comparison_type"] in ("sibling_projects", "cross_client") and r["governance_role_a"] == "Project" and r["governance_role_b"] == "Project":
             for suffix in ("a", "b"):
                 c = _pick(r, f"client_label_{suffix}")
                 if c:
                     all_clients.add(c)
 
-    # Cross-client Jaccard
+    # Cross-client Jaccard. cross_client is the purpose-built comparison
+    # (discover_cross_client() in compare_cross_segment.py); sibling_projects is
+    # kept alongside it for corpora that predate that producer change. Reads
+    # client_label_a/b directly rather than positionally parsing segment_id
+    # (the old "len(pa) == 3" assumption only holds for the
+    # unit|role|client-shaped IDs build_segment_manifest.py happens to emit for
+    # a client-only-scoped Project segment -- discover_cross_client() places no
+    # such constraint on segment_id shape, and the row already carries the
+    # client labels directly). ca != cb excludes within-client sibling_projects
+    # pairs (see discover_sibling_segments()'s own docstring on this) -- the
+    # old segment_id-length==3 check happened to reject these too (a
+    # discipline-scoped within-client sibling's segment_id has 4 parts), so
+    # this guard is required to preserve that exclusion now that segment_id
+    # shape is no longer being read at all.
+    #
+    # A pair is excluded here if EITHER side has a CONFIRMED non-comparable
+    # sector -- sector_map.get(c, "unknown") not in ("unknown", "healthcare") --
+    # matching this exact function's own tier definition of "comparable"
+    # below ("Non-comparable (different sector)" fires only for a KNOWN
+    # non-healthcare sector, never for "unknown"). Without this, cross_client
+    # being default-on and pairing every client regardless of sector means a
+    # healthcare client's xc_mean/tier can be driven by a comparison against a
+    # client whose OWN row is separately (and correctly) marked
+    # non-comparable -- a real contamination risk this loop had no defense
+    # against for either source type before.
+    def _confirmed_non_healthcare(client: str) -> bool:
+        return sector_map.get(client, "unknown") not in ("unknown", "healthcare")
+
     xc_by_client = defaultdict(list)
     for r in summary_rows:
-        if r["comparison_type"] != "sibling_projects":
+        if r["comparison_type"] not in ("sibling_projects", "cross_client"):
             continue
-        pa, pb = r["segment_id_a"].split("|"), r["segment_id_b"].split("|")
-        if len(pa) == 3 and pa[2] in all_clients and len(pb) == 3 and pb[2] in all_clients:
-            v = pf(_col(r, "jaccard_mean"))
-            if v is not None:
-                xc_by_client[pa[2]].append(v)
-                xc_by_client[pb[2]].append(v)
+        if r["domain"] in EXCLUDED_FROM_SCORING:
+            continue
+        ca = _pick(r, "client_label_a")
+        cb = _pick(r, "client_label_b")
+        if ca == cb or ca not in all_clients or cb not in all_clients:
+            continue
+        if _confirmed_non_healthcare(ca) or _confirmed_non_healthcare(cb):
+            continue
+        v = pf(_col(r, "jaccard_mean"))
+        if v is not None:
+            xc_by_client[ca].append(v)
+            xc_by_client[cb].append(v)
 
     # Within-project coherence. Gated on governance_role_a == "Project" for the
     # same reason as the all_clients fallback above -- within_project rows exist
@@ -1881,24 +2002,30 @@ def build_client_summary(
             nf = int(r["n_files_a"]) if r.get("n_files_a") else 0
             if c and (c not in client_files or nf > client_files[c]):
                 client_files[c] = nf
-        elif r["comparison_type"] == "sibling_projects" and r["governance_role_a"] == "Project" and r["governance_role_b"] == "Project":
+        elif r["comparison_type"] in ("sibling_projects", "cross_client") and r["governance_role_a"] == "Project" and r["governance_role_b"] == "Project":
             for suffix in ("a", "b"):
                 c = _pick(r, f"client_label_{suffix}")
                 nf = int(r[f"n_files_{suffix}"]) if r.get(f"n_files_{suffix}") else 0
                 if c and (c not in client_files or nf > client_files[c]):
                     client_files[c] = nf
 
-    # Domain-level xc means
+    # Domain-level xc means. Same client_label_a/b-direct-read fix, same
+    # ca != cb within-client exclusion, and same confirmed-non-healthcare
+    # exclusion as xc_by_client above.
     xc_dom_by_client = defaultdict(lambda: defaultdict(list))
     for r in summary_rows:
-        if r["comparison_type"] != "sibling_projects":
+        if r["comparison_type"] not in ("sibling_projects", "cross_client"):
             continue
-        pa, pb = r["segment_id_a"].split("|"), r["segment_id_b"].split("|")
-        if len(pa) == 3 and pa[2] in all_clients and len(pb) == 3 and pb[2] in all_clients:
-            v = pf(_col(r, "jaccard_mean"))
-            if v is not None and r["domain"] not in EXCLUDED_FROM_SCORING:
-                xc_dom_by_client[pa[2]][r["domain"]].append(v)
-                xc_dom_by_client[pb[2]][r["domain"]].append(v)
+        ca = _pick(r, "client_label_a")
+        cb = _pick(r, "client_label_b")
+        if ca == cb or ca not in all_clients or cb not in all_clients:
+            continue
+        if _confirmed_non_healthcare(ca) or _confirmed_non_healthcare(cb):
+            continue
+        v = pf(_col(r, "jaccard_mean"))
+        if v is not None and r["domain"] not in EXCLUDED_FROM_SCORING:
+            xc_dom_by_client[ca][r["domain"]].append(v)
+            xc_dom_by_client[cb][r["domain"]].append(v)
 
     rows_out = []
     for client in sorted(all_clients):
@@ -3251,6 +3378,13 @@ _FINDING_LIMITS_STANDARD = [
 # needs to grow when assign_tier() itself grows, not per finding type.
 _TIER_DRIVER_SUPPORT_FIELDS = [
     "governance_tier", "template_to_project", "container_to_project",
+    # container_to_project_scoped/_pair: the only scalar evidence for the
+    # data_sufficient scoped Container->Project fallback (see cp_scoped in
+    # build_cascade()) when container_to_project itself is blank -- a finding
+    # drill-through that only lists container_to_project would miss this
+    # populated fallback entirely for exactly the domains it matters most for
+    # (missing_or_degraded_evidence, where container_to_project is empty).
+    "container_to_project_scoped", "container_to_project_scoped_pair",
     "template_to_container", "score_reliability", "local_active_share",
     "provided_passive_share", "provided_missing_share", "provided_to_used_containment",
 ]
@@ -4029,6 +4163,12 @@ def main():
             "cascade_generic_to_project": fmt(d.get("gp")),
             "template_to_container": fmt(d["tc"]),
             "container_to_project": fmt(d["cp"]),
+            # Rollup-gap fix: populated only when "container_to_project" (the
+            # enterprise::enterprise slice) is None -- the largest data_sufficient
+            # scoped bucket (see cp_by_scope_suff), plus which scope_pair it came
+            # from so this is never mistaken for enterprise-level evidence.
+            "container_to_project_scoped": fmt(d.get("cp_scoped")),
+            "container_to_project_scoped_pair": d.get("cp_scoped_pair") or "",
             "template_to_project": fmt(d["tp"]),
             "cross_client_convergence": fmt(d["xc"]),
             "within_project_all": fmt(d["wp_all"]),

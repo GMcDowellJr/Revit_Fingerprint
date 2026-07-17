@@ -262,6 +262,23 @@ def test_missing_or_degraded_evidence_for_sparse_tier_lists_primary_fields():
     assert "container_to_project" in fields
 
 
+def test_missing_or_degraded_evidence_lists_container_to_project_scoped_fields():
+    """Regression for a Codex review finding on PR #370: when
+    container_to_project is blank but container_to_project_scoped (the
+    data_sufficient scoped Container->Project fallback -- see cp_scoped in
+    build_cascade()) is the only actual evidence for this domain, a
+    missing_or_degraded_evidence finding's support fields must list both new
+    columns, or a consumer following container_to_project (blank) would miss
+    the populated fallback entirely."""
+    cascade = {"line_styles": _min_domain_dict(tc=None, cp=None, tp=None, wp_all=0.30)}
+    findings = build_structured_findings(cascade, [], None)
+    finding = next(f for f in findings
+                   if f["subject"]["id"] == "line_styles" and f["finding_type"] == "missing_or_degraded_evidence")
+    fields = finding["support"][0]["fields"]
+    assert "container_to_project_scoped" in fields
+    assert "container_to_project_scoped_pair" in fields
+
+
 def test_missing_or_degraded_evidence_not_emitted_for_non_renderable_domain():
     """Regression test for a PR review finding: a domain whose only signal is
     Group-3 scope-level data is retained in `cascade` but never gets a
