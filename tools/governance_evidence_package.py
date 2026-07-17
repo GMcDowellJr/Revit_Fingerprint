@@ -38,6 +38,7 @@ from typing import Optional
 PACKAGE_TYPE = "governance_evidence_package"
 PACKAGE_SCHEMA_VERSION = "1.0"
 EVIDENCE_MAP_SCHEMA_VERSION = "1.0"
+FINDINGS_SCHEMA_VERSION = "1.0"
 
 GENERATOR_IDENTITY = "generate_governance_narrative.py"
 GENERATOR_ROLE = "deterministic_governance_narrative_generator"
@@ -58,6 +59,33 @@ AUTHORITY_LEVELS = {
     AUTHORITY_LLM_GENERATED_PROVISIONAL_INTERPRETATION,
 }
 
+# ── finding provenance vocabulary (epistemic provenance: origin/fidelity/ ────
+# ── authority/limits) ─────────────────────────────────────────────────────────
+# Names match the framework's four components of epistemic provenance
+# (patterns/deterministic_to_llm_boundary.md in the design-reference-only
+# llm_evidence_framework repo). Every finding in governance_findings.json is
+# derived from deterministic computation over already-authoritative CSV data
+# (build_cascade()/build_client_summary()/assign_tier() outputs), so origin
+# and fidelity are constant across all findings this generator produces.
+
+FINDING_ORIGIN_DETERMINISTIC_COMPUTATION = "deterministic_computation"
+FINDING_FIDELITY_EXACT = "exact"
+FINDING_STATUS_SUPPORTED = "supported"
+FINDING_STATUS_QUESTION_NOT_CLAIM = "question_not_claim"
+
+FINDING_TYPES = {
+    "baseline_candidate",
+    "strong_baseline_candidate",
+    "local_review_required",
+    "high_fragmentation",
+    "active_local_practice",
+    "cross_client_convergence",
+    "low_client_coherence",
+    "passive_inheritance_risk",
+    "missing_or_degraded_evidence",
+    "leadership_question",
+}
+
 
 def _utc_now_iso() -> str:
     # Matches compare_cross_segment.py's own executed_utc stamping convention
@@ -67,6 +95,20 @@ def _utc_now_iso() -> str:
 
 def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+
+
+def build_findings_document(findings: list, schema_version: str = FINDINGS_SCHEMA_VERSION) -> dict:
+    """Wrap a list of finding dicts (already built by the caller -- domain-
+    governance classification logic stays in generate_governance_narrative.py,
+    which owns TIER_*/PASSIVE_INHERITANCE_RISK_DOMAINS/assign_tier()) in the
+    same schema_version-tagged envelope used by the other three package
+    artifacts. Pure function -- no filesystem I/O, no re-derivation of the
+    findings themselves.
+    """
+    for f in findings:
+        if f.get("finding_type") not in FINDING_TYPES:
+            raise ValueError(f"unknown finding_type: {f.get('finding_type')!r}")
+    return {"schema_version": schema_version, "findings": findings}
 
 
 # ── package manifest ─────────────────────────────────────────────────────────
@@ -628,7 +670,31 @@ def build_evidence_map(
          "are absent."],
         {},
         ["governance_domain_summary", "governance_client_summary",
-         "governance_package_health", "governance_evidence_map"],
+         "governance_package_health", "governance_evidence_map", "governance_findings"],
+    ))
+
+    artifacts.append(_artifact(
+        "governance_findings", p(output_paths, "governance_findings"), "json", False, True,
+        GENERATOR_IDENTITY, AUTHORITY_CONTROLLED_INTERPRETATION,
+        "structured, rule-derived findings (tier/anomaly/onboarding classifications) "
+        "with provenance -- origin, fidelity, authority, and limits per finding, "
+        "plus leadership questions marked as questions rather than claims",
+        "one object per package generation run, containing one entry per finding",
+        [], ["finding_id"], [],
+        ["which domains/clients meet a specific named governance rule "
+         "(baseline_candidate, high_fragmentation, passive_inheritance_risk, etc.), "
+         "and what CSV fields/rows support that classification"],
+        ["raw metric values -- follow each finding's support[].selector back to "
+         "governance_domain_summary.csv/governance_client_summary.csv for those"],
+        ["derived by build_structured_findings(), which reuses the exact same "
+         "classification buckets governance_narrative_context.md's Key Findings "
+         "section renders as prose -- the two are not independent implementations. "
+         "leadership_question findings carry status: question_not_claim and "
+         "authority_level: convenience_summary -- they are suggested questions, "
+         "not observed results."],
+        {},
+        ["governance_domain_summary", "governance_client_summary", "governance_narrative_context"],
+        schema_version=FINDINGS_SCHEMA_VERSION,
     ))
 
     artifacts.append(_artifact(
@@ -642,7 +708,7 @@ def build_evidence_map(
          "optional inputs were actually supplied"],
         ["input CSV content correctness -- only presence/path/size is validated, "
          "never parsed content"],
-        [], {}, ["governance_package_health", "governance_evidence_map"],
+        [], {}, ["governance_package_health", "governance_evidence_map", "governance_findings"],
         schema_version=package_schema_version,
     ))
 
@@ -657,7 +723,7 @@ def build_evidence_map(
         ["does not repeat or replace governance_narrative_context.md's own "
          "Analytical Notes and Limitations section -- this is a machine-readable "
          "companion, not a superseding source"],
-        [], {}, ["governance_package_manifest", "governance_evidence_map"],
+        [], {}, ["governance_package_manifest", "governance_evidence_map", "governance_findings"],
         schema_version=package_schema_version,
     ))
 

@@ -275,15 +275,17 @@ def test_emit_and_no_emit_produce_identical_csvs(tmp_path, monkeypatch):
 def test_no_emit_narrative_does_not_point_at_missing_package_files(tmp_path, monkeypatch):
     """Regression test for a PR review finding: the narrative's authority
     header unconditionally referenced governance_package_health.json/
-    governance_evidence_map.json even when --no-emit-evidence-package means
-    those files are never written."""
+    governance_findings.json/governance_evidence_map.json even when
+    --no-emit-evidence-package means those files are never written."""
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
                             "--out", str(tmp_path), "--no-emit-evidence-package"])
     md = (tmp_path / "governance_narrative_context.md").read_text(encoding="utf-8")
     assert "governance_package_health.json" not in md
+    assert "governance_findings.json" not in md
     assert "governance_evidence_map.json" not in md
     assert "--no-emit-evidence-package" in md
+    # The rest of the narrative (findings section, footer) is unaffected.
     assert "## Key Findings and Governance Questions" in md
     assert f"`{GENERATOR_IDENTITY}`" in md
 
@@ -293,6 +295,7 @@ def test_emit_narrative_points_at_package_files(tmp_path, monkeypatch):
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     md = (tmp_path / "governance_narrative_context.md").read_text(encoding="utf-8")
     assert "governance_package_health.json" in md
+    assert "governance_findings.json" in md
     assert "governance_evidence_map.json" in md
 
 
@@ -394,15 +397,32 @@ def test_package_health_optional_inputs_present_reflects_cli_flags(tmp_path, mon
     assert health["optional_inputs"]["cross_segment_union_inventory"] is False
 
 
-def test_evidence_map_lists_eighteen_artifacts_with_required_fields(tmp_path, monkeypatch):
+def test_evidence_map_lists_nineteen_artifacts_with_required_fields(tmp_path, monkeypatch):
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
     ids = [a["artifact_id"] for a in evidence_map["artifacts"]]
-    assert len(ids) == 18
+    assert len(ids) == 19
     assert len(ids) == len(set(ids))
+    assert "governance_findings" in ids
     narrative = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_narrative_context")
     assert narrative["authority_level"] != "authoritative_deterministic_evidence"
+
+
+def test_evidence_map_findings_entry_has_a_real_path(tmp_path, monkeypatch):
+    """Regression test for a PR review finding: build_evidence_map() looked up
+    output_paths["findings_json"], but main() writes that entry under the key
+    "governance_findings" -- the evidence-map entry for governance_findings
+    reported path: null and present: true simultaneously, since the .get()
+    silently returned nothing for the mismatched key. path must resolve to
+    the real governance_findings.json file that was actually written."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    entry = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_findings")
+    assert entry["path"] is not None
+    assert Path(entry["path"]).name == "governance_findings.json"
+    assert Path(entry["path"]).exists()
 
 
 def test_manifest_output_artifact_ids_match_evidence_map_artifact_ids(tmp_path, monkeypatch):
