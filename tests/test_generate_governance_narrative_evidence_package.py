@@ -16,7 +16,9 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
-from compare_cross_segment import SUMMARY_FIELDS, POOLED_FIELDS  # noqa: E402
+from compare_cross_segment import (  # noqa: E402
+    SUMMARY_FIELDS, POOLED_FIELDS, DELTA_FIELDS, GOVERNANCE_STATE_SUMMARY_FIELDS,
+)
 from governance_evidence_package import GENERATOR_IDENTITY  # noqa: E402
 from generate_governance_narrative import (  # noqa: E402
     CASCADE_GROUP1_TYPES,
@@ -39,6 +41,18 @@ def _summary_row(**overrides):
 
 def _pooled_row(**overrides):
     r = {f: "" for f in POOLED_FIELDS}
+    r.update(overrides)
+    return r
+
+
+def _delta_row(**overrides):
+    r = {f: "" for f in DELTA_FIELDS}
+    r.update(overrides)
+    return r
+
+
+def _gov_state_summary_row(**overrides):
+    r = {f: "" for f in GOVERNANCE_STATE_SUMMARY_FIELDS}
     r.update(overrides)
     return r
 
@@ -375,6 +389,41 @@ def test_package_manifest_comparison_run_ids_include_pooled_only_values(tmp_path
     manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
     assert manifest["corpus_scope"]["comparison_run_ids"] == ["run1", "run2"]
     assert manifest["corpus_scope"]["source_executed_utc"] == ["2026-07-15T00:00:00Z", "2026-07-16T00:00:00Z"]
+
+
+def test_package_manifest_comparison_run_ids_include_optional_evidence_values(tmp_path, monkeypatch):
+    """Regression test for a PR review finding: --governance-state-summary/
+    --delta rows are parsed and can drive the narrative/findings, and they
+    carry their own comparison_run_id/executed_utc (compare_cross_segment.py's
+    GOVERNANCE_STATE_SUMMARY_FIELDS/DELTA_FIELDS), but the manifest's
+    corpus_scope used to report only summary_rows/pooled_rows -- so a package
+    built from a --delta or --governance-state-summary file taken from a
+    different comparison run than --summary/--pooled would silently look like
+    a single reproducible run."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+
+    delta_rows = [_delta_row(comparison_run_id="run-delta", domain="line_styles",
+                              executed_utc="2026-06-01T00:00:00Z")]
+    delta_path = tmp_path / "cross_segment_delta.csv"
+    _write_csv(delta_path, DELTA_FIELDS, delta_rows)
+
+    state_summary_rows = [_gov_state_summary_row(
+        comparison_run_id="run-state", domain="line_styles", comparison_type="template_to_project",
+        executed_utc="2026-06-02T00:00:00Z",
+    )]
+    state_summary_path = tmp_path / "cross_segment_governance_state_summary.csv"
+    _write_csv(state_summary_path, GOVERNANCE_STATE_SUMMARY_FIELDS, state_summary_rows)
+
+    _run_main(monkeypatch, [
+        "--summary", str(summary_path), "--pooled", str(pooled_path),
+        "--delta", str(delta_path), "--governance-state-summary", str(state_summary_path),
+        "--out", str(tmp_path),
+    ])
+    manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["corpus_scope"]["comparison_run_ids"] == ["run-delta", "run-state", "run1"]
+    assert manifest["corpus_scope"]["source_executed_utc"] == [
+        "2026-06-01T00:00:00Z", "2026-06-02T00:00:00Z", "2026-07-16T00:00:00Z",
+    ]
 
 
 def test_package_health_schema_detection_dual_for_dual_view_rows(tmp_path, monkeypatch):

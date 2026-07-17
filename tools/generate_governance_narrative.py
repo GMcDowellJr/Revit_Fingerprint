@@ -3260,19 +3260,34 @@ def _classify_domains_for_findings(cascade: dict, state_summary: Optional[dict] 
     }
 
 
-def _passive_inheritance_risk_domains(cascade: dict) -> list:
+def _passive_inheritance_risk_domains(cascade: dict, state_summary: Optional[dict] = None) -> list:
     """Domains in PASSIVE_INHERITANCE_RISK_DOMAINS showing a material passive
     signal, using the same thresholds and dual/single-schema branching as
-    detect_anomalies()'s bundle/passive-inheritance fallback block (lines
-    ~1311-1343) -- mirrored rather than shared because detect_anomalies()
-    returns rendered prose strings, not a reusable boolean/value pair.
+    detect_anomalies()'s bundle/passive-inheritance fallback block -- mirrored
+    rather than shared because detect_anomalies() returns rendered prose
+    strings, not a reusable boolean/value pair.
+
+    When explicit governance-state data is available for a domain, this
+    mirrors detect_anomalies()'s own `if state: ... if not state: <bundle
+    fallback>` gating: the state's own provided_passive_share is authoritative
+    and used instead of the bundle/passive_indicator heuristic, so a domain
+    whose explicit state says passive share is clean can't still get flagged
+    passive_inheritance_risk here purely from a bundle-density signal the
+    narrative itself would not have used for that same domain.
 
     Restricted to domains passing _has_renderable_cascade_signal(), matching
     _classify_domains_for_findings() -- see that function's docstring.
     """
+    state_summary = state_summary or {}
     flagged = []
     for dom, d in cascade.items():
         if dom not in PASSIVE_INHERITANCE_RISK_DOMAINS or not _has_renderable_cascade_signal(d):
+            continue
+        state = state_summary.get(dom)
+        if state:
+            passive = state.get("provided_passive_share")
+            if passive is not None and passive >= PASSIVE_MATERIAL_THRESHOLD:
+                flagged.append(dom)
             continue
         bundle_schema = d.get("bundle_schema", "none")
         if bundle_schema == "dual":
@@ -3330,7 +3345,7 @@ def build_structured_findings(
     assign_tier() itself routes that domain to TIER_INSUFFICIENT instead.
     """
     domain_buckets = _classify_domains_for_findings(cascade, state_summary)
-    passive_risk_domains = _passive_inheritance_risk_domains(cascade)
+    passive_risk_domains = _passive_inheritance_risk_domains(cascade, state_summary)
     low_coherence_clients = _low_coherence_clients(client_rows)
 
     findings: list[dict] = []
@@ -3440,17 +3455,22 @@ def build_structured_findings(
         )
     for dom in passive_risk_domains:
         d = cascade[dom]
-        detail = (
-            f"passive_inheritance_indicator={fmt(d.get('passive_indicator'))}"
-            if d.get("bundle_schema") == "dual"
-            else f"bundle_share_all={fmt(d.get('bundle_share_all'))}"
-        )
+        dom_state = (state_summary or {}).get(dom)
+        if dom_state:
+            detail = f"provided_passive_share={fmt(dom_state.get('provided_passive_share'))}"
+            support_fields = ["provided_passive_share", "passive_inheritance_risk"]
+        elif d.get("bundle_schema") == "dual":
+            detail = f"passive_inheritance_indicator={fmt(d.get('passive_indicator'))}"
+            support_fields = ["passive_inheritance_indicator", "passive_inheritance_risk"]
+        else:
+            detail = f"bundle_share_all={fmt(d.get('bundle_share_all'))}"
+            support_fields = ["bundle_share_all", "passive_inheritance_risk"]
         add_domain_finding(
             dom, "passive_inheritance_risk",
             f"{label(dom)} is in the passive-inheritance risk group and shows a "
             f"material passive signal ({detail}).",
             _RULE_PASSIVE_INHERITANCE_RISK,
-            ["passive_inheritance_indicator", "bundle_share_all", "passive_inheritance_risk"],
+            support_fields,
         )
 
     for client in low_coherence_clients:
@@ -4027,18 +4047,32 @@ def main():
             "governance_findings": "structured, rule-derived findings",
         }
 
+        # All loaded row sets that carry their own comparison_run_id/executed_utc
+        # (per compare_cross_segment.py's own *_FIELDS definitions) -- not just
+        # summary_rows/pooled_rows. An optional evidence file loaded from a
+        # different comparison run (e.g. --governance-state-summary/--delta
+        # supplied from a stale export) must surface as multiple values here,
+        # or a mixed-run package would misleadingly look like one reproducible
+        # run. union_inventory_rows/reuse_distribution_rows/matrix_manifest_rows
+        # carry executed_utc but not comparison_run_id (they are not scoped to
+        # a single directed-comparison run the way the others are).
+        _run_id_row_sets = (
+            summary_rows, pooled_rows, governance_state_rows,
+            governance_state_summary_rows, delta_rows,
+        )
+        _executed_utc_row_sets = _run_id_row_sets + (
+            union_inventory_rows, reuse_distribution_rows, matrix_manifest_rows,
+        )
         comparison_run_ids = sorted(
-            (
-                {r.get("comparison_run_id", "") for r in summary_rows}
-                | {r.get("comparison_run_id", "") for r in pooled_rows}
-            )
+            set().union(*(
+                {r.get("comparison_run_id", "") for r in rows} for rows in _run_id_row_sets
+            ))
             - {""}
         )
         source_executed_utc = sorted(
-            (
-                {r.get("executed_utc", "") for r in summary_rows}
-                | {r.get("executed_utc", "") for r in pooled_rows}
-            )
+            set().union(*(
+                {r.get("executed_utc", "") for r in rows} for rows in _executed_utc_row_sets
+            ))
             - {""}
         )
 
