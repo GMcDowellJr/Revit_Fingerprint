@@ -3376,6 +3376,13 @@ _FINDING_LIMITS_STANDARD = [
 # needs to grow when assign_tier() itself grows, not per finding type.
 _TIER_DRIVER_SUPPORT_FIELDS = [
     "governance_tier", "template_to_project", "container_to_project",
+    # container_to_project_scoped/_pair: the only scalar evidence for the
+    # data_sufficient scoped Container->Project fallback (see cp_scoped in
+    # build_cascade()) when container_to_project itself is blank -- a finding
+    # drill-through that only lists container_to_project would miss this
+    # populated fallback entirely for exactly the domains it matters most for
+    # (missing_or_degraded_evidence, where container_to_project is empty).
+    "container_to_project_scoped", "container_to_project_scoped_pair",
     "template_to_container", "score_reliability", "local_active_share",
     "provided_passive_share", "provided_missing_share", "provided_to_used_containment",
 ]

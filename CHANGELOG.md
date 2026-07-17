@@ -90,6 +90,12 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   filtered view of `cp_by_scope`, so `_has_group1_bc_pooled_evidence()`/
   `render_group1_scope_section()` (existing `cp_by_scope` consumers) are
   unaffected. No other comparison type's `data_sufficient` handling changed.
+  `_TIER_DRIVER_SUPPORT_FIELDS` (the shared list of `governance_domain_summary.csv`
+  columns every tier-based `governance_findings.json` finding's `support[].fields`
+  references) now includes both new columns, so a `missing_or_degraded_evidence`
+  finding for a domain whose only evidence is the scoped fallback (i.e.
+  `container_to_project` itself is blank) still points a consumer at the
+  actual populated value instead of only the blank primary column.
 - `tools/generate_governance_narrative.py` now emits an interpretation/
   routing layer: `docs/governance_interpretation_guide.md` (stable,
   package-type-level -- what each metric/tier means, comparability rules,
