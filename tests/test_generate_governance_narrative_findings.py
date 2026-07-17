@@ -30,6 +30,7 @@ from generate_governance_narrative import (  # noqa: E402
     PASSIVE_INHERITANCE_RISK_DOMAINS,
     TIER_ACTIVE_LOCAL,
     TIER_BASELINE_CONTAINER_GAP,
+    TIER_BASELINE_LOCAL_REVIEW,
     TIER_HIGH_FRAGMENTATION,
     TIER_STRONG_BASELINE,
     build_structured_findings,
@@ -87,6 +88,30 @@ def test_active_local_practice_and_local_review_required():
     types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
     assert ("line_styles", "active_local_practice") in types
     assert ("line_styles", "local_review_required") in types
+
+
+def test_active_local_practice_finding_at_high_primary_containment():
+    """Regression test for a PR review finding: when primary >= 0.90 and
+    local_active_share is material, assign_tier() returns
+    TIER_BASELINE_LOCAL_REVIEW (via _has_material_state_exception()), not
+    TIER_ACTIVE_LOCAL -- but the active_local_practice finding must still
+    fire, since the underlying active-local signal is real regardless of
+    which tier it lands in. The finding's summary must also report the
+    domain's actual tier, not a hard-coded TIER_ACTIVE_LOCAL."""
+    cascade = {"line_styles": _min_domain_dict(tc=0.90, cp=0.95, tp=0.95, wp_p10=0.90, wp_p90=0.95)}
+    state = {"line_styles": {"local_active_share": 0.20}}
+    findings = build_structured_findings(cascade, [], state)
+    types = {(f["subject"]["id"], f["finding_type"]) for f in findings}
+    assert ("line_styles", "active_local_practice") in types
+    assert ("line_styles", "baseline_candidate") in types
+    assert ("line_styles", "local_review_required") in types
+    assert ("line_styles", "strong_baseline_candidate") not in types
+
+    active_local_finding = next(
+        f for f in findings if f["subject"]["id"] == "line_styles" and f["finding_type"] == "active_local_practice"
+    )
+    assert TIER_ACTIVE_LOCAL not in active_local_finding["summary"]
+    assert TIER_BASELINE_LOCAL_REVIEW in active_local_finding["summary"]
 
 
 def test_local_review_required_via_passive_or_missing_share_lists_all_triggering_fields():

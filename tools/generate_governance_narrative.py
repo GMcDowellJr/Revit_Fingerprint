@@ -2948,7 +2948,12 @@ def _classify_domains_for_findings(cascade: dict, state_summary: Optional[dict] 
             dom for dom, t in tiers.items()
             if t in (TIER_BASELINE_LOCAL_REVIEW, TIER_INVESTIGATE, TIER_ACTIVE_LOCAL)
         ),
-        "active_local_practice": sorted(dom for dom, t in tiers.items() if t == TIER_ACTIVE_LOCAL),
+        "active_local_practice": sorted(
+            dom for dom in renderable
+            if tiers[dom] == TIER_ACTIVE_LOCAL
+            or (_state_value(state_summary.get(dom), "local_active_share") or 0)
+            >= LOCAL_ACTIVE_MATERIAL_THRESHOLD
+        ),
         "high_fragmentation": sorted(dom for dom, t in tiers.items() if t == TIER_HIGH_FRAGMENTATION),
         "missing_or_degraded_evidence": sorted(
             dom for dom, t in tiers.items()
@@ -3105,10 +3110,11 @@ def build_structured_findings(
              "provided_missing_share", "provided_to_used_containment"],
         )
     for dom in domain_buckets["active_local_practice"]:
+        tier = assign_tier(cascade[dom], (state_summary or {}).get(dom))
         add_domain_finding(
             dom, "active_local_practice",
             f"{label(dom)} shows material active local practice (governance_tier: "
-            f"{TIER_ACTIVE_LOCAL}).",
+            f"{tier}).",
             _RULE_ACTIVE_LOCAL_PRACTICE,
             ["governance_tier", "local_active_share"],
         )
