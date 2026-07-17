@@ -3669,14 +3669,27 @@ def main() -> int:
     if args.cross_client:
         pairs.extend(discover_cross_client(manifest))
 
-    pairs = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
     pairs = deduplicate_pairs(pairs)
 
-    # Filter by --segment-a / --segment-b
+    # Filter by --segment-a / --segment-b. Must run BEFORE
+    # drop_legacy_sibling_projects_covered_by_cross_client(): that drop is
+    # order-independent (frozenset((a, b))), but discover_sibling_segments()
+    # orders its pair by sorted segment ID while discover_cross_client() orders
+    # by sorted client label -- the surviving cross_client row can therefore be
+    # the reverse (b, a) of the sibling_projects row it replaces. Since these
+    # filters are position-sensitive (a == args.segment_a, b == args.segment_b),
+    # running the drop first could remove the correctly-oriented sibling row
+    # and leave only a reversed-orientation cross_client row that then fails
+    # the filter too, making a scoped run silently report zero pairs for
+    # segments that do have a comparison. Filtering here first means the drop
+    # only ever sees (and only ever needs to reconcile) whichever orientation
+    # actually survived the requested scope.
     if args.segment_a:
         pairs = [(a, b, ct) for a, b, ct in pairs if a == args.segment_a]
     if args.segment_b:
         pairs = [(a, b, ct) for a, b, ct in pairs if b == args.segment_b]
+
+    pairs = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
 
     if not pairs:
         print("[compare] no pairs discovered — check manifest hierarchy and mode flags")

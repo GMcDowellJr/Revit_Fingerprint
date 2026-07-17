@@ -61,7 +61,17 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   this function's own definition of "comparable"; an unclassified client
   still counts. This closes a pre-existing gap (this rollup never filtered by
   sector for either source type) that `cross_client` being default-on and
-  pairing every client made routinely consequential.
+  pairing every client made routinely consequential. `main()` in
+  `compare_cross_segment.py` now applies `--segment-a`/`--segment-b`
+  filtering *before*
+  `drop_legacy_sibling_projects_covered_by_cross_client()` rather than after:
+  `discover_sibling_segments()` orders its pair by sorted segment ID while
+  `discover_cross_client()` orders by sorted client label, so the surviving
+  `cross_client` row replacing a dropped `sibling_projects` row can be in the
+  reverse orientation -- which the position-sensitive segment filters would
+  then also reject, making a scoped run silently report zero pairs for
+  segments that do have a comparison. No effect on the default (unscoped)
+  path.
 - `governance_domain_summary.csv` gains `container_to_project_scoped` /
   `container_to_project_scoped_pair` columns in
   `tools/generate_governance_narrative.py`. Root cause: `container_to_project`

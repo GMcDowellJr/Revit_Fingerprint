@@ -202,3 +202,42 @@ def test_drop_legacy_sibling_projects_leaves_other_types_untouched():
 def test_drop_legacy_sibling_projects_noop_when_no_cross_client_rows():
     pairs = [("p_kaiser", "p_sutter", "sibling_projects")]
     assert drop_legacy_sibling_projects_covered_by_cross_client(pairs) == pairs
+
+
+def test_segment_filter_before_drop_preserves_reversed_orientation_pair():
+    """Regression for a fifth Codex review finding on PR #370: main() must
+    apply --segment-a/--segment-b filtering BEFORE calling
+    drop_legacy_sibling_projects_covered_by_cross_client() -- not after.
+
+    discover_sibling_segments() orders its pair by sorted segment ID, while
+    discover_cross_client() orders by sorted client label -- for two segments
+    whose ID order doesn't match their client-label order, the surviving
+    cross_client pair can be the reverse (b, a) of the sibling_projects pair
+    it replaces. The position-sensitive --segment-a/--segment-b filters
+    (`a == args.segment_a`, `b == args.segment_b`) would then reject that
+    reversed row too, leaving a scoped run with zero pairs for segments that
+    do have a comparison -- unless filtering happens first, so the drop only
+    ever operates on whichever orientation actually survived the requested
+    scope.
+
+    Here segment_id sorts "p_zclient" < "p_akiser" is false alphabetically
+    (z > a), so pick IDs that invert the client-label sort order directly:
+    client "Akiser" (segment "p_zsutter") vs client "Zsutter" (segment
+    "p_akiser") -- sibling_projects (segment-ID order) emits
+    ("p_akiser", "p_zsutter"); cross_client (client-label order) emits
+    ("p_zsutter", "p_akiser"), the reverse.
+    """
+    pairs = [
+        ("p_akiser", "p_zsutter", "sibling_projects"),  # segment-ID sorted order
+        ("p_zsutter", "p_akiser", "cross_client"),       # client-label sorted order (reversed)
+    ]
+    # Simulate `--segment-a p_akiser --segment-b p_zsutter`, applied BEFORE the
+    # drop (the fixed order in main()).
+    segment_a, segment_b = "p_akiser", "p_zsutter"
+    filtered = [(a, b, ct) for a, b, ct in pairs if a == segment_a]
+    filtered = [(a, b, ct) for a, b, ct in filtered if b == segment_b]
+    result = drop_legacy_sibling_projects_covered_by_cross_client(filtered)
+    # Only the correctly-oriented sibling_projects row matches the filter
+    # (the reversed cross_client row doesn't survive it at all), so the drop
+    # sees no cross_client entry for this pair and must not remove it.
+    assert result == [("p_akiser", "p_zsutter", "sibling_projects")]
