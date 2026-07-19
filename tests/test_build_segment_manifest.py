@@ -15,8 +15,11 @@ from build_segment_manifest import (
     _build_registry,
     _population_hash,
     _normalize_rows,
+    _validate_required_metadata,
     _build_membership_rows,
     _membership_by_segment,
+    DIMENSION_CONFIG,
+    REQUIRED_ROW_FIELDS,
     MANIFEST_FIELDNAMES,
     REGISTRY_FIELDNAMES,
     main,
@@ -27,14 +30,41 @@ from build_segment_manifest import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _meta_row(export_run_id, unit_system, client_label, governance_role, discipline_label=""):
+def _meta_row(export_run_id, unit_system, client_label, governance_role, discipline_label="", business_center_label=""):
     return {
         "export_run_id": export_run_id,
         "unit_system": unit_system,
         "client_label": client_label,
         "governance_role": governance_role,
         "discipline_label": discipline_label,
+        "business_center_label": business_center_label,
     }
+
+
+def _full_row(export_run_id, unit_system, client_label, governance_role, discipline_label, business_center_label):
+    """Like _meta_row, but every required field must be passed explicitly --
+    for building fixtures fed through main() (which now blocks the whole
+    build if any required field is blank on any row)."""
+    return _meta_row(export_run_id, unit_system, client_label, governance_role, discipline_label, business_center_label)
+
+
+# A fully-valid fixture (every REQUIRED_ROW_FIELDS value populated) for tests
+# that route through main() -- ROWS deliberately keeps discipline_label/
+# business_center_label blank on most rows (and unit_system blank on r10) to
+# exercise _build_segments()'s own permissive combinatorics directly; main()
+# would now block on all of that, so main()-level tests use VALID_ROWS.
+VALID_ROWS = [
+    _full_row("r01", "imperial", "Kaiser", "Project", "architectural", "1450"),
+    _full_row("r02", "imperial", "Kaiser", "Project", "architectural", "1450"),
+    _full_row("r03", "imperial", "Kaiser", "Project", "architectural", "1450"),
+    _full_row("r04", "imperial", "Kaiser", "Template", "architectural", "1450"),
+    _full_row("r05", "imperial", "Renown", "Project", "structural", "2270"),
+    _full_row("r06", "imperial", "Renown", "Project", "structural", "2270"),
+    _full_row("r07", "imperial", "Renown", "Project", "structural", "2270"),
+    _full_row("r08", "metric", "Global", "Project", "mechanical", "0000"),
+    _full_row("r09", "metric", "Global", "Container", "mechanical", "0000"),
+]
+VALID_FIELDNAMES = ["export_run_id", "unit_system", "client_label", "governance_role", "discipline_label", "business_center_label"]
 
 
 def _read_csv(path: Path):
@@ -340,11 +370,10 @@ def test_registry_initial_status_pending():
 
 def test_main_writes_files(tmp_path):
     meta = tmp_path / "file_metadata.csv"
-    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
     with meta.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        w = csv.DictWriter(f, fieldnames=VALID_FIELDNAMES, extrasaction="ignore")
         w.writeheader()
-        for row in ROWS:
+        for row in VALID_ROWS:
             w.writerow(row)
 
     out_dir = tmp_path / "out"
@@ -429,15 +458,18 @@ def test_registry_folder_merges_for_client_label_case_variants():
     assert kaiser_rows[0]["output_folder"] == "imperial_project_kaiser"
 
 
-def test_blank_client_label_level2_id_distinct_from_level1():
-    # When client_label is blank the level-2 segment_id must be "imperial|", not "imperial",
-    # so it never collides with the level-1 segment_id for the same unit_system.
+def test_blank_client_label_no_longer_participates_in_subset():
+    # Blank-value injection is removed under the explicit-metadata contract:
+    # a blank client_label row no longer manufactures a distinct "selected
+    # blank client" segment (the old "imperial|" twin). It simply doesn't
+    # contribute client_label to the subset lattice at all.
     rows = [_meta_row(f"r{i:02d}", "imperial", "", "Project") for i in range(3)]
     segs = _build_segments(rows, min_files=1)
-    l1_ids = {r["segment_id"] for r in segs if r["segment_level"] == "1"}
-    l2_ids = {r["segment_id"] for r in segs if r["segment_level"] == "2"}
-    assert l1_ids.isdisjoint(l2_ids), f"Level-1 and level-2 IDs overlap: {l1_ids & l2_ids}"
-    assert "imperial|" in l2_ids
+    seg_ids = {r["segment_id"] for r in segs}
+    assert "imperial|" not in seg_ids
+    assert "imperial|Project" in seg_ids
+    proj = next(r for r in segs if r["segment_id"] == "imperial|Project")
+    assert proj["client_label"] == ""
 
 
 def test_main_missing_metadata_file(tmp_path):
@@ -472,24 +504,27 @@ def test_main_fails_when_export_run_id_column_absent(tmp_path):
     assert rc == 1
 
 
-def test_main_warns_on_blank_export_run_id(tmp_path, capsys):
+def test_main_blocks_on_blank_export_run_id(tmp_path, capsys):
+    # A blank export_run_id must now BLOCK the entire build (not warn and
+    # silently exclude the row) -- see the "Required-field blocking" tests
+    # further down for the full per-field sweep.
     meta = tmp_path / "file_metadata.csv"
-    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
     with meta.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w = csv.DictWriter(f, fieldnames=VALID_FIELDNAMES)
         w.writeheader()
-        w.writerow({"export_run_id": "r01", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
-        w.writerow({"export_run_id": "r02", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
-        w.writerow({"export_run_id": "r03", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
-        # Malformed row — blank export_run_id, valid unit_system
-        w.writerow({"export_run_id": "", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Project"})
+        for row in VALID_ROWS[:3]:
+            w.writerow(row)
+        bad = dict(VALID_ROWS[3]); bad["export_run_id"] = ""
+        w.writerow(bad)
 
-    import io, contextlib
-    stderr_buf = io.StringIO()
-    with contextlib.redirect_stderr(stderr_buf):
-        rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "1"])
-    assert rc == 0
-    assert "blank export_run_id" in stderr_buf.getvalue()
+    out_dir = tmp_path / "out"
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+    assert rc == 1
+    assert not (out_dir / "segment_manifest.csv").exists()
+    captured = capsys.readouterr()
+    assert "BLOCKED" in captured.err
+    assert "field=export_run_id" in captured.err
+    assert "reason=missing_value" in captured.err
 
 
 def test_main_fails_on_missing_columns_even_with_no_data_rows(tmp_path):
@@ -639,8 +674,11 @@ def test_no_discipline_column_rows_not_broken():
     assert disc_segs == []
 
 
-def test_discipline_cut_not_required_column(tmp_path):
-    # A metadata file without discipline_label must succeed (not exit 1).
+def test_discipline_cut_not_required_column_now_blocks(tmp_path, capsys):
+    # Under the explicit-metadata contract, discipline_label is a required
+    # row value -- a metadata file that lacks the column entirely means every
+    # row is missing it, which now blocks the build (this supersedes the old
+    # "discipline_label is optional" contract).
     meta = tmp_path / "file_metadata.csv"
     fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
     with meta.open("w", newline="") as f:
@@ -648,8 +686,12 @@ def test_discipline_cut_not_required_column(tmp_path):
         w.writeheader()
         for row in ROWS:
             w.writerow({k: row.get(k, "") for k in fieldnames})
-    rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "3"])
-    assert rc == 0
+    out_dir = tmp_path / "out"
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "3"])
+    assert rc == 1
+    assert not (out_dir / "segment_manifest.csv").exists()
+    captured = capsys.readouterr()
+    assert "field=discipline_label" in captured.err
 
 
 # ---------------------------------------------------------------------------
@@ -700,26 +742,23 @@ def test_single_child_same_hash_still_demoted():
 
 
 def test_matching_child_demotes_parent_even_with_other_nonmatching_children():
-    # Real-world shape: a business_center-scoped Container pool where every
-    # row also happens to have a blank client_label (so the client=""-twin
-    # child is a byte-identical duplicate of the parent), AND a subset of
+    # A business_center-scoped Container pool where every row also happens to
+    # share the same (real, non-blank) client_label, so the client+bc child
+    # is a byte-identical duplicate of the bc-only parent, AND a subset of
     # those rows also carry a discipline_label (so a second, non-matching
-    # discipline-cut child also exists as a sibling). The old "exactly one
-    # child" gate saw two children and skipped the redundancy check
-    # entirely, leaving the parent — a true duplicate of its client=""-twin
-    # — independently runnable alongside that twin. It must now demote
+    # discipline-cut child also exists as a sibling). The parent must demote
     # regardless of the extra non-matching sibling.
     rows = (
         [{"export_run_id": f"s{i:02d}", "unit_system": "imperial", "governance_role": "Container",
-          "client_label": "", "business_center_label": "Shared", "discipline_label": "architectural"}
+          "client_label": "Acme", "business_center_label": "Shared", "discipline_label": "architectural"}
          for i in range(2)]
         + [{"export_run_id": f"s{i:02d}", "unit_system": "imperial", "governance_role": "Container",
-            "client_label": "", "business_center_label": "Shared"}
+            "client_label": "Acme", "business_center_label": "Shared"}
            for i in range(2, 5)]
     )
     segs = _build_segments(rows, min_files=3)
     parent = next(r for r in segs if r["segment_id"] == "imperial|Container|Shared")
-    twin = next(r for r in segs if r["segment_id"] == "imperial|Container||Shared")
+    twin = next(r for r in segs if r["segment_id"] == "imperial|Container|Acme|Shared")
     disc_child = next(r for r in segs if r["segment_id"] == "imperial|Container|architectural|Shared")
 
     assert parent["file_count"] == "5"
@@ -727,12 +766,12 @@ def test_matching_child_demotes_parent_even_with_other_nonmatching_children():
     assert disc_child["file_count"] == "2"
 
     assert parent["run_type"] == "registration", (
-        "Parent with a byte-identical child (the client=\"\" twin) must demote "
+        "Parent with a byte-identical child (the client+bc cut) must demote "
         "even though it also has a second, non-matching discipline-cut child"
     )
     assert "redundant_single_child" in (parent.get("notes") or "")
-    # The pointer must name the matching twin, not the non-matching sibling.
-    assert "imperial|Container||Shared" in parent["notes"]
+    # The pointer must name the matching client+bc child, not the non-matching sibling.
+    assert "imperial|Container|Acme|Shared" in parent["notes"]
     assert disc_child["file_count"] != parent["file_count"]
 
 
@@ -968,187 +1007,12 @@ def test_client_discipline_leaf_no_empty_purpose():
 
 
 # ---------------------------------------------------------------------------
-# collection_label segment-id collision guard
+# collection_label is no longer a segmentation dimension (PR: segment builder
+# explicit contract) -- it may still exist as a column in file_metadata.csv,
+# and the segment builder simply ignores it. See "Collection exclusion" /
+# "Collapse after collection removal" tests further down for the new
+# ignore-collection_label coverage.
 # ---------------------------------------------------------------------------
-
-def _collision_rows():
-    rows = []
-    for i in range(3):
-        rows.append({
-            "export_run_id": f"bc{i}", "unit_system": "imperial", "governance_role": "Template",
-            "client_label": "", "business_center_label": "Shared", "discipline_label": "",
-        })
-    for i in range(3):
-        rows.append({
-            "export_run_id": f"coll{i}", "unit_system": "imperial", "governance_role": "Template",
-            "client_label": "", "collection_label": "Shared", "discipline_label": "",
-        })
-    return rows
-
-
-def test_collection_label_value_does_not_collide_with_other_dimension_value():
-    # A business-center-scoped segment and a collection-scoped segment that
-    # happen to share the same literal value ("Shared") must not produce the
-    # same segment_id, or one overwrites the other in any downstream loader
-    # that keys segment_manifest.csv by segment_id, and their memberships mix
-    # in segment_membership.csv.
-    segs = _build_segments(_collision_rows(), min_files=3)
-    ids = [r["segment_id"] for r in segs]
-    assert len(ids) == len(set(ids)), f"duplicate segment_id values: {ids}"
-
-    bc_scoped = [r for r in segs if r.get("business_center_label") == "Shared" and not r.get("collection_label")]
-    coll_scoped = [r for r in segs if r.get("collection_label") == "Shared" and not r.get("business_center_label")]
-    assert bc_scoped and coll_scoped
-    bc_ids = {r["segment_id"] for r in bc_scoped}
-    coll_ids = {r["segment_id"] for r in coll_scoped}
-    assert bc_ids.isdisjoint(coll_ids), (
-        f"business-center-scoped and collection-scoped segment_ids collide: {bc_ids & coll_ids}"
-    )
-
-
-def test_collection_namespace_prefix_itself_cannot_be_forged_by_other_fields():
-    # A business_center_label whose raw value literally IS the reserved
-    # "collection:Shared" token must not collide with a real
-    # collection_label="Shared" row's namespaced "collection:Shared" token.
-    # Without escaping the raw value's own colon, both would render as the
-    # identical segment_id substring "collection:Shared".
-    rows = []
-    for i in range(3):
-        rows.append({
-            "export_run_id": f"forge{i}", "unit_system": "imperial", "governance_role": "Template",
-            "client_label": "", "business_center_label": "collection:Shared", "discipline_label": "",
-        })
-    for i in range(3):
-        rows.append({
-            "export_run_id": f"real{i}", "unit_system": "imperial", "governance_role": "Template",
-            "client_label": "", "collection_label": "Shared", "discipline_label": "",
-        })
-    segs = _build_segments(rows, min_files=3)
-    ids = [r["segment_id"] for r in segs]
-    assert len(ids) == len(set(ids)), f"duplicate segment_id values: {ids}"
-
-    forged = next(r for r in segs if r.get("business_center_label") == "collection:Shared" and r["segment_level"] == "4")
-    real = next(r for r in segs if r.get("collection_label") == "Shared" and r["segment_level"] == "4")
-    assert forged["segment_id"] != real["segment_id"]
-    assert forged["segment_id"] == "imperial|Template||collection::Shared"
-    assert real["segment_id"] == "imperial|Template||collection:Shared"
-
-
-def test_colon_in_non_collection_value_not_forging_prefix_is_left_untouched():
-    # A client_label/discipline_label/business_center_label containing a
-    # colon that does NOT start with the reserved "collection:" prefix
-    # can never be confused with a namespaced token, so its segment_id
-    # rendering must stay byte-for-byte identical to before namespacing was
-    # introduced. Escaping it anyway would silently change segment_id for
-    # an already-stable segment on the next rebuild with unchanged source
-    # data, breaking _build_registry()'s folder-stability guarantee for it.
-    rows = [{
-        "export_run_id": f"r{i}", "unit_system": "imperial", "governance_role": "Project",
-        "client_label": "A:B", "discipline_label": "",
-    } for i in range(3)]
-    segs = _build_segments(rows, min_files=3)
-    leaf = next(r for r in segs if r["client_label"] == "A:B" and r["segment_level"] == "3")
-    assert leaf["segment_id"] == "imperial|Project|A:B"
-
-
-def test_collection_label_own_leading_colon_does_not_collide_with_forged_escape():
-    # collection_label=":Shared" and business_center_label="collection:Shared"
-    # must not render to the identical segment_id substring. Without also
-    # escaping collection_label's own value, "collection:" + ":Shared" and
-    # the escaped forgery "collection:Shared".replace(":","::") both produce
-    # "collection::Shared".
-    rows = []
-    for i in range(3):
-        rows.append({
-            "export_run_id": f"lead{i}", "unit_system": "imperial", "governance_role": "Template",
-            "client_label": "", "collection_label": ":Shared", "discipline_label": "",
-        })
-    for i in range(3):
-        rows.append({
-            "export_run_id": f"forge{i}", "unit_system": "imperial", "governance_role": "Template",
-            "client_label": "", "business_center_label": "collection:Shared", "discipline_label": "",
-        })
-    segs = _build_segments(rows, min_files=3)
-    ids = [r["segment_id"] for r in segs]
-    assert len(ids) == len(set(ids)), f"duplicate segment_id values: {ids}"
-
-    coll_leaf = next(r for r in segs if r.get("collection_label") == ":Shared" and r["segment_level"] == "4")
-    forged_leaf = next(r for r in segs if r.get("business_center_label") == "collection:Shared" and r["segment_level"] == "4")
-    assert coll_leaf["segment_id"] != forged_leaf["segment_id"]
-
-
-def test_collection_label_segment_id_namespaced_in_output():
-    segs = _build_segments(_collision_rows(), min_files=3)
-    coll_leaf = next(
-        r for r in segs
-        if r.get("collection_label") == "Shared" and r["governance_role"] == "Template" and not r.get("business_center_label")
-    )
-    assert "collection:Shared" in coll_leaf["segment_id"]
-
-
-def test_non_collection_segment_ids_unaffected_by_namespacing():
-    # The pre-existing dimensions (client/discipline/business_center) must
-    # keep their exact prior segment_id format — only collection_label gets
-    # namespaced.
-    segs = _build_segments(_collision_rows(), min_files=3)
-    bc_leaf = next(
-        r for r in segs
-        if r.get("business_center_label") == "Shared" and r["governance_role"] == "Template"
-        and not r.get("collection_label") and r["segment_level"] == "3"
-    )
-    assert bc_leaf["segment_id"] == "imperial|Template|Shared"
-
-
-# ---------------------------------------------------------------------------
-# client_label + collection_label leaf purposes
-# ---------------------------------------------------------------------------
-
-def _client_collection_rows():
-    """Mirrors real Sutter-shaped data: a client's Container/Template rows
-    are all tagged with that client's own collection_label, but its Project
-    rows carry no collection_label at all — so the level-3 client-alone
-    Container segment has population-identical children (the discipline-cut
-    child and the client+collection leaf), and pass5 can demote the level-3
-    parent, making the client+collection leaf the actual runnable segment."""
-    rows = []
-    for i in range(4):
-        rows.append({
-            "export_run_id": f"sc{i}", "unit_system": "imperial", "governance_role": "Container",
-            "client_label": "Sutter", "collection_label": "Sutter Standards",
-        })
-    for i in range(4):
-        rows.append({
-            "export_run_id": f"sp{i}", "unit_system": "imperial", "governance_role": "Project",
-            "client_label": "Sutter",
-        })
-    return rows
-
-
-def test_client_collection_leaf_gets_purpose_and_label():
-    segs = _build_segments(_client_collection_rows(), min_files=3)
-    leaf = next(
-        r for r in segs
-        if r["client_label"] == "Sutter" and r.get("collection_label") == "Sutter Standards"
-        and r["governance_role"] == "Container"
-    )
-    assert leaf["run_type"] in ("bundle", "reference"), (
-        "expected the client+collection leaf to be runnable in this fixture"
-    )
-    assert leaf["segment_purpose"] == "client_collection_coordination"
-    assert leaf["segment_label"] == "Sutter — Sutter Standards coordination files"
-    assert leaf["segment_label"] != leaf["segment_id"]
-
-
-def test_client_collection_discipline_leaf_gets_purpose_and_label():
-    rows = [dict(r, discipline_label="architectural") for r in _client_collection_rows() if r["governance_role"] == "Container"]
-    segs = _build_segments(rows, min_files=3)
-    leaf = next(
-        r for r in segs
-        if r["client_label"] == "Sutter" and r.get("collection_label") == "Sutter Standards"
-        and r["discipline_label"] == "architectural" and r["governance_role"] == "Container"
-    )
-    assert leaf["segment_purpose"] == "client_collection_discipline_coordination"
-    assert leaf["segment_label"] != leaf["segment_id"]
 
 
 # ---------------------------------------------------------------------------
@@ -1171,14 +1035,13 @@ def test_unit_system_case_variants_merge_into_single_segment():
 
 
 def test_governance_role_case_variants_merge_and_no_false_warning(tmp_path, capsys):
-    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
     rows = (
-        [{"export_run_id": f"a{i:02d}", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Container"} for i in range(3)]
-        + [{"export_run_id": f"b{i:02d}", "unit_system": "imperial", "client_label": "Acme", "governance_role": "container"} for i in range(3)]
+        [{"export_run_id": f"a{i:02d}", "unit_system": "imperial", "client_label": "Acme", "governance_role": "Container", "discipline_label": "architectural", "business_center_label": "1450"} for i in range(3)]
+        + [{"export_run_id": f"b{i:02d}", "unit_system": "imperial", "client_label": "Acme", "governance_role": "container", "discipline_label": "architectural", "business_center_label": "1450"} for i in range(3)]
     )
     meta = tmp_path / "file_metadata.csv"
     with meta.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w = csv.DictWriter(f, fieldnames=VALID_FIELDNAMES)
         w.writeheader()
         for row in rows:
             w.writerow(row)
@@ -1195,15 +1058,15 @@ def test_governance_role_case_variants_merge_and_no_false_warning(tmp_path, caps
 
 
 def test_unknown_governance_role_still_warns_after_normalization_added(tmp_path, capsys):
-    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
     meta = tmp_path / "file_metadata.csv"
     with meta.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w = csv.DictWriter(f, fieldnames=VALID_FIELDNAMES)
         w.writeheader()
         for i in range(3):
             w.writerow({
                 "export_run_id": f"r{i:02d}", "unit_system": "imperial",
                 "client_label": "Acme", "governance_role": "Contractor",
+                "discipline_label": "architectural", "business_center_label": "1450",
             })
 
     rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "1"])
@@ -1231,15 +1094,15 @@ def test_client_label_first_seen_casing_is_canonical():
 
 
 def test_normalization_warning_emitted_with_aggregate_count(tmp_path, capsys):
-    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
     meta = tmp_path / "file_metadata.csv"
     with meta.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w = csv.DictWriter(f, fieldnames=VALID_FIELDNAMES)
         w.writeheader()
         for i in range(16):
             w.writerow({
                 "export_run_id": f"r{i:02d}", "unit_system": "Imperial",
                 "client_label": "Acme", "governance_role": "Project",
+                "discipline_label": "architectural", "business_center_label": "1450",
             })
 
     rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "1"])
@@ -1412,18 +1275,17 @@ def test_segment_membership_round_trip_reconstructs_in_memory_sets(tmp_path):
     # assert equality with the in-memory sets used to compute
     # file_count/has_seed_file/population_hash.
     meta = tmp_path / "file_metadata.csv"
-    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
     with meta.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        w = csv.DictWriter(f, fieldnames=VALID_FIELDNAMES, extrasaction="ignore")
         w.writeheader()
-        for row in ROWS:
+        for row in VALID_ROWS:
             w.writerow(row)
 
     out_dir = tmp_path / "out"
     rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "3"])
     assert rc == 0
 
-    segs = _build_segments(ROWS, min_files=3)
+    segs = _build_segments(VALID_ROWS, min_files=3)
     membership_rows = _read_csv(out_dir / "segment_membership.csv")
 
     for seg in segs:
@@ -1445,11 +1307,10 @@ def test_segment_membership_join_keys_present_in_manifest_and_metadata(tmp_path)
     # segment_id joins back to segment_manifest.csv; export_run_id joins back
     # to file_metadata.csv (definition grain, unchanged by this migration).
     meta = tmp_path / "file_metadata.csv"
-    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
     with meta.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        w = csv.DictWriter(f, fieldnames=VALID_FIELDNAMES, extrasaction="ignore")
         w.writeheader()
-        for row in ROWS:
+        for row in VALID_ROWS:
             w.writerow(row)
 
     out_dir = tmp_path / "out"
@@ -1457,7 +1318,7 @@ def test_segment_membership_join_keys_present_in_manifest_and_metadata(tmp_path)
     assert rc == 0
 
     manifest_ids = {r["segment_id"] for r in _read_csv(out_dir / "segment_manifest.csv")}
-    metadata_ids = {r["export_run_id"] for r in ROWS if r["export_run_id"]}
+    metadata_ids = {r["export_run_id"] for r in VALID_ROWS if r["export_run_id"]}
     membership_rows = _read_csv(out_dir / "segment_membership.csv")
 
     for row in membership_rows:
@@ -1490,13 +1351,13 @@ def test_manifest_and_registry_fields_stay_under_size_threshold(tmp_path):
     # would have blown past the threshold (each id here is ~30 chars; 500 files
     # -> ~15,000 chars, comfortably over the 10,000-char guard).
     rows = [
-        _meta_row(f"export-run-id-{i:06d}-looooong-suffix", "imperial", "BigClient", "Project")
+        _meta_row(f"export-run-id-{i:06d}-looooong-suffix", "imperial", "BigClient", "Project",
+                  discipline_label="architectural", business_center_label="1450")
         for i in range(500)
     ]
     meta = tmp_path / "file_metadata.csv"
-    fieldnames = ["export_run_id", "unit_system", "client_label", "governance_role"]
     with meta.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        w = csv.DictWriter(f, fieldnames=VALID_FIELDNAMES, extrasaction="ignore")
         w.writeheader()
         for row in rows:
             w.writerow(row)
@@ -1519,3 +1380,353 @@ def test_manifest_and_registry_fields_stay_under_size_threshold(tmp_path):
     for row in _read_csv(out_dir / "segment_membership.csv"):
         for field, value in row.items():
             assert len(value) < _MAX_SANE_FIELD_LEN
+
+
+# ---------------------------------------------------------------------------
+# PR "segment builder explicit contract" -- Enterprise (Stantec/0000) literal
+# preservation. No blank-to-Enterprise fallback, no bookkeeping-token fold.
+# ---------------------------------------------------------------------------
+
+def test_enterprise_bc_0000_preserved_literally_not_folded_to_blank():
+    rows = [
+        _full_row(f"e{i:02d}", "imperial", "Stantec", "Container", "architectural", "0000")
+        for i in range(3)
+    ]
+    segs = _build_segments(rows, min_files=3)
+    # The client+bc leaf (level 4: client_label + business_center_label both
+    # selected) carries "0000" literally -- it is never folded to blank.
+    leaf = next(r for r in segs if r["client_label"] == "Stantec" and r["business_center_label"] == "0000" and r["segment_level"] == "4")
+    assert leaf["business_center_label"] == "0000"
+    assert "0000" in leaf["segment_id"]
+    # And its population is identical to the client-only pool (every row here
+    # shares the same bc), proving "0000" wasn't silently dropped/blanked
+    # anywhere along the way -- not a redundant_single_child artifact of a
+    # bookkeeping-token fold.
+    client_only = next(r for r in segs if r["segment_id"] == "imperial|Container|Stantec")
+    assert leaf["export_run_ids"] == client_only["export_run_ids"]
+
+
+def test_enterprise_identity_not_inferred_from_blank_business_center():
+    # A real (non-Stantec, non-0000) client with a genuinely blank
+    # business_center_label must not be folded into or conflated with the
+    # Stantec/0000 Enterprise population -- 0000 is a literal value, not a
+    # stand-in for "unspecified business center".
+    stantec_rows = [_full_row(f"s{i:02d}", "imperial", "Stantec", "Container", "architectural", "0000") for i in range(3)]
+    other_rows = [_meta_row(f"o{i:02d}", "imperial", "Kaiser", "Container", "architectural") for i in range(3)]
+    segs = _build_segments(stantec_rows + other_rows, min_files=3)
+    stantec_leaf = next(r for r in segs if r["client_label"] == "Stantec" and r["segment_level"] == "3" and r["business_center_label"] == "0000")
+    kaiser_leaf = next(r for r in segs if r["client_label"] == "Kaiser" and r["segment_level"] == "3")
+    assert set(stantec_leaf["export_run_ids"].split("|")).isdisjoint(set(kaiser_leaf["export_run_ids"].split("|")))
+
+
+def test_business_center_case_variants_of_0000_still_fold_by_casing_not_bookkeeping():
+    # "0000" has no case variants to speak of, but a mixed-case bc token like
+    # "Bc1450"/"bc1450" should still fold via the ordinary first-seen-casing
+    # rule (unrelated to the removed enterprise-bookkeeping fold).
+    rows = (
+        [_full_row(f"a{i:02d}", "imperial", "Kaiser", "Container", "architectural", "BC1450") for i in range(2)]
+        + [_full_row(f"b{i:02d}", "imperial", "Kaiser", "Container", "architectural", "bc1450") for i in range(2, 4)]
+    )
+    segs = _build_segments(rows, min_files=1)
+    bc_values = {r["business_center_label"] for r in segs if r["business_center_label"]}
+    assert bc_values == {"BC1450"}
+
+
+# ---------------------------------------------------------------------------
+# PR "segment builder explicit contract" -- collection exclusion: two rows
+# identical except collection_label must produce the same segment identities
+# and the same population memberships (no collection-specific children).
+# ---------------------------------------------------------------------------
+
+def test_collection_label_ignored_same_segments_same_membership():
+    base = dict(unit_system="imperial", governance_role="Container", client_label="Kaiser",
+                discipline_label="architectural", business_center_label="1450")
+    rows_a = [dict(base, export_run_id=f"a{i:02d}", collection_label="Kaiser Standards") for i in range(3)]
+    rows_b = [dict(base, export_run_id=f"b{i:02d}", collection_label="Legacy Collection") for i in range(3)]
+
+    segs_with_collection = _build_segments(rows_a + rows_b, min_files=1)
+    rows_a_no_coll = [{k: v for k, v in r.items() if k != "collection_label"} for r in rows_a]
+    rows_b_no_coll = [{k: v for k, v in r.items() if k != "collection_label"} for r in rows_b]
+    segs_without_collection = _build_segments(rows_a_no_coll + rows_b_no_coll, min_files=1)
+
+    ids_with = {r["segment_id"] for r in segs_with_collection}
+    ids_without = {r["segment_id"] for r in segs_without_collection}
+    assert ids_with == ids_without, "collection_label must not affect segment identity at all"
+
+    # No collection-specific children exist: every generated segment's
+    # collection_label column is always blank.
+    assert all(r.get("collection_label", "") == "" for r in segs_with_collection)
+
+    leaf = next(r for r in segs_with_collection if r["segment_id"] == "imperial|Container|Kaiser|architectural|1450")
+    assert set(leaf["export_run_ids"].split("|")) == {r["export_run_id"] for r in rows_a + rows_b}
+
+
+def test_collection_label_column_absence_produces_identical_manifest(tmp_path):
+    # A metadata file with a collection_label column vs. one entirely without
+    # it must produce byte-identical segment_manifest.csv content (ignoring
+    # collection_label really means ignoring it, column present or not).
+    base_rows = [
+        _full_row(f"r{i:02d}", "imperial", "Kaiser", "Container", "architectural", "1450")
+        for i in range(3)
+    ]
+
+    def _write_and_build(out_name, extra_field):
+        fieldnames = list(VALID_FIELDNAMES)
+        if extra_field:
+            fieldnames = fieldnames + ["collection_label"]
+        meta = tmp_path / f"{out_name}.csv"
+        with meta.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fieldnames)
+            w.writeheader()
+            for row in base_rows:
+                r = dict(row)
+                if extra_field:
+                    r["collection_label"] = "Kaiser Standards"
+                w.writerow(r)
+        out_dir = tmp_path / out_name
+        rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+        assert rc == 0
+        return _read_csv(out_dir / "segment_manifest.csv")
+
+    with_coll = _write_and_build("with_coll", True)
+    without_coll = _write_and_build("without_coll", False)
+    assert with_coll == without_coll
+
+
+# ---------------------------------------------------------------------------
+# PR "segment builder explicit contract" -- required-field blocking. Missing
+# or N/A-sentinel value in export_run_id/unit_system/governance_role/
+# client_label/discipline_label/business_center_label blocks the ENTIRE
+# build; no partial manifest is ever written.
+# ---------------------------------------------------------------------------
+
+def _write_metadata_csv(path, rows):
+    with path.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=VALID_FIELDNAMES)
+        w.writeheader()
+        for row in rows:
+            w.writerow(row)
+
+
+@pytest.mark.parametrize("field", ["export_run_id", "unit_system", "governance_role", "client_label", "discipline_label", "business_center_label"])
+def test_required_field_blank_blocks_entire_build(tmp_path, capsys, field):
+    rows = [dict(r) for r in VALID_ROWS]
+    rows[3][field] = ""
+    meta = tmp_path / "file_metadata.csv"
+    _write_metadata_csv(meta, rows)
+    out_dir = tmp_path / "out"
+
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+
+    assert rc == 1, f"blank {field} must block the build"
+    assert not (out_dir / "segment_manifest.csv").exists()
+    assert not (out_dir / "run_registry.csv").exists()
+    assert not (out_dir / "segment_membership.csv").exists()
+    captured = capsys.readouterr()
+    assert "BLOCKED" in captured.err
+    assert f"field={field}" in captured.err
+    assert "reason=missing_value" in captured.err
+    # row 3 of VALID_ROWS is the 4th data row -> CSV row_number 5 (1=header).
+    assert "row=5" in captured.err
+
+
+@pytest.mark.parametrize("field", ["export_run_id", "unit_system", "governance_role", "client_label", "discipline_label", "business_center_label"])
+def test_required_field_na_sentinel_blocks_entire_build(tmp_path, capsys, field):
+    rows = [dict(r) for r in VALID_ROWS]
+    rows[0][field] = "N/A"
+    meta = tmp_path / "file_metadata.csv"
+    _write_metadata_csv(meta, rows)
+    out_dir = tmp_path / "out"
+
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+
+    assert rc == 1, f"N/A {field} must block the build"
+    assert not (out_dir / "segment_manifest.csv").exists()
+    captured = capsys.readouterr()
+    assert "BLOCKED" in captured.err
+    assert f"field={field}" in captured.err
+    assert "reason=not_applicable_sentinel" in captured.err
+
+
+def test_validate_required_metadata_reports_row_and_field_directly():
+    rows = [dict(r) for r in VALID_ROWS[:2]]
+    rows[1]["business_center_label"] = ""
+    diagnostics = _validate_required_metadata(rows)
+    assert len(diagnostics) == 1
+    d = diagnostics[0]
+    assert d["field"] == "business_center_label"
+    assert d["reason"] == "missing_value"
+    assert d["row_number"] == "3"  # header=1, rows[0]=2, rows[1]=3
+    assert d["export_run_id"] == rows[1]["export_run_id"]
+
+
+def test_validate_required_metadata_empty_for_fully_valid_rows():
+    assert _validate_required_metadata(VALID_ROWS) == []
+
+
+def test_duplicate_export_run_id_blocks_as_distinct_conflict_reason(tmp_path, capsys):
+    rows = [dict(r) for r in VALID_ROWS]
+    dup = dict(rows[0]); dup["export_run_id"] = rows[1]["export_run_id"]
+    rows.append(dup)
+    meta = tmp_path / "file_metadata.csv"
+    _write_metadata_csv(meta, rows)
+    out_dir = tmp_path / "out"
+
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+
+    assert rc == 1
+    assert not (out_dir / "segment_manifest.csv").exists()
+    captured = capsys.readouterr()
+    assert "duplicate_row_conflict" in captured.err
+    assert f"export_run_id={rows[1]['export_run_id']}" in captured.err
+
+
+def test_unreadable_input_reported_distinctly_not_bare_except(tmp_path, capsys):
+    # A file that exists but cannot be decoded as UTF-8/text (e.g. binary
+    # garbage) must be reported as an "Unreadable input" failure, distinct
+    # from a "BLOCKED" required-metadata failure, and must not crash with an
+    # unhandled traceback.
+    meta = tmp_path / "file_metadata.csv"
+    meta.write_bytes(b"\xff\xfe\x00\xff\xff\xfe\x00\x01garbage-not-utf8-\xfe\xff")
+    out_dir = tmp_path / "out"
+
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+
+    assert rc == 1
+    assert not (out_dir / "segment_manifest.csv").exists()
+    captured = capsys.readouterr()
+    assert "Unreadable input" in captured.err
+    assert "BLOCKED" not in captured.err
+
+
+# ---------------------------------------------------------------------------
+# PR "segment builder explicit contract" -- business_center_label="0000" must
+# never be treated as missing/N-A by validation (it is a valid literal).
+# ---------------------------------------------------------------------------
+
+def test_business_center_0000_is_a_valid_value_not_a_validation_failure():
+    rows = [_full_row(f"r{i:02d}", "imperial", "Stantec", "Container", "architectural", "0000") for i in range(3)]
+    assert _validate_required_metadata(rows) == []
+
+
+def test_business_center_0000_main_succeeds(tmp_path):
+    rows = [_full_row(f"r{i:02d}", "imperial", "Stantec", "Container", "architectural", "0000") for i in range(3)]
+    meta = tmp_path / "file_metadata.csv"
+    _write_metadata_csv(meta, rows)
+    out_dir = tmp_path / "out"
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+    assert rc == 0
+    manifest_rows = _read_csv(out_dir / "segment_manifest.csv")
+    assert any(r["business_center_label"] == "0000" for r in manifest_rows)
+
+
+# ---------------------------------------------------------------------------
+# PR "segment builder explicit contract" -- project_label sentinel handling.
+# project_label is not a DIMENSION_CONFIG field and is not read by this file
+# at all, so it never participates in segmentation and may carry any value
+# (including an explicit not-applicable sentinel) without affecting output.
+# ---------------------------------------------------------------------------
+
+def test_project_label_not_a_required_field():
+    assert "project_label" not in REQUIRED_ROW_FIELDS
+    assert "project_label" not in [d["field"] for d in DIMENSION_CONFIG]
+
+
+def test_project_label_sentinel_does_not_affect_segmentation(tmp_path):
+    # An extra project_label column carrying an explicit not-applicable
+    # sentinel (permitted only for this field) segments identically to the
+    # same rows with a different, non-participating project_label value —
+    # project_label plays no role in segment identity either way.
+    rows_a = [dict(r, project_label="__NOT_APPLICABLE__") for r in VALID_ROWS]
+    rows_b = [dict(r, project_label="Some Other Project") for r in VALID_ROWS]
+
+    def _build_with_project_label(out_name, rows):
+        fieldnames = VALID_FIELDNAMES + ["project_label"]
+        meta = tmp_path / f"{out_name}.csv"
+        with meta.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fieldnames)
+            w.writeheader()
+            for row in rows:
+                w.writerow(row)
+        out_dir = tmp_path / out_name
+        rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+        assert rc == 0
+        return _read_csv(out_dir / "segment_manifest.csv")
+
+    manifest_a = _build_with_project_label("proj_a", rows_a)
+    manifest_b = _build_with_project_label("proj_b", rows_b)
+    assert manifest_a == manifest_b
+
+
+# ---------------------------------------------------------------------------
+# PR "segment builder explicit contract" -- determinism. Identical input ->
+# identical output; reordering input rows doesn't change segment_ids, parent
+# ids, or sorted memberships.
+# ---------------------------------------------------------------------------
+
+def test_running_builder_twice_on_identical_input_is_byte_identical(tmp_path):
+    meta = tmp_path / "file_metadata.csv"
+    _write_metadata_csv(meta, VALID_ROWS)
+
+    out1 = tmp_path / "out1"
+    out2 = tmp_path / "out2"
+    assert main(["--metadata-file", str(meta), "--out-dir", str(out1), "--min-files", "1"]) == 0
+    assert main(["--metadata-file", str(meta), "--out-dir", str(out2), "--min-files", "1"]) == 0
+
+    for name in ("segment_manifest.csv", "run_registry.csv", "segment_membership.csv"):
+        assert _read_csv(out1 / name) == _read_csv(out2 / name), f"{name} not byte-identical across runs"
+
+
+def test_reordering_input_rows_does_not_change_segment_ids_or_parents(tmp_path):
+    import random
+    shuffled = list(VALID_ROWS)
+    random.Random(42).shuffle(shuffled)
+
+    meta_orig = tmp_path / "orig.csv"
+    meta_shuf = tmp_path / "shuf.csv"
+    _write_metadata_csv(meta_orig, VALID_ROWS)
+    _write_metadata_csv(meta_shuf, shuffled)
+
+    out_orig = tmp_path / "out_orig"
+    out_shuf = tmp_path / "out_shuf"
+    assert main(["--metadata-file", str(meta_orig), "--out-dir", str(out_orig), "--min-files", "1"]) == 0
+    assert main(["--metadata-file", str(meta_shuf), "--out-dir", str(out_shuf), "--min-files", "1"]) == 0
+
+    manifest_orig = {r["segment_id"]: (r["parent_segment_id"], r["population_hash"]) for r in _read_csv(out_orig / "segment_manifest.csv")}
+    manifest_shuf = {r["segment_id"]: (r["parent_segment_id"], r["population_hash"]) for r in _read_csv(out_shuf / "segment_manifest.csv")}
+    assert manifest_orig == manifest_shuf
+
+    membership_orig = sorted((r["segment_id"], r["export_run_id"]) for r in _read_csv(out_orig / "segment_membership.csv"))
+    membership_shuf = sorted((r["segment_id"], r["export_run_id"]) for r in _read_csv(out_shuf / "segment_membership.csv"))
+    assert membership_orig == membership_shuf
+
+
+# ---------------------------------------------------------------------------
+# PR "segment builder explicit contract" -- collapse after collection
+# removal. Former collection-specific rows that now collapse into one
+# segment retain the union of all distinct file memberships exactly once.
+# ---------------------------------------------------------------------------
+
+def test_former_collection_specific_rows_collapse_with_union_membership():
+    # Before this PR, two rows sharing every dimension except collection_label
+    # would have produced two distinct collection-scoped segments. Now they
+    # collapse into a single segment whose membership is the exact union of
+    # both groups' export_run_ids, with no duplicates.
+    base = dict(unit_system="imperial", governance_role="Template", client_label="Sutter",
+                discipline_label="architectural", business_center_label="1450")
+    rows_collection_a = [dict(base, export_run_id=f"a{i:02d}", collection_label="Sutter Standards") for i in range(3)]
+    rows_collection_b = [dict(base, export_run_id=f"b{i:02d}", collection_label="Legacy") for i in range(2)]
+    all_rows = rows_collection_a + rows_collection_b
+
+    segs = _build_segments(all_rows, min_files=1)
+    leaf = next(r for r in segs if r["segment_id"] == "imperial|Template|Sutter|architectural|1450")
+
+    expected_eids = {r["export_run_id"] for r in all_rows}
+    actual_eids = set(leaf["export_run_ids"].split("|"))
+    assert actual_eids == expected_eids
+    assert len(leaf["export_run_ids"].split("|")) == len(expected_eids), "no duplicate export_run_ids in the collapsed membership"
+
+    membership = _build_membership_rows(segs)
+    leaf_membership = [m for m in membership if m["segment_id"] == "imperial|Template|Sutter|architectural|1450"]
+    assert {m["export_run_id"] for m in leaf_membership} == expected_eids
+    assert len(leaf_membership) == len(expected_eids), "each file appears exactly once in segment_membership rows"

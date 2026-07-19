@@ -10,28 +10,34 @@ _TOOLS_DIR = str(Path(__file__).resolve().parent)
 if _TOOLS_DIR not in sys.path:
     sys.path.insert(0, _TOOLS_DIR)
 
-from na_token import is_na_token, ENTERPRISE_BC_BOOKKEEPING_TOKENS
+from na_token import is_na_token
 
 SEED_ROLES={"Template","Container"}
+# Header-presence check only (main()) — does not validate per-row values.
 REQUIRED_COLUMNS={"export_run_id","unit_system","client_label","governance_role"}
+# Per-row required-VALUE check (see _validate_required_metadata()): every row
+# must carry a real, non-blank, non-N/A value for each of these, or the
+# entire manifest build is blocked. project_label is deliberately excluded —
+# it is not a segmentation dimension (not in DIMENSION_CONFIG, not read by
+# this file at all) and may carry an explicit not-applicable sentinel under
+# the current metadata contract.
+REQUIRED_ROW_FIELDS=["export_run_id","unit_system","governance_role","client_label","discipline_label","business_center_label"]
 MANIFEST_FIELDNAMES=["segment_id","parent_segment_id","segment_level","unit_system","governance_role","client_label","discipline_label","business_center_label","collection_label","extra_dimensions","ancestor_segment_ids","run_type","file_count","has_seed_file","population_hash","notes","segment_purpose","segment_label"]
 REGISTRY_FIELDNAMES=["segment_id","parent_segment_id","run_type","population_hash","conformance_reference_mode","output_folder","status","last_run_utc","notes","segment_purpose","segment_label"]
 MEMBERSHIP_FIELDNAMES=["segment_id","export_run_id","is_seed"]
+# Segment dimensions under the explicit-metadata contract: every row must
+# carry a real, non-sentinel value for each of these (validated by
+# _validate_required_metadata() before _build_segments() ever sees the row
+# via main()). collection_label intentionally does not participate — it may
+# still exist as a column in file_metadata.csv (and as an always-blank
+# column in segment_manifest.csv, for downstream schema stability), but the
+# segment builder ignores its value entirely.
 DIMENSION_CONFIG = [
     {"field": "unit_system", "type": "root"},
     {"field": "governance_role", "type": "governance"},
     {"field": "client_label", "type": "cut"},
     {"field": "discipline_label", "type": "cut"},
     {"field": "business_center_label", "type": "cut"},
-    # collection_label distinguishes multiple named standards libraries that
-    # share the same business_center_label (or the same client_label) — e.g.
-    # a business center that houses both its own general standards and a
-    # separately-named legacy collection. business_center_label/client_label
-    # alone cannot tell those apart; collection_label can.
-    {"field": "collection_label", "type": "cut"},
-    # Future cut dimensions added here:
-    # {"field": "region", "type": "cut"},
-    # {"field": "office_location", "type": "cut"},
 ]
 
 def _read_csv(path: Path) -> tuple:
@@ -53,17 +59,21 @@ def _population_hash(export_run_ids: List[str]) -> str:
     token="|".join(sorted(export_run_ids));return hashlib.sha1(token.encode()).hexdigest()
 
 _UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]')
-# A cut dimension explicitly selected in a subset with a blank value
-# (currently only client_label — see _build_segments()'s blank-client
-# handling) renders in segment_id as an empty part between pipes (e.g.
-# "imperial|Template|" or "imperial|Container||architectural"). That part is
-# rendered as this token in the derived folder name — a bare "_" (or "__")
-# there reads as a naming mistake rather than the intentional "no client
-# selected" segment it actually is.
+# A cut dimension explicitly selected in a subset with a blank value renders
+# in segment_id as an empty part between pipes (e.g. "imperial|Template|" or
+# "imperial|Container||architectural"). That part is rendered as this token
+# in the derived folder name — a bare "_" (or "__") there reads as a naming
+# mistake rather than the intentional "no value selected" segment it actually
+# is. Under the current explicit-metadata contract, every required dimension
+# is validated nonblank before a row reaches _build_segments() via main(), so
+# _build_segments() no longer itself produces a selected-blank subset for any
+# dimension — this handling is retained defensively for any segment_id
+# string this function is handed directly (hand-crafted fixtures, a future
+# dimension that permits blank selection, etc.).
 #
 # This used to be "enterprise", matching compare_cross_segment.py's
 # "enterprise" scope-level term. That was misleading here: this token fires
-# for every blank-client segment regardless of whether the segment also has
+# for every blank-selected segment regardless of whether the segment also has
 # a real business_center_label, so a Stantec-internal segment scoped to a
 # specific business center (e.g. "imperial|Container||architectural|1779")
 # rendered as "..._enterprise_architectural_1779...", implying a truly
@@ -137,13 +147,84 @@ _GOVERNANCE_ROLE_CANONICAL = {
     "project": "Project", "template": "Template", "container": "Container", "generic": "Generic",
 }
 
+
+def _invalid_required_value_reason(value: str) -> "str | None":
+    """Return why `value` fails the required-field contract for a segment
+    dimension, or None if it's valid. Blank means "missing metadata"; an
+    explicit N/A-style spelling means "reviewed, does not apply" — both are
+    invalid for a required segment dimension under the current metadata
+    contract (only project_label, which this file does not use, is allowed
+    to carry a not-applicable sentinel)."""
+    stripped = (value or "").strip()
+    if not stripped:
+        return "missing_value"
+    if is_na_token(stripped):
+        return "not_applicable_sentinel"
+    return None
+
+
+def _validate_required_metadata(rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Validate REQUIRED_ROW_FIELDS on every row of file_metadata.csv, plus
+    export_run_id uniqueness. Returns a list of diagnostic dicts (empty if
+    every row is valid); never raises — the caller (main()) decides whether
+    and how to block the build.
+
+    Each diagnostic has:
+      row_number    — source row number, 1-indexed including the header, so
+                       the first data row is 2 (matches what a human editing
+                       the CSV in a spreadsheet would see).
+      export_run_id — best-effort, for cross-referencing even when
+                       export_run_id itself is the failing field.
+      field         — the invalid field name (or "export_run_id" for a
+                       duplicate-row conflict).
+      raw_value     — the offending raw value.
+      reason        — "missing_value" | "not_applicable_sentinel" |
+                       "duplicate_row_conflict:first_seen_row=<N>".
+
+    export_run_id is meant to be a unique join key into file_metadata.csv —
+    any export_run_id repeated across rows is a data-integrity conflict this
+    tool cannot silently resolve (which row is authoritative?), so it blocks
+    the build rather than picking one arbitrarily.
+    """
+    diagnostics: List[Dict[str, str]] = []
+    first_seen_row_by_eid: Dict[str, int] = {}
+    for row_number, row in enumerate(rows, start=2):
+        eid = (row.get("export_run_id") or "").strip()
+        for field in REQUIRED_ROW_FIELDS:
+            reason = _invalid_required_value_reason(row.get(field, ""))
+            if reason:
+                diagnostics.append({
+                    "row_number": str(row_number),
+                    "export_run_id": eid,
+                    "field": field,
+                    "raw_value": row.get(field, "") or "",
+                    "reason": reason,
+                })
+        if eid:
+            prior_row = first_seen_row_by_eid.get(eid)
+            if prior_row is None:
+                first_seen_row_by_eid[eid] = row_number
+            else:
+                diagnostics.append({
+                    "row_number": str(row_number),
+                    "export_run_id": eid,
+                    "field": "export_run_id",
+                    "raw_value": eid,
+                    "reason": f"duplicate_row_conflict:first_seen_row={prior_row}",
+                })
+    return diagnostics
+
+
 def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], List[tuple]]":
     """Case-normalize DIMENSION_CONFIG fields before they enter segment_id
     construction, so a manual-edit typo (e.g. "Imperial" vs "imperial" during
     the Run A -> Run B annotation pause) does not silently fragment one
     population into two shadow segments that never merge.
 
-    Normalization rule per field:
+    This function assumes every field value has already passed
+    _validate_required_metadata() (blank/N/A values are rejected there, not
+    folded here) — it only performs casing canonicalization:
+
       - unit_system: folds to lowercase — the established canonical form
         ("imperial" / "metric") used throughout the pipeline.
       - governance_role: values matching a KNOWN_ROLES member case-insensitively
@@ -154,26 +235,21 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
         repeated variants of an unrecognized role still converge on one
         segment instead of fragmenting (main()'s unrecognized-role warning
         still fires for it either way).
-      - client_label / discipline_label: no fixed enum. Case-insensitive fold
-        to the casing of the first occurrence in row order. `rows` is a list,
-        not a set/dict, so "first occurrence" is deterministic regardless of
-        any hash/iteration order.
-      - Any DIMENSION_CONFIG field whose value is a recognized "not applicable"
-        spelling (see na_token.is_na_token) folds to blank ("") ahead of the
-        field-specific rule above. Blank means "not yet filled in" (a manual-
-        entry todo); an explicit N/A spelling means "reviewed, does not apply" —
-        both must behave identically for segment-key purposes (neither should
-        leak into segment_id as a literal token), but only the N/A case is
-        folded here since blank cells are already blank.
-      - business_center_label additionally folds any spelling in
-        ENTERPRISE_BC_BOOKKEEPING_TOKENS (e.g. "0000"/"bc_0000",
-        case-insensitive) to blank, ahead of the field-specific rule above —
-        same treatment as an N/A spelling, and the same token set
-        compare_cross_segment.py's _normalize_bc_label() already applies when
-        reading segment rows back out. Without this, "0000"-tagged enterprise
-        rows would be folded blank only at comparison time, not at segment-
-        build time, so they'd still get pooled into whichever real business
-        center's segment happened to also be missing that fold.
+      - client_label / discipline_label / business_center_label: no fixed
+        enum. Case-insensitive fold to the casing of the first occurrence in
+        row order. `rows` is a list, not a set/dict, so "first occurrence" is
+        deterministic regardless of any hash/iteration order.
+
+    Sentinel handling (N/A-style spellings, enterprise-bookkeeping-token
+    folding) does not apply to any DIMENSION_CONFIG field — they are the
+    required, explicit-metadata segment dimensions validated by
+    _validate_required_metadata() before this function ever sees them via
+    main(). In particular, "0000"/"BC_0000" are ordinary literal
+    business_center_label values under the current contract (Stantec /
+    "0000" is the authoritative Enterprise identity), not enterprise-
+    bookkeeping tokens to be folded away. Only project_label (not a
+    DIMENSION_CONFIG field; not read by this file at all) may carry an
+    explicit not-applicable sentinel.
 
     Returns (normalized_rows, changes) where changes is a list of
     (field, raw_value, normalized_value) tuples, one per row-field whose value
@@ -189,14 +265,6 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
         for field in fields:
             raw = (row.get(field) or "").strip()
             if not raw:
-                continue
-            if is_na_token(raw):
-                changes.append((field, raw, ""))
-                new_row[field] = ""
-                continue
-            if field == "business_center_label" and raw.lower() in ENTERPRISE_BC_BOOKKEEPING_TOKENS:
-                changes.append((field, raw, ""))
-                new_row[field] = ""
                 continue
             if field == "unit_system":
                 canon = raw.lower()
@@ -228,72 +296,9 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     seed_pops = defaultdict(list)
     project_presence_by_l2: Dict[str, bool] = defaultdict(bool)
 
-    # collection_label is free text (unlike client_label/discipline_label/
-    # business_center_label, which draw from comparatively disjoint,
-    # controlled-ish vocabularies), so its value is markedly more likely to
-    # collide with another dimension's value at the same position in
-    # _subset_to_id()'s output — e.g. a business-center-scoped
-    # "imperial|Template||Shared" and a collection-scoped
-    # "imperial|Template||Shared" (business_center_label="Shared" vs.
-    # collection_label="Shared") render identically today, since the join
-    # encodes which VALUES were selected but not which FIELDS supplied them.
-    # That is a real, pre-existing structural gap in _subset_to_id() (any two
-    # dimensions could in principle collide this way), but collection_label
-    # is the first field free-text enough to make it likely in practice.
-    # Namespace collection_label's contribution rather than rewriting the id
-    # scheme for every dimension — segment_id is parsed positionally
-    # elsewhere (tools/generate_governance_narrative.py) and hardcoded
-    # verbatim across dozens of existing tests and any already-run
-    # run_registry.csv folder mappings, so changing the format for the four
-    # pre-existing dimensions would be a much larger, hash-breaking-style
-    # change for a collision risk that hasn't manifested there in practice.
-    _SUBSET_ID_NAMESPACED_FIELDS = {"collection_label": "collection"}
-    _SUBSET_ID_RESERVED_PREFIX = "collection:"
-
     def _subset_to_id(key: frozenset) -> str:
         kv = dict(key)
-        parts = []
-        for f in cfg_fields:
-            if f not in kv:
-                continue
-            value = kv[f]
-            ns = _SUBSET_ID_NAMESPACED_FIELDS.get(f)
-            if ns:
-                # collection_label's own colons are doubled too, exactly
-                # like the escaped-forgery branch below, before the single
-                # literal separator colon is prepended. That single colon
-                # immediately after "collection" is then unambiguously the
-                # namespace separator, never a colon that originated from
-                # the value itself — e.g. collection_label=":Shared" must
-                # not render to the same text ("collection::Shared") as an
-                # escaped business_center_label="collection:Shared". Without
-                # this, a collection_label value that itself starts with a
-                # colon could collide with an escaped forgery from the
-                # branch below.
-                parts.append(f"{ns}:{value.replace(':', '::')}" if value else value)
-            elif value.startswith(_SUBSET_ID_RESERVED_PREFIX):
-                # Escaping is scoped to exactly this narrow case: a non-
-                # collection field (client_label/discipline_label/
-                # business_center_label) whose raw value already starts
-                # with the reserved "collection:" prefix, which would
-                # otherwise be indistinguishable from a real
-                # collection_label-derived token at the same position (e.g.
-                # business_center_label="collection:Shared" colliding with
-                # collection_label="Shared"). Doubling every colon in
-                # *every* field's value (the prior approach) fixed that but
-                # also silently rewrote segment_id for any unrelated,
-                # already-stable segment whose client_label/discipline_
-                # label/business_center_label happened to contain a colon
-                # (e.g. "A:B") — breaking _build_registry()'s folder-
-                # stability guarantee for those segments on the very next
-                # rebuild, even with unchanged source data. A value that
-                # doesn't start with "collection:" can never be confused
-                # with a namespaced token regardless of what it contains, so
-                # it is left byte-for-byte as before.
-                parts.append(value.replace(":", "::"))
-            else:
-                parts.append(value)
-        return "|".join(parts)
+        return "|".join(kv[f] for f in cfg_fields if f in kv)
 
     normalized_rows, _changes = _normalize_rows(rows)
 
@@ -306,18 +311,9 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             value = (row.get(field) or "").strip()
             if value:
                 dim_values[field] = value
-            elif field == client_field:
-                dim_values[field] = ""
         root_value = dim_values.get(root_field, "")
         if not root_value:
             continue
-        # Blank client_label participates in subset generation like any other
-        # value (as the pair (client_field, "")) — it is not special-cased to
-        # strip governance_role/discipline_label/business_center_label out of
-        # non_root_pairs. Previously, a blank-client row only ever populated
-        # the root and root+client("") keys, so it was invisible to every
-        # role-scoped and business-center-scoped segment and only ever landed
-        # in one governance-agnostic pool at (root, client="").
         non_root_pairs = [(f, dim_values[f]) for f in cfg_fields if f != root_field and f in dim_values]
         for size in range(len(non_root_pairs) + 1):
             for subset in combinations(non_root_pairs, size):
@@ -367,7 +363,10 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             "client_label": dim_map.get(client_field, ""),
             "discipline_label": dim_map.get("discipline_label", ""),
             "business_center_label": dim_map.get("business_center_label", ""),
-            "collection_label": dim_map.get("collection_label", ""),
+            # Retained as a schema column only (downstream tools read it by
+            # name with a "" default) — collection_label is no longer a
+            # segmentation dimension, see DIMENSION_CONFIG.
+            "collection_label": "",
             "extra_dimensions": "|".join(extra),
             "ancestor_segment_ids": "|".join(ancestor_ids),
             "run_type": "",
@@ -434,22 +433,15 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     # purpose/label
     def child_span(r):
         row_key = row_to_key[id(r)]
-        # A distinct scope is a real client_label, business_center_label, or
-        # collection_label on a level-3 child — client/business_center are
-        # mutually exclusive per row today, but collection_label can ride
-        # alongside either one, so it's checked independently rather than
-        # folded into the same `or` chain (two children that share a
-        # business_center but differ only by collection must still count as
-        # distinct). Without counting these here, a Template pool whose only
-        # children are BC- or collection-scoped (no client-having children at
-        # all) would look like it has zero distinct children and get wrongly
-        # collapsed as "redundant_single_child" even when multiple distinct
-        # scopes are present.
+        # A distinct scope is a real client_label or business_center_label on
+        # a level-3 child (mutually exclusive per row today, so a plain set
+        # of "whichever is present" is enough to detect more than one
+        # distinct scope among direct children).
         cs={
-            (key_to_row[k]["client_label"] or key_to_row[k]["business_center_label"], key_to_row[k]["collection_label"])
+            key_to_row[k]["client_label"] or key_to_row[k]["business_center_label"]
             for k in key_to_children.get(row_key,[])
             if key_to_row[k]["segment_level"]=="3"
-            and (key_to_row[k]["client_label"] or key_to_row[k]["business_center_label"] or key_to_row[k]["collection_label"])
+            and (key_to_row[k]["client_label"] or key_to_row[k]["business_center_label"])
         }
         return "multi_client" if len(cs)>1 else "single_client"
     for r in rows_out:
@@ -457,66 +449,27 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         lev,role,rt=int(r["segment_level"]),r["governance_role"],r["run_type"]
         disc=r["discipline_label"]
         bc=r["business_center_label"]
-        coll=r["collection_label"]
+        client=r["client_label"]
         # client_label and business_center_label are mutually exclusive "why
         # was this captured" scopes; each is a distinct differentiator, so a
         # level-3/4 segment is only "disc cut" or "bc cut" when the other
-        # scope isn't also present in that segment's key. collection_label is
-        # a further, independent differentiator (a business center or client
-        # can host more than one named collection), so every non-collection
-        # predicate below also requires collection to be absent — otherwise a
-        # collection-scoped segment would be mislabeled by the coarser
-        # (collection-agnostic) branch that happens to come first.
-        is_disc_cut=bool(disc and not r["client_label"] and not bc and not coll)
-        is_client_disc_cut=bool(disc and r["client_label"] and not coll)
-        is_bc_cut=bool(bc and not r["client_label"] and not disc and not coll)
-        is_bc_disc_cut=bool(bc and disc and not r["client_label"] and not coll)
-        # True when a role-scoped key has no other dimension in play — covers
-        # both the plain level-2 {role} key and its level-3 "twin"
-        # {role, client=""} produced by client_label's always-present-even-
-        # blank dim_values treatment (see non_root_pairs comment above).
-        is_role_alone=bool(not disc and not bc and not coll and not r["client_label"])
-        # collection_label alone, or combined with discipline/business_center,
-        # never with client_label. Level ranges mirror the
-        # business_center_label branches one dimension over, for the same
-        # blank-client-twin reason.
-        is_coll_cut=bool(coll and not r["client_label"] and not bc and not disc)
-        is_coll_disc_cut=bool(coll and disc and not r["client_label"] and not bc)
-        is_bc_coll_cut=bool(bc and coll and not r["client_label"] and not disc)
-        is_bc_coll_disc_cut=bool(bc and coll and disc and not r["client_label"])
-        # client_label + collection_label: a client can host more than one
-        # named collection (e.g. "Sutter Standards" plus some other
-        # separately-named collection under the same client), so
-        # collection_label still differentiates even though client_label
-        # already names the segment. Unlike the business_center_label
-        # combos, client_label has no forced-blank-twin level here — it is
-        # only ever included in a subset when its value is real, so these
-        # land on a single exact level rather than a (lev, lev+1) range.
-        is_client_coll_cut=bool(r["client_label"] and coll and not disc)
-        is_client_coll_disc_cut=bool(r["client_label"] and coll and disc)
+        # scope isn't also present in that segment's key.
+        is_disc_cut=bool(disc and not client and not bc)
+        is_client_disc_cut=bool(disc and client)
+        is_bc_cut=bool(bc and not client and not disc)
+        is_bc_disc_cut=bool(bc and disc and not client)
+        is_role_alone=bool(not disc and not bc and not client)
         if lev==1: pur="population_denominator"
-        elif lev == 2 and r["client_label"] and not role:
+        elif lev == 2 and client and not role:
             pur = "client_population"
         elif lev == 2 and bc and not role:
             pur = "business_center_population"
-        elif lev == 2 and coll and not role:
-            pur = "collection_population"
         elif lev in (2,3) and is_role_alone and role=="Template":
             if rt=="bundle": pur="cross_template_agreement"
             elif rt in {"registration","reference"}: pur="cross_org_template_pool" if child_span(r)=="multi_client" else "redundant_single_child"
         elif lev in (2,3) and is_role_alone and role=="Project": pur="cross_project_practice" if rt=="bundle" else "practiced_standards_corpus"
         elif lev in (2,3) and is_role_alone and role=="Container": pur="coordination_corpus"
         elif lev in (2,3) and is_role_alone and role=="Generic" and rt=="reference": pur="generic_reference_corpus"
-        # lev in (3,4)/(4,5) rather than a single level: client_label is the
-        # only field always present in dim_values (even blank), so every
-        # combo not involving a real client has a "twin" one level deeper
-        # with a redundant (client, "") pair tacked on — e.g. both
-        # {role,discipline} (lev 3) and {role,client="",discipline} (lev 4)
-        # are reachable for a blank-client row. The two are population-
-        # identical and pass5 below collapses whichever is shallower into a
-        # "redundant_single_child" pointer at the other — but which one
-        # survives as the real "bundle"/"reference" segment depends on
-        # sibling shape, so both levels need the same purpose branch.
         elif lev in (3,4) and is_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="discipline_templates"
         elif lev in (3,4) and is_disc_cut and role=="Project": pur="discipline_practice" if rt=="bundle" else "insufficient_population"
         elif lev in (3,4) and is_disc_cut and role=="Container": pur="discipline_coordination"
@@ -525,47 +478,21 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         elif lev in (3,4) and is_bc_cut and role=="Project": pur="business_center_practice" if rt=="bundle" else "insufficient_population"
         elif lev in (3,4) and is_bc_cut and role=="Container": pur="business_center_coordination"
         elif lev in (3,4) and is_bc_cut and role=="Generic" and rt=="reference": pur="business_center_reference"
-        elif lev==3 and role=="Template" and r["client_label"] and rt in {"bundle","reference"}: pur="client_standard_anchor"
-        elif lev==3 and role=="Project" and r["client_label"]: pur="client_practice" if rt=="bundle" else "insufficient_population"
-        elif lev==3 and role=="Container" and r["client_label"]: pur="client_coordination"
-        elif lev==3 and role=="Generic" and r["client_label"] and rt=="reference": pur="client_reference"
+        elif lev==3 and role=="Template" and client and rt in {"bundle","reference"}: pur="client_standard_anchor"
+        elif lev==3 and role=="Project" and client: pur="client_practice" if rt=="bundle" else "insufficient_population"
+        elif lev==3 and role=="Container" and client: pur="client_coordination"
+        elif lev==3 and role=="Generic" and client and rt=="reference": pur="client_reference"
         elif lev==4 and is_client_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="client_discipline_standard_anchor"
         elif lev==4 and is_client_disc_cut and role=="Project": pur="client_discipline_practice" if rt=="bundle" else "insufficient_population"
         elif lev==4 and is_client_disc_cut and role=="Container": pur="client_discipline_coordination"
         elif lev==4 and is_client_disc_cut and role=="Generic" and rt=="reference": pur="client_discipline_reference"
-        elif lev==4 and is_client_coll_cut and role=="Template" and rt in {"bundle","reference"}: pur="client_collection_standard_anchor"
-        elif lev==4 and is_client_coll_cut and role=="Project": pur="client_collection_practice" if rt=="bundle" else "insufficient_population"
-        elif lev==4 and is_client_coll_cut and role=="Container": pur="client_collection_coordination"
-        elif lev==4 and is_client_coll_cut and role=="Generic" and rt=="reference": pur="client_collection_reference"
-        elif lev==5 and is_client_coll_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="client_collection_discipline_standard_anchor"
-        elif lev==5 and is_client_coll_disc_cut and role=="Project": pur="client_collection_discipline_practice" if rt=="bundle" else "insufficient_population"
-        elif lev==5 and is_client_coll_disc_cut and role=="Container": pur="client_collection_discipline_coordination"
-        elif lev==5 and is_client_coll_disc_cut and role=="Generic" and rt=="reference": pur="client_collection_discipline_reference"
         elif lev in (4,5) and is_bc_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="business_center_discipline_standard_anchor"
         elif lev in (4,5) and is_bc_disc_cut and role=="Project": pur="business_center_discipline_practice" if rt=="bundle" else "insufficient_population"
         elif lev in (4,5) and is_bc_disc_cut and role=="Container": pur="business_center_discipline_coordination"
         elif lev in (4,5) and is_bc_disc_cut and role=="Generic" and rt=="reference": pur="business_center_discipline_reference"
-        # collection_label branches: same role/level shape as the
-        # business_center_label branches above, shifted one dimension over.
-        elif lev in (3,4) and is_coll_cut and role=="Template" and rt in {"bundle","reference"}: pur="collection_standard_anchor"
-        elif lev in (3,4) and is_coll_cut and role=="Project": pur="collection_practice" if rt=="bundle" else "insufficient_population"
-        elif lev in (3,4) and is_coll_cut and role=="Container": pur="collection_coordination"
-        elif lev in (3,4) and is_coll_cut and role=="Generic" and rt=="reference": pur="collection_reference"
-        elif lev in (4,5) and is_coll_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="collection_discipline_standard_anchor"
-        elif lev in (4,5) and is_coll_disc_cut and role=="Project": pur="collection_discipline_practice" if rt=="bundle" else "insufficient_population"
-        elif lev in (4,5) and is_coll_disc_cut and role=="Container": pur="collection_discipline_coordination"
-        elif lev in (4,5) and is_coll_disc_cut and role=="Generic" and rt=="reference": pur="collection_discipline_reference"
-        elif lev in (4,5) and is_bc_coll_cut and role=="Template" and rt in {"bundle","reference"}: pur="business_center_collection_standard_anchor"
-        elif lev in (4,5) and is_bc_coll_cut and role=="Project": pur="business_center_collection_practice" if rt=="bundle" else "insufficient_population"
-        elif lev in (4,5) and is_bc_coll_cut and role=="Container": pur="business_center_collection_coordination"
-        elif lev in (4,5) and is_bc_coll_cut and role=="Generic" and rt=="reference": pur="business_center_collection_reference"
-        elif lev in (5,6) and is_bc_coll_disc_cut and role=="Template" and rt in {"bundle","reference"}: pur="business_center_collection_discipline_standard_anchor"
-        elif lev in (5,6) and is_bc_coll_disc_cut and role=="Project": pur="business_center_collection_discipline_practice" if rt=="bundle" else "insufficient_population"
-        elif lev in (5,6) and is_bc_coll_disc_cut and role=="Container": pur="business_center_collection_discipline_coordination"
-        elif lev in (5,6) and is_bc_coll_disc_cut and role=="Generic" and rt=="reference": pur="business_center_collection_discipline_reference"
         r["segment_purpose"]=pur
-        unit=r["unit_system"].title(); client=r["client_label"]; sid=r["segment_id"]
-        templates={"population_denominator":f"All {unit} files","cross_org_template_pool":f"{unit} templates — all organisations (registration only)","cross_template_agreement":f"{unit} templates — cross-template agreement","practiced_standards_corpus":f"{unit} projects — full corpus","cross_project_practice":f"{unit} projects — cross-project practice","coordination_corpus":f"{unit} coordination files","generic_reference_corpus":f"{unit} generic reference","client_population":f"{client} — all roles combined","client_standard_anchor":f"{client} templates — standards as authored","client_practice":f"{client} projects — standards as practiced","client_coordination":f"{client} coordination files","client_reference":f"{client} generic reference","insufficient_population":f"{sid} — below minimum file threshold","discipline_practice":f"{disc} projects — standards as practiced","discipline_templates":f"{disc} templates — standards as authored","discipline_coordination":f"{disc} coordination files","discipline_reference":f"{disc} generic reference","client_discipline_standard_anchor":f"{client} {disc} templates — standards as authored","client_discipline_practice":f"{client} {disc} projects — standards as practiced","client_discipline_coordination":f"{client} {disc} coordination files","client_discipline_reference":f"{client} {disc} generic reference","business_center_population":f"{bc} — all roles combined","business_center_standard_anchor":f"{bc} templates — standards as authored","business_center_practice":f"{bc} projects — standards as practiced","business_center_coordination":f"{bc} coordination files","business_center_reference":f"{bc} generic reference","business_center_discipline_standard_anchor":f"{bc} {disc} templates — standards as authored","business_center_discipline_practice":f"{bc} {disc} projects — standards as practiced","business_center_discipline_coordination":f"{bc} {disc} coordination files","business_center_discipline_reference":f"{bc} {disc} generic reference","collection_population":f"{coll} — all roles combined","collection_standard_anchor":f"{coll} templates — standards as authored","collection_practice":f"{coll} projects — standards as practiced","collection_coordination":f"{coll} coordination files","collection_reference":f"{coll} generic reference","collection_discipline_standard_anchor":f"{coll} {disc} templates — standards as authored","collection_discipline_practice":f"{coll} {disc} projects — standards as practiced","collection_discipline_coordination":f"{coll} {disc} coordination files","collection_discipline_reference":f"{coll} {disc} generic reference","business_center_collection_standard_anchor":f"{bc} — {coll} templates — standards as authored","business_center_collection_practice":f"{bc} — {coll} projects — standards as practiced","business_center_collection_coordination":f"{bc} — {coll} coordination files","business_center_collection_reference":f"{bc} — {coll} generic reference","business_center_collection_discipline_standard_anchor":f"{bc} — {coll} {disc} templates — standards as authored","business_center_collection_discipline_practice":f"{bc} — {coll} {disc} projects — standards as practiced","business_center_collection_discipline_coordination":f"{bc} — {coll} {disc} coordination files","business_center_collection_discipline_reference":f"{bc} — {coll} {disc} generic reference","client_collection_standard_anchor":f"{client} — {coll} templates — standards as authored","client_collection_practice":f"{client} — {coll} projects — standards as practiced","client_collection_coordination":f"{client} — {coll} coordination files","client_collection_reference":f"{client} — {coll} generic reference","client_collection_discipline_standard_anchor":f"{client} — {coll} {disc} templates — standards as authored","client_collection_discipline_practice":f"{client} — {coll} {disc} projects — standards as practiced","client_collection_discipline_coordination":f"{client} — {coll} {disc} coordination files","client_collection_discipline_reference":f"{client} — {coll} {disc} generic reference"}
+        unit=r["unit_system"].title(); sid=r["segment_id"]
+        templates={"population_denominator":f"All {unit} files","cross_org_template_pool":f"{unit} templates — all organisations (registration only)","cross_template_agreement":f"{unit} templates — cross-template agreement","practiced_standards_corpus":f"{unit} projects — full corpus","cross_project_practice":f"{unit} projects — cross-project practice","coordination_corpus":f"{unit} coordination files","generic_reference_corpus":f"{unit} generic reference","client_population":f"{client} — all roles combined","client_standard_anchor":f"{client} templates — standards as authored","client_practice":f"{client} projects — standards as practiced","client_coordination":f"{client} coordination files","client_reference":f"{client} generic reference","insufficient_population":f"{sid} — below minimum file threshold","discipline_practice":f"{disc} projects — standards as practiced","discipline_templates":f"{disc} templates — standards as authored","discipline_coordination":f"{disc} coordination files","discipline_reference":f"{disc} generic reference","client_discipline_standard_anchor":f"{client} {disc} templates — standards as authored","client_discipline_practice":f"{client} {disc} projects — standards as practiced","client_discipline_coordination":f"{client} {disc} coordination files","client_discipline_reference":f"{client} {disc} generic reference","business_center_population":f"{bc} — all roles combined","business_center_standard_anchor":f"{bc} templates — standards as authored","business_center_practice":f"{bc} projects — standards as practiced","business_center_coordination":f"{bc} coordination files","business_center_reference":f"{bc} generic reference","business_center_discipline_standard_anchor":f"{bc} {disc} templates — standards as authored","business_center_discipline_practice":f"{bc} {disc} projects — standards as practiced","business_center_discipline_coordination":f"{bc} {disc} coordination files","business_center_discipline_reference":f"{bc} {disc} generic reference"}
         if r["segment_purpose"]:
             r["segment_label"]=templates.get(r["segment_purpose"],sid)
         else:
@@ -573,26 +500,20 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     # pass5 redundant hash
     #
     # A parent is redundant whenever ANY direct child has byte-identical
-    # population — not only when it happens to have exactly one child. The
-    # old "exactly one child" gate made sense back when a node's only
-    # plausible sibling was its client_label="" twin, but with discipline_
-    # label/business_center_label/collection_label all coexisting as cut
-    # dimensions, most parents now have several distinct children (a
-    # discipline-cut child, a business-center-cut child, a collection-cut
-    # child, the client=""-twin, ...). That gate silently stopped the
-    # redundant-parent detection from firing at all for those parents, even
-    # when one specific child (most commonly the client=""-twin) turns out
-    # to carry the parent's *entire* population — e.g. a business-center
-    # pool where every file also happens to have a blank client_label. Such
+    # population — not only when it happens to have exactly one child. A
+    # node's only plausible sibling is typically a discipline-cut child, a
+    # business-center-cut child, a client-cut child, etc. — most parents have
+    # several distinct children, but one specific child can still turn out to
+    # carry the parent's *entire* population (e.g. a business-center pool
+    # where every file also happens to share the same discipline_label). Such
     # a parent is a true duplicate of that child: same files, same hash, yet
-    # both were left as independently runnable bundle/reference segments.
+    # both would otherwise be left as independently runnable bundle/reference
+    # segments.
     #
-    # If more than one child ties on population_hash (only possible when two
-    # different cut dimensions each fully, non-fragmentarily cover the same
-    # population), the pointer target is picked deterministically by
-    # segment_id — which specific matching child gets named in the note
-    # doesn't change whether the parent itself is correctly recognized as
-    # redundant.
+    # If more than one child ties on population_hash, the pointer target is
+    # picked deterministically by segment_id — which specific matching child
+    # gets named in the note doesn't change whether the parent itself is
+    # correctly recognized as redundant.
     for r in rows_out:
         if r["run_type"] not in {"bundle", "registration", "reference"}: continue
         row_key = row_to_key[id(r)]
@@ -606,8 +527,6 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             r["run_type"]="registration"; r["segment_purpose"]="redundant_single_child"; r["segment_label"]=f"{r['segment_id']} — same population as {ch}"
     rows_out.sort(key=lambda r:(int(r["segment_level"]),r["segment_id"]))
     return rows_out
-
-# preserve remaining functions from original manually omitted
 
 def _build_registry(
     manifest_rows: List[Dict[str, str]],
@@ -807,7 +726,12 @@ def main(argv: List[str] | None = None) -> int:
     out_dir = Path(args.out_dir)
     min_files: int = args.min_files
 
-    fieldnames, rows = _read_csv(metadata_path)
+    try:
+        fieldnames, rows = _read_csv(metadata_path)
+    except (OSError, UnicodeDecodeError, csv.Error) as exc:
+        sys.stderr.write(f"[ERROR] Unreadable input: failed to read {metadata_path}: {exc}\n")
+        return 1
+
     # Validate headers unconditionally — even a header-only file must declare the required columns.
     if not fieldnames:
         sys.stderr.write(f"[WARN] file_metadata.csv is completely empty (no header): {metadata_path}\n")
@@ -821,17 +745,26 @@ def main(argv: List[str] | None = None) -> int:
         if not rows:
             sys.stderr.write(f"[WARN] file_metadata.csv has a valid header but no data rows: {metadata_path}\n")
 
-    skipped_blank_us = sum(1 for r in rows if not (r.get("unit_system") or "").strip())
-    if skipped_blank_us:
-        sys.stderr.write(f"[WARN] Excluded {skipped_blank_us} row(s) with blank unit_system\n")
-
-    skipped_blank_eid = sum(
-        1 for r in rows
-        if (r.get("unit_system") or "").strip()      # unit_system present (not already counted above)
-        and not (r.get("export_run_id") or "").strip()
-    )
-    if skipped_blank_eid:
-        sys.stderr.write(f"[WARN] Excluded {skipped_blank_eid} row(s) with blank export_run_id\n")
+    # Required segmentation metadata: export_run_id, unit_system,
+    # governance_role, client_label, discipline_label, business_center_label
+    # must all be present, nonblank, and not an N/A-style sentinel on every
+    # row. A violation on any of these blocks the entire build — no partial
+    # manifest is ever written. (If a required column is missing from the CSV
+    # entirely, every row fails on that field here, which blocks the build
+    # just as surely as the header-presence check above, with one diagnostic
+    # line per row/field instead of a single column-name message.)
+    diagnostics = _validate_required_metadata(rows)
+    if diagnostics:
+        sys.stderr.write(
+            f"[ERROR] Segment manifest build BLOCKED: {len(diagnostics)} required-metadata "
+            f"violation(s) in {metadata_path}. No output written.\n"
+        )
+        for d in diagnostics:
+            sys.stderr.write(
+                f"[ERROR]   row={d['row_number']} export_run_id={d['export_run_id'] or '<missing>'} "
+                f"field={d['field']} value={d['raw_value']!r} reason={d['reason']}\n"
+            )
+        return 1
 
     # Normalize once here — for the KNOWN_ROLES check and the aggregated
     # normalization-change warning below — routing both through the same
