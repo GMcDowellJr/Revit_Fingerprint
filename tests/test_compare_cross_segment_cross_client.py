@@ -54,10 +54,13 @@ def test_is_client_only_project_segment_false_when_client_blank():
     assert _is_client_only_project_segment(_seg("Project", client="n/a")) is False
 
 
-def test_is_client_only_project_segment_false_when_further_scoped_by_discipline():
+def test_is_client_only_project_segment_true_when_further_scoped_by_discipline():
+    """discipline_label is a grouping dimension for discover_cross_client(),
+    not a disqualifier -- a client's per-discipline roll-up is still a valid
+    client-only population as long as bc/collection aren't also cut."""
     assert _is_client_only_project_segment(
         _seg("Project", client="Kaiser", discipline="architectural")
-    ) is False
+    ) is True
 
 
 def test_is_client_only_project_segment_false_when_further_scoped_by_bc():
@@ -94,10 +97,10 @@ def test_discover_cross_client_no_pair_across_different_unit_systems():
     assert discover_cross_client(manifest) == []
 
 
-def test_discover_cross_client_excludes_discipline_scoped_project_segments():
-    """A client's discipline-scoped Project child must not participate --
-    only the client's own broadest (client-only) segment is a peer of another
-    client's broadest segment; mixing grains would compare a narrower
+def test_discover_cross_client_discipline_scoped_segment_does_not_mix_with_broader_grain():
+    """A client's discipline-scoped Project child is its own distinct
+    population -- it does not pair against another client's blank-discipline
+    (broader) portfolio segment; mixing grains would compare a narrower
     population against a broader one."""
     manifest = {
         "p_kaiser": _seg("Project", client="Kaiser"),
@@ -107,6 +110,29 @@ def test_discover_cross_client_excludes_discipline_scoped_project_segments():
     pairs = discover_cross_client(manifest)
     assert ("p_kaiser", "p_sutter", "cross_client") in pairs
     assert not any("p_kaiser_arch" in (a, b) for a, b, _ in pairs)
+
+
+def test_discover_cross_client_matching_discipline_peers_do_pair():
+    """Two clients each with the SAME discipline-scoped Project population
+    pair on that discipline grain -- discipline is a grouping dimension now,
+    not an exclusion."""
+    manifest = {
+        "p_kaiser_arch": _seg("Project", client="Kaiser", discipline="architectural"),
+        "p_sutter_arch": _seg("Project", client="Sutter", discipline="architectural"),
+    }
+    pairs = discover_cross_client(manifest)
+    assert ("p_kaiser_arch", "p_sutter_arch", "cross_client") in pairs
+    assert len(pairs) == 1
+
+
+def test_discover_cross_client_discipline_mismatch_produces_no_pair():
+    """Matching unit_system alone is not sufficient -- differing
+    discipline_label values must not produce a cross_client pair."""
+    manifest = {
+        "p_kaiser_arch": _seg("Project", client="Kaiser", discipline="architectural"),
+        "p_sutter_elec": _seg("Project", client="Sutter", discipline="electrical"),
+    }
+    assert discover_cross_client(manifest) == []
 
 
 def test_discover_cross_client_excludes_non_project_roles():

@@ -11,7 +11,65 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Changed
+- `tools/compare_cross_segment.py` organizational scope is now derived from
+  explicit, literal `client_label`/`business_center_label` values instead of
+  blank inference, matching `build_segment_manifest.py`'s explicit-metadata
+  contract: **enterprise** (`client_label == "Stantec"`,
+  `business_center_label == "0000"`), **business_center** (`client_label ==
+  "Stantec"`, a real `business_center_label`), **client_business_center** (a
+  real external `client_label`, a real `business_center_label`) via the
+  rewritten `_scope_level()`. A row where either dimension isn't cut at all
+  (blank) is a roll-up pooling multiple real scopes and is handled per
+  comparison type (`_is_client_wide_rollup()`), not classified by
+  `_scope_level()` itself.
+  - `_normalize_bc_label()` no longer folds `"0000"`/`"BC_0000"` to blank —
+    `"0000"` now flows through as the literal Enterprise business-center
+    value everywhere this file uses `business_center_label`. This was a live
+    inconsistency left in place by the segment-manifest explicit-contract
+    change: since `client_label` is now always populated (literally
+    `"Stantec"` for internal work, never blank),
+    `discover_governance_chain()`'s prior blank-based scope inference meant
+    `_scope_level()` could never return `"enterprise"` for real data at all
+    (an internal-work row's populated `client_label` always won the old
+    3-way branch before blank-derived `"bc"`/`"client"` were ever reached) —
+    `enterprise_to_project`/`enterprise_to_bc`/`enterprise_to_client` pairs
+    were silently produced for zero pairs against current data. Fixed.
+  - `discover_governance_chain()`'s `_key()` now folds `business_center_label`
+    into its client-populated bucket too — without this, an Enterprise
+    Template (`Stantec`/`0000`) and a specific business center's Template
+    (`Stantec`/`2270`) collapsed into one `client=="Stantec"` bucket and
+    incorrectly produced `template_to_project`/`template_to_container` pairs
+    against each other's downstream population.
+  - `_disc_match()`'s blank-discipline wildcard is removed — discipline-gated
+    comparisons now require an exact `discipline_label` match, full stop.
+  - `discover_cross_client()`'s grain now includes `discipline_label`
+    (previously excluded any discipline-scoped Project segment from
+    `cross_client` entirely); grouping key is now `(client_label,
+    unit_system, discipline_label)`.
+  - `SUMMARY_FIELDS` gains `scope_level_a`/`scope_level_b`; `POOLED_FIELDS`
+    gains `scope_level` (empty string for roll-up rows).
+- Cardinality/aggregation semantics (`data_sufficient` gate, pairwise-mean
+  computation, `jaccard_mean`/`containment_*_mean` field naming) are
+  unchanged by this entry — `cross_client` and the new `client_cross_bc`
+  comparison type reuse the existing metrics functions as-is and remain
+  pairwise/provisional pending a population-union aggregation fix.
+
 ### Added
+- New `bc_to_bc` comparison type in `tools/compare_cross_segment.py`
+  (`discover_governance_chain()`, fires under `--governance-chain`): pairs
+  every combination of real business centers' same-role, same-discipline
+  Template/Container/Project populations against each other (peer-to-peer,
+  not routed through `parent_segment_id`/collection_label).
+- New `client_cross_bc` comparison type in `tools/compare_cross_segment.py`
+  (`discover_client_cross_bc()`, fires under `--cross-client`): for a real
+  client whose work spans more than one real business center, pairs that
+  client's per-business-center (`client_business_center` scope) populations
+  against each other for every business-center pair it actually appears in
+  (derived from the data, not a fixed two-BC comparison), matched by
+  `client_label`, `governance_role`, `discipline_label`, `unit_system`.
+  Provisional metric pending PR3's population-union aggregation fix, same as
+  `cross_client`.
 - New `cross_client` comparison type in `tools/compare_cross_segment.py`
   (`discover_cross_client()`, `--cross-client` CLI flag, default-on): pairs
   each client's own broadest (client-only-scoped) Project population against
