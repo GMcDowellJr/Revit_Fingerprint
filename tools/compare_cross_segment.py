@@ -3302,9 +3302,9 @@ def run_pooled_comparison(
         happen to have work for that client, to check client-level
         consistency.
 
-    business_center_label bookkeeping tags ("0000"/"BC_0000") are normalized
-    to blank before bc-pool grouping (see _bc_of()) so they never masquerade
-    as a shared peer bc.
+    business_center_label is normalized via _bc_of() before bc-pool grouping
+    (blank/NA spellings fold to blank; "0000" is a real, literal value and is
+    no longer folded away -- see _normalize_bc_label()).
 
     Emits one row per (segment_id, domain, pool_scope).
     """
@@ -3322,6 +3322,17 @@ def run_pooled_comparison(
         parent = row.get("parent_segment_id", "").strip()
         if parent:
             parent_groups[(parent, role, us)].append(sid)
+        # pool_scope ("parent_sibling"|"bc"|"client") answers a different question
+        # than scope_level ("enterprise"|"business_center"|"client_business_center"):
+        # pool_scope is which axis this pool was GROUPED along, not where the
+        # segment sits organizationally. They are not parallel/competing
+        # classifications -- both are derived from the same normalized
+        # business_center_label via _bc_of()/_normalize_bc_label(), so an
+        # Enterprise segment (business_center_label == "0000") is never silently
+        # excluded or mis-bucketed by either path. Do not attempt to collapse
+        # pool_scope into scope_level; a segment's scope_level is fixed, but the
+        # same segment can appear in a "bc" pool and a "client" pool depending on
+        # which sibling group is being pooled against.
         bc = _bc_of(row)
         if bc:
             bc_groups[(bc, role, us)].append(sid)

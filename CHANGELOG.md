@@ -63,6 +63,16 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   comparison type reuse the existing metrics functions as-is and remain
   pairwise/provisional pending a population-union aggregation fix.
 
+### Design notes
+- `pool_scope` (`run_pooled_comparison()`) and `scope_level` (`_scope_level()`)
+  are intentionally distinct — the former describes which axis a sibling pool
+  is grouped along, the latter describes a segment's organizational position.
+  Both now derive from the same corrected `_normalize_bc_label()`, so they no
+  longer risk drifting apart on how `business_center_label` is interpreted
+  (verified: `_bc_of()` calls the shared function directly, no independent
+  re-implementation). No unification needed; documented at the `pool_scope`
+  definition site to prevent future confusion.
+
 ### Added
 - New `bc_to_bc` comparison type in `tools/compare_cross_segment.py`
   (`discover_governance_chain()`, fires under `--governance-chain`): pairs
