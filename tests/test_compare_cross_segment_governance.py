@@ -605,6 +605,53 @@ def test_pooled_comparison_bc_scope_pools_across_clients_ignoring_client(tmp_pat
     assert by_sid["proj_a"]["all_containment_focal_in_pool"] == "0.500000"
 
 
+def test_pooled_comparison_bc_scope_pools_enterprise_0000_segments(tmp_path):
+    # Before this PR, business_center_label=="0000" normalized to blank via
+    # _normalize_bc_label(), so `if bc:` at the bc_groups gate in
+    # run_pooled_comparison() was always False for Enterprise-scoped rows --
+    # they were silently excluded from bc-scoped pooling entirely (not
+    # pooled under a "blank" bucket, just never added to bc_groups at all).
+    # _bc_of() (used here, same as everywhere else in this file) now returns
+    # the literal "0000", so two Enterprise segments correctly pool together
+    # under their own real bc bucket.
+    segments_root = tmp_path / "segments"
+    domain = "line_patterns"
+    _write_segment(
+        segments_root, "ent_a", domain,
+        [("p1", "shared", "Shared"), ("p2", "a_only", "A Only")],
+        [{"export_run_id": "ent_a_file", "pattern_id": "p1"}, {"export_run_id": "ent_a_file", "pattern_id": "p2"}],
+        [{"export_run_id": "ent_a_file", "pattern_id": "p1"}],
+        ["p1", "p2"],
+    )
+    _write_segment(
+        segments_root, "ent_b", domain,
+        [("p1", "shared", "Shared"), ("p2", "b_only", "B Only")],
+        [{"export_run_id": "ent_b_file", "pattern_id": "p1"}, {"export_run_id": "ent_b_file", "pattern_id": "p2"}],
+        [{"export_run_id": "ent_b_file", "pattern_id": "p1"}],
+        ["p1", "p2"],
+    )
+    manifest = {
+        "ent_a": {**_seg("Project", client="Stantec"), "business_center_label": "0000", "segment_label": "Ent A"},
+        "ent_b": {**_seg("Project", client="Stantec"), "business_center_label": "0000", "segment_label": "Ent B"},
+    }
+    registry = {
+        "ent_a": {"output_folder": "ent_a", "run_type": "bundle"},
+        "ent_b": {"output_folder": "ent_b", "run_type": "bundle"},
+    }
+
+    rows = run_pooled_comparison(manifest, registry, segments_root, min_patterns=1, executed_utc="2026-07-13T00:00:00Z")
+
+    # Same client (both "Stantec") -- both bc and client pools fire, since
+    # "0000" is no longer folded away and client_groups still fires
+    # independently.
+    assert {r["pool_scope"] for r in rows} == {"bc", "client"}
+    by_sid_scope = {(r["segment_id"], r["pool_scope"]): r for r in rows}
+    bc_row = by_sid_scope[("ent_a", "bc")]
+    assert bc_row["business_center_label"] == "0000"
+    assert bc_row["n_shared_join_hash"] == "1"
+    assert bc_row["all_containment_focal_in_pool"] == "0.500000"
+
+
 def test_pooled_comparison_client_scope_pools_across_bcs_ignoring_bc(tmp_path):
     segments_root = tmp_path / "segments"
     domain = "line_patterns"

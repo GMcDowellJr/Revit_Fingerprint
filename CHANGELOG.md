@@ -49,6 +49,14 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
     unit_system, discipline_label)`.
   - `SUMMARY_FIELDS` gains `scope_level_a`/`scope_level_b`; `POOLED_FIELDS`
     gains `scope_level` (empty string for roll-up rows).
+  - `run_pooled_comparison()`'s `bc_groups` pooling (`pool_scope == "bc"`)
+    calls `_bc_of()`, which calls the now-fixed `_normalize_bc_label()`
+    directly (no independent re-implementation) — so this same fix also
+    stops silently excluding Enterprise-scoped (`"0000"`) rows from
+    bc-scoped pooling entirely (previously `if bc:` was always False for
+    them, since `_bc_of()` folded `"0000"` to blank; they simply never
+    entered `bc_groups`). New coverage:
+    `test_pooled_comparison_bc_scope_pools_enterprise_0000_segments`.
 - Cardinality/aggregation semantics (`data_sufficient` gate, pairwise-mean
   computation, `jaccard_mean`/`containment_*_mean` field naming) are
   unchanged by this entry — `cross_client` and the new `client_cross_bc`
