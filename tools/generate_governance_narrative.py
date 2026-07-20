@@ -311,6 +311,14 @@ def normalise_summary_schema(rows: list) -> None:
     alias("has_bundles_b", "all_has_bundles_b", "has_bundles_b")
     # Signal ambiguity
     alias("signal_spread", "signal_spread", "signal_spread")
+    # Union metrics (population-footprint; independent of n_files_a x n_files_b).
+    # New in this schema generation -- no legacy predecessor to fall back to.
+    alias("all_union_jaccard", "all_union_jaccard")
+    alias("used_union_jaccard", "used_union_jaccard")
+    alias("all_union_containment_a_in_b", "all_union_containment_a_in_b")
+    alias("all_union_containment_b_in_a", "all_union_containment_b_in_a")
+    alias("used_union_containment_a_in_b", "used_union_containment_a_in_b")
+    alias("used_union_containment_b_in_a", "used_union_containment_b_in_a")
 
 
 def _col(row: dict, canonical: str) -> str:
@@ -677,9 +685,14 @@ CASCADE_GROUP4_EXCLUDED_TYPES = {
         "population compared to itself across the real business centers it "
         "touches) emitted by discover_client_cross_bc() — same same-role/peer-not-"
         "cascade reason class as sibling_templates/sibling_containers/bc_to_bc "
-        "above. Also pairwise/provisional pending a population-union aggregation "
-        "fix (see compare_cross_segment.py's discover_client_cross_bc() docstring); "
-        "routing this into cascade is a design decision, not resolved by this pass."
+        "above. The population-union aggregation fix this exclusion used to be "
+        "pending on has since shipped (compare_cross_segment.py's all_union_*/"
+        "used_union_* fields) and is now the adopted primary metric for "
+        "cross_client/sibling_projects/within_project (see xc_by_client/"
+        "wp_by_client in build_client_summary()); client_cross_bc itself is not "
+        "wired into any cascade or client-summary accumulator by that adoption — "
+        "routing it in remains a separate, unresolved design decision, not "
+        "something this file does implicitly by association."
     ),
 }
 
@@ -773,7 +786,8 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     tc = defaultdict(list)
     cp = defaultdict(list)
     tp = defaultdict(list)
-    xc = defaultdict(list)
+    xc = defaultdict(list)        # cross-client/sibling-project convergence, PRIMARY = used-view union
+    xc_all = defaultdict(list)    # same rows, all-view union (context: configured/inherited, not active practice)
     wp_all = defaultdict(list)
     wp_disc = defaultdict(lambda: defaultdict(list))
     tw = defaultdict(list)
@@ -926,9 +940,16 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             # incidentally excluded these (they render with >3 parts); requiring
             # distinct clients here is the direct, column-based replacement.
             if ca != cb and sector_map.get(ca) == "healthcare" and sector_map.get(cb) == "healthcare":
-                v = pf(_col(r, "jaccard_mean"))
+                # Union metrics (see _recommended_primary_view() in compare_cross_segment.py):
+                # used-view is active practice for sibling_projects/cross_client, all-view is
+                # configured/inherited context -- v is PRIMARY (used), v_all is the secondary
+                # context value, not the other way around (opposite convention from tc/cp/tp).
+                v = pf(_col(r, "used_union_jaccard"))
                 if v is not None:
                     xc[dom].append(v)
+                v_all = pf(_col(r, "all_union_jaccard"))
+                if v_all is not None:
+                    xc_all[dom].append(v_all)
 
         elif ct == "cross_client":
             # Purpose-built cross-client comparison (discover_cross_client() in
@@ -951,17 +972,25 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             ca = _pick(r, "client_label_a")
             cb = _pick(r, "client_label_b")
             if ca != cb and sector_map.get(ca) == "healthcare" and sector_map.get(cb) == "healthcare":
-                v = pf(_col(r, "jaccard_mean"))
+                v = pf(_col(r, "used_union_jaccard"))
                 if v is not None:
                     xc[dom].append(v)
+                v_all = pf(_col(r, "all_union_jaccard"))
+                if v_all is not None:
+                    xc_all[dom].append(v_all)
 
         elif ct == "within_project":
-            v = pf(_col(r, "jaccard_mean"))
+            # wp_all/wp_disc/wp_used are already a genuine all-view/used-view pair
+            # (unlike xc above, which had no used companion before this change) --
+            # swap the metric family from pairwise mean to union without changing
+            # which side is "all" and which is "used"; passive_indicator's
+            # (all - used) delta below depends on that assignment staying fixed.
+            v = pf(_col(r, "all_union_jaccard"))
             disc = _pick(r, "discipline_label_a") or "all"
             if v is not None:
                 wp_disc[dom][disc].append(v)
                 wp_all[dom].append(v)
-            vu = pf(_col(r, "used_jaccard_mean"))
+            vu = pf(_col(r, "used_union_jaccard"))
             if vu is not None:
                 wp_used[dom].append(vu)
             if a == b and r["governance_role_a"] == "Template" and v is not None:
@@ -1193,6 +1222,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             "tc_used": mean_or_none(tc_used[dom]),
             "cp_used": mean_or_none(cp_used[dom]),
             "xc": mean_or_none(xc[dom]),
+            "xc_all": mean_or_none(xc_all[dom]),
             "wp_all": mean_or_none(wp_all[dom]),
             "wp_used": mean_or_none(wp_used[dom]),
             "wp_disc": {d: statistics.mean(v) for d, v in wp_disc[dom].items() if v},
@@ -1985,7 +2015,13 @@ def build_client_summary(
     def _confirmed_non_healthcare(client: str) -> bool:
         return sector_map.get(client, "unknown") not in ("unknown", "healthcare")
 
+    # xc_by_client/wp_by_client are PRIMARY = used-view union (active practice, per
+    # _recommended_primary_view() in compare_cross_segment.py for sibling_projects/
+    # cross_client/within_project-Project rows); the _all suffix dicts carry the
+    # all-view union as secondary/context (configured/inherited), opposite of the
+    # tc/cp/tp convention where the bare name is all-view.
     xc_by_client = defaultdict(list)
+    xc_by_client_all = defaultdict(list)
     for r in summary_rows:
         if r["comparison_type"] not in ("sibling_projects", "cross_client"):
             continue
@@ -1997,22 +2033,30 @@ def build_client_summary(
             continue
         if _confirmed_non_healthcare(ca) or _confirmed_non_healthcare(cb):
             continue
-        v = pf(_col(r, "jaccard_mean"))
+        v = pf(_col(r, "used_union_jaccard"))
         if v is not None:
             xc_by_client[ca].append(v)
             xc_by_client[cb].append(v)
+        v_all = pf(_col(r, "all_union_jaccard"))
+        if v_all is not None:
+            xc_by_client_all[ca].append(v_all)
+            xc_by_client_all[cb].append(v_all)
 
     # Within-project coherence. Gated on governance_role_a == "Project" for the
     # same reason as the all_clients fallback above -- within_project rows exist
     # for any role, and this section reports PROJECT coherence specifically.
     wp_by_client = defaultdict(list)
+    wp_by_client_all = defaultdict(list)
     for r in summary_rows:
         if r["comparison_type"] != "within_project" or r["governance_role_a"] != "Project":
             continue
         c = _pick(r, "client_label_a")
-        v = pf(_col(r, "jaccard_mean"))
+        v = pf(_col(r, "used_union_jaccard"))
         if v is not None and c:
             wp_by_client[c].append(v)
+        v_all = pf(_col(r, "all_union_jaccard"))
+        if v_all is not None and c:
+            wp_by_client_all[c].append(v_all)
 
     # n_files from pooled — every pool_scope grain, same rationale as all_clients
     # above: n_files_focal describes the focal segment, not the pool, so it's
@@ -2048,6 +2092,7 @@ def build_client_summary(
     # ca != cb within-client exclusion, and same confirmed-non-healthcare
     # exclusion as xc_by_client above.
     xc_dom_by_client = defaultdict(lambda: defaultdict(list))
+    xc_dom_by_client_all = defaultdict(lambda: defaultdict(list))
     for r in summary_rows:
         if r["comparison_type"] not in ("sibling_projects", "cross_client"):
             continue
@@ -2057,22 +2102,35 @@ def build_client_summary(
             continue
         if _confirmed_non_healthcare(ca) or _confirmed_non_healthcare(cb):
             continue
-        v = pf(_col(r, "jaccard_mean"))
+        v = pf(_col(r, "used_union_jaccard"))
         if v is not None and r["domain"] not in EXCLUDED_FROM_SCORING:
             xc_dom_by_client[ca][r["domain"]].append(v)
             xc_dom_by_client[cb][r["domain"]].append(v)
+        v_all = pf(_col(r, "all_union_jaccard"))
+        if v_all is not None and r["domain"] not in EXCLUDED_FROM_SCORING:
+            xc_dom_by_client_all[ca][r["domain"]].append(v_all)
+            xc_dom_by_client_all[cb][r["domain"]].append(v_all)
 
     rows_out = []
     for client in sorted(all_clients):
         xc_vals = xc_by_client.get(client, [])
         xc_mean = statistics.mean(xc_vals) if xc_vals else None
+        xc_vals_all = xc_by_client_all.get(client, [])
+        xc_mean_all = statistics.mean(xc_vals_all) if xc_vals_all else None
         wp_vals = wp_by_client.get(client, [])
         wp_mean = statistics.mean(wp_vals) if wp_vals else None
+        wp_vals_all = wp_by_client_all.get(client, [])
+        wp_mean_all = statistics.mean(wp_vals_all) if wp_vals_all else None
         n_files = client_files.get(client, 0)
 
         dom_means = {
             d: statistics.mean(v)
             for d, v in xc_dom_by_client[client].items()
+            if v
+        }
+        dom_means_all = {
+            d: statistics.mean(v)
+            for d, v in xc_dom_by_client_all[client].items()
             if v
         }
         strongest = sorted(dom_means.items(), key=lambda x: -x[1])[:3]
@@ -2109,10 +2167,13 @@ def build_client_summary(
             "n_files": n_files,
             "tier": tier,
             "xc_mean": xc_mean,
+            "xc_mean_all": xc_mean_all,
             "wp_mean": wp_mean,
+            "wp_mean_all": wp_mean_all,
             "confidence_note": conf,
             "strongest": strongest,
             "weakest": weakest,
+            "dom_means_all": dom_means_all,
             "sector": sector,
             "is_healthcare": sector == "healthcare",
         })
@@ -2893,18 +2954,25 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
     """Render per-discipline within-project coherence and cascade summary."""
     lines = ["## Discipline Analysis\n"]
 
-    # Gather within-project by discipline
+    # Gather within-project by discipline. PRIMARY = used-view union (active
+    # practice, per _recommended_primary_view() for within_project/Project rows);
+    # _all carries the all-view union as secondary/context, same convention as
+    # xc_by_client/wp_by_client in build_client_summary().
     disc_domain_wp = defaultdict(lambda: defaultdict(list))
+    disc_domain_wp_all = defaultdict(lambda: defaultdict(list))
     disc_file_counts = {}
     for r in summary_rows:
         if r["comparison_type"] != "within_project":
             continue
         disc = _pick(r, "discipline_label_a")
-        v = pf(_col(r, "jaccard_mean"))
+        v = pf(_col(r, "used_union_jaccard"))
         if disc and v is not None:
             disc_domain_wp[disc][r["domain"]].append(v)
             if disc not in disc_file_counts:
                 disc_file_counts[disc] = int(r["n_files_a"]) if r["n_files_a"] else 0
+        v_all = pf(_col(r, "all_union_jaccard"))
+        if disc and v_all is not None:
+            disc_domain_wp_all[disc][r["domain"]].append(v_all)
 
     # Has-template flag
     template_discs = set()
@@ -2926,7 +2994,14 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
         if not domain_means:
             continue
 
+        domain_means_all = {
+            d: statistics.mean(v)
+            for d, v in disc_domain_wp_all[disc].items()
+            if v and d not in EXCLUDED_FROM_SCORING
+        }
+
         overall = statistics.mean(domain_means.values())
+        overall_all = statistics.mean(domain_means_all.values()) if domain_means_all else None
         strongest = sorted(domain_means.items(), key=lambda x: -x[1])[:3]
         weakest = sorted(domain_means.items(), key=lambda x: x[1])[:3]
 
@@ -2934,7 +3009,8 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
         lines.append(
             f"Files in corpus: **{n_files}**. "
             f"{'Discipline-specific templates exist. ' if has_template else 'No discipline-specific templates — coordination files are the primary governance source. '}"
-            f"Mean within-population coherence: **{pct(overall)}**.\n"
+            f"Mean within-population coherence (used-view, active practice): **{pct(overall)}**"
+            f"{f' (all-view/configured: {pct(overall_all)})' if overall_all is not None else ''}.\n"
         )
 
         lines.append("**Most consistent domains:**")
@@ -4206,6 +4282,7 @@ def main():
             "container_to_project_scoped_pair": d.get("cp_scoped_pair") or "",
             "template_to_project": fmt(d["tp"]),
             "cross_client_convergence": fmt(d["xc"]),
+            "cross_client_convergence_all_view": fmt(d.get("xc_all")),
             "within_project_all": fmt(d["wp_all"]),
             "within_project_p10": fmt(d["wp_p10"]),
             "within_project_p90": fmt(d["wp_p90"]),
@@ -4272,7 +4349,9 @@ def main():
             "n_project_files": r["n_files"],
             "alignment_tier": r["tier"],
             "cross_client_similarity_mean": fmt(r["xc_mean"]),
+            "cross_client_similarity_mean_all_view": fmt(r.get("xc_mean_all")),
             "within_project_coherence": fmt(r["wp_mean"]),
+            "within_project_coherence_all_view": fmt(r.get("wp_mean_all")),
             "confidence_note": r["confidence_note"],
             "most_aligned_domains": strongest_str,
             "least_aligned_domains": weakest_str,

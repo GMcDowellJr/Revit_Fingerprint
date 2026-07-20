@@ -11,6 +11,59 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Changed
+- `tools/generate_governance_narrative.py`'s cross-client/within-project
+  metrics (`xc_by_client`/`wp_by_client`/`xc_dom_by_client` in
+  `build_client_summary()`, `disc_domain_wp` in `render_discipline_section()`,
+  and `xc`/`wp_all`/`wp_used`/`tw` in `build_cascade()`) now read
+  `compare_cross_segment.py`'s population-union metrics
+  (`all_union_jaccard`/`used_union_jaccard`) instead of the pairwise-file
+  mean (`all_pairwise_jaccard_mean`, previously read via the canonical
+  `jaccard_mean` alias). This is a genuine interpretation change, not a
+  rename follow-up: union jaccard measures footprint overlap between two
+  populations' full file unions, independent of `n_files_a x n_files_b`,
+  which is materially different from (and more resistant to file-count
+  skew than) a mean of pairwise file comparisons — the exact problem
+  `all_union_jaccard`/`used_union_jaccard` were added to
+  `compare_cross_segment.py` to solve.
+  - For `cross_client`/`sibling_projects`/`within_project`(Project role),
+    `compare_cross_segment.py`'s own `_recommended_primary_view()` states
+    used-view is primary ("active practice") for these types — the
+    **opposite** convention from `tc`/`cp`/`tp` (Group 1 governance chain),
+    where all-view is primary and `_used` is the secondary diagnostic. So
+    `xc_mean`/`wp_mean`/`d["xc"]` (the bare, tier-driving names) are now
+    sourced from `used_union_jaccard`; a new secondary value (`xc_mean_all`/
+    `wp_mean_all`/`d["xc_all"]`, and `cross_client_convergence_all_view`/
+    `cross_client_similarity_mean_all_view`/`within_project_coherence_all_view`
+    in the CSV outputs) carries the all-view union metric as context. This
+    changes `CLIENT_ALIGNMENT_HIGH`/`CLIENT_ALIGNMENT_MODERATE` tier
+    assignment, `XC_STRONG_CONVERGENCE`/`cross_client_convergence` findings,
+    `CLIENT_COHERENCE_LOW`/`low_client_coherence` findings, and onboarding
+    profile reads (`_client_onboarding_profile()`) for any client/domain with
+    a real gap between pairwise-mean and used-view-union scores — real tier
+    movement is expected, not a bug.
+  - `wp_all[dom]`/`wp_used[dom]` in `build_cascade()` were already a genuine
+    all-view/used-view pair (unlike `xc`, which had no used companion before
+    this change) — only the metric family swapped (pairwise mean → union);
+    which side is "all" and which is "used" is unchanged, since
+    `passive_indicator`'s `(all - used)` delta depends on that assignment
+    staying fixed. `tw[dom]` (Template self-comparison) shares `wp_all`'s `v`
+    and is therefore also now union-sourced, still all-view.
+  - `CASCADE_GROUP4_EXCLUDED_TYPES["client_cross_bc"]`'s docstring updated:
+    the "provisional pending a population-union aggregation fix" text was
+    stale (the fix has shipped and is now adopted for the other three
+    types) — `client_cross_bc` itself remains unrouted into any
+    cascade/client-summary accumulator; that is still a separate, unresolved
+    design decision, not something this change does implicitly.
+  - `_SUMMARY_COL_ALIASES` gains 6 new canonical entries for the union
+    fields (`all_union_jaccard`, `used_union_jaccard`,
+    `all_union_containment_a_in_b`, `all_union_containment_b_in_a`,
+    `used_union_containment_a_in_b`, `used_union_containment_b_in_a`), read
+    via `_col()` like every other field in this file rather than a raw
+    `row.get()` bypass. `all_pairwise_*`/`used_pairwise_*` fields and their
+    aliases are unchanged — this is an addition of what else is read, not a
+    removal.
+
 ### Fixed
 - Six correctness bugs in the `comparison_status="blocked"` row-emission
   path added earlier in this changeset (found via code review), all in

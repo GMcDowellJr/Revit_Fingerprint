@@ -206,7 +206,8 @@ _EXPECTED_DOMAIN_COLUMNS = [
     "template_to_container", "container_to_project",
     "container_to_project_scoped", "container_to_project_scoped_pair",
     "template_to_project",
-    "cross_client_convergence", "within_project_all", "within_project_p10", "within_project_p90",
+    "cross_client_convergence", "cross_client_convergence_all_view",
+    "within_project_all", "within_project_p10", "within_project_p90",
     "within_project_spread", "within_project_architectural", "within_project_mechanical_plumbing",
     "within_project_electrical", "within_project_structural", "bundle_schema",
     "template_to_project_used", "bundle_share_all", "bundle_share_used",
@@ -220,7 +221,9 @@ _EXPECTED_DOMAIN_COLUMNS = [
 
 _EXPECTED_CLIENT_COLUMNS = [
     "client", "n_project_files", "alignment_tier", "cross_client_similarity_mean",
-    "within_project_coherence", "confidence_note", "most_aligned_domains", "least_aligned_domains",
+    "cross_client_similarity_mean_all_view",
+    "within_project_coherence", "within_project_coherence_all_view",
+    "confidence_note", "most_aligned_domains", "least_aligned_domains",
     "onboarding_internal_read", "onboarding_portability_read", "onboarding_common_base",
     "onboarding_variant_burden", "onboarding_operating_implication",
 ]

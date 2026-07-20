@@ -62,7 +62,7 @@ def test_render_discipline_section_includes_disciplines_beyond_disc_labels():
             governance_role_a="Project", governance_role_b="Project",
             discipline_label_a=disc, discipline_label_b=disc,
             comparison_type="within_project", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.5", n_files_a="3", n_files_b="3",
+            used_union_jaccard="0.5", n_files_a="3", n_files_b="3",
         ))
     normalise_summary_schema(rows)
     cascade = build_cascade(rows)
@@ -100,7 +100,7 @@ def _client_fixture(client_names):
             governance_role_a="Project", governance_role_b="Project",
             client_label_a=c, client_label_b=c,
             comparison_type="within_project", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.6", n_files_a="12", n_files_b="12",
+            used_union_jaccard="0.6", n_files_a="12", n_files_b="12",
         ))
         pooled_rows.append(_pooled_row(
             segment_id=f"imperial|Project|{c}", governance_role="Project",
@@ -149,14 +149,14 @@ def test_cascade_cross_client_jaccard_uses_sector_map():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Sutter",
             comparison_type="sibling_projects", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.5", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.5", n_files_a="10", n_files_b="10",
         ),
         _summary_row(
             segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Intel",
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Intel",
             comparison_type="sibling_projects", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.9", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.9", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -224,14 +224,14 @@ def test_within_client_sibling_projects_excluded_from_cross_client_xc():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Kaiser",
             comparison_type="sibling_projects", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.95", n_files_a="5", n_files_b="5",
+            used_union_jaccard="0.95", n_files_a="5", n_files_b="5",
         ),
         _summary_row(
             segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Sutter",
             comparison_type="sibling_projects", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.5", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.5", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -259,7 +259,7 @@ def test_cascade_cross_client_requires_both_healthcare_like_sibling_projects():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Intel", client_label_b="Acme",
             comparison_type="cross_client", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.7", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.7", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -275,7 +275,7 @@ def test_cascade_cross_client_feeds_xc_when_both_sides_healthcare():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Sutter",
             comparison_type="cross_client", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.7", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.7", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -291,14 +291,14 @@ def test_cascade_cross_client_and_sibling_projects_both_feed_xc():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Sutter",
             comparison_type="sibling_projects", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.5", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.5", n_files_a="10", n_files_b="10",
         ),
         _summary_row(
             segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Acme",
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Acme",
             comparison_type="cross_client", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.9", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.9", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -316,14 +316,14 @@ def test_cascade_cross_client_excludes_pair_with_one_non_healthcare_side():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Sutter",
             comparison_type="sibling_projects", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.5", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.5", n_files_a="10", n_files_b="10",
         ),
         _summary_row(
             segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Intel",
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Intel",
             comparison_type="cross_client", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.9", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.9", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -343,7 +343,7 @@ def test_build_client_summary_xc_mean_uses_cross_client_rows():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Sutter",
             comparison_type="cross_client", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.6", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.6", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -367,7 +367,7 @@ def test_build_client_summary_xc_mean_uses_client_label_not_segment_id_shape():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Sutter",
             comparison_type="cross_client", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.6", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.6", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -391,7 +391,7 @@ def test_build_client_summary_backfills_n_files_for_cross_client_only_clients():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Sutter",
             comparison_type="cross_client", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.6", n_files_a="42", n_files_b="17",
+            used_union_jaccard="0.6", n_files_a="42", n_files_b="17",
         ),
     ]
     normalise_summary_schema(rows)
@@ -413,14 +413,14 @@ def test_within_client_cross_client_like_pair_excluded_from_xc_mean():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Kaiser",
             comparison_type="sibling_projects", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.95", n_files_a="5", n_files_b="5",
+            used_union_jaccard="0.95", n_files_a="5", n_files_b="5",
         ),
         _summary_row(
             segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Sutter",
             comparison_type="cross_client", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.5", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.5", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -446,7 +446,7 @@ def test_build_client_summary_excludes_confirmed_non_healthcare_partner_from_xc_
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Intel",
             comparison_type="cross_client", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.9", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.9", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -469,7 +469,7 @@ def test_build_client_summary_unclassified_partner_still_feeds_xc_mean():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="NewClient",
             comparison_type="cross_client", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.8", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.8", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -495,14 +495,14 @@ def test_build_client_summary_excludes_policy_excluded_domain_from_xc_mean():
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Sutter",
             comparison_type="cross_client", domain=excluded_domain,
-            all_pairwise_jaccard_mean="0.95", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.95", n_files_a="10", n_files_b="10",
         ),
         _summary_row(
             segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
             governance_role_a="Project", governance_role_b="Project",
             client_label_a="Kaiser", client_label_b="Sutter",
             comparison_type="cross_client", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.3", n_files_a="10", n_files_b="10",
+            used_union_jaccard="0.3", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
@@ -526,9 +526,108 @@ def test_non_project_within_project_rows_excluded_from_client_summary():
             governance_role_a="Template", governance_role_b="Template",
             client_label_a="GhostClient", client_label_b="GhostClient",
             comparison_type="within_project", domain="arrowheads",
-            all_pairwise_jaccard_mean="0.99", n_files_a="50", n_files_b="50",
+            used_union_jaccard="0.99", n_files_a="50", n_files_b="50",
         ),
     ]
     normalise_summary_schema(rows)
     client_rows = build_client_summary(rows, [], {})
     assert "GhostClient" not in {r["client"] for r in client_rows}
+
+
+# ---------------------------------------------------------------------------
+# PR B1: xc/wp/xc_dom/disc_domain_wp union-metric adoption (v/vu read sites)
+# ---------------------------------------------------------------------------
+#
+# _recommended_primary_view() in compare_cross_segment.py declares used-view
+# primary ("active practice") for cross_client/sibling_projects/within_project
+# (Project role) rows -- xc_mean/wp_mean/d["xc"] must therefore read
+# used_union_jaccard, with all_union_jaccard exposed as the secondary "_all"/
+# "xc_all" context value. Stale all_pairwise_jaccard_mean/all_jaccard_mean
+# values are deliberately set alongside the union fields in these tests and
+# must be ignored -- proving the read sites were actually swapped, not just
+# aliased through to the old pairwise family under a new name.
+
+def test_xc_mean_reads_used_union_jaccard_not_pairwise_mean():
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            # Stale pairwise fields present with a DIFFERENT value than the
+            # union fields -- if the read site still resolved to these, the
+            # assertion below on xc_mean would fail.
+            all_pairwise_jaccard_mean="0.10", all_jaccard_mean="0.10",
+            all_union_jaccard="0.40", used_union_jaccard="0.75",
+            n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    client_rows = build_client_summary(rows, [], sector_map)
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    assert kaiser["xc_mean"] == 0.75
+    assert kaiser["xc_mean_all"] == 0.40
+    assert kaiser["xc_mean"] != kaiser["xc_mean_all"]
+
+
+def test_wp_mean_reads_used_union_jaccard_and_exposes_all_view_companion():
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Kaiser",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser",
+            comparison_type="within_project", domain="arrowheads",
+            all_pairwise_jaccard_mean="0.10",
+            all_union_jaccard="0.30", used_union_jaccard="0.65",
+            n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    client_rows = build_client_summary(rows, [], {})
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    assert kaiser["wp_mean"] == 0.65
+    assert kaiser["wp_mean_all"] == 0.30
+    assert kaiser["wp_mean"] != kaiser["wp_mean_all"]
+
+
+def test_cascade_xc_reads_used_union_jaccard_with_distinct_all_view_companion():
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_pairwise_jaccard_mean="0.10",
+            all_union_jaccard="0.20", used_union_jaccard="0.85",
+            n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    cascade = build_cascade(rows, sector_map=sector_map)
+    d = cascade["arrowheads"]
+    assert d["xc"] == 0.85
+    assert d["xc_all"] == 0.20
+    assert d["xc"] != d["xc_all"]
+
+
+def test_cascade_wp_all_and_wp_used_stay_a_true_all_used_pair_not_flipped():
+    """Unlike xc (no prior used companion), wp_all/wp_used were already a
+    genuine all-view/used-view pair before this PR -- the metric family swaps
+    to union, but which side is "all" and which is "used" must not flip, or
+    the passive_indicator (all - used) delta downstream would silently invert."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Kaiser",
+            governance_role_a="Project", governance_role_b="Project",
+            comparison_type="within_project", domain="arrowheads",
+            all_union_jaccard="0.90", used_union_jaccard="0.20",
+            n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    cascade = build_cascade(rows, sector_map={})
+    d = cascade["arrowheads"]
+    assert d["wp_all"] == 0.90
+    assert d["wp_used"] == 0.20
