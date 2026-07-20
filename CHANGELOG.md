@@ -47,6 +47,18 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   behavior for non-Project rows. The all-view secondary (`disc_domain_wp_all`)
   is only populated for Project rows — there is no meaningful secondary to
   show for a role where used-view isn't primary in the first place.
+- (PR #376 review, second P2 finding) The fix above stores the all-view
+  value into `domain_means` for non-Project rows, but the rendered
+  "Mean within-population coherence" sentence still unconditionally said
+  `used-view, active practice` regardless of what actually fed that
+  discipline's aggregate — misstating configured standards evidence as
+  active usage for a Template/Container/Generic-only discipline. A new
+  per-discipline `disc_role_mix` tracks whether a discipline's rows were
+  Project-only, non-Project-only, or both; the label is now
+  `used-view, active practice` (Project-only), `all-view, configured
+  standards` (non-Project-only), or a neutral
+  `mixed used-view (Project rows) / all-view (standards rows)` for a
+  discipline fed by both.
 
 ### Changed
 - `tools/generate_governance_narrative.py`'s cross-client/within-project

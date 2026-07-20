@@ -747,3 +747,51 @@ def test_disc_domain_wp_keeps_all_view_primary_for_non_project_within_project_ro
     normalise_summary_schema(rows)
     section = render_discipline_section({}, rows)
     assert "88" in section
+
+
+def test_disc_domain_wp_labels_non_project_discipline_as_all_view_not_active_practice():
+    """PR #376 review, second P2 finding: the rendered sentence must not claim
+    'used-view, active practice' for a discipline whose domain_means value is
+    actually all-view (a Template/Container/Generic-only discipline) -- that
+    would misstate configured standards evidence as active usage."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Template|arch", segment_id_b="imperial|Template|arch",
+            governance_role_a="Template", governance_role_b="Template",
+            discipline_label_a="architectural",
+            comparison_type="within_project", domain="arrowheads",
+            all_union_jaccard="0.77",
+            n_files_a="4", n_files_b="4",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    section = render_discipline_section({}, rows)
+    assert "all-view, configured standards" in section
+    assert "used-view, active practice" not in section
+
+
+def test_disc_domain_wp_labels_mixed_project_and_non_project_discipline():
+    """A discipline fed by both a Project (used-view) row and a Template
+    (all-view) row must get the neutral mixed label, not silently claim
+    'used-view, active practice' for the whole aggregate."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Kaiser",
+            governance_role_a="Project", governance_role_b="Project",
+            discipline_label_a="architectural",
+            comparison_type="within_project", domain="arrowheads",
+            used_union_jaccard="0.65", all_union_jaccard="0.80",
+            n_files_a="10", n_files_b="10",
+        ),
+        _summary_row(
+            segment_id_a="imperial|Template|arch", segment_id_b="imperial|Template|arch",
+            governance_role_a="Template", governance_role_b="Template",
+            discipline_label_a="architectural",
+            comparison_type="within_project", domain="fill_patterns_drafting",
+            all_union_jaccard="0.90",
+            n_files_a="4", n_files_b="4",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    section = render_discipline_section({}, rows)
+    assert "mixed used-view (Project rows) / all-view (standards rows)" in section

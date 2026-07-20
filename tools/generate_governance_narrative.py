@@ -2996,6 +2996,12 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
     disc_domain_wp = defaultdict(lambda: defaultdict(list))
     disc_domain_wp_all = defaultdict(lambda: defaultdict(list))
     disc_file_counts = {}
+    # Tracks whether a discipline's domain_means values came from Project rows
+    # (used-view, active practice), non-Project rows (all-view, configured
+    # standards), or both -- so the rendered "coherence" sentence never
+    # mislabels a standards-only or mixed discipline's all-view number as if
+    # it were an active-usage read (see PR #376 review, second P2 finding).
+    disc_role_mix: dict = defaultdict(lambda: {"project": False, "non_project": False})
     for r in summary_rows:
         if r["comparison_type"] != "within_project":
             continue
@@ -3009,6 +3015,7 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
             v = pf(_col_union_or_pairwise(r, "all_union_jaccard", "jaccard_mean"))
         if disc and v is not None:
             disc_domain_wp[disc][r["domain"]].append(v)
+            disc_role_mix[disc]["project" if is_project else "non_project"] = True
             if disc not in disc_file_counts:
                 disc_file_counts[disc] = int(r["n_files_a"]) if r["n_files_a"] else 0
         if is_project:
@@ -3047,11 +3054,24 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
         strongest = sorted(domain_means.items(), key=lambda x: -x[1])[:3]
         weakest = sorted(domain_means.items(), key=lambda x: x[1])[:3]
 
+        # Label reflects what domain_means actually contains for THIS discipline
+        # -- Project rows contribute used-view (active practice), non-Project
+        # rows contribute all-view (configured standards); a discipline fed by
+        # both is neither purely one nor the other, so it gets a neutral,
+        # explicit mixed label rather than defaulting to either single claim.
+        role_mix = disc_role_mix.get(disc, {"project": False, "non_project": False})
+        if role_mix["project"] and role_mix["non_project"]:
+            coherence_label = "mixed used-view (Project rows) / all-view (standards rows)"
+        elif role_mix["project"]:
+            coherence_label = "used-view, active practice"
+        else:
+            coherence_label = "all-view, configured standards"
+
         lines.append(f"### {label}\n")
         lines.append(
             f"Files in corpus: **{n_files}**. "
             f"{'Discipline-specific templates exist. ' if has_template else 'No discipline-specific templates — coordination files are the primary governance source. '}"
-            f"Mean within-population coherence (used-view, active practice): **{pct(overall)}**"
+            f"Mean within-population coherence ({coherence_label}): **{pct(overall)}**"
             f"{f' (all-view/configured: {pct(overall_all)})' if overall_all is not None else ''}.\n"
         )
 
