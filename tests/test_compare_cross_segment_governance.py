@@ -1321,6 +1321,110 @@ def test_main_emits_governance_states_when_pair_skipped_by_min_patterns(tmp_path
     assert summary_rows[0]["provided_missing_share"] == "1.000000"
 
 
+def test_main_skips_delta_generation_for_blocked_reference(tmp_path, monkeypatch):
+    import csv
+
+    domain = "delta_blocked_domain"
+    records_dir = tmp_path / "records"
+    segments_root = tmp_path / "segments"
+    out_dir = tmp_path / "out"
+    records_dir.mkdir()
+
+    _write_csv(
+        records_dir / "segment_manifest.csv",
+        [
+            {
+                "segment_id": "template_ref",
+                "segment_label": "Template",
+                "governance_role": "Template",
+                "client_label": "Acme",
+                "discipline_label": "",
+                "unit_system": "imperial",
+                "run_type": "bundle",
+                "segment_level": "2",
+                "parent_segment_id": "imperial",
+            },
+            {
+                "segment_id": "project_tgt",
+                "segment_label": "Project",
+                "governance_role": "Project",
+                "client_label": "Acme",
+                "discipline_label": "",
+                "unit_system": "imperial",
+                "run_type": "bundle",
+                "segment_level": "2",
+                "parent_segment_id": "imperial",
+            },
+        ],
+    )
+    _write_csv(
+        records_dir / "run_registry.csv",
+        [
+            {"segment_id": "template_ref", "output_folder": "template_ref", "run_type": "bundle"},
+            {"segment_id": "project_tgt", "output_folder": "project_tgt", "run_type": "bundle"},
+        ],
+    )
+    _write_csv(records_dir / "file_metadata.csv", [{"export_run_id": "tgt_file", "project_label": ""}])
+    # template_ref: zero readable files -- the reference side is blocked.
+    (segments_root / "template_ref").mkdir(parents=True)
+    # project_tgt: real patterns the (blocked) reference has no knowledge of.
+    _write_segment(
+        segments_root,
+        "project_tgt",
+        domain,
+        [("p1", "tgt_a", "Target A"), ("p2", "tgt_b", "Target B")],
+        [
+            {"export_run_id": "tgt_file", "pattern_id": "p1"},
+            {"export_run_id": "tgt_file", "pattern_id": "p2"},
+        ],
+        [
+            {"export_run_id": "tgt_file", "pattern_id": "p1"},
+            {"export_run_id": "tgt_file", "pattern_id": "p2"},
+        ],
+        ["p1"],
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "compare_cross_segment.py",
+            "--segments-root", str(segments_root),
+            "--records-dir", str(records_dir),
+            "--out-dir", str(out_dir),
+            "--governance-chain",
+            "--domain", domain,
+            "--min-patterns", "1",
+            "--workers", "1",
+            # deliberately no --no-delta: delta generation must be active
+            # for this comparison_type so the fix is actually exercised.
+        ],
+    )
+
+    assert compare_main() == 0
+
+    summary_path = out_dir / "cross_segment_summary.csv"
+    delta_path = out_dir / "cross_segment_delta.csv"
+
+    with summary_path.open("r", encoding="utf-8", newline="") as f:
+        summary_rows = [r for r in csv.DictReader(f) if r["comparison_type"] == "template_to_project"]
+    assert len(summary_rows) == 1
+    assert summary_rows[0]["comparison_status"] == "blocked"
+    assert summary_rows[0]["n_files_a"] == "0"
+    assert summary_rows[0]["n_files_b"] == "1"
+
+    # The blocked reference must not produce delta rows -- with an empty
+    # ref_union, tgt_a/tgt_b would otherwise both be misreported as locally
+    # drifted patterns instead of "reference unknown."
+    if delta_path.exists():
+        with delta_path.open("r", encoding="utf-8", newline="") as f:
+            delta_rows = [
+                r for r in csv.DictReader(f)
+                if r["segment_id_reference"] == "template_ref" and r["segment_id_target"] == "project_tgt"
+            ]
+        assert delta_rows == []
+
+
 
 def _union_rows_for(tmp_path, manifest, registry, domain="line_patterns"):
     import compare_cross_segment as ccs

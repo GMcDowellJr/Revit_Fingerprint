@@ -2924,8 +2924,12 @@ def run_pair(
         blocked_row = _build_summary_row(
             crid_blocked, seg_a, seg_b, comparison_type, domain,
             manifest, {"n_files_a": str(n_files_a_ct), "n_files_b": str(n_files_b_ct), "n_pairs": "0"},
-            n_patterns_a=0, n_patterns_b=0,
-            n_unique_patterns_a=0, n_unique_patterns_b=0,
+            # n_a/n_b are the populated side's real pattern counts (a blocked
+            # side is zero by definition, but the other side may not be) --
+            # reporting them as 0 here would corrupt the raw inventory counts
+            # a downstream reader needs to understand what was blocked.
+            n_patterns_a=n_a, n_patterns_b=n_b,
+            n_unique_patterns_a=n_a, n_unique_patterns_b=n_b,
             all_has_bundles_a="false", all_has_bundles_b="false",
             all_n_shared_bundle_both=0, all_n_shared_bundle_a_only=0, all_n_shared_bundle_b_only=0,
             used_has_bundles_a="false", used_has_bundles_b="false",
@@ -3641,6 +3645,17 @@ def run_pooled_comparison(
 
     rows: List[Dict[str, str]] = []
 
+    # Memoized across every group/grain in this call -- the same segment_id
+    # can appear as a member of several sibling groups (parent_sibling, bc,
+    # client grains all draw from the same manifest), so without this a
+    # large corpus would re-discover the same segment's domains repeatedly.
+    domains_cache: Dict[str, Set[str]] = {}
+
+    def _domains_for(sid: str) -> Set[str]:
+        if sid not in domains_cache:
+            domains_cache[sid] = discover_domains_for_segment(segments_root, registry, sid)
+        return domains_cache[sid]
+
     def _emit_for_groups(
         groups: Dict[Tuple[str, str, str], List[str]], pool_scope: str
     ) -> None:
@@ -3661,7 +3676,15 @@ def run_pooled_comparison(
                     if s != focal_sid and not _is_lineage_related(ancestor_map, focal_sid, s)
                 ]
 
-                focal_domains = discover_domains_for_segment(segments_root, registry, focal_sid)
+                # Union with the pool's own domains, not just the focal
+                # segment's -- otherwise a focal segment with zero inventory
+                # for a domain the pool has (n_files_focal=0, n_files_pool>0,
+                # the exact case _build_pooled_row()'s blocked-row path
+                # exists to report) never gets scheduled at all, since there
+                # would be no domain to iterate for it.
+                focal_domains = _domains_for(focal_sid)
+                for s in pool_sids:
+                    focal_domains = focal_domains | _domains_for(s)
                 if domain_filter:
                     focal_domains = focal_domains & {domain_filter}
 
@@ -4260,7 +4283,21 @@ def main() -> int:
                 # Delta pattern output — directed pairs only, opt-out via --no-delta.
                 # Delta generation remains in the parent process so worker results stay
                 # limited to the existing (summary_row, detail_rows) contract.
-                if not args.no_delta and ctype in DELTA_DIRECTED_TYPES:
+                #
+                # comparison_status == "blocked" (zero readable files on the
+                # reference side, or the target side) must be excluded here:
+                # an empty ref_union would make every target join_hash look
+                # like it's outside the reference, i.e. tgt_union - ref_union
+                # == tgt_union -- every target pattern gets misreported as
+                # locally-invented drift instead of "reference unknown, not
+                # locally drifted." A blocked row still exists in
+                # cross_segment_summary.csv (so the block itself is visible),
+                # it just can't source a trustworthy delta.
+                if (
+                    not args.no_delta
+                    and ctype in DELTA_DIRECTED_TYPES
+                    and result.get("comparison_status") != "blocked"
+                ):
                     tgt_files = load_file_join_hashes(segments_root, registry, seg_b, domain)
                     tgt_files_used = load_file_join_hashes(
                         segments_root, registry, seg_b, domain, "used"

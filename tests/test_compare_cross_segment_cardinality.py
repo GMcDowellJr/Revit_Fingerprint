@@ -23,6 +23,7 @@ from compare_cross_segment import (  # noqa: E402
     compare_directed_file,
     compare_symmetric_file,
     run_pair,
+    run_pooled_comparison,
     _segment_domain_source_status,
 )
 
@@ -287,6 +288,15 @@ def test_zero_files_on_either_side_is_blocked_not_zero_valued(tmp_path):
     # Not a zero-valued similarity row -- blank, not "0.000000".
     assert row["all_pairwise_jaccard_mean"] == ""
     assert row.get("all_union_jaccard", "") == ""
+    # The populated side's real pattern counts must survive on a blocked
+    # row -- only the blocked side is legitimately zero. "populated" has 2
+    # patterns (jh1, jh2); reporting n_patterns_b/n_unique_patterns_b as 0
+    # here would corrupt the raw inventory count a downstream reader needs
+    # to understand what was actually blocked.
+    assert row["n_patterns_a"] == "0"
+    assert row["n_patterns_b"] == "2"
+    assert row["n_unique_patterns_a"] == "0"
+    assert row["n_unique_patterns_b"] == "2"
 
 
 # ---------------------------------------------------------------------------
@@ -399,3 +409,50 @@ def test_single_file_side_is_never_blocked(tmp_path):
 
     assert row["comparison_status"] != "blocked"
     assert row["comparison_status"] == "degraded"
+
+
+# ---------------------------------------------------------------------------
+# Pooled comparison: pool-only domains must still be scheduled for a
+# zero-inventory focal segment (found in PR review; run_pooled_comparison()
+# only iterated the focal segment's own domains, so a domain the focal has
+# zero inventory for but its pool has real data in was never scheduled at
+# all -- the blocked-row path added to _build_pooled_row() never got a
+# chance to run for that case).
+# ---------------------------------------------------------------------------
+
+def test_pooled_comparison_schedules_pool_only_domain_for_empty_focal(tmp_path):
+    _clear_caches()
+    domain = "pooldom"
+    segments_root = tmp_path / "segments"
+    # focal_empty has literally no domain_patterns.csv at all -- zero
+    # inventory for every domain, including "pooldom", which only the pool
+    # sibling has.
+    (segments_root / "focal_empty").mkdir(parents=True)
+    _write_segment(segments_root, "pool_sib", domain, {"fp1": ["jh1", "jh2"]})
+
+    manifest = {
+        "focal_empty": {**_manifest_entry(), "parent_segment_id": "p1"},
+        "pool_sib": {**_manifest_entry(), "parent_segment_id": "p1"},
+    }
+    registry = {
+        "focal_empty": _registry_entry("focal_empty"),
+        "pool_sib": _registry_entry("pool_sib"),
+    }
+
+    rows = run_pooled_comparison(
+        manifest, registry, segments_root, min_patterns=1,
+        executed_utc="2026-07-20T00:00:00Z", focal_segment_ids={"focal_empty"},
+    )
+
+    # Both segments share client_label="Acme" too (via _manifest_entry()'s
+    # default), so this also produces a "client" pool_scope row alongside
+    # "parent_sibling" -- restrict to the grain under test.
+    pooldom_rows = [
+        r for r in rows if r["domain"] == domain and r["pool_scope"] == "parent_sibling"
+    ]
+    assert len(pooldom_rows) == 1
+    row = pooldom_rows[0]
+    assert row["segment_id"] == "focal_empty"
+    assert row["n_files_focal"] == "0"
+    assert row["n_files_pool"] == "1"
+    assert row["comparison_status"] == "blocked"

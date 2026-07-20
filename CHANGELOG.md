@@ -12,6 +12,35 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Fixed
+- Three correctness bugs in the `comparison_status="blocked"` row-emission
+  path added earlier in this changeset (found via code review), all in
+  `tools/compare_cross_segment.py`:
+  - **Blocked rows corrupted the populated side's own counts.** `run_pair()`'s
+    blocked-row builder hardcoded `n_patterns_a`/`n_patterns_b`/
+    `n_unique_patterns_a`/`n_unique_patterns_b` to `0` for *both* sides, even
+    when only one side was actually empty and `n_a`/`n_b` (the populated
+    side's real counts) were already computed. Now uses the real per-side
+    counts; only the genuinely-empty side reads `0`.
+  - **Blocked directed references produced false delta findings.** Before
+    this changeset, a directed comparison with a zero-file reference side
+    returned `None` from `run_pair()`, so `main()`'s delta-generation block
+    (for `DELTA_DIRECTED_TYPES`) never ran. Now that a blocked comparison
+    returns a real row, that block *did* run — with an empty `ref_union`,
+    `tgt_union - ref_union` equals `tgt_union`, so every target join_hash
+    was written to `cross_segment_delta.csv` as if the target had invented
+    it locally, when the true story is "reference unknown," not "target
+    drifted." Delta generation now skips rows with
+    `comparison_status == "blocked"`.
+  - **Pool-only domains were never scheduled for an empty focal segment.**
+    `run_pooled_comparison()` iterated only `discover_domains_for_segment
+    (focal_sid)` when deciding which domains to run `_build_pooled_row()`
+    for. A focal segment with zero inventory for a domain that exists only
+    in its pool (`n_files_focal=0, n_files_pool>0` — precisely the case the
+    blocked-row path exists to report) was therefore never scheduled at all
+    for that domain, silently dropping the row instead of reporting it
+    blocked. Domain discovery now unions the focal segment's domains with
+    every pool member's domains (memoized per segment_id across the whole
+    call, since the same segment recurs across the three pool grains).
 - `tools/compare_cross_segment.py`'s `make_comparison_run_id()` now includes
   `comparison_type` in its hash input (`seg_a|seg_b|comparison_type|
   executed_utc`, was `seg_a|seg_b|executed_utc`). An enterprise (Stantec/
