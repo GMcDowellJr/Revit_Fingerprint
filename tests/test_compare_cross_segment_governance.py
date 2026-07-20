@@ -19,12 +19,16 @@ from compare_cross_segment import (  # noqa: E402
     build_pair_domain_work_items,
     build_pattern_reuse_distribution_rows,
     build_union_inventory_rows,
+    deduplicate_pairs,
     discover_client_cross_bc,
     discover_domains_for_segment,
     discover_governance_chain,
+    discover_sibling_segments,
     discover_within_project,
+    drop_legacy_siblings_covered_by_peer_comparisons,
     load_file_join_hashes,
     main as compare_main,
+    make_comparison_run_id,
     run_pooled_comparison,
     sort_pair_detail_rows,
     sort_summary_rows,
@@ -408,6 +412,60 @@ def test_discover_governance_chain_enterprise_to_bc_and_client_are_same_role_onl
     assert ("ent_c", "bc_c", "enterprise_to_bc") in pairs
     assert ("ent_t", "bc_c", "enterprise_to_bc") not in pairs
     assert ("ent_t", "client_t", "enterprise_to_client") in pairs
+
+
+def test_enterprise_to_bc_and_sibling_template_survive_with_distinct_run_ids():
+    # An enterprise (Stantec/0000) standard and a real-BC standard of the
+    # same role sharing a parent_segment_id get paired BOTH as
+    # sibling_templates (discover_sibling_segments, symmetric Jaccard) AND
+    # as enterprise_to_bc (discover_governance_chain, directed reference-
+    # union containment) -- these are genuinely distinct measurements of the
+    # same two segments, not duplicates, so neither drop_legacy_siblings_
+    # covered_by_peer_comparisons() nor anything else should suppress
+    # either row. "seg_0000" sorts before "seg_bc001" alphabetically, so
+    # both discover_sibling_segments()'s sorted-ID pairing and
+    # discover_governance_chain()'s enterprise-then-bc pairing land on the
+    # exact same (seg_a, seg_b) orientation -- the scenario that used to
+    # collide on comparison_run_id.
+    manifest = {
+        "seg_0000": {
+            **_seg("Template", client="Stantec"),
+            "business_center_label": "0000",
+            "parent_segment_id": "parent1",
+        },
+        "seg_bc001": {
+            **_seg("Template", client="Stantec"),
+            "business_center_label": "BC1",
+            "parent_segment_id": "parent1",
+        },
+    }
+
+    sibling_pairs = discover_sibling_segments(manifest)
+    governance_pairs = discover_governance_chain(manifest)
+    assert ("seg_0000", "seg_bc001", "sibling_templates") in sibling_pairs
+    assert ("seg_0000", "seg_bc001", "enterprise_to_bc") in governance_pairs
+
+    pairs = deduplicate_pairs(sibling_pairs + governance_pairs)
+    pairs = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
+
+    surviving = {ctype for a, b, ctype in pairs if {a, b} == {"seg_0000", "seg_bc001"}}
+    assert surviving == {"sibling_templates", "enterprise_to_bc"}
+
+    executed_utc = "2026-07-20T00:00:00Z"
+    ids = {
+        ctype: make_comparison_run_id("seg_0000", "seg_bc001", executed_utc, ctype)
+        for ctype in surviving
+    }
+    assert len(set(ids.values())) == len(ids)
+
+
+def test_make_comparison_run_id_differs_by_comparison_type_for_same_pair_and_timestamp():
+    executed_utc = "2026-07-20T00:00:00Z"
+    id_a = make_comparison_run_id("s1", "s2", executed_utc, "sibling_templates")
+    id_b = make_comparison_run_id("s1", "s2", executed_utc, "enterprise_to_bc")
+    assert id_a != id_b
+    # Deterministic given identical inputs.
+    assert id_a == make_comparison_run_id("s1", "s2", executed_utc, "sibling_templates")
 
 
 def test_discover_governance_chain_excludes_generic_from_scope_fanout():

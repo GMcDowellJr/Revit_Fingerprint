@@ -11,6 +11,38 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Fixed
+- `tools/compare_cross_segment.py`'s `make_comparison_run_id()` now includes
+  `comparison_type` in its hash input (`seg_a|seg_b|comparison_type|
+  executed_utc`, was `seg_a|seg_b|executed_utc`). An enterprise (Stantec/
+  `"0000"`) standard and a real-BC standard of the same role that share a
+  `parent_segment_id` get paired both as `sibling_templates`/
+  `sibling_containers` (`discover_sibling_segments()`, symmetric Jaccard)
+  and as `enterprise_to_bc` (`discover_governance_chain()`, directed
+  reference-union containment) — genuinely distinct measurements of the
+  same two segments, not duplicates (unlike the `cross_client`/`bc_to_bc`/
+  `client_cross_bc` case `drop_legacy_siblings_covered_by_peer_comparisons()`
+  already handles, which are symmetric duplicates and correctly get the
+  sibling row dropped). Because `discover_sibling_segments()`'s sorted-ID
+  pairing and `discover_governance_chain()`'s enterprise-then-bc pairing can
+  land on the identical `(seg_a, seg_b)` orientation (whenever the
+  enterprise segment's generated ID happens to sort first, e.g. `"0000"`
+  segments), both rows previously collided on the same `comparison_run_id`
+  even though `cross_segment_file_pairs.csv` carries no `comparison_type`
+  column to disambiguate by. `enterprise_to_client` has the identical
+  structural risk (same shared-parent/same-role precondition) and is fixed
+  by the same change. All callers within `compare_cross_segment.py` that
+  build a `comparison_run_id` for a `run_pair()`-style comparison now pass
+  their `comparison_type` through; the two `_build_pooled_row()` pooled-
+  comparison call sites are unaffected (their second `make_comparison_run_id`
+  argument already embeds `pool_scope`, so there is no analogous collision
+  there). This changes every `comparison_run_id` value produced by the tool
+  (the hash input format changed for all rows, not just the previously-
+  colliding ones) — `comparison_run_id` is a per-run bookkeeping ID
+  (embeds `executed_utc` already, so never reproducible across runs
+  regardless), not one of the record.v2 identity/fingerprint hashes D-002
+  protects, so no `DECISIONS.md` entry is needed.
+
 ### Changed
 - `tools/compare_cross_segment.py` cardinality and aggregation semantics are
   now explicit. Adds non-suppressive `comparison_status` (`ok`/`degraded`/

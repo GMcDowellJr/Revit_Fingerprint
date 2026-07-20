@@ -173,7 +173,7 @@ One row per (segment_id_a, segment_id_b, domain, comparison_type).
 
 | Column | Description |
 |--------|-------------|
-| `comparison_run_id` | `cmp_<sha1[:12]>` of seg_a + seg_b + executed_utc |
+| `comparison_run_id` | `cmp_<sha1[:12]>` of seg_a + seg_b + comparison_type + executed_utc — comparison_type is included so that two distinct comparison types for the same segment pair (e.g. a `sibling_templates` row and an `enterprise_to_bc` row that happen to share a parent_segment_id) never collide on the same ID |
 | `segment_id_a` | Left segment identifier |
 | `segment_id_b` | Right segment identifier |
 | `segment_label_a/b` | Human-readable segment labels from manifest |

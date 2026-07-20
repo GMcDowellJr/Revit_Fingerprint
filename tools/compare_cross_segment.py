@@ -2619,15 +2619,24 @@ def drop_legacy_siblings_covered_by_peer_comparisons(
     same pair are usually distinct analytical questions and must all be
     preserved), a sibling_* row and its purpose-built counterpart measure the
     identical underlying file-level comparison for the identical two
-    segments -- keeping both would double-count that one pair downstream and
-    collide on comparison_run_id (make_comparison_run_id() hashes only
-    segment IDs + timestamp, not comparison_type, and
-    cross_segment_file_pairs.csv carries no comparison_type column at all --
-    a broader, pre-existing characteristic of that identifier/schema not
-    touched here). The purpose-built type is the unambiguous producer for its
-    signal; drop the sibling_* entry (order-independent) for any pair a
-    purpose-built peer type already covers, and leave every other pair/type
-    untouched.
+    segments (both symmetric Jaccard/containment over the same file
+    inventories) -- keeping both would just double the row count for zero
+    additional signal, since cross_segment_file_pairs.csv carries no
+    comparison_type column to distinguish them by. make_comparison_run_id()
+    now includes comparison_type in its hash, so the two rows would no
+    longer collide on ID -- but they would still be exact duplicates. The
+    purpose-built type is the unambiguous producer for its signal; drop the
+    sibling_* entry (order-independent) for any pair a purpose-built peer
+    type already covers, and leave every other pair/type untouched.
+
+    enterprise_to_bc/enterprise_to_client (discover_governance_chain()) are
+    NOT in _PURPOSE_BUILT_PEER_TYPES despite having the identical
+    shared-parent collision risk with sibling_templates/sibling_containers,
+    because they are directed reference-union containment, not a duplicate
+    of the sibling_* symmetric measurement -- dropping the sibling_* row
+    there would silently discard real, distinct signal. That case is
+    resolved by make_comparison_run_id() disambiguating on comparison_type
+    instead: both rows survive, each with its own correct ID.
     """
     peer_covered_pairs = {
         frozenset((a, b)) for a, b, ctype in pairs if ctype in _PURPOSE_BUILT_PEER_TYPES
@@ -2642,8 +2651,26 @@ def drop_legacy_siblings_covered_by_peer_comparisons(
 # comparison_run_id
 # ---------------------------------------------------------------------------
 
-def make_comparison_run_id(seg_a: str, seg_b: str, executed_utc: str) -> str:
-    token = f"{seg_a}|{seg_b}|{executed_utc}"
+def make_comparison_run_id(
+    seg_a: str, seg_b: str, executed_utc: str, comparison_type: str = "",
+) -> str:
+    """comparison_type is included so that two distinct comparison types for
+    the exact same (seg_a, seg_b) pair and timestamp never collide on the
+    same ID. This does happen in practice: e.g. an enterprise (Stantec/0000)
+    standard and a real-BC standard of the same role can share a
+    parent_segment_id, so discover_sibling_segments() pairs them as
+    sibling_templates/sibling_containers *in addition to*
+    discover_governance_chain() pairing them as enterprise_to_bc -- both use
+    the same (seg_a, seg_b) orientation (sibling's sorted-ID order happens to
+    match enterprise-then-bc order whenever the enterprise segment's
+    generated ID sorts first). Unlike the sibling_*-vs-purpose-built-peer
+    overlap drop_legacy_siblings_covered_by_peer_comparisons() handles
+    (genuinely duplicate symmetric measurements of the same pair), sibling_*
+    and enterprise_to_bc/enterprise_to_client are not duplicates -- sibling_*
+    is symmetric Jaccard, the enterprise_to_* pairing is directed reference-
+    union containment -- so the fix here is to keep both rows and give them
+    distinct IDs, not to drop one."""
+    token = f"{seg_a}|{seg_b}|{comparison_type}|{executed_utc}"
     digest = hashlib.sha1(token.encode("utf-8")).hexdigest()
     return f"cmp_{digest[:12]}"
 
@@ -2783,7 +2810,7 @@ def run_pair(
             "n_pairs": str(len(raw_pairs)),
         }
 
-        crid = make_comparison_run_id(seg_a, seg_b, executed_utc)
+        crid = make_comparison_run_id(seg_a, seg_b, executed_utc, comparison_type)
         all_has_bundles = "true" if bnd_a_wp_all else "false"
         used_has_bundles = "true" if bnd_a_wp_used else "false"
         n_unique_wp = len(total_jhs)
@@ -2893,7 +2920,7 @@ def run_pair(
     if n_files_a_ct == 0 or n_files_b_ct == 0:
         status_a, _ = _segment_domain_source_status(segments_root, registry, seg_a, domain)
         status_b, _ = _segment_domain_source_status(segments_root, registry, seg_b, domain)
-        crid_blocked = make_comparison_run_id(seg_a, seg_b, executed_utc)
+        crid_blocked = make_comparison_run_id(seg_a, seg_b, executed_utc, comparison_type)
         blocked_row = _build_summary_row(
             crid_blocked, seg_a, seg_b, comparison_type, domain,
             manifest, {"n_files_a": str(n_files_a_ct), "n_files_b": str(n_files_b_ct), "n_pairs": "0"},
@@ -2948,7 +2975,7 @@ def run_pair(
             for r in pair_rows_used
         }
         # Emit ALL pair rows — no suppression threshold
-        crid_pre = make_comparison_run_id(seg_a, seg_b, executed_utc)
+        crid_pre = make_comparison_run_id(seg_a, seg_b, executed_utc, comparison_type)
         for r in pair_rows_raw:
             eid_a2 = r.get("export_run_id_a", "")
             eid_b2 = r.get("export_run_id_b", "")
@@ -2998,7 +3025,7 @@ def run_pair(
     used_has_bundles_a = "true" if bnd_a_used else "false"
     used_has_bundles_b = "true" if bnd_b_used else "false"
 
-    crid = make_comparison_run_id(seg_a, seg_b, executed_utc)
+    crid = make_comparison_run_id(seg_a, seg_b, executed_utc, comparison_type)
     summary = _build_summary_row(
         crid, seg_a, seg_b, comparison_type, domain,
         manifest, metrics,
@@ -4316,7 +4343,7 @@ def main() -> int:
                 crid = (
                     result.get("comparison_run_id", "")
                     if result is not None
-                    else make_comparison_run_id(seg_a, seg_b, executed_utc)
+                    else make_comparison_run_id(seg_a, seg_b, executed_utc, ctype)
                 )
                 state_rows, state_summary = build_governance_state_outputs(
                     crid=crid,
