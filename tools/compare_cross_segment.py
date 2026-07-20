@@ -49,12 +49,46 @@ Sufficiency and ambiguity judgment
 -----------------------------------
 Scores are always computed and emitted, along with the raw counts
 (n_files_a/b, n_files_focal/pool, n_shared_join_hash, n_unique_patterns_*)
-needed to judge them. This file does not itself classify a comparison as
-interpretable, sufficient, or ambiguous — no data_sufficient flag, no
-score_ambiguity_band label. signal_spread is reported as a raw float
-(computed from the same shared/unique counts) for downstream banding;
-it is not itself a judgment. That interpretive layer belongs to
-generate_governance_narrative.py.
+needed to judge them. This file does not classify a comparison as
+interpretable, sufficient, or ambiguous — no score_ambiguity_band label.
+signal_spread is reported as a raw float (computed from the same
+shared/unique counts) for downstream banding; it is not itself a judgment.
+That interpretive layer belongs to generate_governance_narrative.py.
+
+comparison_status is the one exception: it is explicit, non-suppressive
+cardinality metadata (ok/degraded/blocked, computed purely from file
+counts), not a judgment about the scores themselves. blocked means zero
+readable file inventory on a required side; degraded means one side has
+exactly one file while the other has more; everything else, including a
+symmetric 1x1 comparison, is ok. No comparison is ever suppressed on this
+basis — this is the replacement for the removed n_files >= 5
+data_sufficient gate, which silently hid narrow-but-valid rows instead of
+labeling them. cardinality_shape and file_count_ratio are purely
+descriptive siblings of comparison_status and never gate output either.
+
+Cartesian pairwise means (all_pairwise_jaccard_mean, used_pairwise_jaccard_mean,
+all_pairwise_containment_a_in_b_mean, etc.; aggregation_method =
+"cartesian_file_pair_mean") answer "what's the mean of all A-file x B-file
+pairs" -- a different question from the population-union metrics
+(all_union_jaccard, all_union_containment_a_in_b/b_in_a, and their used_
+counterparts), which answer "how similar are these two populations" from
+each side's union footprint, independent of n_files_a x n_files_b. The two
+families diverge exactly when file counts are imbalanced; neither
+supersedes the other. all_a_file_mean_similarity_to_b_mean/min and its B
+counterpart expose directional population experience for symmetric
+comparisons -- in a 1xN comparison, the A-side summary is one file's
+average similarity to N files, while the B-side summary is the
+distribution of N files against that one A file.
+
+Directed comparisons keep the reference-union -> per-target-file-
+distribution approach (reference_aggregation = "union", target_aggregation
+= "per_file_distribution"); reference_union_pattern_count,
+reference_intersection_pattern_count, and reference_core_share (=
+intersection/union across every reference file) are heterogeneity
+diagnostics that reveal whether a multi-file reference is a coherent
+standard or a broad union of conflicting sources, independent of how well
+any target matches it. reference_core_share degrades to 1.0 for a
+single-file reference -- not an artificial failure.
 
 Reference segment participation
 --------------------------------
@@ -178,18 +212,27 @@ SUMMARY_FIELDS: List[str] = [
     "n_patterns_a", "n_patterns_b", "n_shared_join_hash",
     "n_unique_patterns_a", "n_unique_patterns_b",
     "signal_spread",
-    "all_containment_a_in_b_mean", "all_containment_a_in_b_min",
-    "all_containment_b_in_a_mean", "all_containment_b_in_a_min",
-    "all_jaccard_mean", "all_jaccard_p10", "all_jaccard_p90",
-    "used_jaccard_mean", "used_jaccard_p10", "used_jaccard_p90",
-    "used_containment_a_in_b_mean", "used_containment_a_in_b_min",
-    "used_containment_b_in_a_mean", "used_containment_b_in_a_min",
+    "all_pairwise_containment_a_in_b_mean", "all_containment_a_in_b_min",
+    "all_pairwise_containment_b_in_a_mean", "all_containment_b_in_a_min",
+    "all_pairwise_jaccard_mean", "all_jaccard_p10", "all_jaccard_p90",
+    "used_pairwise_jaccard_mean", "used_jaccard_p10", "used_jaccard_p90",
+    "used_pairwise_containment_a_in_b_mean", "used_containment_a_in_b_min",
+    "used_pairwise_containment_b_in_a_mean", "used_containment_b_in_a_min",
     "used_n_shared_join_hash",
+    "aggregation_method",
+    "all_union_jaccard", "all_union_containment_a_in_b", "all_union_containment_b_in_a",
+    "used_union_jaccard", "used_union_containment_a_in_b", "used_union_containment_b_in_a",
+    "all_a_file_mean_similarity_to_b_mean", "all_a_file_mean_similarity_to_b_min",
+    "all_b_file_mean_similarity_to_a_mean", "all_b_file_mean_similarity_to_a_min",
+    "reference_aggregation", "target_aggregation", "n_reference_files",
+    "reference_union_pattern_count", "reference_intersection_pattern_count", "reference_core_share",
     "all_has_bundles_a", "all_has_bundles_b",
     "all_n_shared_bundle_both", "all_n_shared_bundle_a_only", "all_n_shared_bundle_b_only",
     "used_has_bundles_a", "used_has_bundles_b",
     "used_n_shared_bundle_both", "used_n_shared_bundle_a_only", "used_n_shared_bundle_b_only",
     "n_files_a", "n_files_b", "n_pairs",
+    "comparison_status", "cardinality_shape", "file_count_ratio",
+    "inventory_status_a", "inventory_status_b",
     "reference_usage_interpretable",
     "target_usage_interpretable",
     "recommended_primary_view",
@@ -246,6 +289,7 @@ POOLED_FIELDS: List[str] = [
     "domain",
     "pool_scope",
     "n_files_focal", "n_files_pool",
+    "comparison_status", "cardinality_shape", "file_count_ratio",
     "n_unique_patterns_focal", "n_unique_patterns_pool", "n_shared_join_hash",
     "signal_spread",
     "all_containment_focal_in_pool", "all_containment_pool_in_focal",
@@ -1577,6 +1621,60 @@ def _min(xs: List[float]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Cardinality / status classification — explicit, non-suppressive.
+#
+# comparison_status replaces the removed n_files >= 5 data_sufficient gate.
+# Scores are always computed and emitted regardless of status; status is
+# purely interpretive metadata. blocked is reserved for "no data at all" —
+# degraded/ok comparisons still carry full, trustworthy metrics, just with
+# narrower (degraded) or normal (ok) evidence breadth. cardinality_shape and
+# file_count_ratio are descriptive only and never gate anything.
+# ---------------------------------------------------------------------------
+
+def _comparison_status(n_files_a: int, n_files_b: int) -> str:
+    if n_files_a == 0 or n_files_b == 0:
+        return "blocked"
+    if (n_files_a == 1 or n_files_b == 1) and n_files_a != n_files_b:
+        return "degraded"
+    return "ok"
+
+
+def _cardinality_shape(n_files_a: int, n_files_b: int) -> str:
+    if n_files_a == n_files_b:
+        return "balanced"
+    if n_files_a == 1:
+        return "single_a"
+    if n_files_b == 1:
+        return "single_b"
+    return "imbalanced"
+
+
+def _file_count_ratio(n_files_a: int, n_files_b: int) -> str:
+    if n_files_a == 0 or n_files_b == 0:
+        return ""
+    return _fmt(max(n_files_a, n_files_b) / min(n_files_a, n_files_b))
+
+
+def _cardinality_fields(n_files_a: int, n_files_b: int) -> Dict[str, str]:
+    return {
+        "comparison_status": _comparison_status(n_files_a, n_files_b),
+        "cardinality_shape": _cardinality_shape(n_files_a, n_files_b),
+        "file_count_ratio": _file_count_ratio(n_files_a, n_files_b),
+    }
+
+
+def _union_similarity(jhs_a: Set[str], jhs_b: Set[str]) -> Tuple[str, str, str]:
+    """Population-footprint metrics: union(A) vs union(B), independent of
+    n_files_a x n_files_b. Returns (jaccard, containment_a_in_b, containment_b_in_a)."""
+    union = jhs_a | jhs_b
+    shared = jhs_a & jhs_b
+    jac = _fmt(len(shared) / len(union)) if union else ""
+    c_ab = _fmt(len(shared) / len(jhs_a)) if jhs_a else ""
+    c_ba = _fmt(len(shared) / len(jhs_b)) if jhs_b else ""
+    return jac, c_ab, c_ba
+
+
+# ---------------------------------------------------------------------------
 # Comparison engine — directed (containment)
 # ---------------------------------------------------------------------------
 
@@ -1603,15 +1701,31 @@ def compare_directed_file(
     for jhs in tgt_files.values():
         all_b |= jhs
 
+    # Reference heterogeneity: is a multi-file reference a coherent standard
+    # (high core share) or a broad union of conflicting sources (low core
+    # share)? Degrades gracefully to 1.0 for a single-file reference — a
+    # lone file is trivially coherent with itself, not an artificial failure.
+    ref_intersection: Optional[Set[str]] = None
+    for jhs in ref_files.values():
+        ref_intersection = jhs if ref_intersection is None else (ref_intersection & jhs)
+    ref_intersection = ref_intersection or set()
+    ref_core_share = (
+        len(ref_intersection) / len(ref_union) if ref_union else 0.0
+    )
+
     return {
         "n_shared_join_hash": str(len(ref_union & all_b)),
-        "all_containment_a_in_b_mean": _mean(a_in_b),
+        "all_pairwise_containment_a_in_b_mean": _mean(a_in_b),
         "all_containment_a_in_b_min": _min(a_in_b),
-        "all_containment_b_in_a_mean": _mean(b_in_a),
+        "all_pairwise_containment_b_in_a_mean": _mean(b_in_a),
         "all_containment_b_in_a_min": _min(b_in_a),
         "n_files_a": str(len(ref_files)),
         "n_files_b": str(len(tgt_files)),
         "n_pairs": str(len(tgt_files)),
+        "n_reference_files": str(len(ref_files)),
+        "reference_union_pattern_count": str(len(ref_union)),
+        "reference_intersection_pattern_count": str(len(ref_intersection)),
+        "reference_core_share": _fmt(ref_core_share),
     }
 
 
@@ -1633,6 +1747,8 @@ def compare_symmetric_file(
     c_ab_list: List[float] = []
     c_ba_list: List[float] = []
     pair_rows: List[Dict[str, str]] = []
+    per_a_jaccards: Dict[str, List[float]] = defaultdict(list)
+    per_b_jaccards: Dict[str, List[float]] = defaultdict(list)
 
     for eid_a, jhs_a in files_a.items():
         for eid_b, jhs_b in files_b.items():
@@ -1643,6 +1759,8 @@ def compare_symmetric_file(
             jaccards.append(j)
             c_ab_list.append(c_ab)
             c_ba_list.append(c_ba)
+            per_a_jaccards[eid_a].append(j)
+            per_b_jaccards[eid_b].append(j)
             pair_rows.append({
                 "export_run_id_a": eid_a,
                 "export_run_id_b": eid_b,
@@ -1661,18 +1779,30 @@ def compare_symmetric_file(
     for jhs in files_b.values():
         all_b |= jhs
 
+    # Side-balanced summaries: each A-file's own mean similarity to every B
+    # file, then mean/min of those per-file means (and the inverse for B).
+    # Exposes directional population experience — in a 1xN comparison, the
+    # A-side summary is one file's average similarity to N files; the B-side
+    # summary is the distribution of N files against that one A file.
+    a_file_means = [sum(v) / len(v) for v in per_a_jaccards.values()]
+    b_file_means = [sum(v) / len(v) for v in per_b_jaccards.values()]
+
     summary = {
         "n_shared_join_hash": str(len(all_a & all_b)),
-        "all_containment_a_in_b_mean": _mean(c_ab_list),
+        "all_pairwise_containment_a_in_b_mean": _mean(c_ab_list),
         "all_containment_a_in_b_min": _min(c_ab_list),
-        "all_containment_b_in_a_mean": _mean(c_ba_list),
+        "all_pairwise_containment_b_in_a_mean": _mean(c_ba_list),
         "all_containment_b_in_a_min": _min(c_ba_list),
-        "all_jaccard_mean": _mean(jaccards),
+        "all_pairwise_jaccard_mean": _mean(jaccards),
         "all_jaccard_p10": _fmt(_pct(jaccards, 10)) if jaccards else "",
         "all_jaccard_p90": _fmt(_pct(jaccards, 90)) if jaccards else "",
         "n_files_a": str(len(files_a)),
         "n_files_b": str(len(files_b)),
         "n_pairs": str(len(jaccards)),
+        "all_a_file_mean_similarity_to_b_mean": _mean(a_file_means),
+        "all_a_file_mean_similarity_to_b_min": _min(a_file_means),
+        "all_b_file_mean_similarity_to_a_mean": _mean(b_file_means),
+        "all_b_file_mean_similarity_to_a_min": _min(b_file_means),
     }
     return summary, pair_rows
 
@@ -2645,7 +2775,7 @@ def run_pair(
 
         metrics: Dict[str, str] = {
             "n_shared_join_hash": str(n_shared_jh),
-            "all_jaccard_mean": _mean(jaccards),
+            "all_pairwise_jaccard_mean": _mean(jaccards),
             "all_jaccard_p10": _fmt(_pct(jaccards, 10)) if jaccards else "",
             "all_jaccard_p90": _fmt(_pct(jaccards, 90)) if jaccards else "",
             "n_files_a": str(n_files),
@@ -2676,7 +2806,7 @@ def run_pair(
             used_n_shared_bundle_a_only=n_aonly_wp_used,
             used_n_shared_bundle_b_only=n_bonly_wp_used,
             used_n_shared_join_hash=str(used_n_shared_jh_wp),
-            used_jaccard_mean=_mean(used_jaccards_wp),
+            used_pairwise_jaccard_mean=_mean(used_jaccards_wp),
             used_jaccard_p10=_fmt(_pct(used_jaccards_wp, 10)) if used_jaccards_wp else "",
             used_jaccard_p90=_fmt(_pct(used_jaccards_wp, 90)) if used_jaccards_wp else "",
             executed_utc=executed_utc,
@@ -2723,14 +2853,16 @@ def run_pair(
             })
 
         # Patch containment into summary metrics (mean/min over all pairs)
-        summary_row["all_containment_a_in_b_mean"] = _mean(c_ab_list_wp)
+        summary_row["all_pairwise_containment_a_in_b_mean"] = _mean(c_ab_list_wp)
         summary_row["all_containment_a_in_b_min"] = _min(c_ab_list_wp)
-        summary_row["all_containment_b_in_a_mean"] = _mean(c_ba_list_wp)
+        summary_row["all_pairwise_containment_b_in_a_mean"] = _mean(c_ba_list_wp)
         summary_row["all_containment_b_in_a_min"] = _min(c_ba_list_wp)
-        summary_row["used_containment_a_in_b_mean"] = _mean(used_c_ab_list_wp)
+        summary_row["used_pairwise_containment_a_in_b_mean"] = _mean(used_c_ab_list_wp)
         summary_row["used_containment_a_in_b_min"] = _min(used_c_ab_list_wp)
-        summary_row["used_containment_b_in_a_mean"] = _mean(used_c_ba_list_wp)
+        summary_row["used_pairwise_containment_b_in_a_mean"] = _mean(used_c_ba_list_wp)
         summary_row["used_containment_b_in_a_min"] = _min(used_c_ba_list_wp)
+        summary_row["aggregation_method"] = "cartesian_file_pair_mean"
+        summary_row.update(_cardinality_fields(n_files, n_files))
 
         return summary_row, detail_rows
 
@@ -2749,6 +2881,48 @@ def run_pair(
 
     n_a = len(all_jhs_a)
     n_b = len(all_jhs_b)
+    n_files_a_ct = len(files_a)
+    n_files_b_ct = len(files_b)
+
+    # Zero readable file inventory on either side is the only case that means
+    # "don't trust this row at all" -- emit a real, schema-complete row marked
+    # blocked instead of silently suppressing it. inventory_status_a/b
+    # distinguishes a confirmed-empty domain (source read succeeded, zero
+    # patterns) from a side that couldn't be read at all -- both have zero
+    # files, but they are not the same fact.
+    if n_files_a_ct == 0 or n_files_b_ct == 0:
+        status_a, _ = _segment_domain_source_status(segments_root, registry, seg_a, domain)
+        status_b, _ = _segment_domain_source_status(segments_root, registry, seg_b, domain)
+        crid_blocked = make_comparison_run_id(seg_a, seg_b, executed_utc)
+        blocked_row = _build_summary_row(
+            crid_blocked, seg_a, seg_b, comparison_type, domain,
+            manifest, {"n_files_a": str(n_files_a_ct), "n_files_b": str(n_files_b_ct), "n_pairs": "0"},
+            n_patterns_a=0, n_patterns_b=0,
+            n_unique_patterns_a=0, n_unique_patterns_b=0,
+            all_has_bundles_a="false", all_has_bundles_b="false",
+            all_n_shared_bundle_both=0, all_n_shared_bundle_a_only=0, all_n_shared_bundle_b_only=0,
+            used_has_bundles_a="false", used_has_bundles_b="false",
+            used_n_shared_bundle_both=0, used_n_shared_bundle_a_only=0, used_n_shared_bundle_b_only=0,
+            executed_utc=executed_utc,
+        )
+        blocked_row.update(_cardinality_fields(n_files_a_ct, n_files_b_ct))
+        blocked_row["inventory_status_a"] = status_a
+        blocked_row["inventory_status_b"] = status_b
+        for key in (
+            "all_union_jaccard", "all_union_containment_a_in_b", "all_union_containment_b_in_a",
+            "used_union_jaccard", "used_union_containment_a_in_b", "used_union_containment_b_in_a",
+            "all_a_file_mean_similarity_to_b_mean", "all_a_file_mean_similarity_to_b_min",
+            "all_b_file_mean_similarity_to_a_mean", "all_b_file_mean_similarity_to_a_min",
+            "reference_union_pattern_count", "reference_intersection_pattern_count", "reference_core_share",
+        ):
+            blocked_row[key] = ""
+        if is_directed:
+            blocked_row["reference_aggregation"] = "union"
+            blocked_row["target_aggregation"] = "per_file_distribution"
+            blocked_row["n_reference_files"] = str(n_files_a_ct)
+        else:
+            blocked_row["aggregation_method"] = "cartesian_file_pair_mean"
+        return blocked_row, []
 
     if n_a < min_patterns or n_b < min_patterns:
         return None, []
@@ -2843,15 +3017,37 @@ def run_pair(
         used_n_shared_bundle_a_only=n_aonly_used,
         used_n_shared_bundle_b_only=n_bonly_used,
         used_n_shared_join_hash=str(used_n_shared_jh),
-        used_jaccard_mean=metrics_used.get("all_jaccard_mean", ""),
+        used_pairwise_jaccard_mean=metrics_used.get("all_pairwise_jaccard_mean", ""),
         used_jaccard_p10=metrics_used.get("all_jaccard_p10", ""),
         used_jaccard_p90=metrics_used.get("all_jaccard_p90", ""),
-        used_containment_a_in_b_mean=metrics_used.get("all_containment_a_in_b_mean", ""),
+        used_pairwise_containment_a_in_b_mean=metrics_used.get("all_pairwise_containment_a_in_b_mean", ""),
         used_containment_a_in_b_min=metrics_used.get("all_containment_a_in_b_min", ""),
-        used_containment_b_in_a_mean=metrics_used.get("all_containment_b_in_a_mean", ""),
+        used_pairwise_containment_b_in_a_mean=metrics_used.get("all_pairwise_containment_b_in_a_mean", ""),
         used_containment_b_in_a_min=metrics_used.get("all_containment_b_in_a_min", ""),
         executed_utc=executed_utc,
     )
+    summary.update(_cardinality_fields(n_files_a_ct, n_files_b_ct))
+    if is_directed:
+        summary["reference_aggregation"] = "union"
+        summary["target_aggregation"] = "per_file_distribution"
+        summary["n_reference_files"] = metrics.get("n_reference_files", "")
+        summary["reference_union_pattern_count"] = metrics.get("reference_union_pattern_count", "")
+        summary["reference_intersection_pattern_count"] = metrics.get("reference_intersection_pattern_count", "")
+        summary["reference_core_share"] = metrics.get("reference_core_share", "")
+    else:
+        summary["aggregation_method"] = "cartesian_file_pair_mean"
+        all_union_jaccard, all_union_c_ab, all_union_c_ba = _union_similarity(all_jhs_a, all_jhs_b)
+        used_union_jaccard, used_union_c_ab, used_union_c_ba = _union_similarity(all_jhs_a_used, all_jhs_b_used)
+        summary["all_union_jaccard"] = all_union_jaccard
+        summary["all_union_containment_a_in_b"] = all_union_c_ab
+        summary["all_union_containment_b_in_a"] = all_union_c_ba
+        summary["used_union_jaccard"] = used_union_jaccard
+        summary["used_union_containment_a_in_b"] = used_union_c_ab
+        summary["used_union_containment_b_in_a"] = used_union_c_ba
+        summary["all_a_file_mean_similarity_to_b_mean"] = metrics.get("all_a_file_mean_similarity_to_b_mean", "")
+        summary["all_a_file_mean_similarity_to_b_min"] = metrics.get("all_a_file_mean_similarity_to_b_min", "")
+        summary["all_b_file_mean_similarity_to_a_mean"] = metrics.get("all_b_file_mean_similarity_to_a_mean", "")
+        summary["all_b_file_mean_similarity_to_a_min"] = metrics.get("all_b_file_mean_similarity_to_a_min", "")
     for r in pair_rows:
         r["comparison_run_id"] = crid
     return summary, pair_rows
@@ -2910,12 +3106,12 @@ def _build_summary_row(
     used_n_shared_bundle_b_only: int,
     executed_utc: str,
     used_n_shared_join_hash: str = "",
-    used_jaccard_mean: str = "",
+    used_pairwise_jaccard_mean: str = "",
     used_jaccard_p10: str = "",
     used_jaccard_p90: str = "",
-    used_containment_a_in_b_mean: str = "",
+    used_pairwise_containment_a_in_b_mean: str = "",
     used_containment_a_in_b_min: str = "",
-    used_containment_b_in_a_mean: str = "",
+    used_pairwise_containment_b_in_a_mean: str = "",
     used_containment_b_in_a_min: str = "",
 ) -> Dict[str, str]:
     ma = manifest.get(seg_a, {})
@@ -2959,19 +3155,19 @@ def _build_summary_row(
         "n_unique_patterns_a": str(n_unique_patterns_a),
         "n_unique_patterns_b": str(n_unique_patterns_b),
         "signal_spread": _signal_spread_str,
-        "all_containment_a_in_b_mean": metrics.get("all_containment_a_in_b_mean", ""),
+        "all_pairwise_containment_a_in_b_mean": metrics.get("all_pairwise_containment_a_in_b_mean", ""),
         "all_containment_a_in_b_min": metrics.get("all_containment_a_in_b_min", ""),
-        "all_containment_b_in_a_mean": metrics.get("all_containment_b_in_a_mean", ""),
+        "all_pairwise_containment_b_in_a_mean": metrics.get("all_pairwise_containment_b_in_a_mean", ""),
         "all_containment_b_in_a_min": metrics.get("all_containment_b_in_a_min", ""),
-        "all_jaccard_mean": metrics.get("all_jaccard_mean", ""),
+        "all_pairwise_jaccard_mean": metrics.get("all_pairwise_jaccard_mean", ""),
         "all_jaccard_p10": metrics.get("all_jaccard_p10", ""),
         "all_jaccard_p90": metrics.get("all_jaccard_p90", ""),
-        "used_jaccard_mean": used_jaccard_mean,
+        "used_pairwise_jaccard_mean": used_pairwise_jaccard_mean,
         "used_jaccard_p10": used_jaccard_p10,
         "used_jaccard_p90": used_jaccard_p90,
-        "used_containment_a_in_b_mean": used_containment_a_in_b_mean,
+        "used_pairwise_containment_a_in_b_mean": used_pairwise_containment_a_in_b_mean,
         "used_containment_a_in_b_min": used_containment_a_in_b_min,
-        "used_containment_b_in_a_mean": used_containment_b_in_a_mean,
+        "used_pairwise_containment_b_in_a_mean": used_pairwise_containment_b_in_a_mean,
         "used_containment_b_in_a_min": used_containment_b_in_a_min,
         "used_n_shared_join_hash": used_n_shared_join_hash,
         "all_has_bundles_a": all_has_bundles_a,
@@ -3176,9 +3372,6 @@ def _build_pooled_row(
     for jhs in focal_files.values():
         focal_union |= jhs
 
-    if len(focal_union) < min_patterns:
-        return None
-
     # Aggregate pool files — key by (segment_id, export_run_id) so that
     # the same export_run_id appearing in two sibling segments is counted twice
     # rather than silently collapsed into one entry.
@@ -3192,7 +3385,52 @@ def _build_pooled_row(
     for jhs in pool_files_keyed.values():
         pool_union |= jhs
 
-    if len(pool_union) < min_patterns:
+    n_files_focal = len(focal_files)
+    n_files_pool = len(pool_files_keyed)
+
+    # Zero readable file inventory on either side -- emit a blocked row with
+    # blank similarity fields (not a zero-valued one) instead of suppressing
+    # it outright. See run_pair()'s equivalent short-circuit for rationale.
+    if n_files_focal == 0 or n_files_pool == 0:
+        mf_blocked = manifest.get(focal_sid, {})
+        crid_blocked = make_comparison_run_id(focal_sid, f"pool_{pool_scope}_{pool_key_str}", executed_utc)
+        blocked_row = {
+            "comparison_run_id": crid_blocked,
+            "segment_id": focal_sid,
+            "segment_label": mf_blocked.get("segment_label", ""),
+            "governance_role": mf_blocked.get("governance_role", ""),
+            "client_label": mf_blocked.get("client_label", ""),
+            "business_center_label": _bc_of(mf_blocked),
+            "scope_level": _scope_level(mf_blocked) or "",
+            "unit_system": mf_blocked.get("unit_system", ""),
+            "domain": domain,
+            "pool_scope": pool_scope,
+            "n_files_focal": str(n_files_focal),
+            "n_files_pool": str(n_files_pool),
+            "n_unique_patterns_focal": str(len(focal_union)),
+            "n_unique_patterns_pool": str(len(pool_union)),
+            "n_shared_join_hash": "",
+            "signal_spread": "",
+            "all_containment_focal_in_pool": "",
+            "all_containment_pool_in_focal": "",
+            "used_containment_focal_in_pool": "",
+            "used_containment_pool_in_focal": "",
+            "all_has_bundles_focal": "false",
+            "all_has_bundles_pool": "false",
+            "all_n_shared_bundle_both": "0",
+            "all_n_shared_bundle_focal_only": "0",
+            "all_n_shared_bundle_pool_only": "0",
+            "used_has_bundles_focal": "false",
+            "used_has_bundles_pool": "false",
+            "used_n_shared_bundle_both": "0",
+            "used_n_shared_bundle_focal_only": "0",
+            "used_n_shared_bundle_pool_only": "0",
+            "executed_utc": executed_utc,
+        }
+        blocked_row.update(_cardinality_fields(n_files_focal, n_files_pool))
+        return blocked_row
+
+    if len(focal_union) < min_patterns or len(pool_union) < min_patterns:
         return None
 
     shared = focal_union & pool_union
@@ -3227,9 +3465,6 @@ def _build_pooled_row(
     used_c_pool_in_focal = (
         len(shared_used) / len(pool_union_used) if pool_union_used else 0.0
     )
-
-    n_files_focal = len(focal_files)
-    n_files_pool = len(pool_files_keyed)
 
     # signal_spread: raw containment-asymmetry measure, same formula as
     # _build_summary_row; no interpretive banding applied here.
@@ -3273,7 +3508,7 @@ def _build_pooled_row(
     mf = manifest.get(focal_sid, {})
     crid = make_comparison_run_id(focal_sid, f"pool_{pool_scope}_{pool_key_str}", executed_utc)
 
-    return {
+    row = {
         "comparison_run_id": crid,
         "segment_id": focal_sid,
         "segment_label": mf.get("segment_label", ""),
@@ -3306,6 +3541,8 @@ def _build_pooled_row(
         "used_n_shared_bundle_pool_only": str(n_pool_only_used),
         "executed_utc": executed_utc,
     }
+    row.update(_cardinality_fields(n_files_focal, n_files_pool))
+    return row
 
 
 def run_pooled_comparison(
@@ -3574,7 +3811,7 @@ def build_explicit_matrix_outputs(
     )):
         row_id = r.get("segment_label_a") or r.get("segment_id_a", "")
         col_id = r.get("segment_label_b") or r.get("segment_id_b", "")
-        for view, col in [("all", "all_jaccard_mean"), ("used", "used_jaccard_mean")]:
+        for view, col in [("all", "all_pairwise_jaccard_mean"), ("used", "used_pairwise_jaccard_mean")]:
             raw = r.get(col, "")
             value = float(raw) if raw else None
             status = "ok" if raw else "unavailable"

@@ -155,7 +155,7 @@ jaccard = |A ∩ B| / |A ∪ B|
 
 Summary columns report mean, P10, and P90 across all pairs. P10/P90 bound the distribution — a high mean with low P10 indicates some outlier pairs pulling the group apart.
 
-When `n_pairs ≤ 50`, every individual pair is also written to `cross_segment_file_pairs.csv` with per-file containment values in both directions.
+Every individual pair is also written to `cross_segment_file_pairs.csv` with per-file containment values in both directions — there is no row-count suppression threshold.
 
 ---
 
@@ -164,7 +164,7 @@ When `n_pairs ≤ 50`, every individual pair is also written to `cross_segment_f
 Three CSV files are written to `--out-dir`:
 
 - **`cross_segment_summary.csv`** — one row per (segment_a, segment_b, domain, comparison_type)
-- **`cross_segment_file_pairs.csv`** — individual file pair detail rows when n_pairs ≤ 50
+- **`cross_segment_file_pairs.csv`** — individual file pair detail rows (all pairs are streamed to disk; there is no row-count suppression threshold)
 - **`cross_segment_delta.csv`** — one row per delta join_hash for directed pairs (suppressed by `--no-delta`)
 
 ### cross_segment_summary.csv
@@ -188,38 +188,52 @@ One row per (segment_id_a, segment_id_b, domain, comparison_type).
 | `n_shared_join_hash` | Intersection size |
 | `n_unique_patterns_a/b` | Deduplicated population-level join_hash counts per side |
 | `signal_spread` | `(n_shared/min(a,b)) − (n_shared/max(a,b))` — score sensitivity to size asymmetry (raw float; no banding applied here) |
-| `all_containment_a_in_b_mean` | Mean all-view fraction of A's patterns found in each B unit (directed only) |
+| `all_pairwise_containment_a_in_b_mean` | Mean all-view fraction of A's patterns found in each B unit (Cartesian file-pair mean for symmetric pairs; per-target-file mean against the reference union for directed pairs — see `aggregation_method`/`reference_aggregation`) |
 | `all_containment_a_in_b_min` | Min across B units |
-| `all_containment_b_in_a_mean` | Mean all-view fraction of B's mandate covered by each A unit (directed only) |
+| `all_pairwise_containment_b_in_a_mean` | Mean all-view fraction of B's mandate covered by each A unit |
 | `all_containment_b_in_a_min` | Min across A units |
-| `all_jaccard_mean` | Mean pairwise Jaccard from all-view inventories (symmetric only) |
+| `all_pairwise_jaccard_mean` | Mean pairwise Jaccard from all-view inventories, Cartesian over every A-file × B-file pair (symmetric only) |
 | `all_jaccard_p10` | P10 pairwise Jaccard, all-view (symmetric only) |
 | `all_jaccard_p90` | P90 pairwise Jaccard, all-view (symmetric only) |
-| `used_jaccard_mean` | Mean pairwise Jaccard from used-view inventories (symmetric only) |
+| `used_pairwise_jaccard_mean` | Mean pairwise Jaccard from used-view inventories (symmetric only) |
 | `used_jaccard_p10` | P10 pairwise Jaccard, used-view (symmetric only) |
 | `used_jaccard_p90` | P90 pairwise Jaccard, used-view (symmetric only) |
-| `used_containment_a_in_b_mean` | Mean used-view containment (directed only) |
+| `used_pairwise_containment_a_in_b_mean` | Mean used-view containment |
 | `used_containment_a_in_b_min` | Min across B units, used-view |
-| `used_containment_b_in_a_mean` | Mean used-view containment (directed only) |
+| `used_pairwise_containment_b_in_a_mean` | Mean used-view containment |
 | `used_containment_b_in_a_min` | Min across A units, used-view |
 | `used_n_shared_join_hash` | Count of join_hashes shared in both segments' used-view inventories |
+| `aggregation_method` | `cartesian_file_pair_mean` for symmetric comparisons — labels the `*_pairwise_*` fields' aggregation explicitly; blank for directed pairs (see `reference_aggregation`/`target_aggregation`) |
+| `all_union_jaccard`, `all_union_containment_a_in_b`, `all_union_containment_b_in_a` | Population-footprint metrics (symmetric only): Jaccard/containment between `union(A's all-view files)` and `union(B's all-view files)`, independent of `n_files_a × n_files_b`. Answers "how similar are these two populations" as opposed to the pairwise mean's "what's the mean of all file pairs" |
+| `used_union_jaccard`, `used_union_containment_a_in_b`, `used_union_containment_b_in_a` | Same, over each side's used-view file union |
+| `all_a_file_mean_similarity_to_b_mean`, `all_a_file_mean_similarity_to_b_min` | Symmetric only: each A-file's own mean Jaccard to every B file, then mean/min of those per-file means — exposes A's side of directional population experience |
+| `all_b_file_mean_similarity_to_a_mean`, `all_b_file_mean_similarity_to_a_min` | Same for B's side |
+| `reference_aggregation`, `target_aggregation` | Directed only: always `union` / `per_file_distribution` — the reference side is unioned into one mandate before comparison; containment against each target file is reported as a distribution (mean/min), not a Cartesian file-pair mean |
+| `n_reference_files` | Directed only: number of files unioned into the reference mandate |
+| `reference_union_pattern_count`, `reference_intersection_pattern_count`, `reference_core_share` | Directed only, reference heterogeneity diagnostics: union/intersection pattern counts across every reference file, and `core_share = intersection / union`. A low core share signals a multi-file reference may not represent one coherent standard, independent of how well any target matches it. Degrades to `1.0` for a single-file reference (trivially coherent, not an artificial failure) |
 | `all_has_bundles_a/b` | Whether all-view bundle analysis produced output for each side |
 | `all_n_shared_bundle_both/a_only/b_only` | All-view bundle overlap annotation buckets |
 | `used_has_bundles_a/b` | Whether used-view bundle analysis produced output for each side |
 | `used_n_shared_bundle_both/a_only/b_only` | Used-view bundle overlap annotation buckets |
 | `n_files_a/b` | File count for each side |
-| `n_pairs` | Number of unit pairs that produced Jaccard values, or number of target units for directed |
+| `n_pairs` | Number of unit pairs that produced Jaccard values, or number of target units for directed. Not an evidence-sufficiency proxy — a 20×20 comparison is not 400 independent observations; use `n_files_a`/`n_files_b` for evidence breadth instead |
+| `comparison_status` | `ok` \| `degraded` \| `blocked` — explicit, non-suppressive cardinality status. `blocked`: either side has zero readable file inventory (the only status meaning "don't trust this row"). `degraded`: exactly one side has a single file while the other has more (narrow but valid evidence). `ok`: everything else, including a symmetric 1×1 comparison. Scores are always computed and emitted regardless of status — this replaces the removed `n_files >= 5` `data_sufficient` gate with a status that never hides data |
+| `cardinality_shape` | `single_a` \| `single_b` \| `balanced` \| `imbalanced` — purely descriptive shape of `(n_files_a, n_files_b)`; `balanced` means equal counts (including 1×1), `single_a`/`single_b` means one side has exactly one file and the other doesn't, `imbalanced` covers everything else unequal. Never gates output |
+| `file_count_ratio` | `max(n_files_a, n_files_b) / min(n_files_a, n_files_b)`; blank when either side is `0` (undefined) |
+| `inventory_status_a/b` | Populated only on `blocked` rows: `no_patterns` (segment read successfully, this domain is confirmed to have zero patterns) vs `missing_domain_patterns` (segment/domain data couldn't be read at all) — distinguishes a legitimately-empty inventory from a genuinely unreadable one, both of which have zero files |
 | `reference_usage_interpretable` | Whether used-view is an active-practice signal for the A-side role |
 | `target_usage_interpretable` | Whether used-view is an active-practice signal for the B-side role |
 | `recommended_primary_view` | `all` or `used` — pipeline guidance on which view to use for this comparison type |
 | `comparison_role_semantics` | Plain-language description of what the comparison is measuring |
 | `executed_utc` | ISO-8601 UTC timestamp of the comparison run |
 
-Columns that do not apply to a comparison direction are emitted as blank strings. For directed pairs: `jaccard_*` columns are blank. For symmetric pairs: `containment_*` columns are blank. Semantic columns (`reference_usage_interpretable`, `target_usage_interpretable`, `recommended_primary_view`, `comparison_role_semantics`) clarify when used-view scores are active-practice signals versus annotations.
+Columns that do not apply to a comparison direction are emitted as blank strings. For directed pairs: `jaccard_*`/`*_union_*`/`*_file_mean_similarity_*`/`aggregation_method` columns are blank. For symmetric pairs: `reference_aggregation`/`target_aggregation`/`n_reference_files`/`reference_*_pattern_count`/`reference_core_share` columns are blank. Semantic columns (`reference_usage_interpretable`, `target_usage_interpretable`, `recommended_primary_view`, `comparison_role_semantics`) clarify when used-view scores are active-practice signals versus annotations.
+
+**Migration note**: `all_jaccard_mean`/`used_jaccard_mean`/`all_containment_a_in_b_mean`/`all_containment_b_in_a_mean`/`used_containment_a_in_b_mean`/`used_containment_b_in_a_mean` were renamed to their `*_pairwise_*` equivalents above. `tools/generate_governance_narrative.py` and `tools/compare_governance_populations.py` still read the pre-rename names as of this writing and will read blank values for these specific fields until migrated in a follow-up PR — see `CHANGELOG.md`.
 
 ### cross_segment_file_pairs.csv
 
-Written only for (segment_a, segment_b, domain) triples where `n_pairs ≤ 50`.
+Written for every (segment_a, segment_b, domain) triple with a symmetric comparison — no row-count suppression threshold.
 
 | Column | Description |
 |--------|-------------|
@@ -265,6 +279,9 @@ A segment can appear once per applicable pool grain — e.g. a Project with both
 | `domain` | Domain name |
 | `pool_scope` | `parent_sibling`, `bc`, or `client` — which pool grain produced this row |
 | `n_files_focal` / `n_files_pool` | File counts for the focal segment and the aggregated pool |
+| `comparison_status` | `ok` \| `degraded` \| `blocked` — same semantics as the summary's `comparison_status`, computed from `(n_files_focal, n_files_pool)` |
+| `cardinality_shape` | `single_a` \| `single_b` \| `balanced` \| `imbalanced` — same semantics as the summary's `cardinality_shape`, treating focal as the "a" side and pool as the "b" side |
+| `file_count_ratio` | `max(n_files_focal, n_files_pool) / min(n_files_focal, n_files_pool)`; blank when either side is `0` |
 | `n_unique_patterns_focal` / `n_unique_patterns_pool` | Distinct join_hash counts |
 | `n_shared_join_hash` | Intersection size between focal and pool unions |
 | `signal_spread` | `(n_shared/min(focal,pool)) − (n_shared/max(focal,pool))` — same formula as the summary's `signal_spread`; raw float, no banding applied here |

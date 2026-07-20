@@ -1238,7 +1238,17 @@ def test_main_emits_governance_states_when_pair_skipped_by_min_patterns(tmp_path
     summary_path = out_dir / "cross_segment_summary.csv"
     states_path = out_dir / "cross_segment_governance_states.csv"
     state_summary_path = out_dir / "cross_segment_governance_state_summary.csv"
-    assert not summary_path.exists()
+    # project_sparse has zero readable files (not merely below min_patterns) --
+    # this is now the explicit blocked case: a real, schema-complete summary
+    # row is emitted with comparison_status="blocked" rather than the pair
+    # being suppressed outright. Governance-state outputs are unaffected --
+    # they run through a separate code path from cross_segment_summary.csv.
+    assert summary_path.exists()
+    with summary_path.open("r", encoding="utf-8", newline="") as f:
+        summary_rows = list(csv.DictReader(f))
+    assert len(summary_rows) == 1
+    assert summary_rows[0]["comparison_status"] == "blocked"
+    assert summary_rows[0]["all_pairwise_jaccard_mean"] == ""
     assert states_path.exists()
     assert state_summary_path.exists()
 
@@ -1749,7 +1759,7 @@ def test_explicit_matrices_union_jaccard_differs_from_mean_file_pair():
         "client_label_a": "A", "client_label_b": "B",
         "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial",
         "segment_label_a": "Project A", "segment_label_b": "Project B",
-        "domain": "d", "all_jaccard_mean": "0.000000", "used_jaccard_mean": "",
+        "domain": "d", "all_pairwise_jaccard_mean": "0.000000", "used_pairwise_jaccard_mean": "",
     }]
 
     matrices, frag, manifest = build_explicit_matrix_outputs(summary, [], union_rows, "2026-06-22T00:00:00Z")
@@ -1773,8 +1783,8 @@ def test_fragmentation_diagnostic_uses_all_domains_file_pair_aggregate():
             for jh in hashes:
                 union_rows.append({"governance_role": "Project", "client_label": client, "discipline_label": "Arch", "unit_system": "imperial", "domain": domain, "view_scope": "all", "join_hash": jh, "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000", "inventory_status": "ok"})
     summary = [
-        {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d2", "all_jaccard_mean": "0.000000"},
-        {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d1", "all_jaccard_mean": "1.000000"},
+        {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d2", "all_pairwise_jaccard_mean": "0.000000"},
+        {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d1", "all_pairwise_jaccard_mean": "1.000000"},
     ]
 
     matrices, frag, _ = build_explicit_matrix_outputs(summary, [], union_rows, "2026-06-22T00:00:00Z")
@@ -1903,7 +1913,7 @@ def test_mean_file_pair_matrix_adds_synthetic_diagonal_cells():
         "segment_label_a": "Project A",
         "segment_label_b": "Project B",
         "domain": "d",
-        "all_jaccard_mean": "0.250000",
+        "all_pairwise_jaccard_mean": "0.250000",
     }]
 
     matrices, _, _ = build_explicit_matrix_outputs(summary, [], [], "2026-06-22T00:00:00Z")
@@ -1919,8 +1929,8 @@ def test_mean_file_pair_diagonals_limited_to_project_observed_domains():
     from compare_cross_segment import build_explicit_matrix_outputs
 
     summary = [
-        {"governance_role_a": "Project", "governance_role_b": "Project", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d1", "all_jaccard_mean": "0.250000"},
-        {"governance_role_a": "Project", "governance_role_b": "Project", "segment_label_a": "Project C", "segment_label_b": "Project D", "domain": "d2", "all_jaccard_mean": "0.500000"},
+        {"governance_role_a": "Project", "governance_role_b": "Project", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d1", "all_pairwise_jaccard_mean": "0.250000"},
+        {"governance_role_a": "Project", "governance_role_b": "Project", "segment_label_a": "Project C", "segment_label_b": "Project D", "domain": "d2", "all_pairwise_jaccard_mean": "0.500000"},
     ]
 
     matrices, _, _ = build_explicit_matrix_outputs(summary, [], [], "2026-06-22T00:00:00Z")
@@ -1941,7 +1951,7 @@ def test_mean_file_pair_matrix_emits_symmetric_cells():
         "segment_label_a": "Project A",
         "segment_label_b": "Project B",
         "domain": "d",
-        "all_jaccard_mean": "0.250000",
+        "all_pairwise_jaccard_mean": "0.250000",
     }]
 
     matrices, _, _ = build_explicit_matrix_outputs(summary, [], [], "2026-06-22T00:00:00Z")

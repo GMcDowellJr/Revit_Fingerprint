@@ -12,6 +12,90 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Changed
+- `tools/compare_cross_segment.py` cardinality and aggregation semantics are
+  now explicit. Adds non-suppressive `comparison_status` (`ok`/`degraded`/
+  `blocked`) computed purely from file counts on each side of a comparison
+  (`blocked` = zero readable file inventory on a required side; `degraded` =
+  exactly one side has a single file while the other has more; everything
+  else, including a symmetric 1×1 comparison, is `ok`) to `cross_segment_
+  summary.csv` and `cross_segment_pooled.csv`. This is a genuine behavior
+  change: a comparison where either side has zero files previously produced
+  no row at all (`run_pair()`'s shared `min_patterns` gate silently returned
+  `None`); it now emits a real, schema-complete row with `comparison_status
+  = "blocked"` and blank (not zero-valued) similarity fields instead.
+  `n_files_a >= 1 and n_files_b >= 1` comparisons that used to be silently
+  suppressed via the same path are unaffected — that "can we say anything at
+  all" pattern-count gate (`min_patterns`, default 3, unrelated to file
+  count) is untouched and still silently suppresses rows below it, by
+  design (out of scope for this change).
+  - Purely descriptive `cardinality_shape` (`single_a`/`single_b`/`balanced`/
+    `imbalanced`) and `file_count_ratio` siblings added alongside — neither
+    ever gates output; `balanced` classifies equal file counts on both
+    sides, including 1×1, as symmetric rather than narrow.
+  - `inventory_status_a`/`inventory_status_b` (populated only on `blocked`
+    rows) distinguish a confirmed-empty domain (segment read succeeded,
+    zero patterns — `no_patterns`) from a segment/domain that couldn't be
+    read at all (`missing_domain_patterns`), reusing the existing
+    `_segment_domain_source_status()` helper. Both have zero files but are
+    not the same fact.
+  - Adds population-union metrics for every comparison routed through
+    `compare_symmetric_file()` (this now covers the `bc_to_bc` and
+    `client_cross_bc` comparison types PR2/#373 left at provisional status
+    specifically because of this imbalance problem): `all_union_jaccard`,
+    `all_union_containment_a_in_b`, `all_union_containment_b_in_a`, and
+    `used_*` counterparts — Jaccard/containment between each side's full
+    file-union footprint, independent of `n_files_a × n_files_b`. These
+    answer "how similar are these two populations", a different question
+    from the existing pairwise mean ("what's the mean of all file pairs"),
+    and are stable when a side gains an exact-duplicate file where the
+    pairwise mean is not.
+  - Renames `all_jaccard_mean` → `all_pairwise_jaccard_mean`,
+    `used_jaccard_mean` → `used_pairwise_jaccard_mean`,
+    `all_containment_a_in_b_mean` → `all_pairwise_containment_a_in_b_mean`
+    (and the `b_in_a`/`used_*` counterparts) in `cross_segment_summary.csv`,
+    and adds `aggregation_method = "cartesian_file_pair_mean"` (symmetric
+    rows only) to label them explicitly. The underlying computation is
+    unchanged for symmetric rows; directed rows now populate the same
+    renamed columns via the same reference-union-vs-per-target-file-
+    distribution computation they always used (unchanged) — `reference_
+    aggregation`/`target_aggregation`/`n_reference_files` make that
+    directed-specific meaning explicit per row instead of requiring the
+    reader to already know it from `comparison_type`.
+  - **Breaking for downstream consumers of the renamed fields** — this was
+    a deliberate correctness-over-compatibility call, not an oversight.
+    `tools/compare_governance_populations.py` imports `compare_symmetric_
+    file()`/`compare_directed_file()` directly and spreads their return
+    dict into its own rows (`row.update(metrics)`); it will silently read
+    blank values for `all_jaccard_mean`/`all_containment_a_in_b_mean`/
+    `all_containment_b_in_a_mean` until migrated. `tools/generate_
+    governance_narrative.py` reads the pre-rename names at ~15 call sites
+    via its `_SUMMARY_COL_ALIASES`-style alias helper; it will also
+    silently read blank values for the same three field families until
+    migrated. Neither is touched by this change (out of scope; migrate in
+    a follow-up PR) — 40 tests across `tests/test_generate_governance_
+    narrative_brief.py`, `tests/test_generate_governance_narrative_
+    evidence_package.py`, `tests/test_generate_governance_narrative_
+    policy.py`, and `tests/test_compare_governance_populations.py` now fail
+    as a direct, documented consequence and are left failing pending that
+    migration.
+  - Adds directed-reference heterogeneity diagnostics:
+    `reference_union_pattern_count`, `reference_intersection_pattern_count`,
+    `reference_core_share` (= intersection/union across every file on the
+    reference side) — reveals whether a multi-file reference (e.g. a
+    Template segment backed by several files) is a coherent standard or a
+    broad union of conflicting sources, independent of how well any target
+    matches it. Degrades to `1.0` for a single-file reference — not an
+    artificial failure.
+  - Adds side-balanced summaries for symmetric comparisons:
+    `all_a_file_mean_similarity_to_b_mean/min`,
+    `all_b_file_mean_similarity_to_a_mean/min` — each A-file's own mean
+    Jaccard to every B file, then mean/min of those per-file means (and the
+    inverse for B), exposing directional population experience that a
+    single pooled mean/min hides in an imbalanced comparison.
+  - `docs/cross_segment_comparison.md` updated to match; also corrects two
+    stale claims (a `n_pairs ≤ 50` row-count suppression threshold for
+    `cross_segment_file_pairs.csv` that does not exist anywhere in the
+    code).
 - `tools/compare_cross_segment.py` organizational scope is now derived from
   explicit, literal `client_label`/`business_center_label` values instead of
   blank inference, matching `build_segment_manifest.py`'s explicit-metadata
