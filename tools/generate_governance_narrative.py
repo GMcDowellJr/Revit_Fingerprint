@@ -3640,9 +3640,16 @@ def _render_portfolio_footprint_identity(union_rows: list, matrix_manifest_rows:
         lines.append("`project_union_jaccard_matrix.csv` not provided; footprint-identity comparison unavailable this run.")
         return lines
     lines += _manifest_bullets_for_matrix(matrix_manifest_rows, "project_union_jaccard_matrix.csv")
-    blocked = sum(1 for r in union_rows if _matrix_value_status_blocked(r.get("value_status", "")))
+    # Scoped to view_scope == "all" -- this paragraph only ever renders the
+    # all-view ALL_DOMAINS pairs below, so an unavailable used-view cell (e.g.
+    # a run where only all-view union was computed) must not inflate the
+    # blocked count reported alongside the all-view table.
+    blocked = sum(
+        1 for r in union_rows
+        if r.get("view_scope") == "all" and _matrix_value_status_blocked(r.get("value_status", ""))
+    )
     if blocked:
-        lines.append(f"- Blocked/unavailable footprint-identity cells: {blocked}")
+        lines.append(f"- Blocked/unavailable footprint-identity cells (all-view): {blocked}")
     pairs = _unordered_project_pairs(union_rows, view_scope="all", domain="ALL_DOMAINS", metric="union_jaccard")
     if not pairs:
         lines.append("\nNo ok ALL_DOMAINS `union_jaccard` project pairs available (all-view).")
@@ -3670,9 +3677,14 @@ def _render_portfolio_density_similarity(
         lines.append("`project_density_similarity_matrix.csv` not provided; density-similarity comparison unavailable this run.")
         return lines
     lines += _manifest_bullets_for_matrix(matrix_manifest_rows, "project_density_similarity_matrix.csv")
-    blocked = sum(1 for r in density_rows if _matrix_value_status_blocked(r.get("value_status", "")))
+    # Scoped to view_scope == "all" -- see the matching comment in
+    # _render_portfolio_footprint_identity().
+    blocked = sum(
+        1 for r in density_rows
+        if r.get("view_scope") == "all" and _matrix_value_status_blocked(r.get("value_status", ""))
+    )
     if blocked:
-        lines.append(f"- Blocked/unavailable density-similarity cells: {blocked}")
+        lines.append(f"- Blocked/unavailable density-similarity cells (all-view): {blocked}")
     pairs = _unordered_project_pairs(density_rows, view_scope="all", domain="ALL_DOMAINS", metric="density_similarity")
     if not pairs:
         lines.append("\nNo ok ALL_DOMAINS `density_similarity` project pairs available (all-view).")
@@ -3716,9 +3728,19 @@ def _render_portfolio_pool_containment(pool_rows: list, matrix_manifest_rows: li
         lines.append("`project_pool_containment_similarity_matrix.csv` not provided; peer-pool containment unavailable this run.")
         return lines
     lines += _manifest_bullets_for_matrix(matrix_manifest_rows, "project_pool_containment_similarity_matrix.csv")
-    blocked = sum(1 for r in pool_rows if _matrix_value_status_blocked(r.get("value_status", "")))
+    # Scoped to view_scope == "all" -- this paragraph only ever aggregates the
+    # all-view metric below (used-view rows exist in this file too, per
+    # compare_cross_segment.py emitting one row per (all|used) x
+    # (segment_id, domain, pool_scope)). An unavailable used-view cell (e.g. a
+    # run where only all-view containment was computed) must not be counted
+    # as a blocked all-view cell here -- see the matching comment in
+    # _render_portfolio_footprint_identity().
+    blocked = sum(
+        1 for r in pool_rows
+        if r.get("view_scope") == "all" and _matrix_value_status_blocked(r.get("value_status", ""))
+    )
     if blocked:
-        lines.append(f"- Blocked/unavailable peer-pool containment cells: {blocked}")
+        lines.append(f"- Blocked/unavailable peer-pool containment cells (all-view): {blocked}")
 
     # This matrix has no ALL_DOMAINS aggregate row in compare_cross_segment.py
     # (unlike the other three project matrices) -- rows are per
@@ -3770,9 +3792,14 @@ def _render_portfolio_fragmentation(frag_rows: list, matrix_manifest_rows: list,
     diagnostic_rows = [
         r for r in frag_rows if r.get("value_status") == "diagnostic" and r.get("view_scope") == "all"
     ]
-    unavailable = sum(1 for r in frag_rows if r.get("value_status") != "diagnostic")
+    # Scoped to view_scope == "all" -- see the matching comment in
+    # _render_portfolio_footprint_identity().
+    unavailable = sum(
+        1 for r in frag_rows
+        if r.get("view_scope") == "all" and r.get("value_status") != "diagnostic"
+    )
     if unavailable:
-        lines.append(f"- Fragmentation-diagnostic cells not computable: {unavailable}")
+        lines.append(f"- Fragmentation-diagnostic cells not computable (all-view): {unavailable}")
 
     seen: set = set()
     pairs = []
@@ -4946,13 +4973,19 @@ def main():
         # or a mixed-run package would misleadingly look like one reproducible
         # run. union_inventory_rows/reuse_distribution_rows/matrix_manifest_rows
         # carry executed_utc but not comparison_run_id (they are not scoped to
-        # a single directed-comparison run the way the others are).
+        # a single directed-comparison run the way the others are) -- same for
+        # reuse_by_client_rows/project_union_jaccard_rows/
+        # project_density_similarity_rows/project_pool_containment_rows/
+        # project_fragmentation_rows (REUSE_SUMMARY_FIELDS/MATRIX_OUTPUT_FIELDS/
+        # FRAGMENTATION_DIAGNOSTIC_FIELDS in compare_cross_segment.py).
         _run_id_row_sets = (
             summary_rows, pooled_rows, governance_state_rows,
             governance_state_summary_rows, delta_rows,
         )
         _executed_utc_row_sets = _run_id_row_sets + (
             union_inventory_rows, reuse_distribution_rows, matrix_manifest_rows,
+            reuse_by_client_rows, project_union_jaccard_rows, project_density_similarity_rows,
+            project_pool_containment_rows, project_fragmentation_rows,
         )
         comparison_run_ids = sorted(
             set().union(*(
