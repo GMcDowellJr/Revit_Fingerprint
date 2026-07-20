@@ -3675,6 +3675,18 @@ def run_pooled_comparison(
                     s for s in members
                     if s != focal_sid and not _is_lineage_related(ancestor_map, focal_sid, s)
                 ]
+                if not pool_sids:
+                    # Lineage filtering removed every candidate peer (e.g. a
+                    # 2-member group where the other member is this focal's
+                    # own ancestor/descendant) -- there is no pool to compare
+                    # against, not an unreadable one. Emitting a
+                    # comparison_status="blocked" row here would misrepresent
+                    # "no eligible pool exists" as "the pool's inventory
+                    # couldn't be read," inflating blocked counts with
+                    # comparisons that were never eligible in the first
+                    # place. Skip entirely, matching pre-blocked-row behavior
+                    # for this case.
+                    continue
 
                 # Union with the pool's own domains, not just the focal
                 # segment's -- otherwise a focal segment with zero inventory

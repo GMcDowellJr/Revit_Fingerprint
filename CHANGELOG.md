@@ -12,9 +12,21 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Fixed
-- Three correctness bugs in the `comparison_status="blocked"` row-emission
+- Four correctness bugs in the `comparison_status="blocked"` row-emission
   path added earlier in this changeset (found via code review), all in
   `tools/compare_cross_segment.py`:
+  - **Lineage-emptied pools were reported as blocked instead of skipped.**
+    `_emit_for_groups()` excludes any pool member in the focal segment's own
+    `parent_segment_id` lineage before calling `_build_pooled_row()` — for a
+    2-member bc/client pool group where the other member is the focal's own
+    ancestor or descendant, this leaves `pool_sids` empty. The zero-inventory
+    blocked-row branch doesn't distinguish "no eligible pool exists" from
+    "the pool's inventory couldn't be read," so it emitted a
+    `comparison_status="blocked", n_files_pool=0` row for every one of the
+    focal's own domains — a comparison that was never eligible in the first
+    place, inflating blocked-pool counts. Now skipped entirely (`continue`)
+    as soon as lineage filtering leaves `pool_sids` empty, before any domain
+    is even considered.
   - **Blocked rows corrupted the populated side's own counts.** `run_pair()`'s
     blocked-row builder hardcoded `n_patterns_a`/`n_patterns_b`/
     `n_unique_patterns_a`/`n_unique_patterns_b` to `0` for *both* sides, even

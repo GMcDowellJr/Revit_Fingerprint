@@ -456,3 +456,35 @@ def test_pooled_comparison_schedules_pool_only_domain_for_empty_focal(tmp_path):
     assert row["n_files_focal"] == "0"
     assert row["n_files_pool"] == "1"
     assert row["comparison_status"] == "blocked"
+
+
+def test_pooled_comparison_skips_when_lineage_filtering_empties_the_pool(tmp_path):
+    # bc_parent and bc_child share the same business_center_label (so the
+    # "bc" pool grain, which ignores parent_segment_id, groups them
+    # together) but bc_child is bc_parent's own lineage descendant --
+    # _is_lineage_related() excludes it from bc_parent's pool_sids, leaving
+    # zero eligible peers. This is "no pool exists," not "the pool's
+    # inventory couldn't be read" -- no row should be emitted at all.
+    _clear_caches()
+    domain = "dlineage"
+    segments_root = tmp_path / "segments"
+    _write_segment(segments_root, "bc_parent", domain, {"fpar1": ["jh1", "jh2"]})
+
+    manifest = {
+        "bc_parent": {**_manifest_entry(bc="BC1"), "parent_segment_id": ""},
+        "bc_child": {**_manifest_entry(bc="BC1"), "parent_segment_id": "bc_parent"},
+    }
+    registry = {
+        "bc_parent": _registry_entry("bc_parent"),
+        "bc_child": _registry_entry("bc_child"),
+    }
+
+    rows = run_pooled_comparison(
+        manifest, registry, segments_root, min_patterns=1,
+        executed_utc="2026-07-20T00:00:00Z", focal_segment_ids={"bc_parent"},
+    )
+
+    # Both segments also share client_label="Acme" (_manifest_entry()'s
+    # default), so the "client" grain hits the identical lineage-exclusion
+    # case -- no row should survive on any grain.
+    assert rows == []
