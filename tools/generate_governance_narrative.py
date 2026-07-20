@@ -22,12 +22,27 @@ Optional inputs (enrich state, delta, and pattern sections when available):
   --union-inventory         cross_segment_union_inventory.csv
   --reuse-distribution      pattern_reuse_distribution.csv
   --matrix-manifest         matrix_output_manifest.csv
+  --reuse-by-client         pattern_reuse_summary_by_client.csv (adoption-breadth
+                              signal -- how many clients use a pattern -- added
+                              alongside the existing distinct-pattern reuse table
+                              in the Union Inventory Reuse Summary section)
+  --project-union-jaccard-matrix        project_union_jaccard_matrix.csv
+  --project-density-similarity-matrix   project_density_similarity_matrix.csv
+  --project-pool-containment-matrix     project_pool_containment_similarity_matrix.csv
+  --project-fragmentation-diagnostic    project_fragmentation_diagnostic.csv
+                              (these four feed the Project Portfolio section --
+                              project x project grain, intentionally outside
+                              assign_tier()/governance_domain_summary.csv; see
+                              docs/governance_generator_cross_compare_coverage.md)
 
 Not yet consumed directly; see docs/governance_generator_cross_compare_coverage.md
 for recommended integration points:
   comparison_registry.csv, cross_segment_file_pairs.csv,
-  pattern_reuse_summary_by_domain.csv, pattern_reuse_summary_by_client.csv,
-  project_*_matrix.csv, and project_fragmentation_diagnostic.csv
+  pattern_reuse_summary_by_domain.csv (excluded on purpose -- its n_patterns
+  duplicates the corpus-wide reuse signal the distinct-pattern table already
+  reports), and project_mean_file_pair_jaccard_matrix.csv (its signal is folded
+  into project_fragmentation_diagnostic.csv's exact_identity_overlap column
+  rather than consumed standalone)
 
 Output:
   --out          governance_narrative_context.md  (default)
@@ -3407,8 +3422,13 @@ def render_union_reuse_summary(
     union_inventory_rows: list,
     reuse_distribution_rows: list,
     matrix_manifest_rows: list,
+    reuse_by_client_rows: Optional[list] = None,
 ) -> Optional[str]:
-    if not union_inventory_rows and not reuse_distribution_rows and not matrix_manifest_rows:
+    reuse_by_client_rows = reuse_by_client_rows or []
+    if (
+        not union_inventory_rows and not reuse_distribution_rows
+        and not matrix_manifest_rows and not reuse_by_client_rows
+    ):
         return None
 
     lines = ["## Union Inventory Reuse Summary\n"]
@@ -3481,6 +3501,55 @@ def render_union_reuse_summary(
             lines.append(f"\nTable limited to 20 domains; {len(sorted_domains) - 20} domains not shown.")
         lines.append("")
 
+    if reuse_by_client_rows:
+        # Adoption-breadth signal: how many clients' patterns reach corpus-wide
+        # reuse, per domain. Sourced from pattern_reuse_summary_by_client.csv's
+        # own n_patterns under the "corpus_wide" bucket (bucket_basis
+        # clients_in_corpus_domain) -- additive to, and independent of, the
+        # distinct-pattern dedup table above (which never groups by client).
+        # Do not touch that table's logic from here.
+        clients_seen_by_domain: dict = defaultdict(set)
+        corpus_wide_clients_by_domain: dict = defaultdict(set)
+        corpus_wide_instances_by_domain: dict = defaultdict(int)
+        for row in reuse_by_client_rows:
+            if row.get("classification_status") != "ok":
+                continue
+            client = row.get("client_label", "")
+            domain = row.get("domain", "")
+            if not client or not domain:
+                continue
+            clients_seen_by_domain[domain].add(client)
+            if row.get("reuse_bucket") == "corpus_wide":
+                n = int(row.get("n_patterns") or "0")
+                if n > 0:
+                    corpus_wide_clients_by_domain[domain].add(client)
+                    corpus_wide_instances_by_domain[domain] += n
+
+        adoption_domains = sorted(
+            clients_seen_by_domain.keys(),
+            key=lambda d: (-len(corpus_wide_clients_by_domain.get(d, set())), d),
+        )
+        if adoption_domains:
+            lines.append("**Adoption breadth by domain (client reach)**\n")
+            lines.append(
+                "How many of a domain's clients have at least one corpus-wide-reused "
+                "pattern (n_patterns under the corpus_wide bucket, basis "
+                "clients_in_corpus_domain) -- an additive breadth cut, not a "
+                "replacement for the distinct-pattern reuse table above.\n"
+            )
+            lines.append("| domain | clients with corpus-wide patterns | clients seen | corpus-wide pattern-instances |")
+            lines.append("|---|---:|---:|---:|")
+            for domain in adoption_domains[:20]:
+                n_clients_cw = len(corpus_wide_clients_by_domain.get(domain, set()))
+                n_clients_seen = len(clients_seen_by_domain[domain])
+                lines.append(
+                    f"| {domain} | {n_clients_cw} | {n_clients_seen} "
+                    f"| {corpus_wide_instances_by_domain.get(domain, 0)} |"
+                )
+            if len(adoption_domains) > 20:
+                lines.append(f"\nTable limited to 20 domains; {len(adoption_domains) - 20} domains not shown.")
+            lines.append("")
+
     if matrix_manifest_rows:
         lines.append("**Matrix manifest metadata**\n")
         lines.append("Matrix availability is determined by each matrix CSV `value_status`; manifest rows are descriptive metadata.\n")
@@ -3508,6 +3577,273 @@ def render_union_reuse_summary(
     elif union_inventory_rows or reuse_distribution_rows:
         lines.append("Matrix manifest not provided; matrix availability unknown.")
 
+    return "\n".join(lines)
+
+
+def _matrix_value_status_blocked(status: str) -> bool:
+    """Blocked/unavailable value_status values across the project matrix
+    outputs (see MATRIX_OUTPUT_FIELDS / FRAGMENTATION_DIAGNOSTIC_FIELDS
+    value_status in compare_cross_segment.py) -- "ok"/"diagnostic"/
+    "synthetic_self_comparison" are the only non-blocked statuses emitted
+    there.
+    """
+    return status not in ("ok", "diagnostic", "synthetic_self_comparison")
+
+
+def _manifest_bullets_for_matrix(matrix_manifest_rows: list, matrix_name: str) -> list:
+    """Mirror render_union_reuse_summary()'s matrix-manifest bullet rendering
+    (matrix_name: metric (interpretation, truncated to 120 chars)), scoped to
+    one matrix, for reuse across the Project Portfolio paragraphs below.
+    """
+    lines = []
+    for row in matrix_manifest_rows:
+        if row.get("matrix_name") != matrix_name:
+            continue
+        interpretation = row.get("interpretation", "")
+        if len(interpretation) > 120:
+            interpretation = interpretation[:120].rstrip()
+        lines.append(f"- {row.get('matrix_name', '')}: {row.get('metric', '')} ({interpretation})")
+    return lines
+
+
+def _unordered_project_pairs(rows: list, *, view_scope: str, domain: str, metric: str) -> list:
+    """Deduplicate a symmetric project x project matrix (compare_cross_segment.py's
+    add_matrix loops emit both (a, b) and (b, a) rows) down to one row per
+    unordered pair, excluding self-comparisons and non-ok cells.
+    """
+    seen: set = set()
+    pairs = []
+    for row in rows:
+        if row.get("view_scope") != view_scope or row.get("domain") != domain:
+            continue
+        if row.get("metric") != metric or row.get("value_status") != "ok":
+            continue
+        if row.get("self_comparison") == "true":
+            continue
+        a, b = row.get("row_id", ""), row.get("column_id", "")
+        if not a or not b or a == b:
+            continue
+        key = tuple(sorted((a, b)))
+        if key in seen:
+            continue
+        seen.add(key)
+        value = pf(row.get("value"))
+        if value is None:
+            continue
+        pairs.append((key[0], key[1], value))
+    return pairs
+
+
+def _render_portfolio_footprint_identity(union_rows: list, matrix_manifest_rows: list, top_n: int = 5) -> list:
+    lines = ["### Footprint identity\n"]
+    if not union_rows:
+        lines.append("`project_union_jaccard_matrix.csv` not provided; footprint-identity comparison unavailable this run.")
+        return lines
+    lines += _manifest_bullets_for_matrix(matrix_manifest_rows, "project_union_jaccard_matrix.csv")
+    blocked = sum(1 for r in union_rows if _matrix_value_status_blocked(r.get("value_status", "")))
+    if blocked:
+        lines.append(f"- Blocked/unavailable footprint-identity cells: {blocked}")
+    pairs = _unordered_project_pairs(union_rows, view_scope="all", domain="ALL_DOMAINS", metric="union_jaccard")
+    if not pairs:
+        lines.append("\nNo ok ALL_DOMAINS `union_jaccard` project pairs available (all-view).")
+        return lines
+    lines.append(
+        f"\nSystem-level project footprint overlap (`union_jaccard`, ALL_DOMAINS, all-view); "
+        f"{len(pairs)} project pairs compared.\n"
+    )
+    most = sorted(pairs, key=lambda p: (-p[2], p[0], p[1]))
+    lines.append(f"**Most similar footprint ({min(top_n, len(most))} pairs)**")
+    for a, b, v in most[:top_n]:
+        lines.append(f"- {a} <-> {b}: {fmt(v)}")
+    least = sorted(pairs, key=lambda p: (p[2], p[0], p[1]))
+    lines.append(f"\n**Least similar footprint ({min(top_n, len(least))} pairs)**")
+    for a, b, v in least[:top_n]:
+        lines.append(f"- {a} <-> {b}: {fmt(v)}")
+    return lines
+
+
+def _render_portfolio_density_similarity(
+    density_rows: list, union_rows: list, matrix_manifest_rows: list, top_n: int = 5
+) -> list:
+    lines = ["### Density similarity\n"]
+    if not density_rows:
+        lines.append("`project_density_similarity_matrix.csv` not provided; density-similarity comparison unavailable this run.")
+        return lines
+    lines += _manifest_bullets_for_matrix(matrix_manifest_rows, "project_density_similarity_matrix.csv")
+    blocked = sum(1 for r in density_rows if _matrix_value_status_blocked(r.get("value_status", "")))
+    if blocked:
+        lines.append(f"- Blocked/unavailable density-similarity cells: {blocked}")
+    pairs = _unordered_project_pairs(density_rows, view_scope="all", domain="ALL_DOMAINS", metric="density_similarity")
+    if not pairs:
+        lines.append("\nNo ok ALL_DOMAINS `density_similarity` project pairs available (all-view).")
+        return lines
+    lines.append(
+        "\n**Caveat: high density similarity with low footprint (`union_jaccard`) similarity "
+        'means "same shape, different content" -- projects populate the same domains to a '
+        "similar degree without holding the same canonical patterns. This is stated literally, "
+        "not as a softened approximation.**\n"
+    )
+    union_index = {
+        (a, b): v
+        for a, b, v in (
+            _unordered_project_pairs(union_rows, view_scope="all", domain="ALL_DOMAINS", metric="union_jaccard")
+            if union_rows else []
+        )
+    }
+
+    def _shape_note(a: str, b: str, density_v: float) -> str:
+        uv = union_index.get((a, b))
+        if uv is not None and density_v >= 0.8 and uv < 0.3:
+            return f" -- same shape, different content (union_jaccard={fmt(uv)})"
+        return ""
+
+    most = sorted(pairs, key=lambda p: (-p[2], p[0], p[1]))
+    lines.append(f"**Most similar density ({min(top_n, len(most))} pairs)**")
+    for a, b, v in most[:top_n]:
+        lines.append(f"- {a} <-> {b}: {fmt(v)}{_shape_note(a, b, v)}")
+    least = sorted(pairs, key=lambda p: (p[2], p[0], p[1]))
+    lines.append(f"\n**Least similar density ({min(top_n, len(least))} pairs)**")
+    for a, b, v in least[:top_n]:
+        lines.append(f"- {a} <-> {b}: {fmt(v)}")
+    if not union_rows:
+        lines.append("\n`project_union_jaccard_matrix.csv` not provided; same-shape/different-content cross-check unavailable.")
+    return lines
+
+
+def _render_portfolio_pool_containment(pool_rows: list, matrix_manifest_rows: list, bottom_n: int = 5) -> list:
+    lines = ["### Peer-pool containment\n"]
+    if not pool_rows:
+        lines.append("`project_pool_containment_similarity_matrix.csv` not provided; peer-pool containment unavailable this run.")
+        return lines
+    lines += _manifest_bullets_for_matrix(matrix_manifest_rows, "project_pool_containment_similarity_matrix.csv")
+    blocked = sum(1 for r in pool_rows if _matrix_value_status_blocked(r.get("value_status", "")))
+    if blocked:
+        lines.append(f"- Blocked/unavailable peer-pool containment cells: {blocked}")
+
+    # This matrix has no ALL_DOMAINS aggregate row in compare_cross_segment.py
+    # (unlike the other three project matrices) -- rows are per
+    # (focal_project, domain, pool_scope) only. Mean across a project's
+    # available domains per (project, pool_scope) to get one outlier score
+    # per project per peer-pool grain.
+    sums: dict = defaultdict(float)
+    counts: dict = defaultdict(int)
+    for row in pool_rows:
+        if row.get("view_scope") != "all" or row.get("value_status") != "ok":
+            continue
+        if row.get("metric") != "pool_containment_similarity":
+            continue
+        col = row.get("column_id", "")
+        if not col.startswith("peer_pool:") or col.count(":") < 2:
+            continue
+        pool_scope = col.split(":", 2)[1]
+        value = pf(row.get("value"))
+        if value is None:
+            continue
+        key = (row.get("row_id", ""), pool_scope)
+        sums[key] += value
+        counts[key] += 1
+    means = sorted(
+        ((proj, scope, sums[(proj, scope)] / counts[(proj, scope)]) for proj, scope in counts),
+        key=lambda t: (t[2], t[0], t[1]),
+    )
+    if not means:
+        lines.append("\nNo ok all-view `pool_containment_similarity` rows available.")
+        return lines
+    lines.append(
+        f"\nPer-project mean `pool_containment_similarity` across available domains (all-view), "
+        f"by peer-pool grain ({len(means)} project/pool-grain combinations). Mean across domains "
+        "because this matrix carries no ALL_DOMAINS aggregate row. Lowest scores below are the "
+        "outliers -- projects whose systems least resemble their own peer pool.\n"
+    )
+    lines.append(f"**Lowest peer-pool containment ({min(bottom_n, len(means))})**")
+    for proj, scope, v in means[:bottom_n]:
+        lines.append(f"- {proj} (pool: {scope}): {fmt(v)}")
+    return lines
+
+
+def _render_portfolio_fragmentation(frag_rows: list, matrix_manifest_rows: list, top_n: int = 5) -> list:
+    lines = ["### Fragmentation diagnostic\n"]
+    if not frag_rows:
+        lines.append("`project_fragmentation_diagnostic.csv` not provided; fragmentation diagnostic unavailable this run.")
+        return lines
+    lines += _manifest_bullets_for_matrix(matrix_manifest_rows, "project_fragmentation_diagnostic.csv")
+    diagnostic_rows = [
+        r for r in frag_rows if r.get("value_status") == "diagnostic" and r.get("view_scope") == "all"
+    ]
+    unavailable = sum(1 for r in frag_rows if r.get("value_status") != "diagnostic")
+    if unavailable:
+        lines.append(f"- Fragmentation-diagnostic cells not computable: {unavailable}")
+
+    seen: set = set()
+    pairs = []
+    for r in diagnostic_rows:
+        a, b = r.get("row_id", ""), r.get("column_id", "")
+        if not a or not b or a == b:
+            continue
+        key = tuple(sorted((a, b)))
+        if key in seen:
+            continue
+        seen.add(key)
+        diag = pf(r.get("fragmentation_diagnostic"))
+        if diag is None:
+            continue
+        pairs.append((key[0], key[1], diag, pf(r.get("footprint_similarity")), pf(r.get("exact_identity_overlap"))))
+    if not pairs:
+        lines.append("\nNo diagnostic ALL_DOMAINS fragmentation rows available (all-view).")
+        return lines
+    lines.append(
+        "\n`fragmentation_diagnostic` = `footprint_similarity` (union_jaccard) minus "
+        "`exact_identity_overlap` (mean file-pair jaccard -- this is where "
+        "`project_mean_file_pair_jaccard_matrix.csv`'s signal is folded in, rather than "
+        "rendering that matrix standalone; its other signal is already visible via the "
+        "sibling_projects/cross_client rows elsewhere in this narrative). A large positive "
+        "value means projects share broad structural footprint without matching exact "
+        f"file-level identity. {len(pairs)} project pairs compared.\n"
+    )
+    most = sorted(pairs, key=lambda p: (-p[2], p[0], p[1]))
+    lines.append(f"**Highest fragmentation divergence ({min(top_n, len(most))} pairs)**")
+    for a, b, diag, foot, exact in most[:top_n]:
+        lines.append(f"- {a} <-> {b}: {fmt(diag)} (footprint {fmt(foot)}, exact {fmt(exact)})")
+    return lines
+
+
+def render_project_portfolio_section(
+    union_jaccard_rows: list,
+    density_similarity_rows: list,
+    pool_containment_rows: list,
+    fragmentation_rows: list,
+    matrix_manifest_rows: list,
+) -> Optional[str]:
+    """Project x project portfolio-shape section.
+
+    Deliberately outside assign_tier()/governance_domain_summary.csv -- project
+    x project grain has no natural domain-tier slot. This matches the existing
+    guardrail in docs/governance_generator_cross_compare_coverage.md ("Do not
+    use matrix values to override domain governance tiers directly; they are
+    project/portfolio diagnostics and should remain separate from domain-level
+    cascade/state classifications"), not an oversight to fix later.
+
+    Each paragraph degrades gracefully to a one-line not-provided note when its
+    source file is absent; the whole section is omitted only when all four
+    project/matrix inputs are absent.
+    """
+    if not union_jaccard_rows and not density_similarity_rows and not pool_containment_rows and not fragmentation_rows:
+        return None
+
+    lines = [
+        "## Project Portfolio\n",
+        "Project x project comparisons at portfolio grain. This section is intentionally "
+        "kept separate from the domain governance tiers above and from "
+        "`governance_domain_summary.csv` -- these matrices answer portfolio-shape questions, "
+        "not domain-standard approval questions, and never override a domain tier.\n",
+    ]
+    lines += _render_portfolio_footprint_identity(union_jaccard_rows, matrix_manifest_rows)
+    lines.append("")
+    lines += _render_portfolio_density_similarity(density_similarity_rows, union_jaccard_rows, matrix_manifest_rows)
+    lines.append("")
+    lines += _render_portfolio_pool_containment(pool_containment_rows, matrix_manifest_rows)
+    lines.append("")
+    lines += _render_portfolio_fragmentation(fragmentation_rows, matrix_manifest_rows)
     return "\n".join(lines)
 
 
@@ -4118,10 +4454,30 @@ def main():
     parser.add_argument("--reuse-distribution",
                         help="pattern_reuse_distribution.csv (optional)")
     parser.add_argument("--matrix-manifest",
-                        help="matrix_output_manifest.csv (optional). This is currently metadata-only; "
-                             "see docs/governance_generator_cross_compare_coverage.md for where "
-                             "the project_* matrices and fragmentation diagnostic should enter "
-                             "the narrative.")
+                        help="matrix_output_manifest.csv (optional). Also used as the "
+                             "availability/limitations source for the Project Portfolio "
+                             "section when the --project-* matrix flags below are supplied.")
+    parser.add_argument("--reuse-by-client",
+                        help="pattern_reuse_summary_by_client.csv (optional). Adds an "
+                             "adoption-breadth (how many clients reach a pattern) cut "
+                             "alongside the existing distinct-pattern reuse table in the "
+                             "Union Inventory Reuse Summary section.")
+    parser.add_argument("--project-union-jaccard-matrix",
+                        help="project_union_jaccard_matrix.csv (optional). Feeds the "
+                             "Project Portfolio section's footprint-identity paragraph.")
+    parser.add_argument("--project-density-similarity-matrix",
+                        help="project_density_similarity_matrix.csv (optional). Feeds the "
+                             "Project Portfolio section's density-similarity paragraph.")
+    parser.add_argument("--project-pool-containment-matrix",
+                        help="project_pool_containment_similarity_matrix.csv (optional). "
+                             "Feeds the Project Portfolio section's peer-pool-containment "
+                             "paragraph.")
+    parser.add_argument("--project-fragmentation-diagnostic",
+                        help="project_fragmentation_diagnostic.csv (optional). Feeds the "
+                             "Project Portfolio section's fragmentation-diagnostic paragraph "
+                             "(also covers project_mean_file_pair_jaccard_matrix.csv's "
+                             "signal via this file's own exact_identity_overlap column, "
+                             "rather than consuming that matrix standalone).")
     parser.add_argument("--policy-dir", default=str(_DEFAULT_POLICY_DIR),
                         help="Directory of externalized governance policy files: "
                              "governance_thresholds.json, domain_governance_policy.json, "
@@ -4234,6 +4590,31 @@ def main():
     if args.matrix_manifest:
         print(f"Loading {args.matrix_manifest}...")
         matrix_manifest_rows = read_csv(Path(args.matrix_manifest))
+
+    reuse_by_client_rows = []
+    if args.reuse_by_client:
+        print(f"Loading {args.reuse_by_client}...")
+        reuse_by_client_rows = read_csv(Path(args.reuse_by_client))
+
+    project_union_jaccard_rows = []
+    if args.project_union_jaccard_matrix:
+        print(f"Loading {args.project_union_jaccard_matrix}...")
+        project_union_jaccard_rows = read_csv(Path(args.project_union_jaccard_matrix))
+
+    project_density_similarity_rows = []
+    if args.project_density_similarity_matrix:
+        print(f"Loading {args.project_density_similarity_matrix}...")
+        project_density_similarity_rows = read_csv(Path(args.project_density_similarity_matrix))
+
+    project_pool_containment_rows = []
+    if args.project_pool_containment_matrix:
+        print(f"Loading {args.project_pool_containment_matrix}...")
+        project_pool_containment_rows = read_csv(Path(args.project_pool_containment_matrix))
+
+    project_fragmentation_rows = []
+    if args.project_fragmentation_diagnostic:
+        print(f"Loading {args.project_fragmentation_diagnostic}...")
+        project_fragmentation_rows = read_csv(Path(args.project_fragmentation_diagnostic))
 
     sector_map = load_client_sectors(client_sector_rows)
 
@@ -4454,10 +4835,16 @@ def main():
     elif delta_summary:
         sections.append(render_delta_section(delta_summary))
     union_reuse_section = render_union_reuse_summary(
-        union_inventory_rows, reuse_distribution_rows, matrix_manifest_rows
+        union_inventory_rows, reuse_distribution_rows, matrix_manifest_rows, reuse_by_client_rows
     )
     if union_reuse_section:
         sections.append(union_reuse_section)
+    portfolio_section = render_project_portfolio_section(
+        project_union_jaccard_rows, project_density_similarity_rows,
+        project_pool_containment_rows, project_fragmentation_rows, matrix_manifest_rows,
+    )
+    if portfolio_section:
+        sections.append(portfolio_section)
     sections += [
         render_findings_and_recommendations(cascade, client_rows, governance_state_summary, findings),
         render_limitations(corpus, legacy_fallback, bool(governance_state_summary)),
@@ -4485,6 +4872,11 @@ def main():
             "cross_segment_union_inventory": Path(args.union_inventory) if args.union_inventory else None,
             "pattern_reuse_distribution": Path(args.reuse_distribution) if args.reuse_distribution else None,
             "matrix_output_manifest": Path(args.matrix_manifest) if args.matrix_manifest else None,
+            "pattern_reuse_summary_by_client": Path(args.reuse_by_client) if args.reuse_by_client else None,
+            "project_union_jaccard_matrix": Path(args.project_union_jaccard_matrix) if args.project_union_jaccard_matrix else None,
+            "project_density_similarity_matrix": Path(args.project_density_similarity_matrix) if args.project_density_similarity_matrix else None,
+            "project_pool_containment_similarity_matrix": Path(args.project_pool_containment_matrix) if args.project_pool_containment_matrix else None,
+            "project_fragmentation_diagnostic": Path(args.project_fragmentation_diagnostic) if args.project_fragmentation_diagnostic else None,
         }
         input_required = {"cross_segment_summary": True, "cross_segment_pooled": True}
         input_roles = {
@@ -4498,6 +4890,11 @@ def main():
             "cross_segment_union_inventory": "authoritative_deterministic_evidence",
             "pattern_reuse_distribution": "authoritative_deterministic_evidence",
             "matrix_output_manifest": "convenience_summary",
+            "pattern_reuse_summary_by_client": "authoritative_deterministic_evidence",
+            "project_union_jaccard_matrix": "authoritative_deterministic_evidence",
+            "project_density_similarity_matrix": "authoritative_deterministic_evidence",
+            "project_pool_containment_similarity_matrix": "authoritative_deterministic_evidence",
+            "project_fragmentation_diagnostic": "authoritative_deterministic_evidence",
         }
         input_present = {k: bool(v) and v.exists() for k, v in input_paths.items()}
 

@@ -11,6 +11,52 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Added
+- `tools/generate_governance_narrative.py` now consumes two more
+  `compare_cross_segment.py` outputs, narrative-side only (no changes to the
+  producer). `render_union_reuse_summary()` gains an additive adoption-breadth
+  cut from `pattern_reuse_summary_by_client.csv` (new optional
+  `--reuse-by-client` flag) — how many of a domain's clients have at least
+  one corpus-wide-reused pattern — alongside, and independent of, the
+  existing distinct-pattern reuse table (unchanged; verified byte-identical
+  before/after when `--reuse-by-client` is omitted).
+  `pattern_reuse_summary_by_domain.csv` was evaluated and deliberately not
+  wired in: its `n_patterns` duplicates the corpus-wide signal the existing
+  distinct-pattern table already reports.
+  A new top-level **Project Portfolio** section (new `render_project_portfolio_section()`,
+  behind four new optional flags — `--project-union-jaccard-matrix`,
+  `--project-density-similarity-matrix`, `--project-pool-containment-matrix`,
+  `--project-fragmentation-diagnostic`) renders four paragraphs: footprint
+  identity (`project_union_jaccard_matrix.csv`, ALL_DOMAINS-only, top/bottom-N
+  project pairs), density similarity (`project_density_similarity_matrix.csv`,
+  ALL_DOMAINS-only, cross-referenced against footprint identity for an
+  explicit "same shape, different content" caveat when both matrices are
+  supplied), peer-pool containment (`project_pool_containment_similarity_matrix.csv`,
+  rendered as a per-project outlier list — this matrix carries no ALL_DOMAINS
+  aggregate row, so the narrative means `pool_containment_similarity` across
+  a project's available domains per `(project, pool_scope)` itself), and a
+  fragmentation diagnostic (`project_fragmentation_diagnostic.csv`, which also
+  folds in `project_mean_file_pair_jaccard_matrix.csv`'s signal via the
+  diagnostic's own `exact_identity_overlap` column rather than consuming that
+  matrix standalone). Each paragraph degrades to a one-line not-provided note
+  when its source file is absent; the whole section is omitted only when all
+  four are absent. This section is deliberately kept outside `assign_tier()`
+  and `governance_domain_summary.csv` — project x project grain has no
+  natural domain-tier slot, matching the existing guardrail in
+  `docs/governance_generator_cross_compare_coverage.md` ("Do not use matrix
+  values to override domain governance tiers directly"), not an oversight.
+  `governance_domain_summary.csv`/`governance_client_summary.csv` output is
+  unchanged before/after (verified byte-identical).
+  `tools/governance_evidence_package.py`'s `build_evidence_map()` gains five
+  matching artifact entries for the new inputs (evidence-map artifact count:
+  22 → 27), required to keep the existing
+  `test_manifest_input_artifact_ids_match_evidence_map_artifact_ids`
+  invariant (every `governance_package_manifest.json` input must also appear
+  in `governance_evidence_map.json`) satisfied — `build_package_manifest()`/
+  `build_package_health()` already derive their input lists dynamically from
+  `input_paths`, so they needed no code change, only the five new dict
+  entries in `generate_governance_narrative.py`'s `main()`.
+
 ### Fixed
 - (PR #376 review) The union-metric adoption above silently dropped all
   `within_project` evidence: `compare_cross_segment.py`'s dedicated
