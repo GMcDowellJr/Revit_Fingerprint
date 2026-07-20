@@ -11,6 +11,27 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Fixed
+- (PR #376 review) The union-metric adoption above silently dropped all
+  `within_project` evidence: `compare_cross_segment.py`'s dedicated
+  within-project branch (project-internal file-pair aggregation) returns
+  its summary row before reaching the normal path's `_union_similarity()`
+  call, so `all_union_jaccard`/`used_union_jaccard` are never populated for
+  this comparison type — only `all_pairwise_jaccard_mean`/
+  `used_pairwise_jaccard_mean` ever are. `wp_all`/`wp_disc`/`wp_used`/`tw`
+  in `build_cascade()`, `wp_by_client` in `build_client_summary()`, and
+  `disc_domain_wp` in `render_discipline_section()` now read the union
+  field first via a new `_col_union_or_pairwise()` helper, falling back to
+  the pairwise-mean family only when union is blank — a no-op for
+  `cross_client`/`sibling_projects` (which always populate union fields
+  when they have real data, confirmed by reading the producer's non-directed
+  branch) and a real value for `within_project`. Without this, every
+  client's `wp_mean`/within-project coherence and every within_project-fed
+  cascade signal (`wp_all`, `tw`, the `phases` domain guidance trigger,
+  reliability-note text) silently read as unavailable against real exports,
+  despite the underlying pairwise data being present in the CSV the whole
+  time.
+
 ### Changed
 - `tools/generate_governance_narrative.py`'s cross-client/within-project
   metrics (`xc_by_client`/`wp_by_client`/`xc_dom_by_client` in

@@ -334,6 +334,24 @@ def _resolved_col_name(canonical: str) -> str:
     return _SUMMARY_COL_ALIASES.get(canonical, canonical)
 
 
+def _col_union_or_pairwise(row: dict, union_canonical: str, pairwise_canonical: str) -> str:
+    """Read a union-metric column, falling back to the pairwise-mean family
+    when blank -- specifically for within_project rows. compare_cross_segment.py's
+    dedicated within-project branch (a single-segment, project-internal
+    aggregation with its own summary-row construction) returns before the
+    normal path's _union_similarity() call and never sets all_union_*/
+    used_union_* -- only all_pairwise_jaccard_mean/used_pairwise_jaccard_mean
+    are ever populated for this comparison type. cross_client/sibling_projects
+    rows always populate the union fields when they have real data (both are
+    non-directed types that hit the normal path's else branch), so this
+    fallback is a no-op for them -- do not use this for xc/xc_by_client/
+    xc_dom_by_client reads, which should never silently fall back."""
+    value = _col(row, union_canonical)
+    if value:
+        return value
+    return _col(row, pairwise_canonical)
+
+
 def used_view_falls_back_to_legacy() -> bool:
     """True when canonical used-view columns resolved to legacy all-view names."""
     legacy_pairs = {
@@ -985,12 +1003,15 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             # swap the metric family from pairwise mean to union without changing
             # which side is "all" and which is "used"; passive_indicator's
             # (all - used) delta below depends on that assignment staying fixed.
-            v = pf(_col(r, "all_union_jaccard"))
+            # Falls back to the pairwise mean when union is blank -- see
+            # _col_union_or_pairwise()'s docstring: within_project rows never
+            # get all_union_*/used_union_* from the producer at all.
+            v = pf(_col_union_or_pairwise(r, "all_union_jaccard", "jaccard_mean"))
             disc = _pick(r, "discipline_label_a") or "all"
             if v is not None:
                 wp_disc[dom][disc].append(v)
                 wp_all[dom].append(v)
-            vu = pf(_col(r, "used_union_jaccard"))
+            vu = pf(_col_union_or_pairwise(r, "used_union_jaccard", "used_jaccard_mean"))
             if vu is not None:
                 wp_used[dom].append(vu)
             if a == b and r["governance_role_a"] == "Template" and v is not None:
@@ -2051,10 +2072,12 @@ def build_client_summary(
         if r["comparison_type"] != "within_project" or r["governance_role_a"] != "Project":
             continue
         c = _pick(r, "client_label_a")
-        v = pf(_col(r, "used_union_jaccard"))
+        # within_project rows never carry all_union_*/used_union_* from the
+        # producer -- see _col_union_or_pairwise()'s docstring.
+        v = pf(_col_union_or_pairwise(r, "used_union_jaccard", "used_jaccard_mean"))
         if v is not None and c:
             wp_by_client[c].append(v)
-        v_all = pf(_col(r, "all_union_jaccard"))
+        v_all = pf(_col_union_or_pairwise(r, "all_union_jaccard", "jaccard_mean"))
         if v_all is not None and c:
             wp_by_client_all[c].append(v_all)
 
@@ -2965,12 +2988,14 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
         if r["comparison_type"] != "within_project":
             continue
         disc = _pick(r, "discipline_label_a")
-        v = pf(_col(r, "used_union_jaccard"))
+        # within_project rows never carry all_union_*/used_union_* from the
+        # producer -- see _col_union_or_pairwise()'s docstring.
+        v = pf(_col_union_or_pairwise(r, "used_union_jaccard", "used_jaccard_mean"))
         if disc and v is not None:
             disc_domain_wp[disc][r["domain"]].append(v)
             if disc not in disc_file_counts:
                 disc_file_counts[disc] = int(r["n_files_a"]) if r["n_files_a"] else 0
-        v_all = pf(_col(r, "all_union_jaccard"))
+        v_all = pf(_col_union_or_pairwise(r, "all_union_jaccard", "jaccard_mean"))
         if disc and v_all is not None:
             disc_domain_wp_all[disc][r["domain"]].append(v_all)
 

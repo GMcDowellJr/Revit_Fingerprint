@@ -631,3 +631,91 @@ def test_cascade_wp_all_and_wp_used_stay_a_true_all_used_pair_not_flipped():
     d = cascade["arrowheads"]
     assert d["wp_all"] == 0.90
     assert d["wp_used"] == 0.20
+
+
+# ---------------------------------------------------------------------------
+# PR #376 review fix: within_project rows never carry all_union_*/used_union_*
+# from the real producer (compare_cross_segment.py's dedicated within-project
+# branch returns before the normal path's _union_similarity() call) -- these
+# tests use the REAL producer row shape (pairwise fields populated, union
+# fields blank/absent) rather than setting union fields directly, to prove
+# the fallback actually engages and isn't just a no-op against a synthetic
+# fixture that happens to always supply both.
+# ---------------------------------------------------------------------------
+
+def test_cascade_wp_falls_back_to_pairwise_when_union_blank_real_producer_shape():
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Kaiser",
+            governance_role_a="Project", governance_role_b="Project",
+            comparison_type="within_project", domain="arrowheads",
+            all_pairwise_jaccard_mean="0.55", used_pairwise_jaccard_mean="0.35",
+            # all_union_jaccard/used_union_jaccard deliberately left blank --
+            # this is the real shape a within_project row has today.
+            n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    cascade = build_cascade(rows, sector_map={})
+    d = cascade["arrowheads"]
+    assert d["wp_all"] == 0.55
+    assert d["wp_used"] == 0.35
+
+
+def test_wp_by_client_falls_back_to_pairwise_when_union_blank_real_producer_shape():
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Kaiser",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser",
+            comparison_type="within_project", domain="arrowheads",
+            all_pairwise_jaccard_mean="0.60", used_pairwise_jaccard_mean="0.40",
+            n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    client_rows = build_client_summary(rows, [], {})
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    assert kaiser["wp_mean"] == 0.40
+    assert kaiser["wp_mean_all"] == 0.60
+
+
+def test_disc_domain_wp_falls_back_to_pairwise_when_union_blank_real_producer_shape():
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|arch", segment_id_b="imperial|Project|arch",
+            governance_role_a="Project", governance_role_b="Project",
+            discipline_label_a="architectural",
+            comparison_type="within_project", domain="arrowheads",
+            all_pairwise_jaccard_mean="0.70", used_pairwise_jaccard_mean="0.45",
+            n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    section = render_discipline_section({}, rows)
+    assert "45" in section
+    assert "70" in section
+
+
+def test_xc_does_not_fall_back_to_pairwise_when_union_blank():
+    """The fallback is within_project-only. cross_client/sibling_projects
+    always populate union fields when they have real data (they hit the
+    normal path's else branch, unlike within_project) -- xc must never
+    silently fall back to the stale pairwise family, or a genuine producer
+    regression on those types would be masked instead of surfaced as blank."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            governance_role_a="Project", governance_role_b="Project",
+            client_label_a="Kaiser", client_label_b="Sutter",
+            comparison_type="cross_client", domain="arrowheads",
+            all_pairwise_jaccard_mean="0.60",
+            # all_union_jaccard/used_union_jaccard deliberately blank.
+            n_files_a="10", n_files_b="10",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    client_rows = build_client_summary(rows, [], sector_map)
+    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    assert kaiser["xc_mean"] is None
