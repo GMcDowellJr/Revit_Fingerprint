@@ -150,14 +150,20 @@ convention) and wrapped in a schema-versioned envelope by
 ### `governance_evidence_map.json`
 
 Authority: `authoritative_deterministic_evidence` (a structural fact about
-the package, not an interpretation). One entry per artifact, 22 total:
+the package, not an interpretation). One entry per artifact, 27 total:
 
-**Source artifacts consumed via CLI** (2 required, 8 optional):
+**Source artifacts consumed via CLI** (2 required, 13 optional):
 `cross_segment_summary.csv`, `cross_segment_pooled.csv`,
 `cross_segment_governance_states.csv`, `cross_segment_governance_state_summary.csv`,
 `cross_segment_delta.csv`, `file_metadata.csv`, `client_sector.csv`,
 `cross_segment_union_inventory.csv`, `pattern_reuse_distribution.csv`,
-`matrix_output_manifest.csv`.
+`matrix_output_manifest.csv`, `pattern_reuse_summary_by_client.csv`,
+`project_union_jaccard_matrix.csv`, `project_density_similarity_matrix.csv`,
+`project_pool_containment_similarity_matrix.csv`,
+`project_fragmentation_diagnostic.csv` (the last five feed the
+`generate_governance_narrative.py` Project Portfolio section and adoption-
+breadth cut added in PR B2 — see
+`docs/governance_generator_cross_compare_coverage.md`).
 
 **Sibling artifacts, never consumed by this generator** (4): `cross_segment_file_pairs.csv`
 and `comparison_registry.csv` — both written by `compare_cross_segment.py`'s
@@ -180,7 +186,7 @@ unconditional on `--emit-interpretation-layer` (see below).
 above (`governance_package_manifest.json`, `governance_package_health.json`,
 `governance_findings.json`, `governance_evidence_map.json`,
 `governance_brief.md`), including a self-entry for
-`governance_evidence_map.json` itself (`related_artifacts` lists all 21
+`governance_evidence_map.json` itself (`related_artifacts` lists all 26
 other artifact IDs). Unlike the other generated artifacts (whose `present`
 is asserted `True`, since `build_evidence_map()` only ever runs after
 they're already written), `governance_brief.md`'s `present` is a real
