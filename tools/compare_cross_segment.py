@@ -77,6 +77,25 @@ as unused bloat. Directed governance-state output therefore compares upstream
 reference all-view vocabulary to downstream target all-view and, for Project
 targets, target used-view vocabulary.
 
+Organizational scope levels
+----------------------------
+Scope is derived from explicit, literal client_label/business_center_label
+values (see _scope_level() / _is_client_wide_rollup()), not blank inference:
+enterprise (client_label=="Stantec", business_center_label=="0000" --
+"BC_0000"/any-case spelling variants canonicalize to "0000" via
+_normalize_bc_label(), they are not folded to blank),
+business_center (client_label=="Stantec", a real business_center_label), and
+client_business_center (a real external client_label, a real
+business_center_label). A row where either dimension isn't cut at all
+(blank) is a roll-up pooling multiple real scopes, handled by individual
+comparison-type discovery rather than by _scope_level() itself. The
+governance chain fans out across these levels: enterprise_to_project,
+bc_to_project, enterprise_to_bc, enterprise_to_client (discover_governance_
+chain()), bc_to_bc (peer business centers, also in discover_governance_
+chain()), cross_client (discover_cross_client(), now grouped by discipline_
+label too), and client_cross_bc (discover_client_cross_bc(), a real client's
+populations compared across every business center it appears in).
+
 Usage:
     python tools/compare_cross_segment.py \\
         --segments-root segments/ \\
@@ -151,6 +170,7 @@ SUMMARY_FIELDS: List[str] = [
     "governance_role_a", "governance_role_b",
     "client_label_a", "client_label_b",
     "business_center_label_a", "business_center_label_b",
+    "scope_level_a", "scope_level_b",
     "discipline_label_a", "discipline_label_b",
     "unit_system",
     "comparison_type",
@@ -221,6 +241,7 @@ POOLED_FIELDS: List[str] = [
     "segment_id", "segment_label",
     "governance_role", "client_label",
     "business_center_label",
+    "scope_level",
     "unit_system",
     "domain",
     "pool_scope",
@@ -1676,35 +1697,44 @@ DIRECTED_TYPES = {
 }
 
 # ---------------------------------------------------------------------------
-# Scope-level fan-out (enterprise / bc / client / project)
+# Scope-level classification (enterprise / business_center / client_business_center)
 #
-# Scope level is derived purely from which of business_center_label /
-# client_label are populated on a segment's own row — it is orthogonal to
-# governance_role. Enterprise = neither populated. BC = business_center_label
-# populated, client_label not. Client = client_label populated,
-# business_center_label not. Project = both populated (the shape Project-role
-# segments carry going forward; some legacy Project rows may still lack bc,
-# in which case they present as Client scope here — that is a data-quality
-# fact about those rows, not a special case this function needs to know
-# about). These are plain scope filters, not cardinality claims: a bc-scoped
-# segment isn't defined by "having multiple clients" — that's a consequence
-# observed when pooling, not part of what the scope level means.
+# Under the explicit-metadata contract (PR1), client_label and
+# business_center_label are real, literal, non-blank values on every
+# file_metadata.csv row -- "Stantec" / "0000" for Stantec-internal work, a
+# real client name / business center number otherwise. A blank value on a
+# segment_manifest.csv row therefore no longer means "not a client
+# engagement" -- it means this segment's subset simply did not cut on that
+# dimension, so the segment pools every value of it (a roll-up). Scope level
+# is a classification of a segment's OWN cut values, not of what it pools;
+# roll-ups are handled separately by the callers that need them (see
+# discover_cross_client() / the enterprise_to_client target logic below),
+# not by this function.
+#
+# A row is Enterprise-scoped only when BOTH client_label == "Stantec" AND
+# business_center_label == "0000" -- either alone is not sufficient (a real
+# external client can still carry the "0000" bookkeeping tag in principle,
+# and Stantec-internal work can carry a real business center). Scope level
+# is orthogonal to governance_role -- do not encode Project into it; a
+# client+bc segment can be Template, Container, or Project.
 # ---------------------------------------------------------------------------
 
-# business_center_label values that mean "enterprise work, tagged for
-# bookkeeping" rather than a real peer business center. Must be normalized to
-# blank before any bc-scoped grouping or comparison — treating "0000" as a
-# real bc would silently group unrelated enterprise-wide rows together as if
-# they shared one specific business center. The token set itself lives in
-# na_token.py (imported above as _ENTERPRISE_BC_BOOKKEEPING_TOKENS) so
-# build_segment_manifest.py's own bookkeeping-token fold shares one literal
-# list instead of a hand-maintained duplicate.
+_ENTERPRISE_BC_LABEL = "0000"
 
 
 def _normalize_bc_label(value: str) -> str:
     v = (value or "").strip()
-    if is_blank_or_na(v) or v.lower() in _ENTERPRISE_BC_BOOKKEEPING_TOKENS:
+    if is_blank_or_na(v):
         return ""
+    # "0000"/"BC_0000" (any case) are spelling variants of the same
+    # enterprise-bookkeeping value elsewhere in the pipeline (e.g. the
+    # extraction completeness gate documents both) -- canonicalize to the
+    # literal "0000" so they group/classify identically instead of
+    # fragmenting into two distinct-looking business centers. This is
+    # distinct from the removed blank-fold: a real, non-blank value is
+    # still returned, just spelled consistently.
+    if v.lower() in _ENTERPRISE_BC_BOOKKEEPING_TOKENS:
+        return _ENTERPRISE_BC_LABEL
     return v
 
 
@@ -1717,16 +1747,49 @@ def _client_of(row: Dict[str, str]) -> str:
     return "" if is_blank_or_na(v) else v
 
 
-def _scope_level(row: Dict[str, str]) -> str:
+def _is_internal_client(client_label: str) -> bool:
+    return client_label.strip().lower() == "stantec"
+
+
+def _is_enterprise_bc(bc_label: str) -> bool:
+    return bc_label.strip() == _ENTERPRISE_BC_LABEL
+
+
+def _scope_level(row: Dict[str, str]) -> Optional[str]:
+    """Classify a segment row's own (client_label, business_center_label)
+    cut values. Returns None when either dimension is not cut on this row
+    (a roll-up pooling multiple real scopes) -- callers that need roll-up
+    populations (client-wide standards, cross-client comparisons) handle
+    that case explicitly rather than treating it as a fourth scope level.
+    """
     client = _client_of(row)
     bc = _bc_of(row)
-    if client and bc:
-        return "project"
-    if bc:
-        return "bc"
-    if client:
-        return "client"
-    return "enterprise"
+    if not client or not bc:
+        return None
+    internal = _is_internal_client(client)
+    enterprise_bc = _is_enterprise_bc(bc)
+    if internal and enterprise_bc:
+        return "enterprise"
+    if internal and not enterprise_bc:
+        return "business_center"
+    if not internal and not enterprise_bc:
+        return "client_business_center"
+    # Real external client literally tagged with the "0000" bookkeeping
+    # value -- does not fit a defined scope level.
+    return None
+
+
+def _is_client_wide_rollup(row: Dict[str, str]) -> bool:
+    """A real, non-Stantec client's row with business_center_label not cut
+    (pools that client's work across whichever real BCs it touches). This
+    is the "client-wide roll-up" population -- distinct from
+    _scope_level()'s "client_business_center" bucket, which requires bc to
+    be cut to one specific real value.
+    """
+    client = _client_of(row)
+    if not client or _is_internal_client(client):
+        return False
+    return not _bc_of(row)
 
 
 def _is_standard_role(role_key: str) -> bool:
@@ -1881,14 +1944,19 @@ def discover_sibling_segments(
 
 
 def _is_client_only_project_segment(row: Dict[str, str]) -> bool:
-    """True for a Project-role segment scoped by client_label alone -- no
-    discipline/business_center/collection narrowing -- the "client-level pooled
-    vocabulary" population discover_cross_client() compares peer-to-peer.
+    """True for a Project-role segment scoped by client_label (and,
+    optionally, discipline_label) alone -- no business_center/collection
+    narrowing -- the "client-level pooled vocabulary" population
+    discover_cross_client() compares peer-to-peer. discipline_label is a
+    grouping dimension for that comparison, not a disqualifier: a client's
+    per-discipline roll-up (e.g. "Kaiser, Architectural") is just as valid a
+    client-only population as the client's fully blank-discipline portfolio,
+    as long as it isn't further narrowed by business_center or collection.
 
-    Deliberately stricter than _scope_level(row) == "client" (which only checks
-    client-set/bc-blank): a client's own discipline- or collection-scoped
-    Project child would also pass that check but is a narrower population than
-    the client's full portfolio, and comparing a narrower slice for one client
+    Deliberately stricter than _scope_level(row) == "client_business_center":
+    a client's own business_center- or collection-scoped Project child would
+    also fail that check but is a narrower population than the client's
+    per-discipline portfolio, and comparing a narrower slice for one client
     against a broader one for another would silently mix comparison grains --
     exactly the anti-pattern documented on CASCADE_GROUP2_TYPES in
     generate_governance_narrative.py.
@@ -1900,8 +1968,7 @@ def _is_client_only_project_segment(row: Dict[str, str]) -> bool:
     if is_blank_or_na(client):
         return False
     return (
-        is_blank_or_na(row.get("discipline_label", ""))
-        and is_blank_or_na(row.get("business_center_label", ""))
+        is_blank_or_na(row.get("business_center_label", ""))
         and is_blank_or_na(row.get("collection_label", ""))
     )
 
@@ -1910,20 +1977,25 @@ def discover_cross_client(
     manifest: Dict[str, Dict[str, str]],
 ) -> List[ComparisonPair]:
     """Purpose-built client-vs-client comparison: each client's own broadest
-    (client-only-scoped) Project population, paired against every OTHER
-    client's, within the same unit_system.
+    (client-only-scoped) Project population for a given discipline, paired
+    against every OTHER client's population for that SAME discipline, within
+    the same unit_system. A client's fully blank-discipline portfolio and its
+    per-discipline roll-ups are each distinct populations, compared only
+    against the matching population (same discipline value, blank included)
+    on the other client's side -- never mixed across disciplines.
 
     Unlike discover_sibling_segments()'s "sibling_projects" -- which only pairs
     Project segments sharing an immediate parent_segment_id, an accident of the
     segment lattice's hierarchy that a corpus with client-scoped Project
     segments nested straight under one enterprise-wide "Project" parent may
     still satisfy, but is not guaranteed to -- this function groups purely by
-    (client_label, unit_system) and pairs every distinct client combination.
-    No shared-parent requirement, no hardcoded sector restriction (sector
-    filtering, where wanted, is a downstream concern of the comparison_type's
-    consumers -- see policies/client_sector.csv).
+    (client_label, unit_system, discipline_label) and pairs every distinct
+    client combination sharing a discipline. No shared-parent requirement, no
+    hardcoded sector restriction (sector filtering, where wanted, is a
+    downstream concern of the comparison_type's consumers -- see
+    policies/client_sector.csv).
     """
-    by_client_unit: Dict[Tuple[str, str], str] = {}
+    by_client_unit_disc: Dict[Tuple[str, str, str], str] = {}
     for sid, row in manifest.items():
         if row.get("run_type", "").strip().lower() not in ("bundle", "reference"):
             continue
@@ -1931,22 +2003,58 @@ def discover_cross_client(
             continue
         client = row.get("client_label", "").strip()
         unit = row.get("unit_system", "").strip()
+        disc = row.get("discipline_label", "").strip()
         if not unit:
             continue
         # First-seen wins if the manifest somehow carries more than one
-        # client-only Project segment for the same (client, unit) -- shouldn't
-        # happen given build_segment_manifest.py's one-row-per-subset-key
-        # contract, but a silent duplicate overwrite would be worse than a
-        # deterministic pick.
-        by_client_unit.setdefault((client, unit), sid)
+        # client-only Project segment for the same (client, unit, discipline)
+        # -- shouldn't happen given build_segment_manifest.py's
+        # one-row-per-subset-key contract, but a silent duplicate overwrite
+        # would be worse than a deterministic pick.
+        by_client_unit_disc.setdefault((client, unit, disc), sid)
 
     pairs: List[ComparisonPair] = []
-    items = sorted(by_client_unit.items())
-    for i, ((_client_a, unit_a), sid_a) in enumerate(items):
-        for (_client_b, unit_b), sid_b in items[i + 1:]:
-            if unit_a != unit_b:
+    items = sorted(by_client_unit_disc.items())
+    for i, ((client_a, unit_a, disc_a), sid_a) in enumerate(items):
+        for (client_b, unit_b, disc_b), sid_b in items[i + 1:]:
+            if client_a == client_b or unit_a != unit_b or disc_a != disc_b:
                 continue
             pairs.append((sid_a, sid_b, "cross_client"))
+    return pairs
+
+
+def discover_client_cross_bc(
+    manifest: Dict[str, Dict[str, str]],
+) -> List[ComparisonPair]:
+    """Same-client, cross-business-center comparison: for a real (non-Stantec)
+    client whose work spans more than one real business center, compare that
+    client's per-business-center populations against each other, for every
+    pair of business centers the client actually appears in -- not a fixed
+    two-BC comparison.
+
+    Matched by client_label, governance_role, discipline_label, unit_system.
+    Client-wide roll-ups (business_center_label not cut -- see
+    _is_client_wide_rollup()) are out of scope here; this compares only the
+    client's client_business_center-scoped populations against each other.
+    """
+    by_group: Dict[Tuple[str, str, str, str], List[str]] = defaultdict(list)
+    for sid, row in manifest.items():
+        if row.get("run_type", "").strip().lower() not in ("bundle", "reference"):
+            continue
+        if _scope_level(row) != "client_business_center":
+            continue
+        client = row.get("client_label", "").strip()
+        unit = row.get("unit_system", "").strip()
+        disc = row.get("discipline_label", "").strip()
+        role = row.get("governance_role", "").strip().lower()
+        by_group[(client, unit, disc, role)].append(sid)
+
+    pairs: List[ComparisonPair] = []
+    for _group_key, sids in by_group.items():
+        for a_sid, b_sid in combinations(sorted(sids), 2):
+            if _bc_of(manifest[a_sid]) == _bc_of(manifest[b_sid]):
+                continue
+            pairs.append((a_sid, b_sid, "client_cross_bc"))
     return pairs
 
 
@@ -1992,18 +2100,17 @@ def discover_governance_chain(
     # and Container→Project. Project target used-view is usage; other target roles
     # remain provided-vocabulary inventories.
     # Reference segments are included — they participate using their file inventories.
-    def _key(row: Dict[str, str]) -> Tuple[str, str, str]:
+    def _key(row: Dict[str, str]) -> Tuple[str, ...]:
         # client_label is blank, or an explicit "not applicable" spelling
-        # (na, N/A, __NOT_APPLICABLE__, ...), for Standards-collection rows
-        # that were never a client engagement (e.g. BC_2270 templates/
-        # containers). Pooling all of those under a single "" key would group
-        # unrelated collections together; fall back to business_center_label
-        # first (the real, populated cut dimension for BC-scoped rows per
-        # build_segment_manifest.py), then to collection_label as a
-        # last-resort fallback for whenever that field does get wired in.
-        # is_blank_or_na() (shared with build_segment_manifest.py) recognizes
-        # any NA spelling, not just the one literal "__NOT_APPLICABLE__"
-        # token this used to hardcode.
+        # (na, N/A, __NOT_APPLICABLE__, ...), for roll-up rows that don't cut
+        # on client at all (e.g. a BC-wide aggregate). Pooling all of those
+        # under a single "" key would group unrelated collections together;
+        # fall back to business_center_label first (the real, populated cut
+        # dimension for BC-scoped rows per build_segment_manifest.py), then
+        # to collection_label as a last-resort fallback for whenever that
+        # field does get wired in. is_blank_or_na() (shared with
+        # build_segment_manifest.py) recognizes any NA spelling, not just the
+        # one literal "__NOT_APPLICABLE__" token this used to hardcode.
         #
         # client_label, business_center_label, and collection_label are
         # distinct cut dimensions with independent text namespaces — a real
@@ -2011,6 +2118,17 @@ def discover_governance_chain(
         # row whose business_center_label happens to be the same text. The
         # key therefore tags which dimension supplied the value instead of
         # collapsing them all into one bare string slot.
+        #
+        # When client_label is populated, business_center_label is folded
+        # into the same key alongside it (rather than being ignored) --
+        # under the explicit-metadata contract client_label is always
+        # populated for Stantec-internal rows too ("Stantec"), so without
+        # this, an Enterprise-scoped Template (Stantec/0000) and a specific
+        # business center's Template (Stantec/2270) would collapse into one
+        # "client=Stantec" bucket and incorrectly pair with that business
+        # center's Projects as if they were the same governance population.
+        # A populated-client, blank-bc row (a client-wide roll-up) still
+        # gets its own distinct bucket via the empty bc slot.
         #
         # collection_label is NOT folded into this key, even though it is a
         # real cut dimension in build_segment_manifest.py's DIMENSION_CONFIG
@@ -2033,11 +2151,7 @@ def discover_governance_chain(
         unit = row.get("unit_system", "").strip()
         client = row.get("client_label", "").strip()
         if not is_blank_or_na(client):
-            return ("client", client, unit)
-        # "0000"/"BC_0000" are enterprise-wide bookkeeping tags, not a real
-        # peer business center — _bc_of() normalizes them to blank so they
-        # fall through to the collection/blank fallbacks below instead of
-        # wildcarding every enterprise-tagged row into one fake shared bc.
+            return ("client", client, _bc_of(row), unit)
         bc = _bc_of(row)
         if bc:
             return ("business_center", bc, unit)
@@ -2058,10 +2172,13 @@ def discover_governance_chain(
         return row.get("discipline_label", "").strip()
 
     def _disc_match(ra: Dict[str, str], rb: Dict[str, str]) -> bool:
-        da, db = _disc(ra), _disc(rb)
-        if not da or not db:
-            return True
-        return da == db
+        # Discipline comparisons require the same unit_system and the same
+        # discipline_label, full stop -- no cross-discipline wildcard mode.
+        # Under the explicit-metadata contract discipline_label is a
+        # required, always-populated field, so this is an exact match in
+        # practice; it is intentionally not blank-tolerant for any
+        # malformed/legacy row that reaches this function directly.
+        return _disc(ra) == _disc(rb)
 
     def _collection(row: Dict[str, str]) -> str:
         value = row.get("collection_label", "").strip()
@@ -2103,7 +2220,7 @@ def discover_governance_chain(
             return not _is_collection_rollup(ra)
         return True
 
-    by_key: Dict[Tuple[str, str, str], Dict[str, List[str]]] = defaultdict(
+    by_key: Dict[Tuple[str, ...], Dict[str, List[str]]] = defaultdict(
         lambda: defaultdict(list)
     )
     for sid, row in manifest.items():
@@ -2134,7 +2251,7 @@ def discover_governance_chain(
                 continue
             pairs.append((g, sid, f"generic_to_{role}"))
 
-    for (_dim, _client, _us), role_map in by_key.items():
+    for _key_tuple, role_map in by_key.items():
         generics = role_map.get("generic", [])
         templates = role_map.get("template", [])
         projects = role_map.get("project", [])
@@ -2163,16 +2280,15 @@ def discover_governance_chain(
                 if _disc_match(manifest[c], manifest[p]) and _collection_match(manifest[c], manifest[p]):
                     pairs.append((c, p, "container_to_project"))
 
-    # --- Scope-level fan-out (enterprise / bc / client) ---
+    # --- Scope-level fan-out (enterprise / business_center / client) ---
     # Independent parallel edges alongside the by_key() pairs above — no
-    # fixed override precedence is assumed between enterprise/bc/client
-    # standards, since any of them may or may not have adapted from any
-    # other. bc's own Project-role rows are matched by normalized
-    # business_center_label alone (ignoring client_label), since a
-    # bc-scoped Template/Container is meant to apply across whichever
-    # clients happen to have work in that bc. An enterprise-scoped
-    # Template/Container has no client/bc of its own, so it is compared
-    # against every runnable Project regardless of scope.
+    # fixed override precedence is assumed between enterprise/business_center/
+    # client standards, since any of them may or may not have adapted from
+    # any other. A business_center-scoped Template/Container is meant to
+    # apply across whichever clients happen to have work in that bc. An
+    # enterprise-scoped Template/Container (Stantec/"0000") has no client/bc
+    # narrowing of its own, so it is compared against every runnable Project
+    # regardless of scope.
     eligible_rows = [
         (sid, row) for sid, row in manifest.items()
         if row.get("run_type", "").strip().lower() in ("bundle", "reference")
@@ -2186,8 +2302,16 @@ def discover_governance_chain(
         if _role_key(row.get("governance_role", "")) == "project"
     ]
     enterprise_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row) == "enterprise"]
-    bc_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row) == "bc"]
-    client_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row) == "client"]
+    bc_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row) == "business_center"]
+    # enterprise_to_client targets: a client's standards, whether narrowed to
+    # one specific business center (client_business_center scope) or pooled
+    # across every business center that client touches (a client-wide
+    # roll-up). Both are legitimate, distinct targets -- if a client has
+    # both, they produce separate comparison rows, not a merged population.
+    client_standards = [
+        (sid, row) for sid, row in standard_rows
+        if _scope_level(row) == "client_business_center" or _is_client_wide_rollup(row)
+    ]
 
     # These loops group purely by scope level, ignoring parent_segment_id —
     # so an ancestor and its own descendant (e.g. an enterprise-scoped
@@ -2252,6 +2376,25 @@ def discover_governance_chain(
             ):
                 pairs.append((e_sid, c_sid, "enterprise_to_client"))
 
+    # --- BC-to-BC peers ---
+    # Purpose-built discovery, not an accident of shared parent_segment_id:
+    # every pair of real business centers' same-role, same-discipline
+    # populations. Spans whichever role (Template/Container/Project) has
+    # business_center-scoped rows -- scope level is orthogonal to role.
+    by_role_bc: Dict[str, List[str]] = defaultdict(list)
+    for sid, row in eligible_rows:
+        if _scope_level(row) == "business_center":
+            by_role_bc[_role_key(row.get("governance_role", ""))].append(sid)
+    for _role, sids in by_role_bc.items():
+        for a_sid, b_sid in combinations(sorted(sids), 2):
+            a_row, b_row = manifest[a_sid], manifest[b_sid]
+            if _bc_of(a_row) == _bc_of(b_row):
+                continue
+            if _is_lineage_related(ancestor_map, a_sid, b_sid):
+                continue
+            if _same_unit(manifest, a_sid, b_sid) and _disc_match(a_row, b_row):
+                pairs.append((a_sid, b_sid, "bc_to_bc"))
+
     return pairs
 
 
@@ -2314,33 +2457,54 @@ def deduplicate_pairs(pairs: List[ComparisonPair]) -> List[ComparisonPair]:
     return result
 
 
-def drop_legacy_sibling_projects_covered_by_cross_client(
+# sibling_* comparison_type values discover_sibling_segments() can emit,
+# grouped purely by shared parent_segment_id -- every one of these can
+# collide with a purpose-built peer comparison for the exact same
+# (seg_a, seg_b) pair (see drop_legacy_siblings_covered_by_peer_comparisons()).
+_SIBLING_PEER_TYPES = {
+    "sibling_projects", "sibling_templates", "sibling_containers",
+    "sibling_generic", "sibling_segments",
+}
+
+# Purpose-built peer-comparison types, each discovered independently of
+# parent_segment_id (cross_client: client_label; bc_to_bc/client_cross_bc:
+# business_center_label/scope_level) -- any of these can duplicate a
+# sibling_* row for the same pair whenever the peers they connect also
+# happen to share an immediate parent.
+_PURPOSE_BUILT_PEER_TYPES = {"cross_client", "bc_to_bc", "client_cross_bc"}
+
+
+def drop_legacy_siblings_covered_by_peer_comparisons(
     pairs: List[ComparisonPair],
 ) -> List[ComparisonPair]:
-    """sibling_projects and cross_client can both fire for the exact same
-    (seg_a, seg_b) pair: discover_sibling_segments() groups Project-role
-    segments purely by (parent_segment_id, unit_system), so two client-only
-    Project segments discover_cross_client() already pairs can ALSO share an
-    immediate parent (e.g. an enterprise-wide "unit|Project" rollup) and get
-    re-paired as sibling_projects. Unlike deduplicate_pairs()'s general case
-    (different comparison_types for the same pair are usually distinct
-    analytical questions and must all be preserved), these two specifically
-    measure the identical underlying file-level comparison for the identical
-    two segments -- keeping both would double-count that one pair in
-    build_cascade()'s xc / build_client_summary()'s xc_by_client downstream,
-    and collide on compare_cross_segment_run_id (make_comparison_run_id()
-    hashes only segment IDs + timestamp, not comparison_type -- a broader,
-    pre-existing characteristic of that identifier not touched here).
-    cross_client is the purpose-built, unambiguous producer for this signal;
-    drop the sibling_projects entry (order-independent) for any pair
-    cross_client already covers, and leave every other pair/type untouched.
+    """A sibling_* row and a purpose-built peer comparison (cross_client,
+    bc_to_bc, client_cross_bc) can both fire for the exact same (seg_a, seg_b)
+    pair: discover_sibling_segments() groups segments purely by
+    (parent_segment_id, governance_role, unit_system), so two segments a
+    purpose-built peer function already pairs (by client_label, or by
+    scope_level/business_center_label) can ALSO share an immediate parent
+    (e.g. an enterprise-wide "unit|Project" rollup, or a client/bc segment's
+    natural lattice parent) and get re-paired as a sibling_* type too. Unlike
+    deduplicate_pairs()'s general case (different comparison_types for the
+    same pair are usually distinct analytical questions and must all be
+    preserved), a sibling_* row and its purpose-built counterpart measure the
+    identical underlying file-level comparison for the identical two
+    segments -- keeping both would double-count that one pair downstream and
+    collide on comparison_run_id (make_comparison_run_id() hashes only
+    segment IDs + timestamp, not comparison_type, and
+    cross_segment_file_pairs.csv carries no comparison_type column at all --
+    a broader, pre-existing characteristic of that identifier/schema not
+    touched here). The purpose-built type is the unambiguous producer for its
+    signal; drop the sibling_* entry (order-independent) for any pair a
+    purpose-built peer type already covers, and leave every other pair/type
+    untouched.
     """
-    cross_client_pairs = {
-        frozenset((a, b)) for a, b, ctype in pairs if ctype == "cross_client"
+    peer_covered_pairs = {
+        frozenset((a, b)) for a, b, ctype in pairs if ctype in _PURPOSE_BUILT_PEER_TYPES
     }
     return [
         (a, b, ctype) for a, b, ctype in pairs
-        if not (ctype == "sibling_projects" and frozenset((a, b)) in cross_client_pairs)
+        if not (ctype in _SIBLING_PEER_TYPES and frozenset((a, b)) in peer_covered_pairs)
     ]
 
 
@@ -2782,6 +2946,8 @@ def _build_summary_row(
         "client_label_b": mb.get("client_label", ""),
         "business_center_label_a": _bc_of(ma),
         "business_center_label_b": _bc_of(mb),
+        "scope_level_a": _scope_level(ma) or "",
+        "scope_level_b": _scope_level(mb) or "",
         "discipline_label_a": ma.get("discipline_label", ""),
         "discipline_label_b": mb.get("discipline_label", ""),
         "unit_system": ma.get("unit_system", ""),
@@ -3114,6 +3280,7 @@ def _build_pooled_row(
         "governance_role": mf.get("governance_role", ""),
         "client_label": mf.get("client_label", ""),
         "business_center_label": _bc_of(mf),
+        "scope_level": _scope_level(mf) or "",
         "unit_system": mf.get("unit_system", ""),
         "domain": domain,
         "pool_scope": pool_scope,
@@ -3167,9 +3334,10 @@ def run_pooled_comparison(
         happen to have work for that client, to check client-level
         consistency.
 
-    business_center_label bookkeeping tags ("0000"/"BC_0000") are normalized
-    to blank before bc-pool grouping (see _bc_of()) so they never masquerade
-    as a shared peer bc.
+    business_center_label is normalized via _bc_of() before bc-pool grouping
+    (blank/NA spellings fold to blank; "0000"/"BC_0000" spelling variants
+    canonicalize to the literal "0000" rather than folding to blank -- see
+    _normalize_bc_label()).
 
     Emits one row per (segment_id, domain, pool_scope).
     """
@@ -3187,6 +3355,17 @@ def run_pooled_comparison(
         parent = row.get("parent_segment_id", "").strip()
         if parent:
             parent_groups[(parent, role, us)].append(sid)
+        # pool_scope ("parent_sibling"|"bc"|"client") answers a different question
+        # than scope_level ("enterprise"|"business_center"|"client_business_center"):
+        # pool_scope is which axis this pool was GROUPED along, not where the
+        # segment sits organizationally. They are not parallel/competing
+        # classifications -- both are derived from the same normalized
+        # business_center_label via _bc_of()/_normalize_bc_label(), so an
+        # Enterprise segment (business_center_label == "0000") is never silently
+        # excluded or mis-bucketed by either path. Do not attempt to collapse
+        # pool_scope into scope_level; a segment's scope_level is fixed, but the
+        # same segment can appear in a "bc" pool and a "client" pool depending on
+        # which sibling group is being pooled against.
         bc = _bc_of(row)
         if bc:
             bc_groups[(bc, role, us)].append(sid)
@@ -3666,28 +3845,31 @@ def main() -> int:
         pairs.extend(discover_within_project(manifest, registry, file_metadata, segments_root))
     if args.cross_client:
         pairs.extend(discover_cross_client(manifest))
+        pairs.extend(discover_client_cross_bc(manifest))
 
     pairs = deduplicate_pairs(pairs)
 
     # Filter by --segment-a / --segment-b. Must run BEFORE
-    # drop_legacy_sibling_projects_covered_by_cross_client(): that drop is
+    # drop_legacy_siblings_covered_by_peer_comparisons(): that drop is
     # order-independent (frozenset((a, b))), but discover_sibling_segments()
-    # orders its pair by sorted segment ID while discover_cross_client() orders
-    # by sorted client label -- the surviving cross_client row can therefore be
-    # the reverse (b, a) of the sibling_projects row it replaces. Since these
-    # filters are position-sensitive (a == args.segment_a, b == args.segment_b),
-    # running the drop first could remove the correctly-oriented sibling row
-    # and leave only a reversed-orientation cross_client row that then fails
-    # the filter too, making a scoped run silently report zero pairs for
-    # segments that do have a comparison. Filtering here first means the drop
-    # only ever sees (and only ever needs to reconcile) whichever orientation
-    # actually survived the requested scope.
+    # orders its pairs by sorted segment ID while discover_cross_client() orders
+    # by sorted client label (bc_to_bc/discover_client_cross_bc() both order by
+    # sorted segment ID too, matching sibling's own convention) -- the surviving
+    # cross_client row can therefore be the reverse (b, a) of the sibling_projects
+    # row it replaces. Since these filters are position-sensitive
+    # (a == args.segment_a, b == args.segment_b), running the drop first could
+    # remove the correctly-oriented sibling row and leave only a
+    # reversed-orientation peer row that then fails the filter too, making a
+    # scoped run silently report zero pairs for segments that do have a
+    # comparison. Filtering here first means the drop only ever sees (and only
+    # ever needs to reconcile) whichever orientation actually survived the
+    # requested scope.
     if args.segment_a:
         pairs = [(a, b, ct) for a, b, ct in pairs if a == args.segment_a]
     if args.segment_b:
         pairs = [(a, b, ct) for a, b, ct in pairs if b == args.segment_b]
 
-    pairs = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
+    pairs = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
 
     if not pairs:
         print("[compare] no pairs discovered — check manifest hierarchy and mode flags")

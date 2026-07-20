@@ -11,7 +11,120 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Changed
+- `tools/compare_cross_segment.py` organizational scope is now derived from
+  explicit, literal `client_label`/`business_center_label` values instead of
+  blank inference, matching `build_segment_manifest.py`'s explicit-metadata
+  contract: **enterprise** (`client_label == "Stantec"`,
+  `business_center_label == "0000"`), **business_center** (`client_label ==
+  "Stantec"`, a real `business_center_label`), **client_business_center** (a
+  real external `client_label`, a real `business_center_label`) via the
+  rewritten `_scope_level()`. A row where either dimension isn't cut at all
+  (blank) is a roll-up pooling multiple real scopes and is handled per
+  comparison type (`_is_client_wide_rollup()`), not classified by
+  `_scope_level()` itself.
+  - `_normalize_bc_label()` no longer folds `"0000"`/`"BC_0000"` to blank —
+    `"0000"` now flows through as the literal Enterprise business-center
+    value everywhere this file uses `business_center_label` (`"BC_0000"`/any
+    case spelling variant canonicalizes to the same literal `"0000"` rather
+    than being left as a separately-fragmenting literal — see the "Fixed"
+    entry below). This was a live inconsistency left in place by the
+    segment-manifest explicit-contract change: since `client_label` is now
+    always populated (literally
+    `"Stantec"` for internal work, never blank),
+    `discover_governance_chain()`'s prior blank-based scope inference meant
+    `_scope_level()` could never return `"enterprise"` for real data at all
+    (an internal-work row's populated `client_label` always won the old
+    3-way branch before blank-derived `"bc"`/`"client"` were ever reached) —
+    `enterprise_to_project`/`enterprise_to_bc`/`enterprise_to_client` pairs
+    were silently produced for zero pairs against current data. Fixed.
+  - `discover_governance_chain()`'s `_key()` now folds `business_center_label`
+    into its client-populated bucket too — without this, an Enterprise
+    Template (`Stantec`/`0000`) and a specific business center's Template
+    (`Stantec`/`2270`) collapsed into one `client=="Stantec"` bucket and
+    incorrectly produced `template_to_project`/`template_to_container` pairs
+    against each other's downstream population.
+  - `_disc_match()`'s blank-discipline wildcard is removed — discipline-gated
+    comparisons now require an exact `discipline_label` match, full stop.
+  - `discover_cross_client()`'s grain now includes `discipline_label`
+    (previously excluded any discipline-scoped Project segment from
+    `cross_client` entirely); grouping key is now `(client_label,
+    unit_system, discipline_label)`.
+  - `SUMMARY_FIELDS` gains `scope_level_a`/`scope_level_b`; `POOLED_FIELDS`
+    gains `scope_level` (empty string for roll-up rows).
+  - `run_pooled_comparison()`'s `bc_groups` pooling (`pool_scope == "bc"`)
+    calls `_bc_of()`, which calls the now-fixed `_normalize_bc_label()`
+    directly (no independent re-implementation) — so this same fix also
+    stops silently excluding Enterprise-scoped (`"0000"`) rows from
+    bc-scoped pooling entirely (previously `if bc:` was always False for
+    them, since `_bc_of()` folded `"0000"` to blank; they simply never
+    entered `bc_groups`). New coverage:
+    `test_pooled_comparison_bc_scope_pools_enterprise_0000_segments`.
+- Cardinality/aggregation semantics (`data_sufficient` gate, pairwise-mean
+  computation, `jaccard_mean`/`containment_*_mean` field naming) are
+  unchanged by this entry — `cross_client` and the new `client_cross_bc`
+  comparison type reuse the existing metrics functions as-is and remain
+  pairwise/provisional pending a population-union aggregation fix.
+
+### Design notes
+- `pool_scope` (`run_pooled_comparison()`) and `scope_level` (`_scope_level()`)
+  are intentionally distinct — the former describes which axis a sibling pool
+  is grouped along, the latter describes a segment's organizational position.
+  Both now derive from the same corrected `_normalize_bc_label()`, so they no
+  longer risk drifting apart on how `business_center_label` is interpreted
+  (verified: `_bc_of()` calls the shared function directly, no independent
+  re-implementation). No unification needed; documented at the `pool_scope`
+  definition site to prevent future confusion.
+
+### Fixed
+- (PR #373 review) `_normalize_bc_label()` now canonicalizes `"BC_0000"`/any
+  case spelling to the literal `"0000"` instead of leaving it as a separate,
+  fragmenting literal — `_is_enterprise_bc()` only ever compared against
+  `"0000"` exactly, so a row spelled `"BC_0000"` (a real spelling used
+  elsewhere in the pipeline, e.g. the extraction completeness gate) was
+  classified `business_center` instead of `enterprise`, omitting the
+  intended `enterprise_to_project`/`enterprise_to_bc` fan-out and able to
+  emit a bogus `bc_to_bc` peer pairing between the enterprise segment and a
+  real business center. Reuses the shared `na_token.
+  ENTERPRISE_BC_BOOKKEEPING_TOKENS` set (re-imported) rather than
+  reimplementing it.
+- (PR #373 review) `drop_legacy_sibling_projects_covered_by_cross_client()`
+  renamed to `drop_legacy_siblings_covered_by_peer_comparisons()` and
+  generalized: it previously only dropped a `sibling_projects` row covered
+  by a `cross_client` pair. The new `bc_to_bc`/`client_cross_bc` types have
+  the identical collision risk against `sibling_templates`/
+  `sibling_containers`/`sibling_projects` (same-role BC-scoped segments, or
+  a client's per-BC segments, can share an immediate `parent_segment_id`
+  with what a purpose-built peer function already pairs) — both would have
+  collided on `comparison_run_id` and double-counted the pair in
+  `cross_segment_file_pairs.csv`, which carries no `comparison_type` column.
+  The generalized function drops any `sibling_*` row for a pair any of
+  `cross_client`/`bc_to_bc`/`client_cross_bc` already covers.
+- (PR #373 review) `bc_to_bc` and `client_cross_bc` registered in
+  `generate_governance_narrative.py`'s `CASCADE_GROUP4_EXCLUDED_TYPES`
+  (same-role/same-client peer comparison, no cascade treatment designed
+  yet — same reason class as `sibling_templates`/`sibling_containers`).
+  Without this, any default run where these types fire fed
+  `_warn_unrecognized_comparison_types()` an unrecognized value. This is a
+  narrow, additive exception to keeping `generate_governance_narrative.py`
+  out of scope for this PR — registering a type name in the existing
+  documented-exclusion registry, not new narrative/cascade logic.
+
 ### Added
+- New `bc_to_bc` comparison type in `tools/compare_cross_segment.py`
+  (`discover_governance_chain()`, fires under `--governance-chain`): pairs
+  every combination of real business centers' same-role, same-discipline
+  Template/Container/Project populations against each other (peer-to-peer,
+  not routed through `parent_segment_id`/collection_label).
+- New `client_cross_bc` comparison type in `tools/compare_cross_segment.py`
+  (`discover_client_cross_bc()`, fires under `--cross-client`): for a real
+  client whose work spans more than one real business center, pairs that
+  client's per-business-center (`client_business_center` scope) populations
+  against each other for every business-center pair it actually appears in
+  (derived from the data, not a fixed two-BC comparison), matched by
+  `client_label`, `governance_role`, `discipline_label`, `unit_system`.
+  Provisional metric pending PR3's population-union aggregation fix, same as
+  `cross_client`.
 - New `cross_client` comparison type in `tools/compare_cross_segment.py`
   (`discover_cross_client()`, `--cross-client` CLI flag, default-on): pairs
   each client's own broadest (client-only-scoped) Project population against

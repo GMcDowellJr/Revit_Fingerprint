@@ -653,6 +653,24 @@ CASCADE_GROUP4_EXCLUDED_TYPES = {
         "not this string. Nothing to feed into cascade under this name; kept here "
         "only so the coverage check below doesn't flag it as unrecognized."
     ),
+    "bc_to_bc": (
+        "Same-role peer-to-peer comparison across business centers (Template vs "
+        "Template, Container vs Container, or Project vs Project in different real "
+        "business centers) emitted by discover_governance_chain()'s scope-level "
+        "fan-out, not a cross-role directed cascade measurement — same defect/reason "
+        "class as sibling_templates/sibling_containers above. Whether/how BC-vs-BC "
+        "peer consistency should be surfaced is a design decision, not resolved by "
+        "this pass."
+    ),
+    "client_cross_bc": (
+        "Same-client, cross-business-center peer comparison (a real client's own "
+        "population compared to itself across the real business centers it "
+        "touches) emitted by discover_client_cross_bc() — same same-role/peer-not-"
+        "cascade reason class as sibling_templates/sibling_containers/bc_to_bc "
+        "above. Also pairwise/provisional pending a population-union aggregation "
+        "fix (see compare_cross_segment.py's discover_client_cross_bc() docstring); "
+        "routing this into cascade is a design decision, not resolved by this pass."
+    ),
 }
 
 # Group 1/2 signal keys -- a domain with data in at least one of these has something

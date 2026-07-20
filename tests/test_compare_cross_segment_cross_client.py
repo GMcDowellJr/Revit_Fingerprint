@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 from compare_cross_segment import (  # noqa: E402
     _is_client_only_project_segment,
     discover_cross_client,
-    drop_legacy_sibling_projects_covered_by_cross_client,
+    drop_legacy_siblings_covered_by_peer_comparisons,
 )
 
 
@@ -54,10 +54,13 @@ def test_is_client_only_project_segment_false_when_client_blank():
     assert _is_client_only_project_segment(_seg("Project", client="n/a")) is False
 
 
-def test_is_client_only_project_segment_false_when_further_scoped_by_discipline():
+def test_is_client_only_project_segment_true_when_further_scoped_by_discipline():
+    """discipline_label is a grouping dimension for discover_cross_client(),
+    not a disqualifier -- a client's per-discipline roll-up is still a valid
+    client-only population as long as bc/collection aren't also cut."""
     assert _is_client_only_project_segment(
         _seg("Project", client="Kaiser", discipline="architectural")
-    ) is False
+    ) is True
 
 
 def test_is_client_only_project_segment_false_when_further_scoped_by_bc():
@@ -94,10 +97,10 @@ def test_discover_cross_client_no_pair_across_different_unit_systems():
     assert discover_cross_client(manifest) == []
 
 
-def test_discover_cross_client_excludes_discipline_scoped_project_segments():
-    """A client's discipline-scoped Project child must not participate --
-    only the client's own broadest (client-only) segment is a peer of another
-    client's broadest segment; mixing grains would compare a narrower
+def test_discover_cross_client_discipline_scoped_segment_does_not_mix_with_broader_grain():
+    """A client's discipline-scoped Project child is its own distinct
+    population -- it does not pair against another client's blank-discipline
+    (broader) portfolio segment; mixing grains would compare a narrower
     population against a broader one."""
     manifest = {
         "p_kaiser": _seg("Project", client="Kaiser"),
@@ -107,6 +110,29 @@ def test_discover_cross_client_excludes_discipline_scoped_project_segments():
     pairs = discover_cross_client(manifest)
     assert ("p_kaiser", "p_sutter", "cross_client") in pairs
     assert not any("p_kaiser_arch" in (a, b) for a, b, _ in pairs)
+
+
+def test_discover_cross_client_matching_discipline_peers_do_pair():
+    """Two clients each with the SAME discipline-scoped Project population
+    pair on that discipline grain -- discipline is a grouping dimension now,
+    not an exclusion."""
+    manifest = {
+        "p_kaiser_arch": _seg("Project", client="Kaiser", discipline="architectural"),
+        "p_sutter_arch": _seg("Project", client="Sutter", discipline="architectural"),
+    }
+    pairs = discover_cross_client(manifest)
+    assert ("p_kaiser_arch", "p_sutter_arch", "cross_client") in pairs
+    assert len(pairs) == 1
+
+
+def test_discover_cross_client_discipline_mismatch_produces_no_pair():
+    """Matching unit_system alone is not sufficient -- differing
+    discipline_label values must not produce a cross_client pair."""
+    manifest = {
+        "p_kaiser_arch": _seg("Project", client="Kaiser", discipline="architectural"),
+        "p_sutter_elec": _seg("Project", client="Sutter", discipline="electrical"),
+    }
+    assert discover_cross_client(manifest) == []
 
 
 def test_discover_cross_client_excludes_non_project_roles():
@@ -146,7 +172,7 @@ def test_discover_cross_client_no_self_pair_or_reverse_duplicate():
 
 
 # ---------------------------------------------------------------------------
-# drop_legacy_sibling_projects_covered_by_cross_client()
+# drop_legacy_siblings_covered_by_peer_comparisons()
 # ---------------------------------------------------------------------------
 
 def test_drops_sibling_projects_when_same_pair_covered_by_cross_client():
@@ -160,7 +186,7 @@ def test_drops_sibling_projects_when_same_pair_covered_by_cross_client():
         ("p_kaiser", "p_sutter", "sibling_projects"),
         ("p_kaiser", "p_sutter", "cross_client"),
     ]
-    result = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
+    result = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
     assert result == [("p_kaiser", "p_sutter", "cross_client")]
 
 
@@ -169,7 +195,7 @@ def test_drop_legacy_sibling_projects_is_order_independent():
         ("p_sutter", "p_kaiser", "sibling_projects"),
         ("p_kaiser", "p_sutter", "cross_client"),
     ]
-    result = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
+    result = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
     assert result == [("p_kaiser", "p_sutter", "cross_client")]
 
 
@@ -181,7 +207,7 @@ def test_drop_legacy_sibling_projects_leaves_uncovered_pairs_untouched():
         ("p_kaiser_arch", "p_kaiser_elec", "sibling_projects"),
         ("p_kaiser", "p_sutter", "cross_client"),
     ]
-    result = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
+    result = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
     assert ("p_kaiser_arch", "p_kaiser_elec", "sibling_projects") in result
     assert ("p_kaiser", "p_sutter", "cross_client") in result
     assert len(result) == 2
@@ -195,19 +221,19 @@ def test_drop_legacy_sibling_projects_leaves_other_types_untouched():
         ("p_kaiser", "p_sutter", "template_to_project"),
         ("p_kaiser", "p_sutter", "cross_client"),
     ]
-    result = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
+    result = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
     assert set(result) == set(pairs)
 
 
 def test_drop_legacy_sibling_projects_noop_when_no_cross_client_rows():
     pairs = [("p_kaiser", "p_sutter", "sibling_projects")]
-    assert drop_legacy_sibling_projects_covered_by_cross_client(pairs) == pairs
+    assert drop_legacy_siblings_covered_by_peer_comparisons(pairs) == pairs
 
 
 def test_segment_filter_before_drop_preserves_reversed_orientation_pair():
     """Regression for a fifth Codex review finding on PR #370: main() must
     apply --segment-a/--segment-b filtering BEFORE calling
-    drop_legacy_sibling_projects_covered_by_cross_client() -- not after.
+    drop_legacy_siblings_covered_by_peer_comparisons() -- not after.
 
     discover_sibling_segments() orders its pair by sorted segment ID, while
     discover_cross_client() orders by sorted client label -- for two segments
@@ -236,8 +262,54 @@ def test_segment_filter_before_drop_preserves_reversed_orientation_pair():
     segment_a, segment_b = "p_akiser", "p_zsutter"
     filtered = [(a, b, ct) for a, b, ct in pairs if a == segment_a]
     filtered = [(a, b, ct) for a, b, ct in filtered if b == segment_b]
-    result = drop_legacy_sibling_projects_covered_by_cross_client(filtered)
+    result = drop_legacy_siblings_covered_by_peer_comparisons(filtered)
     # Only the correctly-oriented sibling_projects row matches the filter
     # (the reversed cross_client row doesn't survive it at all), so the drop
     # sees no cross_client entry for this pair and must not remove it.
     assert result == [("p_akiser", "p_zsutter", "sibling_projects")]
+
+
+def test_drops_sibling_templates_when_same_pair_covered_by_bc_to_bc():
+    """Regression for a PR #373 review finding: when two BC-scoped Template
+    segments discover_governance_chain()'s bc_to_bc fan-out already pairs
+    also happen to share an immediate parent_segment_id,
+    discover_sibling_segments() re-pairs them as sibling_templates for the
+    exact same (seg_a, seg_b) -- keeping both would collide on
+    comparison_run_id and double-count the pair downstream. bc_to_bc wins."""
+    pairs = [
+        ("bc1_t", "bc2_t", "sibling_templates"),
+        ("bc1_t", "bc2_t", "bc_to_bc"),
+    ]
+    result = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
+    assert result == [("bc1_t", "bc2_t", "bc_to_bc")]
+
+
+def test_drops_sibling_containers_when_same_pair_covered_by_bc_to_bc():
+    pairs = [
+        ("bc1_c", "bc2_c", "sibling_containers"),
+        ("bc1_c", "bc2_c", "bc_to_bc"),
+    ]
+    result = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
+    assert result == [("bc1_c", "bc2_c", "bc_to_bc")]
+
+
+def test_drops_sibling_projects_when_same_pair_covered_by_client_cross_bc():
+    """Regression for a PR #373 review finding: when client+BC-scoped Project
+    segments for the same client discover_client_cross_bc() already pairs
+    also happen to share a natural client parent,
+    discover_sibling_segments() re-pairs them as sibling_projects for the
+    exact same (seg_a, seg_b) -- client_cross_bc wins."""
+    pairs = [
+        ("acme_bc1", "acme_bc2", "sibling_projects"),
+        ("acme_bc1", "acme_bc2", "client_cross_bc"),
+    ]
+    result = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
+    assert result == [("acme_bc1", "acme_bc2", "client_cross_bc")]
+
+
+def test_drop_leaves_sibling_generic_and_sibling_segments_untouched_when_uncovered():
+    pairs = [
+        ("g1", "g2", "sibling_generic"),
+        ("x1", "x2", "sibling_segments"),
+    ]
+    assert drop_legacy_siblings_covered_by_peer_comparisons(pairs) == pairs

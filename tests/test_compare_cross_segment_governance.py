@@ -19,6 +19,7 @@ from compare_cross_segment import (  # noqa: E402
     build_pair_domain_work_items,
     build_pattern_reuse_distribution_rows,
     build_union_inventory_rows,
+    discover_client_cross_bc,
     discover_domains_for_segment,
     discover_governance_chain,
     discover_within_project,
@@ -302,43 +303,63 @@ def test_discover_governance_chain_rollup_does_not_wildcard_match_specific_colle
 
 
 def test_scope_level_derivation():
-    # Scope level is purely about which of client_label/business_center_label
-    # are populated on the segment's own row — orthogonal to governance_role.
-    assert _scope_level(_seg("Template", client="")) == "enterprise"
-    assert _scope_level({**_seg("Template", client=""), "business_center_label": "BC_1234"}) == "bc"
-    assert _scope_level(_seg("Template", client="Acme")) == "client"
-    assert _scope_level({**_seg("Project", client="Acme"), "business_center_label": "BC_1234"}) == "project"
+    # Scope level is derived from explicit, literal client_label/
+    # business_center_label values -- orthogonal to governance_role.
+    assert _scope_level({**_seg("Template", client="Stantec"), "business_center_label": "0000"}) == "enterprise"
+    assert _scope_level({**_seg("Template", client="Stantec"), "business_center_label": "2270"}) == "business_center"
+    assert _scope_level({**_seg("Project", client="Acme"), "business_center_label": "2270"}) == "client_business_center"
+    # Role never enters into the classification -- a client+bc segment can
+    # be Template, Container, or Project; scope alone doesn't imply role.
+    assert _scope_level({**_seg("Container", client="Acme"), "business_center_label": "2270"}) == "client_business_center"
+    # Either dimension not cut at all (blank) is a roll-up, not a defined
+    # scope level.
+    assert _scope_level(_seg("Template", client="")) is None
+    assert _scope_level({**_seg("Template", client="Acme"), "business_center_label": ""}) is None
 
 
-def test_bc_bookkeeping_tags_normalize_to_blank():
-    # "0000"/"BC_0000" (any case) mean enterprise work tagged for
-    # bookkeeping, never a real peer business center.
-    assert _normalize_bc_label("0000") == ""
-    assert _normalize_bc_label("BC_0000") == ""
-    assert _normalize_bc_label("bc_0000") == ""
+def test_0000_flows_through_as_literal_enterprise_value():
+    # Under the explicit-metadata contract, "0000" is a real, literal
+    # business_center_label value (the Enterprise identity) -- it must not
+    # be folded to blank anymore.
+    assert _normalize_bc_label("0000") == "0000"
     assert _normalize_bc_label("BC_1234") == "BC_1234"
-    assert _bc_of({**_seg("Template", client=""), "business_center_label": "0000"}) == ""
-    assert _scope_level({**_seg("Template", client=""), "business_center_label": "0000"}) == "enterprise"
+    assert _bc_of({**_seg("Template", client="Stantec"), "business_center_label": "0000"}) == "0000"
+    assert _scope_level({**_seg("Template", client="Stantec"), "business_center_label": "0000"}) == "enterprise"
+
+
+def test_bc_0000_spelling_variants_canonicalize_to_0000():
+    # "0000"/"BC_0000" (any case) are spelling variants of the same
+    # enterprise-bookkeeping value elsewhere in the pipeline (e.g. the
+    # extraction completeness gate documents both) -- they must canonicalize
+    # to the SAME literal "0000", not fragment into two distinct-looking
+    # business centers, and must not fold to blank either.
+    for token in ("BC_0000", "bc_0000", "Bc_0000"):
+        assert _normalize_bc_label(token) == "0000"
+        row = {**_seg("Template", client="Stantec"), "business_center_label": token}
+        assert _bc_of(row) == "0000"
+        assert _scope_level(row) == "enterprise"
 
 
 def test_na_spelled_business_center_labels_normalize_to_blank():
     # A missing business_center_label spelled as an NA token (n/a, NA,
-    # __NOT_APPLICABLE__, ...) must normalize to blank the same way the
-    # pre-existing governance-chain fallback did via is_blank_or_na() —
-    # it is not a real business center any more than an empty string is.
+    # __NOT_APPLICABLE__, ...) must still normalize to blank -- this is a
+    # distinct mechanism (is_blank_or_na()) from the removed "0000" fold, and
+    # a blank bc means the segment is a roll-up (not cut on bc), not a
+    # defined scope level.
     for token in ("n/a", "NA", "__NOT_APPLICABLE__", "not applicable"):
         assert _normalize_bc_label(token) == ""
-        row = {**_seg("Template", client=""), "business_center_label": token}
+        row = {**_seg("Template", client="Stantec"), "business_center_label": token}
         assert _bc_of(row) == ""
-        assert _scope_level(row) == "enterprise"
+        assert _scope_level(row) is None
 
 
 def test_discover_governance_chain_enterprise_to_project_reaches_every_scope():
-    # An enterprise-scoped Template/Container has no client/bc of its own and
-    # applies across the whole business — it must reach every Project
-    # regardless of that project's own client/bc scope.
+    # An enterprise-scoped Template/Container (Stantec/"0000") has no real
+    # client/bc narrowing of its own and applies across the whole business —
+    # it must reach every Project regardless of that project's own client/bc
+    # scope.
     manifest = {
-        "ent_t": _seg("Template", client=""),
+        "ent_t": {**_seg("Template", client="Stantec"), "business_center_label": "0000"},
         "proj_a": {**_seg("Project", client="Acme"), "business_center_label": "BC_1234"},
         "proj_b": {**_seg("Project", client="Widgets"), "business_center_label": "BC_9999"},
     }
@@ -350,11 +371,12 @@ def test_discover_governance_chain_enterprise_to_project_reaches_every_scope():
 
 
 def test_discover_governance_chain_bc_to_project_scoped_to_matching_bc_only():
-    # A bc-scoped Template only reaches Projects within the SAME
-    # (normalized) business center — not projects in a different bc, even
-    # though both are still "downstream" of the enterprise.
+    # A business_center-scoped Template (Stantec + a real bc) only reaches
+    # Projects within the SAME (normalized) business center — not projects
+    # in a different bc, even though both are still "downstream" of the
+    # enterprise.
     manifest = {
-        "bc_t": {**_seg("Template", client=""), "business_center_label": "BC_1234"},
+        "bc_t": {**_seg("Template", client="Stantec"), "business_center_label": "BC_1234"},
         "proj_same_bc": {**_seg("Project", client="Acme"), "business_center_label": "BC_1234"},
         "proj_other_bc": {**_seg("Project", client="Widgets"), "business_center_label": "BC_9999"},
     }
@@ -370,10 +392,13 @@ def test_discover_governance_chain_enterprise_to_bc_and_client_are_same_role_onl
     # (Template vs Template, Container vs Container) — they must not mix
     # roles (Template vs Container).
     manifest = {
-        "ent_t": _seg("Template", client=""),
-        "ent_c": _seg("Container", client=""),
-        "bc_t": {**_seg("Template", client=""), "business_center_label": "BC_1234"},
-        "bc_c": {**_seg("Container", client=""), "business_center_label": "BC_1234"},
+        "ent_t": {**_seg("Template", client="Stantec"), "business_center_label": "0000"},
+        "ent_c": {**_seg("Container", client="Stantec"), "business_center_label": "0000"},
+        "bc_t": {**_seg("Template", client="Stantec"), "business_center_label": "BC_1234"},
+        "bc_c": {**_seg("Container", client="Stantec"), "business_center_label": "BC_1234"},
+        # No business_center_label at all -- a client-wide roll-up, a valid
+        # (distinct) enterprise_to_client target alongside any
+        # client_business_center-scoped standard the client might also have.
         "client_t": _seg("Template", client="Acme"),
     }
 
@@ -407,9 +432,12 @@ def test_discover_governance_chain_excludes_ancestor_descendant_from_scope_fanou
     # under it) can otherwise land on opposite sides of one of these edges,
     # even though a descendant's data is always a subset of its ancestor's.
     manifest = {
-        "ent_t": {**_seg("Template", client=""), "parent_segment_id": ""},
+        "ent_t": {
+            **_seg("Template", client="Stantec"), "business_center_label": "0000",
+            "parent_segment_id": "",
+        },
         "bc_t_child": {
-            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            **_seg("Template", client="Stantec"), "business_center_label": "BC_1234",
             "parent_segment_id": "ent_t",
         },
         "proj_grandchild": {
@@ -417,7 +445,7 @@ def test_discover_governance_chain_excludes_ancestor_descendant_from_scope_fanou
             "parent_segment_id": "bc_t_child",
         },
         "bc_t_unrelated": {
-            **_seg("Template", client=""), "business_center_label": "BC_1234",
+            **_seg("Template", client="Stantec"), "business_center_label": "BC_1234",
             "parent_segment_id": "",
         },
         "proj_unrelated": {
@@ -436,6 +464,122 @@ def test_discover_governance_chain_excludes_ancestor_descendant_from_scope_fanou
     assert ("ent_t", "bc_t_unrelated", "enterprise_to_bc") in pairs
     assert ("ent_t", "proj_unrelated", "enterprise_to_project") in pairs
     assert ("bc_t_unrelated", "proj_unrelated", "bc_to_project") in pairs
+
+
+def test_discover_governance_chain_enterprise_to_bc_reaches_every_real_bc():
+    # An enterprise-scoped Template must fan out to EVERY real business
+    # center's same-role Template, not just one -- a fixture with 3+ BCs must
+    # show all 3, not a fixed pair.
+    manifest = {
+        "ent_t": {**_seg("Template", client="Stantec"), "business_center_label": "0000"},
+        "bc1_t": {**_seg("Template", client="Stantec"), "business_center_label": "1450"},
+        "bc2_t": {**_seg("Template", client="Stantec"), "business_center_label": "2270"},
+        "bc3_t": {**_seg("Template", client="Stantec"), "business_center_label": "9999"},
+    }
+
+    pairs = {(a, b) for a, b, ctype in discover_governance_chain(manifest) if ctype == "enterprise_to_bc"}
+
+    assert pairs == {("ent_t", "bc1_t"), ("ent_t", "bc2_t"), ("ent_t", "bc3_t")}
+
+
+def test_discover_governance_chain_bc_to_bc_pairs_every_peer_business_center():
+    # Purpose-built BC-to-BC peer discovery: every pair of real business
+    # centers' same-role, same-discipline Template populations.
+    manifest = {
+        "bc1_t": {**_seg("Template", client="Stantec"), "business_center_label": "1450"},
+        "bc2_t": {**_seg("Template", client="Stantec"), "business_center_label": "2270"},
+        "bc3_t": {**_seg("Template", client="Stantec"), "business_center_label": "9999"},
+    }
+
+    pairs = {(a, b) for a, b, ctype in discover_governance_chain(manifest) if ctype == "bc_to_bc"}
+
+    assert pairs == {("bc1_t", "bc2_t"), ("bc1_t", "bc3_t"), ("bc2_t", "bc3_t")}
+
+
+def test_discover_governance_chain_bc_to_bc_excludes_same_bc_and_enterprise():
+    manifest = {
+        "bc1_t": {**_seg("Template", client="Stantec"), "business_center_label": "1450"},
+        "bc1_t_dup": {**_seg("Template", client="Stantec"), "business_center_label": "1450"},
+        "ent_t": {**_seg("Template", client="Stantec"), "business_center_label": "0000"},
+    }
+
+    pairs = {(a, b, ctype) for a, b, ctype in discover_governance_chain(manifest) if ctype == "bc_to_bc"}
+
+    # Same normalized bc on both sides is not a peer pair.
+    assert not any({a, b} == {"bc1_t", "bc1_t_dup"} for a, b, _ in pairs)
+    # Enterprise scope never participates in bc_to_bc.
+    assert not any("ent_t" in (a, b) for a, b, _ in pairs)
+
+
+def test_discover_governance_chain_disc_match_has_no_blank_wildcard():
+    # A row with blank discipline_label must not wildcard-pair with a
+    # populated-discipline row under discipline-gated comparison types --
+    # the removed _disc_match() blank wildcard must not silently reappear.
+    manifest = {
+        "bc1_t_blank": {
+            **_seg("Template", client="Stantec", discipline=""), "business_center_label": "1450",
+        },
+        "bc2_t_arch": {
+            **_seg("Template", client="Stantec", discipline="Architectural"), "business_center_label": "2270",
+        },
+    }
+
+    pairs = {(a, b) for a, b, ctype in discover_governance_chain(manifest) if ctype == "bc_to_bc"}
+
+    assert ("bc1_t_blank", "bc2_t_arch") not in pairs
+    assert ("bc2_t_arch", "bc1_t_blank") not in pairs
+
+
+def test_discover_client_cross_bc_multi_bc_enumeration():
+    # A client present in 3 BCs produces pairs across all 3 (not a fixed
+    # two-BC comparison) -- derived from the data, not hardcoded.
+    manifest = {
+        "acme_bc1": {**_seg("Project", client="Acme"), "business_center_label": "1450"},
+        "acme_bc2": {**_seg("Project", client="Acme"), "business_center_label": "2270"},
+        "acme_bc3": {**_seg("Project", client="Acme"), "business_center_label": "9999"},
+    }
+
+    pairs = {(a, b) for a, b, ctype in discover_client_cross_bc(manifest) if ctype == "client_cross_bc"}
+
+    assert pairs == {("acme_bc1", "acme_bc2"), ("acme_bc1", "acme_bc3"), ("acme_bc2", "acme_bc3")}
+
+
+def test_discover_client_cross_bc_single_bc_produces_no_pairs():
+    manifest = {
+        "acme_bc1": {**_seg("Project", client="Acme"), "business_center_label": "1450"},
+        "widgets_bc1": {**_seg("Project", client="Widgets"), "business_center_label": "1450"},
+    }
+
+    assert discover_client_cross_bc(manifest) == []
+
+
+def test_discover_client_cross_bc_and_bc_to_bc_do_not_reference_collection_label():
+    # Regression guard: these new pair-discovery functions must not gate on
+    # collection_label -- PR1 left it an always-blank column, and neither
+    # function should depend on it being populated (or its absence) to find
+    # a pair a differing collection_label value would otherwise be expected
+    # to block, since neither reads the field at all.
+    manifest = {
+        "acme_bc1": {
+            **_seg("Project", client="Acme"), "business_center_label": "1450",
+            "collection_label": "Some Collection",
+        },
+        "acme_bc2": {
+            **_seg("Project", client="Acme"), "business_center_label": "2270",
+            "collection_label": "A Totally Different Collection",
+        },
+        "bc1_t": {
+            **_seg("Template", client="Stantec"), "business_center_label": "1450",
+            "collection_label": "Some Collection",
+        },
+        "bc2_t": {
+            **_seg("Template", client="Stantec"), "business_center_label": "2270",
+            "collection_label": "A Totally Different Collection",
+        },
+    }
+
+    assert ("acme_bc1", "acme_bc2", "client_cross_bc") in discover_client_cross_bc(manifest)
+    assert ("bc1_t", "bc2_t", "bc_to_bc") in discover_governance_chain(manifest)
 
 
 def test_pooled_comparison_bc_scope_pools_across_clients_ignoring_client(tmp_path):
@@ -472,6 +616,53 @@ def test_pooled_comparison_bc_scope_pools_across_clients_ignoring_client(tmp_pat
     by_sid = {r["segment_id"]: r for r in rows}
     assert by_sid["proj_a"]["n_shared_join_hash"] == "1"
     assert by_sid["proj_a"]["all_containment_focal_in_pool"] == "0.500000"
+
+
+def test_pooled_comparison_bc_scope_pools_enterprise_0000_segments(tmp_path):
+    # Before this PR, business_center_label=="0000" normalized to blank via
+    # _normalize_bc_label(), so `if bc:` at the bc_groups gate in
+    # run_pooled_comparison() was always False for Enterprise-scoped rows --
+    # they were silently excluded from bc-scoped pooling entirely (not
+    # pooled under a "blank" bucket, just never added to bc_groups at all).
+    # _bc_of() (used here, same as everywhere else in this file) now returns
+    # the literal "0000", so two Enterprise segments correctly pool together
+    # under their own real bc bucket.
+    segments_root = tmp_path / "segments"
+    domain = "line_patterns"
+    _write_segment(
+        segments_root, "ent_a", domain,
+        [("p1", "shared", "Shared"), ("p2", "a_only", "A Only")],
+        [{"export_run_id": "ent_a_file", "pattern_id": "p1"}, {"export_run_id": "ent_a_file", "pattern_id": "p2"}],
+        [{"export_run_id": "ent_a_file", "pattern_id": "p1"}],
+        ["p1", "p2"],
+    )
+    _write_segment(
+        segments_root, "ent_b", domain,
+        [("p1", "shared", "Shared"), ("p2", "b_only", "B Only")],
+        [{"export_run_id": "ent_b_file", "pattern_id": "p1"}, {"export_run_id": "ent_b_file", "pattern_id": "p2"}],
+        [{"export_run_id": "ent_b_file", "pattern_id": "p1"}],
+        ["p1", "p2"],
+    )
+    manifest = {
+        "ent_a": {**_seg("Project", client="Stantec"), "business_center_label": "0000", "segment_label": "Ent A"},
+        "ent_b": {**_seg("Project", client="Stantec"), "business_center_label": "0000", "segment_label": "Ent B"},
+    }
+    registry = {
+        "ent_a": {"output_folder": "ent_a", "run_type": "bundle"},
+        "ent_b": {"output_folder": "ent_b", "run_type": "bundle"},
+    }
+
+    rows = run_pooled_comparison(manifest, registry, segments_root, min_patterns=1, executed_utc="2026-07-13T00:00:00Z")
+
+    # Same client (both "Stantec") -- both bc and client pools fire, since
+    # "0000" is no longer folded away and client_groups still fires
+    # independently.
+    assert {r["pool_scope"] for r in rows} == {"bc", "client"}
+    by_sid_scope = {(r["segment_id"], r["pool_scope"]): r for r in rows}
+    bc_row = by_sid_scope[("ent_a", "bc")]
+    assert bc_row["business_center_label"] == "0000"
+    assert bc_row["n_shared_join_hash"] == "1"
+    assert bc_row["all_containment_focal_in_pool"] == "0.500000"
 
 
 def test_pooled_comparison_client_scope_pools_across_bcs_ignoring_bc(tmp_path):
