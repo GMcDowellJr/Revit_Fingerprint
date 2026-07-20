@@ -74,22 +74,22 @@ def test_gt_enterprise_slice_unchanged_by_scoped_rows():
         _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template",
              governance_role_a="Generic", governance_role_b="Template",
              comparison_type="generic_to_template", domain="arrowheads",
-             all_containment_a_in_b_mean="0.90", n_files_a="1", n_files_b="3"),
+             all_pairwise_containment_a_in_b_mean="0.90", n_files_a="1", n_files_b="3"),
         _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template|Kaiser",
              governance_role_a="Generic", governance_role_b="Template",
              client_label_b="Kaiser",
              comparison_type="generic_to_template", domain="arrowheads",
-             all_containment_a_in_b_mean="0.40", n_files_a="1", n_files_b="4"),
+             all_pairwise_containment_a_in_b_mean="0.40", n_files_a="1", n_files_b="4"),
         _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template|architectural",
              governance_role_a="Generic", governance_role_b="Template",
              discipline_label_b="architectural",
              comparison_type="generic_to_template", domain="arrowheads",
-             all_containment_a_in_b_mean="0.60", n_files_a="1", n_files_b="5"),
+             all_pairwise_containment_a_in_b_mean="0.60", n_files_a="1", n_files_b="5"),
         _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template|BC_2270",
              governance_role_a="Generic", governance_role_b="Template",
              business_center_label_b="BC_2270",
              comparison_type="generic_to_template", domain="arrowheads",
-             all_containment_a_in_b_mean="0.55", n_files_a="1", n_files_b="6"),
+             all_pairwise_containment_a_in_b_mean="0.55", n_files_a="1", n_files_b="6"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["arrowheads"]
@@ -108,7 +108,7 @@ def test_gt_by_scope_absent_when_no_generic_to_template_rows():
         _row(segment_id_a="imperial|Template", segment_id_b="imperial|Container",
              governance_role_a="Template", governance_role_b="Container",
              comparison_type="template_to_container", domain="arrowheads",
-             all_containment_a_in_b_mean="0.8", n_files_a="3", n_files_b="5"),
+             all_pairwise_containment_a_in_b_mean="0.8", n_files_a="3", n_files_b="5"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["arrowheads"]
@@ -126,7 +126,7 @@ def test_generic_side_still_gated_to_unscoped_reference():
              governance_role_a="Generic", governance_role_b="Template",
              discipline_label_a="architectural",
              comparison_type="generic_to_template", domain="ghost_domain",
-             all_containment_a_in_b_mean="0.99", n_files_a="1", n_files_b="3"),
+             all_pairwise_containment_a_in_b_mean="0.99", n_files_a="1", n_files_b="3"),
     ]
     normalise_summary_schema(rows)
     cascade = build_cascade(rows)
@@ -142,7 +142,7 @@ def _generic_to_template_rows(enterprise_val, client_val, domain="arrowheads"):
         _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template",
              governance_role_a="Generic", governance_role_b="Template",
              comparison_type="generic_to_template", domain=domain,
-             all_containment_a_in_b_mean=str(enterprise_val), n_files_a="1", n_files_b="3"),
+             all_pairwise_containment_a_in_b_mean=str(enterprise_val), n_files_a="1", n_files_b="3"),
     ]
     if client_val is not None:
         rows.append(
@@ -150,7 +150,7 @@ def _generic_to_template_rows(enterprise_val, client_val, domain="arrowheads"):
                  governance_role_a="Generic", governance_role_b="Template",
                  client_label_b="Kaiser",
                  comparison_type="generic_to_template", domain=domain,
-                 all_containment_a_in_b_mean=str(client_val), n_files_a="1", n_files_b="4")
+                 all_pairwise_containment_a_in_b_mean=str(client_val), n_files_a="1", n_files_b="4")
         )
     return rows
 
@@ -199,7 +199,7 @@ def test_render_generic_baseline_scope_section_empty_when_no_data():
         _row(segment_id_a="imperial|Template", segment_id_b="imperial|Container",
              governance_role_a="Template", governance_role_b="Container",
              comparison_type="template_to_container", domain="arrowheads",
-             all_containment_a_in_b_mean="0.8", n_files_a="3", n_files_b="5"),
+             all_pairwise_containment_a_in_b_mean="0.8", n_files_a="3", n_files_b="5"),
     ]
     normalise_summary_schema(rows)
     cascade = build_cascade(rows)

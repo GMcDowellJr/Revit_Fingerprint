@@ -118,7 +118,7 @@ def test_comparison_type_still_unambiguous_with_project_scoped_template():
     out_rows = run_comparisons(manifest_rows, membership_rows, records_rows)
     shape_by_type = {}
     for row in out_rows:
-        has_jaccard = bool(row.get("all_jaccard_mean"))
+        has_jaccard = bool(row.get("all_pairwise_jaccard_mean"))
         ctype = row["comparison_type"]
         assert shape_by_type.setdefault(ctype, has_jaccard) == has_jaccard, (
             f"comparison_type {ctype!r} mixes symmetric and directed rows"
@@ -224,7 +224,7 @@ def test_files_with_no_inventory_for_domain_are_excluded_not_zero_padded():
     assert len(bc_bc_rows) == 1
     row = bc_bc_rows[0]
     assert row["n_files_a"] == "1"
-    assert float(row["all_jaccard_mean"]) == 1.0
+    assert float(row["all_pairwise_jaccard_mean"]) == 1.0
 
 
 def test_zero_inventory_domain_produces_no_row():
@@ -252,7 +252,7 @@ def test_comparison_type_never_mixes_symmetric_and_directed_metric_shape():
 
     shape_by_type = {}
     for row in out_rows:
-        has_jaccard = bool(row.get("all_jaccard_mean"))
+        has_jaccard = bool(row.get("all_pairwise_jaccard_mean"))
         ctype = row["comparison_type"]
         if ctype not in shape_by_type:
             shape_by_type[ctype] = has_jaccard

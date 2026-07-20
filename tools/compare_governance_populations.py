@@ -70,9 +70,9 @@ CROSS_GOVERNANCE_FIELDNAMES = [
     "unit_system", "domain", "comparison_type",
     "n_files_a", "n_files_b", "n_pairs",
     "n_shared_join_hash",
-    "all_containment_a_in_b_mean", "all_containment_a_in_b_min",
-    "all_containment_b_in_a_mean", "all_containment_b_in_a_min",
-    "all_jaccard_mean", "all_jaccard_p10", "all_jaccard_p90",
+    "all_pairwise_containment_a_in_b_mean", "all_containment_a_in_b_min",
+    "all_pairwise_containment_b_in_a_mean", "all_containment_b_in_a_min",
+    "all_pairwise_jaccard_mean", "all_jaccard_p10", "all_jaccard_p90",
     "executed_utc",
 ]
 

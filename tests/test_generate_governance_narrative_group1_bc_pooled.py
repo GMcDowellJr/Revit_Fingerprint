@@ -58,17 +58,17 @@ def test_tc_enterprise_slice_unchanged_by_bc_scoped_rows():
         _row(segment_id_a="imperial|Template", segment_id_b="imperial|Container",
              governance_role_a="Template", governance_role_b="Container",
              comparison_type="template_to_container", domain="arrowheads",
-             all_containment_a_in_b_mean="0.80", n_files_a="3", n_files_b="5"),
+             all_pairwise_containment_a_in_b_mean="0.80", n_files_a="3", n_files_b="5"),
         _row(segment_id_a="imperial|Template|BC_1", segment_id_b="imperial|Container|BC_1",
              governance_role_a="Template", governance_role_b="Container",
              business_center_label_a="BC_1", business_center_label_b="BC_1",
              comparison_type="template_to_container", domain="arrowheads",
-             all_containment_a_in_b_mean="0.40", n_files_a="2", n_files_b="4"),
+             all_pairwise_containment_a_in_b_mean="0.40", n_files_a="2", n_files_b="4"),
         _row(segment_id_a="imperial|Template|BC_2", segment_id_b="imperial|Container|BC_2",
              governance_role_a="Template", governance_role_b="Container",
              business_center_label_a="BC_2", business_center_label_b="BC_2",
              comparison_type="template_to_container", domain="arrowheads",
-             all_containment_a_in_b_mean="0.60", n_files_a="2", n_files_b="4"),
+             all_pairwise_containment_a_in_b_mean="0.60", n_files_a="2", n_files_b="4"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["arrowheads"]
@@ -85,7 +85,7 @@ def test_tp_by_scope_absent_when_no_group1_rows():
         _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template",
              governance_role_a="Generic", governance_role_b="Template",
              comparison_type="generic_to_template", domain="arrowheads",
-             all_containment_a_in_b_mean="0.9", n_files_a="1", n_files_b="3"),
+             all_pairwise_containment_a_in_b_mean="0.9", n_files_a="1", n_files_b="3"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["arrowheads"]
@@ -102,12 +102,12 @@ def test_tp_bc_pooled_when_both_sides_same_bc_no_enterprise_pair():
              governance_role_a="Template", governance_role_b="Project",
              business_center_label_a="BC_1", business_center_label_b="BC_1",
              comparison_type="template_to_project", domain="materials",
-             all_containment_a_in_b_mean="0.18", n_files_a="2", n_files_b="6"),
+             all_pairwise_containment_a_in_b_mean="0.18", n_files_a="2", n_files_b="6"),
         _row(segment_id_a="imperial|Template|BC_2", segment_id_b="imperial|Project|BC_2",
              governance_role_a="Template", governance_role_b="Project",
              business_center_label_a="BC_2", business_center_label_b="BC_2",
              comparison_type="template_to_project", domain="materials",
-             all_containment_a_in_b_mean="0.995", n_files_a="2", n_files_b="6"),
+             all_pairwise_containment_a_in_b_mean="0.995", n_files_a="2", n_files_b="6"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["materials"]
@@ -127,7 +127,7 @@ def test_group1_scope_pair_uses_both_sides_unlike_group2():
              governance_role_a="Template", governance_role_b="Container",
              client_label_a="Kaiser", business_center_label_b="BC_1",
              comparison_type="template_to_container", domain="ghost_domain",
-             all_containment_a_in_b_mean="0.33", n_files_a="2", n_files_b="3"),
+             all_pairwise_containment_a_in_b_mean="0.33", n_files_a="2", n_files_b="3"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["ghost_domain"]
@@ -152,13 +152,13 @@ def test_scope_pair_separator_does_not_collide_across_multi_dimension_labels():
              client_label_a="Kaiser", business_center_label_a="BC_1",
              discipline_label_b="architectural",
              comparison_type="container_to_project", domain="collision_domain",
-             all_containment_a_in_b_mean="0.20", n_files_a="2", n_files_b="3"),
+             all_pairwise_containment_a_in_b_mean="0.20", n_files_a="2", n_files_b="3"),
         _row(segment_id_a="imperial|Container|Kaiser", segment_id_b="imperial|Project|BC_1|architectural",
              governance_role_a="Container", governance_role_b="Project",
              client_label_a="Kaiser",
              business_center_label_b="BC_1", discipline_label_b="architectural",
              comparison_type="container_to_project", domain="collision_domain",
-             all_containment_a_in_b_mean="0.90", n_files_a="2", n_files_b="3"),
+             all_pairwise_containment_a_in_b_mean="0.90", n_files_a="2", n_files_b="3"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["collision_domain"]
@@ -182,7 +182,7 @@ def test_group1_scope_pair_rejects_mismatched_bc_values():
              governance_role_a="Template", governance_role_b="Project",
              business_center_label_a="BC_1", business_center_label_b="BC_2",
              comparison_type="template_to_project", domain="mismatch_domain",
-             all_containment_a_in_b_mean="0.42", n_files_a="2", n_files_b="3"),
+             all_pairwise_containment_a_in_b_mean="0.42", n_files_a="2", n_files_b="3"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["mismatch_domain"]
@@ -198,7 +198,7 @@ def test_group1_scope_pair_accepts_matching_bc_values():
                governance_role_a="Template", governance_role_b="Project",
                business_center_label_a="BC_1", business_center_label_b="BC_1",
                comparison_type="template_to_project", domain="match_domain",
-               all_containment_a_in_b_mean="0.77", n_files_a="2", n_files_b="3")
+               all_pairwise_containment_a_in_b_mean="0.77", n_files_a="2", n_files_b="3")
     scope_a, scope_b, scope_pair = _group1_scope_pair(row)
     assert scope_pair == "bc::bc"
 
@@ -212,7 +212,7 @@ def test_group1_scope_pair_mismatched_client_bc_combo():
                client_label_a="Kaiser", business_center_label_a="BC_1",
                client_label_b="Kaiser", business_center_label_b="BC_2",
                comparison_type="template_to_project", domain="combo_mismatch_domain",
-               all_containment_a_in_b_mean="0.55", n_files_a="2", n_files_b="3")
+               all_pairwise_containment_a_in_b_mean="0.55", n_files_a="2", n_files_b="3")
     scope_a, scope_b, scope_pair = _group1_scope_pair(row)
     assert scope_pair == "client_bc!cross::client_bc!cross"
 
@@ -254,7 +254,7 @@ def test_scope_only_domain_reaches_bc_evidence_tier_in_full_pipeline():
              governance_role_a="Template", governance_role_b="Project",
              business_center_label_a="BC_1", business_center_label_b="BC_1",
              comparison_type="template_to_project", domain="scope_only_domain",
-             all_containment_a_in_b_mean="0.6", n_files_a="2", n_files_b="3"),
+             all_pairwise_containment_a_in_b_mean="0.6", n_files_a="2", n_files_b="3"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["scope_only_domain"]
@@ -273,7 +273,7 @@ def test_cp_scoped_fallback_populated_when_n_files_sufficient_and_no_enterprise_
         _row(segment_id_a="imperial|Container|2014", segment_id_b="imperial|Project|2014",
              governance_role_a="Container", governance_role_b="Project",
              comparison_type="container_to_project", domain="arrowheads",
-             all_containment_a_in_b_mean="0.95", n_files_a="30", n_files_b="40"),
+             all_pairwise_containment_a_in_b_mean="0.95", n_files_a="30", n_files_b="40"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["arrowheads"]
@@ -289,7 +289,7 @@ def test_cp_scoped_fallback_ignores_n_files_insufficient_rows():
         _row(segment_id_a="imperial|Container|2014", segment_id_b="imperial|Project|2014",
              governance_role_a="Container", governance_role_b="Project",
              comparison_type="container_to_project", domain="arrowheads",
-             all_containment_a_in_b_mean="0.95", n_files_a="2", n_files_b="2"),
+             all_pairwise_containment_a_in_b_mean="0.95", n_files_a="2", n_files_b="2"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["arrowheads"]
@@ -309,7 +309,7 @@ def test_cp_scoped_fallback_does_not_change_cp_by_scope_population():
              governance_role_a="Container", governance_role_b="Project",
              business_center_label_a="BC_1", business_center_label_b="BC_1",
              comparison_type="container_to_project", domain="materials",
-             all_containment_a_in_b_mean="0.5", n_files_a="2", n_files_b="2"),
+             all_pairwise_containment_a_in_b_mean="0.5", n_files_a="2", n_files_b="2"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["materials"]
@@ -326,11 +326,11 @@ def test_cp_scoped_fallback_prefers_enterprise_pair_when_present():
         _row(segment_id_a="imperial|Container", segment_id_b="imperial|Project",
              governance_role_a="Container", governance_role_b="Project",
              comparison_type="container_to_project", domain="arrowheads",
-             all_containment_a_in_b_mean="0.85", n_files_a="10", n_files_b="10"),
+             all_pairwise_containment_a_in_b_mean="0.85", n_files_a="10", n_files_b="10"),
         _row(segment_id_a="imperial|Container|2014", segment_id_b="imperial|Project|2014",
              governance_role_a="Container", governance_role_b="Project",
              comparison_type="container_to_project", domain="arrowheads",
-             all_containment_a_in_b_mean="0.10", n_files_a="30", n_files_b="40"),
+             all_pairwise_containment_a_in_b_mean="0.10", n_files_a="30", n_files_b="40"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["arrowheads"]
@@ -346,17 +346,17 @@ def test_cp_scoped_fallback_picks_bucket_with_most_rows():
              governance_role_a="Container", governance_role_b="Project",
              client_label_a="Kaiser", client_label_b="Kaiser",
              comparison_type="container_to_project", domain="fill_patterns_model",
-             all_containment_a_in_b_mean="0.30", n_files_a="10", n_files_b="10"),
+             all_pairwise_containment_a_in_b_mean="0.30", n_files_a="10", n_files_b="10"),
         _row(segment_id_a="imperial|Container|BC_1", segment_id_b="imperial|Project|BC_1",
              governance_role_a="Container", governance_role_b="Project",
              business_center_label_a="BC_1", business_center_label_b="BC_1",
              comparison_type="container_to_project", domain="fill_patterns_model",
-             all_containment_a_in_b_mean="0.70", n_files_a="10", n_files_b="10"),
+             all_pairwise_containment_a_in_b_mean="0.70", n_files_a="10", n_files_b="10"),
         _row(segment_id_a="imperial|Container|BC_2", segment_id_b="imperial|Project|BC_2",
              governance_role_a="Container", governance_role_b="Project",
              business_center_label_a="BC_2", business_center_label_b="BC_2",
              comparison_type="container_to_project", domain="fill_patterns_model",
-             all_containment_a_in_b_mean="0.90", n_files_a="10", n_files_b="10"),
+             all_pairwise_containment_a_in_b_mean="0.90", n_files_a="10", n_files_b="10"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["fill_patterns_model"]
@@ -372,7 +372,7 @@ def test_domain_with_no_group1_rows_at_all_absent():
         _row(segment_id_a="imperial|Project", segment_id_b="imperial|Project",
              governance_role_a="Project", governance_role_b="Project",
              comparison_type="within_project", domain="only_wp_domain",
-             all_jaccard_mean="0.5", n_files_a="10"),
+             all_pairwise_jaccard_mean="0.5", n_files_a="10"),
     ]
     normalise_summary_schema(rows)
     cascade = build_cascade(rows)
@@ -457,12 +457,12 @@ def _group1_rows(bc1_val, bc2_val, ctype="template_to_project", domain="material
              governance_role_a="Template", governance_role_b="Project",
              business_center_label_a="BC_1", business_center_label_b="BC_1",
              comparison_type=ctype, domain=domain,
-             all_containment_a_in_b_mean=str(bc1_val), n_files_a="2", n_files_b="6"),
+             all_pairwise_containment_a_in_b_mean=str(bc1_val), n_files_a="2", n_files_b="6"),
         _row(segment_id_a="imperial|Template|BC_2", segment_id_b="imperial|Project|BC_2",
              governance_role_a="Template", governance_role_b="Project",
              business_center_label_a="BC_2", business_center_label_b="BC_2",
              comparison_type=ctype, domain=domain,
-             all_containment_a_in_b_mean=str(bc2_val), n_files_a="2", n_files_b="6"),
+             all_pairwise_containment_a_in_b_mean=str(bc2_val), n_files_a="2", n_files_b="6"),
     ]
 
 
@@ -492,7 +492,7 @@ def test_detect_anomalies_silent_when_only_one_bc_pair():
              governance_role_a="Template", governance_role_b="Project",
              business_center_label_a="BC_1", business_center_label_b="BC_1",
              comparison_type="template_to_project", domain="materials",
-             all_containment_a_in_b_mean="0.5", n_files_a="2", n_files_b="6"),
+             all_pairwise_containment_a_in_b_mean="0.5", n_files_a="2", n_files_b="6"),
     ]
     normalise_summary_schema(rows)
     d = build_cascade(rows)["materials"]
@@ -519,7 +519,7 @@ def test_render_group1_scope_section_empty_when_only_enterprise_pair():
         _row(segment_id_a="imperial|Template", segment_id_b="imperial|Container",
              governance_role_a="Template", governance_role_b="Container",
              comparison_type="template_to_container", domain="arrowheads",
-             all_containment_a_in_b_mean="0.8", n_files_a="3", n_files_b="5"),
+             all_pairwise_containment_a_in_b_mean="0.8", n_files_a="3", n_files_b="5"),
     ]
     normalise_summary_schema(rows)
     cascade = build_cascade(rows)
@@ -532,7 +532,7 @@ def test_render_group1_scope_section_empty_when_no_group1_data():
         _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template",
              governance_role_a="Generic", governance_role_b="Template",
              comparison_type="generic_to_template", domain="arrowheads",
-             all_containment_a_in_b_mean="0.9", n_files_a="1", n_files_b="3"),
+             all_pairwise_containment_a_in_b_mean="0.9", n_files_a="1", n_files_b="3"),
     ]
     normalise_summary_schema(rows)
     cascade = build_cascade(rows)
