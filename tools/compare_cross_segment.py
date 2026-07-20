@@ -2921,6 +2921,16 @@ def run_pair(
         status_a, _ = _segment_domain_source_status(segments_root, registry, seg_a, domain)
         status_b, _ = _segment_domain_source_status(segments_root, registry, seg_b, domain)
         crid_blocked = make_comparison_run_id(seg_a, seg_b, executed_utc, comparison_type)
+        # has_bundles_* documents whether bundle analysis produced output for
+        # each side -- availability metadata, not a similarity score -- so
+        # it must be computed per side even when the comparison itself is
+        # blocked. A populated side's bundles are real and available; only
+        # the shared-overlap bucket counts are meaningless when one side has
+        # zero files, so those stay at 0.
+        bnd_a_all_blocked = load_bundle_join_hash_set(segments_root, registry, seg_a, domain, "all")
+        bnd_b_all_blocked = load_bundle_join_hash_set(segments_root, registry, seg_b, domain, "all")
+        bnd_a_used_blocked = load_bundle_join_hash_set(segments_root, registry, seg_a, domain, "used")
+        bnd_b_used_blocked = load_bundle_join_hash_set(segments_root, registry, seg_b, domain, "used")
         blocked_row = _build_summary_row(
             crid_blocked, seg_a, seg_b, comparison_type, domain,
             manifest, {"n_files_a": str(n_files_a_ct), "n_files_b": str(n_files_b_ct), "n_pairs": "0"},
@@ -2930,9 +2940,11 @@ def run_pair(
             # a downstream reader needs to understand what was blocked.
             n_patterns_a=n_a, n_patterns_b=n_b,
             n_unique_patterns_a=n_a, n_unique_patterns_b=n_b,
-            all_has_bundles_a="false", all_has_bundles_b="false",
+            all_has_bundles_a="true" if bnd_a_all_blocked else "false",
+            all_has_bundles_b="true" if bnd_b_all_blocked else "false",
             all_n_shared_bundle_both=0, all_n_shared_bundle_a_only=0, all_n_shared_bundle_b_only=0,
-            used_has_bundles_a="false", used_has_bundles_b="false",
+            used_has_bundles_a="true" if bnd_a_used_blocked else "false",
+            used_has_bundles_b="true" if bnd_b_used_blocked else "false",
             used_n_shared_bundle_both=0, used_n_shared_bundle_a_only=0, used_n_shared_bundle_b_only=0,
             executed_utc=executed_utc,
         )
@@ -3425,6 +3437,27 @@ def _build_pooled_row(
     if n_files_focal == 0 or n_files_pool == 0:
         mf_blocked = manifest.get(focal_sid, {})
         crid_blocked = make_comparison_run_id(focal_sid, f"pool_{pool_scope}_{pool_key_str}", executed_utc)
+        # has_bundles_* is availability metadata (did bundle analysis
+        # produce output for this side), not a similarity score -- compute
+        # it per side even when blocked. The pool side is an aggregate of
+        # every pool_sids member, same as the non-blocked path below; only
+        # the shared-overlap bucket counts are meaningless when the focal
+        # side has zero files, so those stay at 0.
+        focal_bundle_all_blocked = load_bundle_join_hash_set(
+            segments_root, registry, focal_sid, domain, "all"
+        )
+        focal_bundle_used_blocked = load_bundle_join_hash_set(
+            segments_root, registry, focal_sid, domain, "used"
+        )
+        pool_bundle_all_blocked: Set[str] = set()
+        pool_bundle_used_blocked: Set[str] = set()
+        for pool_sid in pool_sids:
+            pool_bundle_all_blocked |= load_bundle_join_hash_set(
+                segments_root, registry, pool_sid, domain, "all"
+            )
+            pool_bundle_used_blocked |= load_bundle_join_hash_set(
+                segments_root, registry, pool_sid, domain, "used"
+            )
         blocked_row = {
             "comparison_run_id": crid_blocked,
             "segment_id": focal_sid,
@@ -3446,13 +3479,13 @@ def _build_pooled_row(
             "all_containment_pool_in_focal": "",
             "used_containment_focal_in_pool": "",
             "used_containment_pool_in_focal": "",
-            "all_has_bundles_focal": "false",
-            "all_has_bundles_pool": "false",
+            "all_has_bundles_focal": "true" if focal_bundle_all_blocked else "false",
+            "all_has_bundles_pool": "true" if pool_bundle_all_blocked else "false",
             "all_n_shared_bundle_both": "0",
             "all_n_shared_bundle_focal_only": "0",
             "all_n_shared_bundle_pool_only": "0",
-            "used_has_bundles_focal": "false",
-            "used_has_bundles_pool": "false",
+            "used_has_bundles_focal": "true" if focal_bundle_used_blocked else "false",
+            "used_has_bundles_pool": "true" if pool_bundle_used_blocked else "false",
             "used_n_shared_bundle_both": "0",
             "used_n_shared_bundle_focal_only": "0",
             "used_n_shared_bundle_pool_only": "0",

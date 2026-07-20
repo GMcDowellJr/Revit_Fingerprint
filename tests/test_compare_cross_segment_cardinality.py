@@ -488,3 +488,93 @@ def test_pooled_comparison_skips_when_lineage_filtering_empties_the_pool(tmp_pat
     # default), so the "client" grain hits the identical lineage-exclusion
     # case -- no row should survive on any grain.
     assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# Blocked rows must preserve the populated side's own bundle availability
+# (all_has_bundles_*/used_has_bundles_*) -- that's metadata about whether
+# bundle analysis produced output for a side, not a similarity score, so it
+# must not be forced to "false" just because the comparison is blocked.
+# ---------------------------------------------------------------------------
+
+def test_blocked_row_preserves_populated_side_bundle_availability(tmp_path):
+    _clear_caches()
+    domain = "dbundleblocked"
+    segments_root = tmp_path / "segments"
+    _write_segment(segments_root, "populated", domain, {"fp1": ["jh1", "jh2"]})
+    # populated's "jh1" pattern is a bundle member (bundle_membership.csv
+    # references pattern_id "fp1_p0", which resolves to join_hash "jh1").
+    _write_csv(
+        segments_root / "populated" / "results" / "bundle_analysis" / "all" / domain / "bundle_membership.csv",
+        [{"pattern_id": "fp1_p0"}],
+    )
+    _write_csv(
+        segments_root / "populated" / "results" / "bundle_analysis" / "used" / domain / "bundle_membership.csv",
+        [{"pattern_id": "fp1_p0"}],
+    )
+    manifest = {
+        "populated": _manifest_entry(),
+        "missing": _manifest_entry(),
+    }
+    registry = {
+        "populated": _registry_entry("populated"),
+        "missing": _registry_entry("does_not_exist"),
+    }
+
+    row, _ = run_pair(
+        "missing", "populated", "cross_client", domain, manifest, registry, {},
+        segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
+    )
+
+    assert row["comparison_status"] == "blocked"
+    # missing side has no bundle output at all -- false is correct there.
+    assert row["all_has_bundles_a"] == "false"
+    assert row["used_has_bundles_a"] == "false"
+    # populated side's bundles are real and available -- must not read false.
+    assert row["all_has_bundles_b"] == "true"
+    assert row["used_has_bundles_b"] == "true"
+    # No trustworthy shared-overlap bucket when one side is empty.
+    assert row["all_n_shared_bundle_both"] == "0"
+
+
+def test_pooled_blocked_row_preserves_pool_bundle_availability(tmp_path):
+    _clear_caches()
+    domain = "dpoolbundleblocked"
+    segments_root = tmp_path / "segments"
+    (segments_root / "focal_empty").mkdir(parents=True)
+    _write_segment(segments_root, "pool_sib", domain, {"fp1": ["jh1", "jh2"]})
+    _write_csv(
+        segments_root / "pool_sib" / "results" / "bundle_analysis" / "all" / domain / "bundle_membership.csv",
+        [{"pattern_id": "fp1_p0"}],
+    )
+    _write_csv(
+        segments_root / "pool_sib" / "results" / "bundle_analysis" / "used" / domain / "bundle_membership.csv",
+        [{"pattern_id": "fp1_p0"}],
+    )
+    manifest = {
+        "focal_empty": {**_manifest_entry(), "parent_segment_id": "p1"},
+        "pool_sib": {**_manifest_entry(), "parent_segment_id": "p1"},
+    }
+    registry = {
+        "focal_empty": _registry_entry("focal_empty"),
+        "pool_sib": _registry_entry("pool_sib"),
+    }
+
+    rows = run_pooled_comparison(
+        manifest, registry, segments_root, min_patterns=1,
+        executed_utc="2026-07-20T00:00:00Z", focal_segment_ids={"focal_empty"},
+    )
+    pooldom_rows = [
+        r for r in rows if r["domain"] == domain and r["pool_scope"] == "parent_sibling"
+    ]
+    assert len(pooldom_rows) == 1
+    row = pooldom_rows[0]
+    assert row["comparison_status"] == "blocked"
+    # focal has no inventory at all -- false is correct there.
+    assert row["all_has_bundles_focal"] == "false"
+    assert row["used_has_bundles_focal"] == "false"
+    # pool's bundles are real and available -- must not read false just
+    # because the focal side is what's blocked.
+    assert row["all_has_bundles_pool"] == "true"
+    assert row["used_has_bundles_pool"] == "true"
+    assert row["all_n_shared_bundle_both"] == "0"

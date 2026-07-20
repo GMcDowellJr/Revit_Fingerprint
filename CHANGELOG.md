@@ -12,9 +12,21 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Fixed
-- Four correctness bugs in the `comparison_status="blocked"` row-emission
+- Six correctness bugs in the `comparison_status="blocked"` row-emission
   path added earlier in this changeset (found via code review), all in
   `tools/compare_cross_segment.py`:
+  - **Blocked rows reported the populated side's bundle availability as
+    false.** Both blocked-row builders (`run_pair()` and
+    `_build_pooled_row()`) hardcoded `all_has_bundles_*`/
+    `used_has_bundles_*` to `"false"` for every side, even when the
+    populated side (or, for pooled rows, one or more pool members) actually
+    had `bundle_membership.csv` output for the domain. These columns
+    document per-side output *availability*, not a similarity score, so
+    they're now computed from `load_bundle_join_hash_set()` per side (the
+    pool side aggregated across every `pool_sids` member, same as the
+    non-blocked path) — only the genuinely-empty side/pool reads `false`.
+    The shared-overlap bucket counts stay at `0` either way, since there's
+    no trustworthy shared set when one side has zero files.
   - **Lineage-emptied pools were reported as blocked instead of skipped.**
     `_emit_for_groups()` excludes any pool member in the focal segment's own
     `parent_segment_id` lineage before calling `_build_pooled_row()` — for a
