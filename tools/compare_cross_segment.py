@@ -81,7 +81,9 @@ Organizational scope levels
 ----------------------------
 Scope is derived from explicit, literal client_label/business_center_label
 values (see _scope_level() / _is_client_wide_rollup()), not blank inference:
-enterprise (client_label=="Stantec", business_center_label=="0000"),
+enterprise (client_label=="Stantec", business_center_label=="0000" --
+"BC_0000"/any-case spelling variants canonicalize to "0000" via
+_normalize_bc_label(), they are not folded to blank),
 business_center (client_label=="Stantec", a real business_center_label), and
 client_business_center (a real external client_label, a real
 business_center_label). A row where either dimension isn't cut at all
@@ -124,7 +126,7 @@ _TOOLS_DIR = str(Path(__file__).resolve().parent)
 if _TOOLS_DIR not in sys.path:
     sys.path.insert(0, _TOOLS_DIR)
 
-from na_token import is_blank_or_na
+from na_token import is_blank_or_na, ENTERPRISE_BC_BOOKKEEPING_TOKENS as _ENTERPRISE_BC_BOOKKEEPING_TOKENS
 
 
 # ---------------------------------------------------------------------------
@@ -1724,6 +1726,15 @@ def _normalize_bc_label(value: str) -> str:
     v = (value or "").strip()
     if is_blank_or_na(v):
         return ""
+    # "0000"/"BC_0000" (any case) are spelling variants of the same
+    # enterprise-bookkeeping value elsewhere in the pipeline (e.g. the
+    # extraction completeness gate documents both) -- canonicalize to the
+    # literal "0000" so they group/classify identically instead of
+    # fragmenting into two distinct-looking business centers. This is
+    # distinct from the removed blank-fold: a real, non-blank value is
+    # still returned, just spelled consistently.
+    if v.lower() in _ENTERPRISE_BC_BOOKKEEPING_TOKENS:
+        return _ENTERPRISE_BC_LABEL
     return v
 
 
@@ -2446,33 +2457,54 @@ def deduplicate_pairs(pairs: List[ComparisonPair]) -> List[ComparisonPair]:
     return result
 
 
-def drop_legacy_sibling_projects_covered_by_cross_client(
+# sibling_* comparison_type values discover_sibling_segments() can emit,
+# grouped purely by shared parent_segment_id -- every one of these can
+# collide with a purpose-built peer comparison for the exact same
+# (seg_a, seg_b) pair (see drop_legacy_siblings_covered_by_peer_comparisons()).
+_SIBLING_PEER_TYPES = {
+    "sibling_projects", "sibling_templates", "sibling_containers",
+    "sibling_generic", "sibling_segments",
+}
+
+# Purpose-built peer-comparison types, each discovered independently of
+# parent_segment_id (cross_client: client_label; bc_to_bc/client_cross_bc:
+# business_center_label/scope_level) -- any of these can duplicate a
+# sibling_* row for the same pair whenever the peers they connect also
+# happen to share an immediate parent.
+_PURPOSE_BUILT_PEER_TYPES = {"cross_client", "bc_to_bc", "client_cross_bc"}
+
+
+def drop_legacy_siblings_covered_by_peer_comparisons(
     pairs: List[ComparisonPair],
 ) -> List[ComparisonPair]:
-    """sibling_projects and cross_client can both fire for the exact same
-    (seg_a, seg_b) pair: discover_sibling_segments() groups Project-role
-    segments purely by (parent_segment_id, unit_system), so two client-only
-    Project segments discover_cross_client() already pairs can ALSO share an
-    immediate parent (e.g. an enterprise-wide "unit|Project" rollup) and get
-    re-paired as sibling_projects. Unlike deduplicate_pairs()'s general case
-    (different comparison_types for the same pair are usually distinct
-    analytical questions and must all be preserved), these two specifically
-    measure the identical underlying file-level comparison for the identical
-    two segments -- keeping both would double-count that one pair in
-    build_cascade()'s xc / build_client_summary()'s xc_by_client downstream,
-    and collide on compare_cross_segment_run_id (make_comparison_run_id()
-    hashes only segment IDs + timestamp, not comparison_type -- a broader,
-    pre-existing characteristic of that identifier not touched here).
-    cross_client is the purpose-built, unambiguous producer for this signal;
-    drop the sibling_projects entry (order-independent) for any pair
-    cross_client already covers, and leave every other pair/type untouched.
+    """A sibling_* row and a purpose-built peer comparison (cross_client,
+    bc_to_bc, client_cross_bc) can both fire for the exact same (seg_a, seg_b)
+    pair: discover_sibling_segments() groups segments purely by
+    (parent_segment_id, governance_role, unit_system), so two segments a
+    purpose-built peer function already pairs (by client_label, or by
+    scope_level/business_center_label) can ALSO share an immediate parent
+    (e.g. an enterprise-wide "unit|Project" rollup, or a client/bc segment's
+    natural lattice parent) and get re-paired as a sibling_* type too. Unlike
+    deduplicate_pairs()'s general case (different comparison_types for the
+    same pair are usually distinct analytical questions and must all be
+    preserved), a sibling_* row and its purpose-built counterpart measure the
+    identical underlying file-level comparison for the identical two
+    segments -- keeping both would double-count that one pair downstream and
+    collide on comparison_run_id (make_comparison_run_id() hashes only
+    segment IDs + timestamp, not comparison_type, and
+    cross_segment_file_pairs.csv carries no comparison_type column at all --
+    a broader, pre-existing characteristic of that identifier/schema not
+    touched here). The purpose-built type is the unambiguous producer for its
+    signal; drop the sibling_* entry (order-independent) for any pair a
+    purpose-built peer type already covers, and leave every other pair/type
+    untouched.
     """
-    cross_client_pairs = {
-        frozenset((a, b)) for a, b, ctype in pairs if ctype == "cross_client"
+    peer_covered_pairs = {
+        frozenset((a, b)) for a, b, ctype in pairs if ctype in _PURPOSE_BUILT_PEER_TYPES
     }
     return [
         (a, b, ctype) for a, b, ctype in pairs
-        if not (ctype == "sibling_projects" and frozenset((a, b)) in cross_client_pairs)
+        if not (ctype in _SIBLING_PEER_TYPES and frozenset((a, b)) in peer_covered_pairs)
     ]
 
 
@@ -3303,8 +3335,9 @@ def run_pooled_comparison(
         consistency.
 
     business_center_label is normalized via _bc_of() before bc-pool grouping
-    (blank/NA spellings fold to blank; "0000" is a real, literal value and is
-    no longer folded away -- see _normalize_bc_label()).
+    (blank/NA spellings fold to blank; "0000"/"BC_0000" spelling variants
+    canonicalize to the literal "0000" rather than folding to blank -- see
+    _normalize_bc_label()).
 
     Emits one row per (segment_id, domain, pool_scope).
     """
@@ -3817,24 +3850,26 @@ def main() -> int:
     pairs = deduplicate_pairs(pairs)
 
     # Filter by --segment-a / --segment-b. Must run BEFORE
-    # drop_legacy_sibling_projects_covered_by_cross_client(): that drop is
+    # drop_legacy_siblings_covered_by_peer_comparisons(): that drop is
     # order-independent (frozenset((a, b))), but discover_sibling_segments()
-    # orders its pair by sorted segment ID while discover_cross_client() orders
-    # by sorted client label -- the surviving cross_client row can therefore be
-    # the reverse (b, a) of the sibling_projects row it replaces. Since these
-    # filters are position-sensitive (a == args.segment_a, b == args.segment_b),
-    # running the drop first could remove the correctly-oriented sibling row
-    # and leave only a reversed-orientation cross_client row that then fails
-    # the filter too, making a scoped run silently report zero pairs for
-    # segments that do have a comparison. Filtering here first means the drop
-    # only ever sees (and only ever needs to reconcile) whichever orientation
-    # actually survived the requested scope.
+    # orders its pairs by sorted segment ID while discover_cross_client() orders
+    # by sorted client label (bc_to_bc/discover_client_cross_bc() both order by
+    # sorted segment ID too, matching sibling's own convention) -- the surviving
+    # cross_client row can therefore be the reverse (b, a) of the sibling_projects
+    # row it replaces. Since these filters are position-sensitive
+    # (a == args.segment_a, b == args.segment_b), running the drop first could
+    # remove the correctly-oriented sibling row and leave only a
+    # reversed-orientation peer row that then fails the filter too, making a
+    # scoped run silently report zero pairs for segments that do have a
+    # comparison. Filtering here first means the drop only ever sees (and only
+    # ever needs to reconcile) whichever orientation actually survived the
+    # requested scope.
     if args.segment_a:
         pairs = [(a, b, ct) for a, b, ct in pairs if a == args.segment_a]
     if args.segment_b:
         pairs = [(a, b, ct) for a, b, ct in pairs if b == args.segment_b]
 
-    pairs = drop_legacy_sibling_projects_covered_by_cross_client(pairs)
+    pairs = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
 
     if not pairs:
         print("[compare] no pairs discovered — check manifest hierarchy and mode flags")

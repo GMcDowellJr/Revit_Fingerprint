@@ -327,6 +327,19 @@ def test_0000_flows_through_as_literal_enterprise_value():
     assert _scope_level({**_seg("Template", client="Stantec"), "business_center_label": "0000"}) == "enterprise"
 
 
+def test_bc_0000_spelling_variants_canonicalize_to_0000():
+    # "0000"/"BC_0000" (any case) are spelling variants of the same
+    # enterprise-bookkeeping value elsewhere in the pipeline (e.g. the
+    # extraction completeness gate documents both) -- they must canonicalize
+    # to the SAME literal "0000", not fragment into two distinct-looking
+    # business centers, and must not fold to blank either.
+    for token in ("BC_0000", "bc_0000", "Bc_0000"):
+        assert _normalize_bc_label(token) == "0000"
+        row = {**_seg("Template", client="Stantec"), "business_center_label": token}
+        assert _bc_of(row) == "0000"
+        assert _scope_level(row) == "enterprise"
+
+
 def test_na_spelled_business_center_labels_normalize_to_blank():
     # A missing business_center_label spelled as an NA token (n/a, NA,
     # __NOT_APPLICABLE__, ...) must still normalize to blank -- this is a

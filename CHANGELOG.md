@@ -25,9 +25,12 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `_scope_level()` itself.
   - `_normalize_bc_label()` no longer folds `"0000"`/`"BC_0000"` to blank —
     `"0000"` now flows through as the literal Enterprise business-center
-    value everywhere this file uses `business_center_label`. This was a live
-    inconsistency left in place by the segment-manifest explicit-contract
-    change: since `client_label` is now always populated (literally
+    value everywhere this file uses `business_center_label` (`"BC_0000"`/any
+    case spelling variant canonicalizes to the same literal `"0000"` rather
+    than being left as a separately-fragmenting literal — see the "Fixed"
+    entry below). This was a live inconsistency left in place by the
+    segment-manifest explicit-contract change: since `client_label` is now
+    always populated (literally
     `"Stantec"` for internal work, never blank),
     `discover_governance_chain()`'s prior blank-based scope inference meant
     `_scope_level()` could never return `"enterprise"` for real data at all
@@ -72,6 +75,40 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   (verified: `_bc_of()` calls the shared function directly, no independent
   re-implementation). No unification needed; documented at the `pool_scope`
   definition site to prevent future confusion.
+
+### Fixed
+- (PR #373 review) `_normalize_bc_label()` now canonicalizes `"BC_0000"`/any
+  case spelling to the literal `"0000"` instead of leaving it as a separate,
+  fragmenting literal — `_is_enterprise_bc()` only ever compared against
+  `"0000"` exactly, so a row spelled `"BC_0000"` (a real spelling used
+  elsewhere in the pipeline, e.g. the extraction completeness gate) was
+  classified `business_center` instead of `enterprise`, omitting the
+  intended `enterprise_to_project`/`enterprise_to_bc` fan-out and able to
+  emit a bogus `bc_to_bc` peer pairing between the enterprise segment and a
+  real business center. Reuses the shared `na_token.
+  ENTERPRISE_BC_BOOKKEEPING_TOKENS` set (re-imported) rather than
+  reimplementing it.
+- (PR #373 review) `drop_legacy_sibling_projects_covered_by_cross_client()`
+  renamed to `drop_legacy_siblings_covered_by_peer_comparisons()` and
+  generalized: it previously only dropped a `sibling_projects` row covered
+  by a `cross_client` pair. The new `bc_to_bc`/`client_cross_bc` types have
+  the identical collision risk against `sibling_templates`/
+  `sibling_containers`/`sibling_projects` (same-role BC-scoped segments, or
+  a client's per-BC segments, can share an immediate `parent_segment_id`
+  with what a purpose-built peer function already pairs) — both would have
+  collided on `comparison_run_id` and double-counted the pair in
+  `cross_segment_file_pairs.csv`, which carries no `comparison_type` column.
+  The generalized function drops any `sibling_*` row for a pair any of
+  `cross_client`/`bc_to_bc`/`client_cross_bc` already covers.
+- (PR #373 review) `bc_to_bc` and `client_cross_bc` registered in
+  `generate_governance_narrative.py`'s `CASCADE_GROUP4_EXCLUDED_TYPES`
+  (same-role/same-client peer comparison, no cascade treatment designed
+  yet — same reason class as `sibling_templates`/`sibling_containers`).
+  Without this, any default run where these types fire fed
+  `_warn_unrecognized_comparison_types()` an unrecognized value. This is a
+  narrow, additive exception to keeping `generate_governance_narrative.py`
+  out of scope for this PR — registering a type name in the existing
+  documented-exclusion registry, not new narrative/cascade logic.
 
 ### Added
 - New `bc_to_bc` comparison type in `tools/compare_cross_segment.py`
