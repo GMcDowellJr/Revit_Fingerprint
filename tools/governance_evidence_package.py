@@ -629,6 +629,114 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
+        "pattern_reuse_summary_by_client", p(input_paths, "pattern_reuse_summary_by_client"), "csv", False,
+        input_present.get("pattern_reuse_summary_by_client", False), "compare_cross_segment.py",
+        AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "feeds render_union_reuse_summary()'s adoption-breadth cut (how many "
+        "clients reach a corpus-wide-reused pattern per domain) -- additive to, "
+        "and independent of, the distinct-pattern reuse table sourced from "
+        "pattern_reuse_distribution.csv",
+        "one row per (view_scope, governance_role, client_label, "
+        "discipline_label, unit_system, domain, reuse_bucket, bucket_basis) "
+        "-- n_patterns is a bucket_basis-scoped occurrence count, not a "
+        "distinct-pattern count",
+        ["domain", "client_label", "reuse_bucket"], [], [],
+        ["how many of a domain's clients have at least one corpus-wide-reused pattern"],
+        ["distinct-pattern counts across the whole corpus -- use "
+         "pattern_reuse_distribution.csv for that; this file is grouped by "
+         "client_label so the same pattern is counted once per client, not once total"],
+        ["pattern_reuse_summary_by_domain.csv (the by-domain sibling of this file) "
+         "is deliberately not consumed -- its n_patterns duplicates the "
+         "corpus-wide reuse signal the distinct-pattern table already reports."],
+        _BLANK_STRING_NULL_SEMANTICS,
+        ["pattern_reuse_distribution", "cross_segment_union_inventory"],
+    ))
+
+    artifacts.append(_artifact(
+        "project_union_jaccard_matrix", p(input_paths, "project_union_jaccard_matrix"), "csv", False,
+        input_present.get("project_union_jaccard_matrix", False), "compare_cross_segment.py",
+        AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "feeds the Project Portfolio section's footprint-identity paragraph "
+        "(render_project_portfolio_section())",
+        "one row per (row_id, column_id, view_scope, domain) matrix cell; "
+        "ALL_DOMAINS rows carry the system-level union_jaccard used in the narrative",
+        ["row_id", "column_id", "view_scope", "domain"], [], [],
+        ["whether two projects' systems contain the same canonical patterns "
+         "(exact footprint overlap), independent of file-pair identity"],
+        ["typical file-to-file similarity -- use project_mean_file_pair_jaccard_matrix.csv's "
+         "signal, folded into project_fragmentation_diagnostic.csv, for that"],
+        ["symmetric matrix -- both (a, b) and (b, a) rows are emitted; the "
+         "narrative dedupes to one row per unordered project pair"],
+        _BLANK_STRING_NULL_SEMANTICS,
+        ["project_density_similarity_matrix", "project_fragmentation_diagnostic", "matrix_output_manifest"],
+    ))
+
+    artifacts.append(_artifact(
+        "project_density_similarity_matrix", p(input_paths, "project_density_similarity_matrix"), "csv", False,
+        input_present.get("project_density_similarity_matrix", False), "compare_cross_segment.py",
+        AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "feeds the Project Portfolio section's density-similarity paragraph, "
+        "cross-referenced against project_union_jaccard_matrix.csv for the "
+        "\"same shape, different content\" caveat when supplied",
+        "one row per (row_id, column_id, view_scope, domain) matrix cell; "
+        "ALL_DOMAINS rows carry the system-level density_similarity used in the narrative",
+        ["row_id", "column_id", "view_scope", "domain"], [], [],
+        ["whether two projects populate the same domains to a similar degree "
+         "(occupancy-count cosine similarity), independent of exact pattern identity"],
+        ["exact pattern identity -- high density similarity with low "
+         "union_jaccard means same shape, different content, not the same content"],
+        ["symmetric matrix, same dedup treatment as project_union_jaccard_matrix.csv; "
+         "the same-shape/different-content cross-check is unavailable when "
+         "project_union_jaccard_matrix.csv is not also supplied"],
+        _BLANK_STRING_NULL_SEMANTICS,
+        ["project_union_jaccard_matrix", "matrix_output_manifest"],
+    ))
+
+    artifacts.append(_artifact(
+        "project_pool_containment_similarity_matrix", p(input_paths, "project_pool_containment_similarity_matrix"), "csv", False,
+        input_present.get("project_pool_containment_similarity_matrix", False), "compare_cross_segment.py",
+        AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "feeds the Project Portfolio section's peer-pool-containment paragraph, "
+        "rendered as a per-project outlier list (not a per-pair table)",
+        "one row per (row_id=focal_project, column_id=peer_pool:{pool_scope}:{row_id}, "
+        "view_scope, domain) -- unlike the other three project matrices, this "
+        "one carries no ALL_DOMAINS aggregate row",
+        ["row_id", "column_id", "view_scope", "domain"], [], [],
+        ["how much a project's system aligns with its parent-sibling/bc/client peer pool"],
+        ["a cross-domain aggregate straight from this file -- the narrative "
+         "computes its own mean pool_containment_similarity across a project's "
+         "available domains per (project, pool_scope) because no ALL_DOMAINS "
+         "row exists here"],
+        ["column_id encodes pool_scope (parent_sibling/bc/client) so a "
+         "project's separate pool grains never share a matrix cell"],
+        _BLANK_STRING_NULL_SEMANTICS,
+        ["matrix_output_manifest"],
+    ))
+
+    artifacts.append(_artifact(
+        "project_fragmentation_diagnostic", p(input_paths, "project_fragmentation_diagnostic"), "csv", False,
+        input_present.get("project_fragmentation_diagnostic", False), "compare_cross_segment.py",
+        AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "feeds the Project Portfolio section's fragmentation-diagnostic "
+        "paragraph; also the sole carrier of project_mean_file_pair_jaccard_matrix.csv's "
+        "signal in this narrative (its own exact_identity_overlap column), rather "
+        "than that matrix being consumed standalone",
+        "one row per (row_id, column_id, view_scope, domain=ALL_DOMAINS) -- "
+        "footprint_similarity minus exact_identity_overlap when both inputs "
+        "were available at production time",
+        ["row_id", "column_id", "view_scope"], [], [],
+        ["divergence between project footprint overlap (union_jaccard) and "
+         "exact per-file identity overlap (mean file-pair jaccard)"],
+        ["an authoritative governance index -- diagnostic only, per this "
+         "file's own interpretation text"],
+        ["value_status other than \"diagnostic\" (e.g. unavailable_required_inputs) "
+         "means the cell could not be computed and is excluded from the "
+         "narrative's pair list"],
+        _BLANK_STRING_NULL_SEMANTICS,
+        ["project_union_jaccard_matrix", "matrix_output_manifest"],
+    ))
+
+    artifacts.append(_artifact(
         "cross_segment_file_pairs", p(sibling_paths, "file_pairs"), "csv", False,
         sibling_present.get("file_pairs", False), "compare_cross_segment.py",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
