@@ -372,7 +372,7 @@ def test_domain_with_no_group1_rows_at_all_absent():
         _row(segment_id_a="imperial|Project", segment_id_b="imperial|Project",
              governance_role_a="Project", governance_role_b="Project",
              comparison_type="within_project", domain="only_wp_domain",
-             all_pairwise_jaccard_mean="0.5", n_files_a="10"),
+             all_union_jaccard="0.5", n_files_a="10"),
     ]
     normalise_summary_schema(rows)
     cascade = build_cascade(rows)
