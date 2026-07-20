@@ -3508,8 +3508,22 @@ def render_union_reuse_summary(
         # clients_in_corpus_domain) -- additive to, and independent of, the
         # distinct-pattern dedup table above (which never groups by client).
         # Do not touch that table's logic from here.
+        #
+        # A client needs at least _ADOPTION_BREADTH_MIN_PATTERNS corpus-wide
+        # pattern-instances in a domain to count as "adopting" it here, not
+        # just one -- a single near-universal pattern (a shipped-default line
+        # style, text type, etc. present in nearly every template regardless
+        # of any real governance decision) can trivially clear the producer's
+        # per-pattern corpus_wide bucket threshold once, which made every
+        # domain read as ~100%-breadth on real data and gave this table no
+        # discriminating power. Raising the bar to >=2 requires genuine
+        # multi-pattern convergence, not a single shared placeholder. This is
+        # a narrative-side interpretation threshold only -- it does not
+        # change reuse_bucket/bucket_basis classification, which stays the
+        # producer's (compare_cross_segment.py's) call.
+        _ADOPTION_BREADTH_MIN_PATTERNS = 2
         clients_seen_by_domain: dict = defaultdict(set)
-        corpus_wide_clients_by_domain: dict = defaultdict(set)
+        client_domain_corpus_wide_n: dict = defaultdict(int)
         corpus_wide_instances_by_domain: dict = defaultdict(int)
         for row in reuse_by_client_rows:
             if row.get("classification_status") != "ok":
@@ -3521,9 +3535,13 @@ def render_union_reuse_summary(
             clients_seen_by_domain[domain].add(client)
             if row.get("reuse_bucket") == "corpus_wide":
                 n = int(row.get("n_patterns") or "0")
-                if n > 0:
-                    corpus_wide_clients_by_domain[domain].add(client)
-                    corpus_wide_instances_by_domain[domain] += n
+                client_domain_corpus_wide_n[(domain, client)] += n
+                corpus_wide_instances_by_domain[domain] += n
+
+        corpus_wide_clients_by_domain: dict = defaultdict(set)
+        for (domain, client), n in client_domain_corpus_wide_n.items():
+            if n >= _ADOPTION_BREADTH_MIN_PATTERNS:
+                corpus_wide_clients_by_domain[domain].add(client)
 
         adoption_domains = sorted(
             clients_seen_by_domain.keys(),
@@ -3532,12 +3550,20 @@ def render_union_reuse_summary(
         if adoption_domains:
             lines.append("**Adoption breadth by domain (client reach)**\n")
             lines.append(
-                "How many of a domain's clients have at least one corpus-wide-reused "
-                "pattern (n_patterns under the corpus_wide bucket, basis "
-                "clients_in_corpus_domain) -- an additive breadth cut, not a "
-                "replacement for the distinct-pattern reuse table above.\n"
+                f"How many of a domain's clients have at least {_ADOPTION_BREADTH_MIN_PATTERNS} "
+                "corpus-wide-reused pattern-instances (n_patterns under the corpus_wide bucket, "
+                "basis clients_in_corpus_domain, summed per client) -- an additive breadth cut, "
+                "not a replacement for the distinct-pattern reuse table above. The pattern-"
+                "instances column is the domain's total corpus-wide n_patterns across all "
+                "clients regardless of this per-client threshold, so a domain reaching every "
+                "client on a small total (concentrated in one or two shared patterns) reads "
+                "differently from one reaching every client on a large total (broad "
+                "multi-pattern convergence).\n"
             )
-            lines.append("| domain | clients with corpus-wide patterns | clients seen | corpus-wide pattern-instances |")
+            lines.append(
+                f"| domain | clients with >={_ADOPTION_BREADTH_MIN_PATTERNS} corpus-wide patterns "
+                "| clients seen | corpus-wide pattern-instances (all clients) |"
+            )
             lines.append("|---|---:|---:|---:|")
             for domain in adoption_domains[:20]:
                 n_clients_cw = len(corpus_wide_clients_by_domain.get(domain, set()))
