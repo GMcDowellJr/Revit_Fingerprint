@@ -19,12 +19,16 @@ from compare_cross_segment import (  # noqa: E402
     build_pair_domain_work_items,
     build_pattern_reuse_distribution_rows,
     build_union_inventory_rows,
+    deduplicate_pairs,
     discover_client_cross_bc,
     discover_domains_for_segment,
     discover_governance_chain,
+    discover_sibling_segments,
     discover_within_project,
+    drop_legacy_siblings_covered_by_peer_comparisons,
     load_file_join_hashes,
     main as compare_main,
+    make_comparison_run_id,
     run_pooled_comparison,
     sort_pair_detail_rows,
     sort_summary_rows,
@@ -408,6 +412,60 @@ def test_discover_governance_chain_enterprise_to_bc_and_client_are_same_role_onl
     assert ("ent_c", "bc_c", "enterprise_to_bc") in pairs
     assert ("ent_t", "bc_c", "enterprise_to_bc") not in pairs
     assert ("ent_t", "client_t", "enterprise_to_client") in pairs
+
+
+def test_enterprise_to_bc_and_sibling_template_survive_with_distinct_run_ids():
+    # An enterprise (Stantec/0000) standard and a real-BC standard of the
+    # same role sharing a parent_segment_id get paired BOTH as
+    # sibling_templates (discover_sibling_segments, symmetric Jaccard) AND
+    # as enterprise_to_bc (discover_governance_chain, directed reference-
+    # union containment) -- these are genuinely distinct measurements of the
+    # same two segments, not duplicates, so neither drop_legacy_siblings_
+    # covered_by_peer_comparisons() nor anything else should suppress
+    # either row. "seg_0000" sorts before "seg_bc001" alphabetically, so
+    # both discover_sibling_segments()'s sorted-ID pairing and
+    # discover_governance_chain()'s enterprise-then-bc pairing land on the
+    # exact same (seg_a, seg_b) orientation -- the scenario that used to
+    # collide on comparison_run_id.
+    manifest = {
+        "seg_0000": {
+            **_seg("Template", client="Stantec"),
+            "business_center_label": "0000",
+            "parent_segment_id": "parent1",
+        },
+        "seg_bc001": {
+            **_seg("Template", client="Stantec"),
+            "business_center_label": "BC1",
+            "parent_segment_id": "parent1",
+        },
+    }
+
+    sibling_pairs = discover_sibling_segments(manifest)
+    governance_pairs = discover_governance_chain(manifest)
+    assert ("seg_0000", "seg_bc001", "sibling_templates") in sibling_pairs
+    assert ("seg_0000", "seg_bc001", "enterprise_to_bc") in governance_pairs
+
+    pairs = deduplicate_pairs(sibling_pairs + governance_pairs)
+    pairs = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
+
+    surviving = {ctype for a, b, ctype in pairs if {a, b} == {"seg_0000", "seg_bc001"}}
+    assert surviving == {"sibling_templates", "enterprise_to_bc"}
+
+    executed_utc = "2026-07-20T00:00:00Z"
+    ids = {
+        ctype: make_comparison_run_id("seg_0000", "seg_bc001", executed_utc, ctype)
+        for ctype in surviving
+    }
+    assert len(set(ids.values())) == len(ids)
+
+
+def test_make_comparison_run_id_differs_by_comparison_type_for_same_pair_and_timestamp():
+    executed_utc = "2026-07-20T00:00:00Z"
+    id_a = make_comparison_run_id("s1", "s2", executed_utc, "sibling_templates")
+    id_b = make_comparison_run_id("s1", "s2", executed_utc, "enterprise_to_bc")
+    assert id_a != id_b
+    # Deterministic given identical inputs.
+    assert id_a == make_comparison_run_id("s1", "s2", executed_utc, "sibling_templates")
 
 
 def test_discover_governance_chain_excludes_generic_from_scope_fanout():
@@ -1238,7 +1296,17 @@ def test_main_emits_governance_states_when_pair_skipped_by_min_patterns(tmp_path
     summary_path = out_dir / "cross_segment_summary.csv"
     states_path = out_dir / "cross_segment_governance_states.csv"
     state_summary_path = out_dir / "cross_segment_governance_state_summary.csv"
-    assert not summary_path.exists()
+    # project_sparse has zero readable files (not merely below min_patterns) --
+    # this is now the explicit blocked case: a real, schema-complete summary
+    # row is emitted with comparison_status="blocked" rather than the pair
+    # being suppressed outright. Governance-state outputs are unaffected --
+    # they run through a separate code path from cross_segment_summary.csv.
+    assert summary_path.exists()
+    with summary_path.open("r", encoding="utf-8", newline="") as f:
+        summary_rows = list(csv.DictReader(f))
+    assert len(summary_rows) == 1
+    assert summary_rows[0]["comparison_status"] == "blocked"
+    assert summary_rows[0]["all_pairwise_jaccard_mean"] == ""
     assert states_path.exists()
     assert state_summary_path.exists()
 
@@ -1251,6 +1319,110 @@ def test_main_emits_governance_states_when_pair_skipped_by_min_patterns(tmp_path
         summary_rows = list(csv.DictReader(f))
     assert summary_rows[0]["provided_but_missing_count"] == "2"
     assert summary_rows[0]["provided_missing_share"] == "1.000000"
+
+
+def test_main_skips_delta_generation_for_blocked_reference(tmp_path, monkeypatch):
+    import csv
+
+    domain = "delta_blocked_domain"
+    records_dir = tmp_path / "records"
+    segments_root = tmp_path / "segments"
+    out_dir = tmp_path / "out"
+    records_dir.mkdir()
+
+    _write_csv(
+        records_dir / "segment_manifest.csv",
+        [
+            {
+                "segment_id": "template_ref",
+                "segment_label": "Template",
+                "governance_role": "Template",
+                "client_label": "Acme",
+                "discipline_label": "",
+                "unit_system": "imperial",
+                "run_type": "bundle",
+                "segment_level": "2",
+                "parent_segment_id": "imperial",
+            },
+            {
+                "segment_id": "project_tgt",
+                "segment_label": "Project",
+                "governance_role": "Project",
+                "client_label": "Acme",
+                "discipline_label": "",
+                "unit_system": "imperial",
+                "run_type": "bundle",
+                "segment_level": "2",
+                "parent_segment_id": "imperial",
+            },
+        ],
+    )
+    _write_csv(
+        records_dir / "run_registry.csv",
+        [
+            {"segment_id": "template_ref", "output_folder": "template_ref", "run_type": "bundle"},
+            {"segment_id": "project_tgt", "output_folder": "project_tgt", "run_type": "bundle"},
+        ],
+    )
+    _write_csv(records_dir / "file_metadata.csv", [{"export_run_id": "tgt_file", "project_label": ""}])
+    # template_ref: zero readable files -- the reference side is blocked.
+    (segments_root / "template_ref").mkdir(parents=True)
+    # project_tgt: real patterns the (blocked) reference has no knowledge of.
+    _write_segment(
+        segments_root,
+        "project_tgt",
+        domain,
+        [("p1", "tgt_a", "Target A"), ("p2", "tgt_b", "Target B")],
+        [
+            {"export_run_id": "tgt_file", "pattern_id": "p1"},
+            {"export_run_id": "tgt_file", "pattern_id": "p2"},
+        ],
+        [
+            {"export_run_id": "tgt_file", "pattern_id": "p1"},
+            {"export_run_id": "tgt_file", "pattern_id": "p2"},
+        ],
+        ["p1"],
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "compare_cross_segment.py",
+            "--segments-root", str(segments_root),
+            "--records-dir", str(records_dir),
+            "--out-dir", str(out_dir),
+            "--governance-chain",
+            "--domain", domain,
+            "--min-patterns", "1",
+            "--workers", "1",
+            # deliberately no --no-delta: delta generation must be active
+            # for this comparison_type so the fix is actually exercised.
+        ],
+    )
+
+    assert compare_main() == 0
+
+    summary_path = out_dir / "cross_segment_summary.csv"
+    delta_path = out_dir / "cross_segment_delta.csv"
+
+    with summary_path.open("r", encoding="utf-8", newline="") as f:
+        summary_rows = [r for r in csv.DictReader(f) if r["comparison_type"] == "template_to_project"]
+    assert len(summary_rows) == 1
+    assert summary_rows[0]["comparison_status"] == "blocked"
+    assert summary_rows[0]["n_files_a"] == "0"
+    assert summary_rows[0]["n_files_b"] == "1"
+
+    # The blocked reference must not produce delta rows -- with an empty
+    # ref_union, tgt_a/tgt_b would otherwise both be misreported as locally
+    # drifted patterns instead of "reference unknown."
+    if delta_path.exists():
+        with delta_path.open("r", encoding="utf-8", newline="") as f:
+            delta_rows = [
+                r for r in csv.DictReader(f)
+                if r["segment_id_reference"] == "template_ref" and r["segment_id_target"] == "project_tgt"
+            ]
+        assert delta_rows == []
 
 
 
@@ -1749,7 +1921,7 @@ def test_explicit_matrices_union_jaccard_differs_from_mean_file_pair():
         "client_label_a": "A", "client_label_b": "B",
         "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial",
         "segment_label_a": "Project A", "segment_label_b": "Project B",
-        "domain": "d", "all_jaccard_mean": "0.000000", "used_jaccard_mean": "",
+        "domain": "d", "all_pairwise_jaccard_mean": "0.000000", "used_pairwise_jaccard_mean": "",
     }]
 
     matrices, frag, manifest = build_explicit_matrix_outputs(summary, [], union_rows, "2026-06-22T00:00:00Z")
@@ -1773,8 +1945,8 @@ def test_fragmentation_diagnostic_uses_all_domains_file_pair_aggregate():
             for jh in hashes:
                 union_rows.append({"governance_role": "Project", "client_label": client, "discipline_label": "Arch", "unit_system": "imperial", "domain": domain, "view_scope": "all", "join_hash": jh, "n_files_present": "1", "n_files_denominator": "1", "n_projects_present": "1", "n_projects_denominator": "1", "n_clients_present": "1", "n_clients_denominator": "1", "pct_clients_present": "1.000000", "inventory_status": "ok"})
     summary = [
-        {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d2", "all_jaccard_mean": "0.000000"},
-        {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d1", "all_jaccard_mean": "1.000000"},
+        {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d2", "all_pairwise_jaccard_mean": "0.000000"},
+        {"governance_role_a": "Project", "governance_role_b": "Project", "client_label_a": "A", "client_label_b": "B", "discipline_label_a": "Arch", "discipline_label_b": "Arch", "unit_system": "imperial", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d1", "all_pairwise_jaccard_mean": "1.000000"},
     ]
 
     matrices, frag, _ = build_explicit_matrix_outputs(summary, [], union_rows, "2026-06-22T00:00:00Z")
@@ -1903,7 +2075,7 @@ def test_mean_file_pair_matrix_adds_synthetic_diagonal_cells():
         "segment_label_a": "Project A",
         "segment_label_b": "Project B",
         "domain": "d",
-        "all_jaccard_mean": "0.250000",
+        "all_pairwise_jaccard_mean": "0.250000",
     }]
 
     matrices, _, _ = build_explicit_matrix_outputs(summary, [], [], "2026-06-22T00:00:00Z")
@@ -1919,8 +2091,8 @@ def test_mean_file_pair_diagonals_limited_to_project_observed_domains():
     from compare_cross_segment import build_explicit_matrix_outputs
 
     summary = [
-        {"governance_role_a": "Project", "governance_role_b": "Project", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d1", "all_jaccard_mean": "0.250000"},
-        {"governance_role_a": "Project", "governance_role_b": "Project", "segment_label_a": "Project C", "segment_label_b": "Project D", "domain": "d2", "all_jaccard_mean": "0.500000"},
+        {"governance_role_a": "Project", "governance_role_b": "Project", "segment_label_a": "Project A", "segment_label_b": "Project B", "domain": "d1", "all_pairwise_jaccard_mean": "0.250000"},
+        {"governance_role_a": "Project", "governance_role_b": "Project", "segment_label_a": "Project C", "segment_label_b": "Project D", "domain": "d2", "all_pairwise_jaccard_mean": "0.500000"},
     ]
 
     matrices, _, _ = build_explicit_matrix_outputs(summary, [], [], "2026-06-22T00:00:00Z")
@@ -1941,7 +2113,7 @@ def test_mean_file_pair_matrix_emits_symmetric_cells():
         "segment_label_a": "Project A",
         "segment_label_b": "Project B",
         "domain": "d",
-        "all_jaccard_mean": "0.250000",
+        "all_pairwise_jaccard_mean": "0.250000",
     }]
 
     matrices, _, _ = build_explicit_matrix_outputs(summary, [], [], "2026-06-22T00:00:00Z")
