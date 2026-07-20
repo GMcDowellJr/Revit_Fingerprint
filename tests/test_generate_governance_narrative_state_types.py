@@ -32,7 +32,7 @@ def _gs_row(**overrides):
         "reference_all_count": "", "target_all_count": "", "target_used_count": "",
         "provided_to_configured_containment": "", "provided_to_used_containment": "",
         "provided_passive_share": "", "provided_missing_share": "", "local_active_share": "",
-        "all_containment_a_in_b_mean": "",
+        "all_pairwise_containment_a_in_b_mean": "",
     }
     r.update(overrides)
     return r

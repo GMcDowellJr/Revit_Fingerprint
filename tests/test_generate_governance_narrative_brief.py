@@ -188,7 +188,7 @@ def _minimal_fixture(tmp_path: Path) -> tuple[Path, Path]:
             segment_id_b="imperial|Project|acme", governance_role_a="Template",
             governance_role_b="Project", client_label_b="acme",
             comparison_type="template_to_project", domain="line_styles",
-            all_containment_a_in_b_mean="0.95", all_jaccard_mean="0.5",
+            all_pairwise_containment_a_in_b_mean="0.95", all_pairwise_jaccard_mean="0.5",
             n_files_a="3", n_files_b="10",
             executed_utc="2026-07-16T00:00:00Z", unit_system="imperial",
         ),

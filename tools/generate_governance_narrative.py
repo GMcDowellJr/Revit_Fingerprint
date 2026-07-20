@@ -277,24 +277,27 @@ def normalise_summary_schema(rows: list) -> None:
         return
     cols = set(rows[0].keys())
 
-    def alias(canonical: str, dual_name: str, legacy_name: str) -> None:
-        if dual_name in cols:
-            _SUMMARY_COL_ALIASES[canonical] = dual_name
-        elif legacy_name in cols:
-            _SUMMARY_COL_ALIASES[canonical] = legacy_name
+    def alias(canonical: str, *candidates: str) -> None:
+        """Map a canonical renderer column name to the first matching real
+        CSV column, trying names in priority order: current schema first,
+        then each older schema generation this file has ever produced."""
+        for name in candidates:
+            if name in cols:
+                _SUMMARY_COL_ALIASES[canonical] = name
+                return
 
     # Jaccard
-    alias("jaccard_mean",            "all_jaccard_mean",            "jaccard_mean")
+    alias("jaccard_mean",            "all_pairwise_jaccard_mean",            "all_jaccard_mean",            "jaccard_mean")
     alias("jaccard_p10",             "all_jaccard_p10",             "jaccard_p10")
     alias("jaccard_p90",             "all_jaccard_p90",             "jaccard_p90")
-    alias("used_jaccard_mean",       "used_jaccard_mean",           "jaccard_mean")
+    alias("used_jaccard_mean",       "used_pairwise_jaccard_mean",  "used_jaccard_mean",           "jaccard_mean")
     alias("used_jaccard_p10",        "used_jaccard_p10",            "jaccard_p10")
     alias("used_jaccard_p90",        "used_jaccard_p90",            "jaccard_p90")
     # Containment
-    alias("containment_a_in_b_mean",      "all_containment_a_in_b_mean",      "containment_a_in_b_mean")
-    alias("containment_b_in_a_mean",      "all_containment_b_in_a_mean",      "containment_b_in_a_mean")
-    alias("used_containment_a_in_b_mean", "used_containment_a_in_b_mean",     "containment_a_in_b_mean")
-    alias("used_containment_b_in_a_mean", "used_containment_b_in_a_mean",     "containment_b_in_a_mean")
+    alias("containment_a_in_b_mean",      "all_pairwise_containment_a_in_b_mean",      "all_containment_a_in_b_mean",      "containment_a_in_b_mean")
+    alias("containment_b_in_a_mean",      "all_pairwise_containment_b_in_a_mean",      "all_containment_b_in_a_mean",      "containment_b_in_a_mean")
+    alias("used_containment_a_in_b_mean", "used_pairwise_containment_a_in_b_mean",     "used_containment_a_in_b_mean",     "containment_a_in_b_mean")
+    alias("used_containment_b_in_a_mean", "used_pairwise_containment_b_in_a_mean",     "used_containment_b_in_a_mean",     "containment_b_in_a_mean")
     # Shared counts
     alias("n_shared_join_hash",      "n_shared_join_hash",      "n_shared_join_hash")
     alias("used_n_shared_join_hash", "used_n_shared_join_hash", "n_shared_join_hash")
@@ -314,6 +317,13 @@ def _col(row: dict, canonical: str) -> str:
     """Read a summary row column using canonical renderer name."""
     actual = _SUMMARY_COL_ALIASES.get(canonical, canonical)
     return row.get(actual, "")
+
+
+def _resolved_col_name(canonical: str) -> str:
+    """Return the real CSV column name a canonical renderer name currently
+    resolves to (via _SUMMARY_COL_ALIASES), for callers that need to pass a
+    column NAME rather than read a value through _col()."""
+    return _SUMMARY_COL_ALIASES.get(canonical, canonical)
 
 
 def used_view_falls_back_to_legacy() -> bool:
@@ -2318,11 +2328,11 @@ def build_governance_state_summary(
         _add_float(bucket["local_active_vals"], row, "local_active_share")
 
         if ctype == "generic_to_template":
-            _add_float(bucket["generic_to_template_vals"], row, "provided_to_configured_containment", "all_containment_a_in_b_mean")
+            _add_float(bucket["generic_to_template_vals"], row, "provided_to_configured_containment", _resolved_col_name("containment_a_in_b_mean"))
         elif ctype == "generic_to_container":
-            _add_float(bucket["generic_to_container_vals"], row, "provided_to_configured_containment", "all_containment_a_in_b_mean")
+            _add_float(bucket["generic_to_container_vals"], row, "provided_to_configured_containment", _resolved_col_name("containment_a_in_b_mean"))
         elif ctype == "generic_to_project":
-            _add_float(bucket["generic_to_project_vals"], row, "provided_to_configured_containment", "all_containment_a_in_b_mean")
+            _add_float(bucket["generic_to_project_vals"], row, "provided_to_configured_containment", _resolved_col_name("containment_a_in_b_mean"))
 
     # Detailed per-pattern rows fill gaps and support early-state files. Kept under
     # the same (dom, ctype) key as the compact loop so the two data sources merge
