@@ -2977,10 +2977,22 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
     """Render per-discipline within-project coherence and cascade summary."""
     lines = ["## Discipline Analysis\n"]
 
-    # Gather within-project by discipline. PRIMARY = used-view union (active
-    # practice, per _recommended_primary_view() for within_project/Project rows);
-    # _all carries the all-view union as secondary/context, same convention as
-    # xc_by_client/wp_by_client in build_client_summary().
+    # Gather within-project by discipline. discover_within_project() emits
+    # within_project rows for ANY non-skip/non-registration segment, not just
+    # Project ones -- a discipline-scoped Template/Container/Generic standards
+    # segment self-compared for internal consistency is a real, common case
+    # here (unlike wp_by_client in build_client_summary(), which gates to
+    # governance_role_a == "Project" and simply excludes non-Project rows,
+    # this section is meant to show discipline coherence from ALL of them).
+    # PRIMARY is therefore picked PER ROW by role: used-view union for Project
+    # rows (active practice, per _recommended_primary_view()), all-view union
+    # for every other role (used-view is not meaningful/primary outside
+    # Project targets -- matches this section's pre-union-adoption behavior,
+    # which read all-view unconditionally for every row regardless of role).
+    # _all only carries a genuine all-view secondary for Project rows -- for
+    # non-Project rows all-view IS primary, so there is no separate "context"
+    # value to expose without mislabeling a not-meaningful used-view number
+    # as if it were all-view.
     disc_domain_wp = defaultdict(lambda: defaultdict(list))
     disc_domain_wp_all = defaultdict(lambda: defaultdict(list))
     disc_file_counts = {}
@@ -2988,16 +3000,21 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
         if r["comparison_type"] != "within_project":
             continue
         disc = _pick(r, "discipline_label_a")
+        is_project = r["governance_role_a"] == "Project"
         # within_project rows never carry all_union_*/used_union_* from the
         # producer -- see _col_union_or_pairwise()'s docstring.
-        v = pf(_col_union_or_pairwise(r, "used_union_jaccard", "used_jaccard_mean"))
+        if is_project:
+            v = pf(_col_union_or_pairwise(r, "used_union_jaccard", "used_jaccard_mean"))
+        else:
+            v = pf(_col_union_or_pairwise(r, "all_union_jaccard", "jaccard_mean"))
         if disc and v is not None:
             disc_domain_wp[disc][r["domain"]].append(v)
             if disc not in disc_file_counts:
                 disc_file_counts[disc] = int(r["n_files_a"]) if r["n_files_a"] else 0
-        v_all = pf(_col_union_or_pairwise(r, "all_union_jaccard", "jaccard_mean"))
-        if disc and v_all is not None:
-            disc_domain_wp_all[disc][r["domain"]].append(v_all)
+        if is_project:
+            v_all = pf(_col_union_or_pairwise(r, "all_union_jaccard", "jaccard_mean"))
+            if disc and v_all is not None:
+                disc_domain_wp_all[disc][r["domain"]].append(v_all)
 
     # Has-template flag
     template_discs = set()

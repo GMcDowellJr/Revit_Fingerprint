@@ -719,3 +719,31 @@ def test_xc_does_not_fall_back_to_pairwise_when_union_blank():
     client_rows = build_client_summary(rows, [], sector_map)
     kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
     assert kaiser["xc_mean"] is None
+
+
+def test_disc_domain_wp_keeps_all_view_primary_for_non_project_within_project_rows():
+    """PR #376 P2 review finding: discover_within_project() emits within_project
+    rows for discipline-scoped Template/Container/Generic standards segments
+    too, not just Project ones (unlike wp_by_client in build_client_summary(),
+    which gates to governance_role_a == "Project" and drops non-Project rows
+    entirely, this section must keep showing them). used-view is not
+    meaningful/primary outside Project targets per _recommended_primary_view()
+    -- a Template segment with no used-view membership at all (used blank,
+    only all-view populated) must still render its real all-view coherence,
+    not silently drop to "no data" because the read switched to a used-view
+    field that was never meaningful for this role in the first place."""
+    rows = [
+        _summary_row(
+            segment_id_a="imperial|Template|arch", segment_id_b="imperial|Template|arch",
+            governance_role_a="Template", governance_role_b="Template",
+            discipline_label_a="architectural",
+            comparison_type="within_project", domain="arrowheads",
+            all_union_jaccard="0.88",
+            # used_union_jaccard/used_pairwise_jaccard_mean deliberately blank
+            # -- this Template standards segment has no used-view membership.
+            n_files_a="4", n_files_b="4",
+        ),
+    ]
+    normalise_summary_schema(rows)
+    section = render_discipline_section({}, rows)
+    assert "88" in section

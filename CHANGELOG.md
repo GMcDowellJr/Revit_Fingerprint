@@ -31,6 +31,22 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   reliability-note text) silently read as unavailable against real exports,
   despite the underlying pairwise data being present in the CSV the whole
   time.
+- (PR #376 review, P2) `render_discipline_section()`'s within-project loop
+  has no `governance_role_a` gate — unlike `wp_by_client` in
+  `build_client_summary()`, it also processes discipline-scoped Template/
+  Container/Generic standards segments self-compared for internal
+  consistency, not just Project rows. The union-metric adoption above made
+  the bare/primary value used-view unconditionally, but
+  `_recommended_primary_view()` only makes used-view primary for Project
+  targets — a Template/Container/Generic segment can have no used-view
+  membership at all (used-view is annotation-only for those roles), which
+  silently dropped that discipline's real all-view coherence from the
+  section entirely. Primary is now picked per row by
+  `governance_role_a == "Project"`: used-view for Project rows (unchanged),
+  all-view for every other role, matching this section's pre-union-adoption
+  behavior for non-Project rows. The all-view secondary (`disc_domain_wp_all`)
+  is only populated for Project rows — there is no meaningful secondary to
+  show for a role where used-view isn't primary in the first place.
 
 ### Changed
 - `tools/generate_governance_narrative.py`'s cross-client/within-project
