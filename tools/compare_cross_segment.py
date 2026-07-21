@@ -2042,33 +2042,161 @@ def discover_within_segment(
     return pairs
 
 
+def _redundant_child_segment_id(row: Dict[str, str]) -> Optional[str]:
+    """Extract the target segment_id from a "redundant_single_child:<segment_id>"
+    note, if present (see build_segment_manifest.py's _build_segments() pass5).
+
+    build_segment_manifest.py demotes a segment to run_type="registration"
+    whenever a direct child's population is byte-identical to its own
+    (e.g. a client whose every Project file happens to sit in a single
+    business_center_label, now that business_center_label is a real cut
+    dimension rather than always-blank) -- correctly avoiding running the
+    same population twice under two different segment_ids. That child is not
+    a narrower/rescoped population; it IS the same population_hash, just
+    recorded under a more specific segment_id. Substituting it back in where
+    the demoted row would otherwise have been used is therefore not blending
+    distinct comparison grains -- see _is_client_only_project_segment()'s and
+    discover_cross_client()'s docstrings on why that anti-pattern must be
+    avoided elsewhere in this module.
+
+    segment_id itself uses "|" as its own internal field separator, and other
+    notes may already share the pipe-joined `notes` string, so a naive
+    `notes.split("|")` would mangle a multi-part child segment_id. pass5 always
+    runs last (see build_segment_manifest.py), so "redundant_single_child:" is
+    guaranteed to be the final note appended -- take everything after the
+    marker to the end of the string instead of splitting.
+    """
+    notes = row.get("notes", "") or ""
+    marker = "redundant_single_child:"
+    idx = notes.find(marker)
+    if idx == -1:
+        return None
+    return notes[idx + len(marker):]
+
+
+def _resolve_runnable_segment(
+    manifest: Dict[str, Dict[str, str]], sid: str
+) -> Optional[str]:
+    """Resolve sid to a run_type in (bundle, reference) segment_id: sid
+    itself if already eligible, or -- transitively -- whatever
+    population-identical segment build_segment_manifest.py's
+    redundant_single_child pass ultimately points at, if any. Transitive
+    because a redundant_single_child pointer can itself be redundant to a
+    further child (e.g. a Template rollup redundant to its
+    single-real-client child, which -- since business_center_label's
+    promotion -- is itself redundant to a single-business-center child one
+    level deeper); a single-hop lookup would wrongly treat that intermediate,
+    still-ineligible row as a dead end. Returns None if sid isn't eligible and
+    carries no pointer that eventually resolves to an eligible segment (e.g.
+    a genuinely below-min-files/skip segment, or a cycle -- guarded against
+    via `visited`, though build_segment_manifest.py's population-subset
+    strictly shrinks along any real chain and cannot actually cycle).
+    """
+    visited: Set[str] = set()
+    cur = sid
+    while cur not in visited:
+        visited.add(cur)
+        row = manifest.get(cur)
+        if row is None:
+            return None
+        if row.get("run_type", "").strip().lower() in ("bundle", "reference"):
+            return cur
+        nxt = _redundant_child_segment_id(row)
+        if not nxt:
+            return None
+        cur = nxt
+    return None
+
+
+def _scope_override_key(comparison_type: str) -> str:
+    return f"_scope_override__{comparison_type}"
+
+
+def _stash_scope_override(
+    manifest: Dict[str, Dict[str, str]],
+    resolved_sid: str,
+    comparison_type: str,
+    original_row: Dict[str, str],
+) -> None:
+    """Record `original_row`'s scope metadata onto the RESOLVED descendant's
+    manifest entry, namespaced by comparison_type.
+
+    segment_id_a/segment_id_b in cross_segment_summary.csv must stay the
+    resolved descendant -- it's the only segment with real on-disk analysis
+    data (segment_output_dir() looks it up via the registry, and the demoted
+    original never gets its own analysis run). But _build_summary_row() also
+    derives business_center_label_a/_b, discipline_label_a/_b, and
+    scope_level_a/_b straight from that same segment's manifest row, which for
+    a resolved descendant is its own narrower identity (e.g.
+    business_center_label="BC_C") rather than the broader (typically blank-bc)
+    population this comparison was actually matched under (Codex review
+    finding on PR #380). Stashing the override here lets _build_summary_row()
+    show the scope the comparison was grouped on, without needing to change
+    which segment_id is used to load data.
+
+    Namespaced by comparison_type (not just resolved_sid) because the SAME
+    resolved segment can legitimately appear under its own true identity in a
+    different comparison_type -- e.g. "imperial|Project|Sutter|BC_C" is
+    correctly bc-scoped when discover_client_cross_bc() uses it directly, even
+    while cross_client's override for the SAME sid says otherwise.
+    """
+    manifest[resolved_sid][_scope_override_key(comparison_type)] = {
+        "business_center_label": _bc_of(original_row),
+        "discipline_label": original_row.get("discipline_label", ""),
+        "scope_level": _scope_level(original_row) or "",
+    }
+
+
+# role_key -> sibling comparison_type, shared between discover_sibling_segments()'s
+# candidate-collection pass (which needs the eventual ctype to key a scope
+# override -- see _stash_scope_override()) and its pair-emission pass.
+_SIBLING_CTYPE_BY_ROLE = {
+    "template": "sibling_templates",
+    "project": "sibling_projects",
+    "container": "sibling_containers",
+    "generic": "sibling_generic",
+    "generic-host": "sibling_generic",
+    "generic_host": "sibling_generic",
+}
+
+
 def discover_sibling_segments(
     manifest: Dict[str, Dict[str, str]],
 ) -> List[ComparisonPair]:
-    # Group by (parent_segment_id, governance_role, unit_system)
+    # Group by (parent_segment_id, governance_role, unit_system). A segment
+    # demoted to run_type="registration" by build_segment_manifest.py's
+    # redundant_single_child pass is resolved to its population-identical
+    # runnable descendant (see _resolve_runnable_segment()) and bucketed under
+    # THIS row's own (parent, role, unit) key, not the descendant's own --
+    # the descendant's parent_segment_id is one or more levels deeper (e.g.
+    # this client's own Project node) and would not be shared with sibling
+    # clients' equivalent substitutes.
     groups: Dict[Tuple[str, str, str], List[str]] = defaultdict(list)
     for sid, row in manifest.items():
         parent = row.get("parent_segment_id", "").strip()
         role = row.get("governance_role", "").strip().lower()
         role_key = "generic" if _is_generic_role(role) else role
         us = row.get("unit_system", "").strip()
-        rt = row.get("run_type", "").strip().lower()
-        if parent and role_key and us and rt in ("bundle", "reference"):
-            groups[(parent, role_key, us)].append(sid)
+        if not (parent and role_key and us):
+            continue
+        resolved = _resolve_runnable_segment(manifest, sid)
+        if resolved is None:
+            continue
+        if resolved != sid:
+            _stash_scope_override(
+                manifest, resolved,
+                _SIBLING_CTYPE_BY_ROLE.get(role_key, "sibling_segments"),
+                row,
+            )
+        groups[(parent, role_key, us)].append(resolved)
 
     pairs: List[ComparisonPair] = []
     for (_, role, _), members in groups.items():
+        members = sorted(set(members))
         if len(members) < 2:
             continue
-        ctype = {
-            "template": "sibling_templates",
-            "project": "sibling_projects",
-            "container": "sibling_containers",
-            "generic": "sibling_generic",
-            "generic-host": "sibling_generic",
-            "generic_host": "sibling_generic",
-        }.get(role, "sibling_segments")
-        for a, b in combinations(sorted(members), 2):
+        ctype = _SIBLING_CTYPE_BY_ROLE.get(role, "sibling_segments")
+        for a, b in combinations(members, 2):
             pairs.append((a, b, ctype))
     return pairs
 
@@ -2124,11 +2252,23 @@ def discover_cross_client(
     hardcoded sector restriction (sector filtering, where wanted, is a
     downstream concern of the comparison_type's consumers -- see
     policies/client_sector.csv).
+
+    bc-scoped fallback: a client-only Project segment whose Project files all
+    sit in a single business_center_label is population-identical to that
+    business-center-scoped child, so build_segment_manifest.py's
+    redundant_single_child pass demotes it to run_type="registration" instead
+    of leaving a duplicate-population segment runnable -- see
+    _resolve_runnable_segment(). That demotion is now common for single-BC
+    clients (business_center_label having been promoted to a real cut
+    dimension), so the row is resolved to its population-identical runnable
+    descendant instead, so those clients aren't silently dropped from
+    cross_client entirely. This is not the "loosen the blank-bc requirement"
+    anti-pattern _is_client_only_project_segment()'s docstring warns against
+    -- the substitute carries the exact same population_hash the demoted
+    client-only segment would have, not a narrower slice of it.
     """
     by_client_unit_disc: Dict[Tuple[str, str, str], str] = {}
     for sid, row in manifest.items():
-        if row.get("run_type", "").strip().lower() not in ("bundle", "reference"):
-            continue
         if not _is_client_only_project_segment(row):
             continue
         client = row.get("client_label", "").strip()
@@ -2136,12 +2276,17 @@ def discover_cross_client(
         disc = row.get("discipline_label", "").strip()
         if not unit:
             continue
+        resolved = _resolve_runnable_segment(manifest, sid)
+        if resolved is None:
+            continue
+        if resolved != sid:
+            _stash_scope_override(manifest, resolved, "cross_client", row)
         # First-seen wins if the manifest somehow carries more than one
         # client-only Project segment for the same (client, unit, discipline)
         # -- shouldn't happen given build_segment_manifest.py's
         # one-row-per-subset-key contract, but a silent duplicate overwrite
         # would be worse than a deterministic pick.
-        by_client_unit_disc.setdefault((client, unit, disc), sid)
+        by_client_unit_disc.setdefault((client, unit, disc), resolved)
 
     pairs: List[ComparisonPair] = []
     items = sorted(by_client_unit_disc.items())
@@ -2192,29 +2337,57 @@ def discover_parent_siblings(
     manifest: Dict[str, Dict[str, str]],
 ) -> List[ComparisonPair]:
     # Level-2 segments sharing same level-1 parent, different governance_role
-    # Specifically: Template-role vs Project-role
-    level2: List[str] = [
-        sid for sid, row in manifest.items()
-        if row.get("segment_level", "").strip() == "2"
-        and row.get("run_type", "").strip().lower() in ("bundle", "reference")
-    ]
-
-    by_parent: Dict[str, List[str]] = defaultdict(list)
-    for sid in level2:
-        parent = manifest[sid].get("parent_segment_id", "").strip()
-        if parent:
-            by_parent[parent].append(sid)
+    # Specifically: Template-role vs Project-role. A segment demoted to
+    # run_type="registration" by build_segment_manifest.py's
+    # redundant_single_child pass is resolved to its population-identical
+    # runnable descendant (see _resolve_runnable_segment()), grouped under
+    # THIS row's own parent since the descendant's own parent_segment_id is
+    # one or more levels deeper. Role is classified from the ORIGINAL
+    # (level-2) row, not the resolved descendant -- a blank-role, client-only
+    # rollup (e.g. "imperial|Kaiser", pooling every role for that client) can
+    # itself be redundant_single_child to a role-scoped descendant (e.g.
+    # "imperial|Project|Kaiser", if that client happens to have no non-Project
+    # files) whose OWN governance_role is "Project"; classifying by the
+    # descendant's role would misfile that blank-role rollup as a genuine
+    # Project sibling, which it was never scoped to be.
+    #
+    # Unlike discover_cross_client()/discover_sibling_segments(), no
+    # _stash_scope_override() call here: parent_sibling_roles feeds
+    # generate_governance_narrative.py's _group1_scope_pair() (via
+    # _target_scope_label()/_is_unscoped_segment()), which classifies
+    # "enterprise" scope by re-deriving structure from segment_id_a/_b itself
+    # (splitting on "|" and requiring every part past index 2 to be blank) --
+    # not by trusting business_center_label_a/_b/discipline_label_a/_b at face
+    # value. Since segment_id must stay the resolved descendant (the only
+    # segment with real on-disk data), no column override can make
+    # _is_unscoped_segment() see it as unscoped; overriding the label columns
+    # here would only make the row internally inconsistent (columns
+    # disagreeing with segment_id) without changing that already-shipped,
+    # untouchable classification. The row still lands in whichever
+    # non-enterprise scope_pair bucket its resolved descendant's TRUE shape
+    # implies (e.g. tp_by_scope["bc::enterprise"]) -- a real, if not headline,
+    # Group 1 evidence source, same as any other already-supported
+    # non-enterprise scope_pair.
+    by_parent: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
+    for sid, row in manifest.items():
+        if row.get("segment_level", "").strip() != "2":
+            continue
+        parent = row.get("parent_segment_id", "").strip()
+        if not parent:
+            continue
+        role = row.get("governance_role", "").strip().lower()
+        if role not in ("template", "project"):
+            continue
+        resolved = _resolve_runnable_segment(manifest, sid)
+        if resolved is None:
+            continue
+        by_parent[parent].append((resolved, role))
 
     pairs: List[ComparisonPair] = []
     for _parent, siblings in by_parent.items():
-        templates = [
-            s for s in siblings
-            if manifest[s].get("governance_role", "").strip().lower() == "template"
-        ]
-        projects = [
-            s for s in siblings
-            if manifest[s].get("governance_role", "").strip().lower() == "project"
-        ]
+        siblings = sorted(set(siblings))
+        templates = [s for s, role in siblings if role == "template"]
+        projects = [s for s, role in siblings if role == "project"]
         for t in templates:
             for p in projects:
                 if _same_unit(manifest, t, p):
@@ -3159,6 +3332,16 @@ def _build_summary_row(
 ) -> Dict[str, str]:
     ma = manifest.get(seg_a, {})
     mb = manifest.get(seg_b, {})
+    # A resolved redundant_single_child descendant (see _resolve_runnable_segment())
+    # carries an override, stashed by _stash_scope_override(), of the ORIGINAL
+    # (demoted) row's business_center_label/discipline_label/scope_level --
+    # the broader population this comparison was actually matched under, as
+    # opposed to the descendant's own narrower identity. segment_id_a/_b stay
+    # the resolved descendant regardless (the only segment with real on-disk
+    # data); only these display fields are affected. See Codex review finding
+    # on PR #380.
+    override_a = ma.get(_scope_override_key(comparison_type)) or {}
+    override_b = mb.get(_scope_override_key(comparison_type)) or {}
 
     # signal_spread: raw containment-asymmetry measure (min-side minus max-side
     # containment share of the shared set); no interpretive banding applied here.
@@ -3183,12 +3366,12 @@ def _build_summary_row(
         "governance_role_b": mb.get("governance_role", ""),
         "client_label_a": ma.get("client_label", ""),
         "client_label_b": mb.get("client_label", ""),
-        "business_center_label_a": _bc_of(ma),
-        "business_center_label_b": _bc_of(mb),
-        "scope_level_a": _scope_level(ma) or "",
-        "scope_level_b": _scope_level(mb) or "",
-        "discipline_label_a": ma.get("discipline_label", ""),
-        "discipline_label_b": mb.get("discipline_label", ""),
+        "business_center_label_a": override_a.get("business_center_label", _bc_of(ma)),
+        "business_center_label_b": override_b.get("business_center_label", _bc_of(mb)),
+        "scope_level_a": override_a.get("scope_level", _scope_level(ma) or ""),
+        "scope_level_b": override_b.get("scope_level", _scope_level(mb) or ""),
+        "discipline_label_a": override_a.get("discipline_label", ma.get("discipline_label", "")),
+        "discipline_label_b": override_b.get("discipline_label", mb.get("discipline_label", "")),
         "unit_system": ma.get("unit_system", ""),
         "comparison_type": comparison_type,
         "domain": domain,
