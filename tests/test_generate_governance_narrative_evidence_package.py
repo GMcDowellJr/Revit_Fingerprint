@@ -478,12 +478,12 @@ def test_package_health_optional_inputs_present_reflects_cli_flags(tmp_path, mon
     assert health["optional_inputs"]["cross_segment_union_inventory"] is False
 
 
-def test_evidence_map_lists_twenty_seven_artifacts_with_required_fields(tmp_path, monkeypatch):
+def test_evidence_map_lists_twenty_eight_artifacts_with_required_fields(tmp_path, monkeypatch):
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
     ids = [a["artifact_id"] for a in evidence_map["artifacts"]]
-    assert len(ids) == 27
+    assert len(ids) == 28
     assert len(ids) == len(set(ids))
     assert "governance_findings" in ids
     narrative = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_narrative_context")

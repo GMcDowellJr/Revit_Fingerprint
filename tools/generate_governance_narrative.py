@@ -912,6 +912,30 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     bb = defaultdict(lambda: defaultdict(list))
     bb_used = defaultdict(lambda: defaultdict(list))
 
+    # Per-BC breakout of Group 3's eb (enterprise_to_bc) capture, additive
+    # alongside the existing pooled eb[dom]/eb_used[dom] -- see
+    # build_bc_summary() / governance_bc_summary.csv. eb[dom]/eb_used[dom]
+    # stay untouched (byte-identical) for backward compatibility; this is a
+    # parallel accumulator keyed by the real target business_center_label
+    # (business_center_label_b -- enterprise_to_bc's a-side is always the
+    # enterprise reference, per discover_governance_chain()), not a
+    # replacement. Same pair-identity principle as bb/bb_used above, applied
+    # to an existing directed comparison_type instead of a new one.
+    eb_by_bc = defaultdict(lambda: defaultdict(list))
+    eb_used_by_bc = defaultdict(lambda: defaultdict(list))
+
+    # Per-BC breakout of tc_by_scope["bc::bc"]. That pooled bucket already
+    # only contains genuine same-VALUE evidence (business_center_label_a ==
+    # business_center_label_b -- see _group1_scope_pair()'s docstring on why
+    # shape alone isn't enough), i.e. a real business center's own
+    # Template->Container reading -- but it pools EVERY business center's
+    # reading into one bucket, losing which specific BC each reading came
+    # from. tc_by_scope/tc_used_by_scope stay untouched; this is the same
+    # additive-parallel-accumulator fix as eb_by_bc above, applied to Group
+    # 1's scoped capture instead of Group 3's.
+    tc_bc_by_bc = defaultdict(lambda: defaultdict(list))
+    tc_used_bc_by_bc = defaultdict(lambda: defaultdict(list))
+
     seen_comparison_types: set = set()
     sector_map = sector_map or {}
 
@@ -941,11 +965,22 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
                 tc_by_scope[dom][scope_pair].append(v)
                 if scope_a == "enterprise" and scope_b == "enterprise":
                     tc[dom].append(v)
+                elif scope_pair == "bc::bc":
+                    # Real value equality already verified by _group1_scope_pair()
+                    # (scope_pair is "bc!cross::bc!cross" otherwise) -- side a's
+                    # business_center_label equals side b's here by construction.
+                    bc_label = r.get("business_center_label_a", "")
+                    if bc_label:
+                        tc_bc_by_bc[dom][bc_label].append(v)
             vu = pf(_col(r, "used_containment_a_in_b_mean"))
             if vu is not None:
                 tc_used_by_scope[dom][scope_pair].append(vu)
                 if scope_a == "enterprise" and scope_b == "enterprise":
                     tc_used[dom].append(vu)
+                elif scope_pair == "bc::bc":
+                    bc_label = r.get("business_center_label_a", "")
+                    if bc_label:
+                        tc_used_bc_by_bc[dom][bc_label].append(vu)
 
         elif ct == "container_to_project":
             scope_a, scope_b, scope_pair = _group1_scope_pair(r)
@@ -1138,12 +1173,19 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
                 bp_used[dom].append(vu)
 
         elif ct == "enterprise_to_bc":
+            # b-side is always the real target business center here (a-side is
+            # always the enterprise reference, per discover_governance_chain()).
+            bc_label = r.get("business_center_label_b", "")
             v = pf(_col(r, "containment_a_in_b_mean"))
             if v is not None:
                 eb[dom].append(v)
+                if bc_label:
+                    eb_by_bc[dom][bc_label].append(v)
             vu = pf(_col(r, "used_containment_a_in_b_mean"))
             if vu is not None:
                 eb_used[dom].append(vu)
+                if bc_label:
+                    eb_used_by_bc[dom][bc_label].append(vu)
 
         elif ct == "enterprise_to_client":
             v = pf(_col(r, "containment_a_in_b_mean"))
@@ -1174,7 +1216,20 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             bc_a = r.get("business_center_label_a", "")
             bc_b = r.get("business_center_label_b", "")
             if bc_a and bc_b:
-                bc_pair = f"{bc_a}::{bc_b}"
+                # Role-scoped key (PR2 fix): discover_governance_chain()'s
+                # by_role_bc grouping only ever pairs two BCs sharing the SAME
+                # role (governance_role_a == governance_role_b for every
+                # bc_to_bc row by construction), but a domain can independently
+                # apply to both Template and Container segments -- e.g. the
+                # same (bc_a, bc_b, domain) could have both a Template-role
+                # bc_to_bc row and a separate Container-role bc_to_bc row.
+                # Keying on (bc_a, bc_b) alone would silently average those two
+                # different-role readings together under one bucket; the role
+                # prefix keeps them apart, the same "shape isn't enough, keep
+                # real identity distinct" principle as bb's own bc-pair-identity
+                # comment above, one level more specific.
+                role = r.get("governance_role_a", "")
+                bc_pair = f"{role}::{bc_a}::{bc_b}"
                 v = pf(_col(r, "all_union_jaccard"))
                 if v is not None:
                     bb[dom][bc_pair].append(v)
@@ -1377,6 +1432,14 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             # every reading is already a scoped, real-BC-pair reading.
             "bb": {s: statistics.mean(v) for s, v in bb[dom].items() if v},
             "bb_used": {s: statistics.mean(v) for s, v in bb_used[dom].items() if v},
+            # Per-BC breakouts (see build_bc_summary() / governance_bc_summary.csv).
+            # Captured only here; not tiered/anomaly-detected/added to
+            # governance_domain_summary.csv in this pass -- same posture as
+            # eb/tc_by_scope themselves.
+            "eb_by_bc": {s: statistics.mean(v) for s, v in eb_by_bc[dom].items() if v},
+            "eb_used_by_bc": {s: statistics.mean(v) for s, v in eb_used_by_bc[dom].items() if v},
+            "tc_bc_by_bc": {s: statistics.mean(v) for s, v in tc_bc_by_bc[dom].items() if v},
+            "tc_used_bc_by_bc": {s: statistics.mean(v) for s, v in tc_used_bc_by_bc[dom].items() if v},
         }
     return result
 
@@ -1533,6 +1596,30 @@ CLIENT_CONFIDENCE_LOW_MAX_FILES = _DEFAULT_CLIENT_CONFIDENCE_LOW_MAX_FILES
 CLIENT_CONFIDENCE_MODERATE_MAX_FILES = _DEFAULT_CLIENT_CONFIDENCE_MODERATE_MAX_FILES
 CLIENT_COHERENCE_LOW = _DEFAULT_CLIENT_COHERENCE_LOW
 
+# BC-tier/confidence thresholds, used by build_bc_summary(). Kept as a separate
+# set of constants from CLIENT_ALIGNMENT_HIGH/_MODERATE and CLIENT_CONFIDENCE_*
+# even though the default values below numerically coincide with them -- same
+# "separate profile even where a default value numerically coincides" posture
+# already established for ONBOARD_XC_HIGH_PORTABILITY_MIN/etc. above, since a
+# --policy-dir override tuning client tiers must not silently also retune BC
+# tiers (or vice versa). These are hand-picked defaults, not data-derived: per
+# Step 0 of this PR, CLIENT_ALIGNMENT_HIGH/_MODERATE were confirmed to be
+# hardcoded literals (externalized to governance_thresholds.json, but not
+# computed via tools/jenks_utils.py/compute_governance_thresholds.py -- that
+# tool computes an unrelated split-detection alignment-rate threshold and is
+# not wired into this file at all), so reusing the same hand-picked-default
+# convention here is consistent with, not a departure from, how this file
+# already sets classification thresholds.
+_DEFAULT_BC_ALIGNMENT_HIGH = 0.45
+_DEFAULT_BC_ALIGNMENT_MODERATE = 0.33
+_DEFAULT_BC_CONFIDENCE_LOW_MAX_FILES = 10
+_DEFAULT_BC_CONFIDENCE_MODERATE_MAX_FILES = 25
+
+BC_ALIGNMENT_HIGH = _DEFAULT_BC_ALIGNMENT_HIGH
+BC_ALIGNMENT_MODERATE = _DEFAULT_BC_ALIGNMENT_MODERATE
+BC_CONFIDENCE_LOW_MAX_FILES = _DEFAULT_BC_CONFIDENCE_LOW_MAX_FILES
+BC_CONFIDENCE_MODERATE_MAX_FILES = _DEFAULT_BC_CONFIDENCE_MODERATE_MAX_FILES
+
 # Client-onboarding-interpretation thresholds (_client_onboarding_profile()).
 # Kept as a separate profile (client_onboarding_policy.json) from the
 # governance-tier thresholds above even where a default value numerically
@@ -1593,6 +1680,10 @@ _POLICY_DEFAULTS = {
             "client_confidence_low_max_files": _DEFAULT_CLIENT_CONFIDENCE_LOW_MAX_FILES,
             "client_confidence_moderate_max_files": _DEFAULT_CLIENT_CONFIDENCE_MODERATE_MAX_FILES,
             "client_coherence_low": _DEFAULT_CLIENT_COHERENCE_LOW,
+            "bc_alignment_high": _DEFAULT_BC_ALIGNMENT_HIGH,
+            "bc_alignment_moderate": _DEFAULT_BC_ALIGNMENT_MODERATE,
+            "bc_confidence_low_max_files": _DEFAULT_BC_CONFIDENCE_LOW_MAX_FILES,
+            "bc_confidence_moderate_max_files": _DEFAULT_BC_CONFIDENCE_MODERATE_MAX_FILES,
         },
     },
     "domain_policy": {
@@ -1662,6 +1753,8 @@ def apply_governance_policy(policy: dict) -> None:
     global XC_STRONG_CONVERGENCE, XC_LOW_THRESHOLD, XC_LOW_TP_MIN
     global CLIENT_ALIGNMENT_HIGH, CLIENT_ALIGNMENT_MODERATE
     global CLIENT_CONFIDENCE_LOW_MAX_FILES, CLIENT_CONFIDENCE_MODERATE_MAX_FILES, CLIENT_COHERENCE_LOW
+    global BC_ALIGNMENT_HIGH, BC_ALIGNMENT_MODERATE
+    global BC_CONFIDENCE_LOW_MAX_FILES, BC_CONFIDENCE_MODERATE_MAX_FILES
     global ONBOARD_WP_STABLE_MIN, ONBOARD_WP_MIXED_MIN
     global ONBOARD_XC_HIGH_PORTABILITY_MIN, ONBOARD_XC_MODERATE_PORTABILITY_MIN
     global ONBOARD_N_FILES_LOW_MAX, ONBOARD_N_FILES_MODERATE_MAX
@@ -1700,6 +1793,10 @@ def apply_governance_policy(policy: dict) -> None:
     CLIENT_CONFIDENCE_LOW_MAX_FILES = th("client_confidence_low_max_files", _DEFAULT_CLIENT_CONFIDENCE_LOW_MAX_FILES)
     CLIENT_CONFIDENCE_MODERATE_MAX_FILES = th("client_confidence_moderate_max_files", _DEFAULT_CLIENT_CONFIDENCE_MODERATE_MAX_FILES)
     CLIENT_COHERENCE_LOW = th("client_coherence_low", _DEFAULT_CLIENT_COHERENCE_LOW)
+    BC_ALIGNMENT_HIGH = th("bc_alignment_high", _DEFAULT_BC_ALIGNMENT_HIGH)
+    BC_ALIGNMENT_MODERATE = th("bc_alignment_moderate", _DEFAULT_BC_ALIGNMENT_MODERATE)
+    BC_CONFIDENCE_LOW_MAX_FILES = th("bc_confidence_low_max_files", _DEFAULT_BC_CONFIDENCE_LOW_MAX_FILES)
+    BC_CONFIDENCE_MODERATE_MAX_FILES = th("bc_confidence_moderate_max_files", _DEFAULT_BC_CONFIDENCE_MODERATE_MAX_FILES)
 
     dp = profiles["domain_policy"]
     EXCLUDED_FROM_SCORING = set(dp.get("excluded_from_scoring", sorted(_DEFAULT_EXCLUDED_FROM_SCORING)))
@@ -2277,6 +2374,250 @@ def build_client_summary(
     return rows_out
 
 
+def build_bc_summary(summary_rows: list[dict], cascade: dict) -> list[dict]:
+    """Per-business-center peer-alignment summary. Structural mirror of
+    build_client_summary() -- same discover/accumulate/tier/sort shape, see
+    that function's own comments for the general rationale.
+
+    Enterprise is deliberately NOT a row here -- see render_enterprise_section().
+    A peer table exists to compare business centers against each other;
+    Enterprise sits above all of them in the provision chain (Generic/
+    Enterprise -> Template/Container -> Project) and has no peer at its own
+    scope level, so a row here would misrepresent it as one more BC among
+    equals.
+
+    No sector gating: client_sector.csv classifies CLIENTS (a client-level
+    concept -- see load_client_sectors()), not business centers, so it does
+    not apply to this summary at all, unlike build_client_summary()'s
+    sector-aware tiering.
+    """
+    # BC discovery mirrors build_client_summary()'s own multi-source posture
+    # ("Client existence must not depend on which pool grain happens to have
+    # >=2 siblings for that client"): bc_to_bc requires >=2 peer BCs sharing a
+    # role to exist at all (discover_governance_chain()'s by_role_bc grouping
+    # only pairs BCs that share a role with at least one other BC), so a BC
+    # whose only Template/Container never got a same-role peer elsewhere would
+    # be invisible if bc_to_bc were the only source. enterprise_to_bc has no
+    # such >=2-peer requirement (every real BC-scoped Template/Container is
+    # paired against a matching-role enterprise standard, if one exists), and
+    # bc_to_project pairs every real BC-scoped standard against every Project
+    # unconditionally -- both are included as independent discovery sources
+    # for the same robustness reason. cascade's own tc_bc_by_bc/eb_by_bc keys
+    # are folded in too, as a final defensive backstop.
+    all_bcs: set = set()
+    for r in summary_rows:
+        ct = r["comparison_type"]
+        if ct == "bc_to_bc":
+            # Role-gated to Template/Container (Codex review finding on this
+            # PR, following the earlier bb/bb_used role filter): unlike
+            # enterprise_to_bc/bc_to_project, whose standards side is
+            # structurally restricted to Template/Container by
+            # _is_standard_role() in compare_cross_segment.py, bc_to_bc's
+            # by_role_bc groups ANY role sharing business_center scope --
+            # including Project. A BC visible ONLY through a Project-role
+            # bc_to_bc pair has no Template/Container evidence anywhere this
+            # summary reads, so every field would be permanently blank/
+            # Insufficient Data for it; discovering it here would just add a
+            # row this section can never fill in, not a real coverage gap.
+            for suffix in ("a", "b"):
+                role = _pick(r, f"governance_role_{suffix}")
+                if role not in ("Template", "Container"):
+                    continue
+                bc = _pick(r, f"business_center_label_{suffix}")
+                if bc:
+                    all_bcs.add(bc)
+        elif ct == "enterprise_to_bc":
+            bc = _pick(r, "business_center_label_b")
+            if bc:
+                all_bcs.add(bc)
+        elif ct == "bc_to_project":
+            bc = _pick(r, "business_center_label_a")
+            if bc:
+                all_bcs.add(bc)
+    for d in cascade.values():
+        all_bcs.update(d.get("tc_bc_by_bc", {}).keys())
+        all_bcs.update(d.get("eb_by_bc", {}).keys())
+
+    # Template+Container file count per BC -- mirrors build_client_summary()'s
+    # client_files (max n_files seen per role, across whichever rows mention
+    # that BC, so a domain-repeated row never inflates the count) -- summed
+    # across the two roles, since a BC's standards footprint spans both
+    # Template and Container files (client_files has only the single Project
+    # role to sum). No EXCLUDED_FROM_SCORING gating, matching client_files'
+    # own precedent: file counts describe corpus size, not a domain-scored
+    # signal.
+    bc_role_files: dict = defaultdict(lambda: defaultdict(int))
+
+    def _note_bc_file(bc_label: str, role: str, n_files: int) -> None:
+        role = (role or "").strip()
+        if bc_label and role in ("Template", "Container") and n_files > bc_role_files[bc_label][role]:
+            bc_role_files[bc_label][role] = n_files
+
+    for r in summary_rows:
+        ct = r["comparison_type"]
+        if ct == "bc_to_bc":
+            for suffix in ("a", "b"):
+                bc = _pick(r, f"business_center_label_{suffix}")
+                role = _pick(r, f"governance_role_{suffix}")
+                nf = int(r[f"n_files_{suffix}"]) if r.get(f"n_files_{suffix}") else 0
+                _note_bc_file(bc, role, nf)
+        elif ct == "enterprise_to_bc":
+            bc = _pick(r, "business_center_label_b")
+            role = _pick(r, "governance_role_b")
+            nf = int(r["n_files_b"]) if r.get("n_files_b") else 0
+            _note_bc_file(bc, role, nf)
+        elif ct == "bc_to_project":
+            # a-side is always the real BC-scoped Template/Container standard
+            # (per discover_governance_chain()'s bc_to_project pairing) -- a BC
+            # discovered ONLY via this comparison_type (no bc_to_bc peer, no
+            # matching-role enterprise standard to pair against) still has a
+            # real file count on this row; without this branch it would report
+            # n_files=0 and a spurious low-confidence note despite the source
+            # row carrying real data.
+            bc = _pick(r, "business_center_label_a")
+            role = _pick(r, "governance_role_a")
+            nf = int(r["n_files_a"]) if r.get("n_files_a") else 0
+            _note_bc_file(bc, role, nf)
+        elif ct == "template_to_container":
+            # Mirrors the bc_to_project fix above for the third discovery
+            # source (all_bcs also folds in tc_bc_by_bc's own keys): a BC
+            # whose only evidence is a genuine same-value "bc::bc" Template->
+            # Container reading (see tc_bc_by_bc's own accumulation in
+            # build_cascade()) still has real n_files_a (Template)/n_files_b
+            # (Container) on that row -- without this branch it would report
+            # n_files=0 despite the row carrying both counts. Only the
+            # value-verified "bc::bc" shape counts, same guard tc_bc_by_bc
+            # itself uses -- a shape-only "client_bc::client_bc" or mismatched-
+            # value "bc!cross::bc!cross" pair is not this BC's own reading.
+            scope_a, scope_b, scope_pair = _group1_scope_pair(r)
+            if scope_pair == "bc::bc":
+                bc = r.get("business_center_label_a", "")
+                _note_bc_file(bc, r.get("governance_role_a", ""),
+                               int(r["n_files_a"]) if r.get("n_files_a") else 0)
+                _note_bc_file(bc, r.get("governance_role_b", ""),
+                               int(r["n_files_b"]) if r.get("n_files_b") else 0)
+
+    # Cross-BC peer alignment: reuses PR1's cascade[dom]["bb"]/["bb_used"]
+    # (per-domain means already keyed by real (bc_a, bc_b) pair), fanned out
+    # to both sides' flat per-BC pools -- same flat-pool shape as
+    # xc_by_client, but PRIMARY = ALL-view, the OPPOSITE convention from
+    # xc_by_client's used-view-primary. bc_to_bc pairs are (per
+    # _recommended_primary_view() in compare_cross_segment.py) Template/
+    # Container peer comparisons -- role_b is never "project" and
+    # comparison_type is never sibling_projects/cross_client for these rows,
+    # so all-view is the recommended primary, same as sibling_templates/
+    # sibling_containers and the tc/cp/tp family's own bare-name-is-all-view
+    # convention. Reusing xc_by_client's used-primary convention here would be
+    # exactly the bug class flagged before PR1 (build_cascade()'s bc_to_bc
+    # capture) was written.
+    bb_by_bc = defaultdict(list)
+    bb_used_by_bc = defaultdict(list)
+    bb_dom_by_bc = defaultdict(lambda: defaultdict(list))
+    tc_bc_vals = defaultdict(list)
+    tc_bc_used_vals = defaultdict(list)
+    eb_bc_vals = defaultdict(list)
+    eb_bc_used_vals = defaultdict(list)
+    for dom, d in cascade.items():
+        # Key shape is "{role}::{bc_a}::{bc_b}" (role-scoped -- see the
+        # bc_to_bc branch's own comment in the accumulation loop above).
+        # discover_governance_chain()'s by_role_bc groups ANY role sharing
+        # business_center scope (Template, Container, OR Project -- see
+        # compare_cross_segment.py:2509-2513's own "whichever role has
+        # business_center-scoped rows" comment), so a bc_to_bc pair can
+        # legitimately be a Project-vs-Project peer comparison between two
+        # BCs' own Project populations. This CSV's file count and framing
+        # ("Template+Container files", "Internal T->C Coherence") are
+        # explicitly Template/Container-scoped -- pooling in a Project-role
+        # reading would let a Project-only BC pair produce a cross-BC
+        # similarity/tier backed by 0 Template/Container files. Filter to
+        # Template/Container roles only (Codex review finding on this PR);
+        # Project-role bc_to_bc peer evidence is a different signal (BC-scoped
+        # project-portfolio convergence, closer to sibling_projects/
+        # cross_client) not represented anywhere in this summary today.
+        for pair, mean_v in d.get("bb", {}).items():
+            role, bc_a, bc_b = pair.split("::", 2)
+            if role not in ("Template", "Container"):
+                continue
+            if bc_a in all_bcs:
+                bb_by_bc[bc_a].append(mean_v)
+                bb_dom_by_bc[bc_a][dom].append(mean_v)
+            if bc_b in all_bcs:
+                bb_by_bc[bc_b].append(mean_v)
+                bb_dom_by_bc[bc_b][dom].append(mean_v)
+        for pair, mean_v in d.get("bb_used", {}).items():
+            role, bc_a, bc_b = pair.split("::", 2)
+            if role not in ("Template", "Container"):
+                continue
+            if bc_a in all_bcs:
+                bb_used_by_bc[bc_a].append(mean_v)
+            if bc_b in all_bcs:
+                bb_used_by_bc[bc_b].append(mean_v)
+        for bc, v in d.get("tc_bc_by_bc", {}).items():
+            tc_bc_vals[bc].append(v)
+        for bc, v in d.get("tc_used_bc_by_bc", {}).items():
+            tc_bc_used_vals[bc].append(v)
+        for bc, v in d.get("eb_by_bc", {}).items():
+            eb_bc_vals[bc].append(v)
+        for bc, v in d.get("eb_used_by_bc", {}).items():
+            eb_bc_used_vals[bc].append(v)
+
+    rows_out = []
+    for bc in sorted(all_bcs):
+        bb_vals = bb_by_bc.get(bc, [])
+        bb_mean = statistics.mean(bb_vals) if bb_vals else None
+        bb_used_vals = bb_used_by_bc.get(bc, [])
+        bb_used_mean = statistics.mean(bb_used_vals) if bb_used_vals else None
+
+        tc_bc_mean = statistics.mean(tc_bc_vals[bc]) if tc_bc_vals.get(bc) else None
+        tc_bc_used_mean = statistics.mean(tc_bc_used_vals[bc]) if tc_bc_used_vals.get(bc) else None
+        eb_bc_mean = statistics.mean(eb_bc_vals[bc]) if eb_bc_vals.get(bc) else None
+        eb_bc_used_mean = statistics.mean(eb_bc_used_vals[bc]) if eb_bc_used_vals.get(bc) else None
+
+        n_files = bc_role_files[bc].get("Template", 0) + bc_role_files[bc].get("Container", 0)
+
+        dom_means = {d: statistics.mean(v) for d, v in bb_dom_by_bc[bc].items() if v}
+        strongest = sorted(dom_means.items(), key=lambda x: -x[1])[:3]
+        weakest = sorted(dom_means.items(), key=lambda x: x[1])[:3]
+
+        # Tier from cross-BC peer alignment (all-view), same three-tier shape
+        # as build_client_summary()'s cross-client tier -- see BC_ALIGNMENT_HIGH/
+        # _MODERATE's own definition comment for why these are a separate
+        # (currently value-coincident) profile from CLIENT_ALIGNMENT_HIGH/_MODERATE.
+        if bb_mean is None:
+            tier = "Insufficient Data"
+        elif bb_mean >= BC_ALIGNMENT_HIGH:
+            tier = "High Cross-BC Alignment"
+        elif bb_mean >= BC_ALIGNMENT_MODERATE:
+            tier = "Moderate Cross-BC Alignment"
+        else:
+            tier = "Low Cross-BC Alignment"
+
+        if n_files < BC_CONFIDENCE_LOW_MAX_FILES:
+            conf = f"Low corpus confidence — only {n_files} Template/Container files"
+        elif n_files < BC_CONFIDENCE_MODERATE_MAX_FILES:
+            conf = f"Moderate corpus ({n_files} files)"
+        else:
+            conf = f"Good corpus ({n_files} files)"
+
+        rows_out.append({
+            "bc": bc,
+            "n_files": n_files,
+            "tier": tier,
+            "bb_mean": bb_mean,
+            "bb_mean_used": bb_used_mean,
+            "tc_bc_mean": tc_bc_mean,
+            "tc_bc_mean_used": tc_bc_used_mean,
+            "eb_bc_mean": eb_bc_mean,
+            "eb_bc_mean_used": eb_bc_used_mean,
+            "confidence_note": conf,
+            "strongest": strongest,
+            "weakest": weakest,
+        })
+
+    rows_out.sort(key=lambda r: -(r["bb_mean"] or 0))
+    return rows_out
+
+
 def _pick(row: dict, *names: str) -> str:
     """Return the first non-empty value from row for the provided column names."""
     for name in names:
@@ -2745,7 +3086,8 @@ def render_evidence_authority_header(
 > **Authority ordering:** package health and the source comparison CSVs
 > (`cross_segment_summary.csv`, `cross_segment_pooled.csv`) outrank the
 > deterministic rollups below them (`governance_domain_summary.csv`,
-> `governance_client_summary.csv`), which in turn outrank this narrative's prose.
+> `governance_client_summary.csv`, `governance_bc_summary.csv`), which in
+> turn outrank this narrative's prose.
 > If this document disagrees with a rollup CSV or a source CSV, the CSV wins.
 {package_pointers}{brief_pointer}> **Metric semantics and known bad inferences:** `{INTERPRETATION_GUIDE_PATH.name}`
 > **Where to look for a specific recurring question:** `{QUESTION_ROUTES_PATH.name}`
@@ -3334,6 +3676,112 @@ def render_client_section(client_rows: list[dict]) -> str:
 
     return "\n".join(lines)
 
+
+def render_enterprise_section(cascade: dict) -> str:
+    """Short Enterprise-level summary. Deliberately NOT a governance_bc_summary.csv
+    row or a Business Center Analysis table entry -- Enterprise sits above every
+    business center in the provision chain (Generic/Enterprise -> Template/
+    Container -> Project) and has no peer at its own scope level, so a row in a
+    peer table would misrepresent it as one more BC among equals. Kept as its
+    own top-level section (rendered before Business Center Analysis, not
+    embedded inside it) so it stays visually and structurally distinct.
+
+    Reads cascade[dom]["tc"] (the existing enterprise::enterprise Template->
+    Container reading -- unchanged, same value already in
+    governance_domain_summary.csv's template_to_container column) and the
+    pooled Group 3 eb/ec means (enterprise's average reach into business
+    centers / client-wide standards, respectively). eb/ec were previously
+    captured-only per CASCADE_GROUP3_TYPES's "not rendered" contract; this is
+    their first render, but only as this short summary -- they are still not
+    tiered, anomaly-detected, or added to governance_domain_summary.csv.
+    """
+    tc_vals = [d["tc"] for d in cascade.values() if d.get("tc") is not None]
+    eb_vals = [d["eb"] for d in cascade.values() if d.get("eb") is not None]
+    ec_vals = [d["ec"] for d in cascade.values() if d.get("ec") is not None]
+
+    if not (tc_vals or eb_vals or ec_vals):
+        return ""
+
+    tc_mean = statistics.mean(tc_vals) if tc_vals else None
+    eb_mean = statistics.mean(eb_vals) if eb_vals else None
+    ec_mean = statistics.mean(ec_vals) if ec_vals else None
+
+    lines = ["## Enterprise Overview\n"]
+    lines.append(
+        "Enterprise is the top of the provision chain (Generic/Enterprise → "
+        "Template/Container → Project), not a peer of any business center or "
+        "client — it has no row in the Business Center Analysis table below or "
+        "the Client Analysis table above.\n"
+    )
+    lines.append(
+        f"Enterprise's own Template→Container coherence (all-view, "
+        f"enterprise::enterprise): {fmt(tc_mean)}. "
+        f"Enterprise standard reach into business centers (all-view mean across "
+        f"{len(eb_vals)} domain reading{'s' if len(eb_vals) != 1 else ''}): {fmt(eb_mean)}. "
+        f"Enterprise standard reach into client-wide standards (all-view mean "
+        f"across {len(ec_vals)} domain reading{'s' if len(ec_vals) != 1 else ''}): {fmt(ec_mean)}.\n"
+    )
+    return "\n".join(lines)
+
+
+def render_bc_section(bc_rows: list[dict]) -> str:
+    lines = ["## Business Center Analysis\n"]
+    lines.append(
+        "Cross-BC alignment measures how consistent Template/Container standards "
+        "are across different business centers' own populations, independent of "
+        "the Enterprise-level baseline (see Enterprise Overview above). High "
+        "scores indicate practice convergence between business centers; low "
+        "scores indicate business-center-specific divergence.\n"
+    )
+    lines.append(
+        "> **Primary view note:** unlike the Client Analysis section above (used-"
+        "view primary), the primary reading here is the **all-view** score. "
+        "Cross-BC pairs compare Template/Container populations, not Project "
+        "usage -- per compare_cross_segment.py's own _recommended_primary_view() "
+        "rule, used-view is only primary for Project-target/cross_client/"
+        "sibling_projects comparisons. Reading the used-view column as primary "
+        "here would misread configured standards vocabulary as unused bloat.\n"
+    )
+
+    lines.append("| Business Center | Files | Alignment | Cross-BC Similarity (all-view) | Internal T→C Coherence (all-view) | Enterprise Reach (all-view) | Confidence |")
+    lines.append("|---|---|---|---|---|---|---|")
+    for r in bc_rows:
+        lines.append(
+            f"| {r['bc']} "
+            f"| {r['n_files']} "
+            f"| {r['tier']} "
+            f"| {fmt(r['bb_mean'])} "
+            f"| {fmt(r['tc_bc_mean'])} "
+            f"| {fmt(r['eb_bc_mean'])} "
+            f"| {r['confidence_note']} |"
+        )
+
+    lines.append("")
+
+    # Per-BC narrative
+    for r in bc_rows:
+        lines.append(f"### {r['bc']}\n")
+        lines.append(
+            f"**{r['n_files']} Template/Container files.** "
+            f"Alignment tier: {r['tier']}. "
+            f"Cross-BC similarity (all-view): {fmt(r['bb_mean'])} "
+            f"(used-view: {fmt(r['bb_mean_used'])}). "
+            f"Internal Template→Container coherence (all-view): {fmt(r['tc_bc_mean'])}. "
+            f"Enterprise standard reach into this BC (all-view): {fmt(r['eb_bc_mean'])}.\n"
+        )
+        if r["strongest"]:
+            strong_str = ", ".join(
+                f"{DOMAIN_LABELS.get(d, d)} ({pct(v)})" for d, v in r["strongest"]
+            )
+            lines.append(f"Strongest alignment domains: {strong_str}.\n")
+        if r["weakest"]:
+            weak_str = ", ".join(
+                f"{DOMAIN_LABELS.get(d, d)} ({pct(v)})" for d, v in r["weakest"]
+            )
+            lines.append(f"Weakest alignment domains: {weak_str}.\n")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 def render_governance_state_section(state_summary: dict) -> str:
@@ -4448,7 +4896,7 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
 ---
 
 *Generated by `{GENERATOR_IDENTITY}` from cross_segment_summary.csv, cross_segment_pooled.csv, and optional governance-state outputs.*
-*Supporting tables: governance_domain_summary.csv, governance_client_summary.csv.*
+*Supporting tables: governance_domain_summary.csv, governance_client_summary.csv, governance_bc_summary.csv.*
 """
 
 
@@ -4488,15 +4936,16 @@ def render_governance_brief(
         "digest of `governance_findings.json`, not a new source of evidence.\n"
         "> **Authority:** Subordinate to `governance_package_health.json`, the "
         "source comparison CSVs, `governance_domain_summary.csv`/"
-        "`governance_client_summary.csv`, and `governance_findings.json` -- "
-        "if this brief disagrees with any of those, they win.\n"
+        "`governance_client_summary.csv`/`governance_bc_summary.csv`, and "
+        "`governance_findings.json` -- if this brief disagrees with any of "
+        "those, they win.\n"
         f"> **Metric semantics:** see `{INTERPRETATION_GUIDE_PATH.name}` "
         f"(schema {INTERPRETATION_GUIDE_VERSION}).\n"
         f"> **Where to look for a specific question:** see `{QUESTION_ROUTES_PATH.name}` "
         f"(schema {QUESTION_ROUTES_VERSION}).\n"
         "> **Full detail:** `governance_narrative_context.md`, "
         "`governance_domain_summary.csv`, `governance_client_summary.csv`, "
-        "`governance_findings.json`.\n",
+        "`governance_bc_summary.csv`, `governance_findings.json`.\n",
         "## Package status\n",
         f"- Package health: **{health.get('overall_status', 'unknown')}**"
         + (f" ({len(health.get('warnings', []))} warning(s))" if health.get("warnings") else "")
@@ -4738,6 +5187,9 @@ def main():
     print("Building client summary...")
     client_rows = build_client_summary(summary_rows, pooled_rows, sector_map)
 
+    print("Building BC summary...")
+    bc_rows = build_bc_summary(summary_rows, cascade)
+
     print("Building governance state summary...")
     governance_state_summary = build_governance_state_summary(
         governance_state_rows, governance_state_summary_rows
@@ -4921,6 +5373,56 @@ def main():
             w.writerows(client_csv_rows)
     print(f"  → {client_csv_path} ({len(client_csv_rows)} rows)")
 
+    # ── Emit governance_bc_summary.csv ──────────────────────────────────────
+    # Separate file, not merged into governance_client_summary.csv -- no
+    # shared entity_type column. Enterprise is not a row here (see
+    # render_enterprise_section()).
+    print("Writing BC summary CSV...")
+    bc_csv_path = out_dir / "governance_bc_summary.csv"
+    # Fixed field list (unlike governance_domain_summary.csv/governance_client_
+    # summary.csv, which derive fieldnames from row[0].keys() and therefore
+    # write a 0-byte, headerless file when their row list is empty) -- a
+    # client-only corpus with zero bc_to_bc/enterprise_to_bc/bc_to_project
+    # evidence is a realistic, not just theoretical, empty case for THIS
+    # summary (Codex review finding on this PR), so the header must still be
+    # recoverable by downstream CSV readers/the evidence map even with zero
+    # BC rows.
+    bc_csv_fields = [
+        "business_center", "n_template_container_files", "alignment_tier",
+        "cross_bc_similarity_mean", "cross_bc_similarity_mean_used_view",
+        "internal_template_to_container_coherence",
+        "internal_template_to_container_coherence_used_view",
+        "enterprise_reach", "enterprise_reach_used_view",
+        "confidence_note", "most_aligned_domains", "least_aligned_domains",
+    ]
+    bc_csv_rows = []
+    for r in bc_rows:
+        strongest_str = "; ".join(
+            f"{DOMAIN_LABELS.get(d, d)} ({pct(v)})" for d, v in r["strongest"]
+        )
+        weakest_str = "; ".join(
+            f"{DOMAIN_LABELS.get(d, d)} ({pct(v)})" for d, v in r["weakest"]
+        )
+        bc_csv_rows.append({
+            "business_center": r["bc"],
+            "n_template_container_files": r["n_files"],
+            "alignment_tier": r["tier"],
+            "cross_bc_similarity_mean": fmt(r["bb_mean"]),
+            "cross_bc_similarity_mean_used_view": fmt(r.get("bb_mean_used")),
+            "internal_template_to_container_coherence": fmt(r["tc_bc_mean"]),
+            "internal_template_to_container_coherence_used_view": fmt(r.get("tc_bc_mean_used")),
+            "enterprise_reach": fmt(r["eb_bc_mean"]),
+            "enterprise_reach_used_view": fmt(r.get("eb_bc_mean_used")),
+            "confidence_note": r["confidence_note"],
+            "most_aligned_domains": strongest_str,
+            "least_aligned_domains": weakest_str,
+        })
+    with open(bc_csv_path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=bc_csv_fields)
+        w.writeheader()
+        w.writerows(bc_csv_rows)
+    print(f"  → {bc_csv_path} ({len(bc_csv_rows)} rows)")
+
     # ── Render and write narrative MD ─────────────────────────────────────────
     print("Rendering narrative...")
     sections = [
@@ -4940,6 +5442,10 @@ def main():
         render_client_section(client_rows),
         render_onboarding_section(client_rows),
     ]
+    enterprise_section = render_enterprise_section(cascade)
+    if enterprise_section:
+        sections.append(enterprise_section)
+    sections.append(render_bc_section(bc_rows))
     if governance_state_summary:
         sections.append(render_governance_state_section(governance_state_summary))
     elif delta_summary:
@@ -5011,6 +5517,7 @@ def main():
         output_paths = {
             "governance_domain_summary": domain_csv_path,
             "governance_client_summary": client_csv_path,
+            "governance_bc_summary": bc_csv_path,
             "governance_narrative_context": out_path,
             "governance_package_manifest": out_dir / "governance_package_manifest.json",
             "governance_package_health": out_dir / "governance_package_health.json",
@@ -5018,13 +5525,15 @@ def main():
             "governance_findings": out_dir / "governance_findings.json",
         }
         output_types = {
-            "governance_domain_summary": "csv", "governance_client_summary": "csv", "governance_narrative_context": "markdown",
+            "governance_domain_summary": "csv", "governance_client_summary": "csv",
+            "governance_bc_summary": "csv", "governance_narrative_context": "markdown",
             "governance_package_manifest": "json", "governance_package_health": "json", "governance_evidence_map": "json",
             "governance_findings": "json",
         }
         output_authority = {
             "governance_domain_summary": "authoritative_deterministic_evidence",
             "governance_client_summary": "authoritative_deterministic_evidence",
+            "governance_bc_summary": "authoritative_deterministic_evidence",
             "governance_narrative_context": "controlled_interpretation",
             "governance_package_manifest": "authoritative_deterministic_evidence",
             "governance_package_health": "controlled_interpretation",
@@ -5034,6 +5543,7 @@ def main():
         output_context_role = {
             "governance_domain_summary": "primary tier/score rollup",
             "governance_client_summary": "primary client alignment/onboarding rollup",
+            "governance_bc_summary": "primary business-center peer-alignment rollup",
             "governance_narrative_context": "human-readable synthesis",
             "governance_package_manifest": "provenance record",
             "governance_package_health": "coverage/health signal",

@@ -817,19 +817,46 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
+        "governance_bc_summary", p(output_paths, "governance_bc_summary"), "csv", True, True,
+        GENERATOR_IDENTITY, AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "primary business-center peer-alignment rollup, one row per business center",
+        "one row per real business center discovered via bc_to_bc/enterprise_to_bc/"
+        "bc_to_project summary rows or cascade's tc_bc_by_bc/eb_by_bc breakouts "
+        "(build_bc_summary()) -- Enterprise itself is never a row here, see "
+        "governance_narrative_context.md's Enterprise Overview section instead",
+        ["business_center", "alignment_tier"], ["business_center"], [],
+        ["cross-BC peer similarity (all-view primary -- opposite convention from "
+         "governance_client_summary.csv's used-view-primary cross-client similarity, "
+         "since bc_to_bc pairs are Template/Container peer comparisons, not Project "
+         "usage comparisons), internal Template->Container coherence per BC, and "
+         "Enterprise standard reach into that BC"],
+        ["per-domain detail beyond the top/bottom-3 most/least-aligned columns -- "
+         "see governance_domain_summary.csv; Enterprise's own rollup -- see the "
+         "narrative's Enterprise Overview section, not this CSV"],
+        ["bc_alignment_high/_moderate and bc_confidence_low/moderate_max_files "
+         "thresholds are hand-picked defaults value-coincident with (but a "
+         "separate policy profile from) governance_client_summary.csv's "
+         "client_alignment_*/client_confidence_* thresholds -- see "
+         "BC_ALIGNMENT_HIGH's definition comment in generate_governance_narrative.py."],
+        {"*(fmt-formatted columns)": "— (em dash, U+2014 -- not an ASCII hyphen) means the field exists but has no data for this business center."},
+        ["cross_segment_summary", "governance_domain_summary", "governance_narrative_context"],
+    ))
+
+    artifacts.append(_artifact(
         "governance_narrative_context", p(output_paths, "governance_narrative_context"), "markdown", True, True,
         GENERATOR_IDENTITY, AUTHORITY_CONTROLLED_INTERPRETATION,
         "human-readable synthesis; sections list assembled from render_* functions",
         "one markdown document per run", [], [], [],
-        ["a human-readable synthesis of the two CSVs above, with tier labels and framing prose"],
+        ["a human-readable synthesis of the three CSVs above, with tier labels and framing prose"],
         ["approves no standard, assigns no owner, judges no team -- this is the "
          "generator's own stated scope boundary (render_header()'s Executive Summary)"],
         ["assembled by conditional section inclusion -- governance-state and "
          "delta sections are mutually exclusive (elif); the union/reuse section "
          "is entirely omitted, not blank-rendered, when all three of its inputs "
-         "are absent."],
+         "are absent; the Enterprise Overview section is likewise omitted (not "
+         "blank-rendered) when cascade has no tc/eb/ec signal at all."],
         {},
-        ["governance_domain_summary", "governance_client_summary",
+        ["governance_domain_summary", "governance_client_summary", "governance_bc_summary",
          "governance_package_health", "governance_evidence_map", "governance_findings",
          "governance_brief", "governance_interpretation_guide", "governance_question_routes"],
     ))

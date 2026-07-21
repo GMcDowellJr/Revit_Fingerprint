@@ -12,6 +12,49 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- New `governance_bc_summary.csv` + "Business Center Analysis" narrative section
+  in `tools/generate_governance_narrative.py`, structurally mirroring
+  `build_client_summary()`/`render_client_section()`/`governance_client_summary.csv`
+  (`build_bc_summary()`/`render_bc_section()`, one row per real business center).
+  Enterprise is deliberately NOT a row in this file -- it gets its own short
+  `## Enterprise Overview` section (`render_enterprise_section()`, reading the
+  existing `cascade[dom]["tc"]` enterprise::enterprise reading plus the pooled
+  Group 3 `eb`/`ec` means, rendered here for the first time -- still not tiered
+  or anomaly-detected). Two new additive parallel accumulators feed this:
+  `eb_by_bc[dom][bc_label]` (per-BC breakout of the existing pooled
+  `eb[dom]`/`eb_used[dom]`) and `tc_bc_by_bc[dom][bc_label]` (per-BC breakout of
+  `tc_by_scope[dom]["bc::bc"]`, which pools every real business center's own
+  Template->Container reading into one bucket today) -- both leave their
+  existing pooled/scoped counterparts byte-identical. New `bc_alignment_high`/
+  `_moderate`/`bc_confidence_low`/`_moderate_max_files` policy thresholds
+  (`policies/governance/governance_thresholds.json`) are hand-picked defaults
+  value-coincident with, but a separate profile from, `client_alignment_*`/
+  `client_confidence_*` -- confirmed via Step 0 that the existing client
+  thresholds are hardcoded literals, not Jenks-derived (`tools/jenks_utils.py`/
+  `compute_governance_thresholds.py` compute an unrelated split-detection
+  threshold and are not wired into this generator at all), so this follows the
+  established convention rather than introducing a new one. BC-to-BC peer
+  alignment (`cross_bc_similarity_mean`) uses ALL-view as primary -- the
+  OPPOSITE convention from `governance_client_summary.csv`'s used-view-primary
+  `cross_client_similarity_mean` -- since `bc_to_bc` pairs compare Template/
+  Container populations, not Project usage (see `_recommended_primary_view()`
+  in `compare_cross_segment.py`); this is the exact bug class PR1's own
+  bc_to_bc capture was written to avoid. Also fixes a real gap PR1's `bb`/
+  `bb_used` accumulator had: its key was `f"{bc_a}::{bc_b}"` with no role
+  component, so a Template-role bc_to_bc row and a Container-role bc_to_bc row
+  for the same BC pair + domain would silently average together under one
+  bucket; the key is now role-scoped (`f"{role}::{bc_a}::{bc_b}"`), caught
+  while hand-verifying this PR's BC rows end-to-end against raw source values.
+  `governance_client_summary.csv`, `governance_domain_summary.csv`, and every
+  pre-existing narrative section are unaffected (verified via a synthetic-
+  corpus trace: `build_client_summary()` output is dict-identical with/without
+  BC-only comparison-type rows present, and BC-only cascade fields don't flip
+  `_has_renderable_cascade_signal()` for any domain). `governance_bc_summary`
+  is registered as a new artifact in the evidence-package layer
+  (`governance_package_manifest.json`/`governance_evidence_map.json`,
+  now 28 artifacts, up from 27) -- `governance_evidence_package.py`'s
+  generic, dict-driven manifest builder required no changes; `build_evidence_map()`'s
+  own hand-maintained artifact list did.
 - `tools/generate_governance_narrative.py`'s `build_cascade()` now captures
   `bc_to_bc` rows (peer business-center comparisons from
   `discover_governance_chain()`'s scope-level fan-out) into the `cascade`

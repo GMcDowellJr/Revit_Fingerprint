@@ -1,7 +1,7 @@
 {
   "profile_id": "governance-thresholds-v1",
   "schema_version": "0.1",
-  "notes": "Deterministic materiality/classification thresholds consumed by tools/generate_governance_narrative.py's score_reliability(), assign_tier(), build_client_summary(), and _low_coherence_clients(). Values here reproduce the generator's own pre-externalization Python literals exactly (see docs/governance_evidence_package.md) -- this profile does not change any classification output by itself. These are narrative/classification thresholds, not governance policy approvals.",
+  "notes": "Deterministic materiality/classification thresholds consumed by tools/generate_governance_narrative.py's score_reliability(), assign_tier(), build_client_summary(), build_bc_summary(), and _low_coherence_clients(). Values here reproduce the generator's own pre-externalization Python literals exactly (see docs/governance_evidence_package.md) -- this profile does not change any classification output by itself. These are narrative/classification thresholds, not governance policy approvals. bc_alignment_high/_moderate and bc_confidence_low/moderate_max_files are a separate profile from the client_alignment_*/client_confidence_* thresholds even though their default values currently coincide -- see BC_ALIGNMENT_HIGH's definition comment in generate_governance_narrative.py.",
   "thresholds": {
     "reliability_tight_p10": 0.85,
     "reliability_convergent_p10": 0.50,
@@ -30,6 +30,11 @@
     "client_alignment_moderate": 0.33,
     "client_confidence_low_max_files": 10,
     "client_confidence_moderate_max_files": 25,
-    "client_coherence_low": 0.45
+    "client_coherence_low": 0.45,
+
+    "bc_alignment_high": 0.45,
+    "bc_alignment_moderate": 0.33,
+    "bc_confidence_low_max_files": 10,
+    "bc_confidence_moderate_max_files": 25
   }
 }
