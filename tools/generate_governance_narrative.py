@@ -5329,6 +5329,22 @@ def main():
     # render_enterprise_section()).
     print("Writing BC summary CSV...")
     bc_csv_path = out_dir / "governance_bc_summary.csv"
+    # Fixed field list (unlike governance_domain_summary.csv/governance_client_
+    # summary.csv, which derive fieldnames from row[0].keys() and therefore
+    # write a 0-byte, headerless file when their row list is empty) -- a
+    # client-only corpus with zero bc_to_bc/enterprise_to_bc/bc_to_project
+    # evidence is a realistic, not just theoretical, empty case for THIS
+    # summary (Codex review finding on this PR), so the header must still be
+    # recoverable by downstream CSV readers/the evidence map even with zero
+    # BC rows.
+    bc_csv_fields = [
+        "business_center", "n_template_container_files", "alignment_tier",
+        "cross_bc_similarity_mean", "cross_bc_similarity_mean_used_view",
+        "internal_template_to_container_coherence",
+        "internal_template_to_container_coherence_used_view",
+        "enterprise_reach", "enterprise_reach_used_view",
+        "confidence_note", "most_aligned_domains", "least_aligned_domains",
+    ]
     bc_csv_rows = []
     for r in bc_rows:
         strongest_str = "; ".join(
@@ -5352,10 +5368,9 @@ def main():
             "least_aligned_domains": weakest_str,
         })
     with open(bc_csv_path, "w", newline="", encoding="utf-8") as f:
-        if bc_csv_rows:
-            w = csv.DictWriter(f, fieldnames=list(bc_csv_rows[0].keys()))
-            w.writeheader()
-            w.writerows(bc_csv_rows)
+        w = csv.DictWriter(f, fieldnames=bc_csv_fields)
+        w.writeheader()
+        w.writerows(bc_csv_rows)
     print(f"  → {bc_csv_path} ({len(bc_csv_rows)} rows)")
 
     # ── Render and write narrative MD ─────────────────────────────────────────
