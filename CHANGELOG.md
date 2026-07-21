@@ -12,6 +12,28 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- `tools/generate_governance_narrative.py`'s `build_cascade()` now captures
+  `bc_to_bc` rows (peer business-center comparisons from
+  `discover_governance_chain()`'s scope-level fan-out) into the `cascade`
+  dict under new keys `bb`/`bb_used`, keyed by domain then by the real
+  `f"{business_center_label_a}::{business_center_label_b}"` pair (not by
+  scope shape — `discover_governance_chain()` already guarantees the two
+  sides are real, distinct business centers by construction, so no
+  `_group1_scope_pair()`-style value-equality guard is needed at this
+  layer). Uses `all_union_jaccard`/`used_union_jaccard` (population-similarity,
+  directionless) rather than Group 3's `containment_a_in_b_mean`, because
+  `bc_to_bc` pairs are symmetric peers, not a directed reference→target
+  relationship — a single `containment_a_in_b` reading would silently
+  privilege whichever business center's `segment_id` happened to sort first
+  in `discover_governance_chain()`'s `combinations(sorted(sids), 2)`. Moved
+  `bc_to_bc` out of `CASCADE_GROUP4_EXCLUDED_TYPES` into new
+  `CASCADE_GROUP3B_TYPES`; same "captured only, not rendered/tiered/
+  anomaly-detected" contract as `CASCADE_GROUP3_TYPES`. Additive only —
+  `governance_domain_summary.csv`, `governance_client_summary.csv`, and the
+  narrative brief are unaffected (verified byte-identical: `bb`/`bb_used`
+  are not in `_CASCADE_RENDERABLE_SIGNAL_KEYS`, so
+  `_has_renderable_cascade_signal()` and the domains it gates are unchanged).
+  `client_cross_bc` remains excluded (separate, unresolved decision).
 - `tools/generate_governance_narrative.py` now consumes two more
   `compare_cross_segment.py` outputs, narrative-side only (no changes to the
   producer). `render_union_reuse_summary()` gains an additive adoption-breadth
