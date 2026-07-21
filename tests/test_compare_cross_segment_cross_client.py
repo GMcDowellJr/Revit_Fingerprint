@@ -20,12 +20,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
 from compare_cross_segment import (  # noqa: E402
     _is_client_only_project_segment,
+    _redundant_child_segment_id,
+    _resolve_runnable_segment,
     discover_cross_client,
+    discover_parent_siblings,
+    discover_sibling_segments,
     drop_legacy_siblings_covered_by_peer_comparisons,
 )
 
 
-def _seg(role, client="", unit="imperial", discipline="", bc="", collection="", run_type="bundle"):
+def _seg(
+    role,
+    client="",
+    unit="imperial",
+    discipline="",
+    bc="",
+    collection="",
+    run_type="bundle",
+    notes="",
+    parent="",
+    segment_level="",
+):
     return {
         "governance_role": role,
         "client_label": client,
@@ -34,6 +49,9 @@ def _seg(role, client="", unit="imperial", discipline="", bc="", collection="", 
         "business_center_label": bc,
         "collection_label": collection,
         "run_type": run_type,
+        "notes": notes,
+        "parent_segment_id": parent,
+        "segment_level": segment_level,
     }
 
 
@@ -313,3 +331,169 @@ def test_drop_leaves_sibling_generic_and_sibling_segments_untouched_when_uncover
         ("x1", "x2", "sibling_segments"),
     ]
     assert drop_legacy_siblings_covered_by_peer_comparisons(pairs) == pairs
+
+
+# ---------------------------------------------------------------------------
+# _redundant_child_segment_id() / _resolve_runnable_segment()
+#
+# Regression coverage for the cross-client/bc-promotion starvation bug: once
+# business_center_label became a real cut dimension (peer to client_label/
+# discipline_label), a client whose Project files all sit in a single
+# business center makes its client-only Project rollup byte-identical to
+# that business-center-scoped child. build_segment_manifest.py's
+# redundant_single_child pass correctly demotes the rollup to
+# run_type="registration" (avoiding running the same population twice) and
+# records a "redundant_single_child:<segment_id>" note -- but that silently
+# dropped the client from discover_cross_client()/discover_sibling_segments()
+# entirely, since both require run_type in (bundle, reference).
+# ---------------------------------------------------------------------------
+
+def test_redundant_child_segment_id_extracts_pointer():
+    row = _seg("Project", client="Sutter", run_type="registration",
+                notes="redundant_single_child:imperial|Project|Sutter|BC_C")
+    assert _redundant_child_segment_id(row) == "imperial|Project|Sutter|BC_C"
+
+
+def test_redundant_child_segment_id_survives_pipe_in_segment_id_and_prior_notes():
+    """segment_id uses "|" as its own separator, and redundant_single_child
+    may not be the only note -- but pass5 always appends it last, so
+    everything after the marker (pipes included) belongs to the segment_id."""
+    row = _seg("Project", client="Sutter", run_type="registration",
+                notes="below_min_files|redundant_single_child:imperial|Project|Sutter|BC_C|architectural")
+    assert _redundant_child_segment_id(row) == "imperial|Project|Sutter|BC_C|architectural"
+
+
+def test_redundant_child_segment_id_none_when_no_marker():
+    assert _redundant_child_segment_id(_seg("Project", client="Sutter", run_type="registration")) is None
+
+
+def test_resolve_runnable_segment_returns_self_when_already_eligible():
+    manifest = {"p_kaiser": _seg("Project", client="Kaiser", run_type="bundle")}
+    assert _resolve_runnable_segment(manifest, "p_kaiser") == "p_kaiser"
+
+
+def test_resolve_runnable_segment_follows_single_hop():
+    manifest = {
+        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
+                          notes="redundant_single_child:p_sutter_bc_c"),
+        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle"),
+    }
+    assert _resolve_runnable_segment(manifest, "p_sutter") == "p_sutter_bc_c"
+
+
+def test_resolve_runnable_segment_follows_multi_hop_chain():
+    """redundant_single_child can chain: a segment can be redundant to a
+    child that is itself redundant to a grandchild. A single-hop lookup
+    would wrongly stop at the still-ineligible intermediate row."""
+    manifest = {
+        "a": _seg("Template", run_type="registration", notes="redundant_single_child:b"),
+        "b": _seg("Template", run_type="registration", notes="redundant_single_child:c"),
+        "c": _seg("Template", run_type="bundle"),
+    }
+    assert _resolve_runnable_segment(manifest, "a") == "c"
+
+
+def test_resolve_runnable_segment_none_when_chain_dead_ends():
+    manifest = {
+        "a": _seg("Project", run_type="registration", notes="redundant_single_child:missing"),
+    }
+    assert _resolve_runnable_segment(manifest, "a") is None
+
+
+def test_resolve_runnable_segment_none_when_no_pointer_and_ineligible():
+    manifest = {"p_kaiser": _seg("Project", client="Kaiser", run_type="registration")}
+    assert _resolve_runnable_segment(manifest, "p_kaiser") is None
+
+
+def test_resolve_runnable_segment_guards_against_cycle():
+    manifest = {
+        "a": _seg("Project", run_type="registration", notes="redundant_single_child:b"),
+        "b": _seg("Project", run_type="registration", notes="redundant_single_child:a"),
+    }
+    assert _resolve_runnable_segment(manifest, "a") is None
+
+
+# ---------------------------------------------------------------------------
+# discover_cross_client() bc-scoped fallback
+# ---------------------------------------------------------------------------
+
+def test_discover_cross_client_rescues_single_bc_client_via_redundant_pointer():
+    """Sutter's client-only Project rollup was demoted to "registration"
+    because all of Sutter's files sit in BC_C (single-BC client); it must
+    still pair against Kaiser (a healthy, multi-BC client whose rollup was
+    never demoted) using the population-identical BC_C-scoped segment."""
+    manifest = {
+        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle"),
+        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
+                          notes="redundant_single_child:p_sutter_bc_c"),
+        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle"),
+    }
+    pairs = discover_cross_client(manifest)
+    assert pairs == [("p_kaiser", "p_sutter_bc_c", "cross_client")]
+
+
+def test_discover_cross_client_no_rescue_when_pointed_to_child_also_ineligible():
+    manifest = {
+        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle"),
+        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
+                          notes="redundant_single_child:p_sutter_bc_c"),
+        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="registration"),
+    }
+    assert discover_cross_client(manifest) == []
+
+
+# ---------------------------------------------------------------------------
+# discover_sibling_segments() bc-scoped fallback
+# ---------------------------------------------------------------------------
+
+def test_discover_sibling_segments_rescues_single_bc_client_under_shared_parent():
+    manifest = {
+        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle",
+                          parent="p_root", segment_level="3"),
+        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
+                          notes="redundant_single_child:p_sutter_bc_c",
+                          parent="p_root", segment_level="3"),
+        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle",
+                               parent="p_sutter", segment_level="4"),
+    }
+    pairs = discover_sibling_segments(manifest)
+    assert ("p_kaiser", "p_sutter_bc_c", "sibling_projects") in pairs
+    assert len(pairs) == 1
+
+
+# ---------------------------------------------------------------------------
+# discover_parent_siblings() bc-scoped fallback
+# ---------------------------------------------------------------------------
+
+def test_discover_parent_siblings_rescues_single_bc_template_rollup():
+    manifest = {
+        "l2_template": _seg("Template", run_type="registration",
+                             notes="redundant_single_child:l2_template_bc",
+                             parent="root", segment_level="2"),
+        "l2_template_bc": _seg("Template", bc="BC_STD", run_type="bundle",
+                                parent="l2_template", segment_level="3"),
+        "l2_project": _seg("Project", run_type="bundle", parent="root", segment_level="2"),
+    }
+    pairs = discover_parent_siblings(manifest)
+    assert pairs == [("l2_template_bc", "l2_project", "parent_sibling_roles")]
+
+
+def test_discover_parent_siblings_does_not_misclassify_blank_role_rollup():
+    """Regression: a blank-role, client-only rollup (pools every governance_role
+    for that client) can itself be redundant_single_child to a role-scoped
+    descendant (e.g. a client with no non-Project files, so its "all roles"
+    rollup and its Project rollup are byte-identical). That descendant's OWN
+    governance_role is "Project", but the blank-role original was never
+    scoped to Project specifically -- it must not be classified into
+    `projects` (and must not, therefore, produce a parent_sibling_roles pair
+    it was never a legitimate input to)."""
+    manifest = {
+        # blank-role client rollup, demoted because Kaiser has no non-Project files
+        "l2_kaiser": _seg("", client="Kaiser", run_type="registration",
+                           notes="redundant_single_child:l3_project_kaiser",
+                           parent="root", segment_level="2"),
+        "l3_project_kaiser": _seg("Project", client="Kaiser", run_type="bundle",
+                                   parent="l2_project", segment_level="3"),
+        "l2_template": _seg("Template", run_type="bundle", parent="root", segment_level="2"),
+    }
+    assert discover_parent_siblings(manifest) == []
