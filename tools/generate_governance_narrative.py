@@ -2464,6 +2464,24 @@ def build_bc_summary(summary_rows: list[dict], cascade: dict) -> list[dict]:
             role = _pick(r, "governance_role_a")
             nf = int(r["n_files_a"]) if r.get("n_files_a") else 0
             _note_bc_file(bc, role, nf)
+        elif ct == "template_to_container":
+            # Mirrors the bc_to_project fix above for the third discovery
+            # source (all_bcs also folds in tc_bc_by_bc's own keys): a BC
+            # whose only evidence is a genuine same-value "bc::bc" Template->
+            # Container reading (see tc_bc_by_bc's own accumulation in
+            # build_cascade()) still has real n_files_a (Template)/n_files_b
+            # (Container) on that row -- without this branch it would report
+            # n_files=0 despite the row carrying both counts. Only the
+            # value-verified "bc::bc" shape counts, same guard tc_bc_by_bc
+            # itself uses -- a shape-only "client_bc::client_bc" or mismatched-
+            # value "bc!cross::bc!cross" pair is not this BC's own reading.
+            scope_a, scope_b, scope_pair = _group1_scope_pair(r)
+            if scope_pair == "bc::bc":
+                bc = r.get("business_center_label_a", "")
+                _note_bc_file(bc, r.get("governance_role_a", ""),
+                               int(r["n_files_a"]) if r.get("n_files_a") else 0)
+                _note_bc_file(bc, r.get("governance_role_b", ""),
+                               int(r["n_files_b"]) if r.get("n_files_b") else 0)
 
     # Cross-BC peer alignment: reuses PR1's cascade[dom]["bb"]/["bb_used"]
     # (per-domain means already keyed by real (bc_a, bc_b) pair), fanned out
