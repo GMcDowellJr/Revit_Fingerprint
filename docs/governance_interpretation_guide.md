@@ -133,6 +133,115 @@ numeric alignment/coherence signals into practical onboarding language, but
 carry no more evidence than the `xc`/`within_project_coherence` fields they
 are derived from.
 
+### Project Portfolio fields (Project Portfolio section, `governance_narrative_context.md`)
+ 
+Kept **outside** `assign_tier()`/`governance_domain_summary.csv` by design —
+these are project x project portfolio-shape diagnostics, not domain-standard
+approval signals, and never override a domain's `governance_tier`. Verified:
+adding these matrices to a run left `governance_findings.json`'s 71 findings
+and their category counts unchanged.
+ 
+| Field | Source | Meaning |
+|---|---|---|
+| `union_jaccard` | `project_union_jaccard_matrix.csv` | System-level footprint overlap between two project scopes -- do these projects contain/use the same canonical patterns. ALL_DOMAINS, all-view. |
+| `density_similarity` | `project_density_similarity_matrix.csv` | Whether two projects populate domains to a similar *degree*, independent of whether the populated patterns are the same ones. |
+| `pool_containment_similarity` | `project_pool_containment_similarity_matrix.csv` | How much a project's system aligns with its own peer pool (client- or BC-scoped), averaged across available domains -- this matrix carries no ALL_DOMAINS aggregate row, so the mean is taken across domains, not read from one. |
+| `fragmentation_diagnostic` / `exact_identity_overlap` | `project_fragmentation_diagnostic.csv` | Divergence between footprint overlap (`union_jaccard`) and exact per-file identity overlap. Folds in `project_mean_file_pair_jaccard_matrix.csv`'s signal via this column rather than rendering that matrix standalone -- see `docs/governance_generator_cross_compare_coverage.md`. |
+ 
+**Permissible interpretation:** high `union_jaccard` + high `density_similarity`
+is consistent with two projects sharing real configuration content, not just
+similar population habits. High `density_similarity` alone, with low
+`union_jaccard`, means the two projects populate the same domains to a similar
+*extent* without holding the same canonical patterns -- state this as "same
+shape, different content," not as a softer approximation of similarity.
+ 
+**Prohibited interpretation:** do not read a low `union_jaccard` pair as
+evidence of noncompliance, poor practice, or governance failure -- a
+portfolio-shape diagnostic does not establish that convergence was expected
+or desirable for that pair (see "Known bad inferences," cross-client
+convergence entry, for the same reasoning applied at project grain).
+ 
+**Resolved defect -- absent rows here were a real bug, now fixed; check
+`comparison_type_coverage` before trusting either signal.** An empty
+`fragmentation_diagnostic` ALL_DOMAINS paragraph, and a blank
+`cross_client_similarity_mean` across every client, were both symptoms of
+one upstream defect in `compare_cross_segment.py`'s pair discovery, fixed
+as of PR 381 07/21/26 -- not a data gap, and not the confirmed
+segmentation-design characteristic an earlier version of this guide
+described it as.
+
+- **Root cause.** `build_segment_manifest.py`'s `redundant_single_child`
+  pass demotes a segment to `run_type="registration"` whenever a direct
+  child's population is byte-identical to its own -- correctly avoiding
+  running the same population twice. Once `business_center_label` became
+  a real cut dimension, this made "this client's Project files all sit
+  in one business center" the common case, so a client-only Project
+  rollup routinely got demoted to a business-center-scoped child.
+  `discover_cross_client()`, `discover_sibling_segments()`, and
+  `discover_parent_siblings()` all gated on `run_type in ("bundle",
+  "reference")` before ever reaching their own eligibility checks (e.g.
+  `_is_client_only_project_segment()`'s blank-`business_center_label`
+  test) -- so the demoted row vanished from all three before its shape
+  was even evaluated, not because the shape check itself failed.
+- **Fix.** `_resolve_runnable_segment()` reads the demoted row's
+  `redundant_single_child:<segment_id>` note (added by
+  `_redundant_child_segment_id()`) and resolves -- transitively, since a
+  redundant pointer can itself point to a further-redundant child -- to
+  the population-identical runnable descendant. This is not the
+  "loosen the blank-`business_center_label` requirement" anti-pattern
+  flagged elsewhere in this guide: the substitute carries the exact same
+  `population_hash` the demoted segment would have, not a narrower
+  slice of it. Role/grain classification still reads from the
+  *original*, pre-resolution row (a blank-role client rollup redundant
+  to a Project-scoped descendant must not be misfiled as a genuine
+  Project sibling).
+- **Current state.** `cross_client`, `sibling_projects`, and
+  `parent_sibling_roles` are now populated wherever an eligible client/
+  sibling relationship exists, and `fragmentation_diagnostic` folds in
+  real (non-self) `project_mean_file_pair_jaccard_matrix.csv` cells
+  again. `governance_client_summary.csv`'s `cross_client_similarity_mean`
+  is populated for every client with project files in a comparable
+  sector.
+- **What can still legitimately be empty.** A domain or client can still
+  show no `cross_client`/`sibling_projects` evidence for real reasons
+  unrelated to this defect -- e.g. a client with zero project files, or
+  one classified `Non-comparable (different sector)`. Absence is only
+  suspicious now if `comparison_type_coverage` in
+  `governance_package_health.json` shows the comparison type missing
+  from `seen` entirely across the whole corpus, not merely absent for
+  one client/domain.
+
+**`client_cross_bc` is a separate comparison type with the opposite
+trigger condition**, and was not affected by the above defect:
+`discover_client_cross_bc()` fires only when a single client's Project
+rows span two or more *distinct, non-blank* `business_center_label`
+values. In the current corpus every client sits in exactly one business
+center -- confirmed directly, not inferred -- so `client_cross_bc` is
+correctly and expectedly empty here. A client operating across multiple
+business centers would populate `client_cross_bc`, not `cross_client`;
+these answer different questions and do not fail or succeed together.
+Revisit if a genuine multi-business-center client appears in a future
+corpus.
+ 
+### Adoption breadth (reuse-by-client cut, `pattern_reuse_summary_by_client.csv`)
+ 
+An **additive** breadth signal alongside the existing distinct-pattern reuse
+table -- not a replacement, and not deduplicated against it. Reports, per
+domain, how many of that domain's clients have at least one pattern in the
+`corpus_wide` reuse bucket (`bucket_basis: clients_in_corpus_domain`).
+ 
+**Permissible interpretation:** a domain where few clients clear this bar is
+a real signal of narrow adoption.
+ 
+**Prohibited interpretation / known limitation -- the bar can saturate.**
+"At least one corpus-wide-reused pattern" is a low bar: in at least one
+production run, every domain shown reached 7/7 clients, which does not by
+itself distinguish a domain with deep, broad genuine adoption from one that
+clears the bar once per client and no further. Do not report "N/N clients"
+as evidence of strong governance convergence without also checking the
+`corpus-wide pattern-instances` count (or the distinct-pattern reuse table
+above it) for whether the adoption is substantial or marginal.
+  
 ## Comparability
 
 - **Sector.** Cross-client convergence (`xc`) is computed only between
@@ -242,6 +351,14 @@ surfacing to a human, not silently resolved in the LLM's favor.
   distinct (`*_by_scope` fields, Group 1/2/3 cascade types) specifically to
   prevent that blend; a "pooled mean" hiding sharp per-scope disagreement
   is itself flagged as an anomaly note when it occurs.
+- Do not treat a Project Portfolio pair's low `union_jaccard` as evidence of
+  noncompliance -- it is a footprint-overlap diagnostic, not a governance
+  verdict, and this section is deliberately excluded from `assign_tier()`.
+- Do not treat 100% (or near-100%) adoption breadth in the reuse-by-client
+  cut as proof of deep convergence -- the underlying bar (one corpus-wide
+  pattern) is easy to clear and can saturate across all clients while actual
+  adoption depth varies widely; cross-check the pattern-instance count or
+  the distinct-pattern table before making a convergence claim.
 
 ## Policy profiles (where the thresholds live)
 
@@ -262,3 +379,63 @@ records exactly which profile version was applied to a given run.
   `governance_findings.json`.
 - **Is this package usable at face value:** `governance_package_health.json`.
 - **What exists and where:** `governance_evidence_map.json`.
+
+## What to do when a pre-built route isn't enough
+ 
+`docs/governance_question_routes.md` routes are versioned by maturity, per
+the design reference this package's routing layer follows
+(`GMcDowellJr/llm_evidence_framework/discovery/question_route_discovery.md`):
+ 
+```
+candidate -> active -> recipe-backed -> extractor-backed
+```
+ 
+**Every route in this package is currently `candidate`** -- seeded from
+recurring questions, but none has a proven history of repeated use, and none
+has an attached extraction script. A `candidate` route's "Primary artifacts"
+and "Suggested first check" fields tell you *where* the answer lives; they
+do not, by themselves, make a multi-GB source file (`cross_segment_file_pairs.csv`
+is ~3.8GB) tractable to search directly.
+ 
+**If a question resolves cleanly from the rollup CSVs, `governance_findings.json`,
+or `governance_evidence_map.json` -- stop there.** Most questions this
+package was built for do. This section only applies when a route's own
+"Escalation" field points past those, into the full evidence archive
+(`cross_segment_file_pairs.csv`, `comparison_registry.csv`, or another
+large sibling artifact the generator never parses).
+ 
+**When that happens:**
+ 
+1. **Recognize the gap explicitly, don't silently improvise.** State that the
+   question requires drill-down beyond what the package's compact layer
+   supports, and name which large source file is needed.
+2. **Write a small, parameterized, streaming-safe extraction script** rather
+   than attempting to read or reason over the raw file directly --
+   filtered by the specific fields a finding's `support[]` or a route's
+   "Relevant fields" already name (e.g. `domain`, `comparison_type`,
+   `segment_id`), not a free-form search. Chunked/streaming reads only; do
+   not load a multi-GB CSV into memory or into context.
+3. **Report the filter and the row count against the total**, not just the
+   matching rows -- e.g. "47 rows matched `domain=floor_types`,
+   `comparison_type=container_to_project` out of 3,804,274 total in
+   `cross_segment_file_pairs.csv`." The filtered result is still
+   `authoritative_deterministic_evidence` (a filter over an already-authoritative
+   file, not a new computation) -- but only if the filter itself is stated,
+   so the result is auditable rather than a black box.
+4. **A recipe that gets reused is worth promoting.** If the same extraction
+   pattern would answer a route's question repeatedly (not just this one
+   instance), that's the signal to attach it to the route in
+   `docs/governance_question_routes.md` and move that route from `candidate`
+   toward `recipe-backed` -- per the design reference's own guidance, a
+   route shouldn't be promoted just because it was imagined once; it should
+   be promoted because it proved useful more than once.
+   
+**This loop is itself part of what makes this package usable, not an
+afterthought** -- the compact layer (338KB across the package's core JSON/MD
+artifacts) is a ~16,000:1 compression of the ~5.16GB `cross_segment_*`
+comparison layer, which is itself already a major compression of the raw
+per-file corpus data. That ratio is only defensible because the package is
+built to escalate cleanly into the full archive when a question genuinely
+needs file-level identity, not because nothing was lost in the compression.
+Losing track of *that this escalation path exists* would quietly turn a
+designed boundary into an unexplained dead end.

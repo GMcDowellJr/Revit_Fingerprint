@@ -353,6 +353,140 @@ Escalation:
 
 ---
 
+## Question route: Which project pairs share the most or least configuration footprint?
+ 
+Status:
+- candidate
+
+Question forms:
+- Which projects are most/least similar to each other?
+- Does this project's configuration resemble its peers, or is it an outlier?
+- Are two projects "the same shape" even if their content differs?
+
+Intent:
+- Identify project-to-project footprint overlap and density-population
+  similarity at portfolio grain, separate from domain-level baseline
+  questions.
+  
+Primary artifacts:
+1. `governance_narrative_context.md`'s "Project Portfolio" section --
+   footprint identity and density similarity paragraphs, with top/bottom-N
+   pairs already computed.
+2. `project_union_jaccard_matrix.csv` / `project_density_similarity_matrix.csv`
+   directly, for pairs not in the top/bottom-N shown.
+   
+Secondary artifacts:
+1. `governance_package_health.json`'s `matrix_manifest` -- confirms which
+   matrices were actually supplied for this run before trusting an absence
+   as a real zero result.
+   
+Relevant fields:
+- `union_jaccard` (footprint overlap), `density_similarity` (population-degree
+  similarity), both ALL_DOMAINS/all-view.
+  
+Suggested first check:
+- The Project Portfolio section's "Most/least similar footprint" and
+  "Most/least similar density" lists.
+  
+Evidence type:
+- direct
+
+Supported conclusion types:
+- degree of footprint/population overlap between two named projects
+- whether high density similarity coexists with low footprint overlap
+  ("same shape, different content")
+  
+Unsupported conclusion types:
+- governance compliance or noncompliance of either project
+- domain-level baseline/standards readiness (this section is kept outside
+  `assign_tier()`/`governance_domain_summary.csv` by design)
+  
+Comparability requirements:
+- None beyond both projects appearing in the relevant matrix; this grain is
+  project x project, not gated by the domain-level comparability rules in
+  `docs/governance_interpretation_guide.md`.
+  
+Common traps:
+- Do not read a low `union_jaccard` pair as evidence of poor practice --
+  see `docs/governance_interpretation_guide.md`'s "Known bad inferences."
+- Do not treat "no ALL_DOMAINS rows available" for a matrix as a measured
+  zero -- it means the underlying matrix had no row at that grain for this
+  corpus.
+  
+Escalation:
+- For per-domain (not ALL_DOMAINS) footprint/density detail on a specific
+  pair, drill into the raw matrix CSVs directly -- the narrative section
+  only surfaces the ALL_DOMAINS, all-view top/bottom-N.
+  
+---
+ 
+## Question route: Is a domain's reuse genuinely broad across clients, or does it just clear a low bar?
+ 
+Status:
+- candidate
+
+Question forms:
+- How many clients actually use this domain's common patterns?
+- Is this domain's reuse deep, or just technically present everywhere?
+- Should we trust a domain's adoption-breadth number as evidence of
+  convergence?
+  
+Intent:
+- Distinguish genuine broad client adoption of a domain's shared vocabulary
+  from a low bar (one corpus-wide pattern) being cleared by every client.
+  
+Primary artifacts:
+1. `governance_narrative_context.md`'s "Adoption breadth by domain (client
+   reach)" table (Union Inventory Reuse Summary section).
+2. `pattern_reuse_summary_by_client.csv` directly, for domains beyond the
+   top-20 shown.
+   
+Secondary artifacts:
+1. `governance_narrative_context.md`'s "Reuse breadth summary" table
+   (distinct-pattern reuse, `corpus_wide`/`client_wide`/etc. buckets) --
+   cross-check against this before treating adoption breadth alone as
+   evidence of depth.
+   
+Relevant fields:
+- `clients with corpus-wide patterns`, `clients seen`, `corpus-wide
+  pattern-instances` (adoption-breadth table); `n_patterns` by
+  `reuse_bucket`/`bucket_basis` (distinct-pattern table).
+  
+Suggested first check:
+- Compare `clients with corpus-wide patterns` / `clients seen` against
+  `corpus-wide pattern-instances` for the domain -- a high ratio with a low
+  instance count is a saturated-bar signal, not deep adoption.
+
+Evidence type:
+- direct, but easily overread without the cross-check above
+Supported conclusion types:
+- count of clients reaching at least one corpus-wide-reused pattern for a
+  domain
+- whether that count is universal (N/N) across the corpus's clients
+
+Unsupported conclusion types:
+- depth or intentionality of adoption
+- governance convergence or standards readiness on its own (this is an
+  additive breadth cut, not a replacement for the distinct-pattern table or
+  the domain's `governance_tier`)
+  
+Comparability requirements:
+- None beyond the domain appearing in `pattern_reuse_summary_by_client.csv`.
+
+Common traps:
+- Do not report "N/N clients" as strong convergence evidence without
+  checking `corpus-wide pattern-instances` -- see
+  `docs/governance_interpretation_guide.md`'s "Known bad inferences": in at
+  least one production run every domain shown reached 7/7 clients, which
+  does not by itself distinguish deep adoption from a saturated low bar.
+  
+Escalation:
+- If breadth looks uniformly high across many domains, check whether the
+  underlying `corpus_wide` bucket threshold itself needs revisiting before
+  drawing any cross-domain comparison from this table.
+
+---
+
 ## Route categories represented above
 
 ```text
