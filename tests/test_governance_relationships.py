@@ -133,6 +133,36 @@ def test_multi_discipline_project_collects_sorted_discipline_list():
     assert out[0]["project_file_count"] == "3"
 
 
+def test_enterprise_bookkeeping_bc_token_blanked_not_carried_as_fake_bc():
+    # governance_manifest.py's compute_scope_key() treats "0000"/"BC_0000" as
+    # "no real business center," regardless of client -- this must not leak a
+    # literal "0000" business center into governance_relationships.csv.
+    rows = [
+        _row("f1", "Sutter", "0000", "Alpha", role="Project"),
+        _row("f2", "Kaiser", "BC_0000", "Beta", role="Project"),
+    ]
+    out, warnings = build_relationships_rows(rows)
+    assert len(out) == 2
+    for r in out:
+        assert r["business_center_label"] == ""
+    assert any("enterprise-bookkeeping" in w for w in warnings)
+
+
+def test_enterprise_bookkeeping_project_excluded_from_bc_client_matrix():
+    rows = [
+        _row("f1", "Sutter", "0000", "Alpha", role="Project"),
+        _row("f2", "Sutter", "2014", "Beta", role="Project"),
+    ]
+    relationship_rows, _ = build_relationships_rows(rows)
+    matrix = build_bc_client_matrix_rows(relationship_rows)
+    # Only the real-BC project appears; the blank-BC one is excluded entirely,
+    # not rendered as a fake "" business center row.
+    assert len(matrix) == 1
+    assert matrix[0]["business_center_label"] == "2014"
+    assert matrix[0]["percentage_of_bc"] == "1.000000"
+    assert matrix[0]["percentage_of_client"] == "1.000000"
+
+
 def test_inconsistent_unit_system_within_one_project_warns_not_raises():
     rows = [
         _row("f1", "Sutter", "2014", "Alpha", unit="imperial"),

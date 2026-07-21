@@ -75,7 +75,11 @@ if _TOOLS_DIR not in sys.path:
 
 from na_token import is_blank_or_na
 from bundle_analysis.common import atomic_write_csv, read_csv_rows
-from governance_manifest import _normalize_manual_metadata, _governance_role_key
+from governance_manifest import (
+    _normalize_manual_metadata,
+    _governance_role_key,
+    normalize_business_center_label,
+)
 
 RELATIONSHIPS_FIELDNAMES = [
     "project_id", "project_name", "project_name_is_fallback",
@@ -135,16 +139,36 @@ def build_relationships_rows(
     one BC's projects into two separate BC identities (bc_label mismatch) --
     both undercounting relative to governance_manifest.csv's own totals for
     the same rows.
+
+    _normalize_manual_metadata() deliberately does NOT resolve enterprise-
+    bookkeeping business_center_label tokens ("0000"/"BC_0000") to "no real
+    BC" -- it keeps the raw spelling so compute_scope_key() (governance_
+    manifest.py's actual scope-classification authority) can decide that,
+    which it does by returning bc="" for those tokens regardless of whether
+    the client is internal or external (see compute_scope_key()'s own
+    branches). This function reuses normalize_business_center_label()
+    directly to apply that same "0000"/"BC_0000" -> no-real-BC contract here
+    -- without it, an enterprise-bookkeeping-tagged Project row would carry
+    the literal token "0000" into project identity and governance_bc_client_
+    matrix.csv, rendering a fake "0000" business center and skewing
+    percentage_of_bc for any client with enterprise-scoped project files.
     """
     file_meta_rows = _normalize_manual_metadata(file_meta_rows)
     groups: Dict[Tuple[str, str, str], Dict[str, object]] = {}
     warnings: List[str] = []
+    enterprise_bookkeeping_project_count = 0
 
     for row in file_meta_rows:
         if _governance_role_key(row.get("governance_role", "") or "") != "project":
             continue
         client_label = (row.get("client_label", "") or "").strip()
-        business_center_label = (row.get("business_center_label", "") or "").strip()
+        raw_business_center_label = (row.get("business_center_label", "") or "").strip()
+        _normalized_bc, is_enterprise_bc = normalize_business_center_label(raw_business_center_label)
+        if is_enterprise_bc:
+            business_center_label = ""
+            enterprise_bookkeeping_project_count += 1
+        else:
+            business_center_label = raw_business_center_label
         project_key, is_fallback = _project_key(row)
         discipline_label = (row.get("discipline_label", "") or "").strip()
         unit_system = (row.get("unit_system", "") or "").strip()
@@ -188,14 +212,28 @@ def build_relationships_rows(
             "export_run_ids": "|".join(export_run_ids),
         })
 
+    if enterprise_bookkeeping_project_count:
+        warnings.append(
+            f"{enterprise_bookkeeping_project_count} Project-role file_metadata.csv row(s) carried an "
+            "enterprise-bookkeeping business_center_label (\"0000\"/\"BC_0000\") -- treated as no real "
+            "business center (business_center_label=\"\" in governance_relationships.csv, matching "
+            "governance_manifest.py's compute_scope_key() contract) and excluded from governance_bc_"
+            "client_matrix.csv/governance_client_bc_matrix.csv, since those files are not attributable "
+            "to any real business center."
+        )
+
     return out_rows, warnings
 
 
 def build_bc_client_matrix_rows(relationship_rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """One row per (business_center_label, client_label) pair actually
-    present in relationship_rows. percentage_of_bc/percentage_of_client are
-    computed here and only here -- downstream consumers (client_bc_matrix,
-    narrative sections) must read these values, not recompute them."""
+    present in relationship_rows, EXCLUDING rows with a blank business_
+    center_label (enterprise-bookkeeping-scoped projects -- see
+    build_relationships_rows()'s docstring; those files are not
+    attributable to any real business center, so they cannot have a
+    percentage_of_bc). percentage_of_bc/percentage_of_client are computed
+    here and only here -- downstream consumers (client_bc_matrix, narrative
+    sections) must read these values, not recompute them."""
     pair_projects: Dict[Tuple[str, str], List[str]] = defaultdict(list)
     pair_files: Dict[Tuple[str, str], int] = defaultdict(int)
     bc_totals: Dict[str, int] = defaultdict(int)
@@ -203,6 +241,8 @@ def build_bc_client_matrix_rows(relationship_rows: List[Dict[str, str]]) -> List
 
     for r in relationship_rows:
         bc = r["business_center_label"]
+        if not bc:
+            continue
         client = r["client_label"]
         n = int(r["project_file_count"])
         key = (bc, client)
