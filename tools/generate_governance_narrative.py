@@ -667,6 +667,16 @@ CASCADE_GROUP3_TYPES = {
     "enterprise_to_project", "bc_to_project", "enterprise_to_bc", "enterprise_to_client",
 }
 
+# Group 3b — bc_to_bc: same producer as Group 3 (discover_governance_chain()'s
+# scope-level fan-out) but a genuinely different comparison shape. Group 3's
+# ep/bp/eb/ec pairs are directed (a is always the standards/reference side by
+# construction of the discovery loop); bc_to_bc pairs are symmetric peers --
+# two real business centers' same-role populations, with segment_id_a/b order
+# just an artifact of combinations(sorted(sids), 2) in discover_governance_
+# chain(), not a reference/target assignment. Captured only -- not rendered,
+# tiered, or anomaly-detected in this pass, same contract as Group 3.
+CASCADE_GROUP3B_TYPES = {"bc_to_bc"}
+
 # Group 4 — known comparison types intentionally excluded from cascade, one reason
 # each (verified against compare_cross_segment.py's actual discovery functions, not
 # guessed):
@@ -704,21 +714,15 @@ CASCADE_GROUP4_EXCLUDED_TYPES = {
         "not this string. Nothing to feed into cascade under this name; kept here "
         "only so the coverage check below doesn't flag it as unrecognized."
     ),
-    "bc_to_bc": (
-        "Same-role peer-to-peer comparison across business centers (Template vs "
-        "Template, Container vs Container, or Project vs Project in different real "
-        "business centers) emitted by discover_governance_chain()'s scope-level "
-        "fan-out, not a cross-role directed cascade measurement — same defect/reason "
-        "class as sibling_templates/sibling_containers above. Whether/how BC-vs-BC "
-        "peer consistency should be surfaced is a design decision, not resolved by "
-        "this pass."
-    ),
     "client_cross_bc": (
         "Same-client, cross-business-center peer comparison (a real client's own "
         "population compared to itself across the real business centers it "
         "touches) emitted by discover_client_cross_bc() — same same-role/peer-not-"
-        "cascade reason class as sibling_templates/sibling_containers/bc_to_bc "
-        "above. The population-union aggregation fix this exclusion used to be "
+        "cascade reason class as sibling_templates/sibling_containers above "
+        "(bc_to_bc itself is no longer in this excluded set -- it has its own "
+        "capture-only branch, see CASCADE_GROUP3B_TYPES -- but client_cross_bc "
+        "is not extended to match; that remains a separate, unresolved decision). "
+        "The population-union aggregation fix this exclusion used to be "
         "pending on has since shipped (compare_cross_segment.py's all_union_*/"
         "used_union_* fields) and is now the adopted primary metric for "
         "cross_client/sibling_projects/within_project (see xc_by_client/"
@@ -891,6 +895,22 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     bp_used = defaultdict(list)
     eb_used = defaultdict(list)
     ec_used = defaultdict(list)
+
+    # Group 3b — bc_to_bc peer comparison. Captured only; NOT rendered, tiered, or
+    # anomaly-detected in this pass (see CASCADE_GROUP3B_TYPES above). Keyed by
+    # the real, already-normalized (business_center_label_a, business_center_label_b)
+    # pair per domain -- not by scope shape -- because discover_governance_chain()
+    # already guarantees _bc_of(a) != _bc_of(b) at pair-discovery time (both sides
+    # are real, distinct business centers by construction: by_role_bc only admits
+    # rows with _scope_level(row) == "business_center", and the pairing loop itself
+    # skips any pair where _bc_of(a_row) == _bc_of(b_row)). A _group1_scope_pair()-
+    # style value-equality guard is therefore not needed at this layer; what IS
+    # still needed is preserving that per-pair identity here, since a-side/b-side
+    # here are symmetric peers, not a fixed reference/target -- pooling without the
+    # real pair key would conflate e.g. a (2270, Page) reading with a
+    # (2270, Vernon) reading under one shapeless bucket.
+    bb = defaultdict(lambda: defaultdict(list))
+    bb_used = defaultdict(lambda: defaultdict(list))
 
     seen_comparison_types: set = set()
     sector_map = sector_map or {}
@@ -1133,6 +1153,35 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             if vu is not None:
                 ec_used[dom].append(vu)
 
+        # Group 3b — bc_to_bc: symmetric peer comparison, not a directed reference->
+        # target relationship, so (unlike Group 3's containment_a_in_b_mean) a
+        # single containment_a_in_b reading would silently privilege whichever
+        # business center's segment_id happened to sort first in discover_
+        # governance_chain()'s combinations(sorted(sids), 2). Uses all_union_jaccard/
+        # used_union_jaccard instead -- the population-similarity family
+        # (compare_cross_segment.py's own module docstring: union metrics answer
+        # "how similar are these two populations", directionless by construction --
+        # exactly the peer-comparison question). No established precedent dictates
+        # otherwise: sibling_templates/sibling_containers (the closer peer-comparison
+        # analog to bc_to_bc than Group 1/3's directed types) are themselves
+        # Group-4-excluded and unrendered anywhere in this file, and
+        # compare_governance_populations.py's own same-role-peer bc_to_bc branch
+        # computes Jaccard + containment side by side without designating either as
+        # primary. bc_to_bc rows are symmetric (is_directed=False in
+        # compare_cross_segment.py), so all_union_jaccard/used_union_jaccard are
+        # unconditionally populated whenever the row isn't blocked.
+        elif ct == "bc_to_bc":
+            bc_a = r.get("business_center_label_a", "")
+            bc_b = r.get("business_center_label_b", "")
+            if bc_a and bc_b:
+                bc_pair = f"{bc_a}::{bc_b}"
+                v = pf(_col(r, "all_union_jaccard"))
+                if v is not None:
+                    bb[dom][bc_pair].append(v)
+                vu = pf(_col(r, "used_union_jaccard"))
+                if vu is not None:
+                    bb_used[dom][bc_pair].append(vu)
+
         # Group 4 — known, deliberately excluded from cascade (see
         # CASCADE_GROUP4_EXCLUDED_TYPES above for the reason behind each).
         elif ct in CASCADE_GROUP4_EXCLUDED_TYPES:
@@ -1145,7 +1194,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     # signal that either this dispatch or compare_cross_segment.py's vocabulary has
     # drifted, and must not be swallowed silently the way the old bare if/elif did.
     _known_comparison_types = (
-        CASCADE_GROUP1_TYPES | CASCADE_GROUP2_TYPES | CASCADE_GROUP3_TYPES
+        CASCADE_GROUP1_TYPES | CASCADE_GROUP2_TYPES | CASCADE_GROUP3_TYPES | CASCADE_GROUP3B_TYPES
         | set(CASCADE_GROUP4_EXCLUDED_TYPES.keys())
     )
     _warn_unrecognized_comparison_types(seen_comparison_types, _known_comparison_types, "build_cascade")
@@ -1216,6 +1265,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
         | set(gt_by_scope) | set(gc_by_scope) | set(gp_by_scope)
         | set(tc_by_scope) | set(cp_by_scope) | set(tp_by_scope)
         | set(ep) | set(bp) | set(eb) | set(ec)
+        | set(bb)
     )
     for dom in all_domains:
         bs_all = mean_or_none(bshare_all[dom])
@@ -1320,6 +1370,13 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             "bp_used": mean_or_none(bp_used[dom]),
             "eb_used": mean_or_none(eb_used[dom]),
             "ec_used": mean_or_none(ec_used[dom]),
+            # Group 3b — bc_to_bc peer comparison, {f"{bc_a}::{bc_b}": mean}. Captured
+            # only; NOT rendered, tiered, or anomaly-detected in this pass (see
+            # CASCADE_GROUP3B_TYPES above). No single enterprise-level scalar (unlike
+            # ep/bp/eb/ec) because bc_to_bc has no enterprise-vs-scoped distinction --
+            # every reading is already a scoped, real-BC-pair reading.
+            "bb": {s: statistics.mean(v) for s, v in bb[dom].items() if v},
+            "bb_used": {s: statistics.mean(v) for s, v in bb_used[dom].items() if v},
         }
     return result
 
@@ -4701,7 +4758,7 @@ def main():
     schema_detection = detect_bundle_schema(summary_rows)
 
     _cascade_known_types = (
-        CASCADE_GROUP1_TYPES | CASCADE_GROUP2_TYPES | CASCADE_GROUP3_TYPES
+        CASCADE_GROUP1_TYPES | CASCADE_GROUP2_TYPES | CASCADE_GROUP3_TYPES | CASCADE_GROUP3B_TYPES
         | set(CASCADE_GROUP4_EXCLUDED_TYPES.keys())
     )
     cascade_coverage = _comparison_type_coverage(

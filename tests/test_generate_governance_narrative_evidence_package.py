@@ -24,6 +24,7 @@ from generate_governance_narrative import (  # noqa: E402
     CASCADE_GROUP1_TYPES,
     CASCADE_GROUP2_TYPES,
     CASCADE_GROUP3_TYPES,
+    CASCADE_GROUP3B_TYPES,
     CASCADE_GROUP4_EXCLUDED_TYPES,
     _comparison_type_coverage,
     _DIRECTED_GOVERNANCE_TYPES,
@@ -135,7 +136,10 @@ def test_authority_header_inserted_between_header_and_state_model(tmp_path, monk
 # ---------------------------------------------------------------------------
 
 def test_comparison_type_coverage_matches_known_cascade_groups():
-    known = CASCADE_GROUP1_TYPES | CASCADE_GROUP2_TYPES | CASCADE_GROUP3_TYPES | set(CASCADE_GROUP4_EXCLUDED_TYPES.keys())
+    known = (
+        CASCADE_GROUP1_TYPES | CASCADE_GROUP2_TYPES | CASCADE_GROUP3_TYPES | CASCADE_GROUP3B_TYPES
+        | set(CASCADE_GROUP4_EXCLUDED_TYPES.keys())
+    )
     cov = _comparison_type_coverage({"template_to_project", "bogus_type"}, known,
                                      intentionally_excluded=set(CASCADE_GROUP4_EXCLUDED_TYPES.keys()))
     assert cov["unrecognized"] == ["bogus_type"]
@@ -144,16 +148,24 @@ def test_comparison_type_coverage_matches_known_cascade_groups():
 
 def test_bc_to_bc_and_client_cross_bc_are_registered_not_unrecognized():
     """Regression for a PR #373 review finding: compare_cross_segment.py's
-    new bc_to_bc/client_cross_bc comparison types must be in the known/
-    excluded set (like sibling_templates/sibling_containers), or a default
-    run where they're emitted surfaces as unrecognized-comparison-type
-    coverage degradation even though the producer intentionally emitted the
-    rows."""
-    known = CASCADE_GROUP1_TYPES | CASCADE_GROUP2_TYPES | CASCADE_GROUP3_TYPES | set(CASCADE_GROUP4_EXCLUDED_TYPES.keys())
+    new bc_to_bc/client_cross_bc comparison types must be in the known set
+    (like sibling_templates/sibling_containers), or a default run where
+    they're emitted surfaces as unrecognized-comparison-type coverage
+    degradation even though the producer intentionally emitted the rows.
+    bc_to_bc has since moved from Group 4 (excluded) to Group 3b (captured
+    into build_cascade(), still not rendered) -- see CASCADE_GROUP3B_TYPES;
+    client_cross_bc remains Group-4-excluded."""
+    known = (
+        CASCADE_GROUP1_TYPES | CASCADE_GROUP2_TYPES | CASCADE_GROUP3_TYPES | CASCADE_GROUP3B_TYPES
+        | set(CASCADE_GROUP4_EXCLUDED_TYPES.keys())
+    )
     cov = _comparison_type_coverage({"bc_to_bc", "client_cross_bc"}, known,
                                      intentionally_excluded=set(CASCADE_GROUP4_EXCLUDED_TYPES.keys()))
     assert cov["unrecognized"] == []
-    assert "bc_to_bc" in CASCADE_GROUP4_EXCLUDED_TYPES
+    assert "bc_to_bc" in cov["recognized"]
+    assert "bc_to_bc" in CASCADE_GROUP3B_TYPES
+    assert "bc_to_bc" not in CASCADE_GROUP4_EXCLUDED_TYPES
+    assert "client_cross_bc" in cov["intentionally_excluded"]
     assert "client_cross_bc" in CASCADE_GROUP4_EXCLUDED_TYPES
 
 
