@@ -11,6 +11,41 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Fixed
+- `generate_governance_narrative.py`'s within-project `score_reliability` p10/p90
+  capture (the sole feeder of `score_reliability()`) was returning `Unknown` for
+  all 32 rendered domains in real corpora. Root cause: it only accepted a
+  `within_project` row when `a == b and _is_unscoped_segment(r,"a")` -- but
+  post `business_center_label`-promotion, the genuinely enterprise-wide root
+  segment for the only role that produces `within_project` pairs (`Project`) is
+  routinely demoted to `run_type="registration"` by `build_segment_manifest.py`'s
+  `redundant_single_child` pass (all Project-role files sitting in one business
+  center), and `compare_cross_segment.py`'s `discover_within_project()` -- unlike
+  `discover_cross_client()`/`discover_sibling_segments()`/`discover_parent_siblings()`,
+  fixed for the same mechanism in PR #380 -- never resolves the demoted root
+  through `_resolve_runnable_segment()`, so no `within_project` row for the root
+  is ever emitted at all. `build_cascade()` now accepts an optional
+  `segment_manifest` dict (loaded from a new optional `--segment-manifest`
+  CLI flag) and, when a row's own segment isn't directly unscoped, resolves the
+  true root (`f"{unit_system}|{role}"`) via `_resolve_runnable_segment()`
+  (imported read-only from `compare_cross_segment.py`); a row is accepted as
+  the enterprise-wide evidence source when it IS that resolved segment.
+  This is not a scope widening: `redundant_single_child` only fires on
+  byte-identical `population_hash`, so the resolved segment is the exact same
+  file population as the (never-discovered) root, just under a more specific
+  `segment_id` -- `score_reliability()`'s meaning is unchanged. A new
+  `wp_p10_source`/`within_project_reliability_source` field (cascade dict /
+  `governance_domain_summary.csv`) records which path fired
+  (`"enterprise"` vs `"enterprise_resolved:<segment_id>"`) for auditability only.
+  Verified against a real corpus: `score_reliability` goes from `Unknown` for
+  all 32 rendered domains to a real value for 31 of them (`materials` stays
+  `Unknown` -- no `within_project` data at all, an unrelated pre-existing gap);
+  `governance_tier` in `governance_domain_summary.csv` is byte-identical
+  before/after; the only other CSV column affected is `notable_anomalies`
+  (now correctly surfacing the pre-existing Presence-based/Sparse reliability
+  note instead of `Unknown` suppressing it). `compare_cross_segment.py` and
+  `build_segment_manifest.py` are unchanged (read-only dependency).
+
 ### Added
 - New `governance_bc_summary.csv` + "Business Center Analysis" narrative section
   in `tools/generate_governance_narrative.py`, structurally mirroring
