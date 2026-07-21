@@ -315,10 +315,10 @@ def _evidence_map(**overrides):
     return build_evidence_map(**kwargs)
 
 
-def test_evidence_map_has_twenty_seven_unique_artifacts():
+def test_evidence_map_has_twenty_eight_unique_artifacts():
     em = _evidence_map()
     ids = [a["artifact_id"] for a in em["artifacts"]]
-    assert len(ids) == 27
+    assert len(ids) == 28
     assert "governance_findings" in ids
     assert len(ids) == len(set(ids))
 
