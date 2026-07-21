@@ -75,6 +75,7 @@ if _TOOLS_DIR not in sys.path:
 
 from na_token import is_blank_or_na
 from bundle_analysis.common import atomic_write_csv, read_csv_rows
+from governance_manifest import _normalize_manual_metadata, _governance_role_key
 
 RELATIONSHIPS_FIELDNAMES = [
     "project_id", "project_name", "project_name_is_fallback",
@@ -119,12 +120,28 @@ def build_relationships_rows(
     (e.g. inconsistent unit_system within one project identity) -- fail-soft,
     not fail-hard: a project with an internal inconsistency is still real
     and still gets a row, but the caller should see the note.
+
+    Rows are normalized via governance_manifest.py's own _normalize_manual_
+    metadata() (unit_system lowercase fold, first-seen-casing fold for
+    client_label/discipline_label, BC_-prefix strip + first-seen-casing fold
+    for business_center_label) before grouping, and governance_role is
+    matched case-insensitively via _governance_role_key() -- reusing the
+    same normalization the rest of the governance pipeline already applies
+    to this same file_metadata.csv contract, rather than a second,
+    independent copy that could drift out of sync with it. Without this, an
+    accepted manual-entry variant (governance_role="project", a client_label
+    casing difference, or business_center_label="BC_2014" vs "2014") would
+    either be silently dropped from this roster (role filter) or fragment
+    one BC's projects into two separate BC identities (bc_label mismatch) --
+    both undercounting relative to governance_manifest.csv's own totals for
+    the same rows.
     """
+    file_meta_rows = _normalize_manual_metadata(file_meta_rows)
     groups: Dict[Tuple[str, str, str], Dict[str, object]] = {}
     warnings: List[str] = []
 
     for row in file_meta_rows:
-        if (row.get("governance_role", "") or "").strip() != "Project":
+        if _governance_role_key(row.get("governance_role", "") or "") != "project":
             continue
         client_label = (row.get("client_label", "") or "").strip()
         business_center_label = (row.get("business_center_label", "") or "").strip()

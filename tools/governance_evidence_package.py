@@ -760,6 +760,82 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
+        "governance_bc_client_matrix", p(input_paths, "governance_bc_client_matrix"), "csv", False,
+        input_present.get("governance_bc_client_matrix", False), "tools/governance_relationships.py",
+        AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "feeds the Business Center Composition section -- client composition "
+        "of each business center's PHYSICAL project population (file_metadata.csv's "
+        "project_label grain), not the governance-population grain used by the "
+        "project_* matrices above",
+        "one row per (business_center_label, client_label) pair actually present",
+        ["business_center_label", "client_label"], [], [],
+        ["how many physical projects/files a client contributes to a business "
+         "center's population, and what share of that business center's files "
+         "that represents (percentage_of_bc, computed exactly once in "
+         "build_bc_client_matrix_rows() and only read here)"],
+        ["behavioral similarity between those projects -- see "
+         "project_pool_containment_similarity_matrix.csv for that, and note its "
+         "\"project\" grain is a (client, discipline, unit_system) governance "
+         "population, not the same entity as a row here; the two are not "
+         "row-for-row joinable"],
+        ["percentage_of_client on this file answers a different question than "
+         "percentage_of_bc on the same row -- one BC's share of one client's "
+         "total files vs. one client's share of one BC's total files; do not "
+         "average or compare them directly"],
+        _BLANK_STRING_NULL_SEMANTICS,
+        ["governance_client_bc_matrix", "governance_relationships"],
+    ))
+
+    artifacts.append(_artifact(
+        "governance_relationships", p(sibling_paths, "governance_relationships"), "csv", False,
+        sibling_present.get("governance_relationships", False), "tools/governance_relationships.py",
+        AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "archive_only -- not read by generate_governance_narrative.py; the "
+        "one-row-per-physical-project source that governance_bc_client_matrix.csv/"
+        "governance_client_bc_matrix.csv are aggregated from, named by path in "
+        "the Business Center Composition section's body text",
+        "one row per (client_label, business_center_label, project_name) "
+        "physical-project identity",
+        ["client_label", "business_center_label", "project_name"], ["project_id"], [],
+        ["which physical projects exist for a client/business center, and how "
+         "many files each carries; whether a project_name string is genuinely "
+         "one project or a same-named collision across different clients"],
+        ["a governance, compliance, or quality read -- project/file counts only"],
+        ["project_name_is_fallback == \"true\" means project_name is a synthetic "
+         "per-file identifier (that file's own export_run_id), not a human-"
+         "assigned project name -- not consumed or checked by this generator, "
+         "which only infers this file's presence as a sibling of --summary's "
+         "directory and never parses it"],
+        {},
+        ["governance_bc_client_matrix", "governance_client_bc_matrix"],
+    ))
+
+    artifacts.append(_artifact(
+        "governance_client_bc_matrix", p(input_paths, "governance_client_bc_matrix"), "csv", False,
+        input_present.get("governance_client_bc_matrix", False), "tools/governance_relationships.py",
+        AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "feeds the Business Center Distribution section -- business-center "
+        "distribution of each client's physical project population, aggregated "
+        "from governance_bc_client_matrix.csv with no independent computation",
+        "one row per client_label",
+        ["client_label"], [], [],
+        ["how many business centers a client's projects span, and how that "
+         "client's project/file count divides across them (business_centers is "
+         "already ordered by governance_bc_client_matrix.csv's percentage_of_client, "
+         "descending)"],
+        ["a percentage_of_bc/percentage_of_client column of its own -- this file "
+         "only sums project_count/project_file_count from governance_bc_client_"
+         "matrix.csv; read percentages from that file, not this one"],
+        ["in the corpus this package type was seeded from, no client's projects "
+         "actually spanned more than one business center (business_center_count "
+         "== 1 for every row) -- a single-BC client here is a real, verified-"
+         "common case, not evidence the multi-BC aggregation path is untested "
+         "(see tests/test_governance_relationships.py's synthetic multi-BC case)"],
+        _BLANK_STRING_NULL_SEMANTICS,
+        ["governance_bc_client_matrix"],
+    ))
+
+    artifacts.append(_artifact(
         "cross_segment_file_pairs", p(sibling_paths, "file_pairs"), "csv", False,
         sibling_present.get("file_pairs", False), "compare_cross_segment.py",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,

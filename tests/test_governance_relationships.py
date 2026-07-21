@@ -50,6 +50,40 @@ def test_non_project_roles_excluded():
     assert warnings == []
 
 
+def test_lowercase_governance_role_still_counted_as_project():
+    # Accepted manual-entry variant (matches governance_manifest.py's own
+    # case-insensitive _governance_role_key() convention) -- must not be
+    # silently dropped from the roster.
+    rows = [_row("f1", "Sutter", "2014", "Alpha", role="project")]
+    out, _ = build_relationships_rows(rows)
+    assert len(out) == 1
+    assert out[0]["project_file_count"] == "1"
+
+
+def test_client_label_casing_variants_fold_to_one_project():
+    rows = [
+        _row("f1", "Sutter", "2014", "Alpha", role="Project"),
+        _row("f2", "sutter", "2014", "Alpha", role="Project"),
+    ]
+    out, _ = build_relationships_rows(rows)
+    assert len(out) == 1
+    assert out[0]["client_label"] == "Sutter"  # first-seen casing
+    assert out[0]["project_file_count"] == "2"
+
+
+def test_bc_prefix_variant_folds_to_same_bc_identity():
+    # "BC_2014" vs "2014" must collapse to one business_center_label, or the
+    # same real BC would fragment into two separate BC/client matrix rows.
+    rows = [
+        _row("f1", "Sutter", "BC_2014", "Alpha", role="Project"),
+        _row("f2", "Sutter", "2014", "Alpha", role="Project"),
+    ]
+    out, _ = build_relationships_rows(rows)
+    assert len(out) == 1
+    assert out[0]["business_center_label"] == "2014"
+    assert out[0]["project_file_count"] == "2"
+
+
 def test_same_project_label_different_client_stays_distinct():
     # Real production case: "MPMC" appears under two unrelated clients in the
     # same BC. Identity must be (client, bc, project_label), not project_label

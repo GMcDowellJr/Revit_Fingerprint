@@ -5702,6 +5702,8 @@ def main():
             "project_pool_containment_similarity_matrix": Path(args.project_pool_containment_matrix) if args.project_pool_containment_matrix else None,
             "project_fragmentation_diagnostic": Path(args.project_fragmentation_diagnostic) if args.project_fragmentation_diagnostic else None,
             "segment_manifest": Path(args.segment_manifest) if args.segment_manifest else None,
+            "governance_bc_client_matrix": Path(args.governance_bc_client_matrix) if args.governance_bc_client_matrix else None,
+            "governance_client_bc_matrix": Path(args.governance_client_bc_matrix) if args.governance_client_bc_matrix else None,
         }
         input_required = {"cross_segment_summary": True, "cross_segment_pooled": True}
         input_roles = {
@@ -5721,6 +5723,8 @@ def main():
             "project_pool_containment_similarity_matrix": "authoritative_deterministic_evidence",
             "project_fragmentation_diagnostic": "authoritative_deterministic_evidence",
             "segment_manifest": "authoritative_deterministic_evidence",
+            "governance_bc_client_matrix": "authoritative_deterministic_evidence",
+            "governance_client_bc_matrix": "authoritative_deterministic_evidence",
         }
         input_present = {k: bool(v) and v.exists() for k, v in input_paths.items()}
 
@@ -5781,6 +5785,12 @@ def main():
         # project_density_similarity_rows/project_pool_containment_rows/
         # project_fragmentation_rows (REUSE_SUMMARY_FIELDS/MATRIX_OUTPUT_FIELDS/
         # FRAGMENTATION_DIAGNOSTIC_FIELDS in compare_cross_segment.py).
+        # governance_bc_client_rows/governance_client_bc_rows carry neither --
+        # tools/governance_relationships.py aggregates directly from file_
+        # metadata.csv's own columns and has no comparison-run/executed_utc
+        # concept of its own (see BC_CLIENT_MATRIX_FIELDNAMES/CLIENT_BC_MATRIX_
+        # FIELDNAMES there) -- so they are intentionally absent from both sets
+        # below, not an oversight.
         _run_id_row_sets = (
             summary_rows, pooled_rows, governance_state_rows,
             governance_state_summary_rows, delta_rows,
@@ -5874,6 +5884,17 @@ def main():
             "comparison_registry": Path(args.summary).parent / "comparison_registry.csv",
             "interpretation_guide": INTERPRETATION_GUIDE_PATH,
             "question_routes": QUESTION_ROUTES_PATH,
+            # governance_relationships.csv (tools/governance_relationships.py) is
+            # never read by this generator -- only governance_bc_client_matrix.csv/
+            # governance_client_bc_matrix.csv (loaded via --governance-bc-client-
+            # matrix/--governance-client-bc-matrix above) are. It is named by
+            # path in the Business Center Composition section's body text ("See
+            # governance_relationships.csv for the underlying per-project rows"),
+            # so it is registered here the same way cross_segment_file_pairs/
+            # comparison_registry are -- inferred presence, drill-through only --
+            # rather than left unfindable in the evidence map for a claim this
+            # generator's own narrative text makes.
+            "governance_relationships": Path(args.summary).parent / "governance_relationships.csv",
         }
         sibling_present = {k: v.exists() for k, v in sibling_paths.items()}
 

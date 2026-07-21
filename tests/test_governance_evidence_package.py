@@ -315,12 +315,17 @@ def _evidence_map(**overrides):
     return build_evidence_map(**kwargs)
 
 
-def test_evidence_map_has_twenty_nine_unique_artifacts():
+def test_evidence_map_has_thirty_two_unique_artifacts():
+    # 29 (pre-relationship-layer) + governance_bc_client_matrix +
+    # governance_client_bc_matrix + governance_relationships.
     em = _evidence_map()
     ids = [a["artifact_id"] for a in em["artifacts"]]
-    assert len(ids) == 29
+    assert len(ids) == 32
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
+    assert "governance_bc_client_matrix" in ids
+    assert "governance_client_bc_matrix" in ids
+    assert "governance_relationships" in ids
     assert len(ids) == len(set(ids))
 
 

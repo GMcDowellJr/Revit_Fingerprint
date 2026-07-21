@@ -521,15 +521,20 @@ def test_segment_manifest_absent_from_evidence_package_when_not_supplied(tmp_pat
     assert health["optional_inputs"]["segment_manifest"] is False
 
 
-def test_evidence_map_lists_twenty_nine_artifacts_with_required_fields(tmp_path, monkeypatch):
+def test_evidence_map_lists_thirty_two_artifacts_with_required_fields(tmp_path, monkeypatch):
+    # 29 (pre-relationship-layer) + governance_bc_client_matrix +
+    # governance_client_bc_matrix + governance_relationships.
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
     ids = [a["artifact_id"] for a in evidence_map["artifacts"]]
-    assert len(ids) == 29
+    assert len(ids) == 32
     assert len(ids) == len(set(ids))
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
+    assert "governance_bc_client_matrix" in ids
+    assert "governance_client_bc_matrix" in ids
+    assert "governance_relationships" in ids
     narrative = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_narrative_context")
     assert narrative["authority_level"] != "authoritative_deterministic_evidence"
 
