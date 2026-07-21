@@ -479,14 +479,57 @@ def test_package_health_optional_inputs_present_reflects_cli_flags(tmp_path, mon
     assert health["optional_inputs"]["cross_segment_union_inventory"] is False
 
 
-def test_evidence_map_lists_twenty_eight_artifacts_with_required_fields(tmp_path, monkeypatch):
+def test_segment_manifest_recorded_in_evidence_package_when_supplied(tmp_path, monkeypatch):
+    """Regression test for a PR #381 review finding: --segment-manifest changes
+    cascade/governance_domain_summary.csv (the within_project_reliability_source
+    resolved-segment fallback) but was not being recorded anywhere in the
+    evidence package, so a run using the fallback would misleadingly claim it
+    was built without the manifest input that actually affected the scores."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    manifest_path = tmp_path / "segment_manifest.csv"
+    _write_csv(manifest_path, ["segment_id", "run_type", "notes"], [
+        {"segment_id": "imperial|Project", "run_type": "registration",
+         "notes": "redundant_single_child:imperial|Project|acme"},
+        {"segment_id": "imperial|Project|acme", "run_type": "bundle", "notes": ""},
+    ])
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(tmp_path), "--segment-manifest", str(manifest_path)])
+
+    manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
+    inputs_by_id = {i["artifact_id"]: i for i in manifest["inputs"]}
+    assert inputs_by_id["segment_manifest"]["present"] is True
+    assert inputs_by_id["segment_manifest"]["path"] == str(manifest_path)
+
+    health = json.loads((tmp_path / "governance_package_health.json").read_text(encoding="utf-8"))
+    assert health["optional_inputs"]["segment_manifest"] is True
+
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    ids = [a["artifact_id"] for a in evidence_map["artifacts"]]
+    assert "segment_manifest" in ids
+
+
+def test_segment_manifest_absent_from_evidence_package_when_not_supplied(tmp_path, monkeypatch):
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+
+    manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
+    inputs_by_id = {i["artifact_id"]: i for i in manifest["inputs"]}
+    assert inputs_by_id["segment_manifest"]["present"] is False
+    assert inputs_by_id["segment_manifest"]["path"] is None
+
+    health = json.loads((tmp_path / "governance_package_health.json").read_text(encoding="utf-8"))
+    assert health["optional_inputs"]["segment_manifest"] is False
+
+
+def test_evidence_map_lists_twenty_nine_artifacts_with_required_fields(tmp_path, monkeypatch):
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
     ids = [a["artifact_id"] for a in evidence_map["artifacts"]]
-    assert len(ids) == 28
+    assert len(ids) == 29
     assert len(ids) == len(set(ids))
     assert "governance_findings" in ids
+    assert "segment_manifest" in ids
     narrative = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_narrative_context")
     assert narrative["authority_level"] != "authoritative_deterministic_evidence"
 

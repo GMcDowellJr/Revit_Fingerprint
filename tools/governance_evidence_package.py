@@ -564,6 +564,29 @@ def build_evidence_map(
     ))
 
     artifacts.append(_artifact(
+        "segment_manifest", p(input_paths, "segment_manifest"), "csv", False,
+        input_present.get("segment_manifest", False), "build_segment_manifest.py",
+        AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "lets build_cascade()'s within_project score_reliability p10/p90 capture "
+        "resolve a redundant_single_child-demoted enterprise-wide root segment to "
+        "its population-identical runnable descendant via _resolve_runnable_segment() "
+        "(imported from compare_cross_segment.py), instead of finding no unscoped "
+        "segment at all",
+        "one row per segment_id in the full segmentation lattice",
+        ["segment_id", "run_type"], ["segment_id"],
+        ["segment_id (join to cross_segment_summary.csv's segment_id_a/_b)"],
+        ["whether a segment_id is directly runnable (run_type in bundle/reference) "
+         "or redundant_single_child to a population-identical descendant"],
+        ["per-domain comparison scores -- this file has no domain column"],
+        ["absent: within_project score_reliability p10/p90 only ever populate from "
+         "a row that is directly _is_unscoped_segment() -- the pre-existing, "
+         "narrower behavior -- rather than also resolving a demoted root through "
+         "its redundant_single_child chain."],
+        _BLANK_STRING_NULL_SEMANTICS,
+        ["cross_segment_summary", "governance_domain_summary"],
+    ))
+
+    artifacts.append(_artifact(
         "client_sector", p(input_paths, "client_sector"), "csv", False,
         input_present.get("client_sector", False), "human-curated (policies/client_sector.csv default)",
         AUTHORITY_USER_PROVIDED_NOTE,

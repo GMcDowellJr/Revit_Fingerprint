@@ -5552,6 +5552,7 @@ def main():
             "project_density_similarity_matrix": Path(args.project_density_similarity_matrix) if args.project_density_similarity_matrix else None,
             "project_pool_containment_similarity_matrix": Path(args.project_pool_containment_matrix) if args.project_pool_containment_matrix else None,
             "project_fragmentation_diagnostic": Path(args.project_fragmentation_diagnostic) if args.project_fragmentation_diagnostic else None,
+            "segment_manifest": Path(args.segment_manifest) if args.segment_manifest else None,
         }
         input_required = {"cross_segment_summary": True, "cross_segment_pooled": True}
         input_roles = {
@@ -5570,6 +5571,7 @@ def main():
             "project_density_similarity_matrix": "authoritative_deterministic_evidence",
             "project_pool_containment_similarity_matrix": "authoritative_deterministic_evidence",
             "project_fragmentation_diagnostic": "authoritative_deterministic_evidence",
+            "segment_manifest": "authoritative_deterministic_evidence",
         }
         input_present = {k: bool(v) and v.exists() for k, v in input_paths.items()}
 
