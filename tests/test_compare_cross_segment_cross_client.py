@@ -19,14 +19,31 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
 from compare_cross_segment import (  # noqa: E402
+    _build_summary_row,
     _is_client_only_project_segment,
     _redundant_child_segment_id,
     _resolve_runnable_segment,
+    _scope_override_key,
     discover_cross_client,
     discover_parent_siblings,
     discover_sibling_segments,
     drop_legacy_siblings_covered_by_peer_comparisons,
 )
+
+
+def _summary_row(seg_a, seg_b, ctype, manifest):
+    """Thin wrapper over _build_summary_row() supplying the required
+    bundle/metric arguments with inert defaults -- these tests only care
+    about the scope-metadata columns it derives from `manifest`."""
+    return _build_summary_row(
+        "crid", seg_a, seg_b, ctype, "some_domain", manifest, {},
+        n_patterns_a=1, n_patterns_b=1, n_unique_patterns_a=1, n_unique_patterns_b=1,
+        all_has_bundles_a="false", all_has_bundles_b="false",
+        all_n_shared_bundle_both=0, all_n_shared_bundle_a_only=0, all_n_shared_bundle_b_only=0,
+        used_has_bundles_a="false", used_has_bundles_b="false",
+        used_n_shared_bundle_both=0, used_n_shared_bundle_a_only=0, used_n_shared_bundle_b_only=0,
+        executed_utc="2026-01-01T00:00:00Z",
+    )
 
 
 def _seg(
@@ -497,3 +514,107 @@ def test_discover_parent_siblings_does_not_misclassify_blank_role_rollup():
         "l2_template": _seg("Template", run_type="bundle", parent="root", segment_level="2"),
     }
     assert discover_parent_siblings(manifest) == []
+
+
+# ---------------------------------------------------------------------------
+# Scope-override metadata (Codex review finding on PR #380): a rescued pair's
+# segment_id must stay the resolved descendant (the only segment with real
+# on-disk data), but _build_summary_row() derives business_center_label_a/_b,
+# discipline_label_a/_b, and scope_level_a/_b straight from that segment's own
+# manifest row -- which, for a resolved descendant, is its own narrower
+# identity rather than the broader population the pair was actually matched
+# under. cross_client/sibling_projects have no consumer that re-derives scope
+# from segment_id, so overriding these display columns to the original,
+# broader row's values is safe and fixes the mislabeling. parent_sibling_roles
+# is deliberately NOT overridden -- see discover_parent_siblings()'s own
+# comment on why (_is_unscoped_segment() re-derives shape from segment_id
+# itself, which no column override can satisfy).
+# ---------------------------------------------------------------------------
+
+def test_discover_cross_client_rescued_pair_reports_original_blank_scope():
+    manifest = {
+        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle"),
+        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
+                          notes="redundant_single_child:p_sutter_bc_c"),
+        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle"),
+    }
+    pairs = discover_cross_client(manifest)
+    seg_a, seg_b, ctype = pairs[0]
+    assert seg_b == "p_sutter_bc_c"  # segment_id stays the resolved (data-bearing) descendant
+
+    row = _summary_row(seg_a, seg_b, ctype, manifest)
+    assert row["segment_id_b"] == "p_sutter_bc_c"
+    assert row["business_center_label_b"] == ""
+    assert row["scope_level_b"] == ""
+
+
+def test_discover_cross_client_override_does_not_leak_into_other_comparison_types():
+    """The SAME resolved segment can legitimately appear under its own true
+    (bc-scoped) identity in a different comparison_type (e.g.
+    discover_client_cross_bc()) -- the override, namespaced by comparison_type,
+    must not affect that reading."""
+    manifest = {
+        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle"),
+        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
+                          notes="redundant_single_child:p_sutter_bc_c"),
+        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle"),
+    }
+    discover_cross_client(manifest)  # populates the cross_client-scoped override as a side effect
+
+    row = _summary_row("p_sutter_bc_c", "p_sutter_bc_c", "client_cross_bc", manifest)
+    assert row["business_center_label_a"] == "BC_C"
+
+
+def test_discover_cross_client_no_override_when_no_resolution_needed():
+    """A client-only segment that was already eligible (never demoted) must
+    not carry a scope override at all -- its own row is already correct."""
+    manifest = {
+        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle"),
+        "p_sutter": _seg("Project", client="Sutter", run_type="bundle"),
+    }
+    discover_cross_client(manifest)
+    assert _scope_override_key("cross_client") not in manifest["p_kaiser"]
+    assert _scope_override_key("cross_client") not in manifest["p_sutter"]
+
+
+def test_discover_sibling_segments_rescued_pair_reports_original_scope():
+    manifest = {
+        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle",
+                          parent="p_root", segment_level="3"),
+        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
+                          notes="redundant_single_child:p_sutter_bc_c",
+                          parent="p_root", segment_level="3"),
+        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle",
+                               parent="p_sutter", segment_level="4"),
+    }
+    pairs = discover_sibling_segments(manifest)
+    seg_a, seg_b, ctype = pairs[0]
+    assert ctype == "sibling_projects"
+
+    row = _summary_row(seg_a, seg_b, ctype, manifest)
+    resolved_side = "business_center_label_a" if seg_a == "p_sutter_bc_c" else "business_center_label_b"
+    assert row[resolved_side] == ""
+
+
+def test_discover_parent_siblings_rescued_pair_reports_resolved_descendants_true_scope():
+    """Deliberately the OPPOSITE of cross_client/sibling_projects: no override
+    is applied here, so the rescued Template side reports its resolved
+    descendant's real (non-blank) business_center_label -- internally
+    consistent with segment_id_a, which _is_unscoped_segment() in
+    generate_governance_narrative.py re-derives its own classification from
+    and which cannot be overridden without breaking on-disk data lookup."""
+    manifest = {
+        "l2_template": _seg("Template", run_type="registration",
+                             notes="redundant_single_child:l2_template_bc",
+                             parent="root", segment_level="2"),
+        "l2_template_bc": _seg("Template", bc="BC_STD", run_type="bundle",
+                                parent="l2_template", segment_level="3"),
+        "l2_project": _seg("Project", run_type="bundle", parent="root", segment_level="2"),
+    }
+    pairs = discover_parent_siblings(manifest)
+    seg_a, seg_b, ctype = pairs[0]
+    assert seg_a == "l2_template_bc"
+
+    row = _summary_row(seg_a, seg_b, ctype, manifest)
+    assert row["business_center_label_a"] == "BC_STD"
+    assert _scope_override_key("parent_sibling_roles") not in manifest["l2_template_bc"]

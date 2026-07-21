@@ -160,6 +160,34 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `population_hash` the demoted rollup would have, not a narrower slice of
   it. `build_segment_manifest.py`, `generate_governance_narrative.py`, and
   `_is_unscoped_segment()`/the Group 1/2/3 cascade logic are unchanged.
+- (PR #380 Codex review) The fix above kept `segment_id_a`/`_b` as the
+  resolved descendant (required — it's the only segment with real on-disk
+  data), but `_build_summary_row()` also derives
+  `business_center_label_a`/`_b`, `discipline_label_a`/`_b`, and
+  `scope_level_a`/`_b` straight from that same segment's own manifest row —
+  so a rescued row showed the resolved descendant's own (narrower) scope in
+  `cross_segment_summary.csv` (e.g. `business_center_label_b="BC_C"`) instead
+  of the broader, typically blank-bc population the pair was actually matched
+  under. New `_stash_scope_override()`/`_scope_override_key()` record the
+  *original* row's `business_center_label`/`discipline_label`/`scope_level`
+  onto the resolved descendant's manifest entry, namespaced by
+  `comparison_type` (the same physical segment can legitimately appear under
+  its own true bc-scoped identity in a different comparison_type, e.g.
+  `discover_client_cross_bc()`); `_build_summary_row()` now prefers this
+  override when present. Applied to `cross_client`/`sibling_projects`
+  (neither has a consumer that re-derives scope from `segment_id`, so this is
+  a pure accuracy fix) but deliberately **not** to `parent_sibling_roles`:
+  that comparison_type feeds `generate_governance_narrative.py`'s
+  `_group1_scope_pair()`/`_is_unscoped_segment()`, which classifies
+  "enterprise" scope by re-deriving structure from `segment_id_a`/`_b` itself
+  (every `|`-part past index 2 must be blank) rather than trusting the label
+  columns — since `segment_id` can't be overridden without breaking data
+  lookup, no column override changes that already-shipped classification; it
+  would only make the row internally inconsistent (columns disagreeing with
+  segment_id) for no benefit. A rescued `parent_sibling_roles` row therefore
+  still reports its resolved descendant's true (non-blank) scope, landing in
+  whichever non-enterprise `tp_by_scope` bucket that shape implies — a real,
+  if not headline, Group 1 evidence source, not a regression.
 - (PR #376 review) The union-metric adoption above silently dropped all
   `within_project` evidence: `compare_cross_segment.py`'s dedicated
   within-project branch (project-internal file-pair aggregation) returns
