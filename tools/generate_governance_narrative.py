@@ -2452,6 +2452,18 @@ def build_bc_summary(summary_rows: list[dict], cascade: dict) -> list[dict]:
             role = _pick(r, "governance_role_b")
             nf = int(r["n_files_b"]) if r.get("n_files_b") else 0
             _note_bc_file(bc, role, nf)
+        elif ct == "bc_to_project":
+            # a-side is always the real BC-scoped Template/Container standard
+            # (per discover_governance_chain()'s bc_to_project pairing) -- a BC
+            # discovered ONLY via this comparison_type (no bc_to_bc peer, no
+            # matching-role enterprise standard to pair against) still has a
+            # real file count on this row; without this branch it would report
+            # n_files=0 and a spurious low-confidence note despite the source
+            # row carrying real data.
+            bc = _pick(r, "business_center_label_a")
+            role = _pick(r, "governance_role_a")
+            nf = int(r["n_files_a"]) if r.get("n_files_a") else 0
+            _note_bc_file(bc, role, nf)
 
     # Cross-BC peer alignment: reuses PR1's cascade[dom]["bb"]/["bb_used"]
     # (per-domain means already keyed by real (bc_a, bc_b) pair), fanned out
