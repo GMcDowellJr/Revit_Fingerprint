@@ -220,6 +220,7 @@ _EXPECTED_DOMAIN_COLUMNS = [
     "template_to_project",
     "cross_client_convergence", "cross_client_convergence_all_view",
     "within_project_all", "within_project_p10", "within_project_p90",
+    "within_project_reliability_source",
     "within_project_spread", "within_project_architectural", "within_project_mechanical_plumbing",
     "within_project_electrical", "within_project_structural", "bundle_schema",
     "template_to_project_used", "bundle_share_all", "bundle_share_used",

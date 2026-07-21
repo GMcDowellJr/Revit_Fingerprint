@@ -72,7 +72,7 @@ from typing import Optional
 # import (its pipeline logic is gated behind `if __name__ == "__main__":`), so its
 # GOVERNANCE_STATE_DIRECTED_TYPES is imported directly rather than hand-copied --
 # see _DIRECTED_GOVERNANCE_TYPES below for why a hand-copy drifted before.
-from compare_cross_segment import GOVERNANCE_STATE_DIRECTED_TYPES
+from compare_cross_segment import GOVERNANCE_STATE_DIRECTED_TYPES, _resolve_runnable_segment
 
 # governance_evidence_package.py is a sibling module (same side-effect-free-on-
 # import convention) providing the package manifest/health/evidence-map layer
@@ -757,7 +757,11 @@ def _has_renderable_cascade_signal(d: dict) -> bool:
     return any(d.get(k) for k in ("tc_by_scope", "cp_by_scope", "tp_by_scope"))
 
 
-def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -> dict:
+def build_cascade(
+    summary_rows: list[dict],
+    sector_map: Optional[dict] = None,
+    segment_manifest: Optional[dict] = None,
+) -> dict:
     """
     Returns domain-keyed dict with cascade scores from generic segments:
       tc: template->container containment_a_in_b_mean
@@ -770,6 +774,16 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
       tw: within-template Jaccard
       wp_p10: within-project Jaccard p10 (generic segment, all roles)
       wp_p90: within-project Jaccard p90 (generic segment, all roles)
+      wp_p10_source: how the wp_p10/wp_p90 segment was obtained -- "enterprise" when
+        a==b and _is_unscoped_segment(r,"a") is directly true (the pre-existing
+        path), or "enterprise_resolved:<segment_id>" when the row's segment is not
+        itself unscoped but IS the segment build_segment_manifest.py's
+        redundant_single_child pass ultimately points the true unscoped root at
+        (same population_hash as the root -- see _resolve_runnable_segment() in
+        compare_cross_segment.py). Only computed when segment_manifest is supplied.
+        This is provenance only -- it does not change what score_reliability()
+        returns for the domain, since the resolved segment is population-identical
+        to the (never-discovered) root, not a narrower substitute.
       gt/gc/gp: generic->template/container/project containment_a_in_b_mean, the
         "enterprise" (target-unscoped) slice only (Group 2 — one level up the
         cascade from tc/cp/tp; see CASCADE_GROUP2_TYPES)
@@ -831,6 +845,10 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
     # p10/p90 from generic (all-role) within_project rows — most representative spread signal
     wp_p10 = {}  # domain -> float
     wp_p90 = {}
+    wp_p10_source = {}  # domain -> "enterprise" | "enterprise_resolved:<segment_id>"
+    # Cache of root_sid -> resolved segment_id (or None), so the same (unit_system,
+    # role) pair isn't re-resolved through the manifest for every domain's row.
+    _resolved_root_cache: dict = {}
     # used-view cascade scores (dual-view schema only; fall back to all-view when absent)
     tc_used = defaultdict(list)
     cp_used = defaultdict(list)
@@ -1086,15 +1104,41 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
                 wp_used[dom].append(vu)
             if a == b and r["governance_role_a"] == "Template" and v is not None:
                 tw[dom].append(v)
-            # Capture p10/p90 for all-view and used-view from most inclusive generic segment
-            if a == b and _is_unscoped_segment(r, "a"):
+            # Capture p10/p90 for all-view and used-view from most inclusive generic segment.
+            #
+            # _is_unscoped_segment(r,"a") is the direct case: this row's own segment IS
+            # the enterprise-wide root. Post business_center_label-promotion, that root is
+            # frequently demoted to run_type="registration" by build_segment_manifest.py's
+            # redundant_single_child pass whenever all its files sit in a single business
+            # center (or client/discipline) -- and discover_within_project() in
+            # compare_cross_segment.py (unlike discover_cross_client()/
+            # discover_sibling_segments()/discover_parent_siblings(), fixed for the same
+            # mechanism in PR #380) never resolves through the redundant chain, so no
+            # within_project row for the root is ever emitted at all. When segment_manifest
+            # is available, resolve the true root (f"{unit_system}|{role}") via
+            # _resolve_runnable_segment() and accept this row as the substitute when it IS
+            # that resolved segment -- guaranteed population_hash-identical to the root by
+            # construction, so this is not narrower evidence, just a different segment_id
+            # for the same population. wp_p10_source records which path fired, for
+            # auditability only (score_reliability()'s meaning is unchanged either way).
+            is_enterprise_root = _is_unscoped_segment(r, "a")
+            is_resolved_enterprise_root = False
+            if not is_enterprise_root and a == b and segment_manifest is not None:
+                root_sid = f"{r.get('unit_system', '')}|{r.get('governance_role_a', '')}"
+                if root_sid not in _resolved_root_cache:
+                    _resolved_root_cache[root_sid] = _resolve_runnable_segment(segment_manifest, root_sid)
+                is_resolved_enterprise_root = _resolved_root_cache[root_sid] == a
+
+            if a == b and (is_enterprise_root or is_resolved_enterprise_root):
                 n = int(r["n_files_a"]) if r.get("n_files_a") else 0
+                source = "enterprise" if is_enterprise_root else f"enterprise_resolved:{a}"
                 if _col(r, "jaccard_p10") and _col(r, "jaccard_p90"):
                     existing_n = wp_p10.get(dom + "_n", -1)
                     if n > existing_n:
                         wp_p10[dom] = pf(_col(r, "jaccard_p10"))
                         wp_p90[dom] = pf(_col(r, "jaccard_p90"))
                         wp_p10[dom + "_n"] = n
+                        wp_p10_source[dom] = source
                 if _col(r, "used_jaccard_p10") and _col(r, "used_jaccard_p90"):
                     existing_n = wp_used_p10.get(dom + "_n", -1)
                     if n > existing_n:
@@ -1370,6 +1414,7 @@ def build_cascade(summary_rows: list[dict], sector_map: Optional[dict] = None) -
             "tw": mean_or_none(tw[dom]),
             "wp_p10": wp_p10.get(dom),
             "wp_p90": wp_p90.get(dom),
+            "wp_p10_source": wp_p10_source.get(dom, "none"),
             "wp_used_p10": wp_used_p10.get(dom),
             "wp_used_p90": wp_used_p90.get(dom),
             # Bundle/passive-inheritance signals
@@ -4996,6 +5041,14 @@ def main():
     parser = argparse.ArgumentParser(description="Generate governance narrative from pipeline CSVs.")
     parser.add_argument("--summary", required=True, help="cross_segment_summary.csv")
     parser.add_argument("--pooled", required=True, help="cross_segment_pooled.csv")
+    parser.add_argument("--segment-manifest",
+                        help="segment_manifest.csv (optional). Lets the within_project "
+                             "score_reliability p10/p90 capture resolve a redundant_single_child-"
+                             "demoted enterprise-wide root segment to its population-identical "
+                             "runnable descendant (see _resolve_runnable_segment() in "
+                             "compare_cross_segment.py) instead of silently finding no "
+                             "unscoped segment at all. Without this flag, behavior is "
+                             "unchanged from before this option existed.")
     parser.add_argument("--governance-states", help="cross_segment_governance_states.csv (optional)")
     parser.add_argument("--governance-state-summary", help="cross_segment_governance_state_summary.csv (optional)")
     parser.add_argument("--delta", help="cross_segment_delta.csv (optional legacy fallback)")
@@ -5177,9 +5230,14 @@ def main():
 
     sector_map = load_client_sectors(client_sector_rows)
 
+    segment_manifest = None
+    if args.segment_manifest:
+        print(f"Loading {args.segment_manifest}...")
+        segment_manifest = {row["segment_id"]: row for row in read_csv(Path(args.segment_manifest))}
+
     normalise_summary_schema(summary_rows)
     print("Computing cascade scores...")
-    cascade = build_cascade(summary_rows, sector_map)
+    cascade = build_cascade(summary_rows, sector_map, segment_manifest)
 
     print("Computing corpus counts...")
     corpus = load_corpus_counts(summary_rows, file_meta_rows)
@@ -5291,6 +5349,7 @@ def main():
             "within_project_all": fmt(d["wp_all"]),
             "within_project_p10": fmt(d["wp_p10"]),
             "within_project_p90": fmt(d["wp_p90"]),
+            "within_project_reliability_source": d.get("wp_p10_source", "none"),
             "within_project_spread": fmt(
                 (d["wp_p90"] - d["wp_p10"])
                 if d["wp_p10"] is not None and d["wp_p90"] is not None
