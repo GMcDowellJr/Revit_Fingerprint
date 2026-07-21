@@ -2505,11 +2505,25 @@ def build_bc_summary(summary_rows: list[dict], cascade: dict) -> list[dict]:
     eb_bc_used_vals = defaultdict(list)
     for dom, d in cascade.items():
         # Key shape is "{role}::{bc_a}::{bc_b}" (role-scoped -- see the
-        # bc_to_bc branch's own comment in the accumulation loop above); only
-        # the trailing bc_a/bc_b matter for a per-BC pool, so split from the
-        # right and discard the role prefix.
+        # bc_to_bc branch's own comment in the accumulation loop above).
+        # discover_governance_chain()'s by_role_bc groups ANY role sharing
+        # business_center scope (Template, Container, OR Project -- see
+        # compare_cross_segment.py:2509-2513's own "whichever role has
+        # business_center-scoped rows" comment), so a bc_to_bc pair can
+        # legitimately be a Project-vs-Project peer comparison between two
+        # BCs' own Project populations. This CSV's file count and framing
+        # ("Template+Container files", "Internal T->C Coherence") are
+        # explicitly Template/Container-scoped -- pooling in a Project-role
+        # reading would let a Project-only BC pair produce a cross-BC
+        # similarity/tier backed by 0 Template/Container files. Filter to
+        # Template/Container roles only (Codex review finding on this PR);
+        # Project-role bc_to_bc peer evidence is a different signal (BC-scoped
+        # project-portfolio convergence, closer to sibling_projects/
+        # cross_client) not represented anywhere in this summary today.
         for pair, mean_v in d.get("bb", {}).items():
-            _, bc_a, bc_b = pair.split("::", 2)
+            role, bc_a, bc_b = pair.split("::", 2)
+            if role not in ("Template", "Container"):
+                continue
             if bc_a in all_bcs:
                 bb_by_bc[bc_a].append(mean_v)
                 bb_dom_by_bc[bc_a][dom].append(mean_v)
@@ -2517,7 +2531,9 @@ def build_bc_summary(summary_rows: list[dict], cascade: dict) -> list[dict]:
                 bb_by_bc[bc_b].append(mean_v)
                 bb_dom_by_bc[bc_b][dom].append(mean_v)
         for pair, mean_v in d.get("bb_used", {}).items():
-            _, bc_a, bc_b = pair.split("::", 2)
+            role, bc_a, bc_b = pair.split("::", 2)
+            if role not in ("Template", "Container"):
+                continue
             if bc_a in all_bcs:
                 bb_used_by_bc[bc_a].append(mean_v)
             if bc_b in all_bcs:
