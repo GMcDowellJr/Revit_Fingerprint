@@ -34,6 +34,12 @@ Optional inputs (enrich state, delta, and pattern sections when available):
                               project x project grain, intentionally outside
                               assign_tier()/governance_domain_summary.csv; see
                               docs/governance_generator_cross_compare_coverage.md)
+  --governance-bc-client-matrix   governance_bc_client_matrix.csv (from
+                              tools/governance_relationships.py) -- feeds the
+                              Business Center Composition section
+  --governance-client-bc-matrix   governance_client_bc_matrix.csv (from
+                              tools/governance_relationships.py) -- feeds the
+                              Business Center Distribution section
 
 Not yet consumed directly; see docs/governance_generator_cross_compare_coverage.md
 for recommended integration points:
@@ -4450,6 +4456,142 @@ def render_project_portfolio_section(
     return "\n".join(lines)
 
 
+# ── Business Center Composition / Business Center Distribution ──────────────
+# Relationship/topology layer, Deliverables 4-5. These render governance_bc_
+# client_matrix.csv / governance_client_bc_matrix.csv (tools/governance_
+# relationships.py) verbatim -- population COMPOSITION (project/file counts
+# by client within a BC, and by BC within a client), computed once in that
+# module. Neither function here recomputes percentage_of_bc/percentage_of_
+# client; they only read and format the columns already on each row.
+#
+# This is deliberately a different question from two existing sections:
+#   - render_bc_section() ("Business Center Analysis"): Template/Container
+#     peer-alignment (bc_to_bc/enterprise_to_bc containment), not project
+#     composition, and carries no client_label at all (see build_bc_summary()'s
+#     own docstring: "No sector gating... does not apply to this summary at
+#     all").
+#   - render_project_portfolio_section()'s peer-pool containment paragraph:
+#     BEHAVIORAL similarity (Jaccard/containment) at "project" grain -- but
+#     that grain is a (client, discipline, unit_system) governance POPULATION
+#     (see compare_cross_segment.py's _label_by_project_group(), keyed by
+#     _matrix_group_id_from_values(role, client_label, discipline_label,
+#     unit_system)), which can itself pool many physical projects together.
+#     governance_relationships.csv's "project" grain is one physical project
+#     (file_metadata.csv's project_label). These two "project" concepts are
+#     NOT the same entity and are not row-for-row joinable -- a reader must
+#     not assume a specific physical project's peer-pool outlier score maps
+#     to this section's composition percentage for the same client. Stated
+#     explicitly below rather than attempting a join that would silently
+#     misrepresent two different grains as comparable.
+def render_bc_composition_section(bc_client_rows: list) -> Optional[str]:
+    """Deliverable 4 -- client composition of each business center's project
+    population. Population-composition facts only (project/file counts) --
+    no compliance, ownership, or quality judgment."""
+    if not bc_client_rows:
+        return None
+    lines = [
+        "## Business Center Composition\n",
+        "Client composition of each business center's project population, from "
+        "`governance_bc_client_matrix.csv`. Project/file counts only -- this is not a "
+        "governance, compliance, ownership, or quality read. See "
+        "`governance_relationships.csv` for the underlying per-project rows.\n",
+        "> **Not the same thing as the Project Portfolio section's peer-pool containment "
+        "paragraph above.** That paragraph measures behavioral similarity between "
+        "(client, discipline, unit_system) governance populations, which can each pool "
+        "several physical projects; this section counts physical projects and files by "
+        "client within a business center. The two do not share a grain and are not "
+        "directly comparable row-for-row -- see the module-level comment above "
+        "render_bc_composition_section() in this file.\n",
+    ]
+    by_bc: dict = defaultdict(list)
+    for r in bc_client_rows:
+        by_bc[r["business_center_label"]].append(r)
+    for bc in sorted(by_bc.keys()):
+        rows = sorted(
+            by_bc[bc],
+            key=lambda r: (-(pf(r["percentage_of_bc"]) or 0.0), r["client_label"]),
+        )
+        n_projects = sum(int(r["project_count"]) for r in rows)
+        n_files = sum(int(r["project_file_count"]) for r in rows)
+        n_clients = len(rows)
+        dominant = rows[0]
+        lines.append(f"### {bc}\n")
+        lines.append(
+            f"**{n_projects} project{'s' if n_projects != 1 else ''} across {n_files} "
+            f"file{'s' if n_files != 1 else ''}, {n_clients} client{'s' if n_clients != 1 else ''}.** "
+            f"Largest client by file count: {dominant['client_label']} "
+            f"({pct(pf(dominant['percentage_of_bc']))} of this BC's files).\n"
+        )
+        for r in rows:
+            lines.append(
+                f"- {r['client_label']}: {r['project_count']} project(s), "
+                f"{r['project_file_count']} file(s) ({pct(pf(r['percentage_of_bc']))} of BC)"
+            )
+        lines.append("")
+    return "\n".join(lines)
+
+
+def render_client_bc_distribution_section(client_bc_rows: list, bc_client_rows: list) -> Optional[str]:
+    """Deliverable 5 -- business-center distribution of each client's project
+    population (mirror of render_bc_composition_section() from the client
+    vantage point). Reads governance_client_bc_matrix.csv (rollup) and
+    governance_bc_client_matrix.csv (per-BC percentage_of_client breakdown)
+    verbatim; computes nothing new."""
+    if not client_bc_rows:
+        return None
+    lines = [
+        "## Business Center Distribution\n",
+        "Business-center distribution of each client's project population, from "
+        "`governance_client_bc_matrix.csv`. Project/file counts only -- this is not a "
+        "governance, compliance, ownership, or quality read.\n",
+        "> **Not the same thing as the Project Portfolio section's peer-pool containment "
+        "paragraph above** -- see the caveat under Business Center Composition; the same "
+        "grain mismatch applies here (physical-project composition vs. governance-"
+        "population behavioral similarity).\n",
+    ]
+    by_client: dict = defaultdict(list)
+    for r in bc_client_rows:
+        by_client[r["client_label"]].append(r)
+    for client_row in client_bc_rows:
+        client = client_row["client_label"]
+        rows = sorted(
+            by_client.get(client, []),
+            key=lambda r: (-(pf(r["percentage_of_client"]) or 0.0), r["business_center_label"]),
+        )
+        lines.append(f"### {client}\n")
+        lines.append(
+            f"**{client_row['project_count']} project(s) across {client_row['project_file_count']} "
+            f"file(s), {client_row['business_center_count']} business center"
+            f"{'s' if client_row['business_center_count'] != '1' else ''}.**\n"
+        )
+        if rows:
+            for r in rows:
+                lines.append(
+                    f"- {r['business_center_label']}: {r['project_count']} project(s), "
+                    f"{r['project_file_count']} file(s) ({pct(pf(r['percentage_of_client']))} of this client)"
+                )
+        else:
+            # --governance-bc-client-matrix not supplied (or has no rows for
+            # this client) -- both matrix flags are independently optional,
+            # so this is reachable even when governance_client_bc_matrix.csv
+            # itself is present. Fall back to that file's own ordered
+            # business_centers list rather than silently omitting the BC
+            # breakdown entirely; it carries no per-BC project_count/
+            # project_file_count/percentage_of_client of its own (only the
+            # labels, already ordered by percentage_of_client descending),
+            # so say so rather than presenting a truncated table as complete.
+            bcs = [b for b in (client_row.get("business_centers") or "").split("|") if b]
+            if bcs:
+                lines.append(
+                    "_Per-BC project/file counts unavailable this run (--governance-bc-client-matrix "
+                    "not supplied) -- business centers below, ordered by percentage_of_client descending:_"
+                )
+                for bc in bcs:
+                    lines.append(f"- {bc}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 # Cross-client-convergence "strong" and client-coherence "low" thresholds are
 # intentionally the same literal values (0.70 / 0.45) already used in
 # detect_anomalies() (lines ~1438-1442) and the client-tier assignment inside
@@ -5090,6 +5232,14 @@ def main():
                              "(also covers project_mean_file_pair_jaccard_matrix.csv's "
                              "signal via this file's own exact_identity_overlap column, "
                              "rather than consuming that matrix standalone).")
+    parser.add_argument("--governance-bc-client-matrix",
+                        help="governance_bc_client_matrix.csv (optional, from "
+                             "tools/governance_relationships.py). Feeds the Business Center "
+                             "Composition section.")
+    parser.add_argument("--governance-client-bc-matrix",
+                        help="governance_client_bc_matrix.csv (optional, from "
+                             "tools/governance_relationships.py). Feeds the Business Center "
+                             "Distribution section.")
     parser.add_argument("--policy-dir", default=str(_DEFAULT_POLICY_DIR),
                         help="Directory of externalized governance policy files: "
                              "governance_thresholds.json, domain_governance_policy.json, "
@@ -5227,6 +5377,16 @@ def main():
     if args.project_fragmentation_diagnostic:
         print(f"Loading {args.project_fragmentation_diagnostic}...")
         project_fragmentation_rows = read_csv(Path(args.project_fragmentation_diagnostic))
+
+    governance_bc_client_rows = []
+    if args.governance_bc_client_matrix:
+        print(f"Loading {args.governance_bc_client_matrix}...")
+        governance_bc_client_rows = read_csv(Path(args.governance_bc_client_matrix))
+
+    governance_client_bc_rows = []
+    if args.governance_client_bc_matrix:
+        print(f"Loading {args.governance_client_bc_matrix}...")
+        governance_client_bc_rows = read_csv(Path(args.governance_client_bc_matrix))
 
     sector_map = load_client_sectors(client_sector_rows)
 
@@ -5520,6 +5680,14 @@ def main():
     )
     if portfolio_section:
         sections.append(portfolio_section)
+    bc_composition_section = render_bc_composition_section(governance_bc_client_rows)
+    if bc_composition_section:
+        sections.append(bc_composition_section)
+    client_bc_distribution_section = render_client_bc_distribution_section(
+        governance_client_bc_rows, governance_bc_client_rows
+    )
+    if client_bc_distribution_section:
+        sections.append(client_bc_distribution_section)
     sections += [
         render_findings_and_recommendations(cascade, client_rows, governance_state_summary, findings),
         render_limitations(corpus, legacy_fallback, bool(governance_state_summary)),
@@ -5553,6 +5721,8 @@ def main():
             "project_pool_containment_similarity_matrix": Path(args.project_pool_containment_matrix) if args.project_pool_containment_matrix else None,
             "project_fragmentation_diagnostic": Path(args.project_fragmentation_diagnostic) if args.project_fragmentation_diagnostic else None,
             "segment_manifest": Path(args.segment_manifest) if args.segment_manifest else None,
+            "governance_bc_client_matrix": Path(args.governance_bc_client_matrix) if args.governance_bc_client_matrix else None,
+            "governance_client_bc_matrix": Path(args.governance_client_bc_matrix) if args.governance_client_bc_matrix else None,
         }
         input_required = {"cross_segment_summary": True, "cross_segment_pooled": True}
         input_roles = {
@@ -5572,6 +5742,8 @@ def main():
             "project_pool_containment_similarity_matrix": "authoritative_deterministic_evidence",
             "project_fragmentation_diagnostic": "authoritative_deterministic_evidence",
             "segment_manifest": "authoritative_deterministic_evidence",
+            "governance_bc_client_matrix": "authoritative_deterministic_evidence",
+            "governance_client_bc_matrix": "authoritative_deterministic_evidence",
         }
         input_present = {k: bool(v) and v.exists() for k, v in input_paths.items()}
 
@@ -5632,6 +5804,12 @@ def main():
         # project_density_similarity_rows/project_pool_containment_rows/
         # project_fragmentation_rows (REUSE_SUMMARY_FIELDS/MATRIX_OUTPUT_FIELDS/
         # FRAGMENTATION_DIAGNOSTIC_FIELDS in compare_cross_segment.py).
+        # governance_bc_client_rows/governance_client_bc_rows carry neither --
+        # tools/governance_relationships.py aggregates directly from file_
+        # metadata.csv's own columns and has no comparison-run/executed_utc
+        # concept of its own (see BC_CLIENT_MATRIX_FIELDNAMES/CLIENT_BC_MATRIX_
+        # FIELDNAMES there) -- so they are intentionally absent from both sets
+        # below, not an oversight.
         _run_id_row_sets = (
             summary_rows, pooled_rows, governance_state_rows,
             governance_state_summary_rows, delta_rows,
@@ -5720,11 +5898,34 @@ def main():
         # independent of --emit-interpretation-layer (that flag controls the
         # per-run governance_brief.md only, not whether these repo-level docs
         # are acknowledged to exist).
+        # governance_relationships.csv (tools/governance_relationships.py) is
+        # never read by this generator -- only governance_bc_client_matrix.csv/
+        # governance_client_bc_matrix.csv (loaded via --governance-bc-client-
+        # matrix/--governance-client-bc-matrix above) are. It is named by path
+        # in the Business Center Composition section's body text ("See
+        # governance_relationships.csv for the underlying per-project rows"),
+        # so it is registered as an inferred sibling path the same way
+        # cross_segment_file_pairs/comparison_registry already are -- but
+        # tools/governance_relationships.py's --out-dir is independent of
+        # --summary's directory (both are free-form CLI paths), and that tool
+        # always writes all three of its outputs into the SAME --out-dir
+        # together. Resolving beside whichever governance-matrix flag was
+        # actually supplied (not beside --summary) means this still finds the
+        # real file when the relationship layer's outputs live somewhere else
+        # entirely -- falling back to --summary's directory only when neither
+        # matrix flag was supplied, at which point none of the three
+        # relationship-layer artifacts are expected to be present anyway.
+        _relationships_anchor = (
+            Path(args.governance_bc_client_matrix) if args.governance_bc_client_matrix
+            else Path(args.governance_client_bc_matrix) if args.governance_client_bc_matrix
+            else Path(args.summary)
+        )
         sibling_paths = {
             "file_pairs": Path(args.summary).parent / "cross_segment_file_pairs.csv",
             "comparison_registry": Path(args.summary).parent / "comparison_registry.csv",
             "interpretation_guide": INTERPRETATION_GUIDE_PATH,
             "question_routes": QUESTION_ROUTES_PATH,
+            "governance_relationships": _relationships_anchor.parent / "governance_relationships.csv",
         }
         sibling_present = {k: v.exists() for k, v in sibling_paths.items()}
 

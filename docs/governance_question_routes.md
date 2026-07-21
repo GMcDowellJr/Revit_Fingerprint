@@ -487,6 +487,149 @@ Escalation:
 
 ---
 
+## Question route: Which clients exist inside a business center?
+
+Status:
+- candidate
+
+Question forms:
+- Which clients does business center X do work for?
+- How is business center X's project population split by client?
+- Who is business center X's largest client by file count?
+
+Intent:
+- Surface the client composition of one business center's project population as a factual rollup, separate from that business center's Template/Container peer-alignment scores.
+
+Primary artifacts:
+1. `governance_narrative_context.md`'s "Business Center Composition" section -- per-BC client breakdown, already computed.
+2. `governance_bc_client_matrix.csv` directly, for the full precision (`percentage_of_bc` is rounded for display in the narrative).
+
+Secondary artifacts:
+1. `governance_relationships.csv` -- the underlying one-row-per-project rows this matrix is aggregated from.
+
+Relevant fields:
+- `governance_bc_client_matrix.csv`: `business_center_label`, `client_label`, `project_count`, `project_file_count`, `percentage_of_bc`
+
+Suggested first check:
+- `governance_bc_client_matrix.csv` filtered to the business center of interest, sorted by `percentage_of_bc` descending.
+
+Evidence type:
+- direct
+
+Supported conclusion types:
+- how many projects/files a given client contributes to a business center's population, in this run
+- which client is the largest contributor to a business center by file count
+
+Unsupported conclusion types:
+- governance compliance, ownership, or quality of any client's work in that business center
+- behavioral similarity between that business center's projects (see the Project Portfolio section's peer-pool containment paragraph for that, and its own comparability caveat against this matrix)
+
+Comparability requirements:
+- None beyond the business center appearing in `governance_bc_client_matrix.csv`.
+
+Common traps:
+- Do not read `percentage_of_bc` against the Project Portfolio section's peer-pool containment scores as if they measured the same thing for the same entities -- `governance_bc_client_matrix.csv`'s grain is one physical project (`file_metadata.csv`'s `project_label`); the Portfolio section's "project" grain is a (client, discipline, unit_system) governance population that can itself pool several physical projects. See the caveat rendered directly under the narrative's "Business Center Composition" heading.
+
+Escalation:
+- None beyond the CSV/narrative section above for this package type today.
+
+---
+
+## Question route: Which business centers deliver work for a client?
+
+Status:
+- candidate
+
+Question forms:
+- Which business centers does client X's work span?
+- Is client X's work concentrated in one business center or spread across several?
+
+Intent:
+- Surface the business-center distribution of one client's project population as a factual rollup, from the client vantage point (mirror of the business-center-vantage route above).
+
+Primary artifacts:
+1. `governance_narrative_context.md`'s "Business Center Distribution" section -- per-client business-center breakdown, already computed.
+2. `governance_client_bc_matrix.csv` directly, for the rollup (`business_center_count`, ordered `business_centers` list).
+
+Secondary artifacts:
+1. `governance_bc_client_matrix.csv` -- the per-BC `percentage_of_client` rows this rollup is aggregated from (no independent computation happens at the client-matrix level).
+
+Relevant fields:
+- `governance_client_bc_matrix.csv`: `client_label`, `business_center_count`, `business_centers`, `project_count`, `project_file_count`
+- `governance_bc_client_matrix.csv`: `percentage_of_client` (per business center, for this client)
+
+Suggested first check:
+- `governance_client_bc_matrix.csv` filtered to the client of interest; `business_centers` is already ordered by `percentage_of_client` descending.
+
+Evidence type:
+- direct
+
+Supported conclusion types:
+- how many business centers a client's projects span, in this run
+- how a client's project/file count is divided across those business centers
+
+Unsupported conclusion types:
+- governance compliance, ownership, or quality implications of a client spanning multiple business centers
+- behavioral similarity between that client's projects across business centers (see the Project Portfolio section's peer-pool containment paragraph for that, and its own comparability caveat against this matrix)
+
+Comparability requirements:
+- None beyond the client appearing in `governance_client_bc_matrix.csv`. In the corpus this route catalog was seeded from, no client's projects actually spanned more than one business center (`client_cross_bc` = 0 rows in `cross_segment_summary.csv`) -- a single-BC client here is a real, verified-common case, not a data gap.
+
+Common traps:
+- Same grain-mismatch trap as the business-center-vantage route above -- do not cross-read this matrix's percentages against Project Portfolio behavioral-similarity numbers as if they described the same entities.
+
+Escalation:
+- None beyond the CSV/narrative section above for this package type today.
+
+---
+
+## Question route: Which projects make up a business center?
+
+Status:
+- candidate
+
+Question forms:
+- What is the full project roster for business center X?
+- How many files does project Y have?
+- Is project label Z the same project everywhere it appears, or does it collide across clients?
+
+Intent:
+- Resolve one physical project's identity (client, business center, disciplines, file count) rather than a governance-population rollup.
+
+Primary artifacts:
+1. `governance_relationships.csv` -- one row per physical project, keyed by (`client_label`, `business_center_label`, `project_name`).
+
+Secondary artifacts:
+1. `governance_narrative_context.md`'s "Business Center Composition" / "Business Center Distribution" sections, for the rolled-up counts this file feeds.
+
+Relevant fields:
+- `governance_relationships.csv`: `project_id`, `project_name`, `project_name_is_fallback`, `client_label`, `business_center_label`, `discipline_labels`, `unit_system`, `project_file_count`, `export_run_ids`
+
+Suggested first check:
+- `governance_relationships.csv` filtered to the business center or client of interest.
+
+Evidence type:
+- direct
+
+Supported conclusion types:
+- which physical projects exist for a given client/business center, and how many files each carries
+- whether a `project_name` string is genuinely one project or a same-named collision across different clients (identity is `(client_label, business_center_label, project_name)`, not `project_name` alone -- two different clients can legitimately share a project-name string)
+
+Unsupported conclusion types:
+- governance compliance, ownership, or quality of the project
+- behavioral similarity between projects (not this file's grain; see the Project Portfolio section)
+
+Comparability requirements:
+- `project_name_is_fallback == "true"` means `file_metadata.csv` had no real `project_label` for that file, so `project_name` is a synthetic per-file identifier (that file's own `export_run_id`), not a human-assigned project name -- treat it as "one unlabeled file," not as evidence the project itself is single-file.
+
+Common traps:
+- Do not assume every row with the same `project_name` string is the same project -- check `client_label`/`business_center_label` too; see Intent above.
+
+Escalation:
+- None beyond this CSV for this package type today.
+
+---
+
 ## Route categories represented above
 
 ```text
@@ -501,9 +644,18 @@ user/project attribution        — client onboarding/coherence
 - Before/after comparison across two runs (no accepted Phase-2 baseline yet
   per `CLAUDE.md`'s "Current operating mode" — out of scope until authority
   is established).
-- Business-center-level rollups (Group 3 cascade fan-out is captured in
-  `cascade` but not yet rendered/tiered — see `CASCADE_GROUP3_TYPES` in
-  `tools/generate_governance_narrative.py`).
+- Business-center-level **project-composition** rollups are now covered —
+  see the three routes above (`governance_bc_client_matrix.csv`,
+  `governance_client_bc_matrix.csv`, `governance_relationships.csv`).
+  Business-center-level **behavioral** rollups (Group 3 cascade fan-out —
+  `enterprise_to_bc`/`bc_to_project`/`enterprise_to_client`/`bc_to_bc`) are a
+  separate, still-open gap: captured in `cascade` but not yet rendered/
+  tiered as their own section — see `CASCADE_GROUP3_TYPES`/
+  `CASCADE_GROUP3B_TYPES` in `tools/generate_governance_narrative.py`. Do
+  not conflate the two — composition (project/file counts) and behavioral
+  similarity (containment/Jaccard) answer different questions, per the
+  grain-mismatch caveat rendered in the Business Center Composition/
+  Distribution sections.
 - A dedicated per-discipline evidence artifact (today only available inside
   `governance_narrative_context.md`'s discipline section, not as its own
   file).

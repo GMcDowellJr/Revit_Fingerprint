@@ -521,17 +521,64 @@ def test_segment_manifest_absent_from_evidence_package_when_not_supplied(tmp_pat
     assert health["optional_inputs"]["segment_manifest"] is False
 
 
-def test_evidence_map_lists_twenty_nine_artifacts_with_required_fields(tmp_path, monkeypatch):
+def test_evidence_map_lists_thirty_two_artifacts_with_required_fields(tmp_path, monkeypatch):
+    # 29 (pre-relationship-layer) + governance_bc_client_matrix +
+    # governance_client_bc_matrix + governance_relationships.
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
     ids = [a["artifact_id"] for a in evidence_map["artifacts"]]
-    assert len(ids) == 29
+    assert len(ids) == 32
     assert len(ids) == len(set(ids))
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
+    assert "governance_bc_client_matrix" in ids
+    assert "governance_client_bc_matrix" in ids
+    assert "governance_relationships" in ids
     narrative = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_narrative_context")
     assert narrative["authority_level"] != "authoritative_deterministic_evidence"
+
+
+def test_governance_relationships_resolved_beside_supplied_matrix_not_summary_dir(tmp_path, monkeypatch):
+    """Regression test for a PR review finding: tools/governance_relationships.py's
+    --out-dir is independent of --summary's directory, but this generator used to
+    hard-code governance_relationships.csv's sibling path relative to --summary,
+    so a caller pointing --governance-bc-client-matrix at a different directory
+    got a permanently-absent governance_relationships evidence-map entry even
+    though the real file existed right beside the matrix it did supply."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+
+    matrix_dir = tmp_path / "relationship_layer_output"
+    matrix_dir.mkdir()
+    _write_csv(
+        matrix_dir / "governance_bc_client_matrix.csv",
+        ["business_center_label", "client_label", "project_count", "project_file_count",
+         "percentage_of_bc", "percentage_of_client"],
+        [{"business_center_label": "2014", "client_label": "Sutter", "project_count": "16",
+          "project_file_count": "62", "percentage_of_bc": "0.446043", "percentage_of_client": "1.000000"}],
+    )
+    relationships_path = matrix_dir / "governance_relationships.csv"
+    _write_csv(
+        relationships_path,
+        ["project_id", "project_name", "project_name_is_fallback", "client_label",
+         "business_center_label", "discipline_labels", "unit_system",
+         "project_file_count", "export_run_ids"],
+        [{"project_id": "proj_abc123", "project_name": "Alpha", "project_name_is_fallback": "false",
+          "client_label": "Sutter", "business_center_label": "2014", "discipline_labels": "architectural",
+          "unit_system": "imperial", "project_file_count": "1", "export_run_ids": "f1"}],
+    )
+    # governance_relationships.csv does NOT exist beside --summary -- only in matrix_dir.
+    assert not (tmp_path / "governance_relationships.csv").exists()
+
+    _run_main(monkeypatch, [
+        "--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path),
+        "--governance-bc-client-matrix", str(matrix_dir / "governance_bc_client_matrix.csv"),
+    ])
+
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    rel_artifact = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_relationships")
+    assert rel_artifact["present"] is True
+    assert rel_artifact["path"] == str(relationships_path)
 
 
 def test_evidence_map_findings_entry_has_a_real_path(tmp_path, monkeypatch):
