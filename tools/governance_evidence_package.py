@@ -804,8 +804,10 @@ def build_evidence_map(
         ["project_name_is_fallback == \"true\" means project_name is a synthetic "
          "per-file identifier (that file's own export_run_id), not a human-"
          "assigned project name -- not consumed or checked by this generator, "
-         "which only infers this file's presence as a sibling of --summary's "
-         "directory and never parses it"],
+         "which only infers this file's presence beside whichever of "
+         "--governance-bc-client-matrix/--governance-client-bc-matrix was "
+         "supplied (falling back to --summary's directory if neither was) "
+         "and never parses it"],
         {},
         ["governance_bc_client_matrix", "governance_client_bc_matrix"],
     ))

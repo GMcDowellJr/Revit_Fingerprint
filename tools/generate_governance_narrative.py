@@ -4564,11 +4564,30 @@ def render_client_bc_distribution_section(client_bc_rows: list, bc_client_rows: 
             f"file(s), {client_row['business_center_count']} business center"
             f"{'s' if client_row['business_center_count'] != '1' else ''}.**\n"
         )
-        for r in rows:
-            lines.append(
-                f"- {r['business_center_label']}: {r['project_count']} project(s), "
-                f"{r['project_file_count']} file(s) ({pct(pf(r['percentage_of_client']))} of this client)"
-            )
+        if rows:
+            for r in rows:
+                lines.append(
+                    f"- {r['business_center_label']}: {r['project_count']} project(s), "
+                    f"{r['project_file_count']} file(s) ({pct(pf(r['percentage_of_client']))} of this client)"
+                )
+        else:
+            # --governance-bc-client-matrix not supplied (or has no rows for
+            # this client) -- both matrix flags are independently optional,
+            # so this is reachable even when governance_client_bc_matrix.csv
+            # itself is present. Fall back to that file's own ordered
+            # business_centers list rather than silently omitting the BC
+            # breakdown entirely; it carries no per-BC project_count/
+            # project_file_count/percentage_of_client of its own (only the
+            # labels, already ordered by percentage_of_client descending),
+            # so say so rather than presenting a truncated table as complete.
+            bcs = [b for b in (client_row.get("business_centers") or "").split("|") if b]
+            if bcs:
+                lines.append(
+                    "_Per-BC project/file counts unavailable this run (--governance-bc-client-matrix "
+                    "not supplied) -- business centers below, ordered by percentage_of_client descending:_"
+                )
+                for bc in bcs:
+                    lines.append(f"- {bc}")
         lines.append("")
     return "\n".join(lines)
 
@@ -5879,22 +5898,34 @@ def main():
         # independent of --emit-interpretation-layer (that flag controls the
         # per-run governance_brief.md only, not whether these repo-level docs
         # are acknowledged to exist).
+        # governance_relationships.csv (tools/governance_relationships.py) is
+        # never read by this generator -- only governance_bc_client_matrix.csv/
+        # governance_client_bc_matrix.csv (loaded via --governance-bc-client-
+        # matrix/--governance-client-bc-matrix above) are. It is named by path
+        # in the Business Center Composition section's body text ("See
+        # governance_relationships.csv for the underlying per-project rows"),
+        # so it is registered as an inferred sibling path the same way
+        # cross_segment_file_pairs/comparison_registry already are -- but
+        # tools/governance_relationships.py's --out-dir is independent of
+        # --summary's directory (both are free-form CLI paths), and that tool
+        # always writes all three of its outputs into the SAME --out-dir
+        # together. Resolving beside whichever governance-matrix flag was
+        # actually supplied (not beside --summary) means this still finds the
+        # real file when the relationship layer's outputs live somewhere else
+        # entirely -- falling back to --summary's directory only when neither
+        # matrix flag was supplied, at which point none of the three
+        # relationship-layer artifacts are expected to be present anyway.
+        _relationships_anchor = (
+            Path(args.governance_bc_client_matrix) if args.governance_bc_client_matrix
+            else Path(args.governance_client_bc_matrix) if args.governance_client_bc_matrix
+            else Path(args.summary)
+        )
         sibling_paths = {
             "file_pairs": Path(args.summary).parent / "cross_segment_file_pairs.csv",
             "comparison_registry": Path(args.summary).parent / "comparison_registry.csv",
             "interpretation_guide": INTERPRETATION_GUIDE_PATH,
             "question_routes": QUESTION_ROUTES_PATH,
-            # governance_relationships.csv (tools/governance_relationships.py) is
-            # never read by this generator -- only governance_bc_client_matrix.csv/
-            # governance_client_bc_matrix.csv (loaded via --governance-bc-client-
-            # matrix/--governance-client-bc-matrix above) are. It is named by
-            # path in the Business Center Composition section's body text ("See
-            # governance_relationships.csv for the underlying per-project rows"),
-            # so it is registered here the same way cross_segment_file_pairs/
-            # comparison_registry are -- inferred presence, drill-through only --
-            # rather than left unfindable in the evidence map for a claim this
-            # generator's own narrative text makes.
-            "governance_relationships": Path(args.summary).parent / "governance_relationships.csv",
+            "governance_relationships": _relationships_anchor.parent / "governance_relationships.csv",
         }
         sibling_present = {k: v.exists() for k, v in sibling_paths.items()}
 
