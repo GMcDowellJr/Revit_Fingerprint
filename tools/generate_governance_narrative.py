@@ -2408,7 +2408,21 @@ def build_bc_summary(summary_rows: list[dict], cascade: dict) -> list[dict]:
     for r in summary_rows:
         ct = r["comparison_type"]
         if ct == "bc_to_bc":
+            # Role-gated to Template/Container (Codex review finding on this
+            # PR, following the earlier bb/bb_used role filter): unlike
+            # enterprise_to_bc/bc_to_project, whose standards side is
+            # structurally restricted to Template/Container by
+            # _is_standard_role() in compare_cross_segment.py, bc_to_bc's
+            # by_role_bc groups ANY role sharing business_center scope --
+            # including Project. A BC visible ONLY through a Project-role
+            # bc_to_bc pair has no Template/Container evidence anywhere this
+            # summary reads, so every field would be permanently blank/
+            # Insufficient Data for it; discovering it here would just add a
+            # row this section can never fill in, not a real coverage gap.
             for suffix in ("a", "b"):
+                role = _pick(r, f"governance_role_{suffix}")
+                if role not in ("Template", "Container"):
+                    continue
                 bc = _pick(r, f"business_center_label_{suffix}")
                 if bc:
                     all_bcs.add(bc)
