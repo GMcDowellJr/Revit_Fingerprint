@@ -332,10 +332,19 @@ def apply_export_cap(df, export_top, group_col):
 
 def compute_seeded_scope(gov: pd.DataFrame) -> pd.DataFrame:
     """Broadest scope at which a Template/Container reference segment's
-    all-view mandate already includes a (domain, join_hash). One row per
-    (domain, join_hash); patterns never seen as governed anywhere are
-    simply absent -- callers treat an absent join as `seeded_scope =
-    "ungoverned"`.
+    all-view mandate already includes a (domain, join_hash, unit_system).
+    One row per key; patterns never seen as governed anywhere are simply
+    absent -- callers treat an absent join as `seeded_scope = "ungoverned"`.
+
+    Keyed on `unit_system` as well as `domain`/`join_hash`: join_hash values
+    are computed from behavioral hashes that include unit-bearing values for
+    most domains, so an imperial and a metric pattern would not normally
+    collide on the same join_hash -- but not every domain's identity
+    necessarily includes a unit-bearing property, and `compare_cross_segment
+    .py` itself enforces matching unit_system on every pair it discovers
+    ("Imperial and metric segments are never compared"). Carrying
+    unit_system through here keeps that same partition instead of relying
+    on hash collision being impossible for every domain.
     """
     g = gov[
         gov["governance_role_reference"].isin(["Template", "Container"])
@@ -345,27 +354,29 @@ def compute_seeded_scope(gov: pd.DataFrame) -> pd.DataFrame:
 
     if g.empty:
         return pd.DataFrame(
-            columns=["domain", "join_hash", "seeded_scope", "seeded_via_comparison_types"]
+            columns=["domain", "join_hash", "unit_system", "seeded_scope",
+                     "seeded_via_comparison_types"]
         )
 
     g["seed_scope_candidate"] = g["comparison_type"].map(COMPARISON_TYPE_TO_SEED_SCOPE)
     g["seed_scope_rank"] = g["seed_scope_candidate"].map(SCOPE_RANK)
 
-    idx = g.groupby(["domain", "join_hash"])["seed_scope_rank"].idxmax()
+    key_cols = ["domain", "join_hash", "unit_system"]
+    idx = g.groupby(key_cols)["seed_scope_rank"].idxmax()
     best = (
-        g.loc[idx, ["domain", "join_hash", "seed_scope_candidate"]]
+        g.loc[idx, key_cols + ["seed_scope_candidate"]]
         .rename(columns={"seed_scope_candidate": "seeded_scope"})
         .reset_index(drop=True)
     )
 
     via = (
-        g.groupby(["domain", "join_hash"])["comparison_type"]
+        g.groupby(key_cols)["comparison_type"]
         .apply(lambda s: ";".join(sorted(set(s))))
         .reset_index()
         .rename(columns={"comparison_type": "seeded_via_comparison_types"})
     )
 
-    return best.merge(via, on=["domain", "join_hash"], how="left")
+    return best.merge(via, on=key_cols, how="left")
 
 
 # ============================================================
@@ -373,27 +384,29 @@ def compute_seeded_scope(gov: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 
 def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tuple:
-    """Broadest reuse_scope observed for a (domain, join_hash), restricted
-    to configured (`view_scope == "all"`) Project-role rows -- see module
-    docstring for why Template/Container/Generic/used-view rows are
-    excluded. Returns (classified, unclassified): `classified` has one row
-    per (domain, join_hash) that resolved to a real scope value;
-    `unclassified` carries rows whose reuse_bucket was "unclassified"
-    (denominators unavailable / degraded source) for their own diagnostic
-    output, never silently merged into "ungoverned".
+    """Broadest reuse_scope observed for a (domain, join_hash, unit_system),
+    restricted to configured (`view_scope == "all"`) Project-role rows --
+    see module docstring for why Template/Container/Generic/used-view rows
+    are excluded. Returns (classified, unclassified): `classified` has one
+    row per key that resolved to a real scope value; `unclassified` carries
+    rows whose reuse_bucket was "unclassified" (denominators unavailable /
+    degraded source) for their own diagnostic output, never silently merged
+    into "ungoverned". Keyed on unit_system for the same reason as
+    compute_seeded_scope -- see its docstring.
     """
     r = reuse[
         (reuse["view_scope"] == "all") & (reuse["governance_role"] == "Project")
     ].copy()
 
+    empty_cols = [
+        "domain", "join_hash", "unit_system", "reuse_scope", "reuse_bucket",
+        "client_label", "n_clients_present", "n_clients_denominator",
+        "pct_clients_present", "n_projects_present", "n_projects_denominator",
+        "pct_projects_present", "n_files_present", "n_files_denominator",
+        "pct_files_present", "enterprise_evidence_downgraded",
+        "reuse_client_pool_is_stantec_internal",
+    ]
     if r.empty:
-        empty_cols = [
-            "domain", "join_hash", "reuse_scope", "reuse_bucket", "client_label",
-            "n_clients_present", "n_clients_denominator", "pct_clients_present",
-            "n_projects_present", "n_projects_denominator", "pct_projects_present",
-            "n_files_present", "n_files_denominator", "pct_files_present",
-            "enterprise_evidence_downgraded", "reuse_client_pool_is_stantec_internal",
-        ]
         return pd.DataFrame(columns=empty_cols), pd.DataFrame(columns=empty_cols)
 
     r["reuse_scope"] = r["reuse_bucket"].map(REUSE_BUCKET_TO_SCOPE)
@@ -415,14 +428,7 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
         classified["reuse_client_pool_is_stantec_internal"] = classified.get(
             "_is_stantec_row", pd.Series(dtype=bool)
         )
-        keep_cols = [
-            "domain", "join_hash", "reuse_scope", "reuse_bucket", "client_label",
-            "n_clients_present", "n_clients_denominator", "pct_clients_present",
-            "n_projects_present", "n_projects_denominator", "pct_projects_present",
-            "n_files_present", "n_files_denominator", "pct_files_present",
-            "enterprise_evidence_downgraded", "reuse_client_pool_is_stantec_internal",
-        ]
-        return classified.reindex(columns=keep_cols), unclassified.reindex(columns=keep_cols)
+        return classified.reindex(columns=empty_cols), unclassified.reindex(columns=empty_cols)
 
     # Multiple client-scoped rows routinely tie at the same reuse_scope_rank
     # -- most commonly every client-row for a join_hash hits "corpus_wide"
@@ -434,12 +440,13 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
     # each computed within one client's own pool, so summing numerator and
     # denominator together across distinct clients yields a genuine
     # corpus/multi-client aggregate rather than one client's figures.
+    key_cols = ["domain", "join_hash", "unit_system"]
     classified["reuse_scope_rank"] = classified["reuse_scope"].map(SCOPE_RANK)
-    max_rank = classified.groupby(["domain", "join_hash"])["reuse_scope_rank"].transform("max")
+    max_rank = classified.groupby(key_cols)["reuse_scope_rank"].transform("max")
     tied = classified[classified["reuse_scope_rank"] == max_rank].copy()
 
     classified = (
-        tied.groupby(["domain", "join_hash"])
+        tied.groupby(key_cols)
         .agg(
             reuse_scope=("reuse_scope", "first"),
             reuse_bucket=("reuse_bucket", lambda s: ";".join(sorted(set(s)))),
@@ -463,14 +470,7 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
         classified["n_files_present"] / classified["n_files_denominator"].replace(0, np.nan)
     ).fillna(0)
 
-    keep_cols = [
-        "domain", "join_hash", "reuse_scope", "reuse_bucket", "client_label",
-        "n_clients_present", "n_clients_denominator", "pct_clients_present",
-        "n_projects_present", "n_projects_denominator", "pct_projects_present",
-        "n_files_present", "n_files_denominator", "pct_files_present",
-        "enterprise_evidence_downgraded", "reuse_client_pool_is_stantec_internal",
-    ]
-    return classified.reindex(columns=keep_cols), unclassified.reindex(columns=keep_cols)
+    return classified.reindex(columns=empty_cols), unclassified.reindex(columns=empty_cols)
 
 
 # ============================================================
@@ -524,7 +524,7 @@ def main(argv=None):
     require_columns(
         gov,
         [
-            "domain", "join_hash", "pattern_label", "state",
+            "domain", "join_hash", "pattern_label", "state", "unit_system",
             "target_usage_interpretable", "n_files_in_target_used",
             "pct_files_in_target_used", "in_any_template", "in_any_container",
             "in_any_generic", "comparison_type", "governance_role_reference",
@@ -536,7 +536,7 @@ def main(argv=None):
     require_columns(
         reuse,
         [
-            "domain", "join_hash", "pattern_label", "view_scope",
+            "domain", "join_hash", "pattern_label", "view_scope", "unit_system",
             "governance_role", "client_label", "reuse_bucket",
             "n_projects_present", "n_projects_denominator",
             "n_clients_present", "n_clients_denominator",
@@ -570,18 +570,33 @@ def main(argv=None):
     if verbose:
         print(f"Local-active rows after domain filter: {len(active):,}")
 
+    # Identity is (domain, join_hash, unit_system) -- join_hash is the
+    # cross-segment identity per compare_cross_segment.py's own contract;
+    # pattern_label is target-derived display text (from that target's
+    # domain_patterns.csv, falling back to the reference's label only when
+    # the target's own is blank -- see build_governance_state_outputs()),
+    # not part of the identity. Grouping by pattern_label as well as
+    # join_hash would split one pattern's evidence into multiple rows
+    # whenever two targets happen to carry differently-spelled labels for
+    # the same join_hash, undercounting files_used/ranking evidence.
+    #
     # A single target segment shows up once per reference it was compared
     # against (Template, Enterprise, BC, ...), each carrying the same
     # n_files_in_target_used for that target (it depends only on the
     # target's own file population, not on the reference side). Collapse to
-    # one row per (domain, join_hash, pattern_label, segment_id_target)
-    # first, or summing n_files_in_target_used below double/triple-counts
-    # the same target files once per reference comparison it appeared in.
+    # one row per (domain, join_hash, unit_system, segment_id_target) first,
+    # or summing n_files_in_target_used below double/triple-counts the same
+    # target files once per reference comparison it appeared in. Within one
+    # target, pattern_label is effectively constant (it's keyed off that
+    # same target's own label lookup), so "first" is safe here; label
+    # variation across *different* targets is preserved (";"-joined) in the
+    # outer aggregation below rather than picked arbitrarily.
     active_by_target = (
         active.groupby(
-            ["domain", "join_hash", "pattern_label", "segment_id_target"], dropna=False
+            ["domain", "join_hash", "unit_system", "segment_id_target"], dropna=False
         )
         .agg(
+            pattern_label=("pattern_label", "first"),
             n_files_in_target_used=("n_files_in_target_used", "max"),
             pct_files_in_target_used=("pct_files_in_target_used", "max"),
             in_any_template=("in_any_template", "max"),
@@ -591,9 +606,14 @@ def main(argv=None):
         .reset_index()
     )
 
+    def _join_labels(s):
+        labels = sorted({str(x) for x in s if pd.notna(x) and str(x).strip()})
+        return ";".join(labels)
+
     base = (
-        active_by_target.groupby(["domain", "join_hash", "pattern_label"], dropna=False)
+        active_by_target.groupby(["domain", "join_hash", "unit_system"], dropna=False)
         .agg(
+            pattern_label=("pattern_label", _join_labels),
             files_used=("n_files_in_target_used", "sum"),
             max_pct_used=("pct_files_in_target_used", "max"),
             any_template=("in_any_template", "max"),
@@ -607,21 +627,24 @@ def main(argv=None):
     # SCOPE RESOLUTION
     # ========================================================
 
+    join_keys = ["domain", "join_hash", "unit_system"]
+
     seeded = compute_seeded_scope(gov)
     reuse_classified, reuse_unclassified = compute_reuse_scope(reuse, min_enterprise_clients)
 
-    df = base.merge(seeded, on=["domain", "join_hash"], how="left")
+    df = base.merge(seeded, on=join_keys, how="left")
     df["seeded_scope"] = df["seeded_scope"].fillna("ungoverned")
     df["seeded_via_comparison_types"] = df["seeded_via_comparison_types"].fillna("")
 
-    df = df.merge(reuse_classified, on=["domain", "join_hash"], how="left")
+    df = df.merge(reuse_classified, on=join_keys, how="left")
 
     unclassified_join_hashes = set(
-        zip(reuse_unclassified["domain"], reuse_unclassified["join_hash"])
+        zip(reuse_unclassified["domain"], reuse_unclassified["join_hash"],
+            reuse_unclassified["unit_system"])
     ) if not reuse_unclassified.empty else set()
 
     def _row_is_unclassified(row):
-        return (row["domain"], row["join_hash"]) in unclassified_join_hashes
+        return (row["domain"], row["join_hash"], row["unit_system"]) in unclassified_join_hashes
 
     df["reuse_data_unclassified"] = df.apply(_row_is_unclassified, axis=1) & df["reuse_scope"].isna()
     df["reuse_scope"] = df["reuse_scope"].fillna(
@@ -747,7 +770,7 @@ def main(argv=None):
     # ========================================================
 
     audit_cols = [
-        "domain", "join_hash", "pattern_label", "routing_bucket", "candidate_class",
+        "domain", "join_hash", "unit_system", "pattern_label", "routing_bucket", "candidate_class",
         "scope_gap", "seeded_scope", "reuse_scope", "seeded_via_comparison_types",
         "reuse_bucket", "client_label", "n_clients_present", "n_clients_denominator",
         "pct_clients_present", "n_projects_present", "n_projects_denominator",

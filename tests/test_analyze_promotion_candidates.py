@@ -29,6 +29,7 @@ def _gov_row(join_hash, **overrides):
     row = {
         "domain": DOMAIN,
         "join_hash": join_hash,
+        "unit_system": "imperial",
         "pattern_label": overrides.pop("pattern_label", join_hash),
         "state": "local_active",
         "target_usage_interpretable": "true",
@@ -135,6 +136,23 @@ def corpus_root(tmp_path):
         # the same reuse_scope_rank) -- their project/file evidence must be
         # aggregated, not have one client's row arbitrarily win.
         _gov_row("jh_tied_clients"),
+
+        # jh_multi_label: same join_hash, two different targets carrying
+        # different pattern_label spellings -- must not split into two rows
+        # / undercount files_used per label.
+        _gov_row("jh_multi_label", segment_id_target="seg_a",
+                 pattern_label="Foo Type", n_files_in_target_used=4),
+        _gov_row("jh_multi_label", segment_id_target="seg_b",
+                 pattern_label="Foo Type (copy)", n_files_in_target_used=6),
+
+        # jh_unit_test: same join_hash string reused across two unit_system
+        # pools with deliberately different seeding/reuse evidence -- must
+        # route independently per unit_system, not merge across the split.
+        _gov_row("jh_unit_test", unit_system="imperial"),
+        _gov_row("jh_unit_test", unit_system="metric"),
+        {**_gov_row("jh_unit_test", unit_system="metric", segment_id_target="seg_metric_seed"),
+         "state": "provided_and_used", "comparison_type": "enterprise_to_project",
+         "governance_role_reference": "Template", "in_reference_all": "true"},
     ]
 
     reuse_rows = [
@@ -170,6 +188,9 @@ def corpus_root(tmp_path):
                    n_clients_present=5, n_clients_denominator=6,
                    n_projects_present=3, n_projects_denominator=5,
                    n_files_present=6, n_files_denominator=10),
+        _reuse_row("jh_multi_label", reuse_bucket="client_wide"),
+        _reuse_row("jh_unit_test", unit_system="imperial", reuse_bucket="client_wide"),
+        _reuse_row("jh_unit_test", unit_system="metric", reuse_bucket="client_wide"),
     ]
 
     pd.DataFrame(gov_rows).to_csv(tmp_path / "cross_segment_governance_states.csv", index=False)
@@ -242,6 +263,37 @@ def test_tied_client_rows_are_aggregated_not_dropped(corpus_root):
     assert row["n_files_denominator"] == 20
     assert set(row["client_label"].split(";")) == {"Acme", "Beta"}
     assert row["reuse_scope"] == "enterprise"
+
+
+def test_pattern_label_variation_does_not_split_identity(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    candidates = _read(corpus_root, "promotion_candidates.csv")
+    matches = candidates[candidates["join_hash"] == "jh_multi_label"]
+    # One row for the join_hash, not two -- files_used combines both targets
+    # (4 + 6), and both label spellings are preserved rather than one being
+    # silently dropped.
+    assert len(matches) == 1
+    row = matches.iloc[0]
+    assert row["files_used"] == 10
+    assert set(row["pattern_label"].split(";")) == {"Foo Type", "Foo Type (copy)"}
+
+
+def test_unit_system_partitions_scope_evidence(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    audit = _read(corpus_root, "promotion_candidate_full_audit.csv")
+    rows = audit[audit["join_hash"] == "jh_unit_test"]
+    assert len(rows) == 2
+    imperial = rows[rows["unit_system"] == "imperial"].iloc[0]
+    metric = rows[rows["unit_system"] == "metric"].iloc[0]
+    # Same join_hash string, deliberately different seeding evidence per
+    # unit_system -- imperial (ungoverned, client-wide reuse) is a
+    # candidate; metric (seeded enterprise-wide, only client-wide reuse) is
+    # governed_but_underused. If the two unit_system rows were merged, both
+    # would land in the same bucket.
+    assert imperial["seeded_scope"] == "ungoverned"
+    assert imperial["routing_bucket"] == "promotion_candidates"
+    assert metric["seeded_scope"] == "enterprise"
+    assert metric["routing_bucket"] == "governed_but_underused"
 
 
 def test_unclassified_reuse_routed_separately(corpus_root):
@@ -327,8 +379,14 @@ def test_routing_buckets_are_mutually_exclusive(corpus_root):
         "baseline_adequately_governed.csv", "below_reuse_floor.csv",
         "unclassified_reuse.csv",
     ]
+    # Identity is (join_hash, unit_system), not join_hash alone -- the same
+    # join_hash string can legitimately carry different scope evidence per
+    # unit_system pool (see test_unit_system_partitions_scope_evidence) and
+    # land in two different buckets for that reason alone.
     seen = {}
     for fname in files:
-        for jh in _read(corpus_root, fname)["join_hash"]:
-            assert jh not in seen, f"{jh} appears in both {seen.get(jh)} and {fname}"
-            seen[jh] = fname
+        df = _read(corpus_root, fname)
+        for jh, unit in zip(df["join_hash"], df["unit_system"]):
+            key = (jh, unit)
+            assert key not in seen, f"{key} appears in both {seen.get(key)} and {fname}"
+            seen[key] = fname
