@@ -50,6 +50,14 @@ for recommended integration points:
   into project_fragmentation_diagnostic.csv's exact_identity_overlap column
   rather than consumed standalone)
 
+  This is the exhaustive list of files this generator writes no code path to
+  read -- confirmed against this docstring, not assumed. All four are still
+  registered as governance_evidence_map.json artifacts (D-024): each entry's
+  columns/row_count are populated by a live scan (the same one
+  governance_file_inventory.json uses) when the file is present beside
+  --summary, so a reader can see the real header/row-count without opening
+  the (potentially multi-GB) file itself. See docs/governance_evidence_package.md.
+
 Output:
   --out          governance_narrative_context.md  (default)
 
@@ -5978,9 +5986,60 @@ def main():
             else Path(args.governance_client_bc_matrix) if args.governance_client_bc_matrix
             else Path(args.summary)
         )
+        # D-024 PR-review fix: pattern_reuse_summary_by_domain.csv and
+        # project_mean_file_pair_jaccard_matrix.csv are written by
+        # compare_cross_segment.py's main() to the SAME --out-dir as their
+        # already-optionally-supplied siblings (pattern_reuse_summary_by_domain.csv
+        # alongside pattern_reuse_distribution.csv/pattern_reuse_summary_by_client.csv;
+        # project_mean_file_pair_jaccard_matrix.csv alongside the other project_*
+        # matrices and project_fragmentation_diagnostic.csv -- see the single
+        # `if reuse_distribution_rows:` / `if matrix_outputs or ...:` write blocks
+        # in compare_cross_segment.py). A caller who points those optional flags
+        # at a directory other than --summary's (allowed, and already how
+        # _relationships_anchor is resolved below) would otherwise get a
+        # permanently `present: false` entry for these two siblings even though
+        # the real files sit right beside the matrix/reuse input actually
+        # supplied. Anchored the same way _relationships_anchor already is:
+        # prefer the most specific supplied sibling, fall back to --summary's directory.
+        _reuse_domain_anchor = (
+            Path(args.reuse_by_client) if args.reuse_by_client
+            else Path(args.reuse_distribution) if args.reuse_distribution
+            # --union-inventory (cross_segment_union_inventory.csv) is written by the
+            # same compare_cross_segment.py invocation to the same --out-dir as the
+            # reuse-distribution family, so it is an equally valid anchor when neither
+            # of the two more specific reuse flags above was supplied.
+            else Path(args.union_inventory) if args.union_inventory
+            else Path(args.summary)
+        )
+        _project_mean_pair_anchor = (
+            Path(args.project_fragmentation_diagnostic) if args.project_fragmentation_diagnostic
+            else Path(args.project_union_jaccard_matrix) if args.project_union_jaccard_matrix
+            else Path(args.project_density_similarity_matrix) if args.project_density_similarity_matrix
+            else Path(args.project_pool_containment_matrix) if args.project_pool_containment_matrix
+            # --matrix-manifest (matrix_output_manifest.csv) is written by the same
+            # compare_cross_segment.py invocation to the same --out-dir as
+            # project_mean_file_pair_jaccard_matrix.csv and every other project_*
+            # matrix (see the single `if matrix_outputs or fragmentation_rows or
+            # matrix_manifest_rows:` write block), so a run that supplies only
+            # --matrix-manifest without any individual --project-* flag still
+            # anchors correctly instead of falling through to --summary's directory.
+            else Path(args.matrix_manifest) if args.matrix_manifest
+            else Path(args.summary)
+        )
         sibling_paths = {
             "file_pairs": Path(args.summary).parent / "cross_segment_file_pairs.csv",
             "comparison_registry": Path(args.summary).parent / "comparison_registry.csv",
+            # D-024: the other two files this generator's own module docstring
+            # names as "not yet consumed directly" (see above) -- both written
+            # by compare_cross_segment.py's main(), anchored beside whichever
+            # related optional input was actually supplied (see _reuse_domain_anchor/
+            # _project_mean_pair_anchor above), falling back to --summary's directory.
+            # Registering them here (rather than leaving them for
+            # inventory_export_directory_files() to discover generically below)
+            # gives each its own governance_evidence_map.json can_answer/
+            # cannot_answer entry instead of a structural-only sentence.
+            "pattern_reuse_summary_by_domain": _reuse_domain_anchor.parent / "pattern_reuse_summary_by_domain.csv",
+            "project_mean_file_pair_jaccard_matrix": _project_mean_pair_anchor.parent / "project_mean_file_pair_jaccard_matrix.csv",
             "interpretation_guide": INTERPRETATION_GUIDE_PATH,
             "question_routes": QUESTION_ROUTES_PATH,
             "governance_relationships": _relationships_anchor.parent / "governance_relationships.csv",
@@ -5990,14 +6049,16 @@ def main():
         # ── D-023: live file-availability inventory ─────────────────────────────
         # Scans the cross_segment export directory (--summary's parent) and,
         # when it differs, the relationship-layer output directory
-        # (_relationships_anchor's parent) for *.csv files this generator has
-        # no artifact_id for yet -- every path already known as an input,
-        # output, or sibling artifact above is excluded. See D-023 and
-        # docs/governance_evidence_package.md. Written before governance_brief.md
-        # so the brief can render a pointer/summary section from the same
-        # already-computed data (no second scan).
+        # (_relationships_anchor's parent) and the pattern-reuse/project-matrix
+        # anchor directories (D-024's _reuse_domain_anchor/_project_mean_pair_anchor)
+        # for *.csv files this generator has no artifact_id for yet -- every path
+        # already known as an input, output, or sibling artifact above is
+        # excluded. See D-023 and docs/governance_evidence_package.md. Written
+        # before governance_brief.md so the brief can render a pointer/summary
+        # section from the same already-computed data (no second scan).
         _export_scan_dirs = []
-        for _d in (Path(args.summary).parent, _relationships_anchor.parent):
+        for _d in (Path(args.summary).parent, _relationships_anchor.parent,
+                   _reuse_domain_anchor.parent, _project_mean_pair_anchor.parent):
             _rd = _d.resolve()
             if _rd not in {sd.resolve() for sd in _export_scan_dirs}:
                 _export_scan_dirs.append(_d)

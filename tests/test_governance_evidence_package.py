@@ -318,18 +318,21 @@ def _evidence_map(**overrides):
     return build_evidence_map(**kwargs)
 
 
-def test_evidence_map_has_thirty_three_unique_artifacts():
+def test_evidence_map_has_thirty_five_unique_artifacts():
     # 29 (pre-relationship-layer) + governance_bc_client_matrix +
-    # governance_client_bc_matrix + governance_relationships + governance_file_inventory.
+    # governance_client_bc_matrix + governance_relationships + governance_file_inventory
+    # + pattern_reuse_summary_by_domain + project_mean_file_pair_jaccard_matrix (D-024).
     em = _evidence_map()
     ids = [a["artifact_id"] for a in em["artifacts"]]
-    assert len(ids) == 33
+    assert len(ids) == 35
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
     assert "governance_bc_client_matrix" in ids
     assert "governance_client_bc_matrix" in ids
     assert "governance_relationships" in ids
     assert "governance_file_inventory" in ids
+    assert "pattern_reuse_summary_by_domain" in ids
+    assert "project_mean_file_pair_jaccard_matrix" in ids
     assert len(ids) == len(set(ids))
 
 
@@ -404,6 +407,60 @@ def test_evidence_map_sibling_artifacts_present_flag_reflects_filesystem(tmp_pat
     # Sibling artifacts are archive-only: never opened/parsed by this generator.
     assert by_id["cross_segment_file_pairs"]["required"] is False
     assert by_id["comparison_registry"]["required"] is False
+
+
+# ---------------------------------------------------------------------------
+# D-024: excluded-sibling structural facts (columns/row_count) reused from
+# the same _scan_csv_file() the D-023 live file inventory already uses.
+# ---------------------------------------------------------------------------
+
+_ESCALATION_TARGET_SIBLING_KEYS = (
+    "file_pairs", "comparison_registry",
+    "pattern_reuse_summary_by_domain", "project_mean_file_pair_jaccard_matrix",
+)
+_ESCALATION_TARGET_ARTIFACT_IDS = (
+    "cross_segment_file_pairs", "comparison_registry",
+    "pattern_reuse_summary_by_domain", "project_mean_file_pair_jaccard_matrix",
+)
+
+
+def test_evidence_map_excluded_siblings_get_scanned_columns_and_row_count_when_present(tmp_path):
+    paths = {}
+    for key in _ESCALATION_TARGET_SIBLING_KEYS:
+        f = tmp_path / f"{key}.csv"
+        f.write_text("segment_id_a,segment_id_b,domain\nimperial|A,imperial|B,line_styles\n", encoding="utf-8")
+        paths[key] = f
+    em = _evidence_map(
+        sibling_paths=paths,
+        sibling_present={key: True for key in _ESCALATION_TARGET_SIBLING_KEYS},
+    )
+    by_id = {a["artifact_id"]: a for a in em["artifacts"]}
+    for artifact_id in _ESCALATION_TARGET_ARTIFACT_IDS:
+        entry = by_id[artifact_id]
+        assert entry["row_count"] == 1, artifact_id
+        col_names = [c["name"] for c in entry["columns"]]
+        assert col_names == ["segment_id_a", "segment_id_b", "domain"], artifact_id
+
+
+def test_evidence_map_excluded_siblings_have_no_scan_fields_when_absent():
+    """Absent sibling files must not carry columns/row_count -- scanning a
+    path that does not exist is meaningless, not an all-zeros result."""
+    em = _evidence_map()  # default fixture: file_pairs/comparison_registry both absent
+    by_id = {a["artifact_id"]: a for a in em["artifacts"]}
+    for artifact_id in _ESCALATION_TARGET_ARTIFACT_IDS:
+        entry = by_id[artifact_id]
+        assert "columns" not in entry, artifact_id
+        assert "row_count" not in entry, artifact_id
+
+
+def test_evidence_map_excluded_sibling_scan_never_retains_sample_values(tmp_path):
+    f = tmp_path / "cross_segment_file_pairs.csv"
+    f.write_text("secret_value\nDO-NOT-LEAK-THIS\n", encoding="utf-8")
+    em = _evidence_map(
+        sibling_paths={"file_pairs": f, "comparison_registry": tmp_path / "comparison_registry.csv"},
+        sibling_present={"file_pairs": True, "comparison_registry": False},
+    )
+    assert "DO-NOT-LEAK-THIS" not in json.dumps(em)
 
 
 def test_evidence_map_uses_overridden_package_schema_version_for_manifest_and_health_entries():

@@ -431,6 +431,29 @@ _BLANK_STRING_NULL_SEMANTICS = {
 }
 
 
+def _sibling_scan_fields(path, present: bool) -> dict:
+    """Reuse _scan_csv_file() -- the same D-023 live scan governance_file_
+    inventory.json already performs for undiscovered files -- to populate an
+    excluded sibling artifact's own governance_evidence_map.json entry with
+    its column header (name + inferred dtype) and row count. A reader who
+    never opens governance_file_inventory.json still gets this for the
+    specific large files docs/governance_interpretation_guide.md's
+    escalation section names by filename (D-024). Returns {} when the file
+    is not present -- scanning a path that does not exist is meaningless,
+    not an error to report. Never returns a sample row or cell value, same
+    scope decision as the D-023 scan itself.
+    """
+    if not present or not path:
+        return {}
+    scan = _scan_csv_file(Path(path))
+    fields = {"row_count": scan["row_count"]}
+    if scan.get("parse_error"):
+        fields["parse_error"] = scan["parse_error"]
+    else:
+        fields["columns"] = scan["columns"]
+    return fields
+
+
 def build_evidence_map(
     *,
     schema_version: str,
@@ -634,7 +657,7 @@ def build_evidence_map(
         [], ["render_union_reuse_summary() consumes this via a top-20 bucket table "
              "only; full distribution detail beyond that is not summarized."],
         _BLANK_STRING_NULL_SEMANTICS,
-        ["cross_segment_union_inventory", "matrix_output_manifest"],
+        ["cross_segment_union_inventory", "matrix_output_manifest", "pattern_reuse_summary_by_domain"],
     ))
 
     artifacts.append(_artifact(
@@ -759,7 +782,7 @@ def build_evidence_map(
          "means the cell could not be computed and is excluded from the "
          "narrative's pair list"],
         _BLANK_STRING_NULL_SEMANTICS,
-        ["project_union_jaccard_matrix", "matrix_output_manifest"],
+        ["project_union_jaccard_matrix", "matrix_output_manifest", "project_mean_file_pair_jaccard_matrix"],
     ))
 
     artifacts.append(_artifact(
@@ -855,10 +878,15 @@ def build_evidence_map(
          "as a sibling of --summary's directory, never verified against its own schema"],
         ["not consumed by this generator in PR1; see "
          "docs/governance_generator_cross_compare_coverage.md's suggested "
-         "'drill-through only' integration point"],
+         "'drill-through only' integration point. columns/row_count below "
+         "(when present) come from the same live directory scan governance_"
+         "file_inventory.json uses (_scan_csv_file, D-023/D-024) -- a "
+         "structural fact about the header, not this generator opening or "
+         "interpreting a single row of it."],
         {},
         ["cross_segment_summary"],
     ))
+    artifacts[-1].update(_sibling_scan_fields(sibling_paths.get("file_pairs"), sibling_present.get("file_pairs", False)))
 
     artifacts.append(_artifact(
         "comparison_registry", p(sibling_paths, "comparison_registry"), "csv", False,
@@ -875,9 +903,77 @@ def build_evidence_map(
         ["not consumed by this generator in PR1 -- missing rows in "
          "cross_segment_summary.csv are currently treated as weak evidence rather "
          "than distinguished from not-run/stale comparisons; see "
-         "docs/governance_generator_cross_compare_coverage.md."],
+         "docs/governance_generator_cross_compare_coverage.md. columns/row_count "
+         "below (when present) come from the same live directory scan governance_"
+         "file_inventory.json uses (_scan_csv_file, D-023/D-024), not from a "
+         "read this generator performs on a normal run."],
         {},
         ["cross_segment_summary"],
+    ))
+    artifacts[-1].update(_sibling_scan_fields(
+        sibling_paths.get("comparison_registry"), sibling_present.get("comparison_registry", False),
+    ))
+
+    artifacts.append(_artifact(
+        "pattern_reuse_summary_by_domain", p(sibling_paths, "pattern_reuse_summary_by_domain"), "csv", False,
+        sibling_present.get("pattern_reuse_summary_by_domain", False), "compare_cross_segment.py",
+        AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "archive_only -- not read by generate_governance_narrative.py; "
+        "deliberately excluded (not merely unwired), since its n_patterns "
+        "duplicates the corpus-wide reuse signal pattern_reuse_distribution.csv's "
+        "own distinct-pattern table already reports -- see this generator's "
+        "own module docstring and docs/governance_generator_cross_compare_coverage.md",
+        "one row per (view_scope, governance_role, client_label, "
+        "discipline_label, unit_system, domain, reuse_bucket, bucket_basis) "
+        "-- the by-domain sibling of pattern_reuse_summary_by_client.csv",
+        ["view_scope", "governance_role", "client_label", "discipline_label", "unit_system", "domain"], [], [],
+        ["per-domain reuse_bucket/n_patterns counts, recorded independently of "
+         "pattern_reuse_distribution.csv's own dedup table"],
+        ["a governance signal distinct from what pattern_reuse_distribution.csv "
+         "already reports -- evaluated and confirmed to add no new information "
+         "beyond that file's already-consumed distinct-pattern table"],
+        ["this generator's narrative/scoring logic never opens or interprets "
+         "this file's row content; columns/row_count below (when present) come "
+         "from the same live directory scan governance_file_inventory.json "
+         "uses (_scan_csv_file, D-023/D-024), not from a read this generator "
+         "performs on a normal run"],
+        _BLANK_STRING_NULL_SEMANTICS,
+        ["pattern_reuse_distribution", "pattern_reuse_summary_by_client"],
+    ))
+    artifacts[-1].update(_sibling_scan_fields(
+        sibling_paths.get("pattern_reuse_summary_by_domain"),
+        sibling_present.get("pattern_reuse_summary_by_domain", False),
+    ))
+
+    artifacts.append(_artifact(
+        "project_mean_file_pair_jaccard_matrix", p(sibling_paths, "project_mean_file_pair_jaccard_matrix"), "csv", False,
+        sibling_present.get("project_mean_file_pair_jaccard_matrix", False), "compare_cross_segment.py",
+        AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "archive_only -- not consumed standalone by generate_governance_narrative.py; "
+        "its signal is folded into project_fragmentation_diagnostic.csv's own "
+        "exact_identity_overlap column instead, per this generator's own module "
+        "docstring and docs/governance_generator_cross_compare_coverage.md",
+        "one row per (row_id, column_id, view_scope, domain) matrix cell, same "
+        "shape as the other project_* matrices; ALL_DOMAINS rows carry the "
+        "cross-domain mean file-pair jaccard",
+        ["row_id", "column_id", "view_scope", "domain"], [], [],
+        ["typical file-to-file similarity between two projects (mean pairwise "
+         "file jaccard), independent of exact system-level footprint overlap"],
+        ["a governance read distinct from project_fragmentation_diagnostic.csv's "
+         "exact_identity_overlap column -- that column already carries this "
+         "file's signal into the narrative; this file itself is never opened "
+         "standalone"],
+        ["this generator's narrative/scoring logic never opens or interprets "
+         "this file's row content directly; columns/row_count below (when "
+         "present) come from the same live directory scan governance_file_"
+         "inventory.json uses (_scan_csv_file, D-023/D-024), not from a read "
+         "this generator performs on a normal run"],
+        _BLANK_STRING_NULL_SEMANTICS,
+        ["project_fragmentation_diagnostic", "project_union_jaccard_matrix"],
+    ))
+    artifacts[-1].update(_sibling_scan_fields(
+        sibling_paths.get("project_mean_file_pair_jaccard_matrix"),
+        sibling_present.get("project_mean_file_pair_jaccard_matrix", False),
     ))
 
     artifacts.append(_artifact(

@@ -655,7 +655,15 @@ user/project attribution        — client onboarding/coherence
   not conflate the two — composition (project/file counts) and behavioral
   similarity (containment/Jaccard) answer different questions, per the
   grain-mismatch caveat rendered in the Business Center Composition/
-  Distribution sections.
+  Distribution sections. If the pair-mean cascade score for a `bc_to_bc`/
+  `enterprise_to_bc` comparison needs file-level audit (e.g. "is this
+  cross-BC/enterprise pattern consistency real or an artifact of a small
+  file sample?"), that is exactly `docs/governance_interpretation_guide.md`'s
+  escalation path into `cross_segment_file_pairs.csv` filtered by
+  `comparison_type=bc_to_bc`/`enterprise_to_bc` and `domain`/`segment_id_a`/
+  `segment_id_b` — see that file's `governance_evidence_map.json` entry
+  (D-024) for its real column header and row count before writing the
+  filtered extraction script.
 - A dedicated per-discipline evidence artifact (today only available inside
   `governance_narrative_context.md`'s discipline section, not as its own
   file).

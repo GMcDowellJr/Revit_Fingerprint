@@ -12,6 +12,56 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **Escalation-target file coverage (D-024):** the four files
+  `generate_governance_narrative.py`'s own module docstring lists as "not
+  yet consumed directly" -- `comparison_registry.csv`,
+  `cross_segment_file_pairs.csv`, `pattern_reuse_summary_by_domain.csv`, and
+  `project_mean_file_pair_jaccard_matrix.csv` -- are now all registered as
+  `sibling_paths` (beside `--summary`'s directory, same inference the first
+  two already used) and get a full `governance_evidence_map.json` artifact
+  entry (`context_role`/`grain`/`can_answer`/`cannot_answer`/
+  `known_limitations`, same voice as every other archive_only sibling). A
+  new `_sibling_scan_fields()` helper (`tools/governance_evidence_package.py`)
+  reuses D-023's `_scan_csv_file()` -- no second scanning implementation --
+  to populate each entry's `columns` (name + inferred dtype) and `row_count`
+  when the file is present; both fields are simply absent when the file is
+  not present, since scanning a nonexistent path is meaningless. No sample
+  row or cell value is ever retained. Registering
+  `pattern_reuse_summary_by_domain`/`project_mean_file_pair_jaccard_matrix`
+  as known siblings also excludes them from
+  `inventory_export_directory_files()`'s generic undiscovered-file scan, so
+  each file gets exactly one narrative home (its own `can_answer`/
+  `cannot_answer`) instead of two competing descriptions of the same file.
+  `pattern_reuse_distribution`/`project_fragmentation_diagnostic` gained a
+  reverse `related_artifacts` link to their newly-registered siblings.
+  `governance_evidence_map.json` grows from 33 to 35 artifacts. Three D-023
+  tests that used these two files as stand-ins for "a generic undiscovered
+  file" were updated to fictitious filenames, since those two real filenames
+  no longer qualify. `docs/governance_interpretation_guide.md`'s escalation
+  section now pins the exhaustive four-file list (previously only gestured
+  at "another large sibling artifact") and points a reader at the new
+  `columns`/`row_count` fields before writing a filtered extraction script.
+  `docs/governance_question_routes.md`'s bc_to_bc/enterprise cascade note
+  gained a pointer to this same escalation path for cross-BC/enterprise
+  pattern-consistency questions needing file-level audit. No existing
+  classification, scoring, CSV column, or narrative content changed.
+  `compare_cross_segment.py` and `build_segment_manifest.py` are unchanged
+  (read-only dependency). PR-review fix folded in: `pattern_reuse_summary_
+  by_domain.csv`/`project_mean_file_pair_jaccard_matrix.csv`'s sibling paths
+  are anchored to whichever related optional flag was actually supplied
+  (`--reuse-by-client`/`--reuse-distribution`;
+  `--project-fragmentation-diagnostic`/`--project-union-jaccard-matrix`/
+  `--project-density-similarity-matrix`/`--project-pool-containment-matrix`),
+  falling back to `--summary`'s directory -- the same anchoring
+  `governance_relationships.csv` already used -- so a mixed-directory run
+  does not silently report these two escalation targets as absent. The
+  D-023 live-scan directories grew to include both new anchor directories
+  too. Second follow-up: both anchor chains also fall back to
+  `--union-inventory`/`--matrix-manifest` (written by the same
+  `compare_cross_segment.py` invocation to the same `--out-dir` as their
+  respective escalation target) before falling back to `--summary`'s
+  directory, so a run supplying only that broader optional input still
+  anchors correctly. See D-024 and `docs/governance_evidence_package.md`.
 - **Live file-availability inventory (D-023):** new `governance_file_inventory.json`
   artifact in the governance evidence package, built fresh on every run by
   `inventory_export_directory_files()` (`tools/governance_evidence_package.py`):
