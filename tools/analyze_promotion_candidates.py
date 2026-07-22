@@ -404,20 +404,64 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
     r["enterprise_evidence_downgraded"] = downgrade_mask
     r.loc[downgrade_mask, "reuse_scope"] = "client"
 
-    r["reuse_client_pool_is_stantec_internal"] = (
-        r["client_label"].astype(str).str.strip().str.lower() == "stantec"
-    ) & (r["reuse_scope"] == "client")
+    r["_is_stantec_row"] = r["client_label"].astype(str).str.strip().str.lower() == "stantec"
 
     unclassified = r[r["reuse_scope"].isna()].copy()
     unclassified["reuse_scope"] = "unclassified"
+    unclassified["reuse_client_pool_is_stantec_internal"] = unclassified["_is_stantec_row"]
 
     classified = r[r["reuse_scope"].notna()].copy()
     if classified.empty:
-        return classified, unclassified
+        classified["reuse_client_pool_is_stantec_internal"] = classified.get(
+            "_is_stantec_row", pd.Series(dtype=bool)
+        )
+        keep_cols = [
+            "domain", "join_hash", "reuse_scope", "reuse_bucket", "client_label",
+            "n_clients_present", "n_clients_denominator", "pct_clients_present",
+            "n_projects_present", "n_projects_denominator", "pct_projects_present",
+            "n_files_present", "n_files_denominator", "pct_files_present",
+            "enterprise_evidence_downgraded", "reuse_client_pool_is_stantec_internal",
+        ]
+        return classified.reindex(columns=keep_cols), unclassified.reindex(columns=keep_cols)
 
+    # Multiple client-scoped rows routinely tie at the same reuse_scope_rank
+    # -- most commonly every client-row for a join_hash hits "corpus_wide"
+    # together, since pct_clients_present is a shared, not client-specific,
+    # quantity. idxmax() alone would silently keep one arbitrary client's
+    # n_projects_present/n_files_present (CSV-row-order dependent) and
+    # discard the others. Aggregate across every row tied at the max rank
+    # instead: n_projects_present/n_files_present and their denominators are
+    # each computed within one client's own pool, so summing numerator and
+    # denominator together across distinct clients yields a genuine
+    # corpus/multi-client aggregate rather than one client's figures.
     classified["reuse_scope_rank"] = classified["reuse_scope"].map(SCOPE_RANK)
-    idx = classified.groupby(["domain", "join_hash"])["reuse_scope_rank"].idxmax()
-    classified = classified.loc[idx].drop(columns=["reuse_scope_rank"]).reset_index(drop=True)
+    max_rank = classified.groupby(["domain", "join_hash"])["reuse_scope_rank"].transform("max")
+    tied = classified[classified["reuse_scope_rank"] == max_rank].copy()
+
+    classified = (
+        tied.groupby(["domain", "join_hash"])
+        .agg(
+            reuse_scope=("reuse_scope", "first"),
+            reuse_bucket=("reuse_bucket", lambda s: ";".join(sorted(set(s)))),
+            client_label=("client_label", lambda s: ";".join(sorted(set(s.astype(str))))),
+            n_clients_present=("n_clients_present", "max"),
+            n_clients_denominator=("n_clients_denominator", "max"),
+            pct_clients_present=("pct_clients_present", "max"),
+            n_projects_present=("n_projects_present", "sum"),
+            n_projects_denominator=("n_projects_denominator", "sum"),
+            n_files_present=("n_files_present", "sum"),
+            n_files_denominator=("n_files_denominator", "sum"),
+            enterprise_evidence_downgraded=("enterprise_evidence_downgraded", "max"),
+            reuse_client_pool_is_stantec_internal=("_is_stantec_row", "max"),
+        )
+        .reset_index()
+    )
+    classified["pct_projects_present"] = (
+        classified["n_projects_present"] / classified["n_projects_denominator"].replace(0, np.nan)
+    ).fillna(0)
+    classified["pct_files_present"] = (
+        classified["n_files_present"] / classified["n_files_denominator"].replace(0, np.nan)
+    ).fillna(0)
 
     keep_cols = [
         "domain", "join_hash", "reuse_scope", "reuse_bucket", "client_label",
@@ -426,7 +470,7 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
         "n_files_present", "n_files_denominator", "pct_files_present",
         "enterprise_evidence_downgraded", "reuse_client_pool_is_stantec_internal",
     ]
-    return classified[keep_cols], unclassified[keep_cols]
+    return classified.reindex(columns=keep_cols), unclassified.reindex(columns=keep_cols)
 
 
 # ============================================================

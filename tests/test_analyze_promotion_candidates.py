@@ -128,6 +128,13 @@ def corpus_root(tmp_path):
         {**_gov_row("jh_dedup_targets", segment_id_target="seg_shared",
                      n_files_in_target_used=7, pct_files_in_target_used=0.7),
          "comparison_type": "bc_to_project"},
+
+        # jh_tied_clients: never seeded, corpus_wide reuse tied across two
+        # distinct clients (pct_clients_present is a shared, not
+        # client-specific, quantity, so both client rows independently hit
+        # the same reuse_scope_rank) -- their project/file evidence must be
+        # aggregated, not have one client's row arbitrarily win.
+        _gov_row("jh_tied_clients"),
     ]
 
     reuse_rows = [
@@ -155,6 +162,14 @@ def corpus_root(tmp_path):
         _reuse_row("jh_semantic_noise", pattern_label="Foo|self",
                    reuse_bucket="client_wide"),
         _reuse_row("jh_dedup_targets", reuse_bucket="client_wide"),
+        _reuse_row("jh_tied_clients", client_label="Acme", reuse_bucket="corpus_wide",
+                   n_clients_present=5, n_clients_denominator=6,
+                   n_projects_present=2, n_projects_denominator=5,
+                   n_files_present=4, n_files_denominator=10),
+        _reuse_row("jh_tied_clients", client_label="Beta", reuse_bucket="corpus_wide",
+                   n_clients_present=5, n_clients_denominator=6,
+                   n_projects_present=3, n_projects_denominator=5,
+                   n_files_present=6, n_files_denominator=10),
     ]
 
     pd.DataFrame(gov_rows).to_csv(tmp_path / "cross_segment_governance_states.csv", index=False)
@@ -212,6 +227,21 @@ def test_files_used_not_inflated_by_repeated_target_across_references(corpus_roo
     # same target -- files_used must reflect that one target's 7 files, not
     # 14 from summing both comparison rows.
     assert row["files_used"] == 7
+
+
+def test_tied_client_rows_are_aggregated_not_dropped(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    candidates = _read(corpus_root, "promotion_candidates.csv")
+    row = candidates[candidates["join_hash"] == "jh_tied_clients"].iloc[0]
+    # Acme (2/5 projects, 4/10 files) and Beta (3/5 projects, 6/10 files)
+    # both hit corpus_wide and tie on reuse_scope_rank -- neither should be
+    # dropped in favor of the other.
+    assert row["n_projects_present"] == 5
+    assert row["n_projects_denominator"] == 10
+    assert row["n_files_present"] == 10
+    assert row["n_files_denominator"] == 20
+    assert set(row["client_label"].split(";")) == {"Acme", "Beta"}
+    assert row["reuse_scope"] == "enterprise"
 
 
 def test_unclassified_reuse_routed_separately(corpus_root):
