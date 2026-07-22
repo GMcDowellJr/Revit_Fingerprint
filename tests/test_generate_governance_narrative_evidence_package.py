@@ -521,20 +521,21 @@ def test_segment_manifest_absent_from_evidence_package_when_not_supplied(tmp_pat
     assert health["optional_inputs"]["segment_manifest"] is False
 
 
-def test_evidence_map_lists_thirty_two_artifacts_with_required_fields(tmp_path, monkeypatch):
+def test_evidence_map_lists_thirty_three_artifacts_with_required_fields(tmp_path, monkeypatch):
     # 29 (pre-relationship-layer) + governance_bc_client_matrix +
-    # governance_client_bc_matrix + governance_relationships.
+    # governance_client_bc_matrix + governance_relationships + governance_file_inventory (D-023).
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
     ids = [a["artifact_id"] for a in evidence_map["artifacts"]]
-    assert len(ids) == 32
+    assert len(ids) == 33
     assert len(ids) == len(set(ids))
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
     assert "governance_bc_client_matrix" in ids
     assert "governance_client_bc_matrix" in ids
     assert "governance_relationships" in ids
+    assert "governance_file_inventory" in ids
     narrative = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_narrative_context")
     assert narrative["authority_level"] != "authoritative_deterministic_evidence"
 
@@ -647,6 +648,142 @@ def test_evidence_map_related_artifacts_use_artifact_ids_not_filenames(tmp_path,
             assert not related.endswith((".csv", ".json", ".md")), (
                 f"{a['artifact_id']}.related_artifacts contains a filename, not an artifact_id: {related!r}"
             )
+
+
+# ---------------------------------------------------------------------------
+# D-023: governance_file_inventory.json (live file-availability inventory)
+# ---------------------------------------------------------------------------
+
+def test_file_inventory_written_and_registered_in_manifest_and_evidence_map(tmp_path, monkeypatch):
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    assert (tmp_path / "governance_file_inventory.json").exists()
+    manifest = json.loads((tmp_path / "governance_package_manifest.json").read_text(encoding="utf-8"))
+    manifest_ids = {o["artifact_id"] for o in manifest["outputs"]}
+    assert "governance_file_inventory" in manifest_ids
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    em_ids = {a["artifact_id"] for a in evidence_map["artifacts"]}
+    assert "governance_file_inventory" in em_ids
+
+
+def test_file_inventory_is_empty_when_no_undiscovered_files_present(tmp_path, monkeypatch):
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    fi = json.loads((tmp_path / "governance_file_inventory.json").read_text(encoding="utf-8"))
+    assert fi["files"] == []
+    assert fi["file_count"] == 0
+
+
+def test_file_inventory_surfaces_an_undiscovered_sibling_csv(tmp_path, monkeypatch):
+    """The motivating scenario: a real pipeline export (e.g.
+    pattern_reuse_summary_by_domain.csv) sits beside cross_segment_summary.csv
+    but has no artifact_id registered anywhere in the evidence-package layer
+    yet -- the live scan must surface it with real header/row-count, computed
+    fresh from disk, not from a hand-maintained list."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _write_csv(
+        tmp_path / "pattern_reuse_summary_by_domain.csv",
+        ["domain", "reuse_bucket", "n_patterns"],
+        [{"domain": "line_styles", "reuse_bucket": "corpus_wide", "n_patterns": "5"}],
+    )
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    fi = json.loads((tmp_path / "governance_file_inventory.json").read_text(encoding="utf-8"))
+    assert fi["file_count"] == 1
+    entry = fi["files"][0]
+    assert entry["filename"] == "pattern_reuse_summary_by_domain.csv"
+    assert entry["row_count"] == 1
+    assert [c["name"] for c in entry["columns"]] == ["domain", "reuse_bucket", "n_patterns"]
+    assert entry["columns"][2]["inferred_dtype"] == "integer"
+    assert "narrative" in entry and entry["narrative"]
+
+
+def test_file_inventory_never_flags_this_runs_own_outputs_as_undiscovered(tmp_path, monkeypatch):
+    """--out defaults to the same directory as --summary in these fixtures --
+    the scan must exclude this generator's own CSV/JSON/MD outputs (already
+    tracked via input_paths/output_paths/sibling_paths), not just the two
+    required input CSVs."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    fi = json.loads((tmp_path / "governance_file_inventory.json").read_text(encoding="utf-8"))
+    flagged = {f["filename"] for f in fi["files"]}
+    assert "governance_domain_summary.csv" not in flagged
+    assert "governance_client_summary.csv" not in flagged
+    assert "governance_bc_summary.csv" not in flagged
+
+
+def test_file_inventory_borrows_interpretation_from_matrix_output_manifest(tmp_path, monkeypatch):
+    """When a discovered file's name matches a matrix_name already documented
+    in matrix_output_manifest.csv, the narrative must reuse that row's own
+    interpretation text rather than falling back to a generic sentence --
+    the 'interpretation field pattern already used in the matrix CSVs'."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    matrix_manifest_path = tmp_path / "matrix_output_manifest.csv"
+    _write_csv(
+        matrix_manifest_path,
+        ["matrix_name", "governance_role", "view_scope", "source_file", "source_grain",
+         "metric", "identity_unit", "aggregation_method", "interpretation",
+         "known_limitations", "executed_utc"],
+        [{
+            "matrix_name": "project_mean_file_pair_jaccard_matrix.csv", "governance_role": "Project",
+            "view_scope": "all,used", "source_file": "cross_segment_summary.csv",
+            "source_grain": "segment_pair/domain", "metric": "mean_file_pair_jaccard",
+            "identity_unit": "file join_hash set",
+            "aggregation_method": "Mean of pairwise file Jaccard comparisons",
+            "interpretation": "Are individual files typically similar across project groups?",
+            "known_limitations": "Not equivalent to union_jaccard.",
+            "executed_utc": "2026-07-16T00:00:00Z",
+        }],
+    )
+    _write_csv(
+        tmp_path / "project_mean_file_pair_jaccard_matrix.csv",
+        ["matrix_name", "row_id", "column_id", "view_scope", "domain", "metric",
+         "value", "value_status", "self_comparison", "interpretation", "executed_utc"],
+        [{
+            "matrix_name": "project_mean_file_pair_jaccard_matrix.csv", "row_id": "proj_a",
+            "column_id": "proj_b", "view_scope": "all", "domain": "ALL_DOMAINS",
+            "metric": "mean_file_pair_jaccard", "value": "0.5", "value_status": "ok",
+            "self_comparison": "false", "interpretation": "x", "executed_utc": "2026-07-16T00:00:00Z",
+        }],
+    )
+    _run_main(monkeypatch, [
+        "--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path),
+        "--matrix-manifest", str(matrix_manifest_path),
+    ])
+    fi = json.loads((tmp_path / "governance_file_inventory.json").read_text(encoding="utf-8"))
+    entry = next(f for f in fi["files"] if f["filename"] == "project_mean_file_pair_jaccard_matrix.csv")
+    assert "Are individual files typically similar across project groups?" in entry["narrative"]
+
+
+def test_no_emit_evidence_package_suppresses_file_inventory(tmp_path, monkeypatch):
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(tmp_path), "--no-emit-evidence-package"])
+    assert not (tmp_path / "governance_file_inventory.json").exists()
+
+
+def test_stale_file_inventory_removed_when_evidence_package_turned_off_between_runs(tmp_path, monkeypatch):
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    assert (tmp_path / "governance_file_inventory.json").exists()
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(tmp_path), "--no-emit-evidence-package"])
+    assert not (tmp_path / "governance_file_inventory.json").exists()
+
+
+def test_file_inventory_surfaces_regardless_of_interpretation_layer_flag(tmp_path, monkeypatch):
+    """governance_file_inventory.json is gated by --emit-evidence-package only,
+    not --emit-interpretation-layer (that flag controls governance_brief.md's
+    section, a separate rendering of the same already-scanned data)."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _write_csv(
+        tmp_path / "pattern_reuse_summary_by_domain.csv",
+        ["domain", "reuse_bucket", "n_patterns"],
+        [{"domain": "line_styles", "reuse_bucket": "corpus_wide", "n_patterns": "5"}],
+    )
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(tmp_path), "--no-emit-interpretation-layer"])
+    fi = json.loads((tmp_path / "governance_file_inventory.json").read_text(encoding="utf-8"))
+    assert fi["file_count"] == 1
 
 
 def test_cli_accepts_policy_dir_and_package_schema_version_as_inert(tmp_path, monkeypatch):

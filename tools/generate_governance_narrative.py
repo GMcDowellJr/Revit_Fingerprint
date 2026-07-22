@@ -90,6 +90,8 @@ from governance_evidence_package import (
     PACKAGE_SCHEMA_VERSION,
     EVIDENCE_MAP_SCHEMA_VERSION,
     FINDINGS_SCHEMA_VERSION,
+    FILE_INVENTORY_SCHEMA_VERSION,
+    AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
     AUTHORITY_CONTROLLED_INTERPRETATION,
     AUTHORITY_CONVENIENCE_SUMMARY,
     FINDING_ORIGIN_DETERMINISTIC_COMPUTATION,
@@ -97,10 +99,12 @@ from governance_evidence_package import (
     FINDING_STATUS_SUPPORTED,
     FINDING_STATUS_QUESTION_NOT_CLAIM,
     build_evidence_map,
+    build_file_inventory_document,
     build_findings_document,
     build_package_health,
     build_package_manifest,
     comparison_type_coverage as _comparison_type_coverage,
+    inventory_export_directory_files,
     write_json,
 )
 
@@ -5098,11 +5102,72 @@ _BRIEF_FINDING_SECTIONS = (
 )
 
 
+def _narrative_for_inventory_entry(entry: dict, matrix_manifest_by_name: dict) -> str:
+    """One or two live-computed sentences describing a file the directory
+    scan found but no artifact_id has been registered for yet (see
+    inventory_export_directory_files()). Never hand-maintained per filename:
+
+    - If the filename matches a matrix_name already documented in
+      matrix_output_manifest.csv (compare_cross_segment.py's own
+      add_manifest() calls), reuse that row's interpretation/known_limitations
+      text verbatim -- the same free-text narrative field pattern already
+      used for the registered project_* matrix artifacts, just applied to a
+      matrix this generator hasn't wired an input flag for yet.
+    - Otherwise, fall back to a structural sentence built only from the
+      header/row-count this scan already computed -- honest about not
+      knowing the file's meaning, rather than guessing.
+    """
+    filename = entry["filename"]
+    manifest_row = matrix_manifest_by_name.get(filename)
+    if manifest_row and manifest_row.get("interpretation"):
+        text = manifest_row["interpretation"]
+        if manifest_row.get("known_limitations"):
+            text += " " + manifest_row["known_limitations"]
+        return f"Per matrix_output_manifest.csv: {text}"
+    if entry.get("parse_error"):
+        return f"Could not be scanned ({entry['parse_error']})."
+    if entry.get("empty_file"):
+        return "Empty file (no header row)."
+    columns = entry.get("columns", [])
+    col_names = [c["name"] for c in columns]
+    shown = ", ".join(col_names[:8]) + (", ..." if len(col_names) > 8 else "")
+    return (
+        f"{len(columns)} column(s) ({shown}), {entry.get('row_count', 0)} data row(s). "
+        "This generator does not read this file today; grain and meaning are "
+        "inferred only from its header, not from any hand-written description."
+    )
+
+
+def render_file_inventory_brief_section(file_inventory: Optional[dict]) -> str:
+    """Renders the live drill-down-file directory as its own section of
+    governance_brief.md -- separate from, and never interleaved into, the
+    per-domain findings sections above it. Returns "" (section entirely
+    omitted) when the scan found nothing undiscovered, matching this file's
+    existing "omit rather than blank-render" convention for empty sections.
+    See D-023 / docs/governance_evidence_package.md.
+    """
+    files = (file_inventory or {}).get("files") or []
+    if not files:
+        return ""
+    lines = [
+        "\n## Detail-Layer File Inventory\n",
+        "> Files found under the scanned export directories that are not "
+        "already one of the artifacts described above -- see "
+        "`governance_file_inventory.json` for the full header/dtype/row-count "
+        "detail. This is a directory of what exists at the detail layer, not "
+        "a claim about what any of it means.\n",
+    ]
+    for f in sorted(files, key=lambda e: e["filename"]):
+        lines.append(f"- **{f['filename']}** ({f.get('row_count', 0)} row(s)) -- {f.get('narrative', '')}")
+    return "\n".join(lines)
+
+
 def render_governance_brief(
     findings: list,
     health: dict,
     corpus: dict,
     package_schema_version: str,
+    file_inventory: Optional[dict] = None,
 ) -> str:
     """A narrower, run-specific digest: consumes the already-built structured
     findings list (built_structured_findings()) and package health -- it
@@ -5112,6 +5177,11 @@ def render_governance_brief(
     category is capped and points back to governance_findings.json for the
     complete list rather than reproducing it. See D-022 and
     docs/governance_evidence_package.md.
+
+    file_inventory (D-023): the already-built governance_file_inventory.json
+    document (or None/omitted) -- same "consume, not recompute" discipline;
+    this function does not scan any directory itself, only renders whatever
+    inventory_export_directory_files() already found in main().
     """
     by_type: dict = defaultdict(list)
     for f in findings:
@@ -5170,6 +5240,10 @@ def render_governance_brief(
         lines.append("\n## Leadership questions\n")
         for i, f in enumerate(leadership_questions, start=1):
             lines.append(f"{i}. {f['summary']}")
+
+    file_inventory_section = render_file_inventory_brief_section(file_inventory)
+    if file_inventory_section:
+        lines.append(file_inventory_section)
 
     lines.append(
         f"\n---\n\n*Generated by `{GENERATOR_IDENTITY}` (package schema "
@@ -5756,12 +5830,13 @@ def main():
             "governance_package_health": out_dir / "governance_package_health.json",
             "governance_evidence_map": out_dir / "governance_evidence_map.json",
             "governance_findings": out_dir / "governance_findings.json",
+            "governance_file_inventory": out_dir / "governance_file_inventory.json",
         }
         output_types = {
             "governance_domain_summary": "csv", "governance_client_summary": "csv",
             "governance_bc_summary": "csv", "governance_narrative_context": "markdown",
             "governance_package_manifest": "json", "governance_package_health": "json", "governance_evidence_map": "json",
-            "governance_findings": "json",
+            "governance_findings": "json", "governance_file_inventory": "json",
         }
         output_authority = {
             "governance_domain_summary": "authoritative_deterministic_evidence",
@@ -5772,6 +5847,7 @@ def main():
             "governance_package_health": "controlled_interpretation",
             "governance_evidence_map": "authoritative_deterministic_evidence",
             "governance_findings": "controlled_interpretation",
+            "governance_file_inventory": AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
         }
         output_context_role = {
             "governance_domain_summary": "primary tier/score rollup",
@@ -5782,6 +5858,7 @@ def main():
             "governance_package_health": "coverage/health signal",
             "governance_evidence_map": "artifact navigation index",
             "governance_findings": "structured, rule-derived findings",
+            "governance_file_inventory": "live directory-scan inventory of undiscovered drill-down files",
         }
 
         if args.emit_interpretation_layer:
@@ -5872,25 +5949,6 @@ def main():
         findings_document = build_findings_document(findings, schema_version=FINDINGS_SCHEMA_VERSION)
         write_json(out_dir / "governance_findings.json", findings_document)
 
-        if args.emit_interpretation_layer:
-            print("Writing governance brief...")
-            brief_md = render_governance_brief(
-                findings=findings, health=health, corpus=corpus,
-                package_schema_version=args.package_schema_version,
-            )
-            brief_path.write_text(brief_md, encoding="utf-8")
-            print(f"  → {brief_path}")
-        elif (out_dir / "governance_brief.md").exists():
-            # Same staleness-prevention rationale as the emit_evidence_package
-            # opt-out branch below: a prior run may have written governance_brief.md
-            # with --emit-interpretation-layer (the default); if this run turned
-            # only that layer off, the stale brief must not survive alongside a
-            # freshly-written governance_findings.json/package_health.json that
-            # it was never actually built from.
-            (out_dir / "governance_brief.md").unlink()
-            print("  → removed stale governance_brief.md from a prior run "
-                  "(this run used --no-emit-interpretation-layer)")
-
         # governance_interpretation_guide.md / governance_question_routes.md are
         # human/LLM-authored static reference docs, never written by this
         # generator -- always listed in the evidence map (like the never-consumed
@@ -5929,6 +5987,58 @@ def main():
         }
         sibling_present = {k: v.exists() for k, v in sibling_paths.items()}
 
+        # ── D-023: live file-availability inventory ─────────────────────────────
+        # Scans the cross_segment export directory (--summary's parent) and,
+        # when it differs, the relationship-layer output directory
+        # (_relationships_anchor's parent) for *.csv files this generator has
+        # no artifact_id for yet -- every path already known as an input,
+        # output, or sibling artifact above is excluded. See D-023 and
+        # docs/governance_evidence_package.md. Written before governance_brief.md
+        # so the brief can render a pointer/summary section from the same
+        # already-computed data (no second scan).
+        _export_scan_dirs = []
+        for _d in (Path(args.summary).parent, _relationships_anchor.parent):
+            _rd = _d.resolve()
+            if _rd not in {sd.resolve() for sd in _export_scan_dirs}:
+                _export_scan_dirs.append(_d)
+        _known_artifact_paths = {
+            p for p in list(input_paths.values()) + list(output_paths.values()) + list(sibling_paths.values())
+            if p
+        }
+        _matrix_manifest_by_name = {r["matrix_name"]: r for r in matrix_manifest_rows if r.get("matrix_name")}
+        file_inventory_entries = inventory_export_directory_files(_export_scan_dirs, _known_artifact_paths)
+        for _entry in file_inventory_entries:
+            _entry["narrative"] = _narrative_for_inventory_entry(_entry, _matrix_manifest_by_name)
+        file_inventory_document = build_file_inventory_document(
+            schema_version=FILE_INVENTORY_SCHEMA_VERSION,
+            scanned_directories=_export_scan_dirs,
+            files=file_inventory_entries,
+        )
+        write_json(out_dir / "governance_file_inventory.json", file_inventory_document)
+        if file_inventory_entries:
+            print(f"  → governance_file_inventory.json: {len(file_inventory_entries)} "
+                  f"undiscovered file(s) found under {[str(d) for d in _export_scan_dirs]}")
+
+        if args.emit_interpretation_layer:
+            print("Writing governance brief...")
+            brief_md = render_governance_brief(
+                findings=findings, health=health, corpus=corpus,
+                package_schema_version=args.package_schema_version,
+                file_inventory=file_inventory_document,
+            )
+            brief_path.write_text(brief_md, encoding="utf-8")
+            print(f"  → {brief_path}")
+        elif (out_dir / "governance_brief.md").exists():
+            # Same staleness-prevention rationale as the emit_evidence_package
+            # opt-out branch below: a prior run may have written governance_brief.md
+            # with --emit-interpretation-layer (the default); if this run turned
+            # only that layer off, the stale brief must not survive alongside a
+            # freshly-written governance_findings.json/package_health.json that
+            # it was never actually built from.
+            (out_dir / "governance_brief.md").unlink()
+            print("  → removed stale governance_brief.md from a prior run "
+                  "(this run used --no-emit-interpretation-layer)")
+
         evidence_map = build_evidence_map(
             schema_version=EVIDENCE_MAP_SCHEMA_VERSION,
             input_paths=input_paths,
@@ -5937,6 +6047,7 @@ def main():
             sibling_paths=sibling_paths,
             sibling_present=sibling_present,
             package_schema_version=args.package_schema_version,
+            file_inventory_schema_version=FILE_INVENTORY_SCHEMA_VERSION,
         )
         write_json(out_dir / "governance_evidence_map.json", evidence_map)
 
@@ -5976,7 +6087,8 @@ def main():
         write_json(out_dir / "governance_package_manifest.json", manifest)
 
         print(f"  → wrote governance_package_health.json, governance_findings.json, "
-              f"governance_evidence_map.json, governance_package_manifest.json"
+              f"governance_file_inventory.json, governance_evidence_map.json, "
+              f"governance_package_manifest.json"
               f"{', governance_brief.md' if args.emit_interpretation_layer else ''} to {out_dir}")
     else:
         # A previous run over this same --out directory may have written
@@ -5992,6 +6104,7 @@ def main():
             "governance_package_health.json",
             "governance_evidence_map.json",
             "governance_findings.json",
+            "governance_file_inventory.json",
             "governance_brief.md",
         )
         removed = [name for name in stale_names if (out_dir / name).exists()]

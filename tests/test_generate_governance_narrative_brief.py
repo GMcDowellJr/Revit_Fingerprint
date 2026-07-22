@@ -21,6 +21,7 @@ from generate_governance_narrative import (  # noqa: E402
     QUESTION_ROUTES_VERSION,
     main,
     render_evidence_authority_header,
+    render_file_inventory_brief_section,
     render_governance_brief,
 )
 
@@ -117,6 +118,46 @@ def test_brief_does_not_recompute_only_consumes_passed_findings():
     md = render_governance_brief(findings, _HEALTH_OK, _CORPUS, "1.0")
     assert "only_this_domain" in md
     assert "Structured findings this run: **1**" in md
+
+
+# ---------------------------------------------------------------------------
+# render_file_inventory_brief_section() / render_governance_brief() D-023 wiring
+# ---------------------------------------------------------------------------
+
+def test_file_inventory_section_omitted_when_no_files():
+    assert render_file_inventory_brief_section(None) == ""
+    assert render_file_inventory_brief_section({"files": []}) == ""
+
+
+def test_file_inventory_section_lists_each_file_with_narrative():
+    section = render_file_inventory_brief_section({
+        "files": [
+            {"filename": "pattern_reuse_summary_by_domain.csv", "row_count": 12, "narrative": "By-domain reuse cut."},
+        ],
+    })
+    assert "## Detail-Layer File Inventory" in section
+    assert "pattern_reuse_summary_by_domain.csv" in section
+    assert "12 row(s)" in section
+    assert "By-domain reuse cut." in section
+
+
+def test_brief_omits_file_inventory_section_when_absent():
+    md = render_governance_brief([], _HEALTH_OK, _CORPUS, "1.0")
+    assert "Detail-Layer File Inventory" not in md
+
+
+def test_brief_omits_file_inventory_section_when_files_list_empty():
+    md = render_governance_brief([], _HEALTH_OK, _CORPUS, "1.0", file_inventory={"files": []})
+    assert "Detail-Layer File Inventory" not in md
+
+
+def test_brief_includes_file_inventory_section_when_files_present():
+    md = render_governance_brief([], _HEALTH_OK, _CORPUS, "1.0", file_inventory={
+        "files": [{"filename": "a.csv", "row_count": 3, "narrative": "Some narrative."}],
+    })
+    assert "## Detail-Layer File Inventory" in md
+    assert "a.csv" in md
+    assert "Some narrative." in md
 
 
 # ---------------------------------------------------------------------------

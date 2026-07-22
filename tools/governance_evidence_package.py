@@ -27,6 +27,7 @@ governance_findings.json (PR2), not to this deterministic layer.
 """
 from __future__ import annotations
 
+import csv
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,6 +40,7 @@ PACKAGE_TYPE = "governance_evidence_package"
 PACKAGE_SCHEMA_VERSION = "1.0"
 EVIDENCE_MAP_SCHEMA_VERSION = "1.0"
 FINDINGS_SCHEMA_VERSION = "1.0"
+FILE_INVENTORY_SCHEMA_VERSION = "1.0"
 
 GENERATOR_IDENTITY = "generate_governance_narrative.py"
 GENERATOR_ROLE = "deterministic_governance_narrative_generator"
@@ -444,6 +446,7 @@ def build_evidence_map(
     # files may be written with an overridden --package-schema-version; their
     # evidence-map entries must declare the same value they actually contain,
     # not PACKAGE_SCHEMA_VERSION unconditionally.
+    file_inventory_schema_version: str = FILE_INVENTORY_SCHEMA_VERSION,
 ) -> dict:
     artifacts = []
 
@@ -986,6 +989,40 @@ def build_evidence_map(
         schema_version=FINDINGS_SCHEMA_VERSION,
     ))
 
+    artifacts.append(_artifact(
+        "governance_file_inventory", p(output_paths, "governance_file_inventory"), "json", False, True,
+        GENERATOR_IDENTITY, AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+        "live directory-scan inventory of *.csv files actually present under "
+        "the cross_segment export directory (and, when supplied separately, "
+        "the relationship-layer output directory) that are NOT already one of "
+        "the artifacts above -- see inventory_export_directory_files(). Exists "
+        "so an LLM reading this package can name a candidate drill-down file "
+        "it has never been told the schema of, instead of stonewalling on a "
+        "question the rollups can't answer",
+        "one entry per undiscovered CSV file found during this run's scan; a "
+        "corpus with no such files produces an entry with an empty files list, "
+        "not a missing artifact",
+        ["filename", "row_count"], [], [],
+        ["that a given file exists in the scanned directories, its column "
+         "header, an inferred dtype per column (integer/float/boolean/string/"
+         "empty), and its row count"],
+        ["what any column or row actually means -- the per-file narrative "
+         "string is either borrowed verbatim from matrix_output_manifest.csv's "
+         "own interpretation column when the filename matches a known "
+         "matrix_name, or a generic structural fallback sentence; neither is a "
+         "substitute for a real evidence-map entry once a file is understood "
+         "well enough to earn one"],
+        ["computed fresh every run from Path.glob('*.csv') -- a file deleted "
+         "or renamed between runs simply stops/starts appearing, with no "
+         "staleness tracking of its own; no sample cell values are ever "
+         "captured, only header names, inferred dtype, and row count; column "
+         "dtype inference is a best-effort classification over the whole "
+         "column's values, not a schema declaration -- see _column_dtype()."],
+        {"*": "A column classified 'empty' had zero non-blank cells in the scanned file."},
+        [],  # no fixed related_artifacts -- the files it lists vary run to run
+        schema_version=file_inventory_schema_version,
+    ))
+
     # governance_brief.md is the only PR4 artifact that may genuinely be
     # absent even when this whole function runs (gated by its own
     # --emit-interpretation-layer flag, independent of --emit-evidence-package)
@@ -1111,3 +1148,143 @@ def build_evidence_map(
             a["related_artifacts"] = [aid for aid in all_ids if aid != "governance_evidence_map"]
 
     return {"schema_version": schema_version, "artifacts": artifacts}
+
+
+# ── file inventory (live directory scan) ─────────────────────────────────────
+# Step 0 for this feature confirmed: (a) no query/tool-calling path exists
+# anywhere in this package -- generate_governance_narrative.py's outputs are
+# consumed single-shot, so an LLM reader can only know a drill-down file
+# exists if this package says so; (b) no prior "csv_inventory.md"-style
+# utility exists in this repo. The functions below are the mechanical
+# directory-scan/schema-inference layer that fills that gap -- they read
+# column headers and infer per-column dtype from the data, but never retain
+# or report sample values (inventory, not analysis).
+
+def _classify_scalar(value: str) -> str:
+    """Classify one non-blank cell value as 'bool' / 'int' / 'float' / 'string'.
+
+    Matches this codebase's own CSV-writing conventions: compare_cross_segment.py's
+    _bool_str() emits exactly "true"/"false" (see its own definition) for boolean
+    fields, never "True"/"1"/"yes" -- so bool detection is intentionally narrow
+    (case-insensitive true/false only) rather than guessing at every truthy-looking
+    token.
+    """
+    lowered = value.strip().lower()
+    if lowered in ("true", "false"):
+        return "bool"
+    try:
+        int(value)
+        return "int"
+    except ValueError:
+        pass
+    try:
+        float(value)
+        return "float"
+    except ValueError:
+        pass
+    return "string"
+
+
+def _column_dtype(seen: set) -> str:
+    """Combine the set of per-cell classifications observed for one column
+    (plus "empty" for blank cells) into a single inferred dtype. Pure
+    function over a set of labels -- no field name or domain knowledge.
+    """
+    non_empty = seen - {"empty"}
+    if not non_empty:
+        return "empty"
+    if non_empty == {"bool"}:
+        return "boolean"
+    if "string" in non_empty:
+        return "string"
+    if "float" in non_empty:
+        return "float"
+    if non_empty == {"int"}:
+        return "integer"
+    return "string"
+
+
+def _scan_csv_file(path: Path) -> dict:
+    """Single-pass header + dtype-inference + row-count scan of one CSV.
+
+    Reads with utf-8-sig (matches read_csv() elsewhere in this codebase) and a
+    plain comma delimiter -- every file compare_cross_segment.py writes via
+    atomic_write_csv() is comma-delimited, so no delimiter sniffing is needed
+    here (unlike a general-purpose inventory tool over an arbitrary pipeline
+    output folder). Never stores a row or a cell value beyond the single pass
+    used to update each column's running dtype-classification set --
+    "type of data, not shape of values": no sample rows are retained or
+    returned.
+    """
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.reader(f)
+            try:
+                header = next(reader)
+            except StopIteration:
+                return {"columns": [], "row_count": 0, "empty_file": True, "parse_error": None}
+            seen_by_col = [set() for _ in header]
+            row_count = 0
+            for row in reader:
+                row_count += 1
+                for i in range(len(header)):
+                    cell = row[i] if i < len(row) else ""
+                    seen_by_col[i].add("empty" if cell.strip() == "" else _classify_scalar(cell))
+            columns = [
+                {"name": name, "inferred_dtype": _column_dtype(seen_by_col[i])}
+                for i, name in enumerate(header)
+            ]
+            return {"columns": columns, "row_count": row_count, "empty_file": False, "parse_error": None}
+    except Exception as e:  # noqa: BLE001 -- reported per-file, scan continues for the rest
+        return {"columns": [], "row_count": 0, "empty_file": False, "parse_error": f"{type(e).__name__}: {e}"}
+
+
+def inventory_export_directory_files(scan_dirs: list, known_paths: set) -> list:
+    """Live directory scan: every *.csv file actually present under scan_dirs
+    that is NOT already one of known_paths (every path this generator already
+    reads as an input, writes as an output, or tracks as a sibling artifact --
+    see build_evidence_map()). Pure filesystem read -- no interpretation of
+    file content beyond the structural facts _scan_csv_file() returns.
+
+    This is deliberately live/computed, not a hand-maintained filename list:
+    a future compare_cross_segment.py export nobody has wired an artifact_id
+    for yet is picked up automatically the next time this runs, with no code
+    change required here.
+    """
+    known_resolved = {p.resolve() for p in known_paths if p}
+    seen_resolved = set()
+    entries = []
+    for scan_dir in scan_dirs:
+        if not scan_dir or not scan_dir.is_dir():
+            continue
+        for path in sorted(scan_dir.glob("*.csv")):
+            resolved = path.resolve()
+            if resolved in known_resolved or resolved in seen_resolved:
+                continue
+            seen_resolved.add(resolved)
+            scan = _scan_csv_file(path)
+            entries.append({
+                "filename": path.name,
+                "path": str(path),
+                **scan,
+            })
+    return entries
+
+
+def build_file_inventory_document(
+    *,
+    schema_version: str,
+    scanned_directories: list,
+    files: list,
+) -> dict:
+    """Pure envelope wrapper (matches build_findings_document()'s convention):
+    files is already fully built (scan + narrative attached) by the caller;
+    this function performs no filesystem I/O and no further computation.
+    """
+    return {
+        "schema_version": schema_version,
+        "generated_at": _utc_now_iso(),
+        "scanned_directories": [str(d) for d in scanned_directories],
+        "file_count": len(files),
+        "files": files,
+    }

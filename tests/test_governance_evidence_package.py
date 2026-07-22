@@ -15,14 +15,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 from governance_evidence_package import (  # noqa: E402
     AUTHORITY_LEVELS,
     EVIDENCE_MAP_SCHEMA_VERSION,
+    FILE_INVENTORY_SCHEMA_VERSION,
     GENERATOR_IDENTITY,
     GENERATOR_ROLE,
     PACKAGE_SCHEMA_VERSION,
     PACKAGE_TYPE,
     build_evidence_map,
+    build_file_inventory_document,
     build_package_health,
     build_package_manifest,
     comparison_type_coverage,
+    inventory_export_directory_files,
     write_json,
 )
 
@@ -315,17 +318,18 @@ def _evidence_map(**overrides):
     return build_evidence_map(**kwargs)
 
 
-def test_evidence_map_has_thirty_two_unique_artifacts():
+def test_evidence_map_has_thirty_three_unique_artifacts():
     # 29 (pre-relationship-layer) + governance_bc_client_matrix +
-    # governance_client_bc_matrix + governance_relationships.
+    # governance_client_bc_matrix + governance_relationships + governance_file_inventory.
     em = _evidence_map()
     ids = [a["artifact_id"] for a in em["artifacts"]]
-    assert len(ids) == 32
+    assert len(ids) == 33
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
     assert "governance_bc_client_matrix" in ids
     assert "governance_client_bc_matrix" in ids
     assert "governance_relationships" in ids
+    assert "governance_file_inventory" in ids
     assert len(ids) == len(set(ids))
 
 
@@ -426,6 +430,120 @@ def test_evidence_map_known_limitations_text_has_no_severity_language():
         lowered = text.lower()
         for term in denylist:
             assert term not in lowered, f"severity language '{term}' found in {a['artifact_id']}: {text}"
+
+
+def test_evidence_map_governance_file_inventory_is_authoritative_and_has_no_fixed_related_artifacts():
+    """D-023: the artifact facts (header/dtype/row count) are directly
+    observed, not interpreted, so authority_level is authoritative_deterministic_evidence.
+    related_artifacts is intentionally empty -- the files it lists vary run
+    to run, unlike every other artifact's fixed relationships."""
+    em = _evidence_map()
+    entry = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_file_inventory")
+    assert entry["authority_level"] == "authoritative_deterministic_evidence"
+    assert entry["related_artifacts"] == []
+    assert entry["schema_version"] == FILE_INVENTORY_SCHEMA_VERSION
+
+
+def test_evidence_map_governance_file_inventory_honors_overridden_schema_version():
+    em = _evidence_map(file_inventory_schema_version="2.0")
+    entry = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_file_inventory")
+    assert entry["schema_version"] == "2.0"
+
+
+# ---------------------------------------------------------------------------
+# file inventory (live directory scan): _scan_csv_file / inventory_export_
+# directory_files / build_file_inventory_document
+# ---------------------------------------------------------------------------
+
+def _write(path: Path, text: str) -> Path:
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_inventory_scan_infers_column_dtypes(tmp_path):
+    f = _write(tmp_path / "a.csv", "name,count,score,active\nx,1,1.5,true\ny,2,2.5,false\n")
+    entries = inventory_export_directory_files([tmp_path], set())
+    assert len(entries) == 1
+    by_name = {c["name"]: c["inferred_dtype"] for c in entries[0]["columns"]}
+    assert by_name == {"name": "string", "count": "integer", "score": "float", "active": "boolean"}
+    assert entries[0]["row_count"] == 2
+
+
+def test_inventory_scan_blank_cells_do_not_break_integer_inference(tmp_path):
+    f = _write(tmp_path / "a.csv", "n\n1\n\n3\n")
+    entries = inventory_export_directory_files([tmp_path], set())
+    assert entries[0]["columns"][0]["inferred_dtype"] == "integer"
+
+
+def test_inventory_scan_all_blank_column_is_empty_dtype(tmp_path):
+    f = _write(tmp_path / "a.csv", "n\n\n\n")
+    entries = inventory_export_directory_files([tmp_path], set())
+    assert entries[0]["columns"][0]["inferred_dtype"] == "empty"
+
+
+def test_inventory_scan_mixed_numeric_and_text_column_is_string(tmp_path):
+    f = _write(tmp_path / "a.csv", "v\n1\nabc\n")
+    entries = inventory_export_directory_files([tmp_path], set())
+    assert entries[0]["columns"][0]["inferred_dtype"] == "string"
+
+
+def test_inventory_scan_header_only_file_is_empty_file(tmp_path):
+    f = _write(tmp_path / "a.csv", "n\n")
+    entries = inventory_export_directory_files([tmp_path], set())
+    assert entries[0]["row_count"] == 0
+    assert entries[0]["empty_file"] is False  # has a header row, just zero data rows
+
+
+def test_inventory_scan_zero_byte_file_is_flagged_empty_file(tmp_path):
+    f = _write(tmp_path / "a.csv", "")
+    entries = inventory_export_directory_files([tmp_path], set())
+    assert entries[0]["empty_file"] is True
+    assert entries[0]["columns"] == []
+
+
+def test_inventory_scan_excludes_known_paths(tmp_path):
+    known = _write(tmp_path / "cross_segment_summary.csv", "a,b\n1,2\n")
+    unknown = _write(tmp_path / "pattern_reuse_summary_by_domain.csv", "a,b\n1,2\n")
+    entries = inventory_export_directory_files([tmp_path], {known})
+    filenames = {e["filename"] for e in entries}
+    assert filenames == {"pattern_reuse_summary_by_domain.csv"}
+
+
+def test_inventory_scan_never_retains_sample_values(tmp_path):
+    _write(tmp_path / "a.csv", "secret_value\nDO-NOT-LEAK-THIS\n")
+    entries = inventory_export_directory_files([tmp_path], set())
+    assert "DO-NOT-LEAK-THIS" not in json.dumps(entries)
+
+
+def test_inventory_scan_dedupes_same_file_seen_via_two_scan_dirs(tmp_path):
+    f = _write(tmp_path / "a.csv", "x\n1\n")
+    entries = inventory_export_directory_files([tmp_path, tmp_path], set())
+    assert len(entries) == 1
+
+
+def test_inventory_scan_skips_nonexistent_directory(tmp_path):
+    entries = inventory_export_directory_files([tmp_path / "does_not_exist"], set())
+    assert entries == []
+
+
+def test_inventory_scan_only_matches_csv_files(tmp_path):
+    _write(tmp_path / "a.csv", "x\n1\n")
+    _write(tmp_path / "notes.md", "not a csv")
+    entries = inventory_export_directory_files([tmp_path], set())
+    assert len(entries) == 1
+    assert entries[0]["filename"] == "a.csv"
+
+
+def test_build_file_inventory_document_wraps_files_and_counts():
+    doc = build_file_inventory_document(
+        schema_version=FILE_INVENTORY_SCHEMA_VERSION,
+        scanned_directories=[Path("/x")],
+        files=[{"filename": "a.csv"}, {"filename": "b.csv"}],
+    )
+    assert doc["schema_version"] == FILE_INVENTORY_SCHEMA_VERSION
+    assert doc["file_count"] == 2
+    assert doc["scanned_directories"] == ["/x"]
+    assert "generated_at" in doc
 
 
 def test_domain_and_client_summary_null_semantics_cite_the_actual_em_dash():
