@@ -586,6 +586,75 @@ def test_governance_relationships_resolved_beside_supplied_matrix_not_summary_di
     assert rel_artifact["path"] == str(relationships_path)
 
 
+def test_pattern_reuse_summary_by_domain_resolved_beside_supplied_reuse_by_client_not_summary_dir(tmp_path, monkeypatch):
+    """Regression test for a PR review finding (D-024): pattern_reuse_summary_by_domain.csv
+    is written by compare_cross_segment.py's main() to the SAME --out-dir as
+    pattern_reuse_summary_by_client.csv/pattern_reuse_distribution.csv, but this
+    generator used to hard-code its sibling path relative to --summary's
+    directory -- so a caller pointing --reuse-by-client at a different
+    directory got a permanently-absent evidence-map entry for this file even
+    though it sits right beside the reuse input actually supplied."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+
+    reuse_dir = tmp_path / "reuse_output"
+    reuse_dir.mkdir()
+    _write_csv(
+        reuse_dir / "pattern_reuse_summary_by_client.csv", REUSE_SUMMARY_FIELDS,
+        [{f: "" for f in REUSE_SUMMARY_FIELDS}],
+    )
+    domain_path = reuse_dir / "pattern_reuse_summary_by_domain.csv"
+    _write_csv(domain_path, REUSE_SUMMARY_FIELDS, [{f: "" for f in REUSE_SUMMARY_FIELDS}] * 3)
+    # pattern_reuse_summary_by_domain.csv does NOT exist beside --summary -- only in reuse_dir.
+    assert not (tmp_path / "pattern_reuse_summary_by_domain.csv").exists()
+
+    _run_main(monkeypatch, [
+        "--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path),
+        "--reuse-by-client", str(reuse_dir / "pattern_reuse_summary_by_client.csv"),
+    ])
+
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    entry = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "pattern_reuse_summary_by_domain")
+    assert entry["present"] is True
+    assert entry["path"] == str(domain_path)
+    assert entry["row_count"] == 3
+
+
+def test_project_mean_file_pair_jaccard_matrix_resolved_beside_supplied_fragmentation_diagnostic_not_summary_dir(tmp_path, monkeypatch):
+    """Regression test for a PR review finding (D-024): project_mean_file_pair_jaccard_matrix.csv
+    is written by compare_cross_segment.py's main() to the SAME --out-dir as
+    project_fragmentation_diagnostic.csv and the other project_* matrices, but
+    this generator used to hard-code its sibling path relative to --summary's
+    directory -- so a caller pointing --project-fragmentation-diagnostic at a
+    different directory got a permanently-absent evidence-map entry for this
+    file even though it sits right beside the matrix input actually supplied."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+
+    matrix_dir = tmp_path / "project_matrix_output"
+    matrix_dir.mkdir()
+    frag_fields = ["matrix_name", "row_id", "column_id", "view_scope", "domain",
+                   "footprint_similarity", "exact_identity_overlap", "fragmentation_diagnostic",
+                   "value_status", "interpretation", "executed_utc"]
+    _write_csv(
+        matrix_dir / "project_fragmentation_diagnostic.csv", frag_fields,
+        [{f: "" for f in frag_fields}],
+    )
+    matrix_path = matrix_dir / "project_mean_file_pair_jaccard_matrix.csv"
+    _write_csv(matrix_path, MATRIX_OUTPUT_FIELDS, [{f: "" for f in MATRIX_OUTPUT_FIELDS}] * 5)
+    # project_mean_file_pair_jaccard_matrix.csv does NOT exist beside --summary -- only in matrix_dir.
+    assert not (tmp_path / "project_mean_file_pair_jaccard_matrix.csv").exists()
+
+    _run_main(monkeypatch, [
+        "--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path),
+        "--project-fragmentation-diagnostic", str(matrix_dir / "project_fragmentation_diagnostic.csv"),
+    ])
+
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    entry = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "project_mean_file_pair_jaccard_matrix")
+    assert entry["present"] is True
+    assert entry["path"] == str(matrix_path)
+    assert entry["row_count"] == 5
+
+
 def test_evidence_map_findings_entry_has_a_real_path(tmp_path, monkeypatch):
     """Regression test for a PR review finding: build_evidence_map() looked up
     output_paths["findings_json"], but main() writes that entry under the key

@@ -964,9 +964,8 @@ scan this phase needs, just scoped to files with no artifact_id at all.
 
 ### Decision
 All four files above are now registered as `sibling_paths` in
-`generate_governance_narrative.py`'s `main()` (the same inferred-path
-pattern `file_pairs`/`comparison_registry` already used: beside `--summary`'s
-directory) and get a full `governance_evidence_map.json` artifact entry
+`generate_governance_narrative.py`'s `main()` and get a full
+`governance_evidence_map.json` artifact entry
 (`build_evidence_map()` in `tools/governance_evidence_package.py`) with
 `context_role`, `grain`, `can_answer`, `cannot_answer`, and
 `known_limitations` text in the same voice as every other archive_only
@@ -996,6 +995,29 @@ by-domain/mean-file-pair siblings, matching the bidirectional linking
 already used elsewhere in the evidence map (e.g.
 `pattern_reuse_summary_by_client` already named `pattern_reuse_distribution`
 as related).
+
+**PR-review fix (anchor point):** `pattern_reuse_summary_by_domain.csv` and
+`project_mean_file_pair_jaccard_matrix.csv`'s sibling paths are not
+hard-coded beside `--summary`'s directory. `compare_cross_segment.py`
+writes both files to the same `--out-dir` as already-optional, already-
+CLI-supplied siblings (`pattern_reuse_summary_by_domain.csv` alongside
+`pattern_reuse_summary_by_client.csv`/`pattern_reuse_distribution.csv`;
+`project_mean_file_pair_jaccard_matrix.csv` alongside
+`project_fragmentation_diagnostic.csv` and the other `project_*` matrices),
+so each is anchored to whichever of those related optional flags
+(`--reuse-by-client`/`--reuse-distribution`; `--project-fragmentation-
+diagnostic`/`--project-union-jaccard-matrix`/`--project-density-similarity-
+matrix`/`--project-pool-containment-matrix`) was actually supplied, falling
+back to `--summary`'s directory when none were — the identical pattern
+`_relationships_anchor` already established for `governance_relationships.csv`
+in the prior relationship-layer phase. Without this, a caller running a
+mixed-directory pipeline (optional reuse/project outputs living somewhere
+other than `--summary`'s directory, which the CLI already allows) would get
+a permanently `present: false` entry for these two escalation targets even
+though the real files sit right beside the input they did supply. The
+D-023 live-scan directories (`_export_scan_dirs`) grew to include both new
+anchor directories too, for the same reason `_relationships_anchor.parent`
+was already scanned.
 
 ### Consequences
 - `governance_evidence_map.json` grows from 33 to 35 artifacts.
