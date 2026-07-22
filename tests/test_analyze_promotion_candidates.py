@@ -1,0 +1,280 @@
+"""Synthetic-fixture tests for tools/analyze_promotion_candidates.py.
+
+No real corpus export data exists in this repo (results/segments/ output
+directories are runtime artifacts, never checked into git -- see the
+module docstring in tools/analyze_promotion_candidates.py). These fixtures
+are built directly from the real, code-confirmed schemas of
+cross_segment_governance_states.csv (tools/compare_cross_segment.py's
+build_governance_state_outputs()) and pattern_reuse_distribution.csv
+(build_pattern_reuse_distribution_rows()), not guessed column names.
+"""
+
+import sys
+from pathlib import Path
+
+import pandas as pd
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+
+import analyze_promotion_candidates as apc
+
+
+DOMAIN = "text_types"
+
+
+def _gov_row(join_hash, **overrides):
+    row = {
+        "domain": DOMAIN,
+        "join_hash": join_hash,
+        "pattern_label": overrides.pop("pattern_label", join_hash),
+        "state": "local_active",
+        "target_usage_interpretable": "true",
+        "n_files_in_target_used": 3,
+        "pct_files_in_target_used": 0.3,
+        "in_any_template": "false",
+        "in_any_container": "false",
+        "in_any_generic": "false",
+        "comparison_type": "template_to_project",
+        "governance_role_reference": "Template",
+        "in_reference_all": "false",
+    }
+    row.update(overrides)
+    return row
+
+
+def _reuse_row(join_hash, **overrides):
+    row = {
+        "domain": DOMAIN,
+        "join_hash": join_hash,
+        "pattern_label": overrides.pop("pattern_label", join_hash),
+        "view_scope": "all",
+        "governance_role": "Project",
+        "client_label": "Acme",
+        "discipline_label": "",
+        "unit_system": "imperial",
+        "reuse_bucket": "client_wide",
+        # Kept well below --baseline-threshold's default (0.90) so tests that
+        # aren't specifically exercising the penetration+seeded baseline
+        # gate don't trip it by accident.
+        "n_projects_present": 1,
+        "n_projects_denominator": 5,
+        "n_clients_present": 1,
+        "n_clients_denominator": 5,
+        "n_files_present": 10,
+        "n_files_denominator": 10,
+        "pct_projects_present": 0.2,
+        "pct_clients_present": 0.2,
+        "pct_files_present": 1.0,
+    }
+    row.update(overrides)
+    return row
+
+
+@pytest.fixture
+def corpus_root(tmp_path):
+    gov_rows = [
+        # jh_candidate_enterprise: seeded at bc, reused enterprise-wide -> candidate
+        _gov_row("jh_candidate_enterprise"),
+        {**_gov_row("jh_candidate_enterprise"), "state": "provided_and_used",
+         "comparison_type": "bc_to_project", "governance_role_reference": "Template",
+         "in_reference_all": "true"},
+
+        # jh_baseline_equal: seeded enterprise, reused enterprise -> baseline (equal)
+        _gov_row("jh_baseline_equal"),
+        {**_gov_row("jh_baseline_equal"), "state": "provided_and_used",
+         "comparison_type": "enterprise_to_project", "governance_role_reference": "Template",
+         "in_reference_all": "true"},
+
+        # jh_underused: seeded enterprise, reused only client-wide -> governed_but_underused
+        _gov_row("jh_underused"),
+        {**_gov_row("jh_underused"), "state": "provided_and_used",
+         "comparison_type": "enterprise_to_project", "governance_role_reference": "Template",
+         "in_reference_all": "true"},
+
+        # jh_below_floor: never seeded, single_file reuse -> below_reuse_floor
+        _gov_row("jh_below_floor"),
+
+        # jh_unclassified: never seeded, unclassified reuse -> unclassified_reuse
+        _gov_row("jh_unclassified"),
+
+        # jh_downgrade: never seeded, corpus_wide reuse but too few clients -> downgraded to client, candidate
+        _gov_row("jh_downgrade"),
+
+        # jh_generic_only: only a generic_to_project reference row (must NOT seed) -> candidate
+        _gov_row("jh_generic_only"),
+        {**_gov_row("jh_generic_only"), "state": "provided_and_used",
+         "comparison_type": "generic_to_project", "governance_role_reference": "Generic",
+         "in_reference_all": "true"},
+
+        # jh_baseline_via_penetration: seeded bc, high project penetration -> baseline via gate,
+        # even though scope-gap alone (client < bc) would say governed_but_underused
+        _gov_row("jh_baseline_via_penetration"),
+        {**_gov_row("jh_baseline_via_penetration"), "state": "provided_and_used",
+         "comparison_type": "bc_to_project", "governance_role_reference": "Template",
+         "in_reference_all": "true"},
+
+        # jh_semantic_noise: never seeded, client-wide reuse, noisy label
+        _gov_row("jh_semantic_noise", pattern_label="Foo|self"),
+    ]
+
+    reuse_rows = [
+        _reuse_row("jh_candidate_enterprise", reuse_bucket="corpus_wide",
+                   n_clients_present=5, n_clients_denominator=6),
+        _reuse_row("jh_baseline_equal", reuse_bucket="corpus_wide",
+                   n_clients_present=5, n_clients_denominator=6),
+        _reuse_row("jh_underused", reuse_bucket="client_wide",
+                   n_clients_present=1, n_clients_denominator=5),
+        _reuse_row("jh_below_floor", reuse_bucket="single_file",
+                   n_files_present=1, n_files_denominator=10,
+                   n_projects_present=1, n_projects_denominator=10,
+                   n_clients_present=1, n_clients_denominator=5),
+        _reuse_row("jh_unclassified", reuse_bucket="unclassified",
+                   n_files_present=0, n_files_denominator=0,
+                   n_projects_present=0, n_projects_denominator=0,
+                   n_clients_present=0, n_clients_denominator=0),
+        _reuse_row("jh_downgrade", reuse_bucket="corpus_wide",
+                   n_clients_present=2, n_clients_denominator=3),
+        _reuse_row("jh_generic_only", reuse_bucket="client_wide",
+                   client_label="Beta", n_clients_present=1, n_clients_denominator=5),
+        _reuse_row("jh_baseline_via_penetration", reuse_bucket="multi_project",
+                   n_projects_present=9, n_projects_denominator=10,
+                   n_clients_present=1, n_clients_denominator=5),
+        _reuse_row("jh_semantic_noise", pattern_label="Foo|self",
+                   reuse_bucket="client_wide"),
+    ]
+
+    pd.DataFrame(gov_rows).to_csv(tmp_path / "cross_segment_governance_states.csv", index=False)
+    pd.DataFrame(reuse_rows).to_csv(tmp_path / "pattern_reuse_distribution.csv", index=False)
+    return tmp_path
+
+
+def _read(root, name):
+    return pd.read_csv(root / "promotion_candidate_analysis" / name)
+
+
+def test_scope_gap_candidate_routing(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    candidates = _read(corpus_root, "promotion_candidates.csv")
+    row = candidates[candidates["join_hash"] == "jh_candidate_enterprise"].iloc[0]
+    assert row["seeded_scope"] == "bc"
+    assert row["reuse_scope"] == "enterprise"
+    assert row["scope_gap"] == "reuse=enterprise > seeded=bc"
+    assert row["candidate_class"] == "consistency_footprint_matches_enterprise_scope"
+
+
+def test_baseline_equal_scope_excluded(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    baseline = _read(corpus_root, "baseline_adequately_governed.csv")
+    assert "jh_baseline_equal" in set(baseline["join_hash"])
+    candidates = _read(corpus_root, "promotion_candidates.csv")
+    assert "jh_baseline_equal" not in set(candidates["join_hash"])
+
+
+def test_underused_routed_separately(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    underused = _read(corpus_root, "governed_but_underused.csv")
+    assert set(underused["join_hash"]) >= {"jh_underused"}
+    candidates = _read(corpus_root, "promotion_candidates.csv")
+    baseline = _read(corpus_root, "baseline_adequately_governed.csv")
+    assert "jh_underused" not in set(candidates["join_hash"])
+    assert "jh_underused" not in set(baseline["join_hash"])
+
+
+def test_below_reuse_floor_not_classified(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    below = _read(corpus_root, "below_reuse_floor.csv")
+    assert "jh_below_floor" in set(below["join_hash"])
+    for fname in ("promotion_candidates.csv", "governed_but_underused.csv",
+                  "baseline_adequately_governed.csv"):
+        assert "jh_below_floor" not in set(_read(corpus_root, fname)["join_hash"])
+
+
+def test_unclassified_reuse_routed_separately(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    unclassified = _read(corpus_root, "unclassified_reuse.csv")
+    assert "jh_unclassified" in set(unclassified["join_hash"])
+    for fname in ("promotion_candidates.csv", "governed_but_underused.csv",
+                  "baseline_adequately_governed.csv", "below_reuse_floor.csv"):
+        assert "jh_unclassified" not in set(_read(corpus_root, fname)["join_hash"])
+
+
+def test_min_enterprise_clients_downgrade(corpus_root):
+    apc.main([
+        "--root", str(corpus_root), "--domains", DOMAIN,
+        "--min-enterprise-clients", "3",
+    ])
+    candidates = _read(corpus_root, "promotion_candidates.csv")
+    row = candidates[candidates["join_hash"] == "jh_downgrade"].iloc[0]
+    assert row["reuse_scope"] == "client"
+    assert row["enterprise_evidence_downgraded"] == True  # noqa: E712
+
+
+def test_generic_reference_does_not_seed(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    candidates = _read(corpus_root, "promotion_candidates.csv")
+    row = candidates[candidates["join_hash"] == "jh_generic_only"].iloc[0]
+    assert row["seeded_scope"] == "ungoverned"
+
+
+def test_baseline_threshold_gate_overrides_scope_gap(corpus_root):
+    apc.main([
+        "--root", str(corpus_root), "--domains", DOMAIN,
+        "--baseline-threshold", "0.90",
+    ])
+    baseline = _read(corpus_root, "baseline_adequately_governed.csv")
+    assert "jh_baseline_via_penetration" in set(baseline["join_hash"])
+    underused = _read(corpus_root, "governed_but_underused.csv")
+    assert "jh_baseline_via_penetration" not in set(underused["join_hash"])
+
+
+def test_semantic_noise_filter_routes_separately(corpus_root):
+    apc.main([
+        "--root", str(corpus_root), "--domains", DOMAIN,
+        "--enable-semantic-noise-filter",
+    ])
+    noise = _read(corpus_root, "semantic_noise_excluded.csv")
+    assert "jh_semantic_noise" in set(noise["join_hash"])
+    for fname in ("promotion_candidates.csv", "baseline_adequately_governed.csv"):
+        assert "jh_semantic_noise" not in set(_read(corpus_root, fname)["join_hash"])
+
+
+def test_semantic_noise_filter_disabled_by_default(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    candidates = _read(corpus_root, "promotion_candidates.csv")
+    assert "jh_semantic_noise" in set(candidates["join_hash"])
+    assert not (corpus_root / "promotion_candidate_analysis" / "semantic_noise_excluded.csv").exists()
+
+
+def test_rank_is_ordinal_per_domain(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    candidates = _read(corpus_root, "promotion_candidates.csv")
+    ranks = sorted(candidates[candidates["domain"] == DOMAIN]["rank"].tolist())
+    assert ranks == list(range(1, len(ranks) + 1))
+
+
+def test_no_bare_numeric_score_in_any_output(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN, "--verbose"])
+    out_dir = corpus_root / "promotion_candidate_analysis"
+    for csv_path in out_dir.glob("*.csv"):
+        cols = pd.read_csv(csv_path, nrows=0).columns
+        assert "promotion_score" not in cols, csv_path
+        assert "score" not in {c.lower() for c in cols}, csv_path
+    summary_text = (out_dir / "promotion_candidate_summary.md").read_text()
+    assert "promotion_score" not in summary_text
+    assert "Read this first" in summary_text
+
+
+def test_routing_buckets_are_mutually_exclusive(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    out_dir = corpus_root / "promotion_candidate_analysis"
+    files = [
+        "promotion_candidates.csv", "governed_but_underused.csv",
+        "baseline_adequately_governed.csv", "below_reuse_floor.csv",
+        "unclassified_reuse.csv",
+    ]
+    seen = {}
+    for fname in files:
+        for jh in _read(corpus_root, fname)["join_hash"]:
+            assert jh not in seen, f"{jh} appears in both {seen.get(jh)} and {fname}"
+            seen[jh] = fname

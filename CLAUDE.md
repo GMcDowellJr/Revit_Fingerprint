@@ -27,7 +27,7 @@ FINGERPRINT_JSON_PATH=/path/to/export.json pytest tests/test_record_contract_v2.
 
 No `requirements.txt` or `pyproject.toml` exists. The only external dependency for development is `pytest` (`pip install pytest`). `.github/workflows/ci.yml` runs `pytest tests/ -v` on Python 3.9–3.12 for every push/PR to `main`. A second workflow, `.github/workflows/graphify.yml`, keeps the `graphify-out/` knowledge graph in sync.
 
-Analysis tools are stdlib-only (no pandas/numpy) as a rule — `tools/` code reads/writes CSV via `csv.DictReader`/`csv.DictWriter` by convention; don't introduce a new dependency there without a strong reason. Known exceptions that already require `pandas`/`numpy`/`scipy`: `tools/patterns_analysis/split_detection.py`, `split_detection_file_level.py`, `split_detection_element_level.py`, and `tools/pareto_joinkey_search.py`.
+Analysis tools are stdlib-only (no pandas/numpy) as a rule — `tools/` code reads/writes CSV via `csv.DictReader`/`csv.DictWriter` by convention; don't introduce a new dependency there without a strong reason. Known exceptions that already require `pandas`/`numpy`/`scipy`: `tools/patterns_analysis/split_detection.py`, `split_detection_file_level.py`, `split_detection_element_level.py`, `tools/pareto_joinkey_search.py`, and `tools/analyze_promotion_candidates.py` (inherited pandas dependency from the prototype it redesigns).
 
 ## Architecture
 
@@ -216,6 +216,16 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             config/archetype/archetype_definitions.json
   compare_templates_stand-alone/   Standalone view-template comparison tool + HTML report (independent of the
                             segment/governance pipeline above)
+  analyze_promotion_candidates.py   Standalone scope-consistency classifier: reads cross_segment_governance_states.csv
+                            + pattern_reuse_distribution.csv and flags patterns whose observed reuse scope
+                            (`reuse_scope`, from `reuse_bucket`) exceeds the broadest scope at which they are
+                            already governed by a Template/Container (`seeded_scope`, from directed
+                            comparison_type edges). Descriptive scope-consistency classification, not a
+                            promotion decision -- not pipeline-wired, not rendered by
+                            generate_governance_narrative.py, no assign_tier() interaction. reuse_scope can
+                            never resolve to bc-level (pattern_reuse_distribution.csv's grouping key has no
+                            business_center_label dimension) -- see the module docstring for the full list of
+                            known upstream measurement gaps this tool works around rather than papers over.
 
   na_token.py             Shared "N/A"-spelling detection used by segment/governance tooling
   jenks_utils.py           Jenks natural-breaks helper for threshold computation
@@ -252,7 +262,9 @@ tests/                  pytest test suite (70+ test files)
   test_governance_manifest.py, test_governance_field_completeness_gate.py, test_generate_governance_narrative_*.py,
   test_run_segment_orchestrator_worker_split.py, test_bundle_pattern_classification_roles.py,
   test_placeholder_exclusions.py, test_reference_bundle.py, test_label_synthesis_domain_prompt_loader.py,
-  test_discover_hash_policy.py, test_discover_vfd_edges.py, test_na_token.py, test_probe_inventory_builder.py
+  test_discover_hash_policy.py, test_discover_vfd_edges.py, test_na_token.py, test_probe_inventory_builder.py,
+  test_analyze_promotion_candidates.py  Synthetic-fixture coverage for tools/analyze_promotion_candidates.py
+                                       (scope-gap routing, ordinal ranking, no-bare-score invariant)
                                        Coverage for the newer segment/governance/archetype tooling
   revit/                              Revit integration harness (requires Revit)
   golden/                             Golden file comparisons
