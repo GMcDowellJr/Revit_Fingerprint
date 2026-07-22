@@ -402,41 +402,51 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
     on unit_system for the same reason as compute_seeded_scope -- see its
     docstring.
 
-    Prefers `view_scope == "used"` rows per (domain, join_hash, unit_system,
-    client_label, discipline_label) -- the same grain
-    build_pattern_reuse_distribution_rows() itself groups on -- over
-    `view_scope == "all"`. Used-view is the active-delivery-practice signal
-    for Project rows (docs/cross_segment_comparison.md: "Project used-view
-    rows can support active delivery practice reporting"); all-view mixes
-    in passively-inherited, configured-but-never-rendered content. Using
-    all-view unconditionally would be inconsistent with the base population
-    itself, which is already restricted to `state == "local_active"` rows
-    from cross_segment_governance_states.csv -- an active-use signal on the
-    governance side. All-view is used only as a fallback, and only for the
-    specific (client, discipline) population that has no used-view row at
-    all (e.g. `inventory_status=used_view_unavailable` upstream, older
-    exports without membership_matrix used-view data) -- never displacing a
-    used-view row that does exist for that same population. Which source
+    Prefers `view_scope == "used"` rows over `view_scope == "all"`, decided
+    per (domain, join_hash, unit_system) identity -- not per (client_label,
+    discipline_label) population. Used-view is the active-delivery-practice
+    signal for Project rows (docs/cross_segment_comparison.md: "Project
+    used-view rows can support active delivery practice reporting");
+    all-view mixes in passively-inherited, configured-but-never-rendered
+    content. Using all-view unconditionally would be inconsistent with the
+    base population itself, which is already restricted to `state ==
+    "local_active"` rows from cross_segment_governance_states.csv -- an
+    active-use signal on the governance side.
+
+    All-view rows are used only as a fallback, and only for an identity
+    with *no* used-view row anywhere (e.g. `inventory_status=
+    used_view_unavailable` upstream, older exports without
+    membership_matrix used-view data). A per-population fallback (falling
+    back to all-view just for the specific client lacking used data, while
+    keeping used-view rows for other clients) was tried and rejected: each
+    row's `reuse_bucket`/`pct_clients_present` is computed upstream against
+    that row's own view_scope's client population -- a "used" row's
+    denominator is the used-view-eligible client pool, an "all" row's is
+    the (typically larger) all-view client pool, which can include clients
+    with no active-use evidence at all. Mixing rows computed against two
+    different denominators in the same max-rank tie-break lets one client's
+    passively-configured all-view corpus_wide reading dominate over other
+    clients' genuinely narrower used-view evidence. Falling back at the
+    whole-identity level instead means an identity with partial used-view
+    coverage is scored from used-view evidence only, never blended with an
+    all-view reading computed against a different population. Which source
     won is recorded per output row in `reuse_view_source` ("used" /
     "all_fallback") rather than left implicit.
     """
     project_rows = reuse[reuse["governance_role"] == "Project"].copy()
 
-    # NaN != NaN, so a blank discipline_label read as float NaN by
-    # pd.read_csv would silently break _key matching between a "used" row
-    # and its "all" counterpart -- normalize match columns to strings first.
-    match_cols = ["domain", "join_hash", "unit_system", "client_label", "discipline_label"]
-    for col in match_cols:
-        project_rows[col] = project_rows[col].fillna("").astype(str)
-    project_rows["_key"] = list(zip(*[project_rows[c] for c in match_cols]))
+    identity_cols = ["domain", "join_hash", "unit_system"]
     used = project_rows[project_rows["view_scope"] == "used"].copy()
     used["reuse_view_source"] = "used"
-    used_keys = set(used["_key"])
+    identities_with_used = set(zip(*[used[c] for c in identity_cols])) if len(used) else set()
     all_fallback = project_rows[
-        (project_rows["view_scope"] == "all") & (~project_rows["_key"].isin(used_keys))
+        (project_rows["view_scope"] == "all")
+        & ~pd.Series(
+            list(zip(*[project_rows[c] for c in identity_cols])), index=project_rows.index
+        ).isin(identities_with_used)
     ].copy()
     all_fallback["reuse_view_source"] = "all_fallback"
-    r = pd.concat([used, all_fallback], ignore_index=True).drop(columns=["_key"])
+    r = pd.concat([used, all_fallback], ignore_index=True)
 
     empty_cols = [
         "domain", "join_hash", "unit_system", "reuse_scope", "reuse_bucket",

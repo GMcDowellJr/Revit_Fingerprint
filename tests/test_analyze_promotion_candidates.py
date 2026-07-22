@@ -159,6 +159,14 @@ def corpus_root(tmp_path):
         # (client, discipline) population shows only single_file active
         # delivery -- used-view must win, not the broader all-view figure.
         _gov_row("jh_used_view_pref"),
+
+        # jh_partial_used_data: never seeded. Client A has narrow used-view
+        # evidence (single_file); Client B has no used-view data at all, only
+        # a broad all-view corpus_wide reading (computed against a different,
+        # larger all-view client population). Once used-view evidence exists
+        # anywhere for this identity, Client B's all-view row must be dropped
+        # entirely, not blended into the max-rank tie-break.
+        _gov_row("jh_partial_used_data"),
     ]
 
     reuse_rows = [
@@ -205,6 +213,16 @@ def corpus_root(tmp_path):
                    n_files_present=1, n_files_denominator=10,
                    n_projects_present=1, n_projects_denominator=10,
                    n_clients_present=1, n_clients_denominator=5),
+        _reuse_row("jh_partial_used_data", client_label="Acme", view_scope="used",
+                   reuse_bucket="single_file",
+                   n_files_present=1, n_files_denominator=10,
+                   n_projects_present=1, n_projects_denominator=10,
+                   n_clients_present=1, n_clients_denominator=5),
+        _reuse_row("jh_partial_used_data", client_label="Beta", view_scope="all",
+                   reuse_bucket="corpus_wide",
+                   n_files_present=20, n_files_denominator=22,
+                   n_projects_present=8, n_projects_denominator=10,
+                   n_clients_present=5, n_clients_denominator=6),
     ]
 
     pd.DataFrame(gov_rows).to_csv(tmp_path / "cross_segment_governance_states.csv", index=False)
@@ -319,6 +337,21 @@ def test_used_view_preferred_over_all_view(corpus_root):
     # must win instead, correctly reflecting narrow active-delivery reuse.
     assert row["reuse_scope"] == "ungoverned"
     assert row["reuse_view_source"] == "used"
+    assert row["routing_bucket"] == "below_reuse_floor"
+
+
+def test_all_view_fallback_dropped_when_used_data_exists_elsewhere(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    audit = _read(corpus_root, "promotion_candidate_full_audit.csv")
+    row = audit[audit["join_hash"] == "jh_partial_used_data"].iloc[0]
+    # Client Beta's all-view corpus_wide row was computed against a
+    # different, larger all-view client population than Client Acme's
+    # used-view row. Since used-view evidence exists for this identity
+    # (Acme), Beta's all-view row must be dropped entirely rather than
+    # letting its corpus_wide reading dominate the max-rank tie-break.
+    assert row["reuse_view_source"] == "used"
+    assert "Beta" not in row["client_label"].split(";")
+    assert row["reuse_scope"] == "ungoverned"
     assert row["routing_bucket"] == "below_reuse_floor"
 
 
