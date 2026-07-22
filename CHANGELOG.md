@@ -11,6 +11,51 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Added
+- **Live file-availability inventory (D-023):** new `governance_file_inventory.json`
+  artifact in the governance evidence package, built fresh on every run by
+  `inventory_export_directory_files()` (`tools/governance_evidence_package.py`):
+  a `Path.glob("*.csv")` scan of the cross_segment export directory
+  (`--summary`'s parent) and, when it differs, the relationship-layer output
+  directory, excluding every path already tracked as an input/output/sibling
+  artifact elsewhere in the package. For each undiscovered file it records
+  the column header, an inferred per-column dtype (`integer`/`float`/
+  `boolean`/`string`/`empty` via `_column_dtype()`), and the row count --
+  never a sample row or cell value. `generate_governance_narrative.py`
+  attaches a one/two-sentence narrative per file
+  (`_narrative_for_inventory_entry()`): when the filename matches a
+  `matrix_name` already documented in `matrix_output_manifest.csv`, it
+  reuses that row's own `interpretation`/`known_limitations` text verbatim
+  (the same free-text narrative pattern `compare_cross_segment.py`'s
+  `add_manifest()` already uses for the registered `project_*` matrix
+  artifacts); otherwise it falls back to a structural sentence built only
+  from the header/row-count the scan already computed. Neither path
+  hand-maintains a per-filename description, so a brand-new future export
+  is picked up automatically with no follow-up code change. Confirmed
+  against the real gap this closes: `pattern_reuse_summary_by_domain.csv`
+  and `project_mean_file_pair_jaccard_matrix.csv` are both written by
+  `compare_cross_segment.py` but were never represented as evidence-package
+  artifacts before this change -- this generator's own code comments
+  already noted them "deliberately not consumed," but that note lived only
+  in Python, invisible to a reader of the package. `governance_brief.md`
+  gains a new `## Detail-Layer File Inventory` section rendering the same
+  already-scanned data (`render_file_inventory_brief_section()`, no second
+  scan) -- appended after the leadership questions, entirely omitted (not
+  blank-rendered) when the scan finds nothing undiscovered, and deliberately
+  not interleaved into the per-domain findings sections above it. Gating:
+  `governance_file_inventory.json` follows manifest/health/evidence-map/
+  findings under `--emit-evidence-package`; the `governance_brief.md`
+  section additionally requires `--emit-interpretation-layer`, matching the
+  rest of the brief. `governance_narrative_context.md` itself is unchanged
+  -- this phase adds no section there, preserving that document's existing
+  `--no-emit-evidence-package` "CSV/MD outputs unaffected" guarantee.
+  `governance_file_inventory` is registered as a 33rd `governance_evidence_map.json`
+  artifact (`authority_level: authoritative_deterministic_evidence`, empty
+  `related_artifacts` since the files it lists vary run to run). No existing
+  classification, scoring, CSV column, or narrative section changed.
+  `compare_cross_segment.py` and `build_segment_manifest.py` are unchanged
+  (read-only dependency). See D-023 and `docs/governance_evidence_package.md`.
+
 ### Fixed
 - `generate_governance_narrative.py`'s within-project `score_reliability` p10/p90
   capture (the sole feeder of `score_reliability()`) was returning `Unknown` for

@@ -845,6 +845,95 @@ artifact; its authority header gains pointers to all three new artifacts.
 
 ---
 
+## D-023 — Governance narrative evidence-package layer (Phase 5: live file-availability inventory)
+
+### Status
+Accepted (2026-07-22)
+
+### Context
+The evidence package (D-019 through D-022) describes, in detail, every
+artifact this generator itself reads or writes. It has no way to describe
+a file it does *not* read: `compare_cross_segment.py` writes several CSVs
+(`pattern_reuse_summary_by_domain.csv`, `project_mean_file_pair_jaccard_matrix.csv`)
+that this generator's own code comments already note are "deliberately not
+consumed," but that note lived only in Python — no package artifact told a
+reader (human or LLM) that these files exist at all. When a question needs
+more detail than the rollups carry, the LLM reading this package has no way
+to know a candidate drill-down file exists; it either guesses or stonewalls
+with "I need more data" and no path forward.
+
+Step 0 for this phase confirmed two facts that shape the whole design:
+(1) this package has, and will continue to have, no query/tool-calling
+path — `generate_governance_narrative.py`'s outputs are consumed single-shot
+by a reader that cannot fetch anything itself, so *naming* a file is the
+only lever available, not fetching it; (2) no `csv_inventory.md`-style
+utility already existed anywhere in this repo to reuse.
+
+### Decision
+Add `governance_file_inventory.json`, built fresh on every run by
+`inventory_export_directory_files()` (`tools/governance_evidence_package.py`):
+a `Path.glob("*.csv")` scan of the cross_segment export directory
+(`--summary`'s parent) and, when it differs, the relationship-layer output
+directory, excluding every path already tracked as an input, output, or
+sibling artifact elsewhere in the package. For each undiscovered file it
+records the column header, an inferred per-column dtype (`integer`/`float`/
+`boolean`/`string`/`empty`), and the row count — **never a sample row or
+cell value**, matching the "type of data, not shape of values" scope
+decision for this phase. A short narrative sentence per file is attached in
+`generate_governance_narrative.py`: when the filename matches a `matrix_name`
+already documented in `matrix_output_manifest.csv`, it reuses that row's own
+`interpretation`/`known_limitations` text verbatim (the same free-text
+narrative field pattern `compare_cross_segment.py`'s `add_manifest()`
+already uses for the registered `project_*` matrix artifacts); otherwise it
+falls back to a structural sentence built only from the header/row-count
+the scan already computed. Neither path hand-maintains a per-filename
+description, so a brand-new future export (a promotion-candidates output,
+a future PR) is picked up automatically the next time this generator runs,
+with no follow-up edit to this code.
+
+`governance_brief.md` renders the same already-scanned data as its own new
+`## Detail-Layer File Inventory` section — a directory of what exists at
+the detail layer, appended after the leadership questions and deliberately
+not interleaved into the per-domain findings sections above it. The
+section is entirely omitted (not blank-rendered) when the scan found
+nothing undiscovered. `governance_file_inventory.json` is gated by
+`--emit-evidence-package` (matching manifest/health/evidence-map/findings);
+the `governance_brief.md` section additionally requires
+`--emit-interpretation-layer`, matching the rest of the brief's existing
+gating. `governance_narrative_context.md` itself is unchanged — this phase
+adds no section there, preserving that document's existing documented
+guarantee that `--no-emit-evidence-package` leaves CSV/MD outputs
+unaffected.
+
+`governance_file_inventory` is registered as a 33rd `governance_evidence_map.json`
+artifact: `authority_level: authoritative_deterministic_evidence` (the
+header/dtype/row-count facts are directly observed, not interpreted), with
+an intentionally empty `related_artifacts` — unlike every other entry, the
+files this artifact lists vary run to run, so no fixed relationship list
+would stay accurate.
+
+### Consequences
+- `governance_evidence_map.json` grows to 33 artifacts.
+- No existing classification, scoring, CSV column, or narrative section
+  changed — the scan only ever describes files nothing else in the package
+  already reads, and `governance_brief.md`'s new section is additive,
+  omitted entirely when there is nothing to report.
+- The design-reference `GMcDowellJr/llm_evidence_framework` repository's
+  `discovery/evidence_map_discovery.md` scaffold (candidate evidence-map
+  field list, already cited by D-019) covers "what files exist" as an
+  explicit evidence-map purpose; this phase is the first to close that gap
+  for files this generator does not itself consume, still with no runtime
+  dependency on that repository.
+- Explicitly out of scope, per this phase's own boundary: any query, fetch,
+  or tool-calling mechanism that would let an LLM actually retrieve a named
+  file's contents. That remains a different initiative, if it ever happens
+  — this phase only makes the file's *existence and shape* discoverable
+  within the single-shot package.
+- `compare_cross_segment.py` and `build_segment_manifest.py` are unchanged
+  (read-only dependency, per this phase's own scope boundary).
+
+---
+
 ## Notes
 
 - This document is **append-only**.
