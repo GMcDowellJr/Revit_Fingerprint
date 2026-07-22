@@ -12,8 +12,10 @@ build_governance_state_outputs()) and pattern_reuse_distribution.csv
 import sys
 from pathlib import Path
 
-import pandas as pd
 import pytest
+
+pd = pytest.importorskip("pandas")
+pytest.importorskip("numpy")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
@@ -38,6 +40,7 @@ def _gov_row(join_hash, **overrides):
         "comparison_type": "template_to_project",
         "governance_role_reference": "Template",
         "in_reference_all": "false",
+        "segment_id_target": overrides.pop("segment_id_target", f"seg_project_{join_hash}"),
     }
     row.update(overrides)
     return row
@@ -116,6 +119,15 @@ def corpus_root(tmp_path):
 
         # jh_semantic_noise: never seeded, client-wide reuse, noisy label
         _gov_row("jh_semantic_noise", pattern_label="Foo|self"),
+
+        # jh_dedup_targets: same target segment appears in two local_active rows
+        # (compared against two different references), same n_files_in_target_used
+        # each time -- must not be double-counted when summing files_used.
+        _gov_row("jh_dedup_targets", segment_id_target="seg_shared",
+                 n_files_in_target_used=7, pct_files_in_target_used=0.7),
+        {**_gov_row("jh_dedup_targets", segment_id_target="seg_shared",
+                     n_files_in_target_used=7, pct_files_in_target_used=0.7),
+         "comparison_type": "bc_to_project"},
     ]
 
     reuse_rows = [
@@ -142,6 +154,7 @@ def corpus_root(tmp_path):
                    n_clients_present=1, n_clients_denominator=5),
         _reuse_row("jh_semantic_noise", pattern_label="Foo|self",
                    reuse_bucket="client_wide"),
+        _reuse_row("jh_dedup_targets", reuse_bucket="client_wide"),
     ]
 
     pd.DataFrame(gov_rows).to_csv(tmp_path / "cross_segment_governance_states.csv", index=False)
@@ -188,6 +201,17 @@ def test_below_reuse_floor_not_classified(corpus_root):
     for fname in ("promotion_candidates.csv", "governed_but_underused.csv",
                   "baseline_adequately_governed.csv"):
         assert "jh_below_floor" not in set(_read(corpus_root, fname)["join_hash"])
+
+
+def test_files_used_not_inflated_by_repeated_target_across_references(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    candidates = _read(corpus_root, "promotion_candidates.csv")
+    row = candidates[candidates["join_hash"] == "jh_dedup_targets"].iloc[0]
+    # seg_shared appears in two local_active rows (compared against two
+    # different references) both reporting n_files_in_target_used=7 for the
+    # same target -- files_used must reflect that one target's 7 files, not
+    # 14 from summing both comparison rows.
+    assert row["files_used"] == 7
 
 
 def test_unclassified_reuse_routed_separately(corpus_root):

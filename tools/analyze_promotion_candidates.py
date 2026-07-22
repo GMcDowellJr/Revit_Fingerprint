@@ -484,7 +484,7 @@ def main(argv=None):
             "target_usage_interpretable", "n_files_in_target_used",
             "pct_files_in_target_used", "in_any_template", "in_any_container",
             "in_any_generic", "comparison_type", "governance_role_reference",
-            "in_reference_all",
+            "in_reference_all", "segment_id_target",
         ],
         "cross_segment_governance_states.csv",
     )
@@ -526,8 +526,29 @@ def main(argv=None):
     if verbose:
         print(f"Local-active rows after domain filter: {len(active):,}")
 
+    # A single target segment shows up once per reference it was compared
+    # against (Template, Enterprise, BC, ...), each carrying the same
+    # n_files_in_target_used for that target (it depends only on the
+    # target's own file population, not on the reference side). Collapse to
+    # one row per (domain, join_hash, pattern_label, segment_id_target)
+    # first, or summing n_files_in_target_used below double/triple-counts
+    # the same target files once per reference comparison it appeared in.
+    active_by_target = (
+        active.groupby(
+            ["domain", "join_hash", "pattern_label", "segment_id_target"], dropna=False
+        )
+        .agg(
+            n_files_in_target_used=("n_files_in_target_used", "max"),
+            pct_files_in_target_used=("pct_files_in_target_used", "max"),
+            in_any_template=("in_any_template", "max"),
+            in_any_container=("in_any_container", "max"),
+            in_any_generic=("in_any_generic", "max"),
+        )
+        .reset_index()
+    )
+
     base = (
-        active.groupby(["domain", "join_hash", "pattern_label"], dropna=False)
+        active_by_target.groupby(["domain", "join_hash", "pattern_label"], dropna=False)
         .agg(
             files_used=("n_files_in_target_used", "sum"),
             max_pct_used=("pct_files_in_target_used", "max"),
