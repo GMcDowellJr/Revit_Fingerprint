@@ -167,6 +167,12 @@ def corpus_root(tmp_path):
         # anywhere for this identity, Client B's all-view row must be dropped
         # entirely, not blended into the max-rank tie-break.
         _gov_row("jh_partial_used_data"),
+
+        # jh_multi_discipline: never seeded. One client, two discipline rows
+        # (Arch and Struct) both tied at client_wide, each reporting the same
+        # underlying projects present in that discipline -- must not be
+        # summed together (a project can have both Arch and Struct files).
+        _gov_row("jh_multi_discipline"),
     ]
 
     reuse_rows = [
@@ -223,6 +229,16 @@ def corpus_root(tmp_path):
                    n_files_present=20, n_files_denominator=22,
                    n_projects_present=8, n_projects_denominator=10,
                    n_clients_present=5, n_clients_denominator=6),
+        _reuse_row("jh_multi_discipline", client_label="Acme", discipline_label="Arch",
+                   reuse_bucket="client_wide",
+                   n_projects_present=3, n_projects_denominator=5,
+                   n_files_present=6, n_files_denominator=10,
+                   n_clients_present=1, n_clients_denominator=5),
+        _reuse_row("jh_multi_discipline", client_label="Acme", discipline_label="Struct",
+                   reuse_bucket="client_wide",
+                   n_projects_present=3, n_projects_denominator=5,
+                   n_files_present=4, n_files_denominator=10,
+                   n_clients_present=1, n_clients_denominator=5),
     ]
 
     pd.DataFrame(gov_rows).to_csv(tmp_path / "cross_segment_governance_states.csv", index=False)
@@ -353,6 +369,18 @@ def test_all_view_fallback_dropped_when_used_data_exists_elsewhere(corpus_root):
     assert "Beta" not in row["client_label"].split(";")
     assert row["reuse_scope"] == "ungoverned"
     assert row["routing_bucket"] == "below_reuse_floor"
+
+
+def test_discipline_tied_rows_not_summed_within_client(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    audit = _read(corpus_root, "promotion_candidate_full_audit.csv")
+    row = audit[audit["join_hash"] == "jh_multi_discipline"].iloc[0]
+    # Acme's Arch (3 projects, 6 files) and Struct (3 projects, 4 files) rows
+    # tie at client_wide -- a project/file can have both Arch and Struct
+    # content, so max() across disciplines (not sum) is the correct,
+    # non-overcounting reading for a single client.
+    assert row["n_projects_present"] == 3
+    assert row["n_files_present"] == 6
 
 
 def test_domain_rollup_total_matches_bucket_sum(corpus_root):

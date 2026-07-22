@@ -485,22 +485,58 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
     # together, since pct_clients_present is a shared, not client-specific,
     # quantity. idxmax() alone would silently keep one arbitrary client's
     # n_projects_present/n_files_present (CSV-row-order dependent) and
-    # discard the others. Aggregate across every row tied at the max rank
-    # instead: n_projects_present/n_files_present and their denominators are
-    # each computed within one client's own pool, so summing numerator and
-    # denominator together across distinct clients yields a genuine
-    # corpus/multi-client aggregate rather than one client's figures.
+    # discard the others.
     key_cols = ["domain", "join_hash", "unit_system"]
     classified["reuse_scope_rank"] = classified["reuse_scope"].map(SCOPE_RANK)
     max_rank = classified.groupby(key_cols)["reuse_scope_rank"].transform("max")
     tied = classified[classified["reuse_scope_rank"] == max_rank].copy()
 
-    classified = (
-        tied.groupby(key_cols)
+    def _union_tokens(series):
+        tokens = set()
+        for s in series:
+            tokens.update(t for t in str(s).split(";") if t)
+        return ";".join(sorted(tokens))
+
+    # Two-stage aggregation, because project/file counts are disjoint across
+    # different clients but NOT across different disciplines within the
+    # same client: pattern_reuse_distribution.csv computes n_projects_present
+    # per (client_label, discipline_label) pool, and a single project can
+    # legitimately have files in more than one discipline (e.g. Arch and
+    # Struct on the same project). Summing across tied discipline rows for
+    # one client would double-count that project.
+    #
+    # Stage 1 -- within one (identity, client_label), collapse any tied
+    # discipline rows via max(): a non-overcounting "at least this many
+    # projects/files" reading, since we cannot deduplicate individual
+    # project identities from the aggregated counts alone.
+    per_client = (
+        tied.groupby(key_cols + ["client_label"])
         .agg(
             reuse_scope=("reuse_scope", "first"),
-            reuse_bucket=("reuse_bucket", lambda s: ";".join(sorted(set(s)))),
-            reuse_view_source=("reuse_view_source", lambda s: ";".join(sorted(set(s)))),
+            reuse_bucket=("reuse_bucket", _union_tokens),
+            reuse_view_source=("reuse_view_source", _union_tokens),
+            n_clients_present=("n_clients_present", "max"),
+            n_clients_denominator=("n_clients_denominator", "max"),
+            pct_clients_present=("pct_clients_present", "max"),
+            n_projects_present=("n_projects_present", "max"),
+            n_projects_denominator=("n_projects_denominator", "max"),
+            n_files_present=("n_files_present", "max"),
+            n_files_denominator=("n_files_denominator", "max"),
+            enterprise_evidence_downgraded=("enterprise_evidence_downgraded", "max"),
+            reuse_client_pool_is_stantec_internal=("_is_stantec_row", "max"),
+        )
+        .reset_index()
+    )
+
+    # Stage 2 -- across distinct clients, project/file pools are genuinely
+    # disjoint (a project belongs to exactly one client), so summing is
+    # correct here, same as before.
+    classified = (
+        per_client.groupby(key_cols)
+        .agg(
+            reuse_scope=("reuse_scope", "first"),
+            reuse_bucket=("reuse_bucket", _union_tokens),
+            reuse_view_source=("reuse_view_source", _union_tokens),
             client_label=("client_label", lambda s: ";".join(sorted(set(s.astype(str))))),
             n_clients_present=("n_clients_present", "max"),
             n_clients_denominator=("n_clients_denominator", "max"),
@@ -510,7 +546,7 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
             n_files_present=("n_files_present", "sum"),
             n_files_denominator=("n_files_denominator", "sum"),
             enterprise_evidence_downgraded=("enterprise_evidence_downgraded", "max"),
-            reuse_client_pool_is_stantec_internal=("_is_stantec_row", "max"),
+            reuse_client_pool_is_stantec_internal=("reuse_client_pool_is_stantec_internal", "max"),
         )
         .reset_index()
     )
