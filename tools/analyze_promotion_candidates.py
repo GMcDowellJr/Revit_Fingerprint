@@ -52,13 +52,21 @@ not just their docs):
   (no `any_generic`).
 
 - `reuse_scope` is derived from `pattern_reuse_distribution.csv`, filtered
-  to `view_scope == "all"` and `governance_role == "Project"` rows only.
+  to `governance_role == "Project"` rows only, preferring `view_scope ==
+  "used"` (active-delivery-practice) over `view_scope == "all"`
+  (configured) per (client_label, discipline_label) population -- all-view
+  is used only as a fallback for a population with no used-view row at all.
   The prototype this replaces did *not* apply either filter, which silently
   blended configured-vocabulary breadth from Template/Container/Generic
-  rows and used-view breadth into what was reported as reuse. That is a
-  real defect, not a style choice: `docs/cross_segment_comparison.md`
-  explicitly warns that Template/Generic/most-Container all-view rows are
-  "configured/published inventory, not active usage claims."
+  rows and passively-inherited all-view breadth into what was reported as
+  reuse. That is a real defect, not a style choice: `docs/cross_segment_
+  comparison.md` explicitly warns that Template/Generic/most-Container
+  all-view rows are "configured/published inventory, not active usage
+  claims" -- and unconditional all-view would also be inconsistent with
+  this tool's own base population, already restricted to `state ==
+  "local_active"` rows on the governance side. See `compute_reuse_scope()`'s
+  docstring for the fallback mechanics and the `reuse_view_source` audit
+  column.
 
   Known upstream gap, confirmed by reading `build_pattern_reuse_distribution_rows()`
   in `compare_cross_segment.py`: the row grouping key is
@@ -385,18 +393,50 @@ def compute_seeded_scope(gov: pd.DataFrame) -> pd.DataFrame:
 
 def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tuple:
     """Broadest reuse_scope observed for a (domain, join_hash, unit_system),
-    restricted to configured (`view_scope == "all"`) Project-role rows --
-    see module docstring for why Template/Container/Generic/used-view rows
-    are excluded. Returns (classified, unclassified): `classified` has one
-    row per key that resolved to a real scope value; `unclassified` carries
-    rows whose reuse_bucket was "unclassified" (denominators unavailable /
-    degraded source) for their own diagnostic output, never silently merged
-    into "ungoverned". Keyed on unit_system for the same reason as
-    compute_seeded_scope -- see its docstring.
+    restricted to Project-role rows -- see module docstring for why
+    Template/Container/Generic rows are excluded. Returns (classified,
+    unclassified): `classified` has one row per key that resolved to a real
+    scope value; `unclassified` carries rows whose reuse_bucket was
+    "unclassified" (denominators unavailable / degraded source) for their
+    own diagnostic output, never silently merged into "ungoverned". Keyed
+    on unit_system for the same reason as compute_seeded_scope -- see its
+    docstring.
+
+    Prefers `view_scope == "used"` rows per (domain, join_hash, unit_system,
+    client_label, discipline_label) -- the same grain
+    build_pattern_reuse_distribution_rows() itself groups on -- over
+    `view_scope == "all"`. Used-view is the active-delivery-practice signal
+    for Project rows (docs/cross_segment_comparison.md: "Project used-view
+    rows can support active delivery practice reporting"); all-view mixes
+    in passively-inherited, configured-but-never-rendered content. Using
+    all-view unconditionally would be inconsistent with the base population
+    itself, which is already restricted to `state == "local_active"` rows
+    from cross_segment_governance_states.csv -- an active-use signal on the
+    governance side. All-view is used only as a fallback, and only for the
+    specific (client, discipline) population that has no used-view row at
+    all (e.g. `inventory_status=used_view_unavailable` upstream, older
+    exports without membership_matrix used-view data) -- never displacing a
+    used-view row that does exist for that same population. Which source
+    won is recorded per output row in `reuse_view_source` ("used" /
+    "all_fallback") rather than left implicit.
     """
-    r = reuse[
-        (reuse["view_scope"] == "all") & (reuse["governance_role"] == "Project")
+    project_rows = reuse[reuse["governance_role"] == "Project"].copy()
+
+    # NaN != NaN, so a blank discipline_label read as float NaN by
+    # pd.read_csv would silently break _key matching between a "used" row
+    # and its "all" counterpart -- normalize match columns to strings first.
+    match_cols = ["domain", "join_hash", "unit_system", "client_label", "discipline_label"]
+    for col in match_cols:
+        project_rows[col] = project_rows[col].fillna("").astype(str)
+    project_rows["_key"] = list(zip(*[project_rows[c] for c in match_cols]))
+    used = project_rows[project_rows["view_scope"] == "used"].copy()
+    used["reuse_view_source"] = "used"
+    used_keys = set(used["_key"])
+    all_fallback = project_rows[
+        (project_rows["view_scope"] == "all") & (~project_rows["_key"].isin(used_keys))
     ].copy()
+    all_fallback["reuse_view_source"] = "all_fallback"
+    r = pd.concat([used, all_fallback], ignore_index=True).drop(columns=["_key"])
 
     empty_cols = [
         "domain", "join_hash", "unit_system", "reuse_scope", "reuse_bucket",
@@ -404,7 +444,7 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
         "pct_clients_present", "n_projects_present", "n_projects_denominator",
         "pct_projects_present", "n_files_present", "n_files_denominator",
         "pct_files_present", "enterprise_evidence_downgraded",
-        "reuse_client_pool_is_stantec_internal",
+        "reuse_client_pool_is_stantec_internal", "reuse_view_source",
     ]
     if r.empty:
         return pd.DataFrame(columns=empty_cols), pd.DataFrame(columns=empty_cols)
@@ -450,6 +490,7 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
         .agg(
             reuse_scope=("reuse_scope", "first"),
             reuse_bucket=("reuse_bucket", lambda s: ";".join(sorted(set(s)))),
+            reuse_view_source=("reuse_view_source", lambda s: ";".join(sorted(set(s)))),
             client_label=("client_label", lambda s: ";".join(sorted(set(s.astype(str))))),
             n_clients_present=("n_clients_present", "max"),
             n_clients_denominator=("n_clients_denominator", "max"),
@@ -537,7 +578,7 @@ def main(argv=None):
         reuse,
         [
             "domain", "join_hash", "pattern_label", "view_scope", "unit_system",
-            "governance_role", "client_label", "reuse_bucket",
+            "governance_role", "client_label", "discipline_label", "reuse_bucket",
             "n_projects_present", "n_projects_denominator",
             "n_clients_present", "n_clients_denominator",
             "n_files_present", "n_files_denominator",
@@ -650,6 +691,7 @@ def main(argv=None):
     df["reuse_scope"] = df["reuse_scope"].fillna(
         df["reuse_data_unclassified"].map({True: "unclassified", False: "ungoverned"})
     )
+    df["reuse_view_source"] = df["reuse_view_source"].fillna("")
 
     df["project_penetration"] = (
         df["n_projects_present"].fillna(0)
@@ -751,7 +793,12 @@ def main(argv=None):
     domain_rollup = (
         df.groupby("domain")
         .agg(
-            total_patterns=("join_hash", "nunique"),
+            # df already has exactly one row per (domain, join_hash,
+            # unit_system) by construction -- "count" (row count) is the
+            # correct total here, not nunique(join_hash), which would
+            # undercount whenever the same join_hash is split across
+            # imperial/metric unit_system pools with different routing.
+            total_patterns=("join_hash", "count"),
             candidates=("routing_bucket", lambda x: (x == "promotion_candidates").sum()),
             governed_but_underused=("routing_bucket", lambda x: (x == "governed_but_underused").sum()),
             baseline_adequately_governed=("routing_bucket", lambda x: (x == "baseline_adequately_governed").sum()),
@@ -772,7 +819,7 @@ def main(argv=None):
     audit_cols = [
         "domain", "join_hash", "unit_system", "pattern_label", "routing_bucket", "candidate_class",
         "scope_gap", "seeded_scope", "reuse_scope", "seeded_via_comparison_types",
-        "reuse_bucket", "client_label", "n_clients_present", "n_clients_denominator",
+        "reuse_bucket", "reuse_view_source", "client_label", "n_clients_present", "n_clients_denominator",
         "pct_clients_present", "n_projects_present", "n_projects_denominator",
         "pct_projects_present", "n_files_present", "n_files_denominator",
         "pct_files_present", "files_used", "max_pct_used", "project_penetration",
@@ -919,6 +966,12 @@ def main(argv=None):
     summary.append(
         "- `governed_but_underused` and `unclassified_reuse` are fully separate outputs, "
         "never merged into `promotion_candidates.csv` or `baseline_adequately_governed.csv`."
+    )
+    summary.append(
+        "- `reuse_scope` prefers used-view (active-delivery-practice) reuse rows over "
+        "all-view (configured) ones; `reuse_view_source` records which was actually used "
+        "per row (`used` vs `all_fallback`, the latter only when no used-view row exists "
+        "for that population at all)."
     )
 
     (out_dir / "promotion_candidate_summary.md").write_text(

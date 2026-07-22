@@ -153,6 +153,12 @@ def corpus_root(tmp_path):
         {**_gov_row("jh_unit_test", unit_system="metric", segment_id_target="seg_metric_seed"),
          "state": "provided_and_used", "comparison_type": "enterprise_to_project",
          "governance_role_reference": "Template", "in_reference_all": "true"},
+
+        # jh_used_view_pref: never seeded. all-view reuse looks corpus_wide
+        # (broadly configured), but the used-view row for the same
+        # (client, discipline) population shows only single_file active
+        # delivery -- used-view must win, not the broader all-view figure.
+        _gov_row("jh_used_view_pref"),
     ]
 
     reuse_rows = [
@@ -191,6 +197,14 @@ def corpus_root(tmp_path):
         _reuse_row("jh_multi_label", reuse_bucket="client_wide"),
         _reuse_row("jh_unit_test", unit_system="imperial", reuse_bucket="client_wide"),
         _reuse_row("jh_unit_test", unit_system="metric", reuse_bucket="client_wide"),
+        _reuse_row("jh_used_view_pref", view_scope="all", reuse_bucket="corpus_wide",
+                   n_clients_present=5, n_clients_denominator=6,
+                   n_projects_present=8, n_projects_denominator=10,
+                   n_files_present=20, n_files_denominator=22),
+        _reuse_row("jh_used_view_pref", view_scope="used", reuse_bucket="single_file",
+                   n_files_present=1, n_files_denominator=10,
+                   n_projects_present=1, n_projects_denominator=10,
+                   n_clients_present=1, n_clients_denominator=5),
     ]
 
     pd.DataFrame(gov_rows).to_csv(tmp_path / "cross_segment_governance_states.csv", index=False)
@@ -294,6 +308,34 @@ def test_unit_system_partitions_scope_evidence(corpus_root):
     assert imperial["routing_bucket"] == "promotion_candidates"
     assert metric["seeded_scope"] == "enterprise"
     assert metric["routing_bucket"] == "governed_but_underused"
+
+
+def test_used_view_preferred_over_all_view(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    audit = _read(corpus_root, "promotion_candidate_full_audit.csv")
+    row = audit[audit["join_hash"] == "jh_used_view_pref"].iloc[0]
+    # The all-view row alone would resolve to corpus_wide/enterprise: the
+    # used-view row (single_file) for the same client/discipline population
+    # must win instead, correctly reflecting narrow active-delivery reuse.
+    assert row["reuse_scope"] == "ungoverned"
+    assert row["reuse_view_source"] == "used"
+    assert row["routing_bucket"] == "below_reuse_floor"
+
+
+def test_domain_rollup_total_matches_bucket_sum(corpus_root):
+    apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
+    rollup = _read(corpus_root, "domain_rollup.csv")
+    row = rollup[rollup["domain"] == DOMAIN].iloc[0]
+    bucket_sum = (
+        row["candidates"] + row["governed_but_underused"]
+        + row["baseline_adequately_governed"] + row["below_reuse_floor"]
+        + row["unclassified_reuse"] + row["semantic_noise_excluded"]
+    )
+    # total_patterns must count the (join_hash, unit_system) grain actually
+    # routed, not distinct join_hash values -- otherwise a join_hash split
+    # across unit_system pools (jh_unit_test) makes the total undercount
+    # the sum of its own category columns.
+    assert row["total_patterns"] == bucket_sum
 
 
 def test_unclassified_reuse_routed_separately(corpus_root):
