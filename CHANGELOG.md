@@ -56,7 +56,12 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `governance_relationships.csv` already used -- so a mixed-directory run
   does not silently report these two escalation targets as absent. The
   D-023 live-scan directories grew to include both new anchor directories
-  too. See D-024 and `docs/governance_evidence_package.md`.
+  too. Second follow-up: both anchor chains also fall back to
+  `--union-inventory`/`--matrix-manifest` (written by the same
+  `compare_cross_segment.py` invocation to the same `--out-dir` as their
+  respective escalation target) before falling back to `--summary`'s
+  directory, so a run supplying only that broader optional input still
+  anchors correctly. See D-024 and `docs/governance_evidence_package.md`.
 - **Live file-availability inventory (D-023):** new `governance_file_inventory.json`
   artifact in the governance evidence package, built fresh on every run by
   `inventory_export_directory_files()` (`tools/governance_evidence_package.py`):

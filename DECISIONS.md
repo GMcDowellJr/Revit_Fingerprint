@@ -1019,6 +1019,18 @@ D-023 live-scan directories (`_export_scan_dirs`) grew to include both new
 anchor directories too, for the same reason `_relationships_anchor.parent`
 was already scanned.
 
+**Second PR-review follow-up (anchor completeness):** the two anchor chains
+above also fall back to `--union-inventory` (`cross_segment_union_inventory.csv`,
+for `pattern_reuse_summary_by_domain.csv`) and `--matrix-manifest`
+(`matrix_output_manifest.csv`, for `project_mean_file_pair_jaccard_matrix.csv`)
+before falling back to `--summary`'s directory — both are written by the
+same `compare_cross_segment.py` invocation to the same `--out-dir` as their
+respective escalation target (`matrix_output_manifest.csv` in particular
+shares the exact same write block as every `project_*` matrix), so a run
+that supplies only that broader optional input, without any of the more
+specific reuse/project-matrix flags, still anchors correctly instead of
+silently falling through to `--summary`'s directory.
+
 ### Consequences
 - `governance_evidence_map.json` grows from 33 to 35 artifacts.
 - Three existing tests that used `pattern_reuse_summary_by_domain.csv`/

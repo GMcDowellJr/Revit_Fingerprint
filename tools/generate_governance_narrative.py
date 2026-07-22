@@ -6004,6 +6004,11 @@ def main():
         _reuse_domain_anchor = (
             Path(args.reuse_by_client) if args.reuse_by_client
             else Path(args.reuse_distribution) if args.reuse_distribution
+            # --union-inventory (cross_segment_union_inventory.csv) is written by the
+            # same compare_cross_segment.py invocation to the same --out-dir as the
+            # reuse-distribution family, so it is an equally valid anchor when neither
+            # of the two more specific reuse flags above was supplied.
+            else Path(args.union_inventory) if args.union_inventory
             else Path(args.summary)
         )
         _project_mean_pair_anchor = (
@@ -6011,6 +6016,14 @@ def main():
             else Path(args.project_union_jaccard_matrix) if args.project_union_jaccard_matrix
             else Path(args.project_density_similarity_matrix) if args.project_density_similarity_matrix
             else Path(args.project_pool_containment_matrix) if args.project_pool_containment_matrix
+            # --matrix-manifest (matrix_output_manifest.csv) is written by the same
+            # compare_cross_segment.py invocation to the same --out-dir as
+            # project_mean_file_pair_jaccard_matrix.csv and every other project_*
+            # matrix (see the single `if matrix_outputs or fragmentation_rows or
+            # matrix_manifest_rows:` write block), so a run that supplies only
+            # --matrix-manifest without any individual --project-* flag still
+            # anchors correctly instead of falling through to --summary's directory.
+            else Path(args.matrix_manifest) if args.matrix_manifest
             else Path(args.summary)
         )
         sibling_paths = {

@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 from compare_cross_segment import (  # noqa: E402
     SUMMARY_FIELDS, POOLED_FIELDS, DELTA_FIELDS, GOVERNANCE_STATE_SUMMARY_FIELDS,
     COMPARISON_REGISTRY_FIELDS, REUSE_SUMMARY_FIELDS, MATRIX_OUTPUT_FIELDS,
+    UNION_INVENTORY_FIELDS, MATRIX_MANIFEST_FIELDS,
 )
 from governance_evidence_package import GENERATOR_IDENTITY  # noqa: E402
 from generate_governance_narrative import (  # noqa: E402
@@ -653,6 +654,67 @@ def test_project_mean_file_pair_jaccard_matrix_resolved_beside_supplied_fragment
     assert entry["present"] is True
     assert entry["path"] == str(matrix_path)
     assert entry["row_count"] == 5
+
+
+def test_pattern_reuse_summary_by_domain_resolved_beside_supplied_union_inventory_when_no_reuse_flag(tmp_path, monkeypatch):
+    """Regression test for a PR-review follow-up (D-024): --union-inventory
+    (cross_segment_union_inventory.csv) is written by compare_cross_segment.py's
+    main() to the same --out-dir as the reuse-distribution family, so it must
+    also anchor pattern_reuse_summary_by_domain.csv when neither
+    --reuse-by-client nor --reuse-distribution was supplied."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+
+    union_dir = tmp_path / "union_output"
+    union_dir.mkdir()
+    _write_csv(
+        union_dir / "cross_segment_union_inventory.csv", UNION_INVENTORY_FIELDS,
+        [{f: "" for f in UNION_INVENTORY_FIELDS}],
+    )
+    domain_path = union_dir / "pattern_reuse_summary_by_domain.csv"
+    _write_csv(domain_path, REUSE_SUMMARY_FIELDS, [{f: "" for f in REUSE_SUMMARY_FIELDS}] * 2)
+    assert not (tmp_path / "pattern_reuse_summary_by_domain.csv").exists()
+
+    _run_main(monkeypatch, [
+        "--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path),
+        "--union-inventory", str(union_dir / "cross_segment_union_inventory.csv"),
+    ])
+
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    entry = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "pattern_reuse_summary_by_domain")
+    assert entry["present"] is True
+    assert entry["path"] == str(domain_path)
+    assert entry["row_count"] == 2
+
+
+def test_project_mean_file_pair_jaccard_matrix_resolved_beside_supplied_matrix_manifest_when_no_project_flag(tmp_path, monkeypatch):
+    """Regression test for a PR-review follow-up (D-024): --matrix-manifest
+    (matrix_output_manifest.csv) is written by compare_cross_segment.py's
+    main() to the same --out-dir as every project_* matrix (the single
+    `if matrix_outputs or fragmentation_rows or matrix_manifest_rows:` write
+    block), so it must also anchor project_mean_file_pair_jaccard_matrix.csv
+    when none of the individual --project-* flags was supplied."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+
+    matrix_dir = tmp_path / "matrix_manifest_output"
+    matrix_dir.mkdir()
+    _write_csv(
+        matrix_dir / "matrix_output_manifest.csv", MATRIX_MANIFEST_FIELDS,
+        [{f: "" for f in MATRIX_MANIFEST_FIELDS}],
+    )
+    matrix_path = matrix_dir / "project_mean_file_pair_jaccard_matrix.csv"
+    _write_csv(matrix_path, MATRIX_OUTPUT_FIELDS, [{f: "" for f in MATRIX_OUTPUT_FIELDS}] * 7)
+    assert not (tmp_path / "project_mean_file_pair_jaccard_matrix.csv").exists()
+
+    _run_main(monkeypatch, [
+        "--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path),
+        "--matrix-manifest", str(matrix_dir / "matrix_output_manifest.csv"),
+    ])
+
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    entry = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "project_mean_file_pair_jaccard_matrix")
+    assert entry["present"] is True
+    assert entry["path"] == str(matrix_path)
+    assert entry["row_count"] == 7
 
 
 def test_evidence_map_findings_entry_has_a_real_path(tmp_path, monkeypatch):
