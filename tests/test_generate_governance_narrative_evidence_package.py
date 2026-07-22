@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
 from compare_cross_segment import (  # noqa: E402
     SUMMARY_FIELDS, POOLED_FIELDS, DELTA_FIELDS, GOVERNANCE_STATE_SUMMARY_FIELDS,
+    COMPARISON_REGISTRY_FIELDS, REUSE_SUMMARY_FIELDS, MATRIX_OUTPUT_FIELDS,
 )
 from governance_evidence_package import GENERATOR_IDENTITY  # noqa: E402
 from generate_governance_narrative import (  # noqa: E402
@@ -521,14 +522,15 @@ def test_segment_manifest_absent_from_evidence_package_when_not_supplied(tmp_pat
     assert health["optional_inputs"]["segment_manifest"] is False
 
 
-def test_evidence_map_lists_thirty_three_artifacts_with_required_fields(tmp_path, monkeypatch):
+def test_evidence_map_lists_thirty_five_artifacts_with_required_fields(tmp_path, monkeypatch):
     # 29 (pre-relationship-layer) + governance_bc_client_matrix +
-    # governance_client_bc_matrix + governance_relationships + governance_file_inventory (D-023).
+    # governance_client_bc_matrix + governance_relationships + governance_file_inventory (D-023)
+    # + pattern_reuse_summary_by_domain + project_mean_file_pair_jaccard_matrix (D-024).
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
     ids = [a["artifact_id"] for a in evidence_map["artifacts"]]
-    assert len(ids) == 33
+    assert len(ids) == 35
     assert len(ids) == len(set(ids))
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
@@ -536,6 +538,8 @@ def test_evidence_map_lists_thirty_three_artifacts_with_required_fields(tmp_path
     assert "governance_client_bc_matrix" in ids
     assert "governance_relationships" in ids
     assert "governance_file_inventory" in ids
+    assert "pattern_reuse_summary_by_domain" in ids
+    assert "project_mean_file_pair_jaccard_matrix" in ids
     narrative = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_narrative_context")
     assert narrative["authority_level"] != "authoritative_deterministic_evidence"
 
@@ -675,14 +679,17 @@ def test_file_inventory_is_empty_when_no_undiscovered_files_present(tmp_path, mo
 
 
 def test_file_inventory_surfaces_an_undiscovered_sibling_csv(tmp_path, monkeypatch):
-    """The motivating scenario: a real pipeline export (e.g.
-    pattern_reuse_summary_by_domain.csv) sits beside cross_segment_summary.csv
-    but has no artifact_id registered anywhere in the evidence-package layer
-    yet -- the live scan must surface it with real header/row-count, computed
-    fresh from disk, not from a hand-maintained list."""
+    """The motivating scenario: a real pipeline export sits beside
+    cross_segment_summary.csv but has no artifact_id registered anywhere in
+    the evidence-package layer yet -- the live scan must surface it with real
+    header/row-count, computed fresh from disk, not from a hand-maintained
+    list. Uses a fictitious filename: pattern_reuse_summary_by_domain.csv
+    (this scenario's original example) was promoted to its own
+    governance_evidence_map.json artifact by D-024, so it is no longer a
+    valid stand-in for "undiscovered"."""
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _write_csv(
-        tmp_path / "pattern_reuse_summary_by_domain.csv",
+        tmp_path / "some_future_pipeline_export.csv",
         ["domain", "reuse_bucket", "n_patterns"],
         [{"domain": "line_styles", "reuse_bucket": "corpus_wide", "n_patterns": "5"}],
     )
@@ -690,7 +697,7 @@ def test_file_inventory_surfaces_an_undiscovered_sibling_csv(tmp_path, monkeypat
     fi = json.loads((tmp_path / "governance_file_inventory.json").read_text(encoding="utf-8"))
     assert fi["file_count"] == 1
     entry = fi["files"][0]
-    assert entry["filename"] == "pattern_reuse_summary_by_domain.csv"
+    assert entry["filename"] == "some_future_pipeline_export.csv"
     assert entry["row_count"] == 1
     assert [c["name"] for c in entry["columns"]] == ["domain", "reuse_bucket", "n_patterns"]
     assert entry["columns"][2]["inferred_dtype"] == "integer"
@@ -715,7 +722,12 @@ def test_file_inventory_borrows_interpretation_from_matrix_output_manifest(tmp_p
     """When a discovered file's name matches a matrix_name already documented
     in matrix_output_manifest.csv, the narrative must reuse that row's own
     interpretation text rather than falling back to a generic sentence --
-    the 'interpretation field pattern already used in the matrix CSVs'."""
+    the 'interpretation field pattern already used in the matrix CSVs'.
+
+    Uses a fictitious matrix filename: project_mean_file_pair_jaccard_matrix.csv
+    (this scenario's original example) was promoted to its own
+    governance_evidence_map.json artifact by D-024, so it is no longer picked
+    up by the generic undiscovered-file scan this test exercises."""
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     matrix_manifest_path = tmp_path / "matrix_output_manifest.csv"
     _write_csv(
@@ -724,7 +736,7 @@ def test_file_inventory_borrows_interpretation_from_matrix_output_manifest(tmp_p
          "metric", "identity_unit", "aggregation_method", "interpretation",
          "known_limitations", "executed_utc"],
         [{
-            "matrix_name": "project_mean_file_pair_jaccard_matrix.csv", "governance_role": "Project",
+            "matrix_name": "project_hypothetical_future_matrix.csv", "governance_role": "Project",
             "view_scope": "all,used", "source_file": "cross_segment_summary.csv",
             "source_grain": "segment_pair/domain", "metric": "mean_file_pair_jaccard",
             "identity_unit": "file join_hash set",
@@ -735,11 +747,11 @@ def test_file_inventory_borrows_interpretation_from_matrix_output_manifest(tmp_p
         }],
     )
     _write_csv(
-        tmp_path / "project_mean_file_pair_jaccard_matrix.csv",
+        tmp_path / "project_hypothetical_future_matrix.csv",
         ["matrix_name", "row_id", "column_id", "view_scope", "domain", "metric",
          "value", "value_status", "self_comparison", "interpretation", "executed_utc"],
         [{
-            "matrix_name": "project_mean_file_pair_jaccard_matrix.csv", "row_id": "proj_a",
+            "matrix_name": "project_hypothetical_future_matrix.csv", "row_id": "proj_a",
             "column_id": "proj_b", "view_scope": "all", "domain": "ALL_DOMAINS",
             "metric": "mean_file_pair_jaccard", "value": "0.5", "value_status": "ok",
             "self_comparison": "false", "interpretation": "x", "executed_utc": "2026-07-16T00:00:00Z",
@@ -750,7 +762,7 @@ def test_file_inventory_borrows_interpretation_from_matrix_output_manifest(tmp_p
         "--matrix-manifest", str(matrix_manifest_path),
     ])
     fi = json.loads((tmp_path / "governance_file_inventory.json").read_text(encoding="utf-8"))
-    entry = next(f for f in fi["files"] if f["filename"] == "project_mean_file_pair_jaccard_matrix.csv")
+    entry = next(f for f in fi["files"] if f["filename"] == "project_hypothetical_future_matrix.csv")
     assert "Are individual files typically similar across project groups?" in entry["narrative"]
 
 
@@ -773,10 +785,13 @@ def test_stale_file_inventory_removed_when_evidence_package_turned_off_between_r
 def test_file_inventory_surfaces_regardless_of_interpretation_layer_flag(tmp_path, monkeypatch):
     """governance_file_inventory.json is gated by --emit-evidence-package only,
     not --emit-interpretation-layer (that flag controls governance_brief.md's
-    section, a separate rendering of the same already-scanned data)."""
+    section, a separate rendering of the same already-scanned data).
+
+    Uses a fictitious filename (see test_file_inventory_surfaces_an_undiscovered_sibling_csv
+    for why pattern_reuse_summary_by_domain.csv no longer qualifies as "undiscovered")."""
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _write_csv(
-        tmp_path / "pattern_reuse_summary_by_domain.csv",
+        tmp_path / "some_future_pipeline_export.csv",
         ["domain", "reuse_bucket", "n_patterns"],
         [{"domain": "line_styles", "reuse_bucket": "corpus_wide", "n_patterns": "5"}],
     )
@@ -784,6 +799,80 @@ def test_file_inventory_surfaces_regardless_of_interpretation_layer_flag(tmp_pat
                             "--out", str(tmp_path), "--no-emit-interpretation-layer"])
     fi = json.loads((tmp_path / "governance_file_inventory.json").read_text(encoding="utf-8"))
     assert fi["file_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# D-024: escalation-target files (the large cross_segment_* siblings this
+# generator never parses, named in docs/governance_interpretation_guide.md's
+# escalation section) get their own governance_evidence_map.json artifact
+# with real header/row_count, instead of only the generic file-inventory
+# scan bucket.
+# ---------------------------------------------------------------------------
+
+def test_escalation_target_files_get_real_shape_in_evidence_map_not_generic_inventory(tmp_path, monkeypatch):
+    """The four files this generator's own module docstring lists as "not yet
+    consumed directly" -- comparison_registry.csv, cross_segment_file_pairs.csv,
+    pattern_reuse_summary_by_domain.csv, project_mean_file_pair_jaccard_matrix.csv
+    -- must each resolve in governance_evidence_map.json with the real column
+    header and row count read straight off disk, and must NOT also appear in
+    governance_file_inventory.json's generic undiscovered-file bucket (that
+    would be a second, redundant narrative layer for the same file)."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _write_csv(
+        tmp_path / "comparison_registry.csv", COMPARISON_REGISTRY_FIELDS,
+        [{f: "" for f in COMPARISON_REGISTRY_FIELDS}],
+    )
+    _write_csv(
+        tmp_path / "cross_segment_file_pairs.csv",
+        ["segment_id_a", "segment_id_b", "domain", "join_hash"],
+        [{"segment_id_a": "imperial|A", "segment_id_b": "imperial|B",
+          "domain": "line_styles", "join_hash": "abc123"}] * 3,
+    )
+    _write_csv(
+        tmp_path / "pattern_reuse_summary_by_domain.csv", REUSE_SUMMARY_FIELDS,
+        [{f: "" for f in REUSE_SUMMARY_FIELDS}] * 2,
+    )
+    _write_csv(
+        tmp_path / "project_mean_file_pair_jaccard_matrix.csv", MATRIX_OUTPUT_FIELDS,
+        [{f: "" for f in MATRIX_OUTPUT_FIELDS}] * 4,
+    )
+
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    by_id = {a["artifact_id"]: a for a in evidence_map["artifacts"]}
+
+    fp = by_id["cross_segment_file_pairs"]
+    assert fp["present"] is True
+    assert fp["row_count"] == 3
+    assert [c["name"] for c in fp["columns"]] == ["segment_id_a", "segment_id_b", "domain", "join_hash"]
+
+    cr = by_id["comparison_registry"]
+    assert cr["present"] is True
+    assert cr["row_count"] == 1
+    assert [c["name"] for c in cr["columns"]] == COMPARISON_REGISTRY_FIELDS
+
+    prsd = by_id["pattern_reuse_summary_by_domain"]
+    assert prsd["present"] is True
+    assert prsd["row_count"] == 2
+    assert [c["name"] for c in prsd["columns"]] == REUSE_SUMMARY_FIELDS
+    assert "can_answer" in prsd and prsd["can_answer"]
+    assert "cannot_answer" in prsd and prsd["cannot_answer"]
+
+    pmfp = by_id["project_mean_file_pair_jaccard_matrix"]
+    assert pmfp["present"] is True
+    assert pmfp["row_count"] == 4
+    assert [c["name"] for c in pmfp["columns"]] == MATRIX_OUTPUT_FIELDS
+    assert "can_answer" in pmfp and pmfp["can_answer"]
+    assert "cannot_answer" in pmfp and pmfp["cannot_answer"]
+
+    # Not duplicated into the generic file-inventory scan bucket.
+    fi = json.loads((tmp_path / "governance_file_inventory.json").read_text(encoding="utf-8"))
+    flagged = {f["filename"] for f in fi["files"]}
+    assert flagged.isdisjoint({
+        "comparison_registry.csv", "cross_segment_file_pairs.csv",
+        "pattern_reuse_summary_by_domain.csv", "project_mean_file_pair_jaccard_matrix.csv",
+    })
 
 
 def test_cli_accepts_policy_dir_and_package_schema_version_as_inert(tmp_path, monkeypatch):

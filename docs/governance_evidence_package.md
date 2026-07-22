@@ -170,17 +170,22 @@ the package, not an interpretation). One entry per artifact, 27 total:
 breadth cut added in PR B2 — see
 `docs/governance_generator_cross_compare_coverage.md`).
 
-**Sibling artifacts, never consumed by this generator** (4): `cross_segment_file_pairs.csv`
-and `comparison_registry.csv` — both written by `compare_cross_segment.py`'s
-`main()` to the same run directory as `cross_segment_summary.csv`, but this
-generator has no CLI argument for either and never opens or parses them.
-Their path is inferred as a sibling of `--summary`'s directory; `present` is
-computed via `Path.exists()` only. See
+**Sibling artifacts, never consumed by this generator** (6, D-024 grew this
+from 4): `cross_segment_file_pairs.csv`, `comparison_registry.csv`,
+`pattern_reuse_summary_by_domain.csv`, and `project_mean_file_pair_jaccard_matrix.csv`
+— all four written by `compare_cross_segment.py`'s `main()` to the same run
+directory as `cross_segment_summary.csv`, but this generator has no CLI
+argument for any of them and never opens or parses their rows. Their path is
+inferred as a sibling of `--summary`'s directory; `present` is computed via
+`Path.exists()` only. `columns`/`row_count`, when present, come from a live
+scan (`_sibling_scan_fields()`, reusing D-023's `_scan_csv_file()`) — a
+structural fact about the header, not this generator reading a row. See
 `docs/governance_generator_cross_compare_coverage.md` for the recommended
 future integration points (drill-through appendix for file pairs;
-completeness/staleness reporting for the comparison registry). Also in this
-group (same "never parsed, presence checked via `Path.exists()` only"
-treatment): `docs/governance_interpretation_guide.md` and
+completeness/staleness reporting for the comparison registry; the other two
+are deliberate scoping exclusions, not gaps). Also in this group (same
+"never parsed, presence checked via `Path.exists()` only" treatment, but no
+scan since they aren't CSVs): `docs/governance_interpretation_guide.md` and
 `docs/governance_question_routes.md` — human/LLM-authored static reference
 docs checked into the repo, not per-run outputs of this generator, and
 unconditional on `--emit-interpretation-layer` (see below).
@@ -216,11 +221,12 @@ the candidate evidence-map field list in
 
 The evidence map's own artifact count has grown across later phases beyond
 the figure above (the relationship layer added three artifacts; D-023 below
-adds a 33rd, `governance_file_inventory`) — the code
-(`build_evidence_map()` in `tools/governance_evidence_package.py`) is the
-current source of truth for the exact count and list; see
-`test_evidence_map_has_thirty_three_unique_artifacts` in
-`tests/test_governance_evidence_package.py` for the up-to-date total.
+adds a 33rd, `governance_file_inventory`; D-024 adds two more —
+`pattern_reuse_summary_by_domain` and `project_mean_file_pair_jaccard_matrix`
+— bringing the total to 35) — the code (`build_evidence_map()` in
+`tools/governance_evidence_package.py`) is the current source of truth for
+the exact count and list; see `test_evidence_map_has_thirty_five_unique_artifacts`
+in `tests/test_governance_evidence_package.py` for the up-to-date total.
 
 ### `governance_file_inventory.json` (D-023)
 
@@ -265,6 +271,42 @@ that note lived in Python, not in any artifact a reader could see. This
 closes that gap without adding any query/fetch/tool-calling mechanism —
 the package remains a single-shot deterministic artifact set; naming a
 candidate file is not the same as being able to fetch it.
+
+### Escalation-target sibling artifacts get real shape (D-024)
+
+`docs/governance_interpretation_guide.md`'s "What to do when a pre-built
+route isn't enough" section names `cross_segment_file_pairs.csv` and
+`comparison_registry.csv` by filename as the drill-down files a route's
+"Escalation" field points past the compact layer into. Before D-024, the
+evidence-map entries for those two files carried only a hand-written
+`context_role`/`can_answer`/`cannot_answer` — real structural facts (the
+column header, row count) were never recorded anywhere, so an escalating
+reader had to open a multi-GB file cold to learn its schema, or fall back to
+`governance_file_inventory.json`'s generic bucket, which only covers files
+with no artifact_id at all.
+
+D-024 confirmed, against `generate_governance_narrative.py`'s own module
+docstring (not assumed), that the generator's complete "not yet consumed
+directly" list is exactly four files: the two named above, plus
+`pattern_reuse_summary_by_domain.csv` and
+`project_mean_file_pair_jaccard_matrix.csv` (both deliberate scoping
+exclusions per `docs/governance_generator_cross_compare_coverage.md`, not
+gaps). All four are now registered as `sibling_paths` beside
+`cross_segment_summary.csv`'s directory (same inference as `cross_segment_
+file_pairs`/`comparison_registry` already used) and get their `columns`/
+`row_count` populated by `_sibling_scan_fields()` — a thin wrapper reusing
+D-023's `_scan_csv_file()`, not a second scanning implementation. Registering
+the two new files as `sibling_paths` also removes them from
+`governance_file_inventory.json`'s generic scan bucket (they are no longer
+"undiscovered"), so each file gets exactly one narrative home — its own
+`can_answer`/`cannot_answer` entry — rather than two competing descriptions
+of the same file.
+
+The net effect for a reader following the interpretation guide's escalation
+steps: step 1 ("name which large source file is needed") can now cite the
+real column names and row count straight from `governance_evidence_map.json`
+before writing the filtered extraction script step 2 calls for, instead of
+guessing at an unopened file's shape from its filename alone.
 
 ## Documented-but-not-fixed limitations
 

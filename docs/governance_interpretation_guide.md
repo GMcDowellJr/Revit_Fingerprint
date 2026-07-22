@@ -400,15 +400,29 @@ is ~3.8GB) tractable to search directly.
 **If a question resolves cleanly from the rollup CSVs, `governance_findings.json`,
 or `governance_evidence_map.json` -- stop there.** Most questions this
 package was built for do. This section only applies when a route's own
-"Escalation" field points past those, into the full evidence archive
-(`cross_segment_file_pairs.csv`, `comparison_registry.csv`, or another
-large sibling artifact the generator never parses).
- 
-**When that happens:**
+"Escalation" field points past those, into the full evidence archive.
+
+**The exhaustive list of files this generator never parses** (per its own
+module docstring in `tools/generate_governance_narrative.py`), each now its
+own `governance_evidence_map.json` artifact (D-024): `cross_segment_file_pairs.csv`,
+`comparison_registry.csv`, `pattern_reuse_summary_by_domain.csv`, and
+`project_mean_file_pair_jaccard_matrix.csv`. Do not assume there are more --
+this is the confirmed set, not a partial example list.
+
+**Each of those four entries already carries its column header (name +
+inferred dtype) and row count**, populated by a live scan of the file when
+present (the same scan `governance_file_inventory.json` uses for files with
+no artifact_id at all). Read the entry's `columns`/`row_count` fields before
+writing an extraction script in step 2 below -- this replaces guessing at a
+multi-GB file's schema from its filename alone with the real header, sourced
+from the file itself.
+
+**When escalation is needed:**
  
 1. **Recognize the gap explicitly, don't silently improvise.** State that the
    question requires drill-down beyond what the package's compact layer
-   supports, and name which large source file is needed.
+   supports, and name which large source file is needed -- with its real
+   schema from `governance_evidence_map.json`, not an assumed one.
 2. **Write a small, parameterized, streaming-safe extraction script** rather
    than attempting to read or reason over the raw file directly --
    filtered by the specific fields a finding's `support[]` or a route's

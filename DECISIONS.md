@@ -934,6 +934,93 @@ would stay accurate.
 
 ---
 
+## D-024 — Governance narrative evidence-package layer (Phase 6: escalation-target file coverage)
+
+### Status
+Accepted (2026-07-22)
+
+### Context
+`docs/governance_interpretation_guide.md`'s "What to do when a pre-built
+route isn't enough" section tells a reader escalating past the compact layer
+to "name which large source file is needed" and names
+`cross_segment_file_pairs.csv`/`comparison_registry.csv` as examples,
+gesturing at "another large sibling artifact the generator never parses."
+Before this phase, that gesture was unresolved: a reader had no way to
+learn the exhaustive list of such files, and the two named files'
+`governance_evidence_map.json` entries carried only hand-written
+`context_role`/`can_answer`/`cannot_answer` text — no real column header or
+row count — so escalating still meant opening a multi-GB file cold to learn
+its schema before the interpretation guide's own step 2 (write a filtered
+extraction script) was possible.
+
+Step 0 for this phase confirmed two facts against the code, not assumed:
+(1) `generate_governance_narrative.py`'s own module docstring already lists
+the exhaustive set of files it writes no code path to read: `comparison_
+registry.csv`, `cross_segment_file_pairs.csv`, `pattern_reuse_summary_by_
+domain.csv`, and `project_mean_file_pair_jaccard_matrix.csv` — four files,
+not two; (2) no `csv_inventory.md`-style utility needed rebuilding —
+D-023's `_scan_csv_file()` already does exactly the header/dtype/row-count
+scan this phase needs, just scoped to files with no artifact_id at all.
+
+### Decision
+All four files above are now registered as `sibling_paths` in
+`generate_governance_narrative.py`'s `main()` (the same inferred-path
+pattern `file_pairs`/`comparison_registry` already used: beside `--summary`'s
+directory) and get a full `governance_evidence_map.json` artifact entry
+(`build_evidence_map()` in `tools/governance_evidence_package.py`) with
+`context_role`, `grain`, `can_answer`, `cannot_answer`, and
+`known_limitations` text in the same voice as every other archive_only
+sibling entry.
+
+A new helper, `_sibling_scan_fields(path, present)`, wraps D-023's
+`_scan_csv_file()` — no second scanning implementation — to populate each of
+the four entries' `columns` (column name + inferred dtype) and `row_count`
+fields when the file is present on disk; both fields are simply absent from
+the entry when the file is not present, since scanning a nonexistent path is
+meaningless, not an all-zeros result. No sample row or cell value is ever
+retained, the same "type of data, not shape of values" scope decision D-023
+made.
+
+Because `pattern_reuse_summary_by_domain.csv` and `project_mean_file_pair_
+jaccard_matrix.csv` are now registered `sibling_paths`, they are
+automatically excluded from `inventory_export_directory_files()`'s generic
+undiscovered-file scan (the same `_known_artifact_paths` exclusion set
+D-023 already built) — each file now has exactly one narrative home, not
+two competing descriptions of the same file. This is `can_answer`/
+`cannot_answer` doing the job it already does, not a second per-file
+narrative layer beside it.
+
+`pattern_reuse_distribution`'s and `project_fragmentation_diagnostic`'s
+`related_artifacts` lists gained a reverse link to their newly-registered
+by-domain/mean-file-pair siblings, matching the bidirectional linking
+already used elsewhere in the evidence map (e.g.
+`pattern_reuse_summary_by_client` already named `pattern_reuse_distribution`
+as related).
+
+### Consequences
+- `governance_evidence_map.json` grows from 33 to 35 artifacts.
+- Three existing tests that used `pattern_reuse_summary_by_domain.csv`/
+  `project_mean_file_pair_jaccard_matrix.csv` as stand-ins for "a generic
+  undiscovered file" (`test_file_inventory_surfaces_an_undiscovered_sibling_csv`,
+  `test_file_inventory_borrows_interpretation_from_matrix_output_manifest`,
+  `test_file_inventory_surfaces_regardless_of_interpretation_layer_flag`)
+  were updated to use fictitious filenames instead — those two real
+  filenames are no longer valid "undiscovered" examples now that they carry
+  their own artifact_id, which is the intended effect of this phase, not a
+  regression.
+- No existing classification, scoring, CSV column, or narrative content
+  changed — this phase only adds evidence-map metadata (context_role,
+  can_answer/cannot_answer, columns, row_count) for files this generator
+  already declared it never reads.
+- `compare_cross_segment.py` and `build_segment_manifest.py` are unchanged
+  (read-only dependency, per this phase's own scope boundary).
+- No query/fetch/tool-calling mechanism was added — the package remains
+  single-shot; a reader still cannot fetch a named file's contents through
+  this package, only see its existence and real shape ahead of writing their
+  own extraction script.
+
+---
+
 ## Notes
 
 - This document is **append-only**.

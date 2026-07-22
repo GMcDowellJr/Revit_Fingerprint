@@ -50,6 +50,14 @@ for recommended integration points:
   into project_fragmentation_diagnostic.csv's exact_identity_overlap column
   rather than consumed standalone)
 
+  This is the exhaustive list of files this generator writes no code path to
+  read -- confirmed against this docstring, not assumed. All four are still
+  registered as governance_evidence_map.json artifacts (D-024): each entry's
+  columns/row_count are populated by a live scan (the same one
+  governance_file_inventory.json uses) when the file is present beside
+  --summary, so a reader can see the real header/row-count without opening
+  the (potentially multi-GB) file itself. See docs/governance_evidence_package.md.
+
 Output:
   --out          governance_narrative_context.md  (default)
 
@@ -5981,6 +5989,15 @@ def main():
         sibling_paths = {
             "file_pairs": Path(args.summary).parent / "cross_segment_file_pairs.csv",
             "comparison_registry": Path(args.summary).parent / "comparison_registry.csv",
+            # D-024: the other two files this generator's own module docstring
+            # names as "not yet consumed directly" (see above) -- both written
+            # by compare_cross_segment.py's main() beside cross_segment_summary.csv,
+            # same as file_pairs/comparison_registry. Registering them here (rather
+            # than leaving them for inventory_export_directory_files() to discover
+            # generically below) gives each its own governance_evidence_map.json
+            # can_answer/cannot_answer entry instead of a structural-only sentence.
+            "pattern_reuse_summary_by_domain": Path(args.summary).parent / "pattern_reuse_summary_by_domain.csv",
+            "project_mean_file_pair_jaccard_matrix": Path(args.summary).parent / "project_mean_file_pair_jaccard_matrix.csv",
             "interpretation_guide": INTERPRETATION_GUIDE_PATH,
             "question_routes": QUESTION_ROUTES_PATH,
             "governance_relationships": _relationships_anchor.parent / "governance_relationships.csv",
