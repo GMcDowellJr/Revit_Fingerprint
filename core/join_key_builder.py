@@ -311,3 +311,23 @@ def build_join_key_from_policy(
         }
 
     return join_key, missing_required
+
+
+def compute_projection_status(domain_policy, missing_required):
+    """Classify a join-key computation using join_key_status's closed vocabulary.
+
+    Mirrors, in spirit, the analysis-pipeline join_key_status column (bootstrap/ok/
+    missing_required/blocked/missing_policy — see tools/apply_join_policy.py and
+    tools/join_key_discovery/eval.py). "bootstrap" is intentionally not reproduced here:
+    it names the flatten-stage identity-mode fallback specific to the two-phase
+    (flatten -> apply) configuration join_hash pipeline, which has no analog for a
+    projection computed in a single inline pass.
+    """
+    if not isinstance(domain_policy, dict):
+        return "missing_policy"
+    required_items = list(domain_policy.get("required_items") or [])
+    if not required_items:
+        return "blocked"
+    if missing_required:
+        return "missing_required"
+    return "ok"

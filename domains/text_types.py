@@ -557,7 +557,11 @@ def extract(doc, ctx=None):
         rec_v2["is_sole_type_in_category"] = _sole
         rec_v2["is_sole_type_in_category_q"] = _soleq
         # join_key/sig_hash are intentionally omitted from extractor output in canonical mode;
-        # they are post-extraction artifacts.
+        # they are post-extraction artifacts. Canonical Name Identity Projection (PR1) follows
+        # the same convention here: text_type.name is already present in rec_v2["items"] (flat
+        # shape), so join_key_name_identity is reconstructed downstream (core/name_key_builder.py)
+        # rather than stamped inline -- unlike every other eligible domain in this PR, which still
+        # emits identity_basis/phase2 and gets join_key_name_identity stamped at export time.
 
         v2_records.append(rec_v2)
         if sig_hash_v2 is not None:

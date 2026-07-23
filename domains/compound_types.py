@@ -35,6 +35,29 @@ from core.record_v2 import (
     build_record_v2,
 )
 from domains.materials import CTX_MATERIAL_UID_TO_NAME, CTX_MATERIAL_UID_TO_CLASS
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
+
+
+def _build_name_key(ctx, domain_name, identity_items):
+    """Canonical Name Identity Projection (PR1): second, independent join_hash variant
+    keyed off this record's own label.display-backing item (wt/ft/rt/ct.type_name, already
+    a native identity_items key for every compound_types partition). compound_types.py
+    never calls build_join_key_from_policy for its own configuration join_hash (Step 0
+    A.1) -- these are new call sites, computed from the same identity_items snapshot
+    already built for sig_hash/identity_basis at each call site."""
+    pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), domain_name)
+    name_key, missing = build_join_key_from_policy(
+        domain_policy=pol,
+        identity_items=identity_items,
+        include_optional_items=False,
+        emit_keys_used=True,
+        hash_optional_items=False,
+        emit_items=False,
+        emit_selectors=True,
+    )
+    name_key["status"] = compute_projection_status(pol, missing)
+    return name_key
 from core.deps import require_domain, Blocked
 
 try:
@@ -562,6 +585,7 @@ def extract_wall_types(doc, ctx=None):
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_wall_type(type_name),
             )
+            rec["join_key_name_identity"] = _build_name_key(ctx, "wall_types", blocked_items)
             _ip, _ip_q = purge_lookup(getattr(getattr(wt, "Id", None), "IntegerValue", None), ctx)
             rec["is_purgeable"] = _ip
             rec["is_purgeable_q"] = _ip_q
@@ -597,6 +621,7 @@ def extract_wall_types(doc, ctx=None):
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_wall_type(type_name),
             )
+            rec["join_key_name_identity"] = _build_name_key(ctx, "wall_types", blocked_items)
             _ip, _ip_q = purge_lookup(getattr(getattr(wt, "Id", None), "IntegerValue", None), ctx)
             rec["is_purgeable"] = _ip
             rec["is_purgeable_q"] = _ip_q
@@ -680,6 +705,7 @@ def extract_wall_types(doc, ctx=None):
             required_qs=required_qs,
             label=_label_for_wall_type(type_name),
         )
+        rec["join_key_name_identity"] = _build_name_key(ctx, "wall_types", identity_items)
         _ip, _ip_q = purge_lookup(getattr(getattr(wt, "Id", None), "IntegerValue", None), ctx)
         rec["is_purgeable"] = _ip
         rec["is_purgeable_q"] = _ip_q
@@ -887,6 +913,7 @@ def extract_floor_types(doc, ctx=None):
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_type(type_name),
             )
+            rec["join_key_name_identity"] = _build_name_key(ctx, "floor_types", blocked_items)
             _ip, _ip_q = purge_lookup(getattr(getattr(ft, "Id", None), "IntegerValue", None), ctx)
             rec["is_purgeable"] = _ip
             rec["is_purgeable_q"] = _ip_q
@@ -960,6 +987,7 @@ def extract_floor_types(doc, ctx=None):
             required_qs=required_qs,
             label=_label_for_type(type_name),
         )
+        rec["join_key_name_identity"] = _build_name_key(ctx, "floor_types", identity_items)
         _ip, _ip_q = purge_lookup(getattr(getattr(ft, "Id", None), "IntegerValue", None), ctx)
         rec["is_purgeable"] = _ip
         rec["is_purgeable_q"] = _ip_q
@@ -1072,6 +1100,7 @@ def extract_roof_types(doc, ctx=None):
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_type(type_name),
             )
+            rec["join_key_name_identity"] = _build_name_key(ctx, "roof_types", blocked_items)
             _ip, _ip_q = purge_lookup(getattr(getattr(rt, "Id", None), "IntegerValue", None), ctx)
             rec["is_purgeable"] = _ip
             rec["is_purgeable_q"] = _ip_q
@@ -1127,6 +1156,7 @@ def extract_roof_types(doc, ctx=None):
             required_qs=required_qs,
             label=_label_for_type(type_name),
         )
+        rec["join_key_name_identity"] = _build_name_key(ctx, "roof_types", identity_items)
         _ip, _ip_q = purge_lookup(getattr(getattr(rt, "Id", None), "IntegerValue", None), ctx)
         rec["is_purgeable"] = _ip
         rec["is_purgeable_q"] = _ip_q
@@ -1239,6 +1269,7 @@ def extract_ceiling_types(doc, ctx=None):
                 required_qs=[ITEM_Q_OK],
                 label=_label_for_type(type_name),
             )
+            rec["join_key_name_identity"] = _build_name_key(ctx, "ceiling_types", blocked_items)
             _ip, _ip_q = purge_lookup(getattr(getattr(ct, "Id", None), "IntegerValue", None), ctx)
             rec["is_purgeable"] = _ip
             rec["is_purgeable_q"] = _ip_q
@@ -1294,6 +1325,7 @@ def extract_ceiling_types(doc, ctx=None):
             required_qs=required_qs,
             label=_label_for_type(type_name),
         )
+        rec["join_key_name_identity"] = _build_name_key(ctx, "ceiling_types", identity_items)
         _ip, _ip_q = purge_lookup(getattr(getattr(ct, "Id", None), "IntegerValue", None), ctx)
         rec["is_purgeable"] = _ip
         rec["is_purgeable_q"] = _ip_q

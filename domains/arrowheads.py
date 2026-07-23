@@ -53,7 +53,7 @@ from core.record_v2 import (
 )
 from core.join_key_policy import get_domain_join_key_policy
 from core.collect import collect_types, purge_lookup
-from core.join_key_builder import build_join_key_from_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 
 try:
     from Autodesk.Revit.DB import BuiltInCategory, ElementType
@@ -614,6 +614,28 @@ def extract(doc, ctx=None):
             emit_items=False,
             emit_selectors=True,
         )
+
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (arrowhead.name).
+        # arrowhead.name does not exist anywhere else in this file -- nm feeds
+        # label.display/label.components.type_name only ("Label is not identity; keep
+        # human if possible."). Widened items list used only for this call;
+        # identity_basis.items/sig_hash/join_key above are unaffected.
+        ah_name_v, ah_name_q = canonicalize_str(nm)
+        name_key_items = identity_items + [
+            make_identity_item("arrowhead.name", ah_name_v, ah_name_q)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), "arrowheads")
+        rec_v2["join_key_name_identity"], name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        rec_v2["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, name_key_missing)
         rec_v2["sig_basis"] = {
             "schema": "arrowheads.sig_basis.v1",
             "keys_used": semantic_keys,

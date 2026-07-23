@@ -55,7 +55,7 @@ from core.phase2 import (
 )
 
 from core.join_key_policy import get_domain_join_key_policy
-from core.join_key_builder import build_join_key_from_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 
 try:
     from Autodesk.Revit.DB import LinePatternElement
@@ -392,6 +392,28 @@ def extract(doc, ctx=None):
             emit_items=False,
             emit_selectors=True,
         )
+
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (line_pattern.name).
+        # line_pattern.name is not a member of identity_items_sorted -- the configuration
+        # join_key policy's own notes say "Names are labels only and must not participate
+        # in joins." Widened items list used only for this call; identity_basis.items/
+        # sig_hash/join_key above are unaffected.
+        lp_name_v, lp_name_q = canonicalize_str(getattr(e, "Name", None))
+        name_key_items = identity_items_sorted + [
+            make_identity_item("line_pattern.name", lp_name_v, lp_name_q)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), "line_patterns")
+        rec_v2["join_key_name_identity"], name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        rec_v2["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, name_key_missing)
 
         cosmetic_items = []
         unknown_items = []

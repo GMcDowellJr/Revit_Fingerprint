@@ -48,7 +48,7 @@ from core.record_v2 import (
     serialize_identity_items,
 )
 from core.join_key_policy import get_domain_join_key_policy
-from core.join_key_builder import build_join_key_from_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 
 try:
     from Autodesk.Revit.DB import WorksharingUtils
@@ -220,6 +220,30 @@ def extract(doc, ctx=None):
     info["phase2"].pop("semantic_items", None)
     info["phase2"]["semantic_keys"] = semantic_keys
 
+    # Canonical Name Identity Projection (PR1): second, independent join_hash variant keyed
+    # off this record's own label.display-backing item (identity.project_title). Unlike
+    # is_workshared/revit_version_*/revit_build above, project_title is not a member of
+    # identity_items today -- it lives only in phase2.unknown_items (file-local noise,
+    # excluded from join-keys by CLAUDE.md's Phase-2 bucket contract). This call therefore
+    # uses a LOCAL widened items list (identity_items + one freshly-wrapped item) for the
+    # name-key projection only; identity_basis.items/sig_hash/join_key above are computed
+    # from the original, unwidened identity_items list and are unaffected.
+    project_title_v, project_title_q = canonicalize_str(info.get("project_title", None))
+    name_key_items = identity_items + [
+        make_identity_item("identity.project_title", project_title_v, project_title_q)
+    ]
+    name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), "identity")
+    name_key, name_key_missing = build_join_key_from_policy(
+        domain_policy=name_key_pol,
+        identity_items=name_key_items,
+        include_optional_items=False,
+        emit_keys_used=True,
+        hash_optional_items=False,
+        emit_items=False,
+        emit_selectors=True,
+    )
+    name_key["status"] = compute_projection_status(name_key_pol, name_key_missing)
+
     rec_v2 = build_record_v2(
         domain="identity",
         record_id="document",
@@ -237,6 +261,7 @@ def extract(doc, ctx=None):
     rec_v2["is_purgeable"] = None
     rec_v2["is_purgeable_q"] = "unsupported_not_applicable"
     rec_v2["join_key"] = join_key
+    rec_v2["join_key_name_identity"] = name_key
     rec_v2["phase2"] = info["phase2"]
     rec_v2["sig_basis"] = {
         "schema": "identity.sig_basis.v1",

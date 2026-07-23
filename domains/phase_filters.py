@@ -52,7 +52,7 @@ from core.record_v2 import (
     build_record_v2,
 )
 from core.join_key_policy import get_domain_join_key_policy
-from core.join_key_builder import build_join_key_from_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 
 try:
     from Autodesk.Revit.DB import PhaseFilter, ElementOnPhaseStatus
@@ -236,6 +236,28 @@ def extract(doc, ctx=None):
         v_uid, q_uid = canonicalize_str_allow_empty(uid)
         v_id, q_id = canonicalize_int(getattr(pf.Id, "IntegerValue", None))
 
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (phase_filter.name).
+        # phase_filter.name is not a member of identity_items_v2_sorted -- this policy's own
+        # notes say so explicitly ("phase_filter.name remains a phase2 coordination/label
+        # field only"). Widened items list used only for this call; identity_basis.items/
+        # sig_hash/join_key above are unaffected.
+        name_v2, name_q2 = canonicalize_str(name)
+        name_key_items = identity_items_v2_sorted + [
+            make_identity_item("phase_filter.name", name_v2, name_q2)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), "phase_filters")
+        name_key, name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        name_key["status"] = compute_projection_status(name_key_pol, name_key_missing)
+
         v_name_p2, q_name_p2 = phase2_qv_from_legacy_sentinel_str(name, allow_empty=False)
 
         phase2_coordination_items = phase2_sorted_items([
@@ -291,6 +313,7 @@ def extract(doc, ctx=None):
         rec_v2["is_purgeable"] = None
         rec_v2["is_purgeable_q"] = "unsupported_not_applicable"
         rec_v2["join_key"] = rec_join_key
+        rec_v2["join_key_name_identity"] = name_key
         rec_v2["phase2"] = rec_phase2
         rec_v2["sig_basis"] = {
             "schema": "phase_filters.sig_basis.v1",
