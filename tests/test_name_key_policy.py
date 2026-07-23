@@ -12,7 +12,7 @@ import pytest
 
 from core.join_key_policy import load_join_key_policies, get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy, compute_projection_status
-from core.name_key_builder import build_name_key_for_record, flat_items_for_record
+from core.name_key_builder import build_name_key_for_record, flat_items_for_record, _has_detail_data
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 POLICY_PATH = REPO_ROOT / "policies" / "domain_name_key_policies.json"
@@ -254,6 +254,23 @@ class TestAnalysisSideReconstruction:
         name_key = build_name_key_for_record(rec, "materials", name_key_policies)
         assert name_key["status"] == "missing_required"
         assert "material.name" in name_key["missing_required"]
+
+    def test_summary_only_record_does_not_synthesize_label_only_name_key(self, name_key_policies):
+        # A summary-only/index-level record (no identity_basis, no phase2, no flat items)
+        # must not produce a spuriously "complete" join_hash from label alone for
+        # label-only domains -- that would misrepresent a degraded input as a full
+        # details-based reconstruction.
+        rec = {"domain": "arrowheads", "label": {"display": "Arrow Filled 15deg"}}
+        assert not _has_detail_data(rec)
+        name_key = build_name_key_for_record(rec, "arrowheads", name_key_policies)
+        assert name_key["status"] == "missing_required"
+        assert name_key["join_hash"] is None or "arrowhead.name" in name_key.get("missing_required", [])
+
+    def test_has_detail_data_true_for_identity_basis_phase2_or_items(self):
+        assert _has_detail_data({"identity_basis": {"items": []}})
+        assert _has_detail_data({"phase2": {}})
+        assert _has_detail_data({"items": []})
+        assert not _has_detail_data({"label": {"display": "x"}})
 
     def test_flat_items_for_record_merges_all_buckets(self):
         rec = {

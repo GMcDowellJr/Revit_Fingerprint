@@ -81,6 +81,23 @@ def flat_items_for_record(record: Dict[str, Any]) -> List[Dict[str, Any]]:
     )
 
 
+def _has_detail_data(record: Dict[str, Any]) -> bool:
+    """True if record carries record-level detail (identity_basis, phase2, or canonical
+    flat items), as opposed to summary-only/index-level data.
+
+    Per CLAUDE.md's input-format-priority rule, summary-only exports are degraded and
+    "records without [identity_basis/phase2] are skipped, not silently treated as
+    complete." A label-only domain's name value lives in label.*, which a summary-only
+    record could still carry -- without this gate, such a record would synthesize a
+    superficially "ok" join_hash that isn't actually a details-based reconstruction.
+    """
+    return (
+        isinstance(record.get("identity_basis"), dict)
+        or isinstance(record.get("phase2"), dict)
+        or isinstance(record.get("items"), list)
+    )
+
+
 def build_name_key_for_record(
     record: Dict[str, Any],
     domain_name: str,
@@ -99,7 +116,7 @@ def build_name_key_for_record(
     items = flat_items_for_record(record)
 
     label_spec = LABEL_ONLY_NAME_KEYS.get(domain_name)
-    if label_spec:
+    if label_spec and _has_detail_data(record):
         label = record.get("label") if isinstance(record.get("label"), dict) else {}
         component = label_spec.get("component")
         if component:
