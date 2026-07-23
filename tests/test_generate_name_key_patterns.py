@@ -166,6 +166,19 @@ class TestExcludedDomainExplicitAbsence:
         pattern_rows = build_name_patterns(rows)
         assert pattern_rows == []
 
+    def test_untraced_input_domain_reported_not_traced_not_silently_dropped(self):
+        # A domain outside both the eligible and excluded registries (schema drift, a
+        # stale input, or a new domain the registry hasn't caught up with) must still
+        # surface as an explicit not_traced exclusion row, not vanish without a trace.
+        rows = build_domain_coverage(["some_future_domain", "materials"])
+        by_domain = {r["domain"]: r for r in rows}
+        assert by_domain["some_future_domain"]["included"] == "false"
+        assert by_domain["some_future_domain"]["coverage_class"] == COVERAGE_EXCLUDED
+        assert by_domain["some_future_domain"]["reason"] == "not_traced"
+        # An already-known domain passed in as "observed" must not be duplicated.
+        assert sum(1 for r in rows if r["domain"] == "materials") == 1
+        assert len(rows) == 38  # 37 traced + 1 untraced
+
 
 class TestBothModeNonCollision:
     def test_pattern_id_formula_differs_by_schema_even_for_same_domain_and_hash(self):

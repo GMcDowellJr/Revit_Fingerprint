@@ -63,7 +63,7 @@ import csv
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List
 
 _TOOLS_DIR = str(Path(__file__).resolve().parent)
 if _TOOLS_DIR not in sys.path:
@@ -159,15 +159,19 @@ def build_name_patterns(name_key_rows: List[Dict[str, str]]) -> List[Dict[str, A
 
 
 def build_name_membership(name_key_rows: List[Dict[str, str]], pattern_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    pid_by_domain_hash: Dict[tuple, str] = {
-        (r["domain"], r["join_hash"]): r["pattern_id"] for r in pattern_rows
+    # Keyed by (domain, join_key_schema, join_hash) -- matching build_clusters()'s cluster
+    # key exactly. A (domain, join_hash) pair alone is not unique if the same domain/hash
+    # ever appears under two different schemas (e.g. mid schema-migration input); dropping
+    # the schema here would silently misroute those records to the wrong pattern_id.
+    pid_by_cluster_key: Dict[tuple, str] = {
+        (r["domain"], r["join_key_schema"], r["join_hash"]): r["pattern_id"] for r in pattern_rows
     }
     out_rows: List[Dict[str, Any]] = []
     for r in name_key_rows:
         domain = r.get("domain", "")
         if domain not in ELIGIBLE_DOMAINS:
             continue
-        pid = pid_by_domain_hash.get((domain, r.get("join_hash", "")), "")
+        pid = pid_by_cluster_key.get((domain, r.get("join_key_schema", ""), r.get("join_hash", "")), "")
         out_rows.append({
             "domain": domain,
             "coverage_class": coverage_class(domain),
@@ -178,10 +182,17 @@ def build_name_membership(name_key_rows: List[Dict[str, str]], pattern_rows: Lis
     return out_rows
 
 
-def build_domain_coverage() -> List[Dict[str, Any]]:
+def build_domain_coverage(observed_domains: Iterable[str] = ()) -> List[Dict[str, Any]]:
     """Every domain traced in PR1's Step-0-within-PR1 audit (25 eligible + 12 excluded),
     so absence of an excluded domain from domain_patterns.csv is explicit, not silently
-    missing -- per the PR2 brief's explicit prohibition on silent exclusion."""
+    missing -- per the PR2 brief's explicit prohibition on silent exclusion.
+
+    `observed_domains` (the domains actually present in this run's name-key input) are
+    included too: a domain outside both the eligible and excluded registries -- schema
+    drift, a stale input, or a new domain the registry hasn't caught up with yet -- would
+    otherwise be filtered out of patterns/membership with no coverage row at all, silently
+    disappearing instead of surfacing as a `not_traced` exclusion."""
+    known = set(ELIGIBLE_DOMAINS) | set(EXCLUDED_DOMAINS)
     rows: List[Dict[str, Any]] = []
     for domain in sorted(ELIGIBLE_DOMAINS):
         rows.append({
@@ -197,6 +208,13 @@ def build_domain_coverage() -> List[Dict[str, Any]]:
             "included": "false",
             "reason": exclusion_reason(domain),
         })
+    for domain in sorted(set(observed_domains) - known):
+        rows.append({
+            "domain": domain,
+            "coverage_class": coverage_class(domain),
+            "included": "false",
+            "reason": exclusion_reason(domain),
+        })
     return rows
 
 
@@ -207,7 +225,7 @@ def emit_name_patterns(name_key_csv: Path, out_dir: Path) -> Path:
 
     pattern_rows = build_name_patterns(name_key_rows)
     membership_rows = build_name_membership(name_key_rows, pattern_rows)
-    coverage_rows = build_domain_coverage()
+    coverage_rows = build_domain_coverage(r.get("domain", "") for r in name_key_rows)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     patterns_path = out_dir / "domain_patterns.csv"
