@@ -92,6 +92,7 @@ DOMAIN_PATTERNS_FIELDS = [
     "pattern_label",
     "join_key_schema",
     "join_hash",
+    "source_cluster_id",
     "pattern_rank",
     "pattern_size_records",
     "pattern_size_files",
@@ -151,6 +152,15 @@ def build_name_patterns(name_key_rows: List[Dict[str, str]]) -> List[Dict[str, A
                 "pattern_label": pattern_label(cluster["join_key_schema"], rank, n),
                 "join_key_schema": cluster["join_key_schema"],
                 "join_hash": cluster["join_hash"],
+                # Matches tools/extractor.py's cluster_id convention exactly (domain|schema|
+                # join_hash) -- tools/compare_cross_segment.py's resolve_join_hashes() reads
+                # this field (not join_hash directly) to identify a pattern row and treats a
+                # row without it as missing_source_cluster_id/skipped. This PR does not wire
+                # name-projection output into compare_cross_segment.py (explicitly out of
+                # scope -- see PR2 brief's Do-NOT list), but the schema stays consistent with
+                # the production domain_patterns.csv convention so a later PR can consume it
+                # without a schema migration.
+                "source_cluster_id": f"{domain}|{cluster['join_key_schema']}|{cluster['join_hash']}",
                 "pattern_rank": rank,
                 "pattern_size_records": cluster["pattern_size_records"],
                 "pattern_size_files": cluster["pattern_size_files"],

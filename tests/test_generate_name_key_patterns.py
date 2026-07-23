@@ -100,6 +100,14 @@ class TestNamePathCoverageClassTagging:
         assert materials_row["pattern_size_records"] == 2
         assert materials_row["pattern_size_files"] == 2
 
+    def test_source_cluster_id_matches_production_convention(self):
+        # tools/extractor.py's cluster_id = f"{dom}|{schema}|{join_hash}" -- tools/
+        # compare_cross_segment.py's resolve_join_hashes() reads source_cluster_id (not
+        # join_hash directly) to identify a pattern row.
+        rows = build_name_patterns(self._sample_rows())
+        materials_row = next(r for r in rows if r["domain"] == "materials")
+        assert materials_row["source_cluster_id"] == "materials|name_identity.join_key.v1|hashA"
+
     def test_non_ok_status_rows_excluded_from_patterns(self):
         rows = build_name_patterns(self._sample_rows())
         # Only one materials pattern (hashA) -- hashD (missing_required) must not appear.
