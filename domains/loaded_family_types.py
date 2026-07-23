@@ -55,6 +55,8 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 
 try:
     from Autodesk.Revit.DB import FamilySymbol, ParameterElement, SharedParameterElement
@@ -380,6 +382,30 @@ def extract(doc, ctx=None):
             dict({"param_index": i}, **r)
             for i, r in enumerate(prov_rows)
         ]
+
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (lft.family_name).
+        # family_name is deliberately excluded from identity_items above ("family_name is
+        # label-only -- excluded so sig_hash is name-independent"). loaded_family_types.py
+        # never calls build_join_key_from_policy for its own configuration join_hash
+        # (Step 0 A.1) -- this is a new call site, using a locally widened items list
+        # (identity_items + one freshly-wrapped item) so identity_basis.items/sig_hash
+        # above stay unaffected.
+        name_key_items = identity_items + [
+            make_identity_item("lft.family_name", fam_name_v, fam_name_q)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), "loaded_family_types")
+        name_key, name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        name_key["status"] = compute_projection_status(name_key_pol, name_key_missing)
+        rec["join_key_name_identity"] = name_key
 
         info["records"].append(rec)
         info["signature_hashes_v2"].append(sig_hash)

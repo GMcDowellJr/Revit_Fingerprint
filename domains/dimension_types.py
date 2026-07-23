@@ -37,7 +37,7 @@ from core.record_v2 import (
 )
 from core.phase2 import phase2_sorted_items
 from core.join_key_policy import get_domain_join_key_policy
-from core.join_key_builder import build_join_key_from_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 from core.dimension_type_helpers import (
     _fmt_in_from_ft,
     _get_dimension_shape,
@@ -379,6 +379,31 @@ def extract_linear(doc, ctx=None):
                 emit_selectors=True,
             )
 
+            # Canonical Name Identity Projection (PR1): second, independent join_hash
+            # variant keyed off this record's own label.display-backing item
+            # (dim_type.name). dim_type.name does not exist anywhere in this file --
+            # type_name/label_str feeds label.display only. Widened items list used
+            # only for this call; identity_basis.items/sig_hash/join_key above are
+            # unaffected. (dimension_types_spot_coordinate/spot_elevation are excluded
+            # from the name-key policy entirely -- their only other name-shaped item,
+            # dim_type.symbol_name, names a different, referenced tick-mark/leader
+            # symbol element, not this record's own label.)
+            dt_name_v, dt_name_q = canonicalize_str(type_name)
+            name_key_items = identity_items + [
+                make_identity_item("dim_type.name", dt_name_v, dt_name_q)
+            ]
+            name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+            rec_v2["join_key_name_identity"], _name_key_missing = build_join_key_from_policy(
+                domain_policy=name_key_pol,
+                identity_items=name_key_items,
+                include_optional_items=False,
+                emit_keys_used=True,
+                hash_optional_items=False,
+                emit_items=False,
+                emit_selectors=True,
+            )
+            rec_v2["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, _name_key_missing)
+
             # coordination_items
             coordination_items = [
                 make_identity_item("dim_type.domain_family", "dimension_types", ITEM_Q_OK),
@@ -657,6 +682,31 @@ def extract_angular(doc, ctx=None):
                 emit_items=False,
                 emit_selectors=True,
             )
+
+            # Canonical Name Identity Projection (PR1): second, independent join_hash
+            # variant keyed off this record's own label.display-backing item
+            # (dim_type.name). dim_type.name does not exist anywhere in this file --
+            # type_name/label_str feeds label.display only. Widened items list used
+            # only for this call; identity_basis.items/sig_hash/join_key above are
+            # unaffected. (dimension_types_spot_coordinate/spot_elevation are excluded
+            # from the name-key policy entirely -- their only other name-shaped item,
+            # dim_type.symbol_name, names a different, referenced tick-mark/leader
+            # symbol element, not this record's own label.)
+            dt_name_v, dt_name_q = canonicalize_str(type_name)
+            name_key_items = identity_items + [
+                make_identity_item("dim_type.name", dt_name_v, dt_name_q)
+            ]
+            name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+            rec_v2["join_key_name_identity"], _name_key_missing = build_join_key_from_policy(
+                domain_policy=name_key_pol,
+                identity_items=name_key_items,
+                include_optional_items=False,
+                emit_keys_used=True,
+                hash_optional_items=False,
+                emit_items=False,
+                emit_selectors=True,
+            )
+            rec_v2["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, _name_key_missing)
 
             coordination_items = [
                 make_identity_item("dim_type.domain_family", "dimension_types", ITEM_Q_OK),
@@ -957,6 +1007,31 @@ def extract_radial(doc, ctx=None):
                 emit_selectors=True,
             )
 
+            # Canonical Name Identity Projection (PR1): second, independent join_hash
+            # variant keyed off this record's own label.display-backing item
+            # (dim_type.name). dim_type.name does not exist anywhere in this file --
+            # type_name/label_str feeds label.display only. Widened items list used
+            # only for this call; identity_basis.items/sig_hash/join_key above are
+            # unaffected. (dimension_types_spot_coordinate/spot_elevation are excluded
+            # from the name-key policy entirely -- their only other name-shaped item,
+            # dim_type.symbol_name, names a different, referenced tick-mark/leader
+            # symbol element, not this record's own label.)
+            dt_name_v, dt_name_q = canonicalize_str(type_name)
+            name_key_items = identity_items + [
+                make_identity_item("dim_type.name", dt_name_v, dt_name_q)
+            ]
+            name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+            rec_v2["join_key_name_identity"], _name_key_missing = build_join_key_from_policy(
+                domain_policy=name_key_pol,
+                identity_items=name_key_items,
+                include_optional_items=False,
+                emit_keys_used=True,
+                hash_optional_items=False,
+                emit_items=False,
+                emit_selectors=True,
+            )
+            rec_v2["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, _name_key_missing)
+
             coordination_items = [
                 make_identity_item("dim_type.domain_family", "dimension_types", ITEM_Q_OK),
             ]
@@ -1255,6 +1330,31 @@ def extract_diameter(doc, ctx=None):
                 emit_items=False,
                 emit_selectors=True,
             )
+
+            # Canonical Name Identity Projection (PR1): second, independent join_hash
+            # variant keyed off this record's own label.display-backing item
+            # (dim_type.name). dim_type.name does not exist anywhere in this file --
+            # type_name/label_str feeds label.display only. Widened items list used
+            # only for this call; identity_basis.items/sig_hash/join_key above are
+            # unaffected. (dimension_types_spot_coordinate/spot_elevation are excluded
+            # from the name-key policy entirely -- their only other name-shaped item,
+            # dim_type.symbol_name, names a different, referenced tick-mark/leader
+            # symbol element, not this record's own label.)
+            dt_name_v, dt_name_q = canonicalize_str(type_name)
+            name_key_items = identity_items + [
+                make_identity_item("dim_type.name", dt_name_v, dt_name_q)
+            ]
+            name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+            rec_v2["join_key_name_identity"], _name_key_missing = build_join_key_from_policy(
+                domain_policy=name_key_pol,
+                identity_items=name_key_items,
+                include_optional_items=False,
+                emit_keys_used=True,
+                hash_optional_items=False,
+                emit_items=False,
+                emit_selectors=True,
+            )
+            rec_v2["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, _name_key_missing)
 
             coordination_items = [
                 make_identity_item("dim_type.domain_family", "dimension_types", ITEM_Q_OK),
@@ -2288,6 +2388,31 @@ def extract_spot_slope(doc, ctx=None):
                 emit_items=False,
                 emit_selectors=True,
             )
+
+            # Canonical Name Identity Projection (PR1): second, independent join_hash
+            # variant keyed off this record's own label.display-backing item
+            # (dim_type.name). dim_type.name does not exist anywhere in this file --
+            # type_name/label_str feeds label.display only. Widened items list used
+            # only for this call; identity_basis.items/sig_hash/join_key above are
+            # unaffected. (dimension_types_spot_coordinate/spot_elevation are excluded
+            # from the name-key policy entirely -- their only other name-shaped item,
+            # dim_type.symbol_name, names a different, referenced tick-mark/leader
+            # symbol element, not this record's own label.)
+            dt_name_v, dt_name_q = canonicalize_str(type_name)
+            name_key_items = identity_items + [
+                make_identity_item("dim_type.name", dt_name_v, dt_name_q)
+            ]
+            name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+            rec_v2["join_key_name_identity"], _name_key_missing = build_join_key_from_policy(
+                domain_policy=name_key_pol,
+                identity_items=name_key_items,
+                include_optional_items=False,
+                emit_keys_used=True,
+                hash_optional_items=False,
+                emit_items=False,
+                emit_selectors=True,
+            )
+            rec_v2["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, _name_key_missing)
 
             coordination_items = [
                 make_identity_item("dim_type.domain_family", "dimension_types", ITEM_Q_OK),

@@ -30,7 +30,7 @@ from core.record_v2 import (
 )
 from core.phase2 import phase2_sorted_items, phase2_qv_from_legacy_sentinel_str, phase2_join_hash
 from core.join_key_policy import get_domain_join_key_policy
-from core.join_key_builder import build_join_key_from_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 from core.graphic_overrides import extract_projection_graphics, extract_cut_graphics, extract_halftone, extract_transparency
 from core.vg_sig import _traceability_unknown_items, emit_builtin_params, emit_shared_params_stub
 
@@ -741,6 +741,29 @@ def extract_floor_structural_area_plans(doc, ctx=None):
         )
         rec["join_key"] = vt_join_key
 
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (view_template.name).
+        # view_template.name does not exist in identity_items for any partition --
+        # identity_items are built from _canonical_identity_items_from_signature(def_hash,
+        # sig_final), a structured signature that explicitly strips "name="-prefixed
+        # entries before hashing. Widened items list used only for this call;
+        # identity_basis.items/sig_hash/join_key above are unaffected.
+        vt_name_v, vt_name_q = canonicalize_str(name)
+        name_key_items = identity_items + [
+            make_identity_item("view_template.name", vt_name_v, vt_name_q)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+        rec["join_key_name_identity"], _vt_name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        rec["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, _vt_name_key_missing)
+
         rec["def_hash"] = def_hash
         rec["def_signature"] = sig_final
 
@@ -1134,6 +1157,29 @@ def extract_ceiling_plans(doc, ctx=None):
             emit_selectors=True,
         )
         rec["join_key"] = vt_join_key
+
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (view_template.name).
+        # view_template.name does not exist in identity_items for any partition --
+        # identity_items are built from _canonical_identity_items_from_signature(def_hash,
+        # sig_final), a structured signature that explicitly strips "name="-prefixed
+        # entries before hashing. Widened items list used only for this call;
+        # identity_basis.items/sig_hash/join_key above are unaffected.
+        vt_name_v, vt_name_q = canonicalize_str(name)
+        name_key_items = identity_items + [
+            make_identity_item("view_template.name", vt_name_v, vt_name_q)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+        rec["join_key_name_identity"], _vt_name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        rec["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, _vt_name_key_missing)
 
         rec["def_hash"] = def_hash
         rec["def_signature"] = sig_final
@@ -1555,6 +1601,29 @@ def extract_elevations_sections_detail(doc, ctx=None):
         )
         rec["join_key"] = vt_join_key
 
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (view_template.name).
+        # view_template.name does not exist in identity_items for any partition --
+        # identity_items are built from _canonical_identity_items_from_signature(def_hash,
+        # sig_final), a structured signature that explicitly strips "name="-prefixed
+        # entries before hashing. Widened items list used only for this call;
+        # identity_basis.items/sig_hash/join_key above are unaffected.
+        vt_name_v, vt_name_q = canonicalize_str(name)
+        name_key_items = identity_items + [
+            make_identity_item("view_template.name", vt_name_v, vt_name_q)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+        rec["join_key_name_identity"], _vt_name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        rec["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, _vt_name_key_missing)
+
         rec["def_hash"] = def_hash
         rec["def_signature"] = sig_final
 
@@ -1951,6 +2020,29 @@ def extract_renderings_drafting(doc, ctx=None):
             emit_selectors=True,
         )
         rec["join_key"] = vt_join_key
+
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (view_template.name).
+        # view_template.name does not exist in identity_items for any partition --
+        # identity_items are built from _canonical_identity_items_from_signature(def_hash,
+        # sig_final), a structured signature that explicitly strips "name="-prefixed
+        # entries before hashing. Widened items list used only for this call;
+        # identity_basis.items/sig_hash/join_key above are unaffected.
+        vt_name_v, vt_name_q = canonicalize_str(name)
+        name_key_items = identity_items + [
+            make_identity_item("view_template.name", vt_name_v, vt_name_q)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+        rec["join_key_name_identity"], _vt_name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        rec["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, _vt_name_key_missing)
 
         rec["def_hash"] = def_hash
         rec["def_signature"] = sig_final
@@ -2360,6 +2452,29 @@ def extract_schedules(doc, ctx=None):
             emit_selectors=True,
         )
         rec["join_key"] = vt_join_key
+
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (view_template.name).
+        # view_template.name does not exist in identity_items for any partition --
+        # identity_items are built from _canonical_identity_items_from_signature(def_hash,
+        # sig_final), a structured signature that explicitly strips "name="-prefixed
+        # entries before hashing. Widened items list used only for this call;
+        # identity_basis.items/sig_hash/join_key above are unaffected.
+        vt_name_v, vt_name_q = canonicalize_str(name)
+        name_key_items = identity_items + [
+            make_identity_item("view_template.name", vt_name_v, vt_name_q)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+        rec["join_key_name_identity"], _vt_name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        rec["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, _vt_name_key_missing)
 
         rec["def_hash"] = def_hash
         rec["def_signature"] = sig_final

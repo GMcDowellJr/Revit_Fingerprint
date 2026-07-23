@@ -33,6 +33,8 @@ from core.record_v2 import (
     serialize_identity_items,
     build_record_v2,
 )
+from core.join_key_policy import get_domain_join_key_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 
 try:
     from Autodesk.Revit.DB import Material, BuiltInParameter
@@ -513,6 +515,24 @@ def extract(doc, ctx=None):
                 "components": {"uid": safe_str(uid), "name": safe_str(name)},
             },
         )
+
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off material.name (this record's own label.display-backing item). materials.py
+        # never calls build_join_key_from_policy for its own configuration join_hash (no
+        # join_key field exists in this domain's export today) -- this is a new call site,
+        # computed from the same identity_items_sorted snapshot used for sig_hash above.
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), "materials")
+        name_key, name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=identity_items_sorted,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        name_key["status"] = compute_projection_status(name_key_pol, name_key_missing)
+        rec["join_key_name_identity"] = name_key
         _ip, _ip_q = purge_lookup(
             getattr(getattr(m, "Id", None), "IntegerValue", None), ctx
         )

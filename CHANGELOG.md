@@ -12,6 +12,58 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **Canonical Name Identity Projection (PR1):** a second, independent, policy-driven
+  `join_hash` variant computed via the same `core/join_key_builder.build_join_key_from_policy()`
+  mechanism used by the existing configuration-based `join_hash`, governed by a new,
+  separate policy file (`policies/domain_name_key_policies.json`) and namespaced under
+  its own `join_key_schema` (`"name_identity.join_key.v1"`, or
+  `"phases.name_identity.join_key.v1.redundant"` for `phases`, whose configuration
+  `join_hash` already keys off the same `phase.name` string per D-010). Stored on each
+  eligible record as `join_key_name_identity` (same `{schema, hash_alg, join_hash, status,
+  ...}` shape as the existing `join_key`), computed inline at export time in
+  `domains/{phases,materials,text_types,compound_types,identity,phase_filters,
+  line_patterns,fill_patterns,arrowheads,loaded_family_types,view_templates,
+  view_filter_definitions,dimension_types}.py` (13 files; `text_types.py` is the one
+  exception -- its "canonical mode" pipeline already treats `join_key`/`sig_hash` as
+  post-extraction artifacts and strips them before finalizing its output, so
+  `join_key_name_identity` is likewise reconstructed downstream rather than stamped
+  inline for that domain only). A parallel, independent analysis-side reconstruction
+  path (`core/name_key_builder.py` + `tools/apply_name_key_policy.py`) computes the
+  identical value directly from already-exported `*.details.json` records -- no
+  re-extraction required, since every value this projection needs (`identity_basis.items`,
+  phase2 bucket items, `label.display`) is already present in existing exports today.
+  Status companion field mirrors `join_key_status`'s closed vocabulary in spirit
+  (`ok`/`missing_required`/`blocked`/`missing_policy` -- `"bootstrap"` does not apply,
+  since this projection has no flatten-then-apply two-phase pipeline) via the new
+  `core.join_key_builder.compute_projection_status()` helper.
+
+  Eligibility is an explicit allow-list (25 of 37 `domain_join_key_policies.json`
+  entries), not an inferred/derived rule -- see
+  `audit_results/audit_6_name_key_step0_within_pr1.md` for the full per-domain trace.
+  For 7 domains (`phases`, `materials`, `text_types`, `wall_types`, `floor_types`,
+  `roof_types`, `ceiling_types`) the record's own name is already a native
+  `identity_items` key. For 18 domains, the record's own name is real and reaches
+  `label.display` today but was never captured as a flat `identity_items` key -- it
+  either lives only in a phase2 bucket (`identity`, `phase_filters`, `line_patterns`,
+  `fill_patterns` x2) or nowhere but `label.display`/`label.components.*`
+  (`arrowheads`, `loaded_family_types`, `view_templates` x5, `view_filter_definitions`,
+  `dimension_types` x5) -- these use a *locally widened* items list (the domain's
+  existing `identity_items` plus one freshly-`make_identity_item`-wrapped value, built
+  only for the name-key call) rather than touching `identity_basis.items`, `sig_hash`,
+  or the existing `join_key`. 12 domains/partitions are excluded entirely: 9 have no
+  name-like value at all (`units`, `line_styles`, `object_styles` x4,
+  `view_category_overrides` x3), 2 have only a referenced-element name rather than
+  their own (`dimension_types_spot_coordinate`/`_spot_elevation`), and 1
+  (`view_filter_applications_view_templates`) has only a UID-preferring composite
+  candidate, not a name string.
+
+  Canonicalization intentionally matches what `join_hash`/`sig_hash` already do today
+  (`core/record_v2.canonicalize_str`/`canonicalize_str_allow_empty`: trim + missing-check
+  only) -- no case-folding or Unicode normalization is introduced. `DIMENSION_CONFIG`
+  (`tools/build_segment_manifest.py`) is unchanged and does not reference this
+  projection, so it cannot affect `population_hash`/segment membership. No existing
+  `join_hash`, `sig_hash`, or `identity_basis.items` value changes for any domain.
+
 - **Escalation-target file coverage (D-024):** the four files
   `generate_governance_narrative.py`'s own module docstring lists as "not
   yet consumed directly" -- `comparison_registry.csv`,

@@ -506,6 +506,11 @@ def run_fingerprint(doc, timing=None):
     policy_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "policies", "domain_join_key_policies.json")
     ctx["join_key_policies"] = load_join_key_policies(policy_path)
 
+    # Name-identity policies (second, independent join_hash variant -- same loader/mechanism,
+    # different policy file; see policies/domain_name_key_policies.json)
+    name_key_policy_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "policies", "domain_name_key_policies.json")
+    ctx["name_key_policies"] = load_join_key_policies(name_key_policy_path)
+
     # PR5: per-run collector cache + counters
     ctx["_collect"] = CollectCtx()
 

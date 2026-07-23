@@ -38,7 +38,7 @@ from core.canon import (
     S_NOT_APPLICABLE,
 )
 from core.join_key_policy import get_domain_join_key_policy
-from core.join_key_builder import build_join_key_from_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 
 try:
     from Autodesk.Revit.DB import Phase
@@ -247,6 +247,23 @@ def extract(doc, ctx=None):
             emit_selectors=True,
         )
 
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (phase.name). Computed
+        # from the same identity_items_v2_sorted snapshot -- no widening needed, phase.name
+        # is already a native identity item. Redundant with join_key_v2 by construction
+        # (D-010); see policies/domain_name_key_policies.json's phases entry.
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), "phases")
+        name_key_v2, name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=identity_items_v2_sorted,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        name_key_v2["status"] = compute_projection_status(name_key_pol, name_key_missing)
+
         sig_preimage_v2 = serialize_identity_items(identity_items_v2_sorted)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)
 
@@ -270,6 +287,7 @@ def extract(doc, ctx=None):
             },
         )
         rec_v2["join_key"] = join_key_v2
+        rec_v2["join_key_name_identity"] = name_key_v2
         rec_v2["phase2"] = phase2_payload
         rec_v2["sig_basis"] = {
             "schema": "phases.sig_basis.v1",

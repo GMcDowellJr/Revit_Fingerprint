@@ -30,7 +30,7 @@ from core.record_v2 import (
     build_record_v2,
 )
 from core.join_key_policy import get_domain_join_key_policy
-from core.join_key_builder import build_join_key_from_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 
 try:
     from Autodesk.Revit.DB import FillPatternElement
@@ -944,6 +944,27 @@ def extract_drafting(doc, ctx=None):
             emit_selectors=True,
         )
 
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (fill_pattern.name).
+        # fill_pattern.name is not a member of identity_items_v2_sorted -- it lives only in
+        # the phase2 cosmetic bucket. Widened items list used only for this call;
+        # identity_basis.items/sig_hash/join_key above are unaffected.
+        fp_name_v, fp_name_q = canonicalize_str(name)
+        name_key_items = identity_items_v2_sorted + [
+            make_identity_item("fill_pattern.name", fp_name_v, fp_name_q)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+        name_key, name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        name_key["status"] = compute_projection_status(name_key_pol, name_key_missing)
+
         rec_v2 = build_record_v2(
             domain=DOMAIN_NAME,
             record_id=safe_str(name) if safe_str(name) else safe_str(e.Id.IntegerValue),
@@ -966,6 +987,7 @@ def extract_drafting(doc, ctx=None):
         rec_v2["is_purgeable"] = _ip
         rec_v2["is_purgeable_q"] = _ip_q
         rec_v2["join_key"] = join_key
+        rec_v2["join_key_name_identity"] = name_key
         rec_v2["phase2"] = phase2_payload
         rec_v2["sig_basis"] = {
             "schema": "{}.sig_basis.v1".format(DOMAIN_NAME),
@@ -1829,6 +1851,27 @@ def extract_model(doc, ctx=None):
             emit_selectors=True,
         )
 
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (fill_pattern.name).
+        # fill_pattern.name is not a member of identity_items_v2_sorted -- it lives only in
+        # the phase2 cosmetic bucket. Widened items list used only for this call;
+        # identity_basis.items/sig_hash/join_key above are unaffected.
+        fp_name_v, fp_name_q = canonicalize_str(name)
+        name_key_items = identity_items_v2_sorted + [
+            make_identity_item("fill_pattern.name", fp_name_v, fp_name_q)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), DOMAIN_NAME)
+        name_key, name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        name_key["status"] = compute_projection_status(name_key_pol, name_key_missing)
+
         rec_v2 = build_record_v2(
             domain=DOMAIN_NAME,
             record_id=safe_str(name) if safe_str(name) else safe_str(e.Id.IntegerValue),
@@ -1851,6 +1894,7 @@ def extract_model(doc, ctx=None):
         rec_v2["is_purgeable"] = _ip
         rec_v2["is_purgeable_q"] = _ip_q
         rec_v2["join_key"] = join_key
+        rec_v2["join_key_name_identity"] = name_key
         rec_v2["phase2"] = phase2_payload
         rec_v2["sig_basis"] = {
             "schema": "{}.sig_basis.v1".format(DOMAIN_NAME),

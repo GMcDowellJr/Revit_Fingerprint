@@ -1,0 +1,299 @@
+{
+  "_schema_notes": [
+    "Canonical Name Identity Projection (PR1). Second, independent policy-driven join_hash",
+    "variant computed via the SAME core/join_key_builder.build_join_key_from_policy() mechanism",
+    "used by policies/domain_join_key_policies.json, loaded/validated with the same",
+    "core/join_key_policy.load_join_key_policies()/get_domain_join_key_policy() functions.",
+    "Every entry's required_items references the single identity item backing that domain's",
+    "own label.display value (see audit_results/audit_6_name_key_step0_within_pr1.md).",
+    "join_key_schema is 'name_identity.join_key.v1' for every domain except phases, which uses",
+    "'phases.name_identity.join_key.v1.redundant' -- phases' join_hash (configuration policy)",
+    "already keys off phase.name, the same string this policy keys off, so the two projections",
+    "are expected to be near-tautologically identical for that one domain (Step 0 addendum A.4).",
+    "Domains not present in this file were explicitly excluded during Step-0-within-PR1 tracing:",
+    "  - no name-like key at all: units, line_styles, object_styles_* (4), view_category_overrides*",
+    "    (coordinator + model + annotation)",
+    "  - name-shaped required item names a different, referenced element, not this record's own",
+    "    label: dimension_types_spot_coordinate, dimension_types_spot_elevation (dim_type.symbol_name",
+    "    names a referenced tick-mark/leader symbol, not the dimension type itself)",
+    "  - only candidate item is a UID-preferring composite, not a name string:",
+    "    view_filter_applications_view_templates (vfa.template_uid_or_namekey uses the referenced",
+    "    view template's UniqueId whenever present, falling back to its name only when UID is",
+    "    absent -- unsuitable for a cross-file name projection); left as an open follow-up.",
+    "required_items below reference items that, for identity/phase_filters/line_patterns/",
+    "fill_patterns_*/arrowheads/loaded_family_types/view_templates_*/view_filter_definitions/",
+    "dimension_types_{linear,angular,radial,diameter,spot_slope}, do NOT exist in those domains'",
+    "canonical identity_items list (they live only in a phase2 cosmetic/coordination/unknown",
+    "bucket, or nowhere at all) -- the extractor wiring for these domains builds a LOCAL,",
+    "name-key-call-only widened items list (identity_items + one freshly-wrapped item) rather",
+    "than mutating identity_basis.items/sig_hash/join_hash. See per-domain code comments."
+  ],
+  "domains": {
+    "phases": {
+      "join_key_schema": "phases.name_identity.join_key.v1.redundant",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["phase.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "Redundant with this domain's own join_hash by construction: phases.join_key_policy's",
+        "sole required item is also phase.name (D-010: phase names are deliberately included in",
+        "behavioral hashes for cross-project comparability). Downstream correspondence/divergence",
+        "reporting must not present this domain alongside genuinely independent domains without",
+        "qualifying it as redundant -- hence the '.redundant' schema suffix rather than a silent",
+        "identical-looking entry."
+      ]
+    },
+    "materials": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["material.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "material.name is a native identity_items key (domains/materials.py) -- excluded from",
+        "the configuration join_hash policy but genuinely present in identity_items, so no",
+        "widened-items call is needed here."
+      ]
+    },
+    "text_types": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["text_type.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "text_type.name is a native identity_items key (domains/text_types.py) -- no widened-items",
+        "call needed."
+      ]
+    },
+    "wall_types": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["wt.type_name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "wt.type_name is a native identity_items key (domains/compound_types.py). compound_types.py",
+        "never calls build_join_key_from_policy inline for its own configuration join_hash (Step 0",
+        "A.1) -- this is a brand-new call site, not a mirror of an existing one."
+      ]
+    },
+    "floor_types": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["ft.type_name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as wall_types; new call site in domains/compound_types.py."]
+    },
+    "roof_types": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["rt.type_name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as wall_types; new call site in domains/compound_types.py."]
+    },
+    "ceiling_types": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["ct.type_name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as wall_types; new call site in domains/compound_types.py."]
+    },
+    "identity": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["identity.project_title"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "identity.project_title exists today only in phase2.unknown_items, not in the",
+        "identity_items list passed to build_record_v2/build_join_key_from_policy. The name-key",
+        "call site builds a local widened items list (identity_items + a freshly",
+        "make_identity_item-wrapped identity.project_title, canonicalized via canonicalize_str)",
+        "used only for this second projection -- identity_basis.items/sig_hash/join_hash are",
+        "computed from the original, unwidened identity_items list and are unaffected."
+      ]
+    },
+    "phase_filters": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["phase_filter.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "phase_filter.name exists today only in phase2 coordination_items (the domain's own policy",
+        "notes confirm: 'phase_filter.name remains a phase2 coordination/label field only'). Widened",
+        "items list used for this call only, per the identity domain's note above."
+      ]
+    },
+    "line_patterns": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["line_pattern.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "line_pattern.name exists today only in phase2 cosmetic_items ('Names are labels only and",
+        "must not participate in joins' -- domain_join_key_policies.json note). Widened items list",
+        "used for this call only; the domain's real join_hash (segments_norm_hash-based) is untouched."
+      ]
+    },
+    "fill_patterns_drafting": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["fill_pattern.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "fill_pattern.name exists today only in the phase2 cosmetic bucket. Widened items list used",
+        "for this call only."
+      ]
+    },
+    "fill_patterns_model": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["fill_pattern.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as fill_patterns_drafting."]
+    },
+    "arrowheads": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["arrowhead.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "arrowhead.name does not exist anywhere in domains/arrowheads.py today -- the type name",
+        "(local var 'nm') feeds label.display/label.components.type_name only ('Label is not",
+        "identity; keep human if possible.'). This is a brand-new key, freshly wrapped in a widened",
+        "items list for this call only; the domain's own identity_items/sig_hash/join_hash are",
+        "unaffected. The configuration join_hash policy's explicitly_excluded_items already lists",
+        "'arrowhead.name' as documentation of intent -- this PR is the first place that key",
+        "actually gets materialized."
+      ]
+    },
+    "loaded_family_types": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["lft.family_name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "lft.family_name does not exist anywhere in domains/loaded_family_types.py today -- deliberately",
+        "so, per the code's own comment: 'family_name is label-only -- excluded so sig_hash is",
+        "name-independent'. Freshly wrapped in a widened items list for this call only; the domain's",
+        "sig_hash-relevant identity_items are unaffected. loaded_family_types.py never calls",
+        "build_join_key_from_policy inline today (Step 0 A.1) -- brand-new call site."
+      ]
+    },
+    "view_templates_floor_structural_area_plans": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["view_template.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "view_template.name does not exist in identity_items for any view_templates partition --",
+        "identity_items are built from _canonical_identity_items_from_signature(def_hash, sig_final),",
+        "a structured signature that explicitly strips 'name='-prefixed entries before hashing.",
+        "Freshly wrapped in a widened items list for this call only."
+      ]
+    },
+    "view_templates_ceiling_plans": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["view_template.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as view_templates_floor_structural_area_plans."]
+    },
+    "view_templates_elevations_sections_detail": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["view_template.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as view_templates_floor_structural_area_plans."]
+    },
+    "view_templates_renderings_drafting": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["view_template.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as view_templates_floor_structural_area_plans."]
+    },
+    "view_templates_schedules": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["view_template.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as view_templates_floor_structural_area_plans."]
+    },
+    "view_filter_definitions": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["vf.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "vf.name does not exist as a flat identity_items key -- the only existing name value lives",
+        "nested inside label.components.name, which build_join_key_from_policy cannot address (it",
+        "only reads flat identity_items keys). Freshly wrapped as a new flat item ('vf.name') in a",
+        "widened items list for this call only; vf.def_hash-based join_hash is untouched."
+      ]
+    },
+    "dimension_types_linear": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["dim_type.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "dim_type.name does not exist anywhere in domains/dimension_types.py today -- type_name",
+        "feeds label.display (as label_str) only. Freshly wrapped in a widened items list for this",
+        "call only. (dimension_types_spot_coordinate/spot_elevation are excluded from this policy",
+        "file entirely -- their only other name-shaped item, dim_type.symbol_name, names a",
+        "different, referenced tick-mark/leader symbol element, not this record's own label.)"
+      ]
+    },
+    "dimension_types_angular": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["dim_type.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as dimension_types_linear."]
+    },
+    "dimension_types_radial": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["dim_type.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as dimension_types_linear."]
+    },
+    "dimension_types_diameter": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["dim_type.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as dimension_types_linear."]
+    },
+    "dimension_types_spot_slope": {
+      "join_key_schema": "name_identity.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": ["dim_type.name"],
+      "optional_items": [],
+      "explicitly_excluded_items": [],
+      "notes": ["Same situation as dimension_types_linear."]
+    }
+  }
+}

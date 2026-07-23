@@ -50,7 +50,7 @@ from core.phase2 import (
 )
 
 from core.join_key_policy import get_domain_join_key_policy
-from core.join_key_builder import build_join_key_from_policy
+from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 
 def _logic_root_token(elem_filter) -> Tuple[Optional[str], str]:
     """Return (v, q) for vf.logic_root."""
@@ -578,6 +578,28 @@ def extract(doc, ctx=None):
             emit_items=False,
             emit_selectors=True,
         )
+
+        # Canonical Name Identity Projection (PR1): second, independent join_hash variant
+        # keyed off this record's own label.display-backing item (vf.name). No flat vf.name
+        # identity item exists -- the only existing name value lives nested inside
+        # label.components.name (build_join_key_from_policy can't address that path; it
+        # only reads flat identity_items keys). Widened items list used only for this call;
+        # identity_basis.items/sig_hash/join_key above are unaffected.
+        vf_name_v, vf_name_q = canonicalize_str(spec["label"].get("components", {}).get("name"))
+        name_key_items = spec["identity_items"] + [
+            make_identity_item("vf.name", vf_name_v, vf_name_q)
+        ]
+        name_key_pol = get_domain_join_key_policy((ctx or {}).get("name_key_policies"), "view_filter_definitions")
+        rec["join_key_name_identity"], _name_key_missing = build_join_key_from_policy(
+            domain_policy=name_key_pol,
+            identity_items=name_key_items,
+            include_optional_items=False,
+            emit_keys_used=True,
+            hash_optional_items=False,
+            emit_items=False,
+            emit_selectors=True,
+        )
+        rec["join_key_name_identity"]["status"] = compute_projection_status(name_key_pol, _name_key_missing)
 
         rec["phase2"] = {
             "schema": "phase2.view_filter_definitions.v1",
