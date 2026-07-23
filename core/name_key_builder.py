@@ -29,23 +29,31 @@ from core.join_key_policy import get_domain_join_key_policy
 
 
 # Domains whose name-key required item is not present in identity_basis.items or any
-# phase2 bucket in existing exports -- the raw name value lives only in label.display.
+# phase2 bucket in existing exports -- the raw name value lives only under label.*.
 # (Every other domain in policies/domain_name_key_policies.json needs no entry here: its
 # name value already surfaces via flat_items_for_record()'s identity_basis/phase2 merge.)
-LABEL_ONLY_NAME_KEYS: Dict[str, str] = {
-    "arrowheads": "arrowhead.name",
-    "loaded_family_types": "lft.family_name",
-    "view_filter_definitions": "vf.name",
-    "view_templates_ceiling_plans": "view_template.name",
-    "view_templates_elevations_sections_detail": "view_template.name",
-    "view_templates_floor_structural_area_plans": "view_template.name",
-    "view_templates_renderings_drafting": "view_template.name",
-    "view_templates_schedules": "view_template.name",
-    "dimension_types_linear": "dim_type.name",
-    "dimension_types_angular": "dim_type.name",
-    "dimension_types_radial": "dim_type.name",
-    "dimension_types_diameter": "dim_type.name",
-    "dimension_types_spot_slope": "dim_type.name",
+#
+# "component" names the label.components.<key> path holding the UNDECORATED raw name the
+# inline extractor actually hashes. label.display is NOT always that raw value -- e.g.
+# loaded_family_types decorates it as "category : family_name", and
+# view_filter_definitions decorates it as "View Filter Definition (name)". Domains with no
+# "component" entry have no separate raw component in the export at all; for those,
+# label.display genuinely IS the same raw, undecorated value the inline extractor hashes
+# (view_templates, dimension_types), so falling back to display is correct there.
+LABEL_ONLY_NAME_KEYS: Dict[str, Dict[str, str]] = {
+    "arrowheads": {"item_key": "arrowhead.name", "component": "type_name"},
+    "loaded_family_types": {"item_key": "lft.family_name", "component": "family_name"},
+    "view_filter_definitions": {"item_key": "vf.name", "component": "name"},
+    "view_templates_ceiling_plans": {"item_key": "view_template.name"},
+    "view_templates_elevations_sections_detail": {"item_key": "view_template.name"},
+    "view_templates_floor_structural_area_plans": {"item_key": "view_template.name"},
+    "view_templates_renderings_drafting": {"item_key": "view_template.name"},
+    "view_templates_schedules": {"item_key": "view_template.name"},
+    "dimension_types_linear": {"item_key": "dim_type.name"},
+    "dimension_types_angular": {"item_key": "dim_type.name"},
+    "dimension_types_radial": {"item_key": "dim_type.name"},
+    "dimension_types_diameter": {"item_key": "dim_type.name"},
+    "dimension_types_spot_slope": {"item_key": "dim_type.name"},
 }
 
 
@@ -90,12 +98,17 @@ def build_name_key_for_record(
 
     items = flat_items_for_record(record)
 
-    label_key = LABEL_ONLY_NAME_KEYS.get(domain_name)
-    if label_key:
+    label_spec = LABEL_ONLY_NAME_KEYS.get(domain_name)
+    if label_spec:
         label = record.get("label") if isinstance(record.get("label"), dict) else {}
-        raw = label.get("display") if isinstance(label, dict) else None
+        component = label_spec.get("component")
+        if component:
+            components = label.get("components") if isinstance(label.get("components"), dict) else {}
+            raw = components.get(component)
+        else:
+            raw = label.get("display")
         v, q = canonicalize_str(raw)
-        items = items + [{"k": label_key, "v": v, "q": q}]
+        items = items + [{"k": label_spec["item_key"], "v": v, "q": q}]
 
     join_key, missing = build_join_key_from_policy(
         domain_policy=pol,

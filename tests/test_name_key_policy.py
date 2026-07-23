@@ -176,15 +176,66 @@ class TestAnalysisSideReconstruction:
         assert name_key["status"] == "ok"
         assert name_key["join_hash"] is not None
 
-    def test_label_only_domain_arrowheads_reads_label_display(self, name_key_policies):
+    def test_label_only_domain_arrowheads_reads_raw_component(self, name_key_policies):
         rec = {
             "domain": "arrowheads",
-            "label": {"display": "Arrow Filled 15deg"},
+            "label": {
+                "display": "Arrow Filled 15deg",
+                "components": {"type_id": "123", "type_name": "Arrow Filled 15deg"},
+            },
             "identity_basis": {"items": [{"k": "arrowhead.style", "v": "Arrow", "q": "ok"}]},
         }
         name_key = build_name_key_for_record(rec, "arrowheads", name_key_policies)
         assert name_key["status"] == "ok"
         assert name_key["join_hash"] is not None
+
+    def test_loaded_family_types_reads_raw_family_name_not_decorated_display(self, name_key_policies):
+        # label.display is decorated ("category : family"); the inline extractor hashes the
+        # raw family name only (label.components.family_name) -- the reconstruction must match.
+        rec_decorated = {
+            "domain": "loaded_family_types",
+            "label": {
+                "display": "Doors : Single-Flush",
+                "components": {"category": "Doors", "family_name": "Single-Flush"},
+            },
+            "identity_basis": {"items": [{"k": "lft.shape_gate.category", "v": "Doors", "q": "ok"}]},
+        }
+        rec_bare = {
+            "domain": "loaded_family_types",
+            "label": {"display": "Single-Flush", "components": {"category": "", "family_name": "Single-Flush"}},
+            "identity_basis": {"items": [{"k": "lft.shape_gate.category", "v": "Doors", "q": "ok"}]},
+        }
+        name_key_decorated = build_name_key_for_record(rec_decorated, "loaded_family_types", name_key_policies)
+        name_key_bare = build_name_key_for_record(rec_bare, "loaded_family_types", name_key_policies)
+        assert name_key_decorated["join_hash"] == name_key_bare["join_hash"]
+
+    def test_view_filter_definitions_reads_raw_name_not_decorated_display(self, name_key_policies):
+        # label.display is decorated ("View Filter Definition (Foo)"); the inline extractor
+        # hashes label.components.name only -- the reconstruction must match.
+        rec = {
+            "domain": "view_filter_definitions",
+            "label": {"display": "View Filter Definition (Foo)", "components": {"name": "Foo"}},
+            "identity_basis": {"items": [{"k": "vf.def_hash", "v": "abc123", "q": "ok"}]},
+        }
+        name_key = build_name_key_for_record(rec, "view_filter_definitions", name_key_policies)
+        assert name_key["status"] == "ok"
+
+        from core.record_v2 import canonicalize_str
+        from core.join_key_builder import build_join_key_from_policy
+        from core.join_key_policy import get_domain_join_key_policy
+
+        raw_v, raw_q = canonicalize_str("Foo")
+        pol = get_domain_join_key_policy(name_key_policies, "view_filter_definitions")
+        expected, _ = build_join_key_from_policy(
+            domain_policy=pol,
+            identity_items=[
+                {"k": "vf.def_hash", "v": "abc123", "q": "ok"},
+                {"k": "vf.name", "v": raw_v, "q": raw_q},
+            ],
+            include_optional_items=False,
+            hash_optional_items=False,
+        )
+        assert name_key["join_hash"] == expected["join_hash"]
 
     def test_ineligible_domain_returns_none(self, name_key_policies):
         rec = {
