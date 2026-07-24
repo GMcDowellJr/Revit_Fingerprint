@@ -180,6 +180,44 @@ class TestMergeBiOutputsExcludesStaleDomainsForEmptySegment:
         assert result["bundles.csv"]["files_merged"] == 1
         assert (bundle_dir / "bundles_combined.csv").exists()
 
+    def test_stale_combined_csv_from_previous_run_is_deleted_on_empty_rerun(self, tmp_path):
+        # PR #390 review, second round: a segment that previously had real bundles and is
+        # rerun with zero current candidates must not leave the old *_combined.csv in
+        # place -- Power BI would keep reading it as if it were this run's result.
+        bundle_dir = tmp_path / "name" / "all"
+        stale_combined = bundle_dir / "bundles_combined.csv"
+        _write_csv(
+            stale_combined,
+            ["schema_version", "analysis_run_id", "domain", "bundle_id"],
+            [{"schema_version": "2.1", "analysis_run_id": "r1", "domain": "old_domain", "bundle_id": "bnd_old"}],
+        )
+        assert stale_combined.exists()
+
+        # No per-domain source folders at all this run (e.g. domain_patterns.csv came back
+        # empty) -- candidates end up empty regardless of active_domains' value.
+        result = merge_bi_outputs(bundle_dir, active_domains=frozenset())
+
+        assert result == {}
+        assert not stale_combined.exists()
+
+    def test_stale_combined_csv_deleted_when_all_candidates_are_headerless(self, tmp_path):
+        # The second "continue without writing" path (candidates exist but every one is a
+        # truly empty/headerless file) must clean up stale output the same way.
+        bundle_dir = tmp_path / "name" / "all"
+        stale_combined = bundle_dir / "bundles_combined.csv"
+        _write_csv(
+            stale_combined,
+            ["schema_version", "domain"],
+            [{"schema_version": "2.1", "domain": "old_domain"}],
+        )
+        (bundle_dir / "some_domain").mkdir(parents=True)
+        (bundle_dir / "some_domain" / "bundles.csv").write_text("", encoding="utf-8")
+
+        result = merge_bi_outputs(bundle_dir, active_domains=frozenset({"some_domain"}))
+
+        assert result == {}
+        assert not stale_combined.exists()
+
 
 class TestSegmentHasNameLegOutput:
     def test_false_when_no_provenance_file(self, tmp_path):

@@ -782,12 +782,22 @@ def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozens
     active_domains: when provided, only subfolders whose name is in this set are
     merged.  Pass the set derived from pattern_presence_file.csv so that stale
     domain folders left over from earlier runs are excluded.
+
+    When a filename has no current candidates (active_domains excludes every existing
+    folder, or none exist at all), any pre-existing `{stem}_combined.csv` from a previous
+    run is deleted rather than left in place -- otherwise a rerun that legitimately finds
+    nothing (e.g. a segment whose active domain set has genuinely gone from non-empty to
+    empty) would leave Power BI reading stale bundle data as if it were current (PR #390
+    review).
     """
     if not bundle_analysis_dir.is_dir():
         return {}
 
     result: Dict[str, dict] = {}
     for filename in BI_MERGE_FILES:
+        stem = Path(filename).stem
+        out_path = bundle_analysis_dir / f"{stem}_combined.csv"
+
         candidates = [
             p for p in bundle_analysis_dir.glob(f"*/{filename}")
             if "_population_discovery" not in str(p)
@@ -795,6 +805,8 @@ def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozens
             and (active_domains is None or p.parent.name in active_domains)
         ]
         if not candidates:
+            if out_path.is_file():
+                out_path.unlink()
             continue
 
         header: Optional[List[str]] = None
@@ -824,10 +836,10 @@ def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozens
             files_merged += 1
 
         if header is None:
+            if out_path.is_file():
+                out_path.unlink()
             continue
 
-        stem = Path(filename).stem
-        out_path = bundle_analysis_dir / f"{stem}_combined.csv"
         atomic_write_csv(out_path, header, all_rows)
         result[filename] = {"files_merged": files_merged, "rows_written": len(all_rows)}
 

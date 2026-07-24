@@ -149,3 +149,21 @@ All four covered by new/updated tests in `tests/test_run_segment_orchestrator_na
 Fix 3 (PowerShell) has no automated test (no `pwsh` available in this environment) —
 verified by careful manual read-through instead. Full suite after all four fixes: 1053
 passed, 6 skipped.
+
+## PR #390 review round 2 — one more fix
+
+5. **A previous run's own `*_combined.csv` was left stale on an empty rerun.** Fix 2
+   (above) stops *foreign* stale per-domain folders from being merged in, but
+   `merge_bi_outputs()` still returned early (`continue`) without touching
+   `{stem}_combined.csv` on disk whenever a filename had zero current candidates --
+   whether because `active_domains` was `frozenset()` or because every candidate file was
+   headerless. So a segment that had real bundles on one run and genuinely produces none
+   on a rerun (e.g. its files no longer intersect any eligible domain) kept showing the
+   *previous* run's `bundles_combined.csv` content to Power BI as if it were current.
+   Fixed: both "no candidates" exit points now delete any pre-existing `{stem}_combined.csv`
+   before continuing, so "found nothing this run" always means "no stale file left behind"
+   -- for the name leg and (since `merge_bi_outputs()` is shared) the config leg alike.
+   This only changes behavior on the already-buggy stale-data path; the "candidates found,
+   write fresh combined file" path is untouched. Covered by two new tests in
+   `TestMergeBiOutputsExcludesStaleDomainsForEmptySegment` (one per exit point). Full suite
+   after this fix: 1055 passed, 6 skipped.
