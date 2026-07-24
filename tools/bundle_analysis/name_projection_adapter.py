@@ -18,7 +18,7 @@ logged and/or carried into `emit_name_target_provenance()`'s manifest, never sil
 """
 
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 if __package__ in (None, ""):
     import sys
@@ -52,7 +52,7 @@ STAGED_PATTERN_PRESENCE_FIELDS = [
 
 DOMAIN_COVERAGE_FIELDS = ["domain", "coverage_class", "included", "reason"]
 
-def _normalize_export_run_id(export_file: str) -> str:
+def normalize_export_run_id(export_file: str, known_ids: Optional[Set[str]] = None) -> str:
     """Normalize PR2's `export_file` (`tools/apply_name_key_policy.py`, which prefers
     `*.details.json` per CLAUDE.md's input-format priority) back to the canonical
     `export_run_id` `tools/extractor.py`'s `emit_records()` actually stamps -- the file
@@ -65,16 +65,29 @@ def _normalize_export_run_id(export_file: str) -> str:
     breaks cross-target file-level alignment (flagged in PR #389 review).
 
     `*.index.json` and plain `*.json` export names are left unchanged -- those are
-    already the primary/canonical name in those cases. This assumes a complete
-    split-export pair, which is the case PR2's own `_iter_export_paths()` selects
-    `*.details.json` for in the first place (it only prefers details files when details
-    files exist at all, and the split-export contract always pairs one with an
-    `*.index.json` sibling); a details file with no sibling index file is an
-    out-of-contract partial export this normalization does not attempt to detect.
+    already the primary/canonical name in those cases.
+
+    Blindly rewriting every `*.details.json` suffix is only correct for a *complete*
+    split-export pair; a details-only export (no sibling `*.index.json` at all -- a
+    legitimate, `_iter_export_files()`-supported case, not an out-of-contract one, per
+    CLAUDE.md's own details-preferred priority) keeps the `*.details.json` name itself as
+    its canonical `export_run_id`, and blindly rewriting it produces an id that never
+    matches anything real (PR #390 review). Pass `known_ids` (e.g. `file_metadata.csv`'s
+    real `export_run_id` set) whenever available to resolve this correctly: the normalized
+    form is tried first, and if that isn't in `known_ids`, the raw (un-normalized) value is
+    tried before falling back to the normalized guess. Without `known_ids` (the default),
+    behavior is unchanged from before this parameter existed -- always the blind rewrite.
     """
+    normalized = export_file
     if export_file.lower().endswith(".details.json"):
-        return export_file[: -len(".details.json")] + ".index.json"
-    return export_file
+        normalized = export_file[: -len(".details.json")] + ".index.json"
+    if known_ids is None:
+        return normalized
+    if normalized in known_ids:
+        return normalized
+    if export_file in known_ids:
+        return export_file
+    return normalized
 
 
 PROVENANCE_NOTE_NAME_TARGET = (
@@ -92,6 +105,7 @@ def stage_name_projection_analysis_dir(
     staging_dir: Path,
     analysis_run_id: str = DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID,
     schema_version: str = DEFAULT_SCHEMA_VERSION,
+    known_export_run_ids: Optional[Set[str]] = None,
 ) -> Dict[str, int]:
     """Materialize a staging `analysis_dir` from PR2's `name/` pattern output.
 
@@ -116,9 +130,13 @@ def stage_name_projection_analysis_dir(
         distinct value" invariant satisfied deterministically.
 
     `export_file` is normalized to the canonical `export_run_id` via
-    `_normalize_export_run_id()` (not copied verbatim) -- see that function's docstring for
+    `normalize_export_run_id()` (not copied verbatim) -- see that function's docstring for
     why a naive copy silently breaks `--roles` filtering and cross-target file alignment on
-    split-export corpora.
+    split-export corpora. Pass `known_export_run_ids` (real ids from `file_metadata.csv`)
+    whenever available so a details-only export (no sibling `*.index.json`) resolves
+    correctly instead of being blindly rewritten to a nonexistent id (PR #390 review) --
+    `run_bundle_analysis_for_target()` supplies this automatically from `--metadata-file`
+    when one is given.
     """
     domain_patterns_path = name_patterns_dir / "domain_patterns.csv"
     membership_path = name_patterns_dir / "pattern_membership.csv"
@@ -158,7 +176,9 @@ def stage_name_projection_analysis_dir(
     out_presence_rows: List[Dict[str, str]] = []
     for row in membership_rows:
         domain = row.get("domain", "")
-        export_run_id = _normalize_export_run_id((row.get("export_file", "") or "").strip())
+        export_run_id = normalize_export_run_id(
+            (row.get("export_file", "") or "").strip(), known_ids=known_export_run_ids
+        )
         pattern_id = (row.get("pattern_id", "") or "").strip()
         if not export_run_id or not pattern_id:
             continue

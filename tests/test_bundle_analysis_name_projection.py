@@ -24,7 +24,7 @@ from tools.generate_name_key_patterns import emit_name_patterns
 from tools.bundle_analysis.name_projection_adapter import (
     DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID,
     PROVENANCE_NOTE_NAME_TARGET,
-    _normalize_export_run_id,
+    normalize_export_run_id,
     emit_name_target_provenance,
     stage_name_projection_analysis_dir,
 )
@@ -240,16 +240,16 @@ class TestSplitExportFileIdNormalization:
     cross-target file alignment for any split-export corpus."""
 
     def test_details_filename_normalized_to_index_filename(self):
-        assert _normalize_export_run_id("model_a.details.json") == "model_a.index.json"
+        assert normalize_export_run_id("model_a.details.json") == "model_a.index.json"
 
     def test_details_filename_normalization_is_case_insensitive_on_suffix(self):
-        assert _normalize_export_run_id("model_a.DETAILS.JSON") == "model_a.index.json"
+        assert normalize_export_run_id("model_a.DETAILS.JSON") == "model_a.index.json"
 
     def test_index_filename_left_unchanged(self):
-        assert _normalize_export_run_id("model_a.index.json") == "model_a.index.json"
+        assert normalize_export_run_id("model_a.index.json") == "model_a.index.json"
 
     def test_plain_filename_left_unchanged(self):
-        assert _normalize_export_run_id("model_a.json") == "model_a.json"
+        assert normalize_export_run_id("model_a.json") == "model_a.json"
 
     def test_staged_presence_rows_use_index_export_run_id_for_split_export(self, tmp_path):
         rows = []
@@ -271,6 +271,75 @@ class TestSplitExportFileIdNormalization:
         export_run_ids = {r["export_run_id"] for r in presence_rows}
         assert export_run_ids == {"model_a.index.json", "model_b.index.json"}
         assert not any(eid.endswith(".details.json") for eid in export_run_ids)
+
+
+class TestNormalizeExportRunIdWithKnownIds:
+    """PR #390 review, fourth round: a details-only export (no sibling *.index.json) keeps
+    its *.details.json name as its canonical export_run_id -- blind normalization can't
+    tell that apart from a split-export file's raw name by string shape alone. known_ids
+    (e.g. file_metadata.csv's real export_run_id set) resolves the ambiguity."""
+
+    def test_split_export_resolves_to_normalized_form(self):
+        known_ids = {"model_a.index.json"}
+        assert normalize_export_run_id("model_a.details.json", known_ids=known_ids) == "model_a.index.json"
+
+    def test_details_only_export_resolves_to_raw_form(self):
+        known_ids = {"model_c.details.json"}
+        assert normalize_export_run_id("model_c.details.json", known_ids=known_ids) == "model_c.details.json"
+
+    def test_neither_form_known_falls_back_to_normalized_guess(self):
+        known_ids = {"some_other_file.index.json"}
+        assert normalize_export_run_id("model_z.details.json", known_ids=known_ids) == "model_z.index.json"
+
+    def test_no_known_ids_is_unchanged_blind_rewrite(self):
+        # Backward compatible: omitting known_ids behaves exactly as before this
+        # parameter existed.
+        assert normalize_export_run_id("model_a.details.json") == "model_a.index.json"
+
+    def test_index_and_plain_names_unaffected_by_known_ids(self):
+        assert normalize_export_run_id("model_a.index.json", known_ids=set()) == "model_a.index.json"
+        assert normalize_export_run_id("model_a.json", known_ids=set()) == "model_a.json"
+
+
+class TestStageWithKnownExportRunIds:
+    def test_details_only_export_stages_with_raw_id_when_known(self, tmp_path):
+        rows = [{
+            "export_file": "model_c.details.json", "domain": "materials", "record_id": "uid:concrete",
+            "label_display": "Concrete", "join_key_schema": "name_identity.join_key.v1",
+            "join_hash": "hashConcrete", "status": "ok", "missing_required": "",
+        }]
+        name_key_csv = tmp_path / "name_key_results.csv"
+        _write_csv(name_key_csv, NAME_KEY_FIELDS, rows)
+        name_patterns_dir = tmp_path / "patterns" / "name"
+        emit_name_patterns(name_key_csv, name_patterns_dir)
+
+        staging_dir = tmp_path / "staging"
+        stage_name_projection_analysis_dir(
+            name_patterns_dir, staging_dir,
+            known_export_run_ids={"model_c.details.json"},
+        )
+
+        presence_rows = read_csv_rows(staging_dir / "pattern_presence_file.csv")
+        assert {r["export_run_id"] for r in presence_rows} == {"model_c.details.json"}
+
+    def test_without_known_export_run_ids_details_only_export_is_wrongly_normalized(self, tmp_path):
+        # Contrast case demonstrating the bug this fix closes: without known ids, staging
+        # falls back to the blind rewrite, producing a nonexistent id.
+        rows = [{
+            "export_file": "model_c.details.json", "domain": "materials", "record_id": "uid:concrete",
+            "label_display": "Concrete", "join_key_schema": "name_identity.join_key.v1",
+            "join_hash": "hashConcrete", "status": "ok", "missing_required": "",
+        }]
+        name_key_csv = tmp_path / "name_key_results.csv"
+        _write_csv(name_key_csv, NAME_KEY_FIELDS, rows)
+        name_patterns_dir = tmp_path / "patterns" / "name"
+        emit_name_patterns(name_key_csv, name_patterns_dir)
+
+        staging_dir = tmp_path / "staging"
+        stage_name_projection_analysis_dir(name_patterns_dir, staging_dir)
+
+        presence_rows = read_csv_rows(staging_dir / "pattern_presence_file.csv")
+        assert {r["export_run_id"] for r in presence_rows} == {"model_c.index.json"}  # wrong, no known_ids given
 
 
 class TestNameProjectionAdapterProducesConsumableInput:
@@ -352,3 +421,62 @@ class TestBundleProvenance:
         emit_name_target_provenance(work_out_dir, name_patterns_dir, DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID)
         second = (work_out_dir / "bundle_provenance.csv").read_text(encoding="utf-8")
         assert first == second
+
+
+class TestRunBundleAnalysisForTargetResolvesDetailsOnlyIdsFromMetadataFile:
+    """PR #390 review, fourth round: run_bundle_analysis_for_target() must supply
+    known_export_run_ids from --metadata-file automatically, end to end, not just as an
+    available parameter nobody calls."""
+
+    def test_metadata_file_resolves_details_only_export_correctly(self, tmp_path):
+        rows = [{
+            "export_file": "model_c.details.json", "domain": "materials", "record_id": "uid:concrete",
+            "label_display": "Concrete", "join_key_schema": "name_identity.join_key.v1",
+            "join_hash": "hashConcrete", "status": "ok", "missing_required": "",
+        }]
+        name_key_csv = tmp_path / "name_key_results.csv"
+        _write_csv(name_key_csv, NAME_KEY_FIELDS, rows)
+        name_patterns_dir = tmp_path / "patterns" / "name"
+        emit_name_patterns(name_key_csv, name_patterns_dir)
+
+        metadata_file = tmp_path / "file_metadata.csv"
+        _write_csv(
+            metadata_file, ["export_run_id", "governance_role"],
+            [{"export_run_id": "model_c.details.json", "governance_role": "Project"}],
+        )
+
+        out_dir = tmp_path / "out"
+        run_bundle_analysis_for_target(
+            analysis_dir=tmp_path / "unused",
+            out_dir=out_dir,
+            comparison_target="name",
+            name_key_patterns_dir=name_patterns_dir,
+            metadata_file=metadata_file,
+            discover_populations_flag=False,
+        )
+
+        presence_rows = read_csv_rows(out_dir / "name" / "_staging_analysis_input" / "pattern_presence_file.csv")
+        assert {r["export_run_id"] for r in presence_rows} == {"model_c.details.json"}
+
+    def test_without_metadata_file_still_falls_back_to_blind_normalize(self, tmp_path):
+        rows = [{
+            "export_file": "model_c.details.json", "domain": "materials", "record_id": "uid:concrete",
+            "label_display": "Concrete", "join_key_schema": "name_identity.join_key.v1",
+            "join_hash": "hashConcrete", "status": "ok", "missing_required": "",
+        }]
+        name_key_csv = tmp_path / "name_key_results.csv"
+        _write_csv(name_key_csv, NAME_KEY_FIELDS, rows)
+        name_patterns_dir = tmp_path / "patterns" / "name"
+        emit_name_patterns(name_key_csv, name_patterns_dir)
+
+        out_dir = tmp_path / "out"
+        run_bundle_analysis_for_target(
+            analysis_dir=tmp_path / "unused",
+            out_dir=out_dir,
+            comparison_target="name",
+            name_key_patterns_dir=name_patterns_dir,
+            discover_populations_flag=False,
+        )
+
+        presence_rows = read_csv_rows(out_dir / "name" / "_staging_analysis_input" / "pattern_presence_file.csv")
+        assert {r["export_run_id"] for r in presence_rows} == {"model_c.index.json"}

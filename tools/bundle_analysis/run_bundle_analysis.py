@@ -1020,10 +1020,26 @@ def run_bundle_analysis_for_target(
         name_out_dir = out_dir / "name"
         staging_dir = name_out_dir / "_staging_analysis_input"
 
+        # A details-only export (no sibling *.index.json) keeps its *.details.json name as
+        # its canonical export_run_id -- normalize_export_run_id() can't tell that apart
+        # from a split-export file's raw name by string shape alone, and blindly rewriting
+        # it produces an id that matches nothing real (PR #390 review). file_metadata.csv's
+        # own export_run_id column is the corpus's real id set, so when --metadata-file is
+        # available it resolves this correctly; without it, staging falls back to the
+        # original blind-rewrite behavior (unchanged for callers with no metadata file).
+        known_export_run_ids = None
+        if metadata_file is not None and Path(metadata_file).is_file():
+            known_export_run_ids = {
+                (row.get("export_run_id", "") or "").strip()
+                for row in read_csv_rows(Path(metadata_file))
+                if (row.get("export_run_id", "") or "").strip()
+            }
+
         stage_stats = stage_name_projection_analysis_dir(
             name_patterns_dir=resolved_name_patterns_dir,
             staging_dir=staging_dir,
             analysis_run_id=name_run_id,
+            known_export_run_ids=known_export_run_ids,
         )
         print(f"[run_multi_target] comparison_target=name staged={stage_stats} out_dir={name_out_dir}")
 

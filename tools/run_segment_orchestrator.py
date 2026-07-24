@@ -24,6 +24,7 @@ import csv
 import hashlib
 import math
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -37,7 +38,10 @@ from typing import Any, Dict, List, Optional
 # Allow import of bundle_analysis package from the same tools/ directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bundle_analysis.common import atomic_write_csv
+from bundle_analysis.name_projection_adapter import normalize_export_run_id
 from build_results_registry import write_results_registry
+
+VALID_COMPARISON_TARGETS = {"config", "name", "both"}
 
 # Maximum destination file handles open simultaneously during preshard.
 # Keeps fd usage well below typical OS limits (1024) regardless of segment count.
@@ -599,6 +603,62 @@ def _write_segment_records(
         (seg_shard_dir / ".complete").write_text("ok", encoding="utf-8")
 
 
+def _filter_name_key_csv_to_segment(
+    name_key_results_csv: Path,
+    out_csv: Path,
+    allowed_ids: set,
+) -> int:
+    """Filter a corpus-wide name_key_results.csv (tools/apply_name_key_policy.py output,
+    computed once for the whole corpus -- there is no per-segment re-parse of raw JSON,
+    unlike the join_hash "patterns" step below) down to one segment's file population, so
+    tools/generate_name_key_patterns.py re-clusters name-identity patterns scoped to just
+    this segment -- the name-projection analog of run_extract_all.py's
+    --filter-export-run-ids for the config/join_hash "patterns" step.
+
+    name_key_results.csv's `export_file` column is the raw *.details.json/*.index.json
+    basename PR1 saw on disk, not necessarily the canonical export_run_id a segment's
+    export_run_ids.txt uses (tools/bundle_analysis/name_projection_adapter.py's
+    normalize_export_run_id() documents why those differ for a split-export pair).
+    Membership is tested against the normalized id first so a segment's export_run_ids.txt
+    actually matches split-export rows; each row's own export_file value is left
+    unmodified in the output -- stage_name_projection_analysis_dir() normalizes it again
+    downstream when building bundle-pipeline input, so re-normalizing here would be
+    redundant, not incorrect, but keeping the raw value is what the filter's one job
+    (membership, not transformation) calls for.
+
+    If the normalized id isn't in allowed_ids, the raw (un-normalized) export_file is also
+    tried before excluding the row. normalize_export_run_id() can't distinguish a genuine
+    split-export pair from a details-only export with no sibling *.index.json file --
+    tools/extractor.py's _iter_export_files() keeps the *.details.json name itself as the
+    canonical export_run_id in that case (there is no *.index.json to rewrite to), so
+    blindly normalizing every *.details.json row would silently drop every row for that
+    export from the segment (PR #390 review). allowed_ids is this segment's own real
+    membership list, not a heuristic guess, so trying the raw id against it is safe.
+
+    Returns the number of rows written.
+    """
+    if not name_key_results_csv.is_file():
+        raise FileNotFoundError(f"--name-key-results-csv not found: {name_key_results_csv}")
+
+    def _in_segment(raw_export_file: str) -> bool:
+        if not raw_export_file:
+            return False
+        if normalize_export_run_id(raw_export_file) in allowed_ids:
+            return True
+        return raw_export_file in allowed_ids
+
+    with name_key_results_csv.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        rows = [r for r in reader if _in_segment((r.get("export_file", "") or "").strip())]
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    with out_csv.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    return len(rows)
+
+
 # ── Diagnostic helpers ────────────────────────────────────────────────────────
 
 def _build_patterns_missing_notes(
@@ -680,18 +740,65 @@ def _active_domains_from_presence_csv(analysis_dir: Path) -> Optional[frozenset]
     return domains if domains else None
 
 
+def _active_domains_from_name_patterns(name_patterns_dir: Path) -> Optional[frozenset]:
+    """Same purpose as _active_domains_from_presence_csv(), but for the name-projection
+    pattern shape (tools/generate_name_key_patterns.py's domain_patterns.csv has no
+    pattern_presence_file.csv equivalent -- see audit_results/audit_8 for the schema diff).
+
+    Unlike _active_domains_from_presence_csv(), an empty-but-present domain_patterns.csv
+    is a legitimate, expected outcome for the name projection (a segment whose files don't
+    intersect any of the 25 eligible domains -- see audit_results/audit_9's "what this PR
+    does not attempt"), not a signal to fall back to "unfiltered." This function therefore
+    returns `frozenset()` (not `None`) when the file exists but has zero domain rows, so
+    merge_bi_outputs() excludes every domain subfolder instead of treating None-as-unfiltered
+    and resurrecting stale per-domain output left over from a previous run of this segment
+    under a different (larger) population. `None` is reserved for "the file is missing" --
+    a genuinely different condition (the name-patterns step never ran or failed).
+    """
+    patterns_csv = name_patterns_dir / "domain_patterns.csv"
+    if not patterns_csv.is_file():
+        return None
+    with patterns_csv.open("r", encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        return frozenset(
+            r.get("domain", "").strip() for r in reader if r.get("domain", "").strip()
+        )
+
+
+def _segment_has_name_leg_output(out_root: Path) -> bool:
+    """Whether this segment's name-projection leg (step 2b/3b/BI-merge-name) has already
+    completed at least once. emit_name_target_provenance() (tools/bundle_analysis's
+    --comparison-target name path) always writes bundle_provenance.csv on a successful run,
+    even when the segment's name-target pattern set comes back empty -- so its presence is
+    a reliable "name leg already ran" marker, independent of run_registry.csv's single
+    whole-segment `status` column, which has no notion of per-leg completion. Used so a
+    segment already marked complete under a config-only run isn't skipped once the operator
+    later asks for --comparison-target name/both -- see PR #390 review."""
+    return (out_root / "results" / "bundle_analysis" / "name" / "bundle_provenance.csv").is_file()
+
+
 def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozenset] = None) -> dict:
     """Pre-merge per-domain bundle analysis CSVs into single combined files for Power BI.
 
     active_domains: when provided, only subfolders whose name is in this set are
     merged.  Pass the set derived from pattern_presence_file.csv so that stale
     domain folders left over from earlier runs are excluded.
+
+    When a filename has no current candidates (active_domains excludes every existing
+    folder, or none exist at all), any pre-existing `{stem}_combined.csv` from a previous
+    run is deleted rather than left in place -- otherwise a rerun that legitimately finds
+    nothing (e.g. a segment whose active domain set has genuinely gone from non-empty to
+    empty) would leave Power BI reading stale bundle data as if it were current (PR #390
+    review).
     """
     if not bundle_analysis_dir.is_dir():
         return {}
 
     result: Dict[str, dict] = {}
     for filename in BI_MERGE_FILES:
+        stem = Path(filename).stem
+        out_path = bundle_analysis_dir / f"{stem}_combined.csv"
+
         candidates = [
             p for p in bundle_analysis_dir.glob(f"*/{filename}")
             if "_population_discovery" not in str(p)
@@ -699,6 +806,8 @@ def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozens
             and (active_domains is None or p.parent.name in active_domains)
         ]
         if not candidates:
+            if out_path.is_file():
+                out_path.unlink()
             continue
 
         header: Optional[List[str]] = None
@@ -728,10 +837,10 @@ def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozens
             files_merged += 1
 
         if header is None:
+            if out_path.is_file():
+                out_path.unlink()
             continue
 
-        stem = Path(filename).stem
-        out_path = bundle_analysis_dir / f"{stem}_combined.csv"
         atomic_write_csv(out_path, header, all_rows)
         result[filename] = {"files_merged": files_merged, "rows_written": len(all_rows)}
 
@@ -833,8 +942,22 @@ def _run_one_segment(
     counters_lock: threading.Lock,
     worker_id: int,
     bundle_workers: int,
+    comparison_target: str = "config",
+    name_key_results_csv: Optional[Path] = None,
 ) -> Dict:
-    """Process one segment. Returns result dict."""
+    """Process one segment. Returns result dict.
+
+    comparison_target="config" (default) is byte-identical to this function before PR4 --
+    every new code path below is gated on comparison_target in {"name", "both"} and adds no
+    new file writes, subprocess calls, or log lines otherwise. When enabled, it adds a
+    parallel name-projection leg (tools/bundle_analysis, --comparison-target name) alongside
+    the existing join_hash leg: re-cluster this segment's slice of a corpus-wide
+    name_key_results.csv (tools/apply_name_key_policy.py, computed once up front -- see
+    _filter_name_key_csv_to_segment()'s docstring for why no per-segment JSON re-parse is
+    needed), then bundle-mine it into results/bundle_analysis/name/all/, mirroring
+    results/bundle_analysis/all/ for the config leg but using join_key_name_identity as the
+    join instead of join_hash.
+    """
     sid = reg_row.get("segment_id", "").strip()
     output_folder = reg_row.get("output_folder", "").strip()
     out_root = segments_root / output_folder
@@ -865,6 +988,9 @@ def _run_one_segment(
     t_patterns = 0
     t_bundle: Optional[int] = None
     t_merge: Optional[int] = None
+    t_patterns_name: Optional[int] = None
+    t_bundle_name: Optional[int] = None
+    t_merge_name: Optional[int] = None
     elapsed = 0
 
     with log_path.open("w", encoding="utf-8", errors="replace") as log_f:
@@ -949,6 +1075,35 @@ def _run_one_segment(
                 for ln in lines_to_show:
                     print(f"[orchestrator]     {ln}", flush=True)
 
+        # Step 2b — Name-projection patterns stage (opt-in, comparison_target in {name, both})
+        if step_failed is None and comparison_target in ("name", "both"):
+            log(f"[orchestrator]   step 2b name-patterns...")
+            t_step2b_start = time.monotonic()
+            try:
+                segment_name_key_csv = out_root / "results" / "name_key" / "name_key_results.csv"
+                rows_written = _filter_name_key_csv_to_segment(
+                    name_key_results_csv, segment_name_key_csv, set(export_run_ids)
+                )
+                log(f"[orchestrator]   step 2b name-patterns filtered_rows={rows_written}")
+                name_patterns_cmd = [
+                    sys.executable,
+                    str(repo_root / "tools" / "generate_name_key_patterns.py"),
+                    "--comparison-target", "name",
+                    "--name-key-csv", str(segment_name_key_csv),
+                    "--out-root", str(out_root / "results" / "name_key" / "patterns"),
+                ]
+                rc, tail, _name_patterns_content = run_step_log(
+                    name_patterns_cmd, out_root / "name_patterns.log", cwd=str(repo_root)
+                )
+                if rc != 0:
+                    step_failed = "patterns_name"
+                    failure_notes = f"step=patterns_name returncode={rc}\n{tail}"
+            except Exception as exc:
+                step_failed = "patterns_name"
+                failure_notes = f"step=patterns_name error={exc}"
+            t_patterns_name = int(time.monotonic() - t_step2b_start)
+            log(f"[orchestrator]   step 2b name-patterns elapsed={t_patterns_name}s")
+
         # Step 3 — Bundle stage
         if step_failed is None and run_type == "bundle":
             log(f"[orchestrator]   step 3/3 bundle...")
@@ -970,6 +1125,45 @@ def _run_one_segment(
             if rc != 0:
                 step_failed = "bundle"
                 failure_notes = f"step=bundle returncode={rc}\n{tail}"
+
+        # Step 3b — Name-projection bundle stage (opt-in, comparison_target in {name, both})
+        # --purge-view is left unset: run_bundle_analysis.py's target-aware default resolves
+        # it to "all" for --comparison-target name (the only view name-target supports).
+        if step_failed is None and run_type == "bundle" and comparison_target in ("name", "both"):
+            log(f"[orchestrator]   step 3b name-bundle...")
+            # Clear any name-leg output from a previous run of this segment before
+            # regenerating. run_bundle_analysis.py only writes per-domain folders for
+            # domains present in *this* run's pattern set -- it never deletes a stale
+            # <domain>/ folder left over from a prior run whose population included a
+            # domain this one doesn't. Left in place, emit_name_target_provenance()'s
+            # rglob("bundles.csv") (inside the run_bundle_analysis.py subprocess below)
+            # would pick up those stale files and report them in a fresh
+            # bundle_provenance.csv even for a segment that now has zero active domains --
+            # merge_bi_outputs()'s *_combined.csv cleanup doesn't cover this, since
+            # provenance is built independently (PR #390 review, third round). Matches the
+            # same explicit stale-file cleanup tools/extractor.py's emit_records() already
+            # does for identity_items_by_domain/*.csv before a fresh regenerate.
+            name_bundle_analysis_dir = out_root / "results" / "bundle_analysis" / "name"
+            if name_bundle_analysis_dir.is_dir():
+                shutil.rmtree(name_bundle_analysis_dir)
+            name_bundle_cmd = [
+                sys.executable,
+                str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
+                "--analysis-dir", str(out_root / "results" / "analysis"),
+                "--out-dir", str(out_root / "results" / "bundle_analysis"),
+                "--comparison-target", "name",
+                "--name-key-patterns-dir", str(out_root / "results" / "name_key" / "patterns" / "name"),
+                "--metadata-file", str(records_dir / "file_metadata.csv"),
+                "--no-discover-populations",
+            ]
+            name_bundle_cmd += ["--workers", str(bundle_workers)]
+            t_step3b_start = time.monotonic()
+            rc, tail, _content = run_step_log(name_bundle_cmd, out_root / "bundle_name.log", cwd=str(repo_root))
+            t_bundle_name = int(time.monotonic() - t_step3b_start)
+            log(f"[orchestrator]   step 3b name-bundle elapsed={t_bundle_name}s")
+            if rc != 0:
+                step_failed = "bundle_name"
+                failure_notes = f"step=bundle_name returncode={rc}\n{tail}"
 
         # Post-bundle validation (warn only, runs before registry write so warnings land in notes)
         if step_failed is None and run_type == "bundle":
@@ -999,6 +1193,26 @@ def _run_one_segment(
             t_merge = int(time.monotonic() - t_merge_start)
             log(f"[orchestrator]   bi_merge elapsed={t_merge}s")
 
+        # Name-projection BI merge (opt-in; mirrors the config-leg merge above but reads
+        # bundle_analysis/name/all/ and the name-target domain set)
+        if step_failed is None and run_type == "bundle" and comparison_target in ("name", "both") and not skip_bi_merge:
+            t_merge_name_start = time.monotonic()
+            try:
+                active_domains_name = _active_domains_from_name_patterns(
+                    out_root / "results" / "name_key" / "patterns" / "name"
+                )
+                bundle_analysis_name_dir = out_root / "results" / "bundle_analysis" / "name" / "all"
+                merge_result_name = merge_bi_outputs(bundle_analysis_name_dir, active_domains=active_domains_name)
+                total_files_name = sum(v["files_merged"] for v in merge_result_name.values())
+                total_rows_name = sum(v["rows_written"] for v in merge_result_name.values())
+                log(
+                    f"[orchestrator] bi_merge_name segment={sid} files_merged={total_files_name} rows_written={total_rows_name}"
+                )
+            except Exception as merge_exc:
+                log(f"[WARN orchestrator] bi_merge_name failed for segment={sid}: {merge_exc}")
+            t_merge_name = int(time.monotonic() - t_merge_name_start)
+            log(f"[orchestrator]   bi_merge_name elapsed={t_merge_name}s")
+
         elapsed = int(time.monotonic() - t_start)
 
         timing_parts = [
@@ -1010,6 +1224,12 @@ def _run_one_segment(
             timing_parts.append(f"bundle={t_bundle}s")
         if t_merge is not None:
             timing_parts.append(f"bi_merge={t_merge}s")
+        if t_patterns_name is not None:
+            timing_parts.append(f"patterns_name={t_patterns_name}s")
+        if t_bundle_name is not None:
+            timing_parts.append(f"bundle_name={t_bundle_name}s")
+        if t_merge_name is not None:
+            timing_parts.append(f"bi_merge_name={t_merge_name}s")
         timing_parts.append(f"total={elapsed}s")
         log(f"[orchestrator]   timing {' '.join(timing_parts)}")
 
@@ -1138,8 +1358,16 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             if args.segment and sid not in set(args.segment):
                 continue
 
-            # skip check
-            skip = (status == "complete" and not args.force)
+            # skip check -- a segment already marked complete under a prior config-only
+            # run still needs (re)processing if this run additionally requests the name
+            # leg and that leg hasn't produced output for this segment yet (PR #390 review).
+            # run_type == "bundle" is required too -- see the matching comment in the
+            # live-run skip-check loop below for why "reference" rows must be excluded.
+            needs_name_leg = args.comparison_target in ("name", "both") and run_type == "bundle"
+            already_satisfied = status == "complete" and (
+                not needs_name_leg or _segment_has_name_leg_output(out_root)
+            )
+            skip = already_satisfied and not args.force
 
             try:
                 level = int(mrow.get("segment_level", 0))
@@ -1174,6 +1402,17 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             ]
             print(f"  step 1: prepare (dirs + segment records filter)")
             print(f"  step 2: {' '.join(extract_cmd[1:])}")
+            if args.comparison_target in ("name", "both"):
+                segment_name_key_csv = out_root / "results" / "name_key" / "name_key_results.csv"
+                name_patterns_cmd = [
+                    sys.executable,
+                    str(repo_root / "tools" / "generate_name_key_patterns.py"),
+                    "--comparison-target", "name",
+                    "--name-key-csv", str(segment_name_key_csv),
+                    "--out-root", str(out_root / "results" / "name_key" / "patterns"),
+                ]
+                print(f"  step 2b: filter {args.name_key_results_csv} -> {segment_name_key_csv}")
+                print(f"  step 2b: {' '.join(name_patterns_cmd[1:])}")
             if run_type == "bundle":
                 bundle_cmd = [
                     sys.executable,
@@ -1187,6 +1426,20 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 ]
                 bundle_cmd += ["--workers", str(args.bundle_workers)]
                 print(f"  step 3: {' '.join(bundle_cmd[1:])}")
+                if args.comparison_target in ("name", "both"):
+                    name_bundle_cmd = [
+                        sys.executable,
+                        str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
+                        "--analysis-dir", str(out_root / "results" / "analysis"),
+                        "--out-dir", str(out_root / "results" / "bundle_analysis"),
+                        "--comparison-target", "name",
+                        "--name-key-patterns-dir", str(out_root / "results" / "name_key" / "patterns" / "name"),
+                        "--metadata-file", str(records_dir / "file_metadata.csv"),
+                        "--no-discover-populations",
+                    ]
+                    name_bundle_cmd += ["--workers", str(args.bundle_workers)]
+                    print(f"  step 3b: rmtree {out_root / 'results' / 'bundle_analysis' / 'name'} (if exists)")
+                    print(f"  step 3b: {' '.join(name_bundle_cmd[1:])}")
             print()
         return 0
 
@@ -1247,11 +1500,29 @@ def run_orchestrator(args: argparse.Namespace) -> int:
     for reg_row, mrow in plan:
         sid = reg_row.get("segment_id", "").strip()
         status = reg_row.get("status", "").strip()
+        run_type = reg_row.get("run_type", "bundle").strip()
+        out_root = segments_root / reg_row.get("output_folder", "").strip()
 
         if args.segment and sid not in set(args.segment):
             continue
 
-        if status == "complete" and not args.force:
+        # A segment already marked complete under a prior config-only run still needs
+        # (re)processing if this run additionally requests the name leg and that leg
+        # hasn't produced output for this segment yet (PR #390 review) -- otherwise
+        # --comparison-target name/both silently produces nothing for already-complete
+        # segments unless the operator also remembers --force (which would needlessly
+        # redo the config leg for every segment, not just the ones missing the name leg).
+        # run_type == "bundle" is required too: step 3/3b (both legs) are gated on
+        # run_type == "bundle", so a "reference" row can never produce a name-leg marker
+        # regardless of comparison_target -- without this gate, reference rows would never
+        # be recognized as satisfied under name/both and would be needlessly reprocessed
+        # (prepare/patterns/name-patterns) on every run instead of honoring the existing
+        # registry-driven skip.
+        needs_name_leg = args.comparison_target in ("name", "both") and run_type == "bundle"
+        already_satisfied = status == "complete" and (
+            not needs_name_leg or _segment_has_name_leg_output(out_root)
+        )
+        if already_satisfied and not args.force:
             print(f"[orchestrator] skip segment={sid} (status=complete; use --force to re-run)")
             n_skipped += 1
             skipped_ids.append(f"{sid} — status=complete")
@@ -1299,6 +1570,10 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 registry_lock, counters, counters_lock,
                 worker_id=(i % args.workers) + 1,
                 bundle_workers=args.bundle_workers,
+                comparison_target=args.comparison_target,
+                name_key_results_csv=(
+                    Path(args.name_key_results_csv).resolve() if args.name_key_results_csv else None
+                ),
             ): reg_row.get("segment_id", "")
             for i, (idx, (reg_row, mrow)) in enumerate(enumerate(plan_to_run, 1))
         }
@@ -1456,7 +1731,23 @@ def main() -> None:
         "--force-preshard", action="store_true",
         help="Force preshard even if corpus marker exists",
     )
+    ap.add_argument(
+        "--comparison-target", choices=sorted(VALID_COMPARISON_TARGETS), default="config",
+        help="config (default, unchanged behavior/output): join_hash only, exactly as "
+             "before this flag existed. name/both additionally re-cluster this segment's "
+             "slice of --name-key-results-csv (PR1's join_key_name_identity) and bundle-mine "
+             "it into results/bundle_analysis/name/all/, alongside the existing "
+             "results/bundle_analysis/{all,used}/ config-target output.",
+    )
+    ap.add_argument(
+        "--name-key-results-csv", default=None,
+        help="Path to a corpus-wide name_key_results.csv (tools/apply_name_key_policy.py "
+             "output, run once for the whole corpus beforehand). Required when "
+             "--comparison-target is name or both.",
+    )
     args = ap.parse_args()
+    if args.comparison_target in ("name", "both") and not args.name_key_results_csv:
+        ap.error("--name-key-results-csv is required when --comparison-target is name or both")
     if str(args.workers).strip().lower() == "auto":
         args.workers, args.bundle_workers = compute_worker_split()
         args.workers_auto = True
