@@ -186,6 +186,23 @@ if ($Run -eq "C") {
             Write-Host "ERROR: -NameKey requires $NAME_KEY_CSV to exist -- run '.\corpus_update_runbook.ps1 -Run A -NameKey' first." -ForegroundColor Red
             exit 1
         }
+        # Freshness guard: a stale name_key_results.csv (e.g. Run A ran again for new/
+        # changed exports but -Run A -NameKey was forgotten) would silently omit those
+        # files from the name projection while the script still reports success. Compare
+        # against records.csv, the join_hash leg's own always-rewritten Run A output, as a
+        # proxy for "when was Run A last actually run" (see PR #390 review).
+        $recordsCsv = "$RECORDS\records.csv"
+        if (Test-Path $recordsCsv) {
+            $nameKeyAge = (Get-Item $NAME_KEY_CSV).LastWriteTimeUtc
+            $recordsAge = (Get-Item $recordsCsv).LastWriteTimeUtc
+            if ($nameKeyAge -lt $recordsAge) {
+                Write-Host "ERROR: $NAME_KEY_CSV ($nameKeyAge UTC) is older than $recordsCsv ($recordsAge UTC)." -ForegroundColor Red
+                Write-Host "  This usually means Run A ran again for new/changed exports without -NameKey, so" -ForegroundColor Red
+                Write-Host "  name_key_results.csv is stale and would silently miss those files. Re-run:" -ForegroundColor Red
+                Write-Host "    .\corpus_update_runbook.ps1 -Run A -NameKey" -ForegroundColor Red
+                exit 1
+            }
+        }
         Write-Host "--- C2-NameKey: also producing results/bundle_analysis/name/all/ per segment ---" -ForegroundColor Cyan
         $nameKeyArgs = @("--comparison-target", "both", "--name-key-results-csv", $NAME_KEY_CSV)
     }

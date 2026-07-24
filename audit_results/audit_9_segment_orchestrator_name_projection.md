@@ -98,3 +98,54 @@ bundle-pipeline input; only the *comparison* needed normalizing here.
   name-key fixture produced a real bundle, and `merge_bi_outputs()` against that output
   produced all 10 `*_combined.csv` files with the expected row counts.
 - Full suite: 1044 passed, 6 skipped (9 new tests over PR3's post-merge baseline of 1035).
+
+## PR #390 review round — four fixes
+
+1. **Skip-check didn't honor the requested comparison_target.** A segment already marked
+   `status=complete` from a prior config-only run was filtered out of `plan_to_run` before
+   ever reaching `_run_one_segment()`, so `--comparison-target name` against an
+   already-complete corpus silently produced nothing unless the operator also passed
+   `--force` (which redoes the config leg for every segment too, not just the ones missing
+   the name leg). Fixed via `_segment_has_name_leg_output()` (checks for
+   `results/bundle_analysis/name/bundle_provenance.csv`, which
+   `emit_name_target_provenance()` always writes on a successful name-leg run, even an
+   empty one) — a segment is only treated as skippable when the *requested* target(s) are
+   both already satisfied, in both the live-run and `--dry-run` skip-check blocks (which
+   must stay in sync with each other, same as the rest of this PR).
+2. **Stale per-domain output could leak into the merge for an empty segment.**
+   `_active_domains_from_name_patterns()` returned `None` both when `domain_patterns.csv`
+   was missing (genuinely no info) and when it was present but had zero domain rows (a
+   legitimate outcome — see "What this PR does not attempt" above). `merge_bi_outputs()`
+   treats `None` as "unfiltered," so the empty-but-legitimate case would resurrect stale
+   per-domain folders left over from a prior, larger population for that segment. Fixed:
+   the function now returns `frozenset()` (not `None`) when the file is present but empty,
+   reserving `None` for "file missing." `merge_bi_outputs(active_domains=frozenset())`
+   correctly matches nothing, so no combined-file entry is produced for that filename.
+3. **`-Run C -NameKey` accepted a stale `name_key_results.csv`.** `Test-Path` only checks
+   existence, not freshness — if `-Run A -NameKey` was forgotten after a `-Run A` that
+   added new exports, Run C would silently produce name-projection output missing those
+   files while still reporting success. Fixed with an mtime freshness guard comparing
+   `$NAME_KEY_CSV` against `$RECORDS\records.csv` (the join_hash leg's own always-rewritten
+   Run A output, used as a proxy for "when was Run A last actually run") — hard-fails with
+   a clear re-run instruction if `name_key_results.csv` is older.
+4. **`normalize_export_run_id()` silently dropped details-only exports.** For a
+   details-only export (no matching `*.index.json`), `tools/extractor.py`'s
+   `_iter_export_files()` keeps the `*.details.json` name itself as the canonical
+   `export_run_id` — there's no index file to rewrite to. `_filter_name_key_csv_to_segment()`
+   was blindly normalizing every `*.details.json` row regardless, so its normalized id
+   never matched that segment's real membership, silently dropping every row for that
+   export. Fixed: the filter now tries the normalized id against `allowed_ids` first, and
+   falls back to the raw (un-normalized) `export_file` value if that doesn't match — safe
+   specifically because `allowed_ids` is the segment's own real membership list, not a
+   heuristic guess. The same underlying ambiguity exists in PR3's
+   `stage_name_projection_analysis_dir()` (merged, `--roles` filtering path) but that
+   function has no `allowed_ids`-equivalent to fall back against at that layer — flagged
+   as a known follow-up, not fixed here, to avoid a larger, differently-shaped change to
+   already-merged code outside this PR's diff surface.
+
+All four covered by new/updated tests in `tests/test_run_segment_orchestrator_name_projection.py`
+(`TestCompleteSegmentSkipHonorsNameTarget`, `TestActiveDomainsFromNamePatterns::test_returns_empty_frozenset_when_present_but_empty`,
+`TestMergeBiOutputsExcludesStaleDomainsForEmptySegment`, `TestFilterNameKeyCsvToSegment::test_preserves_details_only_export_with_no_index_sibling`).
+Fix 3 (PowerShell) has no automated test (no `pwsh` available in this environment) —
+verified by careful manual read-through instead. Full suite after all four fixes: 1053
+passed, 6 skipped.

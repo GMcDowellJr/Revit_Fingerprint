@@ -618,24 +618,38 @@ def _filter_name_key_csv_to_segment(
     basename PR1 saw on disk, not necessarily the canonical export_run_id a segment's
     export_run_ids.txt uses (tools/bundle_analysis/name_projection_adapter.py's
     normalize_export_run_id() documents why those differ for a split-export pair).
-    Membership is tested against the normalized id so a segment's export_run_ids.txt
+    Membership is tested against the normalized id first so a segment's export_run_ids.txt
     actually matches split-export rows; each row's own export_file value is left
     unmodified in the output -- stage_name_projection_analysis_dir() normalizes it again
     downstream when building bundle-pipeline input, so re-normalizing here would be
     redundant, not incorrect, but keeping the raw value is what the filter's one job
     (membership, not transformation) calls for.
 
+    If the normalized id isn't in allowed_ids, the raw (un-normalized) export_file is also
+    tried before excluding the row. normalize_export_run_id() can't distinguish a genuine
+    split-export pair from a details-only export with no sibling *.index.json file --
+    tools/extractor.py's _iter_export_files() keeps the *.details.json name itself as the
+    canonical export_run_id in that case (there is no *.index.json to rewrite to), so
+    blindly normalizing every *.details.json row would silently drop every row for that
+    export from the segment (PR #390 review). allowed_ids is this segment's own real
+    membership list, not a heuristic guess, so trying the raw id against it is safe.
+
     Returns the number of rows written.
     """
     if not name_key_results_csv.is_file():
         raise FileNotFoundError(f"--name-key-results-csv not found: {name_key_results_csv}")
+
+    def _in_segment(raw_export_file: str) -> bool:
+        if not raw_export_file:
+            return False
+        if normalize_export_run_id(raw_export_file) in allowed_ids:
+            return True
+        return raw_export_file in allowed_ids
+
     with name_key_results_csv.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         fieldnames = list(reader.fieldnames or [])
-        rows = [
-            r for r in reader
-            if normalize_export_run_id((r.get("export_file", "") or "").strip()) in allowed_ids
-        ]
+        rows = [r for r in reader if _in_segment((r.get("export_file", "") or "").strip())]
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     with out_csv.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -728,16 +742,38 @@ def _active_domains_from_presence_csv(analysis_dir: Path) -> Optional[frozenset]
 def _active_domains_from_name_patterns(name_patterns_dir: Path) -> Optional[frozenset]:
     """Same purpose as _active_domains_from_presence_csv(), but for the name-projection
     pattern shape (tools/generate_name_key_patterns.py's domain_patterns.csv has no
-    pattern_presence_file.csv equivalent -- see audit_results/audit_8 for the schema diff)."""
+    pattern_presence_file.csv equivalent -- see audit_results/audit_8 for the schema diff).
+
+    Unlike _active_domains_from_presence_csv(), an empty-but-present domain_patterns.csv
+    is a legitimate, expected outcome for the name projection (a segment whose files don't
+    intersect any of the 25 eligible domains -- see audit_results/audit_9's "what this PR
+    does not attempt"), not a signal to fall back to "unfiltered." This function therefore
+    returns `frozenset()` (not `None`) when the file exists but has zero domain rows, so
+    merge_bi_outputs() excludes every domain subfolder instead of treating None-as-unfiltered
+    and resurrecting stale per-domain output left over from a previous run of this segment
+    under a different (larger) population. `None` is reserved for "the file is missing" --
+    a genuinely different condition (the name-patterns step never ran or failed).
+    """
     patterns_csv = name_patterns_dir / "domain_patterns.csv"
     if not patterns_csv.is_file():
         return None
     with patterns_csv.open("r", encoding="utf-8-sig", newline="") as fh:
         reader = csv.DictReader(fh)
-        domains = frozenset(
+        return frozenset(
             r.get("domain", "").strip() for r in reader if r.get("domain", "").strip()
         )
-    return domains if domains else None
+
+
+def _segment_has_name_leg_output(out_root: Path) -> bool:
+    """Whether this segment's name-projection leg (step 2b/3b/BI-merge-name) has already
+    completed at least once. emit_name_target_provenance() (tools/bundle_analysis's
+    --comparison-target name path) always writes bundle_provenance.csv on a successful run,
+    even when the segment's name-target pattern set comes back empty -- so its presence is
+    a reliable "name leg already ran" marker, independent of run_registry.csv's single
+    whole-segment `status` column, which has no notion of per-leg completion. Used so a
+    segment already marked complete under a config-only run isn't skipped once the operator
+    later asks for --comparison-target name/both -- see PR #390 review."""
+    return (out_root / "results" / "bundle_analysis" / "name" / "bundle_provenance.csv").is_file()
 
 
 def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozenset] = None) -> dict:
@@ -1294,8 +1330,14 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             if args.segment and sid not in set(args.segment):
                 continue
 
-            # skip check
-            skip = (status == "complete" and not args.force)
+            # skip check -- a segment already marked complete under a prior config-only
+            # run still needs (re)processing if this run additionally requests the name
+            # leg and that leg hasn't produced output for this segment yet (PR #390 review).
+            needs_name_leg = args.comparison_target in ("name", "both")
+            already_satisfied = status == "complete" and (
+                not needs_name_leg or _segment_has_name_leg_output(out_root)
+            )
+            skip = already_satisfied and not args.force
 
             try:
                 level = int(mrow.get("segment_level", 0))
@@ -1427,11 +1469,22 @@ def run_orchestrator(args: argparse.Namespace) -> int:
     for reg_row, mrow in plan:
         sid = reg_row.get("segment_id", "").strip()
         status = reg_row.get("status", "").strip()
+        out_root = segments_root / reg_row.get("output_folder", "").strip()
 
         if args.segment and sid not in set(args.segment):
             continue
 
-        if status == "complete" and not args.force:
+        # A segment already marked complete under a prior config-only run still needs
+        # (re)processing if this run additionally requests the name leg and that leg
+        # hasn't produced output for this segment yet (PR #390 review) -- otherwise
+        # --comparison-target name/both silently produces nothing for already-complete
+        # segments unless the operator also remembers --force (which would needlessly
+        # redo the config leg for every segment, not just the ones missing the name leg).
+        needs_name_leg = args.comparison_target in ("name", "both")
+        already_satisfied = status == "complete" and (
+            not needs_name_leg or _segment_has_name_leg_output(out_root)
+        )
+        if already_satisfied and not args.force:
             print(f"[orchestrator] skip segment={sid} (status=complete; use --force to re-run)")
             n_skipped += 1
             skipped_ids.append(f"{sid} — status=complete")
