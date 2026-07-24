@@ -28,6 +28,11 @@ if __package__ in (None, ""):
     from step_compare import run_compare_for_domain
     from placeholder_exclusions import compute_placeholder_exclusions
     from jenks_utils import jenks_breaks
+    from name_projection_adapter import (
+        DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID,
+        emit_name_target_provenance,
+        stage_name_projection_analysis_dir,
+    )
 else:
     from .common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id
     from .step0_discover_populations import discover_populations
@@ -43,6 +48,11 @@ else:
     from .step_compare import run_compare_for_domain
     from .placeholder_exclusions import compute_placeholder_exclusions
     from ..jenks_utils import jenks_breaks
+    from .name_projection_adapter import (
+        DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID,
+        emit_name_target_provenance,
+        stage_name_projection_analysis_dir,
+    )
 
 TIMING_FIELDNAMES = ["schema_version", "analysis_run_id", "domain", "population_id", "step", "seconds"]
 TIMING_STEPS = ("step1", "step2", "step2b", "step3", "step4", "step5", "step6", "step7")
@@ -50,6 +60,8 @@ ROLE_GROUP_ALIASES = {
     "template-group": ["Generic", "Generic-Host", "Template"],
 }
 VALID_ROLES = {"Project", "Template", "Generic", "Generic-Host", "Container"}
+VALID_COMPARISON_TARGETS = {"config", "name", "both"}
+DEFAULT_NAME_KEY_PATTERNS_DIR = Path("Results_v21/name_key/patterns/name")
 
 
 def _view_out_dir(out_dir: Path, purge_view: str) -> Path:
@@ -885,10 +897,174 @@ def run_bundle_analysis(
     }
 
 
+def _validate_name_target_constraints(
+    comparison_target: str,
+    purge_view: str,
+    compute_share_profile: bool,
+    compare: bool,
+) -> None:
+    """Fail loudly (never guess, never silently fall back) when a caller asks the
+    name-projection target for a feature that has no defined name-projection equivalent
+    yet. See audit_results/audit_8_bundle_pipeline_name_projection.md items 7, 9, 10."""
+    if comparison_target not in ("name", "both"):
+        return
+    if purge_view != "all":
+        raise SystemExit(
+            f"--comparison-target {comparison_target} only supports --purge-view all. "
+            "USED-view purgeability filtering has no defined name-projection equivalent "
+            "(latent_purgeable.csv is sig_hash-keyed; name-projection patterns key off "
+            "join_key_name_identity's join_hash instead) -- pass --purge-view all "
+            "explicitly, or run comparison_target=config separately for USED-view output. "
+            "See audit_results/audit_8_bundle_pipeline_name_projection.md item 7."
+        )
+    if compute_share_profile:
+        raise SystemExit(
+            f"--comparison-target {comparison_target} does not support "
+            "--compute-share-profile. pattern_share_pct/is_dominant_pattern have no "
+            "name-projection equivalent (PR2's pattern_membership.csv carries neither "
+            "field). See audit_results/audit_8_bundle_pipeline_name_projection.md item 9."
+        )
+    if compare:
+        raise SystemExit(
+            f"--comparison-target {comparison_target} does not support --compare. No "
+            "name-projection reference-bundle baseline is defined yet, and resolving that "
+            "gap is explicitly out of scope for this PR. See "
+            "audit_results/audit_8_bundle_pipeline_name_projection.md item 10."
+        )
+
+
+def run_bundle_analysis_for_target(
+    analysis_dir: Path,
+    out_dir: Path,
+    comparison_target: str = "config",
+    name_key_patterns_dir: Optional[Path] = None,
+    domain: str = "",
+    min_support_count: int = 3,
+    min_support_pct: float = 0.0,
+    analysis_run_id: str = "",
+    discover_populations_flag: bool = True,
+    min_population_size: int = 0,
+    max_population_overlap: float = 0.20,
+    min_population_jaccard: float = 0.30,
+    discovery_support_pct: float = 0.10,
+    compare: bool = False,
+    compute_share_profile: bool = False,
+    roles: Optional[List[str]] = None,
+    metadata_file: Optional[Path] = None,
+    purge_view: str = "both",
+    latent_purgeable_file: Optional[Path] = None,
+    workers: int = 4,
+) -> Dict[str, Dict[str, int]]:
+    """Run bundle analysis for one or both join-basis projections
+    (`--comparison-target {config,name,both}`, PR3), namespacing name-target output under
+    its own subdirectory so it can never collide with or overwrite config-target output.
+
+    The `config` leg (default, and the only leg run when `comparison_target="config"`) is a
+    direct, argument-for-argument passthrough to `run_bundle_analysis()` writing to `out_dir`
+    exactly as before this function existed -- byte-identical by construction, not by
+    convention, since it is literally the same function call.
+
+    The `name` leg stages `Results_v21/name_key/patterns/name/` (PR2's output) into the
+    exact `analysis_dir` shape `run_bundle_analysis()` already expects (see
+    `name_projection_adapter.py`), forces `--purge-view all` /
+    `--compute-share-profile=False` / `--compare=False` (validated up front -- see
+    `_validate_name_target_constraints`), and writes a `bundle_provenance.csv` +
+    `domain_coverage.csv` + `README.md` declaring `comparison_target`, `coverage_class`, and
+    the analysis-side-reconstruction provenance note for every bundle produced.
+    """
+    if comparison_target not in VALID_COMPARISON_TARGETS:
+        raise ValueError(f"--comparison-target must be one of {sorted(VALID_COMPARISON_TARGETS)}, got {comparison_target!r}")
+    _validate_name_target_constraints(comparison_target, purge_view, compute_share_profile, compare)
+
+    targets = ["config"] if comparison_target == "config" else (["name"] if comparison_target == "name" else ["config", "name"])
+    results: Dict[str, Dict[str, int]] = {}
+
+    if "config" in targets:
+        config_out_dir = out_dir if comparison_target == "config" else out_dir / "config"
+        print(f"[run_multi_target] comparison_target=config out_dir={config_out_dir}")
+        results["config"] = run_bundle_analysis(
+            analysis_dir=analysis_dir,
+            out_dir=config_out_dir,
+            domain=domain,
+            min_support_count=min_support_count,
+            min_support_pct=min_support_pct,
+            analysis_run_id=analysis_run_id,
+            discover_populations_flag=discover_populations_flag,
+            min_population_size=min_population_size,
+            max_population_overlap=max_population_overlap,
+            min_population_jaccard=min_population_jaccard,
+            discovery_support_pct=discovery_support_pct,
+            compare=compare,
+            compute_share_profile=compute_share_profile,
+            roles=roles,
+            metadata_file=metadata_file,
+            purge_view=purge_view,
+            latent_purgeable_file=latent_purgeable_file,
+            workers=workers,
+        )
+
+    if "name" in targets:
+        resolved_name_patterns_dir = name_key_patterns_dir or DEFAULT_NAME_KEY_PATTERNS_DIR
+        name_run_id = analysis_run_id or DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID
+        name_out_dir = out_dir / "name"
+        staging_dir = name_out_dir / "_staging_analysis_input"
+
+        stage_stats = stage_name_projection_analysis_dir(
+            name_patterns_dir=resolved_name_patterns_dir,
+            staging_dir=staging_dir,
+            analysis_run_id=name_run_id,
+        )
+        print(f"[run_multi_target] comparison_target=name staged={stage_stats} out_dir={name_out_dir}")
+
+        results["name"] = run_bundle_analysis(
+            analysis_dir=staging_dir,
+            out_dir=name_out_dir,
+            domain=domain,
+            min_support_count=min_support_count,
+            min_support_pct=min_support_pct,
+            analysis_run_id=name_run_id,
+            discover_populations_flag=discover_populations_flag,
+            min_population_size=min_population_size,
+            max_population_overlap=max_population_overlap,
+            min_population_jaccard=min_population_jaccard,
+            discovery_support_pct=discovery_support_pct,
+            compare=False,
+            compute_share_profile=False,
+            roles=roles,
+            metadata_file=metadata_file,
+            purge_view="all",
+            latent_purgeable_file=None,
+            workers=workers,
+        )
+
+        provenance_stats = emit_name_target_provenance(
+            view_out_dir=name_out_dir,
+            name_patterns_dir=resolved_name_patterns_dir,
+            analysis_run_id=name_run_id,
+        )
+        print(f"[run_multi_target] comparison_target=name provenance={provenance_stats}")
+
+    return results
+
+
 def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Run bundle analysis pipeline")
     p.add_argument("--analysis-dir", required=True, type=Path)
     p.add_argument("--out-dir", required=True, type=Path)
+    p.add_argument(
+        "--comparison-target", choices=sorted(VALID_COMPARISON_TARGETS), default="config",
+        help="Which join-basis projection to run bundle analysis against: the existing "
+             "configuration join_hash (config, default -- unchanged behavior/output), "
+             "PR2's Canonical Name Identity Projection output (name, ALL view only), or "
+             "both, namespaced separately under --out-dir/config and --out-dir/name.",
+    )
+    p.add_argument(
+        "--name-key-patterns-dir", type=Path, default=None,
+        help="Directory containing PR2's name-target domain_patterns.csv/"
+             "pattern_membership.csv/domain_coverage.csv (default: "
+             "Results_v21/name_key/patterns/name). Only used when --comparison-target is "
+             "name or both.",
+    )
     p.add_argument("--domain", default="")
     p.add_argument("--analysis-run-id", default="")
     p.add_argument("--min-support-count", type=int, default=3)
@@ -912,9 +1088,11 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = _parse_args(argv)
-    run_bundle_analysis(
+    run_bundle_analysis_for_target(
         analysis_dir=args.analysis_dir,
         out_dir=args.out_dir,
+        comparison_target=args.comparison_target,
+        name_key_patterns_dir=args.name_key_patterns_dir,
         domain=args.domain,
         min_support_count=args.min_support_count,
         min_support_pct=args.min_support_pct,
