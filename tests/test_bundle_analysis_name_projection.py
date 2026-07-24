@@ -128,6 +128,7 @@ class TestConfigPassthroughUnchanged:
 
         assert captured["analysis_dir"] == analysis_dir
         assert captured["out_dir"] == out_dir  # unchanged -- no nesting for config-only runs
+        assert captured["purge_view"] == "both"  # unset default unchanged for config target
         assert "config" in results
 
     def test_both_target_nests_config_output_under_config_subdir(self, tmp_path, monkeypatch):
@@ -159,6 +160,75 @@ class TestConfigPassthroughUnchanged:
         assert out_dir / "config" in by_out_dir
         assert out_dir / "name" in by_out_dir
         assert out_dir not in by_out_dir  # never written directly -- always namespaced
+
+
+class TestPurgeViewDefaultIsTargetAware:
+    """PR #389 review: the flat "both" default (inherited from config target) made
+    --comparison-target name/both fail out of the box even when the caller never asked
+    for anything but ALL view. Only an *explicit* used/both request should still error."""
+
+    def _capture(self, monkeypatch):
+        import tools.bundle_analysis.run_bundle_analysis as rba_module
+
+        captured_calls = []
+
+        def _fake_run_bundle_analysis(**kwargs):
+            captured_calls.append(kwargs)
+            return {"domains_processed": 0}
+
+        monkeypatch.setattr(rba_module, "run_bundle_analysis", _fake_run_bundle_analysis)
+        monkeypatch.setattr(
+            rba_module, "stage_name_projection_analysis_dir",
+            lambda **kwargs: {"patterns": 0, "presence_rows": 0, "domains": 0, "coverage_rows": 0},
+        )
+        monkeypatch.setattr(
+            rba_module, "emit_name_target_provenance",
+            lambda **kwargs: {"bundles_annotated": 0, "excluded_domains": 0},
+        )
+        return captured_calls
+
+    def test_name_target_without_explicit_purge_view_does_not_raise(self, tmp_path, monkeypatch):
+        captured_calls = self._capture(monkeypatch)
+        # No purge_view kwarg at all -- reproduces the bare CLI invocation the review
+        # comment flagged (--comparison-target name with no --purge-view).
+        run_bundle_analysis_for_target(
+            analysis_dir=tmp_path / "analysis", out_dir=tmp_path / "out",
+            comparison_target="name",
+        )
+        assert captured_calls[0]["purge_view"] == "all"
+
+    def test_both_target_without_explicit_purge_view_does_not_raise(self, tmp_path, monkeypatch):
+        captured_calls = self._capture(monkeypatch)
+        run_bundle_analysis_for_target(
+            analysis_dir=tmp_path / "analysis", out_dir=tmp_path / "out",
+            comparison_target="both",
+        )
+        purge_views = {c["purge_view"] for c in captured_calls}
+        assert purge_views == {"all"}
+
+    def test_name_target_with_explicit_used_still_raises(self, tmp_path, monkeypatch):
+        self._capture(monkeypatch)
+        with pytest.raises(SystemExit, match="purge-view all"):
+            run_bundle_analysis_for_target(
+                analysis_dir=tmp_path / "analysis", out_dir=tmp_path / "out",
+                comparison_target="name", purge_view="used",
+            )
+
+    def test_config_target_without_explicit_purge_view_still_defaults_to_both(self, tmp_path, monkeypatch):
+        captured_calls = self._capture(monkeypatch)
+        run_bundle_analysis_for_target(
+            analysis_dir=tmp_path / "analysis", out_dir=tmp_path / "out",
+            comparison_target="config",
+        )
+        assert captured_calls[0]["purge_view"] == "both"
+
+    def test_cli_purge_view_default_is_none(self):
+        import tools.bundle_analysis.run_bundle_analysis as rba_module
+
+        args = rba_module._parse_args([
+            "--analysis-dir", "x", "--out-dir", "y", "--comparison-target", "name",
+        ])
+        assert args.purge_view is None
 
 
 class TestSplitExportFileIdNormalization:

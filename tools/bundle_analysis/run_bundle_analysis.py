@@ -951,7 +951,7 @@ def run_bundle_analysis_for_target(
     compute_share_profile: bool = False,
     roles: Optional[List[str]] = None,
     metadata_file: Optional[Path] = None,
-    purge_view: str = "both",
+    purge_view: Optional[str] = None,
     latent_purgeable_file: Optional[Path] = None,
     workers: int = 4,
 ) -> Dict[str, Dict[str, int]]:
@@ -964,6 +964,15 @@ def run_bundle_analysis_for_target(
     exactly as before this function existed -- byte-identical by construction, not by
     convention, since it is literally the same function call.
 
+    `purge_view=None` (the default -- distinct from an explicit choice, so this can be
+    target-aware) resolves to `"both"` for `comparison_target="config"` (unchanged from
+    `run_bundle_analysis()`'s own default) and to `"all"` for `comparison_target` in
+    `{"name", "both"}`, since ALL is the only view name-target supports (PR #389 review: the
+    old flat `"both"` default made `--comparison-target name` fail out of the box even
+    though the caller never asked for anything but ALL). An *explicit* `--purge-view
+    used`/`both` under `comparison_target` in `{"name", "both"}` still raises via
+    `_validate_name_target_constraints()` -- only the unset-default case is target-aware.
+
     The `name` leg stages `Results_v21/name_key/patterns/name/` (PR2's output) into the
     exact `analysis_dir` shape `run_bundle_analysis()` already expects (see
     `name_projection_adapter.py`), forces `--purge-view all` /
@@ -974,6 +983,8 @@ def run_bundle_analysis_for_target(
     """
     if comparison_target not in VALID_COMPARISON_TARGETS:
         raise ValueError(f"--comparison-target must be one of {sorted(VALID_COMPARISON_TARGETS)}, got {comparison_target!r}")
+    if purge_view is None:
+        purge_view = "all" if comparison_target in ("name", "both") else "both"
     _validate_name_target_constraints(comparison_target, purge_view, compute_share_profile, compare)
 
     targets = ["config"] if comparison_target == "config" else (["name"] if comparison_target == "name" else ["config", "name"])
@@ -1079,7 +1090,13 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--compute-share-profile", action="store_true")
     p.add_argument("--metadata-file", type=Path, default=None, help="Path to file_metadata.csv. Required when --roles is used.")
     p.add_argument("--roles", nargs="+", default=None, help="Governance roles: Project Template Generic Generic-Host Container, or alias template-group")
-    p.add_argument("--purge-view", choices=["all", "used", "both"], default="both")
+    p.add_argument(
+        "--purge-view", choices=["all", "used", "both"], default=None,
+        help="Default: both for --comparison-target config (unchanged); all for "
+             "name/both, since ALL is the only view name-target supports. An explicit "
+             "used/both under name/both still errors -- only the unset default is "
+             "target-aware.",
+    )
     p.add_argument("--latent-purgeable-file", type=Path, default=None, help="Path to latent_purgeable.csv")
     p.add_argument("--workers", type=int, default=4,
                    help="Max parallel domains for bundle analysis (default: 4)")
