@@ -24,7 +24,7 @@ from tools.generate_name_key_patterns import emit_name_patterns
 from tools.bundle_analysis.name_projection_adapter import (
     DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID,
     PROVENANCE_NOTE_NAME_TARGET,
-    _normalize_export_run_id,
+    normalize_export_run_id,
     emit_name_target_provenance,
     stage_name_projection_analysis_dir,
 )
@@ -240,16 +240,16 @@ class TestSplitExportFileIdNormalization:
     cross-target file alignment for any split-export corpus."""
 
     def test_details_filename_normalized_to_index_filename(self):
-        assert _normalize_export_run_id("model_a.details.json") == "model_a.index.json"
+        assert normalize_export_run_id("model_a.details.json") == "model_a.index.json"
 
     def test_details_filename_normalization_is_case_insensitive_on_suffix(self):
-        assert _normalize_export_run_id("model_a.DETAILS.JSON") == "model_a.index.json"
+        assert normalize_export_run_id("model_a.DETAILS.JSON") == "model_a.index.json"
 
     def test_index_filename_left_unchanged(self):
-        assert _normalize_export_run_id("model_a.index.json") == "model_a.index.json"
+        assert normalize_export_run_id("model_a.index.json") == "model_a.index.json"
 
     def test_plain_filename_left_unchanged(self):
-        assert _normalize_export_run_id("model_a.json") == "model_a.json"
+        assert normalize_export_run_id("model_a.json") == "model_a.json"
 
     def test_staged_presence_rows_use_index_export_run_id_for_split_export(self, tmp_path):
         rows = []

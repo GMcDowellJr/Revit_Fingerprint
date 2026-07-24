@@ -52,7 +52,7 @@ STAGED_PATTERN_PRESENCE_FIELDS = [
 
 DOMAIN_COVERAGE_FIELDS = ["domain", "coverage_class", "included", "reason"]
 
-def _normalize_export_run_id(export_file: str) -> str:
+def normalize_export_run_id(export_file: str) -> str:
     """Normalize PR2's `export_file` (`tools/apply_name_key_policy.py`, which prefers
     `*.details.json` per CLAUDE.md's input-format priority) back to the canonical
     `export_run_id` `tools/extractor.py`'s `emit_records()` actually stamps -- the file
@@ -116,7 +116,7 @@ def stage_name_projection_analysis_dir(
         distinct value" invariant satisfied deterministically.
 
     `export_file` is normalized to the canonical `export_run_id` via
-    `_normalize_export_run_id()` (not copied verbatim) -- see that function's docstring for
+    `normalize_export_run_id()` (not copied verbatim) -- see that function's docstring for
     why a naive copy silently breaks `--roles` filtering and cross-target file alignment on
     split-export corpora.
     """
@@ -158,7 +158,7 @@ def stage_name_projection_analysis_dir(
     out_presence_rows: List[Dict[str, str]] = []
     for row in membership_rows:
         domain = row.get("domain", "")
-        export_run_id = _normalize_export_run_id((row.get("export_file", "") or "").strip())
+        export_run_id = normalize_export_run_id((row.get("export_file", "") or "").strip())
         pattern_id = (row.get("pattern_id", "") or "").strip()
         if not export_run_id or not pattern_id:
             continue
