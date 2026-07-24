@@ -1361,7 +1361,9 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             # skip check -- a segment already marked complete under a prior config-only
             # run still needs (re)processing if this run additionally requests the name
             # leg and that leg hasn't produced output for this segment yet (PR #390 review).
-            needs_name_leg = args.comparison_target in ("name", "both")
+            # run_type == "bundle" is required too -- see the matching comment in the
+            # live-run skip-check loop below for why "reference" rows must be excluded.
+            needs_name_leg = args.comparison_target in ("name", "both") and run_type == "bundle"
             already_satisfied = status == "complete" and (
                 not needs_name_leg or _segment_has_name_leg_output(out_root)
             )
@@ -1498,6 +1500,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
     for reg_row, mrow in plan:
         sid = reg_row.get("segment_id", "").strip()
         status = reg_row.get("status", "").strip()
+        run_type = reg_row.get("run_type", "bundle").strip()
         out_root = segments_root / reg_row.get("output_folder", "").strip()
 
         if args.segment and sid not in set(args.segment):
@@ -1509,7 +1512,13 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         # --comparison-target name/both silently produces nothing for already-complete
         # segments unless the operator also remembers --force (which would needlessly
         # redo the config leg for every segment, not just the ones missing the name leg).
-        needs_name_leg = args.comparison_target in ("name", "both")
+        # run_type == "bundle" is required too: step 3/3b (both legs) are gated on
+        # run_type == "bundle", so a "reference" row can never produce a name-leg marker
+        # regardless of comparison_target -- without this gate, reference rows would never
+        # be recognized as satisfied under name/both and would be needlessly reprocessed
+        # (prepare/patterns/name-patterns) on every run instead of honoring the existing
+        # registry-driven skip.
+        needs_name_leg = args.comparison_target in ("name", "both") and run_type == "bundle"
         already_satisfied = status == "complete" and (
             not needs_name_leg or _segment_has_name_leg_output(out_root)
         )

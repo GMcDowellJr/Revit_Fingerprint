@@ -192,3 +192,54 @@ passed, 6 skipped.
    one proving the fix (clearing the directory first between the same two runs yields an
    empty `bundle_provenance.csv` and zero `bundles.csv` files anywhere under `all/`). Full
    suite after this fix: 1057 passed, 6 skipped.
+
+## PR #390 review round 4 — two more fixes
+
+7. **The filter fix (item 4) preserved a details-only row's inclusion, but staging still
+   corrupted its identity.** `_filter_name_key_csv_to_segment()` correctly keeps a
+   details-only export's row (raw `export_file` unchanged), but step 2b's output then
+   feeds through step 3b's `run_bundle_analysis.py --comparison-target name`, whose
+   `stage_name_projection_analysis_dir()` (PR3) calls the *original*, context-free
+   `normalize_export_run_id()` -- which still blindly rewrites `*.details.json` to
+   `*.index.json` regardless. So the row survives filtering but its final
+   `export_run_id` in the staged bundle-pipeline input (and therefore every
+   `membership_matrix.csv`/`bundle_file_membership.csv`/`file_bundle_classification.csv`
+   row derived from it) ends up as a nonexistent id that matches neither
+   `file_metadata.csv` nor the segment's own `export_run_ids.txt` -- silently corrupting
+   file-level alignment for exactly the case item 4 thought it had fixed.
+
+   Fixed at the source rather than by pre-resolving in the filter: `normalize_export_run_id()`
+   gained an optional `known_ids` parameter -- when given, it tries the normalized form
+   against `known_ids` first, then the raw form, before falling back to the normalized
+   guess (identical resolution logic to what the filter already does inline, now
+   available to any caller). `stage_name_projection_analysis_dir()` gained a matching
+   `known_export_run_ids` parameter, threaded straight through to
+   `normalize_export_run_id()`. `run_bundle_analysis_for_target()`'s `name` branch now
+   reads `--metadata-file`'s `export_run_id` column into a set (when a metadata file is
+   given) and passes it as `known_export_run_ids` automatically -- no orchestrator change
+   needed, since step 3b already passes `--metadata-file` to every name-leg invocation.
+   Without a metadata file, behavior is unchanged (blind rewrite, same as before this
+   parameter existed) -- this also retroactively closes the `--roles`-filtering gap
+   flagged-but-not-fixed in round 1 item 4's reply, for any caller that supplies
+   `--metadata-file` under `--comparison-target name`, not just the orchestrator.
+   Covered by `TestNormalizeExportRunIdWithKnownIds`, `TestStageWithKnownExportRunIds`,
+   and `TestRunBundleAnalysisForTargetResolvesDetailsOnlyIdsFromMetadataFile` (the latter
+   exercises `run_bundle_analysis_for_target()` end to end, not just the two lower-level
+   functions in isolation).
+
+8. **The skip-check fix (item 1) never let a `run_type=reference` row be recognized as
+   satisfied under `name`/`both`.** Step 3 and step 3b (both legs) are gated on
+   `run_type == "bundle"` -- a `reference` row never produces any bundle output at all,
+   by design, regardless of `comparison_target`. But item 1's `needs_name_leg` check
+   didn't account for `run_type`, so a complete `reference` row could never satisfy
+   `_segment_has_name_leg_output()` (step 3b never runs for it, so the marker file never
+   gets written) and was needlessly reprocessed (prepare/patterns/name-patterns) on every
+   `-Run C -NameKey` invocation instead of honoring the existing registry-driven skip --
+   a performance regression, not a correctness one, but a real regression from the
+   pre-name-key behavior for every reference row in a corpus. Fixed: `needs_name_leg` now
+   also requires `run_type == "bundle"`, in both the live-run and `--dry-run` skip-check
+   blocks (the live-run block wasn't computing `run_type` at all before this fix; the
+   dry-run block already had it). Covered by
+   `test_name_target_still_skips_complete_reference_row_missing_name_leg`.
+
+Full suite after both fixes: 1067 passed, 6 skipped.

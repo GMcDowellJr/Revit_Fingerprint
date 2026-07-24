@@ -314,7 +314,7 @@ class TestCompleteSegmentSkipHonorsNameTarget:
     name-projection output for it unless the operator also passed --force (which would
     needlessly redo the config leg too)."""
 
-    def _build_fixture(self, tmp_path: Path, *, with_name_leg_output: bool) -> dict:
+    def _build_fixture(self, tmp_path: Path, *, with_name_leg_output: bool, run_type: str = "bundle") -> dict:
         records_dir = tmp_path / "records"
         records_dir.mkdir(parents=True)
         (records_dir / "file_metadata.csv").write_text(
@@ -327,7 +327,7 @@ class TestCompleteSegmentSkipHonorsNameTarget:
         ])
         registry_file = tmp_path / "run_registry.csv"
         _write_csv(registry_file, ["segment_id", "run_type", "output_folder", "status", "notes", "last_run_utc"], [
-            {"segment_id": "seg1", "run_type": "bundle", "output_folder": "seg1", "status": "complete", "notes": "", "last_run_utc": "2026-01-01T00:00:00Z"},
+            {"segment_id": "seg1", "run_type": run_type, "output_folder": "seg1", "status": "complete", "notes": "", "last_run_utc": "2026-01-01T00:00:00Z"},
         ])
         membership_file = tmp_path / "segment_membership.csv"
         _write_csv(membership_file, ["segment_id", "export_run_id"], [
@@ -396,6 +396,26 @@ class TestCompleteSegmentSkipHonorsNameTarget:
             capture_output=True, text=True,
         )
         assert result.returncode == 0, result.stderr
+        assert "skipped — already complete" in result.stdout
+
+    def test_name_target_still_skips_complete_reference_row_missing_name_leg(self, tmp_path):
+        # PR #390 review, fourth round: step 3/3b (both legs) are gated on
+        # run_type == "bundle", so a "reference" row can never produce a name-leg marker
+        # regardless of comparison_target. Without also checking run_type in the skip
+        # logic, a complete reference row would never be recognized as satisfied under
+        # name/both and would be needlessly reprocessed on every run.
+        fx = self._build_fixture(tmp_path, with_name_leg_output=False, run_type="reference")
+        name_key_csv = tmp_path / "name_key_results.csv"
+        _write_csv(name_key_csv, NAME_KEY_FIELDS, [])
+        result = subprocess.run(
+            self._base_args(fx, tmp_path) + [
+                "--comparison-target", "name",
+                "--name-key-results-csv", str(name_key_csv),
+            ],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "skipped — already complete" in result.stdout
 
 
 class TestStaleNameBundleOutputClearedBeforeRerun:
