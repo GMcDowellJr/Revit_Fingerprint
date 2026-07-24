@@ -12,18 +12,21 @@
 param(
     [ValidateSet("A","B","C")]
     [string]$Run = "",
-    [switch]$ForceAll
+    [switch]$ForceAll,
+    [switch]$NameKey
 )
 
 $ErrorActionPreference = "Stop"
 
-$REPO     = "C:\Users\gmcdowell\Documents\Revit_Fingerprint"
-$EXPORTS  = "C:\Users\gmcdowell\Documents\Fingerprint_Out\exports"
-$RESULTS  = "$EXPORTS\results"
-$SEGMENTS = "$EXPORTS\segments"
-$RECORDS  = "$RESULTS\records"
-$SIG_POL  = "$REPO\policies\domain_sig_hash_policies.json"
-$JOIN_POL = "$REPO\policies\domain_join_key_policies.json"
+$REPO         = "C:\Users\gmcdowell\Documents\Revit_Fingerprint"
+$EXPORTS      = "C:\Users\gmcdowell\Documents\Fingerprint_Out\exports"
+$RESULTS      = "$EXPORTS\results"
+$SEGMENTS     = "$EXPORTS\segments"
+$RECORDS      = "$RESULTS\records"
+$SIG_POL      = "$REPO\policies\domain_sig_hash_policies.json"
+$JOIN_POL     = "$REPO\policies\domain_join_key_policies.json"
+$NAME_KEY_POL = "$REPO\policies\domain_name_key_policies.json"
+$NAME_KEY_CSV = "$RESULTS\name_key\name_key_results.csv"
 
 
 Set-Location $REPO
@@ -40,6 +43,16 @@ if ($Run -eq "") {
     Write-Host "    re-run only if its file population changed since the last complete run."
     Write-Host "    Pass -ForceAll after a sig_hash/join_hash policy change (population_hash is"
     Write-Host "    membership-only and cannot detect those) to force a full-corpus rebuild."
+    Write-Host ""
+    Write-Host "  -NameKey (Run A/B/C, opt-in, additive): also produce the Canonical Name"
+    Write-Host "    Identity Projection (join_key_name_identity) alongside the default"
+    Write-Host "    join_hash output. Does NOT change any default Run A/B/C output -- see"
+    Write-Host "    audit_results/audit_8 and audit_9 for what this does and does not cover."
+    Write-Host "      -Run A -NameKey   # parse exports once, corpus-wide -> $NAME_KEY_CSV"
+    Write-Host "      -Run B -NameKey   # OPTIONAL whole-corpus (unsegmented) name patterns;"
+    Write-Host "                        # not required before Run C, which re-clusters per segment"
+    Write-Host "      -Run C -NameKey   # also writes results/bundle_analysis/name/all/ per segment"
+    Write-Host "                        # (requires -Run A -NameKey to have been run first)"
     Write-Host ""
     Write-Host "MANDATORY PAUSE between Run A and Run B:"
     Write-Host "  Edit $RECORDS\file_metadata.csv"
@@ -64,6 +77,16 @@ if ($Run -eq "A") {
         --stages sig_hash,flatten,apply,placeholders `
         --sig-hash-policy $SIG_POL `
         --join-policy $JOIN_POL
+
+    if ($NameKey) {
+        Write-Host ""
+        Write-Host "--- A-NameKey: parse exports for name-identity projection (join_key_name_identity) ---" -ForegroundColor Cyan
+        python tools\apply_name_key_policy.py `
+            --export-dir $EXPORTS `
+            --name-key-policy $NAME_KEY_POL `
+            --out $NAME_KEY_CSV
+        Write-Host "  wrote $NAME_KEY_CSV" -ForegroundColor Cyan
+    }
 
     Write-Host ""
     Write-Host "=== RUN A COMPLETE ===" -ForegroundColor Yellow
@@ -91,6 +114,18 @@ if ($Run -eq "B") {
     python tools\label_synthesis\patch_all_domain_patterns.py `
         --results-root $RESULTS `
         --segments-root $SEGMENTS
+
+    if ($NameKey) {
+        Write-Host "--- B-NameKey (OPTIONAL; not required before Run C -- Run C re-clusters per segment) ---" -ForegroundColor Cyan
+        if (-not (Test-Path $NAME_KEY_CSV)) {
+            Write-Host "  SKIPPED: $NAME_KEY_CSV not found -- run '.\corpus_update_runbook.ps1 -Run A -NameKey' first." -ForegroundColor Yellow
+        } else {
+            python tools\generate_name_key_patterns.py `
+                --comparison-target name `
+                --name-key-csv $NAME_KEY_CSV `
+                --out-root "$RESULTS\name_key\patterns"
+        }
+    }
 
     Write-Host "=== RUN B COMPLETE - proceed to Run C ===" -ForegroundColor Green
 }
@@ -130,6 +165,21 @@ if ($Run -eq "C") {
     Write-Host "--- C2: segment orchestrator (produces all-view and used-view bundle analysis) ---" -ForegroundColor Cyan
     $forceArg = @()
     if ($ForceAll) { $forceArg = @("--force") }
+
+    # --comparison-target both (not name): runs the existing join_hash leg (all/used) AND
+    # the name-projection leg (name/all) in the same per-segment pass, so C2 doesn't need
+    # to run twice. --comparison-target defaults to "config" (this script's prior,
+    # unconditional behaviour) when -NameKey is not passed.
+    $nameKeyArgs = @()
+    if ($NameKey) {
+        if (-not (Test-Path $NAME_KEY_CSV)) {
+            Write-Host "ERROR: -NameKey requires $NAME_KEY_CSV to exist -- run '.\corpus_update_runbook.ps1 -Run A -NameKey' first." -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "--- C2-NameKey: also producing results/bundle_analysis/name/all/ per segment ---" -ForegroundColor Cyan
+        $nameKeyArgs = @("--comparison-target", "both", "--name-key-results-csv", $NAME_KEY_CSV)
+    }
+
     python tools/run_segment_orchestrator.py `
         --manifest-file "$RECORDS\segment_manifest.csv" `
         --registry-file "$RECORDS\run_registry.csv" `
@@ -139,7 +189,8 @@ if ($Run -eq "C") {
         --segments-root $SEGMENTS `
         --repo-root $REPO `
         --join-policy $JOIN_POL `
-        @forceArg
+        @forceArg `
+        @nameKeyArgs
 
     Write-Host "--- C2.5: rebuild BI results registry ---" -ForegroundColor Cyan
     python tools\build_results_registry.py `
@@ -156,6 +207,9 @@ if ($Run -eq "C") {
     Write-Host "Refresh Power BI: open Fingerprint_Segmented_Bundles.pbix and hit Refresh" -ForegroundColor Green
     Write-Host "Cross-segment comparison: run compare_cross_segment.py separately" -ForegroundColor Cyan
     Write-Host "Reminder: used/purge signals are active-delivery signals primarily for Project targets; do not label Template or Generic stock content as unused bloat." -ForegroundColor Cyan
+    if ($NameKey) {
+        Write-Host "Name-projection output: {segment folder}\results\bundle_analysis\name\all\... (join_key_name_identity instead of join_hash; ALL view only -- no used-view/compare/share-profile equivalent yet, see audit_results/audit_8 and audit_9)" -ForegroundColor Cyan
+    }
 }
 
 # NOTES
@@ -180,3 +234,19 @@ if ($Run -eq "C") {
 # Known deferred items:
 #   - build_semantic_groups.py column name fix (item_key/item_value vs k/v/q)
 #   - is_cad_import: lp.is_import not flowing into domain_patterns.csv
+#
+# -NameKey (opt-in, additive -- does not change default Run A/B/C output):
+#   -Run A -NameKey  - apply_name_key_policy.py parses $EXPORTS once, corpus-wide,
+#                      -> $NAME_KEY_CSV. No file_metadata.csv dependency, unlike Run A->B's
+#                      mandatory pause; re-run whenever $EXPORTS gets new files.
+#   -Run B -NameKey  - OPTIONAL: generate_name_key_patterns.py --comparison-target name,
+#                      whole-corpus (unsegmented) pattern set. NOT required before Run C,
+#                      which re-clusters name-key rows per segment internally (step 2b).
+#   -Run C -NameKey  - run_segment_orchestrator.py --comparison-target both
+#                      --name-key-results-csv $NAME_KEY_CSV. Requires -Run A -NameKey to
+#                      have been run first (hard-fails otherwise). Adds
+#                      results/bundle_analysis/name/all/ per segment alongside the
+#                      existing all/used folders -- ALL view only (no used-view/compare/
+#                      share-profile equivalent for the name projection yet). See
+#                      audit_results/audit_8_bundle_pipeline_name_projection.md and
+#                      audit_results/audit_9_segment_orchestrator_name_projection.md.
