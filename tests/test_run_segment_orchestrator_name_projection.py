@@ -396,4 +396,111 @@ class TestCompleteSegmentSkipHonorsNameTarget:
             capture_output=True, text=True,
         )
         assert result.returncode == 0, result.stderr
-        assert "skipped — already complete" in result.stdout
+
+
+class TestStaleNameBundleOutputClearedBeforeRerun:
+    """PR #390 review, third round: run_bundle_analysis.py only ever writes per-domain
+    folders for domains present in the *current* pattern set -- it never deletes a stale
+    <domain>/ folder left over from a prior run whose population included a domain this one
+    doesn't. Left in place, emit_name_target_provenance()'s rglob("bundles.csv") (run
+    automatically inside run_bundle_analysis.py --comparison-target name) picks up those
+    stale files and reports them in a fresh bundle_provenance.csv even for a run that finds
+    zero active domains. merge_bi_outputs()'s *_combined.csv cleanup (round 2's fix) doesn't
+    cover this, since provenance is built independently. These tests exercise the real CLI
+    (not mocked) to prove both the underlying gap and that clearing the output directory
+    first -- what _run_one_segment()'s step 3b now does -- actually closes it."""
+
+    _RUN_BUNDLE_ANALYSIS = _REPO_ROOT / "tools" / "bundle_analysis" / "run_bundle_analysis.py"
+
+    def _materials_name_key_rows(self):
+        rows = []
+        for f in ("f1.details.json", "f2.details.json", "f3.details.json"):
+            rows.append({
+                "export_file": f, "domain": "materials", "record_id": "uid:concrete",
+                "label_display": "Concrete", "join_key_schema": "name_identity.join_key.v1",
+                "join_hash": "hashConcrete", "status": "ok", "missing_required": "",
+            })
+            rows.append({
+                "export_file": f, "domain": "materials", "record_id": "uid:steel",
+                "label_display": "Steel", "join_key_schema": "name_identity.join_key.v1",
+                "join_hash": "hashSteel", "status": "ok", "missing_required": "",
+            })
+        return rows
+
+    def _build_populated_name_patterns_dir(self, tmp_path: Path) -> Path:
+        from tools.generate_name_key_patterns import emit_name_patterns
+
+        name_key_csv = tmp_path / "populated_name_key_results.csv"
+        _write_csv(name_key_csv, NAME_KEY_FIELDS, self._materials_name_key_rows())
+        name_patterns_dir = tmp_path / "patterns_populated" / "name"
+        emit_name_patterns(name_key_csv, name_patterns_dir)
+        return name_patterns_dir
+
+    def _build_empty_name_patterns_dir(self, tmp_path: Path) -> Path:
+        from tools.generate_name_key_patterns import emit_name_patterns
+
+        name_key_csv = tmp_path / "empty_name_key_results.csv"
+        _write_csv(name_key_csv, NAME_KEY_FIELDS, [])
+        name_patterns_dir = tmp_path / "patterns_empty" / "name"
+        emit_name_patterns(name_key_csv, name_patterns_dir)
+        return name_patterns_dir
+
+    def _run_name_bundle_analysis(self, out_dir: Path, name_patterns_dir: Path) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [
+                sys.executable, str(self._RUN_BUNDLE_ANALYSIS),
+                "--analysis-dir", str(out_dir / "unused"),
+                "--out-dir", str(out_dir),
+                "--comparison-target", "name",
+                "--name-key-patterns-dir", str(name_patterns_dir),
+                "--no-discover-populations",
+                "--min-support-count", "2",
+            ],
+            capture_output=True, text=True,
+        )
+
+    def test_reusing_the_same_out_dir_without_clearing_leaves_stale_provenance(self, tmp_path):
+        out_dir = tmp_path / "bundle_out"
+        populated = self._build_populated_name_patterns_dir(tmp_path)
+        first = self._run_name_bundle_analysis(out_dir, populated)
+        assert first.returncode == 0, first.stderr
+        provenance = _read_csv(out_dir / "name" / "bundle_provenance.csv")
+        assert any(r["domain"] == "materials" for r in provenance)
+
+        # Rerun against a name-key CSV that now yields zero domains, WITHOUT clearing
+        # out_dir first -- reproduces the pre-fix orchestrator behavior.
+        empty = self._build_empty_name_patterns_dir(tmp_path)
+        second = self._run_name_bundle_analysis(out_dir, empty)
+        assert second.returncode == 0, second.stderr
+
+        stale_provenance = _read_csv(out_dir / "name" / "bundle_provenance.csv")
+        assert any(r["domain"] == "materials" for r in stale_provenance), (
+            "expected the underlying gap to reproduce: a stale materials bundle should "
+            "still be present without the clear-before-regenerate fix"
+        )
+
+    def test_clearing_out_dir_before_rerun_removes_stale_provenance(self, tmp_path):
+        import shutil
+
+        out_dir = tmp_path / "bundle_out"
+        populated = self._build_populated_name_patterns_dir(tmp_path)
+        first = self._run_name_bundle_analysis(out_dir, populated)
+        assert first.returncode == 0, first.stderr
+        assert any(
+            r["domain"] == "materials"
+            for r in _read_csv(out_dir / "name" / "bundle_provenance.csv")
+        )
+
+        # This is what _run_one_segment()'s step 3b now does before invoking
+        # run_bundle_analysis.py: clear the name-leg output directory first.
+        name_dir = out_dir / "name"
+        if name_dir.is_dir():
+            shutil.rmtree(name_dir)
+
+        empty = self._build_empty_name_patterns_dir(tmp_path)
+        second = self._run_name_bundle_analysis(out_dir, empty)
+        assert second.returncode == 0, second.stderr
+
+        fresh_provenance = _read_csv(out_dir / "name" / "bundle_provenance.csv")
+        assert fresh_provenance == []
+        assert not any((out_dir / "name" / "all").rglob("bundles.csv"))

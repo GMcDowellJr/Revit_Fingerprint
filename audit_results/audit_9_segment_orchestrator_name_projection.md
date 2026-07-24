@@ -167,3 +167,28 @@ passed, 6 skipped.
    write fresh combined file" path is untouched. Covered by two new tests in
    `TestMergeBiOutputsExcludesStaleDomainsForEmptySegment` (one per exit point). Full suite
    after this fix: 1055 passed, 6 skipped.
+
+## PR #390 review round 3 — one more fix
+
+6. **`bundle_provenance.csv` (built independently of the merge step) still picked up stale
+   per-domain source folders.** Round 2's fix covers `merge_bi_outputs()`'s
+   `*_combined.csv` output, but `run_bundle_analysis.py --comparison-target name`'s own
+   `emit_name_target_provenance()` call builds `bundle_provenance.csv` via
+   `view_out_dir.rglob("bundles.csv")` -- an independent scan of whatever's physically on
+   disk under `results/bundle_analysis/name/`, not scoped to the current run's domain set.
+   `run_bundle_analysis.py` only ever writes per-domain folders for domains present in
+   *this* run's pattern set; it never deletes a `<domain>/` folder left over from a prior
+   run whose population included a domain the current one doesn't. Since
+   `_run_one_segment()`'s step 3b reuses the same persistent `results/bundle_analysis/`
+   directory across every rerun of a segment, a segment that goes from populated to
+   zero-active-domains kept surfacing the old bundle in a fresh `bundle_provenance.csv`.
+   Fixed: step 3b now `shutil.rmtree()`s `results/bundle_analysis/name/` before invoking
+   `run_bundle_analysis.py`, whenever it exists -- matching the same explicit
+   stale-file-cleanup-before-regenerate pattern `tools/extractor.py`'s `emit_records()`
+   already uses for `identity_items_by_domain/*.csv`. Mirrored in the `--dry-run` preview
+   text. Verified with two new tests that invoke the real `run_bundle_analysis.py` CLI (not
+   mocked) end to end: one reproducing the underlying gap (reusing the same `--out-dir`
+   across a populated-then-empty rerun leaves the stale row in `bundle_provenance.csv`),
+   one proving the fix (clearing the directory first between the same two runs yields an
+   empty `bundle_provenance.csv` and zero `bundles.csv` files anywhere under `all/`). Full
+   suite after this fix: 1057 passed, 6 skipped.

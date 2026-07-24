@@ -24,6 +24,7 @@ import csv
 import hashlib
 import math
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1130,6 +1131,21 @@ def _run_one_segment(
         # it to "all" for --comparison-target name (the only view name-target supports).
         if step_failed is None and run_type == "bundle" and comparison_target in ("name", "both"):
             log(f"[orchestrator]   step 3b name-bundle...")
+            # Clear any name-leg output from a previous run of this segment before
+            # regenerating. run_bundle_analysis.py only writes per-domain folders for
+            # domains present in *this* run's pattern set -- it never deletes a stale
+            # <domain>/ folder left over from a prior run whose population included a
+            # domain this one doesn't. Left in place, emit_name_target_provenance()'s
+            # rglob("bundles.csv") (inside the run_bundle_analysis.py subprocess below)
+            # would pick up those stale files and report them in a fresh
+            # bundle_provenance.csv even for a segment that now has zero active domains --
+            # merge_bi_outputs()'s *_combined.csv cleanup doesn't cover this, since
+            # provenance is built independently (PR #390 review, third round). Matches the
+            # same explicit stale-file cleanup tools/extractor.py's emit_records() already
+            # does for identity_items_by_domain/*.csv before a fresh regenerate.
+            name_bundle_analysis_dir = out_root / "results" / "bundle_analysis" / "name"
+            if name_bundle_analysis_dir.is_dir():
+                shutil.rmtree(name_bundle_analysis_dir)
             name_bundle_cmd = [
                 sys.executable,
                 str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
@@ -1420,6 +1436,7 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                         "--no-discover-populations",
                     ]
                     name_bundle_cmd += ["--workers", str(args.bundle_workers)]
+                    print(f"  step 3b: rmtree {out_root / 'results' / 'bundle_analysis' / 'name'} (if exists)")
                     print(f"  step 3b: {' '.join(name_bundle_cmd[1:])}")
             print()
         return 0
