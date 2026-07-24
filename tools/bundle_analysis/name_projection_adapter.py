@@ -52,6 +52,31 @@ STAGED_PATTERN_PRESENCE_FIELDS = [
 
 DOMAIN_COVERAGE_FIELDS = ["domain", "coverage_class", "included", "reason"]
 
+def _normalize_export_run_id(export_file: str) -> str:
+    """Normalize PR2's `export_file` (`tools/apply_name_key_policy.py`, which prefers
+    `*.details.json` per CLAUDE.md's input-format priority) back to the canonical
+    `export_run_id` `tools/extractor.py`'s `emit_records()` actually stamps -- the file
+    `_iter_export_files()` picks as `primary`. For a split-export pair, `primary` is
+    always the `*.index.json` file when one exists (`_iter_export_files()`: `if idx is
+    not None: split_pairs.append((idx.name, idx, det))`), never the `*.details.json` file
+    it was paired with. Left uncorrected, name-target `export_run_id` values never match
+    `file_metadata.csv` / config-target `pattern_presence_file.csv` for a split-export
+    corpus, which silently drops every split-export file out of `--roles` filtering and
+    breaks cross-target file-level alignment (flagged in PR #389 review).
+
+    `*.index.json` and plain `*.json` export names are left unchanged -- those are
+    already the primary/canonical name in those cases. This assumes a complete
+    split-export pair, which is the case PR2's own `_iter_export_paths()` selects
+    `*.details.json` for in the first place (it only prefers details files when details
+    files exist at all, and the split-export contract always pairs one with an
+    `*.index.json` sibling); a details file with no sibling index file is an
+    out-of-contract partial export this normalization does not attempt to detect.
+    """
+    if export_file.lower().endswith(".details.json"):
+        return export_file[: -len(".details.json")] + ".index.json"
+    return export_file
+
+
 PROVENANCE_NOTE_NAME_TARGET = (
     "name-identity values are analysis-side-reconstructed "
     "(tools/apply_name_key_policy.py / core/name_key_builder.py) and have not yet been "
@@ -89,6 +114,11 @@ def stage_name_projection_analysis_dir(
       - `analysis_run_id` is a constant (not derived from the input), since PR2's output has
         no run-id concept of its own; this keeps `resolve_analysis_run_id()`'s "exactly one
         distinct value" invariant satisfied deterministically.
+
+    `export_file` is normalized to the canonical `export_run_id` via
+    `_normalize_export_run_id()` (not copied verbatim) -- see that function's docstring for
+    why a naive copy silently breaks `--roles` filtering and cross-target file alignment on
+    split-export corpora.
     """
     domain_patterns_path = name_patterns_dir / "domain_patterns.csv"
     membership_path = name_patterns_dir / "pattern_membership.csv"
@@ -128,7 +158,7 @@ def stage_name_projection_analysis_dir(
     out_presence_rows: List[Dict[str, str]] = []
     for row in membership_rows:
         domain = row.get("domain", "")
-        export_run_id = (row.get("export_file", "") or "").strip()
+        export_run_id = _normalize_export_run_id((row.get("export_file", "") or "").strip())
         pattern_id = (row.get("pattern_id", "") or "").strip()
         if not export_run_id or not pattern_id:
             continue

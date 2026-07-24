@@ -24,6 +24,7 @@ from tools.generate_name_key_patterns import emit_name_patterns
 from tools.bundle_analysis.name_projection_adapter import (
     DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID,
     PROVENANCE_NOTE_NAME_TARGET,
+    _normalize_export_run_id,
     emit_name_target_provenance,
     stage_name_projection_analysis_dir,
 )
@@ -158,6 +159,48 @@ class TestConfigPassthroughUnchanged:
         assert out_dir / "config" in by_out_dir
         assert out_dir / "name" in by_out_dir
         assert out_dir not in by_out_dir  # never written directly -- always namespaced
+
+
+class TestSplitExportFileIdNormalization:
+    """PR #389 review: tools/apply_name_key_policy.py records `export_file` as the
+    *.details.json name (CLAUDE.md's input-format priority), while tools/extractor.py's
+    emit_records() stamps export_run_id/file_metadata.csv from the *.index.json name for a
+    split-export pair (_iter_export_files(): the index file is always `primary` when one
+    exists). Copying export_file verbatim would silently break --roles filtering and
+    cross-target file alignment for any split-export corpus."""
+
+    def test_details_filename_normalized_to_index_filename(self):
+        assert _normalize_export_run_id("model_a.details.json") == "model_a.index.json"
+
+    def test_details_filename_normalization_is_case_insensitive_on_suffix(self):
+        assert _normalize_export_run_id("model_a.DETAILS.JSON") == "model_a.index.json"
+
+    def test_index_filename_left_unchanged(self):
+        assert _normalize_export_run_id("model_a.index.json") == "model_a.index.json"
+
+    def test_plain_filename_left_unchanged(self):
+        assert _normalize_export_run_id("model_a.json") == "model_a.json"
+
+    def test_staged_presence_rows_use_index_export_run_id_for_split_export(self, tmp_path):
+        rows = []
+        for f in ("model_a.details.json", "model_b.details.json"):
+            rows.append({
+                "export_file": f, "domain": "materials", "record_id": "uid:concrete",
+                "label_display": "Concrete", "join_key_schema": "name_identity.join_key.v1",
+                "join_hash": "hashConcrete", "status": "ok", "missing_required": "",
+            })
+        name_key_csv = tmp_path / "name_key_results.csv"
+        _write_csv(name_key_csv, NAME_KEY_FIELDS, rows)
+        name_patterns_dir = tmp_path / "patterns" / "name"
+        emit_name_patterns(name_key_csv, name_patterns_dir)
+
+        staging_dir = tmp_path / "staging"
+        stage_name_projection_analysis_dir(name_patterns_dir, staging_dir)
+
+        presence_rows = read_csv_rows(staging_dir / "pattern_presence_file.csv")
+        export_run_ids = {r["export_run_id"] for r in presence_rows}
+        assert export_run_ids == {"model_a.index.json", "model_b.index.json"}
+        assert not any(eid.endswith(".details.json") for eid in export_run_ids)
 
 
 class TestNameProjectionAdapterProducesConsumableInput:
