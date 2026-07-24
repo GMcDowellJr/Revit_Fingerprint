@@ -13,13 +13,17 @@ param(
     [ValidateSet("A","B","C")]
     [string]$Run = "",
     [switch]$ForceAll,
-    [switch]$NameKey
+    [switch]$NameKey,
+    # Root containing the raw *.json exports plus the results\/segments\ folders nested
+    # under it (previously hardcoded as .../Fingerprint_Out/exports; moved to OneDrive as
+    # of 2026-07 -- exposed as a param so a future move is a CLI override, not a script edit).
+    [string]$ExportsRoot = "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data"
 )
 
 $ErrorActionPreference = "Stop"
 
 $REPO         = "C:\Users\gmcdowell\Documents\Revit_Fingerprint"
-$EXPORTS      = "C:\Users\gmcdowell\Documents\Fingerprint_Out\exports"
+$EXPORTS      = $ExportsRoot
 $RESULTS      = "$EXPORTS\results"
 $SEGMENTS     = "$EXPORTS\segments"
 $RECORDS      = "$RESULTS\records"
@@ -38,6 +42,12 @@ if ($Run -eq "") {
     Write-Host "  .\corpus_update_runbook.ps1 -Run B    # authority + patterns + patch"
     Write-Host "  .\corpus_update_runbook.ps1 -Run C    # segments + all/used bundle analysis (use compare_cross_segment.py for cross-segment comparison)"
     Write-Host "  .\corpus_update_runbook.ps1 -Run C -ForceAll   # Run C, but re-run every segment regardless of registry status"
+    Write-Host "  .\corpus_update_runbook.ps1 -Run A -ExportsRoot 'D:\Somewhere\Else'   # override the exports/results/segments root"
+    Write-Host ""
+    Write-Host "  -ExportsRoot (default: $ExportsRoot):"
+    Write-Host "    Root containing the raw *.json exports plus the results\ and segments\"
+    Write-Host "    folders nested under it. Override if the data has moved without editing"
+    Write-Host "    this script."
     Write-Host ""
     Write-Host "  -ForceAll (Run C only): registry-driven skip is the default - a segment is"
     Write-Host "    re-run only if its file population changed since the last complete run."
