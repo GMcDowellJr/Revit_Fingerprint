@@ -7693,41 +7693,8 @@
       "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
     }
   ],
-  "questions": [
-    {
-      "type": "bridge_node",
-      "question": "Why does `load_exports()` connect `Domain Payload Management` to `Collision Differencing`, `Element Level Classification`, `Intradomain Summary`, `Domain Indexing`, `Domain Identity Contract`, `Reference Standards Building`, `Change Classification`, `Fingerprint Discovery Testing`, `Export File Processing`, `Cluster Analysis`, `Join Key Application`, `Text Types Candidate Simulation`, `Join Hash Parameter Population`?",
-      "why": "High betweenness centrality (0.045) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `log()` connect `Signal Clustering` to `Wall Information`, `Cluster Review Preparation`, `Cross-Domain Item Building`, `Reference Graph Generation`, `Common IO Helpers`?",
-      "why": "High betweenness centrality (0.044) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `jenks_breaks()` connect `Population Discovery` to `Signal Clustering`?",
-      "why": "High betweenness centrality (0.042) - this node is a cross-community bridge."
-    },
-    {
-      "type": "verify_inferred",
-      "question": "Are the 76 inferred relationships involving `_build_segments()` (e.g. with `test_blank_client_label_no_longer_participates_in_subset()` and `test_blank_discipline_does_not_generate_discipline_cut()`) actually correct?",
-      "why": "`_build_segments()` has 76 INFERRED edges - model-reasoned connections that need verification."
-    },
-    {
-      "type": "verify_inferred",
-      "question": "Are the 59 inferred relationships involving `normalise_summary_schema()` (e.g. with `_client_fixture()` and `test_build_client_summary_backfills_n_files_for_cross_client_only_clients()`) actually correct?",
-      "why": "`normalise_summary_schema()` has 59 INFERRED edges - model-reasoned connections that need verification."
-    },
-    {
-      "type": "isolated_nodes",
-      "question": "What connects `session-start.sh script`, `hook-check.sh script`, `setup.sh script` to the rest of the system?",
-      "why": "561 weakly-connected nodes found - possible documentation gaps or missing edges."
-    },
-    {
-      "type": "low_cohesion",
-      "question": "Should `Identity Hashing` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.04386839481555334 - nodes in this community are weakly interconnected."
-    }
-  ]
+  "tokens": {
+    "input": 160585,
+    "output": 3124
+  }
 }
