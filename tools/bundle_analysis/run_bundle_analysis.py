@@ -980,6 +980,18 @@ def run_bundle_analysis_for_target(
     `_validate_name_target_constraints`), and writes a `bundle_provenance.csv` +
     `domain_coverage.csv` + `README.md` declaring `comparison_target`, `coverage_class`, and
     the analysis-side-reconstruction provenance note for every bundle produced.
+
+    The name leg's final output lands at `out_dir/name_all` (per-domain step0-step7 output,
+    `bundle_provenance.csv`, `domain_coverage.csv`, `README.md` -- everything the internal
+    `out_dir/name/all` staging path produced, relocated as the last step of this function).
+    This flat, single-path-segment location matches the existing Power BI model's
+    `pPurgeView` folder-splice convention (`<segment>\\results\\bundle_analysis\\
+    <pPurgeView>\\*_combined.csv`) so a report author can point `pPurgeView` at `name_all`
+    exactly the way they already point it at `all`/`used` today -- see the PR3 BI-output-
+    compatibility brief. `tools/run_segment_orchestrator.py`'s BI-merge step reads/writes
+    `*_combined.csv` directly under `out_dir/name_all`, then calls
+    `name_projection_adapter.annotate_name_target_combined_files()` to add
+    `comparison_target`/`coverage_class`/`provenance_note` columns to each one.
     """
     if comparison_target not in VALID_COMPARISON_TARGETS:
         raise ValueError(f"--comparison-target must be one of {sorted(VALID_COMPARISON_TARGETS)}, got {comparison_target!r}")
@@ -1071,6 +1083,27 @@ def run_bundle_analysis_for_target(
         )
         print(f"[run_multi_target] comparison_target=name provenance={provenance_stats}")
 
+        # Relocate the completed ALL-view output to a flat out_dir/name_all directory.
+        # name_out_dir/"all" (this function's own internal staging/namespacing shape) is
+        # two path segments; the Power BI model's pPurgeView parameter splices in a single
+        # segment (`<segment>\results\bundle_analysis\<pPurgeView>\*_combined.csv`), so the
+        # BI-facing output must land at out_dir/name_all, not out_dir/name/all. Self-clears
+        # any stale name_all/ from a previous run before moving the fresh tree in, so this
+        # is safe to call repeatedly against the same out_dir with no external pre-clean.
+        # Guarded on name_all_source existing so a caller that mocks run_bundle_analysis /
+        # emit_name_target_provenance out (as some tests do) doesn't hit a missing-directory
+        # error here.
+        name_all_dir = out_dir / "name_all"
+        name_all_source = name_out_dir / "all"
+        if name_all_source.is_dir():
+            if name_all_dir.exists():
+                shutil.rmtree(name_all_dir)
+            shutil.move(str(name_all_source), str(name_all_dir))
+            for extra in ("bundle_provenance.csv", "domain_coverage.csv", "README.md"):
+                src = name_out_dir / extra
+                if src.is_file():
+                    shutil.move(str(src), str(name_all_dir / extra))
+
     return results
 
 
@@ -1083,7 +1116,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="Which join-basis projection to run bundle analysis against: the existing "
              "configuration join_hash (config, default -- unchanged behavior/output), "
              "PR2's Canonical Name Identity Projection output (name, ALL view only), or "
-             "both, namespaced separately under --out-dir/config and --out-dir/name.",
+             "both, namespaced separately under --out-dir/config and --out-dir/name_all.",
     )
     p.add_argument(
         "--name-key-patterns-dir", type=Path, default=None,

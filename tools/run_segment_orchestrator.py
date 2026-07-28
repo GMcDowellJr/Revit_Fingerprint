@@ -38,7 +38,7 @@ from typing import Any, Dict, List, Optional
 # Allow import of bundle_analysis package from the same tools/ directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bundle_analysis.common import atomic_write_csv
-from bundle_analysis.name_projection_adapter import normalize_export_run_id
+from bundle_analysis.name_projection_adapter import annotate_name_target_combined_files, normalize_export_run_id
 from build_results_registry import write_results_registry
 
 VALID_COMPARISON_TARGETS = {"config", "name", "both"}
@@ -773,8 +773,12 @@ def _segment_has_name_leg_output(out_root: Path) -> bool:
     a reliable "name leg already ran" marker, independent of run_registry.csv's single
     whole-segment `status` column, which has no notion of per-leg completion. Used so a
     segment already marked complete under a config-only run isn't skipped once the operator
-    later asks for --comparison-target name/both -- see PR #390 review."""
-    return (out_root / "results" / "bundle_analysis" / "name" / "bundle_provenance.csv").is_file()
+    later asks for --comparison-target name/both -- see PR #390 review.
+
+    bundle_provenance.csv lives at bundle_analysis/name_all/ (the flat, single-path-segment
+    BI-facing output location -- see run_bundle_analysis_for_target()'s docstring), not
+    under the internal bundle_analysis/name/ staging path."""
+    return (out_root / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv").is_file()
 
 
 def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozenset] = None) -> dict:
@@ -1194,20 +1198,29 @@ def _run_one_segment(
             log(f"[orchestrator]   bi_merge elapsed={t_merge}s")
 
         # Name-projection BI merge (opt-in; mirrors the config-leg merge above but reads
-        # bundle_analysis/name/all/ and the name-target domain set)
+        # bundle_analysis/name_all/ -- the flat, single-path-segment location
+        # run_bundle_analysis_for_target() relocates the name leg's ALL-view output to, so
+        # it matches the Power BI model's pPurgeView folder-splice convention -- and the
+        # name-target domain set)
         if step_failed is None and run_type == "bundle" and comparison_target in ("name", "both") and not skip_bi_merge:
             t_merge_name_start = time.monotonic()
             try:
                 active_domains_name = _active_domains_from_name_patterns(
                     out_root / "results" / "name_key" / "patterns" / "name"
                 )
-                bundle_analysis_name_dir = out_root / "results" / "bundle_analysis" / "name" / "all"
+                bundle_analysis_name_dir = out_root / "results" / "bundle_analysis" / "name_all"
                 merge_result_name = merge_bi_outputs(bundle_analysis_name_dir, active_domains=active_domains_name)
                 total_files_name = sum(v["files_merged"] for v in merge_result_name.values())
                 total_rows_name = sum(v["rows_written"] for v in merge_result_name.values())
                 log(
                     f"[orchestrator] bi_merge_name segment={sid} files_merged={total_files_name} rows_written={total_rows_name}"
                 )
+                # PR3 BI-output-compatibility brief's "Column-shape constraint": every
+                # *_combined.csv under name_all/ must additionally declare
+                # comparison_target/coverage_class/provenance_note per row, strictly
+                # additive to the existing typed columns the Power BI model already reads.
+                annotate_stats = annotate_name_target_combined_files(bundle_analysis_name_dir)
+                log(f"[orchestrator] bi_merge_name_annotate segment={sid} files_annotated={len(annotate_stats)}")
             except Exception as merge_exc:
                 log(f"[WARN orchestrator] bi_merge_name failed for segment={sid}: {merge_exc}")
             t_merge_name = int(time.monotonic() - t_merge_name_start)

@@ -153,7 +153,7 @@ class TestActiveDomainsFromNamePatterns:
 
 class TestMergeBiOutputsExcludesStaleDomainsForEmptySegment:
     def test_empty_active_domains_merges_nothing_even_with_stale_folder_present(self, tmp_path):
-        bundle_dir = tmp_path / "name" / "all"
+        bundle_dir = tmp_path / "name_all"
         _write_csv(
             bundle_dir / "stale_domain" / "bundles.csv",
             ["schema_version", "analysis_run_id", "domain", "bundle_id"],
@@ -168,7 +168,7 @@ class TestMergeBiOutputsExcludesStaleDomainsForEmptySegment:
     def test_none_active_domains_merges_everything_found_unfiltered(self, tmp_path):
         # Contrast case: None genuinely means "no filtering info available" (e.g. the
         # patterns step never ran), which intentionally still merges whatever is on disk.
-        bundle_dir = tmp_path / "name" / "all"
+        bundle_dir = tmp_path / "name_all"
         _write_csv(
             bundle_dir / "some_domain" / "bundles.csv",
             ["schema_version", "analysis_run_id", "domain", "bundle_id"],
@@ -184,7 +184,7 @@ class TestMergeBiOutputsExcludesStaleDomainsForEmptySegment:
         # PR #390 review, second round: a segment that previously had real bundles and is
         # rerun with zero current candidates must not leave the old *_combined.csv in
         # place -- Power BI would keep reading it as if it were this run's result.
-        bundle_dir = tmp_path / "name" / "all"
+        bundle_dir = tmp_path / "name_all"
         stale_combined = bundle_dir / "bundles_combined.csv"
         _write_csv(
             stale_combined,
@@ -203,7 +203,7 @@ class TestMergeBiOutputsExcludesStaleDomainsForEmptySegment:
     def test_stale_combined_csv_deleted_when_all_candidates_are_headerless(self, tmp_path):
         # The second "continue without writing" path (candidates exist but every one is a
         # truly empty/headerless file) must clean up stale output the same way.
-        bundle_dir = tmp_path / "name" / "all"
+        bundle_dir = tmp_path / "name_all"
         stale_combined = bundle_dir / "bundles_combined.csv"
         _write_csv(
             stale_combined,
@@ -224,7 +224,7 @@ class TestSegmentHasNameLegOutput:
         assert _segment_has_name_leg_output(tmp_path) is False
 
     def test_true_when_provenance_file_present(self, tmp_path):
-        provenance = tmp_path / "results" / "bundle_analysis" / "name" / "bundle_provenance.csv"
+        provenance = tmp_path / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv"
         provenance.parent.mkdir(parents=True)
         provenance.write_text("analysis_run_id,comparison_target\n", encoding="utf-8")
         assert _segment_has_name_leg_output(tmp_path) is True
@@ -336,7 +336,7 @@ class TestCompleteSegmentSkipHonorsNameTarget:
 
         segments_root = tmp_path / "segments"
         if with_name_leg_output:
-            provenance = segments_root / "seg1" / "results" / "bundle_analysis" / "name" / "bundle_provenance.csv"
+            provenance = segments_root / "seg1" / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv"
             provenance.parent.mkdir(parents=True)
             provenance.write_text("analysis_run_id,comparison_target\n", encoding="utf-8")
 
@@ -427,8 +427,11 @@ class TestStaleNameBundleOutputClearedBeforeRerun:
     stale files and reports them in a fresh bundle_provenance.csv even for a run that finds
     zero active domains. merge_bi_outputs()'s *_combined.csv cleanup (round 2's fix) doesn't
     cover this, since provenance is built independently. These tests exercise the real CLI
-    (not mocked) to prove both the underlying gap and that clearing the output directory
-    first -- what _run_one_segment()'s step 3b now does -- actually closes it."""
+    (not mocked). The original gap is now closed as a byproduct of the PR3 BI-output-
+    compatibility follow-up's move-based relocation of out_dir/name/all into the flat
+    out_dir/name_all (see the first test below) -- the second test additionally confirms
+    _run_one_segment()'s own step 3b pre-clean of out_dir/name still works as
+    belt-and-suspenders."""
 
     _RUN_BUNDLE_ANALYSIS = _REPO_ROOT / "tools" / "bundle_analysis" / "run_bundle_analysis.py"
 
@@ -479,24 +482,33 @@ class TestStaleNameBundleOutputClearedBeforeRerun:
             capture_output=True, text=True,
         )
 
-    def test_reusing_the_same_out_dir_without_clearing_leaves_stale_provenance(self, tmp_path):
+    def test_reusing_the_same_out_dir_without_clearing_no_longer_leaves_stale_provenance(self, tmp_path):
+        # PR3 BI-output-compatibility follow-up: run_bundle_analysis_for_target() now
+        # *moves* (not copies) out_dir/name/all into the flat out_dir/name_all BI-facing
+        # location, self-clearing out_dir/name_all before each move. A side effect: the
+        # source directory (out_dir/name/all) no longer persists between invocations of
+        # this script either, so the specific staleness gap this class exercises (a stale
+        # per-domain folder surviving in the *final* output across reruns without an
+        # external pre-clean) is closed as a byproduct -- even calling run_bundle_analysis.py
+        # directly, bypassing the orchestrator's own step-3b pre-clean entirely.
         out_dir = tmp_path / "bundle_out"
         populated = self._build_populated_name_patterns_dir(tmp_path)
         first = self._run_name_bundle_analysis(out_dir, populated)
         assert first.returncode == 0, first.stderr
-        provenance = _read_csv(out_dir / "name" / "bundle_provenance.csv")
+        provenance = _read_csv(out_dir / "name_all" / "bundle_provenance.csv")
         assert any(r["domain"] == "materials" for r in provenance)
 
         # Rerun against a name-key CSV that now yields zero domains, WITHOUT clearing
-        # out_dir first -- reproduces the pre-fix orchestrator behavior.
+        # out_dir first.
         empty = self._build_empty_name_patterns_dir(tmp_path)
         second = self._run_name_bundle_analysis(out_dir, empty)
         assert second.returncode == 0, second.stderr
 
-        stale_provenance = _read_csv(out_dir / "name" / "bundle_provenance.csv")
-        assert any(r["domain"] == "materials" for r in stale_provenance), (
-            "expected the underlying gap to reproduce: a stale materials bundle should "
-            "still be present without the clear-before-regenerate fix"
+        fresh_provenance = _read_csv(out_dir / "name_all" / "bundle_provenance.csv")
+        assert not any(r["domain"] == "materials" for r in fresh_provenance), (
+            "the move-based relocation to name_all/ should have reset the source "
+            "directory, so no stale materials bundle should survive into this rerun's "
+            "output even without an external pre-clean step"
         )
 
     def test_clearing_out_dir_before_rerun_removes_stale_provenance(self, tmp_path):
@@ -508,7 +520,7 @@ class TestStaleNameBundleOutputClearedBeforeRerun:
         assert first.returncode == 0, first.stderr
         assert any(
             r["domain"] == "materials"
-            for r in _read_csv(out_dir / "name" / "bundle_provenance.csv")
+            for r in _read_csv(out_dir / "name_all" / "bundle_provenance.csv")
         )
 
         # This is what _run_one_segment()'s step 3b now does before invoking
@@ -521,6 +533,6 @@ class TestStaleNameBundleOutputClearedBeforeRerun:
         second = self._run_name_bundle_analysis(out_dir, empty)
         assert second.returncode == 0, second.stderr
 
-        fresh_provenance = _read_csv(out_dir / "name" / "bundle_provenance.csv")
+        fresh_provenance = _read_csv(out_dir / "name_all" / "bundle_provenance.csv")
         assert fresh_provenance == []
-        assert not any((out_dir / "name" / "all").rglob("bundles.csv"))
+        assert not any((out_dir / "name_all").rglob("bundles.csv"))

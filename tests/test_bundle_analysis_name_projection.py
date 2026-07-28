@@ -23,7 +23,9 @@ from core.name_key_coverage import COVERAGE_NATIVE
 from tools.generate_name_key_patterns import emit_name_patterns
 from tools.bundle_analysis.name_projection_adapter import (
     DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID,
+    NAME_TARGET_COMBINED_FILES,
     PROVENANCE_NOTE_NAME_TARGET,
+    annotate_name_target_combined_files,
     normalize_export_run_id,
     emit_name_target_provenance,
     stage_name_projection_analysis_dir,
@@ -480,3 +482,159 @@ class TestRunBundleAnalysisForTargetResolvesDetailsOnlyIdsFromMetadataFile:
 
         presence_rows = read_csv_rows(out_dir / "name" / "_staging_analysis_input" / "pattern_presence_file.csv")
         assert {r["export_run_id"] for r in presence_rows} == {"model_c.index.json"}
+
+
+class TestNameAllOutputLocation:
+    """PR3 BI-output-compatibility follow-up: the name leg's BI-facing output must land at
+    a flat out_dir/name_all -- a single path segment, matching the Power BI model's
+    pPurgeView folder-splice convention (<segment>\\results\\bundle_analysis\\<pPurgeView>\\
+    *_combined.csv) -- not the two-level out_dir/name/all this function builds internally
+    for its own staging/namespacing needs."""
+
+    def _run(self, tmp_path: Path) -> Path:
+        name_patterns_dir = _build_pr2_name_patterns_dir(tmp_path)
+        out_dir = tmp_path / "out"
+        run_bundle_analysis_for_target(
+            analysis_dir=tmp_path / "unused",
+            out_dir=out_dir,
+            comparison_target="name",
+            name_key_patterns_dir=name_patterns_dir,
+            min_support_count=2,
+            discover_populations_flag=False,
+        )
+        return out_dir
+
+    def test_name_all_is_flat_single_segment_under_out_dir(self, tmp_path):
+        out_dir = self._run(tmp_path)
+        assert (out_dir / "name_all").is_dir()
+        # Never a nested out_dir/name/all -- that path must no longer exist once the
+        # relocation step has moved it to the flat location.
+        assert not (out_dir / "name" / "all").exists()
+
+    def test_provenance_and_coverage_and_readme_relocated_alongside_bundle_output(self, tmp_path):
+        out_dir = self._run(tmp_path)
+        assert (out_dir / "name_all" / "bundle_provenance.csv").is_file()
+        assert (out_dir / "name_all" / "domain_coverage.csv").is_file()
+        assert (out_dir / "name_all" / "README.md").is_file()
+        assert (out_dir / "name_all" / "materials" / "bundles.csv").is_file()
+
+    def test_staging_input_remains_under_internal_name_dir_not_relocated(self, tmp_path):
+        out_dir = self._run(tmp_path)
+        assert (out_dir / "name" / "_staging_analysis_input" / "domain_patterns.csv").is_file()
+        assert not (out_dir / "name_all" / "_staging_analysis_input").exists()
+
+    def test_rerun_against_same_out_dir_self_clears_stale_name_all(self, tmp_path):
+        # No external pre-clean between the two calls -- the relocation step itself must
+        # not leave a previous run's name_all/ output mixed in with a fresh (empty) run.
+        name_patterns_dir = _build_pr2_name_patterns_dir(tmp_path)
+        out_dir = tmp_path / "out"
+        run_bundle_analysis_for_target(
+            analysis_dir=tmp_path / "unused", out_dir=out_dir, comparison_target="name",
+            name_key_patterns_dir=name_patterns_dir, min_support_count=2,
+            discover_populations_flag=False,
+        )
+        assert (out_dir / "name_all" / "materials").is_dir()
+
+        empty_name_key_csv = tmp_path / "empty_name_key_results.csv"
+        _write_csv(empty_name_key_csv, NAME_KEY_FIELDS, [])
+        empty_patterns_dir = tmp_path / "empty_patterns" / "name"
+        emit_name_patterns(empty_name_key_csv, empty_patterns_dir)
+        run_bundle_analysis_for_target(
+            analysis_dir=tmp_path / "unused", out_dir=out_dir, comparison_target="name",
+            name_key_patterns_dir=empty_patterns_dir, min_support_count=2,
+            discover_populations_flag=False,
+        )
+        assert not (out_dir / "name_all" / "materials").exists()
+
+    def test_config_target_output_untouched_by_relocation(self, tmp_path):
+        # Guards the "never mixed into or overwriting config-target output" acceptance
+        # criterion: comparison_target=config must never produce a name_all/ directory,
+        # and out_dir itself (not out_dir/config) is used exactly as before this PR.
+        analysis_dir = tmp_path / "Results_v21" / "analysis_v21"
+        _write_csv(analysis_dir / "pattern_presence_file.csv", ["schema_version", "analysis_run_id", "domain", "pattern_id"], [])
+        _write_csv(analysis_dir / "domain_patterns.csv", ["schema_version", "analysis_run_id", "domain", "pattern_id"], [])
+        out_dir = tmp_path / "out"
+        run_bundle_analysis_for_target(
+            analysis_dir=analysis_dir, out_dir=out_dir, comparison_target="config",
+            analysis_run_id="test_run", purge_view="all", discover_populations_flag=False,
+        )
+        assert not (out_dir / "name_all").exists()
+        assert not (out_dir / "name").exists()
+
+
+class TestAnnotateNameTargetCombinedFiles:
+    """PR3 BI-output-compatibility follow-up's 'Column-shape constraint': every
+    *_combined.csv under name_all/ must additionally carry comparison_target/
+    coverage_class/provenance_note, strictly appended after the existing typed columns
+    (never inserted/renamed/reordered) so Table.TransformColumnTypes keeps working."""
+
+    def test_adds_three_columns_after_existing_header_and_looks_up_coverage_class(self, tmp_path):
+        bundle_dir = tmp_path / "name_all"
+        _write_csv(
+            bundle_dir / "bundles_combined.csv",
+            ["schema_version", "analysis_run_id", "domain", "scope_key", "bundle_id"],
+            [{"schema_version": "2.1", "analysis_run_id": "name_projection", "domain": "materials", "scope_key": "", "bundle_id": "bnd_x"}],
+        )
+
+        stats = annotate_name_target_combined_files(bundle_dir)
+        assert stats["bundles.csv"] == 1
+
+        rows = read_csv_rows(bundle_dir / "bundles_combined.csv")
+        assert len(rows) == 1
+        row = rows[0]
+        # Existing typed columns are untouched.
+        assert row["schema_version"] == "2.1"
+        assert row["domain"] == "materials"
+        assert row["bundle_id"] == "bnd_x"
+        # New columns are additive.
+        assert row["comparison_target"] == "name"
+        assert row["coverage_class"] == COVERAGE_NATIVE
+        assert row["provenance_note"] == PROVENANCE_NOTE_NAME_TARGET
+
+        with (bundle_dir / "bundles_combined.csv").open(encoding="utf-8-sig", newline="") as fh:
+            header = next(csv.reader(fh))
+        assert header == [
+            "schema_version", "analysis_run_id", "domain", "scope_key", "bundle_id",
+            "comparison_target", "coverage_class", "provenance_note",
+        ]
+
+    def test_missing_files_are_skipped_without_error(self, tmp_path):
+        bundle_dir = tmp_path / "name_all"
+        bundle_dir.mkdir(parents=True)
+        stats = annotate_name_target_combined_files(bundle_dir)
+        assert stats == {}
+
+    def test_idempotent_second_call_leaves_already_annotated_file_unchanged(self, tmp_path):
+        bundle_dir = tmp_path / "name_all"
+        _write_csv(
+            bundle_dir / "scope_registry_combined.csv",
+            ["schema_version", "analysis_run_id", "domain", "scope_key", "files_in_scope", "patterns_in_scope"],
+            [{"schema_version": "2.1", "analysis_run_id": "name_projection", "domain": "materials", "scope_key": "", "files_in_scope": "3", "patterns_in_scope": "2"}],
+        )
+        first_stats = annotate_name_target_combined_files(bundle_dir)
+        assert first_stats["scope_registry.csv"] == 1
+        first_text = (bundle_dir / "scope_registry_combined.csv").read_text(encoding="utf-8")
+
+        second_stats = annotate_name_target_combined_files(bundle_dir)
+        assert second_stats == {}
+        second_text = (bundle_dir / "scope_registry_combined.csv").read_text(encoding="utf-8")
+        assert first_text == second_text
+
+    def test_excluded_domain_row_still_annotated_with_its_own_coverage_class(self, tmp_path):
+        bundle_dir = tmp_path / "name_all"
+        _write_csv(
+            bundle_dir / "bundles_combined.csv",
+            ["schema_version", "analysis_run_id", "domain", "scope_key", "bundle_id"],
+            [{"schema_version": "2.1", "analysis_run_id": "name_projection", "domain": "units", "scope_key": "", "bundle_id": "bnd_y"}],
+        )
+        annotate_name_target_combined_files(bundle_dir)
+        rows = read_csv_rows(bundle_dir / "bundles_combined.csv")
+        assert rows[0]["coverage_class"] == "excluded"
+
+    def test_covers_all_ten_bi_merge_filenames(self):
+        # NAME_TARGET_COMBINED_FILES must mirror run_segment_orchestrator.BI_MERGE_FILES
+        # exactly -- a drift here would silently leave some *_combined.csv files
+        # unannotated.
+        import tools.run_segment_orchestrator as orchestrator_module
+
+        assert set(NAME_TARGET_COMBINED_FILES) == set(orchestrator_module.BI_MERGE_FILES)

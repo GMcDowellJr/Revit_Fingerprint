@@ -12,6 +12,29 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **Name-target bundle BI output location correction (PR3 follow-up):**
+  `run_bundle_analysis_for_target()` (`tools/bundle_analysis/run_bundle_analysis.py`) now
+  relocates the `--comparison-target name` leg's completed ALL-view output from the
+  internal `out_dir/name/all/` staging path to a flat `out_dir/name_all/` as its final
+  step (self-clearing any stale `name_all/` from a previous run first). This matches the
+  Power BI model (`Fingerprint_Segmented_Bundles.vpax`)'s confirmed `pPurgeView`
+  convention -- a free-text parameter spliced in as a single path segment
+  (`<segment>\results\bundle_analysis\<pPurgeView>\*_combined.csv`) -- which the
+  previous two-segment `name/all/` location could never satisfy.
+  `tools/run_segment_orchestrator.py`'s name-leg BI merge and
+  `_segment_has_name_leg_output()` marker-file check were updated to the new path. New
+  `annotate_name_target_combined_files()`
+  (`tools/bundle_analysis/name_projection_adapter.py`), called once per segment right
+  after the name-leg `merge_bi_outputs()` call, appends `comparison_target` /
+  `coverage_class` / `provenance_note` columns to every `*_combined.csv` under
+  `name_all/` -- strictly additive to the existing typed columns the Power BI model's
+  `Table.TransformColumnTypes` steps already read by name, never inserted/renamed/
+  reordered -- so a report author can point `pPurgeView` at `name_all` and get the same
+  ten filenames as `all`/`used` today, now carrying per-row name-projection provenance.
+  `comparison_target=config` output (`out_dir/all`, `out_dir/used`, and under `both`,
+  `out_dir/config/...`) is completely unchanged -- the relocation/annotation code paths
+  are gated entirely inside the name-leg branch. See
+  `audit_results/audit_9_bundle_bi_output_location_correction.md`.
 - **Canonical Name Identity Projection (PR1):** a second, independent, policy-driven
   `join_hash` variant computed via the same `core/join_key_builder.build_join_key_from_policy()`
   mechanism used by the existing configuration-based `join_hash`, governed by a new,
