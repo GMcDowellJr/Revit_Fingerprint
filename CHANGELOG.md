@@ -34,7 +34,7 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `comparison_target=config` output (`out_dir/all`, `out_dir/used`, and under `both`,
   `out_dir/config/...`) is completely unchanged -- the relocation/annotation code paths
   are gated entirely inside the name-leg branch. See
-  `audit_results/audit_9_bundle_bi_output_location_correction.md`.
+  `audit_results/audit_10_bundle_bi_output_location_correction.md`.
 - **Canonical Name Identity Projection (PR1):** a second, independent, policy-driven
   `join_hash` variant computed via the same `core/join_key_builder.build_join_key_from_policy()`
   mechanism used by the existing configuration-based `join_hash`, governed by a new,

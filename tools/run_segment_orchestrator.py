@@ -958,7 +958,7 @@ def _run_one_segment(
     the existing join_hash leg: re-cluster this segment's slice of a corpus-wide
     name_key_results.csv (tools/apply_name_key_policy.py, computed once up front -- see
     _filter_name_key_csv_to_segment()'s docstring for why no per-segment JSON re-parse is
-    needed), then bundle-mine it into results/bundle_analysis/name/all/, mirroring
+    needed), then bundle-mine it into results/bundle_analysis/name_all/, mirroring
     results/bundle_analysis/all/ for the config leg but using join_key_name_identity as the
     join instead of join_hash.
     """
@@ -1749,7 +1749,7 @@ def main() -> None:
         help="config (default, unchanged behavior/output): join_hash only, exactly as "
              "before this flag existed. name/both additionally re-cluster this segment's "
              "slice of --name-key-results-csv (PR1's join_key_name_identity) and bundle-mine "
-             "it into results/bundle_analysis/name/all/, alongside the existing "
+             "it into results/bundle_analysis/name_all/, alongside the existing "
              "results/bundle_analysis/{all,used}/ config-target output.",
     )
     ap.add_argument(

@@ -61,7 +61,7 @@ if ($Run -eq "") {
     Write-Host "      -Run A -NameKey   # parse exports once, corpus-wide -> $NAME_KEY_CSV"
     Write-Host "      -Run B -NameKey   # OPTIONAL whole-corpus (unsegmented) name patterns;"
     Write-Host "                        # not required before Run C, which re-clusters per segment"
-    Write-Host "      -Run C -NameKey   # also writes results/bundle_analysis/name/all/ per segment"
+    Write-Host "      -Run C -NameKey   # also writes results/bundle_analysis/name_all/ per segment"
     Write-Host "                        # (requires -Run A -NameKey to have been run first)"
     Write-Host ""
     Write-Host "MANDATORY PAUSE between Run A and Run B:"
@@ -177,7 +177,7 @@ if ($Run -eq "C") {
     if ($ForceAll) { $forceArg = @("--force") }
 
     # --comparison-target both (not name): runs the existing join_hash leg (all/used) AND
-    # the name-projection leg (name/all) in the same per-segment pass, so C2 doesn't need
+    # the name-projection leg (name_all) in the same per-segment pass, so C2 doesn't need
     # to run twice. --comparison-target defaults to "config" (this script's prior,
     # unconditional behaviour) when -NameKey is not passed.
     $nameKeyArgs = @()
@@ -203,7 +203,7 @@ if ($Run -eq "C") {
                 exit 1
             }
         }
-        Write-Host "--- C2-NameKey: also producing results/bundle_analysis/name/all/ per segment ---" -ForegroundColor Cyan
+        Write-Host "--- C2-NameKey: also producing results/bundle_analysis/name_all/ per segment ---" -ForegroundColor Cyan
         $nameKeyArgs = @("--comparison-target", "both", "--name-key-results-csv", $NAME_KEY_CSV)
     }
 
@@ -235,7 +235,7 @@ if ($Run -eq "C") {
     Write-Host "Cross-segment comparison: run compare_cross_segment.py separately" -ForegroundColor Cyan
     Write-Host "Reminder: used/purge signals are active-delivery signals primarily for Project targets; do not label Template or Generic stock content as unused bloat." -ForegroundColor Cyan
     if ($NameKey) {
-        Write-Host "Name-projection output: {segment folder}\results\bundle_analysis\name\all\... (join_key_name_identity instead of join_hash; ALL view only -- no used-view/compare/share-profile equivalent yet, see audit_results/audit_8 and audit_9)" -ForegroundColor Cyan
+        Write-Host "Name-projection output: {segment folder}\results\bundle_analysis\name_all\... (join_key_name_identity instead of join_hash; ALL view only -- no used-view/compare/share-profile equivalent yet, see audit_results/audit_8, audit_9, and audit_10)" -ForegroundColor Cyan
     }
 }
 
@@ -272,8 +272,12 @@ if ($Run -eq "C") {
 #   -Run C -NameKey  - run_segment_orchestrator.py --comparison-target both
 #                      --name-key-results-csv $NAME_KEY_CSV. Requires -Run A -NameKey to
 #                      have been run first (hard-fails otherwise). Adds
-#                      results/bundle_analysis/name/all/ per segment alongside the
+#                      results/bundle_analysis/name_all/ per segment alongside the
 #                      existing all/used folders -- ALL view only (no used-view/compare/
 #                      share-profile equivalent for the name projection yet). See
-#                      audit_results/audit_8_bundle_pipeline_name_projection.md and
-#                      audit_results/audit_9_segment_orchestrator_name_projection.md.
+#                      audit_results/audit_8_bundle_pipeline_name_projection.md,
+#                      audit_results/audit_9_segment_orchestrator_name_projection.md, and
+#                      audit_results/audit_10_bundle_bi_output_location_correction.md (the
+#                      name_all/ flat-path correction -- name/all/ in earlier revisions of
+#                      this script was never reachable via the Power BI model's pPurgeView
+#                      parameter).
