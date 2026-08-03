@@ -182,6 +182,16 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   (read-only dependency). See D-023 and `docs/governance_evidence_package.md`.
 
 ### Fixed
+- **Stale `name_all/` survives a failed name-target bundle run (PR3 follow-up, PR review):**
+  `run_bundle_analysis_for_target()`'s name leg relocates its completed output to
+  `out_dir/name_all/` as its last step -- if staging, mining, or provenance generation
+  raised before reaching that step, a prior successful run's `name_all/` was left
+  completely untouched, so Power BI (pointed at `pPurgeView=name_all`) would silently
+  keep reading stale combined files from an old run even though the orchestrator marks
+  the current segment run failed. `name_all/` is now cleared upfront, before staging
+  starts, so a failed rerun leaves an empty/missing `name_all/` instead of misleadingly
+  stale data; a successful run still repopulates it normally. See
+  `audit_results/audit_10_bundle_bi_output_location_correction.md`.
 - `generate_governance_narrative.py`'s within-project `score_reliability` p10/p90
   capture (the sole feeder of `score_reliability()`) was returning `Unknown` for
   all 32 rendered domains in real corpora. Root cause: it only accepted a
