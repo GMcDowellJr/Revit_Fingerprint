@@ -35,6 +35,21 @@ $NAME_KEY_CSV = "$RESULTS\name_key\name_key_results.csv"
 
 Set-Location $REPO
 
+# $ErrorActionPreference = "Stop" only promotes PowerShell-native terminating
+# errors -- it does NOT turn a nonzero exit code from an external process (like
+# `python ...`) into a stop. Without this check, a mid-flatten crash in Run A
+# silently leaves records.csv/file_metadata.csv untouched at their prior mtimes
+# while the script still prints "RUN A COMPLETE" and proceeds -- the corpus then
+# looks up to date when it isn't, and downstream Run C segments quietly build
+# against stale data (see the imperial_container_2014 step=bundle incident).
+function Invoke-Checked {
+    param([Parameter(Mandatory)][string]$StepName)
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: $StepName failed (exit code $LASTEXITCODE)" -ForegroundColor Red
+        exit 1
+    }
+}
+
 if ($Run -eq "") {
     Write-Host ""
     Write-Host "Usage:"
@@ -87,6 +102,7 @@ if ($Run -eq "A") {
         --stages sig_hash,flatten,apply,placeholders `
         --sig-hash-policy $SIG_POL `
         --join-policy $JOIN_POL
+    Invoke-Checked -StepName "Run A: flatten/apply/placeholders"
 
     if ($NameKey) {
         Write-Host ""
@@ -95,6 +111,7 @@ if ($Run -eq "A") {
             --export-dir $EXPORTS `
             --name-key-policy $NAME_KEY_POL `
             --out $NAME_KEY_CSV
+        Invoke-Checked -StepName "Run A-NameKey: apply_name_key_policy.py"
         Write-Host "  wrote $NAME_KEY_CSV" -ForegroundColor Cyan
     }
 
@@ -119,11 +136,13 @@ if ($Run -eq "B") {
     python tools/run_extract_all.py $EXPORTS `
         --out-root $EXPORTS `
         --stages authority,patterns
+    Invoke-Checked -StepName "Run B1: authority/patterns"
 
     Write-Host "--- B2: patch corpus domain_patterns ---" -ForegroundColor Cyan
     python tools\label_synthesis\patch_all_domain_patterns.py `
         --results-root $RESULTS `
         --segments-root $SEGMENTS
+    Invoke-Checked -StepName "Run B2: patch_all_domain_patterns.py"
 
     if ($NameKey) {
         Write-Host "--- B-NameKey (OPTIONAL; not required before Run C -- Run C re-clusters per segment) ---" -ForegroundColor Cyan
@@ -134,6 +153,7 @@ if ($Run -eq "B") {
                 --comparison-target name `
                 --name-key-csv $NAME_KEY_CSV `
                 --out-root "$RESULTS\name_key\patterns"
+            Invoke-Checked -StepName "Run B-NameKey: generate_name_key_patterns.py"
         }
     }
 
@@ -153,6 +173,7 @@ if ($Run -eq "C") {
         --metadata-file "$RECORDS\file_metadata.csv" `
         --out-dir $RECORDS `
         --enable-parent-bundle-runs
+    Invoke-Checked -StepName "Run C1: build_segment_manifest.py"
 
     # C1.5: latent_purgeable.csv is created once and cached forever by
     # _ensure_latent_purgeable() in run_bundle_analysis.py - it does NOT
@@ -218,17 +239,27 @@ if ($Run -eq "C") {
         --join-policy $JOIN_POL `
         @forceArg `
         @nameKeyArgs
+    # Non-fatal by design: the orchestrator processes many independent segments and
+    # returns nonzero if ANY segment failed, but individual segment failures are
+    # expected/tracked (status=failed + notes in run_registry.csv) and should not
+    # block C2.5/C3 from running for the segments that DID succeed.
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARNING: run_segment_orchestrator.py reported segment failures (exit code $LASTEXITCODE)." -ForegroundColor Yellow
+        Write-Host "  See run_registry.csv (status=failed rows) and each failed segment's bundle.log / bundle_name.log / run.log." -ForegroundColor Yellow
+    }
 
     Write-Host "--- C2.5: rebuild BI results registry ---" -ForegroundColor Cyan
     python tools\build_results_registry.py `
         --manifest-file "$RECORDS\segment_manifest.csv" `
         --registry-file "$RECORDS\run_registry.csv" `
         --output-file "$RECORDS\results_registry.csv"
+    Invoke-Checked -StepName "Run C2.5: build_results_registry.py"
 
     Write-Host "--- C3: re-patch all segment domain_patterns ---" -ForegroundColor Cyan
     python tools\label_synthesis\patch_all_domain_patterns.py `
         --results-root $RESULTS `
         --segments-root $SEGMENTS
+    Invoke-Checked -StepName "Run C3: patch_all_domain_patterns.py"
 
     Write-Host "=== RUN C COMPLETE ===" -ForegroundColor Green
     Write-Host "Refresh Power BI: open Fingerprint_Segmented_Bundles.pbix and hit Refresh" -ForegroundColor Green
