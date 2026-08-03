@@ -559,8 +559,15 @@ def _derive_unit_system(payload: Dict[str, Any], export_run_id: str) -> str:
     for rec in records:
         if not isinstance(rec, dict):
             continue
-        identity_basis = rec.get("identity_basis")
-        items = identity_basis.get("items") if isinstance(identity_basis, dict) else None
+        # runner/run_dynamo.py's _canonicalize_all_domain_records() strips identity_basis
+        # from every domain's records and replaces it with a flat top-level `items` list
+        # (core/canonical_items.py:canonicalize_record) -- that is the shape every current
+        # export has. Fall back to identity_basis.items for any older archived exports that
+        # predate that canonicalization pass.
+        items = rec.get("items")
+        if not isinstance(items, list):
+            identity_basis = rec.get("identity_basis")
+            items = identity_basis.get("items") if isinstance(identity_basis, dict) else None
         if not isinstance(items, list):
             continue
 
@@ -1068,6 +1075,11 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
             contract = data.get("_contract") if isinstance(data.get("_contract"), dict) else {}
             ident = contract.get("identity") if isinstance(contract.get("identity"), dict) else {}
             identity_meta = _identity_metadata(data)
+            # A file that already has unit_system set in file_metadata.csv keeps that
+            # value verbatim -- only new files (no prior annotation) pay the cost of
+            # deriving unit_system from the export JSON.
+            ann = existing_annotations.get(export_run_id, {})
+            existing_unit_system = ann.get("unit_system", "").strip()
             meta_row: Dict[str, str] = {
                 "schema_version": SCHEMA_VERSION,
                 "export_run_id": export_run_id,
@@ -1087,16 +1099,13 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
                 "exported_utc": exported_utc,
                 "client_label": "",
                 "governance_role": "",
-                "unit_system": _derive_unit_system(data, export_run_id),
+                "unit_system": existing_unit_system or _derive_unit_system(data, export_run_id),
             }
             # Apply annotation preservation and governance inference inline per file.
-            ann = existing_annotations.get(export_run_id, {})
             if ann:
                 for col in annotation_columns:
                     if not meta_row.get(col, "").strip():
                         meta_row[col] = ann.get(col, "")
-                if ann.get("unit_system", "").strip():
-                    meta_row["unit_system"] = ann["unit_system"]
             if not meta_row.get("governance_role", "").strip():
                 meta_row["governance_role"] = _infer_governance_role(meta_row.get("central_path_norm", ""), governance_rules)
             governance_counts[meta_row.get("governance_role", "").strip()] += 1
