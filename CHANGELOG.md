@@ -182,6 +182,28 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   (read-only dependency). See D-023 and `docs/governance_evidence_package.md`.
 
 ### Fixed
+- **Stale `name_all/` survives an orchestrator-level failure, and an annotation failure
+  was recorded as segment success (PR3 follow-up, PR review, second round):** two
+  further gaps in the previous `name_all/` staleness fix. (1) A failure in
+  `run_segment_orchestrator.py`'s step 2b (name-pattern generation) or step 3 (config
+  bundle, which gates step 3b even under `comparison_target=both`) skips step 3b
+  entirely, so `run_bundle_analysis_for_target()` -- and its own upfront `name_all/`
+  clear -- is never invoked at all; a prior successful run's `name_all/` survived
+  completely untouched even though the segment is recorded as failed. New
+  `_clear_stale_name_all_before_run()` helper now clears it at the very start of
+  `_run_one_segment()`, before step 1 even runs, independent of which later step fails
+  (or whether the segment was already skipped as complete, which never reaches this
+  point at all). (2) The name-leg BI-merge block (`merge_bi_outputs()` +
+  `annotate_name_target_combined_files()`) only logged a warning on exception, leaving
+  `step_failed` unset -- since `_segment_has_name_leg_output()`'s "already ran" marker
+  (`bundle_provenance.csv`) is written earlier by step 3b, independent of this block, a
+  merge/annotate failure here still recorded `status=complete`, and a later non-forced
+  run would then skip this segment forever, permanently leaving Power BI with combined
+  files that are stale or missing the required `comparison_target`/`coverage_class`/
+  `provenance_note` columns. This block now sets `step_failed = "bi_merge_name"` on
+  exception, unlike the config leg's own (deliberately unchanged, pre-existing)
+  non-fatal `bi_merge` handling, which has no equivalent completion marker to protect.
+  See `audit_results/audit_10_bundle_bi_output_location_correction.md`.
 - **Stale `name_all/` survives a failed name-target bundle run (PR3 follow-up, PR review):**
   `run_bundle_analysis_for_target()`'s name leg relocates its completed output to
   `out_dir/name_all/` as its last step -- if staging, mining, or provenance generation

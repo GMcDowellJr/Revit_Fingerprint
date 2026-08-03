@@ -924,6 +924,27 @@ def validate_membership_against_manifest(
     return errors
 
 
+def _clear_stale_name_all_before_run(out_root: Path, run_type: str, comparison_target: str, log) -> None:
+    """Clear this segment's stale name-leg BI-facing output before any step of this run
+    begins -- not just before step 3b, and not only inside
+    run_bundle_analysis_for_target()'s own upfront clear. A failure in step 2b
+    (name-pattern generation) or step 3 (config bundle, which gates step 3b even under
+    comparison_target=both) skips step 3b entirely, so run_bundle_analysis_for_target()
+    is never invoked at all and its own clear never runs -- without this, Power BI would
+    keep reading name_all/ from an old successful run even though this run is recorded
+    as failed (PR review, #391, second round).
+
+    Only fires for segments this call actually intends to (re)run with name-leg work --
+    already-complete segments are filtered out of plan_to_run before _run_one_segment()
+    is ever invoked, so their still-current name_all/ is never touched by this function.
+    """
+    if run_type == "bundle" and comparison_target in ("name", "both"):
+        stale_name_all = out_root / "results" / "bundle_analysis" / "name_all"
+        if stale_name_all.is_dir():
+            log(f"[orchestrator]   clearing stale {stale_name_all} before name-leg regeneration")
+            retry_fs_op(shutil.rmtree, str(stale_name_all))
+
+
 def _run_one_segment(
     idx: int,
     total: int,
@@ -1001,6 +1022,8 @@ def _run_one_segment(
         def log(msg: str) -> None:
             log_f.write(msg + "\n")
             log_f.flush()
+
+        _clear_stale_name_all_before_run(out_root, run_type, comparison_target, log)
 
         # Step 1 — Prepare: directories, export_run_ids.txt, segment-level records
         log(f"[orchestrator]   step 1/3 prepare...")
@@ -1226,6 +1249,18 @@ def _run_one_segment(
                 annotate_stats = annotate_name_target_combined_files(bundle_analysis_name_dir)
                 log(f"[orchestrator] bi_merge_name_annotate segment={sid} files_annotated={len(annotate_stats)}")
             except Exception as merge_exc:
+                # Unlike the config leg's own bi_merge above (deliberately non-fatal --
+                # its "complete" status has no separate output-verifying marker),
+                # a failure here MUST fail the segment. _segment_has_name_leg_output()
+                # only checks that bundle_provenance.csv exists, which step 3b already
+                # wrote successfully before this block ever runs -- so a merge/annotate
+                # failure logged as a mere warning would still record status=complete,
+                # and a later non-forced run would then skip this segment forever,
+                # permanently leaving Power BI with combined files that are stale or
+                # missing the required comparison_target/coverage_class/provenance_note
+                # columns (PR review, #391, second round).
+                step_failed = "bi_merge_name"
+                failure_notes = f"step=bi_merge_name error={merge_exc}"
                 log(f"[WARN orchestrator] bi_merge_name failed for segment={sid}: {merge_exc}")
             t_merge_name = int(time.monotonic() - t_merge_name_start)
             log(f"[orchestrator]   bi_merge_name elapsed={t_merge_name}s")
