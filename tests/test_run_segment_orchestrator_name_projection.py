@@ -678,3 +678,89 @@ class TestAnnotationFailureFailsTheSegment:
         # exercising the annotation-failure path, not some unrelated stub gap.
         outcome = self._run(tmp_path, annotate_raises=False, monkeypatch=monkeypatch)
         assert outcome["registry"][0]["status"] == "complete"
+
+
+class TestClearStaleNameAllFailureFailsTheSegment:
+    """PR review (chatgpt-codex-connector, #391, third round): _clear_stale_name_all_
+    before_run() is called before _run_one_segment()'s try/except machinery and its
+    registry-update block. Left unguarded, a persistent failure there (retry_fs_op
+    exhausting every attempt, not just a transient one) would propagate straight out of
+    _run_one_segment() -- the ThreadPoolExecutor caller's generic "unhandled exception"
+    handler only updates in-memory counters/segment_results, never registry_file, so the
+    segment's registry row (and bundle_provenance.csv) would be left at whatever they
+    were before this run -- often status=complete from a prior successful run -- and the
+    next non-forced run would skip it forever, silently reading stale Power BI output."""
+
+    def _run(self, tmp_path: Path, *, clear_raises: bool, monkeypatch) -> dict:
+        import threading
+        import run_segment_orchestrator as orchestrator_module
+
+        out_root = tmp_path / "segments" / "seg1"
+
+        def _fake_run_step_log(cmd, log_path, cwd=None):
+            cmd_str = " ".join(str(c) for c in cmd)
+            if "run_extract_all.py" in cmd_str:
+                presence_csv = out_root / "results" / "analysis" / "pattern_presence_file.csv"
+                presence_csv.parent.mkdir(parents=True, exist_ok=True)
+                presence_csv.write_text("schema_version,analysis_run_id,domain\n", encoding="utf-8")
+            return (0, "", "")
+
+        monkeypatch.setattr(orchestrator_module, "_write_segment_records", lambda *a, **k: None)
+        monkeypatch.setattr(orchestrator_module, "run_step_log", _fake_run_step_log)
+        monkeypatch.setattr(orchestrator_module, "write_results_registry", lambda **k: 0)
+        monkeypatch.setattr(orchestrator_module, "annotate_name_target_combined_files", lambda *a, **k: {})
+        if clear_raises:
+            def _raises(*a, **k):
+                raise PermissionError("[WinError 5] Access is denied (persistent lock)")
+            monkeypatch.setattr(orchestrator_module, "_clear_stale_name_all_before_run", _raises)
+
+        records_dir = tmp_path / "records"
+        records_dir.mkdir(parents=True)
+        exports_dir = tmp_path / "exports"
+        exports_dir.mkdir(parents=True)
+        join_policy = tmp_path / "join_policy.json"
+        join_policy.write_text("{}", encoding="utf-8")
+        registry_file = tmp_path / "run_registry.csv"
+        manifest_file = tmp_path / "segment_manifest.csv"
+        results_registry_file = tmp_path / "results_registry.csv"
+        name_key_results_csv = tmp_path / "name_key_results.csv"
+        _write_csv(name_key_results_csv, NAME_KEY_FIELDS, [])
+
+        # Registry row starts as "complete" from a fictional prior successful run, so a
+        # regression (the exception escaping without updating the registry) would leave
+        # it looking exactly like a real prior success rather than a fresh "pending" --
+        # the scenario the review comment specifically describes.
+        reg_row = {
+            "segment_id": "seg1", "run_type": "bundle", "output_folder": "seg1",
+            "status": "complete", "notes": "", "last_run_utc": "2026-01-01T00:00:00Z",
+        }
+        mrow = {"segment_id": "seg1", "segment_level": "0", "file_count": "1", "population_hash": ""}
+        registry = [dict(reg_row)]
+        reg_index = {"seg1": 0}
+
+        result = orchestrator_module._run_one_segment(
+            idx=1, total=1, reg_row=reg_row, mrow=mrow,
+            membership={"seg1": ["f1.json"]},
+            records_dir=records_dir, exports_dir=exports_dir, segments_root=tmp_path / "segments",
+            repo_root=_REPO_ROOT, join_policy=join_policy,
+            skip_bi_merge=False,
+            registry=registry, reg_index=reg_index, registry_file=registry_file,
+            manifest_file=manifest_file, results_registry_file=results_registry_file,
+            registry_lock=threading.Lock(), counters={"complete": 0, "failed": 0, "skipped": 0, "failed_ids": []},
+            counters_lock=threading.Lock(), worker_id=1, bundle_workers=1,
+            comparison_target="name", name_key_results_csv=name_key_results_csv,
+        )
+        return {"result": result, "registry": registry}
+
+    def test_persistent_clear_failure_does_not_escape_and_marks_segment_failed(self, tmp_path, monkeypatch):
+        # The core assertion: the exception must NOT propagate out of _run_one_segment()
+        # (it must be caught internally), and the registry row must flip from its
+        # starting "complete" to "failed" rather than being left untouched.
+        outcome = self._run(tmp_path, clear_raises=True, monkeypatch=monkeypatch)
+        assert outcome["registry"][0]["status"] == "failed"
+        assert "clear_stale_name_all" in outcome["registry"][0]["notes"]
+
+    def test_no_clear_failure_still_marks_segment_complete(self, tmp_path, monkeypatch):
+        # Contrast case, same rationale as the annotation-failure tests above.
+        outcome = self._run(tmp_path, clear_raises=False, monkeypatch=monkeypatch)
+        assert outcome["registry"][0]["status"] == "complete"

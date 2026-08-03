@@ -182,6 +182,22 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   (read-only dependency). See D-023 and `docs/governance_evidence_package.md`.
 
 ### Fixed
+- **A persistent failure in the new orchestrator-entry `name_all/` pre-clean itself
+  could escape unhandled, leaving the registry row untouched (PR3 follow-up, PR
+  review, third round):** `_clear_stale_name_all_before_run()` (added in the previous
+  fix below) ran before `_run_one_segment()`'s try/except machinery and its
+  registry-update block. If `retry_fs_op` exhausted every retry attempt (a persistent
+  lock, not just a transient one) and re-raised, the exception propagated straight out
+  of `_run_one_segment()`; the `ThreadPoolExecutor` caller's generic "unhandled
+  exception" handler only updates in-memory counters/`segment_results`, never
+  `registry_file`, so the segment's registry row (and `bundle_provenance.csv`) were
+  left at whatever they were before this run -- often `status=complete` from a prior
+  successful run -- and a later non-forced run would skip it forever, silently reading
+  stale Power BI output. The call is now wrapped in the same try/except pattern every
+  other step in `_run_one_segment()` already uses, setting
+  `step_failed = "clear_stale_name_all"` so the failure correctly reaches the
+  registry-update block. See
+  `audit_results/audit_10_bundle_bi_output_location_correction.md`.
 - **Stale `name_all/` survives an orchestrator-level failure, and an annotation failure
   was recorded as segment success (PR3 follow-up, PR review, second round):** two
   further gaps in the previous `name_all/` staleness fix. (1) A failure in

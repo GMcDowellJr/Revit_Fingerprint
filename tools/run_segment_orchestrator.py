@@ -1023,7 +1023,21 @@ def _run_one_segment(
             log_f.write(msg + "\n")
             log_f.flush()
 
-        _clear_stale_name_all_before_run(out_root, run_type, comparison_target, log)
+        # Caught here (rather than left to propagate) so a persistent lock -- retry_fs_op
+        # exhausting every attempt, not just a transient one -- still routes through
+        # step_failed and the registry-update block below. An uncaught exception this
+        # early would escape _run_one_segment() entirely; the ThreadPoolExecutor caller's
+        # generic "unhandled exception" handler only updates in-memory counters/
+        # segment_results, never registry_file, leaving the segment's registry row (and
+        # bundle_provenance.csv) at whatever they were before this run -- often
+        # status=complete from a prior successful run -- so the next non-forced run would
+        # skip it forever, silently reading stale Power BI output (PR review, #391, third
+        # round).
+        try:
+            _clear_stale_name_all_before_run(out_root, run_type, comparison_target, log)
+        except Exception as exc:
+            step_failed = "clear_stale_name_all"
+            failure_notes = f"step=clear_stale_name_all error={exc}"
 
         # Step 1 — Prepare: directories, export_run_ids.txt, segment-level records
         log(f"[orchestrator]   step 1/3 prepare...")
