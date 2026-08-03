@@ -37,7 +37,7 @@ from typing import Any, Dict, List, Optional
 
 # Allow import of bundle_analysis package from the same tools/ directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bundle_analysis.common import atomic_write_csv
+from bundle_analysis.common import atomic_write_csv, retry_fs_op
 from bundle_analysis.name_projection_adapter import annotate_name_target_combined_files, normalize_export_run_id
 from build_results_registry import write_results_registry
 
@@ -1149,7 +1149,11 @@ def _run_one_segment(
             # does for identity_items_by_domain/*.csv before a fresh regenerate.
             name_bundle_analysis_dir = out_root / "results" / "bundle_analysis" / "name"
             if name_bundle_analysis_dir.is_dir():
-                shutil.rmtree(name_bundle_analysis_dir)
+                # retry_fs_op: a cloud-synced segments root (OneDrive, etc.) can hold a
+                # transient lock on a file/folder this pipeline just finished writing on
+                # the previous run, producing a Windows PermissionError ([WinError 5]
+                # Access is denied) on an otherwise-correct rmtree.
+                retry_fs_op(shutil.rmtree, str(name_bundle_analysis_dir))
             name_bundle_cmd = [
                 sys.executable,
                 str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),

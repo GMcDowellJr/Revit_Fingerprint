@@ -14,7 +14,7 @@ if __package__ in (None, ""):
     _THIS_DIR = Path(__file__).resolve().parent
     if str(_THIS_DIR) not in sys.path:
         sys.path.insert(0, str(_THIS_DIR))
-    from common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id
+    from common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id, retry_fs_op
     from step0_discover_populations import discover_populations
     from step1_membership_matrix import build_membership_matrix
     from step2_find_bundles import find_bundles_for_domain
@@ -34,7 +34,7 @@ if __package__ in (None, ""):
         stage_name_projection_analysis_dir,
     )
 else:
-    from .common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id
+    from .common import SCHEMA_VERSION, atomic_write_csv, read_csv_rows, resolve_analysis_run_id, retry_fs_op
     from .step0_discover_populations import discover_populations
     from .step1_membership_matrix import build_membership_matrix
     from .step2_find_bundles import find_bundles_for_domain
@@ -1092,17 +1092,20 @@ def run_bundle_analysis_for_target(
         # is safe to call repeatedly against the same out_dir with no external pre-clean.
         # Guarded on name_all_source existing so a caller that mocks run_bundle_analysis /
         # emit_name_target_provenance out (as some tests do) doesn't hit a missing-directory
-        # error here.
+        # error here. Every mutating call goes through retry_fs_op() -- a segments
+        # root synced by OneDrive (or similar) can transiently lock a file/folder this
+        # function just finished writing (WinError 5 "Access is denied"), and this is
+        # dozens of small per-domain files written and immediately relocated in one pass.
         name_all_dir = out_dir / "name_all"
         name_all_source = name_out_dir / "all"
         if name_all_source.is_dir():
             if name_all_dir.exists():
-                shutil.rmtree(name_all_dir)
-            shutil.move(str(name_all_source), str(name_all_dir))
+                retry_fs_op(shutil.rmtree, str(name_all_dir))
+            retry_fs_op(shutil.move, str(name_all_source), str(name_all_dir))
             for extra in ("bundle_provenance.csv", "domain_coverage.csv", "README.md"):
                 src = name_out_dir / extra
                 if src.is_file():
-                    shutil.move(str(src), str(name_all_dir / extra))
+                    retry_fs_op(shutil.move, str(src), str(name_all_dir / extra))
 
     return results
 

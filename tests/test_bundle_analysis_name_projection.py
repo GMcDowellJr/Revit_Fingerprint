@@ -37,7 +37,7 @@ from tools.bundle_analysis.run_bundle_analysis import (
 )
 from tools.bundle_analysis.step1_membership_matrix import build_membership_matrix
 from tools.bundle_analysis.step2_find_bundles import find_bundles_for_domain
-from tools.bundle_analysis.common import read_csv_rows
+from tools.bundle_analysis.common import read_csv_rows, retry_fs_op
 
 
 NAME_KEY_FIELDS = [
@@ -638,3 +638,53 @@ class TestAnnotateNameTargetCombinedFiles:
         import tools.run_segment_orchestrator as orchestrator_module
 
         assert set(NAME_TARGET_COMBINED_FILES) == set(orchestrator_module.BI_MERGE_FILES)
+
+
+class TestRetryFsOp:
+    """A cloud-synced segments root (OneDrive, etc.) can transiently lock a file/folder
+    the name-projection bundle leg just finished writing, producing a Windows
+    PermissionError ([WinError 5] Access is denied) on an otherwise-correct
+    shutil.move/rmtree. retry_fs_op() is the shared mitigation used by both
+    run_bundle_analysis_for_target()'s out_dir/name_all relocation and
+    run_segment_orchestrator.py's stale-output pre-clean."""
+
+    def test_succeeds_on_first_try_without_retry(self):
+        calls = []
+        retry_fs_op(lambda: calls.append(1), delay_seconds=0)
+        assert calls == [1]
+
+    def test_recovers_after_transient_failures(self):
+        state = {"remaining_failures": 2, "calls": 0}
+
+        def flaky():
+            state["calls"] += 1
+            if state["remaining_failures"] > 0:
+                state["remaining_failures"] -= 1
+                raise PermissionError("[WinError 5] Access is denied")
+
+        retry_fs_op(flaky, attempts=5, delay_seconds=0)
+        assert state["calls"] == 3
+
+    def test_reraises_after_exhausting_attempts(self):
+        def always_fails():
+            raise PermissionError("[WinError 5] Access is denied")
+
+        with pytest.raises(PermissionError):
+            retry_fs_op(always_fails, attempts=3, delay_seconds=0)
+
+    def test_passes_through_positional_args(self, tmp_path):
+        target = tmp_path / "some_dir"
+        target.mkdir()
+        retry_fs_op(lambda p: p.rmdir(), target, delay_seconds=0)
+        assert not target.exists()
+
+    def test_non_os_error_is_not_retried(self):
+        calls = []
+
+        def raises_value_error():
+            calls.append(1)
+            raise ValueError("not a filesystem error")
+
+        with pytest.raises(ValueError):
+            retry_fs_op(raises_value_error, attempts=5, delay_seconds=0)
+        assert calls == [1]
