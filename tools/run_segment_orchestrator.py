@@ -427,19 +427,26 @@ def _preshard_corpus_records(
 
     t0 = time.monotonic()
 
+    # Segments actually being (re)processed this pass. Skip only completed
+    # segments; pending/failed segments always get fresh inputs so retries
+    # without --force don't run against stale data. Computed once and reused
+    # below for marker-stamping too -- a segment excluded here must NOT have
+    # its .preshard_complete / identity_items_by_domain/.complete markers
+    # touched, since those markers are what _write_segment_records() trusts to
+    # skip re-copying. Stamping them for every planned segment regardless of
+    # whether records.csv/shards were actually written let a segment whose
+    # registry status was stale-"complete" end up "marked done" with an empty
+    # records dir (imperial_container_2014 step=bundle incident).
+    segments_to_write = {
+        sid: plan for sid, plan in segment_plans.items()
+        if force or plan.get("status") != "complete"
+    }
+
     # ── records.csv and file_metadata.csv ─────────────────────────────────────
     for fname in ("records.csv", "file_metadata.csv"):
         src = records_dir / fname
         if not src.is_file():
             continue
-
-        # Determine which segments need this file.
-        # Skip only completed segments; pending/failed segments always get fresh
-        # inputs so retries without --force don't run against stale data.
-        segments_to_write = {
-            sid: plan for sid, plan in segment_plans.items()
-            if force or plan.get("status") != "complete"
-        }
         if not segments_to_write:
             print(f"[preshard] {fname} → 0 segments written, {len(segment_plans)} skipped")
             continue
@@ -515,8 +522,11 @@ def _preshard_corpus_records(
                 name, written, skipped = future.result()
                 total_written += written
 
-        # Write .complete markers for all segment shard dirs
-        for plan_entry in segment_plans.values():
+        # Write .complete markers only for segments actually (re)processed this
+        # pass -- a segment excluded from segments_to_write (registry status
+        # already "complete") keeps whatever marker it already has rather than
+        # having a fresh "ok" stamped over a shard dir this pass never wrote to.
+        for plan_entry in segments_to_write.values():
             seg_shard_dir = plan_entry["segment_records_dir"] / "identity_items_by_domain"
             if seg_shard_dir.is_dir():
                 (seg_shard_dir / ".complete").write_text("ok", encoding="utf-8")
@@ -527,10 +537,12 @@ def _preshard_corpus_records(
             flush=True,
         )
 
-    # Write per-segment completion markers.  Done after all source files and
-    # shards so a partial run (exception before this point) leaves no markers,
-    # meaning the next run re-processes those segments from scratch.
-    for plan_entry in segment_plans.values():
+    # Write per-segment completion markers only for segments actually
+    # (re)processed this pass (see segments_to_write comment above). Done
+    # after all source files and shards so a partial run (exception before
+    # this point) leaves no markers, meaning the next run re-processes those
+    # segments from scratch.
+    for plan_entry in segments_to_write.values():
         plan_entry["segment_records_dir"].mkdir(parents=True, exist_ok=True)
         (plan_entry["segment_records_dir"] / ".preshard_complete").write_text("ok", encoding="utf-8")
 
@@ -556,12 +568,20 @@ def _write_segment_records(
     an empty (or absent) input and the guard will surface the failure cleanly.
     """
     preshard_marker = segment_records_dir / ".preshard_complete"
+    # Defense in depth: trust the marker only if records.csv is actually present
+    # alongside it. _preshard_corpus_records() now only stamps this marker for
+    # segments it actually wrote to, but a marker/reality mismatch from any other
+    # cause (manual cleanup, interrupted write, older data) must not cause this
+    # step to silently skip regenerating a segment's records -- that's exactly
+    # what let imperial_container_2014 reach run_bundle_analysis.py with no
+    # records.csv on disk despite both completion markers reading "ok".
+    preshard_marker_valid = preshard_marker.is_file() and (segment_records_dir / "records.csv").is_file()
     for fname in ("records.csv", "file_metadata.csv"):
         src = records_dir / fname
         if not src.is_file():
             continue
         dst = segment_records_dir / fname
-        if preshard_marker.is_file():
+        if preshard_marker_valid:
             continue  # preshard already wrote this segment's inputs
         with src.open("r", encoding="utf-8-sig", newline="") as f:
             reader = csv.DictReader(f)
@@ -584,7 +604,7 @@ def _write_segment_records(
             if not shard_file.is_file() or not shard_file.suffix == ".csv":
                 continue
             dst_shard = seg_shard_dir / shard_file.name
-            if preshard_marker.is_file():
+            if preshard_marker_valid:
                 continue  # preshard already wrote this segment's inputs
             with shard_file.open("r", encoding="utf-8-sig", newline="") as f:
                 reader = csv.DictReader(f)
