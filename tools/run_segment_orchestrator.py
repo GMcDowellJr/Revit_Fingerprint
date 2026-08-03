@@ -1186,29 +1186,40 @@ def _run_one_segment(
             # does for identity_items_by_domain/*.csv before a fresh regenerate.
             name_bundle_analysis_dir = out_root / "results" / "bundle_analysis" / "name"
             if name_bundle_analysis_dir.is_dir():
-                # retry_fs_op: a cloud-synced segments root (OneDrive, etc.) can hold a
-                # transient lock on a file/folder this pipeline just finished writing on
-                # the previous run, producing a Windows PermissionError ([WinError 5]
-                # Access is denied) on an otherwise-correct rmtree.
-                retry_fs_op(shutil.rmtree, str(name_bundle_analysis_dir))
-            name_bundle_cmd = [
-                sys.executable,
-                str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
-                "--analysis-dir", str(out_root / "results" / "analysis"),
-                "--out-dir", str(out_root / "results" / "bundle_analysis"),
-                "--comparison-target", "name",
-                "--name-key-patterns-dir", str(out_root / "results" / "name_key" / "patterns" / "name"),
-                "--metadata-file", str(records_dir / "file_metadata.csv"),
-                "--no-discover-populations",
-            ]
-            name_bundle_cmd += ["--workers", str(bundle_workers)]
-            t_step3b_start = time.monotonic()
-            rc, tail, _content = run_step_log(name_bundle_cmd, out_root / "bundle_name.log", cwd=str(repo_root))
-            t_bundle_name = int(time.monotonic() - t_step3b_start)
-            log(f"[orchestrator]   step 3b name-bundle elapsed={t_bundle_name}s")
-            if rc != 0:
-                step_failed = "bundle_name"
-                failure_notes = f"step=bundle_name returncode={rc}\n{tail}"
+                try:
+                    # retry_fs_op: a cloud-synced segments root (OneDrive, etc.) can hold a
+                    # transient lock on a file/folder this pipeline just finished writing on
+                    # the previous run, producing a Windows PermissionError ([WinError 5]
+                    # Access is denied) on an otherwise-correct rmtree. Caught here (rather
+                    # than left to propagate) for the same reason as
+                    # _clear_stale_name_all_before_run above: retry_fs_op exhausting every
+                    # attempt -- not just a transient lock -- must still route through
+                    # step_failed/registry update rather than escape _run_one_segment()
+                    # uncaught, which would leave this segment's registry row at a stale
+                    # status=complete and cause it to be silently skipped forever.
+                    retry_fs_op(shutil.rmtree, str(name_bundle_analysis_dir))
+                except Exception as exc:
+                    step_failed = "clear_stale_name_bundle"
+                    failure_notes = f"step=clear_stale_name_bundle error={exc}"
+            if step_failed is None:
+                name_bundle_cmd = [
+                    sys.executable,
+                    str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
+                    "--analysis-dir", str(out_root / "results" / "analysis"),
+                    "--out-dir", str(out_root / "results" / "bundle_analysis"),
+                    "--comparison-target", "name",
+                    "--name-key-patterns-dir", str(out_root / "results" / "name_key" / "patterns" / "name"),
+                    "--metadata-file", str(records_dir / "file_metadata.csv"),
+                    "--no-discover-populations",
+                ]
+                name_bundle_cmd += ["--workers", str(bundle_workers)]
+                t_step3b_start = time.monotonic()
+                rc, tail, _content = run_step_log(name_bundle_cmd, out_root / "bundle_name.log", cwd=str(repo_root))
+                t_bundle_name = int(time.monotonic() - t_step3b_start)
+                log(f"[orchestrator]   step 3b name-bundle elapsed={t_bundle_name}s")
+                if rc != 0:
+                    step_failed = "bundle_name"
+                    failure_notes = f"step=bundle_name returncode={rc}\n{tail}"
 
         # Post-bundle validation (warn only, runs before registry write so warnings land in notes)
         if step_failed is None and run_type == "bundle":
