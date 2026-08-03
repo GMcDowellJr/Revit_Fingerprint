@@ -267,6 +267,28 @@ def _resolve_sig_hash_policy_path(explicit: Optional[str], out_root: Path) -> Op
     return None
 
 
+def _sig_hash_policy_fingerprint(pol: Dict[str, Any]) -> str:
+    """Stable fingerprint of a single domain's sig-hash policy entry.
+
+    Used to detect, across sig_hash-stage runs, whether a domain's policy has
+    actually changed since the last run — the basis for deciding whether that
+    domain's rows can reuse their existing sig_hash/status instead of paying
+    a redundant recompute.
+    """
+    canon = json.dumps(pol, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.md5(canon.encode("utf-8")).hexdigest()
+
+
+def _load_sig_hash_reuse_state(state_path: Path) -> Dict[str, Any]:
+    if not state_path.is_file():
+        return {}
+    try:
+        data = json.loads(state_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Optional[List[str]] = None):
     policies = load_sig_hash_policies(str(policy_path))
     dom_filter = set(domains or [])
@@ -278,6 +300,8 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
         "domains_without_policy": [],
         "records_blocked": 0,
         "records_degraded": 0,
+        "records_reused_unchanged_policy": 0,
+        "records_recomputed": 0,
     }
     domains_without = set()
     records_csv = phase0_dir / "records.csv"
@@ -306,56 +330,120 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
             out.setdefault(pk, []).append({"k": k, "v": r.get("v", r.get("item_value")), "q": r.get("q", r.get("item_value_type"))})
         grouped_cache[domain] = out
         return out
-    basis_item_rows: List[Dict[str, str]] = []
+
+    # Per-domain reuse gate: a domain's rows are only ever skipped once a prior run has
+    # *proven* (by actually recomputing and comparing) that this exact policy reproduces
+    # what's already on every row for that domain. Domains that have ever shown a
+    # mismatch (e.g. the policy's required_items is a narrower/wider set than what the
+    # extractor itself requires to avoid blocking) always recompute, forever, regardless
+    # of fingerprint — reuse is opt-in per domain, never assumed.
+    state_path = phase0_dir.parent / "diagnostics" / "sig_hash_policy_state.json"
+    reuse_state = _load_sig_hash_reuse_state(state_path)
+    new_reuse_state: Dict[str, Any] = {}
+
+    basis_csv = phase0_dir / "sig_basis_items.csv"
+    basis_csv_existed = basis_csv.is_file()
+    existing_basis_by_domain: Dict[str, List[Dict[str, str]]] = {}
+    if basis_csv_existed:
+        for r in _iter_csv_rows(basis_csv):
+            existing_basis_by_domain.setdefault(str(r.get("domain", "")).strip(), []).append(r)
+
+    records_by_domain: Dict[str, List[Dict[str, Any]]] = {}
     for row in records:
         dom = str(row.get("domain", "")).strip()
         if dom_filter and dom not in dom_filter:
             continue
+        records_by_domain.setdefault(dom, []).append(row)
+
+    basis_item_rows: List[Dict[str, str]] = []
+    for dom in sorted(records_by_domain):
+        dom_rows = records_by_domain[dom]
         pol = get_domain_sig_hash_policy(policies, dom)
         if not isinstance(pol, dict):
             domains_without.add(dom)
             continue
-        pk = str(row.get("record_pk", ""))
-        rec_items = _load_items_for_domain(dom).get(pk, [])
-        diag["records_processed"] += 1
-        sig_hash, status, reasons, hash_items = build_sig_hash_from_policy(
-            domain_policy=pol,
-            items=rec_items,
-            status_reasons=[],
+
+        fp = _sig_hash_policy_fingerprint(pol)
+        prior = reuse_state.get(dom) if isinstance(reuse_state.get(dom), dict) else None
+        reuse_ok = (
+            basis_csv_existed
+            and prior is not None
+            and prior.get("policy_fingerprint") == fp
+            and prior.get("reuse_safe") is True
         )
-        row["sig_hash"] = "" if sig_hash is None else str(sig_hash)
-        if str(row.get("join_key_schema", "")) == "sig_hash_as_join_key.v1":
-            row["join_hash"] = row["sig_hash"]
-        prior_status = str(row.get("status", "")).strip()
-        if prior_status == "blocked":
-            # Extractor-blocked records are sticky — the sig_hash stage cannot upgrade them.
-            # Exception: records blocked by a *prior apply run* must be re-evaluated so that
-            # policy corrections or updated identity_items can take effect.
-            # Distinguisher: the apply stage writes "identity.incomplete:required_not_ok:<k>";
-            # extractors write "identity.incomplete:<q>:<k>" (e.g. "identity.incomplete:missing:…").
-            # Matching on the apply-specific "required_not_ok" middle segment avoids
-            # misclassifying genuine extractor blocks as apply-stage blocks.
-            prior_reasons = [r for r in str(row.get("status_reasons", "")).split("|") if r]
-            apply_stage_blocked = any(r.startswith("identity.incomplete:required_not_ok:") for r in prior_reasons)
-            if not apply_stage_blocked:
-                pass  # genuine extractor block — preserve it
+
+        if reuse_ok:
+            # Policy unchanged since it was last proven to reproduce exactly what's
+            # already on these rows (extraction's own value, or a prior recompute) —
+            # reuse verbatim instead of recomputing.
+            for row in dom_rows:
+                diag["records_processed"] += 1
+                diag["records_reused_unchanged_policy"] += 1
+                if str(row.get("sig_hash", "")):
+                    diag["records_hashed"] += 1
+                st = str(row.get("status", "")).strip()
+                if st == "blocked":
+                    diag["records_blocked"] += 1
+                elif st == "degraded":
+                    diag["records_degraded"] += 1
+            basis_item_rows.extend(existing_basis_by_domain.get(dom, []))
+            new_reuse_state[dom] = {"policy_fingerprint": fp, "reuse_safe": True}
+            continue
+
+        domain_all_matched = True
+        for row in dom_rows:
+            pk = str(row.get("record_pk", ""))
+            rec_items = _load_items_for_domain(dom).get(pk, [])
+            diag["records_processed"] += 1
+            diag["records_recomputed"] += 1
+            sig_hash, status, reasons, hash_items = build_sig_hash_from_policy(
+                domain_policy=pol,
+                items=rec_items,
+                status_reasons=[],
+            )
+            prior_sig_hash = str(row.get("sig_hash", ""))
+            prior_status = str(row.get("status", "")).strip()
+
+            new_sig_hash = "" if sig_hash is None else str(sig_hash)
+            row["sig_hash"] = new_sig_hash
+            if str(row.get("join_key_schema", "")) == "sig_hash_as_join_key.v1":
+                row["join_hash"] = row["sig_hash"]
+            if prior_status == "blocked":
+                # Extractor-blocked records are sticky — the sig_hash stage cannot upgrade them.
+                # Exception: records blocked by a *prior apply run* must be re-evaluated so that
+                # policy corrections or updated identity_items can take effect.
+                # Distinguisher: the apply stage writes "identity.incomplete:required_not_ok:<k>";
+                # extractors write "identity.incomplete:<q>:<k>" (e.g. "identity.incomplete:missing:…").
+                # Matching on the apply-specific "required_not_ok" middle segment avoids
+                # misclassifying genuine extractor blocks as apply-stage blocks.
+                prior_reasons = [r for r in str(row.get("status_reasons", "")).split("|") if r]
+                apply_stage_blocked = any(r.startswith("identity.incomplete:required_not_ok:") for r in prior_reasons)
+                if not apply_stage_blocked:
+                    pass  # genuine extractor block — preserve it
+                else:
+                    row["status"] = str(status)
+                    row["status_reasons"] = "|".join(reasons)
             else:
                 row["status"] = str(status)
                 row["status_reasons"] = "|".join(reasons)
-        else:
-            row["status"] = str(status)
-            row["status_reasons"] = "|".join(reasons)
-        row["sig_basis_schema"] = str(pol.get("sig_hash_schema") or "")
-        for ordinal, it in enumerate(hash_items):
-            k = it.get("k")
-            if isinstance(k, str) and k:
-                basis_item_rows.append({"record_pk": pk, "domain": dom, "item_key": k, "ordinal": str(ordinal)})
-        if sig_hash is not None:
-            diag["records_hashed"] += 1
-        if status == "blocked":
-            diag["records_blocked"] += 1
-        elif status == "degraded":
-            diag["records_degraded"] += 1
+            row["sig_basis_schema"] = str(pol.get("sig_hash_schema") or "")
+
+            if new_sig_hash != prior_sig_hash or str(row.get("status", "")).strip() != prior_status:
+                domain_all_matched = False
+
+            for ordinal, it in enumerate(hash_items):
+                k = it.get("k")
+                if isinstance(k, str) and k:
+                    basis_item_rows.append({"record_pk": pk, "domain": dom, "item_key": k, "ordinal": str(ordinal)})
+            if sig_hash is not None:
+                diag["records_hashed"] += 1
+            if status == "blocked":
+                diag["records_blocked"] += 1
+            elif status == "degraded":
+                diag["records_degraded"] += 1
+
+        new_reuse_state[dom] = {"policy_fingerprint": fp, "reuse_safe": domain_all_matched}
+
     if records:
         fieldnames = list(records[0].keys())
         for extra in ("sig_hash", "sig_basis_schema", "status", "status_reasons"):
@@ -369,14 +457,13 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
             w.writeheader()
             for r in records:
                 w.writerow({k: r.get(k, "") for k in fieldnames})
+    basis_fields = ["record_pk", "domain", "item_key", "ordinal"]
     if basis_item_rows:
-        basis_csv = phase0_dir / "sig_basis_items.csv"
-        basis_fields = ["record_pk", "domain", "item_key", "ordinal"]
         with basis_csv.open("w", encoding="utf-8", newline="") as f:
             w = csv.DictWriter(f, fieldnames=basis_fields)
             w.writeheader()
             for r in basis_item_rows:
-                w.writerow(r)
+                w.writerow({k: r.get(k, "") for k in basis_fields})
         diag["sig_basis_items_written"] = len(basis_item_rows)
     diag["files_processed"] = 1
     diag["domains_without_policy"] = sorted(domains_without)
@@ -387,6 +474,8 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
                 len(domains_without), ", ".join(sorted(domains_without))
             )
         )
+    _ensure_dir(state_path.parent)
+    state_path.write_text(json.dumps(new_reuse_state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return diag
 
 
@@ -871,6 +960,8 @@ def main() -> None:
                 f"[extract_all] Stage sig_hash complete: "
                 f"processed={diag['records_processed']} hashed={diag['records_hashed']} "
                 f"blocked={diag['records_blocked']} degraded={diag['records_degraded']} "
+                f"reused={diag.get('records_reused_unchanged_policy', 0)} "
+                f"recomputed={diag.get('records_recomputed', 0)} "
                 f"basis_items={diag.get('sig_basis_items_written', 0)} "
                 f"domains_without_policy={len(diag['domains_without_policy'])}",
                 flush=True,
