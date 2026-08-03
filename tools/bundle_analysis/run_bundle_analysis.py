@@ -983,8 +983,12 @@ def run_bundle_analysis_for_target(
 
     The name leg's final output lands at `out_dir/name_all` (per-domain step0-step7 output,
     `bundle_provenance.csv`, `domain_coverage.csv`, `README.md` -- everything the internal
-    `out_dir/name/all` staging path produced, relocated as the last step of this function).
-    This flat, single-path-segment location matches the existing Power BI model's
+    `out_dir/name/all` staging path produced, relocated as the last step of this branch).
+    `out_dir/name_all` is cleared *before* staging even starts, not only after a fresh
+    tree is produced -- if staging/mining/provenance raises partway through, a prior
+    successful run's `name_all/` must not survive untouched and look like current output
+    to Power BI (PR review, #391). This flat, single-path-segment location matches the
+    existing Power BI model's
     `pPurgeView` folder-splice convention (`<segment>\\results\\bundle_analysis\\
     <pPurgeView>\\*_combined.csv`) so a report author can point `pPurgeView` at `name_all`
     exactly the way they already point it at `all`/`used` today -- see the PR3 BI-output-
@@ -1031,6 +1035,18 @@ def run_bundle_analysis_for_target(
         name_run_id = analysis_run_id or DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID
         name_out_dir = out_dir / "name"
         staging_dir = name_out_dir / "_staging_analysis_input"
+
+        # Clear any previous run's BI-facing output before starting regeneration, not only
+        # after a fresh name/all source has been produced. Without this, a failure during
+        # staging/mining/provenance below (raised before the relocation step near the end
+        # of this branch is ever reached) would leave a prior successful run's name_all/
+        # completely untouched -- Power BI would silently keep reading stale combined
+        # files from an old run even though this run is marked failed upstream (PR review,
+        # #391). Matches the same "never leave a misleading stale artifact" rationale as
+        # the orchestrator's own pre-clean of the internal bundle_analysis/name/ directory.
+        name_all_dir = out_dir / "name_all"
+        if name_all_dir.exists():
+            retry_fs_op(shutil.rmtree, str(name_all_dir))
 
         # A details-only export (no sibling *.index.json) keeps its *.details.json name as
         # its canonical export_run_id -- normalize_export_run_id() can't tell that apart
@@ -1087,16 +1103,16 @@ def run_bundle_analysis_for_target(
         # name_out_dir/"all" (this function's own internal staging/namespacing shape) is
         # two path segments; the Power BI model's pPurgeView parameter splices in a single
         # segment (`<segment>\results\bundle_analysis\<pPurgeView>\*_combined.csv`), so the
-        # BI-facing output must land at out_dir/name_all, not out_dir/name/all. Self-clears
-        # any stale name_all/ from a previous run before moving the fresh tree in, so this
-        # is safe to call repeatedly against the same out_dir with no external pre-clean.
-        # Guarded on name_all_source existing so a caller that mocks run_bundle_analysis /
-        # emit_name_target_provenance out (as some tests do) doesn't hit a missing-directory
-        # error here. Every mutating call goes through retry_fs_op() -- a segments
-        # root synced by OneDrive (or similar) can transiently lock a file/folder this
-        # function just finished writing (WinError 5 "Access is denied"), and this is
-        # dozens of small per-domain files written and immediately relocated in one pass.
-        name_all_dir = out_dir / "name_all"
+        # BI-facing output must land at out_dir/name_all, not out_dir/name/all.
+        # name_all_dir was already cleared of any stale prior run above, before staging
+        # even started -- re-checked here defensively in case anything unexpected
+        # recreated it in between. Guarded on name_all_source existing so a caller that
+        # mocks run_bundle_analysis / emit_name_target_provenance out (as some tests do)
+        # doesn't hit a missing-directory error here. Every mutating call goes through
+        # retry_fs_op() -- a segments root synced by OneDrive (or similar) can transiently
+        # lock a file/folder this function just finished writing (WinError 5 "Access is
+        # denied"), and this is dozens of small per-domain files written and immediately
+        # relocated in one pass.
         name_all_source = name_out_dir / "all"
         if name_all_source.is_dir():
             if name_all_dir.exists():

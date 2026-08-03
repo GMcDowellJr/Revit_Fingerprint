@@ -562,6 +562,82 @@ class TestNameAllOutputLocation:
         assert not (out_dir / "name").exists()
 
 
+class TestStaleNameAllClearedBeforeRegenerationEvenOnFailure:
+    """PR review (chatgpt-codex-connector, #391): a failure during staging/mining/
+    provenance generation happens before the relocation step at the end of the name
+    branch ever runs -- without an upfront clear, a prior successful run's name_all/
+    would survive completely untouched, and Power BI would keep reading it as current
+    output even though this run is marked failed upstream. name_all/ must be cleared
+    before regeneration starts, not only after a fresh tree is produced."""
+
+    def test_stale_name_all_removed_even_when_mining_raises(self, tmp_path, monkeypatch):
+        import tools.bundle_analysis.run_bundle_analysis as rba_module
+
+        out_dir = tmp_path / "out"
+        stale_name_all = out_dir / "name_all"
+        (stale_name_all / "materials").mkdir(parents=True)
+        (stale_name_all / "bundle_provenance.csv").write_text("stale", encoding="utf-8")
+        (stale_name_all / "bundles_combined.csv").write_text("stale", encoding="utf-8")
+
+        def _raises(**kwargs):
+            raise RuntimeError("boom during mining")
+
+        monkeypatch.setattr(rba_module, "run_bundle_analysis", _raises)
+
+        name_patterns_dir = _build_pr2_name_patterns_dir(tmp_path)
+        with pytest.raises(RuntimeError, match="boom during mining"):
+            run_bundle_analysis_for_target(
+                analysis_dir=tmp_path / "unused",
+                out_dir=out_dir,
+                comparison_target="name",
+                name_key_patterns_dir=name_patterns_dir,
+                discover_populations_flag=False,
+            )
+
+        assert not stale_name_all.exists()
+
+    def test_stale_name_all_removed_even_when_staging_raises(self, tmp_path, monkeypatch):
+        import tools.bundle_analysis.run_bundle_analysis as rba_module
+
+        out_dir = tmp_path / "out"
+        stale_name_all = out_dir / "name_all"
+        stale_name_all.mkdir(parents=True)
+        (stale_name_all / "bundle_provenance.csv").write_text("stale", encoding="utf-8")
+
+        def _raises(**kwargs):
+            raise RuntimeError("boom during staging")
+
+        monkeypatch.setattr(rba_module, "stage_name_projection_analysis_dir", _raises)
+
+        name_patterns_dir = _build_pr2_name_patterns_dir(tmp_path)
+        with pytest.raises(RuntimeError, match="boom during staging"):
+            run_bundle_analysis_for_target(
+                analysis_dir=tmp_path / "unused",
+                out_dir=out_dir,
+                comparison_target="name",
+                name_key_patterns_dir=name_patterns_dir,
+                discover_populations_flag=False,
+            )
+
+        assert not stale_name_all.exists()
+
+    def test_successful_run_still_repopulates_name_all_normally(self, tmp_path):
+        # Guards against an overzealous fix that clears name_all/ and never lets a
+        # successful run repopulate it.
+        name_patterns_dir = _build_pr2_name_patterns_dir(tmp_path)
+        out_dir = tmp_path / "out"
+        run_bundle_analysis_for_target(
+            analysis_dir=tmp_path / "unused",
+            out_dir=out_dir,
+            comparison_target="name",
+            name_key_patterns_dir=name_patterns_dir,
+            min_support_count=2,
+            discover_populations_flag=False,
+        )
+        assert (out_dir / "name_all" / "bundle_provenance.csv").is_file()
+        assert (out_dir / "name_all" / "materials" / "bundles.csv").is_file()
+
+
 class TestAnnotateNameTargetCombinedFiles:
     """PR3 BI-output-compatibility follow-up's 'Column-shape constraint': every
     *_combined.csv under name_all/ must additionally carry comparison_target/
