@@ -2401,8 +2401,27 @@
       "tools_governance_manifest_rationale_99"
     ],
     "42": [
+      "tools_bundle_analysis_common",
       "tools_bundle_analysis_common_atomic_write_csv",
+      "tools_bundle_analysis_common_derive_scope_key",
       "tools_bundle_analysis_common_py_path",
+      "tools_bundle_analysis_common_read_csv_rows",
+      "tools_bundle_analysis_common_resolve_analysis_run_id",
+      "tools_bundle_analysis_step1_membership_matrix",
+      "tools_bundle_analysis_step1_membership_matrix_build_membership_matrix",
+      "tools_bundle_analysis_step1_membership_matrix_load_population_file_ids",
+      "tools_bundle_analysis_step1_membership_matrix_main",
+      "tools_bundle_analysis_step1_membership_matrix_parse_args",
+      "tools_bundle_analysis_step1_membership_matrix_py_namespace",
+      "tools_bundle_analysis_step1_membership_matrix_py_path",
+      "tools_bundle_analysis_step2b_bundle_share_profile",
+      "tools_bundle_analysis_step2b_bundle_share_profile_build_bundle_share_profile",
+      "tools_bundle_analysis_step2b_bundle_share_profile_fmt_float",
+      "tools_bundle_analysis_step2b_bundle_share_profile_is_true",
+      "tools_bundle_analysis_step2b_bundle_share_profile_main",
+      "tools_bundle_analysis_step2b_bundle_share_profile_parse_args",
+      "tools_bundle_analysis_step2b_bundle_share_profile_py_namespace",
+      "tools_bundle_analysis_step2b_bundle_share_profile_py_path",
       "tools_bundle_analysis_step3_build_dag",
       "tools_bundle_analysis_step3_build_dag_build_dag_for_domain",
       "tools_bundle_analysis_step3_build_dag_main",
@@ -2415,18 +2434,10 @@
       "tools_bundle_analysis_step4_difference_sets_parse_args",
       "tools_bundle_analysis_step4_difference_sets_py_namespace",
       "tools_bundle_analysis_step4_difference_sets_py_path",
-      "tools_bundle_analysis_step6_classify_files",
-      "tools_bundle_analysis_step6_classify_files_emit_stub",
-      "tools_bundle_analysis_step6_classify_files_main",
-      "tools_bundle_analysis_step6_classify_files_parse_args",
-      "tools_bundle_analysis_step6_classify_files_py_namespace",
-      "tools_bundle_analysis_step6_classify_files_py_path",
-      "tools_bundle_analysis_step7_overlap_report",
-      "tools_bundle_analysis_step7_overlap_report_emit_stub",
-      "tools_bundle_analysis_step7_overlap_report_main",
-      "tools_bundle_analysis_step7_overlap_report_parse_args",
-      "tools_bundle_analysis_step7_overlap_report_py_namespace",
-      "tools_bundle_analysis_step7_overlap_report_py_path"
+      "tools_bundle_analysis_step_compare",
+      "tools_bundle_analysis_step_compare_compute_gap_rows",
+      "tools_bundle_analysis_step_compare_py_path",
+      "tools_bundle_analysis_step_compare_run_compare_for_domain"
     ],
     "43": [
       "tools_patterns_analysis_archive_attributes",
@@ -2796,9 +2807,7 @@
       "tests_test_view_instances_cache_key_consistency_test_view_instances_cache_key_consistency"
     ],
     "53": [
-      "tools_bundle_analysis_common",
       "tools_bundle_analysis_common_compute_effective_support",
-      "tools_bundle_analysis_common_derive_scope_key",
       "tools_bundle_analysis_common_make_bundle_id",
       "tools_bundle_analysis_step0_discover_populations",
       "tools_bundle_analysis_step0_discover_populations_collapse_subset_related_roots",
@@ -3918,7 +3927,13 @@
       "tools_bundle_analysis_run_bundle_analysis_run_bundle_analysis",
       "tools_bundle_analysis_run_bundle_analysis_run_pipeline_once",
       "tools_bundle_analysis_run_bundle_analysis_run_step2_to_step7",
-      "tools_bundle_analysis_run_bundle_analysis_view_out_dir"
+      "tools_bundle_analysis_run_bundle_analysis_view_out_dir",
+      "tools_bundle_analysis_step6_classify_files",
+      "tools_bundle_analysis_step6_classify_files_emit_stub",
+      "tools_bundle_analysis_step6_classify_files_main",
+      "tools_bundle_analysis_step6_classify_files_parse_args",
+      "tools_bundle_analysis_step6_classify_files_py_namespace",
+      "tools_bundle_analysis_step6_classify_files_py_path"
     ],
     "93": [
       "tools_probes_probe_identity",
@@ -4059,7 +4074,6 @@
       "tests_test_dimension_types_shape_gating_testsplitdomainpolicies_test_spot_slope_policy_exists"
     ],
     "99": [
-      "tests_test_governance_evidence_package_test_build_file_inventory_document_wraps_files_and_counts",
       "tests_test_governance_evidence_package_test_write_json_round_trips",
       "tools_governance_evidence_package",
       "tools_governance_evidence_package_artifact",
@@ -4277,7 +4291,6 @@
       "tools_run_segment_orchestrator_rationale_781"
     ],
     "109": [
-      "tools_bundle_analysis_common_read_csv_rows",
       "tools_bundle_analysis_placeholder_exclusions",
       "tools_bundle_analysis_placeholder_exclusions_choose_threshold",
       "tools_bundle_analysis_placeholder_exclusions_compute_placeholder_exclusions",
@@ -4775,6 +4788,7 @@
       "tests_test_governance_evidence_package_manifest",
       "tests_test_governance_evidence_package_py_path",
       "tests_test_governance_evidence_package_rationale_159",
+      "tests_test_governance_evidence_package_test_build_file_inventory_document_wraps_files_and_counts",
       "tests_test_governance_evidence_package_test_health_omitted_policy_load_status_adds_no_warning_and_stays_complete",
       "tests_test_governance_evidence_package_test_manifest_does_not_claim_missing_source_identifiers",
       "tests_test_governance_evidence_package_test_manifest_marks_input_present_based_on_real_filesystem_state",
@@ -5804,19 +5818,12 @@
       "tests_test_text_types_flat_items_export_type_init"
     ],
     "220": [
-      "tools_bundle_analysis_common_resolve_analysis_run_id",
-      "tools_bundle_analysis_step2b_bundle_share_profile",
-      "tools_bundle_analysis_step2b_bundle_share_profile_build_bundle_share_profile",
-      "tools_bundle_analysis_step2b_bundle_share_profile_fmt_float",
-      "tools_bundle_analysis_step2b_bundle_share_profile_is_true",
-      "tools_bundle_analysis_step2b_bundle_share_profile_main",
-      "tools_bundle_analysis_step2b_bundle_share_profile_parse_args",
-      "tools_bundle_analysis_step2b_bundle_share_profile_py_namespace",
-      "tools_bundle_analysis_step2b_bundle_share_profile_py_path",
-      "tools_bundle_analysis_step_compare",
-      "tools_bundle_analysis_step_compare_compute_gap_rows",
-      "tools_bundle_analysis_step_compare_py_path",
-      "tools_bundle_analysis_step_compare_run_compare_for_domain"
+      "tools_bundle_analysis_step7_overlap_report",
+      "tools_bundle_analysis_step7_overlap_report_emit_stub",
+      "tools_bundle_analysis_step7_overlap_report_main",
+      "tools_bundle_analysis_step7_overlap_report_parse_args",
+      "tools_bundle_analysis_step7_overlap_report_py_namespace",
+      "tools_bundle_analysis_step7_overlap_report_py_path"
     ],
     "221": [
       "tools_label_synthesis_synopsis_formatters_line_styles",
@@ -7026,15 +7033,6 @@
     ],
     "556": [
       "tools_run_extract_all_py_any"
-    ],
-    "557": [
-      "tools_bundle_analysis_step1_membership_matrix",
-      "tools_bundle_analysis_step1_membership_matrix_build_membership_matrix",
-      "tools_bundle_analysis_step1_membership_matrix_load_population_file_ids",
-      "tools_bundle_analysis_step1_membership_matrix_main",
-      "tools_bundle_analysis_step1_membership_matrix_parse_args",
-      "tools_bundle_analysis_step1_membership_matrix_py_namespace",
-      "tools_bundle_analysis_step1_membership_matrix_py_path"
     ]
   },
   "cohesion": {
@@ -7080,7 +7078,7 @@
     "39": 0.1006006006006006,
     "40": 0.08558558558558559,
     "41": 0.13663663663663664,
-    "42": 0.11384615384615385,
+    "42": 0.12312312312312312,
     "43": 0.11861861861861862,
     "44": 0.07777777777777778,
     "45": 0.1253968253968254,
@@ -7091,7 +7089,7 @@
     "50": 0.17045454545454544,
     "51": 0.11491935483870967,
     "52": 0.15268817204301074,
-    "53": 0.11931818181818182,
+    "53": 0.12043010752688173,
     "54": 0.13978494623655913,
     "55": 0.10967741935483871,
     "56": 0.1010752688172043,
@@ -7130,14 +7128,14 @@
     "89": 0.16205533596837945,
     "90": 0.12987012987012986,
     "91": 0.1341991341991342,
-    "92": 0.23333333333333334,
+    "92": 0.15584415584415584,
     "93": 0.1471861471861472,
     "94": 0.1,
     "95": 0.14761904761904762,
     "96": 0.19523809523809524,
     "97": 0.16666666666666666,
     "98": 0.14210526315789473,
-    "99": 0.14761904761904762,
+    "99": 0.15789473684210525,
     "100": 0.15789473684210525,
     "101": 0.23157894736842105,
     "102": 0.1631578947368421,
@@ -7147,7 +7145,7 @@
     "106": 0.2046783625730994,
     "107": 0.11695906432748537,
     "108": 0.21052631578947367,
-    "109": 0.19473684210526315,
+    "109": 0.18128654970760233,
     "110": 0.15204678362573099,
     "111": 0.10526315789473684,
     "112": 0.19298245614035087,
@@ -7173,7 +7171,7 @@
     "132": 0.2761904761904762,
     "133": 0.2087912087912088,
     "134": 0.3626373626373626,
-    "135": 0.1794871794871795,
+    "135": 0.16483516483516483,
     "136": 0.24175824175824176,
     "137": 0.21978021978021978,
     "138": 0.31868131868131866,
@@ -7258,7 +7256,7 @@
     "217": 0.3333333333333333,
     "218": 0.4666666666666667,
     "219": 0.4666666666666667,
-    "220": 0.2692307692307692,
+    "220": 0.4666666666666667,
     "221": 0.4,
     "222": 0.6,
     "223": 0.4666666666666667,
@@ -7594,8 +7592,7 @@
     "553": 1.0,
     "554": 1.0,
     "555": 1.0,
-    "556": 1.0,
-    "557": 0.47619047619047616
+    "556": 1.0
   },
   "gods": [
     {
@@ -7692,7 +7689,7 @@
       ],
       "confidence": "EXTRACTED",
       "relation": "references",
-      "why": "crosses file types (doc ↔ code); connects across different repos/directories; peripheral node `LinePatternElementDescriptor` unexpectedly reaches hub `RevitLookup Descriptor`"
+      "why": "crosses file types (doc \u2194 code); connects across different repos/directories; peripheral node `LinePatternElementDescriptor` unexpectedly reaches hub `RevitLookup Descriptor`"
     },
     {
       "source": "RevitLookup Descriptor",
@@ -7703,44 +7700,11 @@
       ],
       "confidence": "EXTRACTED",
       "relation": "references",
-      "why": "crosses file types (doc ↔ code); connects across different repos/directories; peripheral node `DimensionTypeDescriptor` unexpectedly reaches hub `RevitLookup Descriptor`"
+      "why": "crosses file types (doc \u2194 code); connects across different repos/directories; peripheral node `DimensionTypeDescriptor` unexpectedly reaches hub `RevitLookup Descriptor`"
     }
   ],
-  "questions": [
-    {
-      "type": "bridge_node",
-      "question": "Why does `load_exports()` connect `Domain Record Extraction` to `Text Types Candidate Simulation`, `Fingerprint Export Discovery`, `Joinhash Parameter Population`, `Intradomain Summary Building`, `Domain Indexing`, `Collision Differencing`, `Domain Identity Contract`, `Element Classification`, `Reference Standards Building`, `Change Classification`, `Cluster Detection`, `Export File Processing`, `Join Key Application`?",
-      "why": "High betweenness centrality (0.045) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `log()` connect `Signal Clustering` to `Shared IO Helpers`, `Cluster Review Preparation`, `Cross Domain Item Building`, `Domain Pattern Classification`, `Reference Graph Generation`?",
-      "why": "High betweenness centrality (0.044) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `jenks_breaks()` connect `Population Discovery` to `Signal Clustering`?",
-      "why": "High betweenness centrality (0.042) - this node is a cross-community bridge."
-    },
-    {
-      "type": "verify_inferred",
-      "question": "Are the 76 inferred relationships involving `_build_segments()` (e.g. with `test_blank_client_label_no_longer_participates_in_subset()` and `test_blank_discipline_does_not_generate_discipline_cut()`) actually correct?",
-      "why": "`_build_segments()` has 76 INFERRED edges - model-reasoned connections that need verification."
-    },
-    {
-      "type": "verify_inferred",
-      "question": "Are the 59 inferred relationships involving `normalise_summary_schema()` (e.g. with `_client_fixture()` and `test_build_client_summary_backfills_n_files_for_cross_client_only_clients()`) actually correct?",
-      "why": "`normalise_summary_schema()` has 59 INFERRED edges - model-reasoned connections that need verification."
-    },
-    {
-      "type": "isolated_nodes",
-      "question": "What connects `session-start.sh script`, `hook-check.sh script`, `setup.sh script` to the rest of the system?",
-      "why": "567 weakly-connected nodes found - possible documentation gaps or missing edges."
-    },
-    {
-      "type": "low_cohesion",
-      "question": "Should `Identity Key Management` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.06318681318681318 - nodes in this community are weakly interconnected."
-    }
-  ]
+  "tokens": {
+    "input": 42050,
+    "output": 1293
+  }
 }
