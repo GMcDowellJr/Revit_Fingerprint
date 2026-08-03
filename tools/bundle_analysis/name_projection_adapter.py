@@ -294,3 +294,69 @@ declaration required for every bundle in this output.
     (view_out_dir / "README.md").write_text(readme, encoding="utf-8")
 
     return {"bundles_annotated": len(provenance_rows), "excluded_domains": len(excluded_rows)}
+
+
+# Mirrors tools/run_segment_orchestrator.py's BI_MERGE_FILES exactly (the per-domain
+# filenames merge_bi_outputs() combines into `{stem}_combined.csv`). Duplicated here
+# rather than imported -- run_segment_orchestrator.py already imports from this module,
+# and bundle_analysis/ must not depend back on the top-level orchestrator script.
+NAME_TARGET_COMBINED_FILES = [
+    "membership_matrix.csv",
+    "bundles.csv",
+    "bundle_dag_nodes.csv",
+    "bundle_dag_edges.csv",
+    "bundle_dag_differences.csv",
+    "pattern_bundle_classification.csv",
+    "bundle_membership.csv",
+    "file_bundle_classification.csv",
+    "bundle_file_membership.csv",
+    "scope_registry.csv",
+]
+
+
+def annotate_name_target_combined_files(bundle_analysis_dir: Path) -> Dict[str, int]:
+    """Add `comparison_target`/`coverage_class`/`provenance_note` columns to every
+    `*_combined.csv` file `merge_bi_outputs()` wrote under `comparison_target=name`.
+
+    Per the PR3 BI-output-compatibility brief's "Column-shape constraint": every existing
+    typed column (the ones the Power BI model's `Table.TransformColumnTypes` steps name)
+    is left exactly as `merge_bi_outputs()` produced it -- these three are appended after
+    the existing header, never inserted, renamed, or substituted for an existing column.
+    `bundles_combined.csv`/etc. only exist under the caller-chosen `name_all` output root
+    (see `run_bundle_analysis_for_target()`), never mixed into config-target's `all`/`used`
+    output, so this never touches a byte of config-target output.
+
+    `coverage_class` is looked up per row from that row's own `domain` column via
+    `core/name_key_coverage.py` -- every one of the ten files carries `domain` natively
+    (bundle-analysis output is inherently domain-partitioned; see step1-step6). Idempotent:
+    a file that already carries `comparison_target` is left untouched, so calling this
+    more than once against the same directory is safe.
+    """
+    import csv as _csv
+    import sys as _sys
+
+    _repo_root = str(Path(__file__).resolve().parent.parent.parent)
+    if _repo_root not in _sys.path:
+        _sys.path.insert(0, _repo_root)
+    from core.name_key_coverage import coverage_class as _coverage_class
+
+    stats: Dict[str, int] = {}
+    for filename in NAME_TARGET_COMBINED_FILES:
+        stem = Path(filename).stem
+        path = bundle_analysis_dir / f"{stem}_combined.csv"
+        if not path.is_file():
+            continue
+        with path.open("r", encoding="utf-8-sig", newline="") as fh:
+            reader = _csv.DictReader(fh)
+            header = list(reader.fieldnames or [])
+            rows = [dict(row) for row in reader]
+        if not header or "comparison_target" in header:
+            continue
+        has_domain = "domain" in header
+        for row in rows:
+            row["comparison_target"] = "name"
+            row["coverage_class"] = _coverage_class(row.get("domain", "")) if has_domain else ""
+            row["provenance_note"] = PROVENANCE_NOTE_NAME_TARGET
+        atomic_write_csv(path, header + ["comparison_target", "coverage_class", "provenance_note"], rows)
+        stats[filename] = len(rows)
+    return stats

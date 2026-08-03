@@ -22,7 +22,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 from run_segment_orchestrator import (  # noqa: E402
     _active_domains_from_name_patterns,
+    _clear_stale_name_all_before_run,
     _filter_name_key_csv_to_segment,
+    _run_one_segment,
     _segment_has_name_leg_output,
     merge_bi_outputs,
 )
@@ -153,7 +155,7 @@ class TestActiveDomainsFromNamePatterns:
 
 class TestMergeBiOutputsExcludesStaleDomainsForEmptySegment:
     def test_empty_active_domains_merges_nothing_even_with_stale_folder_present(self, tmp_path):
-        bundle_dir = tmp_path / "name" / "all"
+        bundle_dir = tmp_path / "name_all"
         _write_csv(
             bundle_dir / "stale_domain" / "bundles.csv",
             ["schema_version", "analysis_run_id", "domain", "bundle_id"],
@@ -168,7 +170,7 @@ class TestMergeBiOutputsExcludesStaleDomainsForEmptySegment:
     def test_none_active_domains_merges_everything_found_unfiltered(self, tmp_path):
         # Contrast case: None genuinely means "no filtering info available" (e.g. the
         # patterns step never ran), which intentionally still merges whatever is on disk.
-        bundle_dir = tmp_path / "name" / "all"
+        bundle_dir = tmp_path / "name_all"
         _write_csv(
             bundle_dir / "some_domain" / "bundles.csv",
             ["schema_version", "analysis_run_id", "domain", "bundle_id"],
@@ -184,7 +186,7 @@ class TestMergeBiOutputsExcludesStaleDomainsForEmptySegment:
         # PR #390 review, second round: a segment that previously had real bundles and is
         # rerun with zero current candidates must not leave the old *_combined.csv in
         # place -- Power BI would keep reading it as if it were this run's result.
-        bundle_dir = tmp_path / "name" / "all"
+        bundle_dir = tmp_path / "name_all"
         stale_combined = bundle_dir / "bundles_combined.csv"
         _write_csv(
             stale_combined,
@@ -203,7 +205,7 @@ class TestMergeBiOutputsExcludesStaleDomainsForEmptySegment:
     def test_stale_combined_csv_deleted_when_all_candidates_are_headerless(self, tmp_path):
         # The second "continue without writing" path (candidates exist but every one is a
         # truly empty/headerless file) must clean up stale output the same way.
-        bundle_dir = tmp_path / "name" / "all"
+        bundle_dir = tmp_path / "name_all"
         stale_combined = bundle_dir / "bundles_combined.csv"
         _write_csv(
             stale_combined,
@@ -224,7 +226,7 @@ class TestSegmentHasNameLegOutput:
         assert _segment_has_name_leg_output(tmp_path) is False
 
     def test_true_when_provenance_file_present(self, tmp_path):
-        provenance = tmp_path / "results" / "bundle_analysis" / "name" / "bundle_provenance.csv"
+        provenance = tmp_path / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv"
         provenance.parent.mkdir(parents=True)
         provenance.write_text("analysis_run_id,comparison_target\n", encoding="utf-8")
         assert _segment_has_name_leg_output(tmp_path) is True
@@ -336,7 +338,7 @@ class TestCompleteSegmentSkipHonorsNameTarget:
 
         segments_root = tmp_path / "segments"
         if with_name_leg_output:
-            provenance = segments_root / "seg1" / "results" / "bundle_analysis" / "name" / "bundle_provenance.csv"
+            provenance = segments_root / "seg1" / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv"
             provenance.parent.mkdir(parents=True)
             provenance.write_text("analysis_run_id,comparison_target\n", encoding="utf-8")
 
@@ -427,8 +429,11 @@ class TestStaleNameBundleOutputClearedBeforeRerun:
     stale files and reports them in a fresh bundle_provenance.csv even for a run that finds
     zero active domains. merge_bi_outputs()'s *_combined.csv cleanup (round 2's fix) doesn't
     cover this, since provenance is built independently. These tests exercise the real CLI
-    (not mocked) to prove both the underlying gap and that clearing the output directory
-    first -- what _run_one_segment()'s step 3b now does -- actually closes it."""
+    (not mocked). The original gap is now closed as a byproduct of the PR3 BI-output-
+    compatibility follow-up's move-based relocation of out_dir/name/all into the flat
+    out_dir/name_all (see the first test below) -- the second test additionally confirms
+    _run_one_segment()'s own step 3b pre-clean of out_dir/name still works as
+    belt-and-suspenders."""
 
     _RUN_BUNDLE_ANALYSIS = _REPO_ROOT / "tools" / "bundle_analysis" / "run_bundle_analysis.py"
 
@@ -479,24 +484,33 @@ class TestStaleNameBundleOutputClearedBeforeRerun:
             capture_output=True, text=True,
         )
 
-    def test_reusing_the_same_out_dir_without_clearing_leaves_stale_provenance(self, tmp_path):
+    def test_reusing_the_same_out_dir_without_clearing_no_longer_leaves_stale_provenance(self, tmp_path):
+        # PR3 BI-output-compatibility follow-up: run_bundle_analysis_for_target() now
+        # *moves* (not copies) out_dir/name/all into the flat out_dir/name_all BI-facing
+        # location, self-clearing out_dir/name_all before each move. A side effect: the
+        # source directory (out_dir/name/all) no longer persists between invocations of
+        # this script either, so the specific staleness gap this class exercises (a stale
+        # per-domain folder surviving in the *final* output across reruns without an
+        # external pre-clean) is closed as a byproduct -- even calling run_bundle_analysis.py
+        # directly, bypassing the orchestrator's own step-3b pre-clean entirely.
         out_dir = tmp_path / "bundle_out"
         populated = self._build_populated_name_patterns_dir(tmp_path)
         first = self._run_name_bundle_analysis(out_dir, populated)
         assert first.returncode == 0, first.stderr
-        provenance = _read_csv(out_dir / "name" / "bundle_provenance.csv")
+        provenance = _read_csv(out_dir / "name_all" / "bundle_provenance.csv")
         assert any(r["domain"] == "materials" for r in provenance)
 
         # Rerun against a name-key CSV that now yields zero domains, WITHOUT clearing
-        # out_dir first -- reproduces the pre-fix orchestrator behavior.
+        # out_dir first.
         empty = self._build_empty_name_patterns_dir(tmp_path)
         second = self._run_name_bundle_analysis(out_dir, empty)
         assert second.returncode == 0, second.stderr
 
-        stale_provenance = _read_csv(out_dir / "name" / "bundle_provenance.csv")
-        assert any(r["domain"] == "materials" for r in stale_provenance), (
-            "expected the underlying gap to reproduce: a stale materials bundle should "
-            "still be present without the clear-before-regenerate fix"
+        fresh_provenance = _read_csv(out_dir / "name_all" / "bundle_provenance.csv")
+        assert not any(r["domain"] == "materials" for r in fresh_provenance), (
+            "the move-based relocation to name_all/ should have reset the source "
+            "directory, so no stale materials bundle should survive into this rerun's "
+            "output even without an external pre-clean step"
         )
 
     def test_clearing_out_dir_before_rerun_removes_stale_provenance(self, tmp_path):
@@ -508,7 +522,7 @@ class TestStaleNameBundleOutputClearedBeforeRerun:
         assert first.returncode == 0, first.stderr
         assert any(
             r["domain"] == "materials"
-            for r in _read_csv(out_dir / "name" / "bundle_provenance.csv")
+            for r in _read_csv(out_dir / "name_all" / "bundle_provenance.csv")
         )
 
         # This is what _run_one_segment()'s step 3b now does before invoking
@@ -521,6 +535,232 @@ class TestStaleNameBundleOutputClearedBeforeRerun:
         second = self._run_name_bundle_analysis(out_dir, empty)
         assert second.returncode == 0, second.stderr
 
-        fresh_provenance = _read_csv(out_dir / "name" / "bundle_provenance.csv")
+        fresh_provenance = _read_csv(out_dir / "name_all" / "bundle_provenance.csv")
         assert fresh_provenance == []
-        assert not any((out_dir / "name" / "all").rglob("bundles.csv"))
+        assert not any((out_dir / "name_all").rglob("bundles.csv"))
+
+
+class TestClearStaleNameAllBeforeRun:
+    """PR review (chatgpt-codex-connector, #391, second round): a failure in step 2b
+    (name-pattern generation) or step 3 (config bundle, which gates step 3b even under
+    comparison_target=both) skips step 3b entirely, so
+    run_bundle_analysis_for_target()'s own upfront clear of name_all/ never runs. This
+    orchestrator-level clear must fire before any step of the run, independent of
+    whether anything later succeeds or fails."""
+
+    def test_clears_existing_name_all_for_bundle_and_name_target(self, tmp_path):
+        out_root = tmp_path / "seg1"
+        name_all = out_root / "results" / "bundle_analysis" / "name_all"
+        (name_all / "materials").mkdir(parents=True)
+        (name_all / "bundle_provenance.csv").write_text("stale", encoding="utf-8")
+
+        logs = []
+        _clear_stale_name_all_before_run(out_root, "bundle", "name", logs.append)
+
+        assert not name_all.exists()
+        assert any("clearing stale" in m for m in logs)
+
+    def test_clears_for_both_target_too(self, tmp_path):
+        out_root = tmp_path / "seg1"
+        name_all = out_root / "results" / "bundle_analysis" / "name_all"
+        name_all.mkdir(parents=True)
+
+        _clear_stale_name_all_before_run(out_root, "bundle", "both", lambda m: None)
+
+        assert not name_all.exists()
+
+    def test_noop_when_name_all_does_not_exist(self, tmp_path):
+        out_root = tmp_path / "seg1"
+        logs = []
+        _clear_stale_name_all_before_run(out_root, "bundle", "name", logs.append)
+        assert logs == []
+
+    def test_noop_for_config_target(self, tmp_path):
+        out_root = tmp_path / "seg1"
+        name_all = out_root / "results" / "bundle_analysis" / "name_all"
+        name_all.mkdir(parents=True)
+
+        _clear_stale_name_all_before_run(out_root, "bundle", "config", lambda m: None)
+
+        assert name_all.exists()  # config target never touches name_all
+
+    def test_noop_for_reference_run_type(self, tmp_path):
+        # Step 3/3b (and thus name-leg work entirely) are gated on run_type == "bundle";
+        # a reference row can never produce name_all output.
+        out_root = tmp_path / "seg1"
+        name_all = out_root / "results" / "bundle_analysis" / "name_all"
+        name_all.mkdir(parents=True)
+
+        _clear_stale_name_all_before_run(out_root, "reference", "name", lambda m: None)
+
+        assert name_all.exists()
+
+
+class TestAnnotationFailureFailsTheSegment:
+    """PR review (chatgpt-codex-connector, #391, second round): if
+    annotate_name_target_combined_files() (or merge_bi_outputs()) raises, the
+    surrounding handler must not just log a warning -- _segment_has_name_leg_output()
+    only checks that bundle_provenance.csv exists (already written by step 3b before
+    this block runs), so a merely-logged failure would still record status=complete,
+    and a later non-forced run would skip this segment forever, permanently leaving
+    Power BI with combined files that are stale or missing the required
+    comparison_target/coverage_class/provenance_note columns."""
+
+    def _run(self, tmp_path: Path, *, annotate_raises: bool, monkeypatch) -> dict:
+        import threading
+        import run_segment_orchestrator as orchestrator_module
+
+        out_root = tmp_path / "segments" / "seg1"
+
+        # Fake out every subprocess-based step (2, 2b, 3, 3b) as an instant success, and
+        # step 1's real-records dependency, so execution reaches the bi_merge_name block
+        # under test without needing a real extraction pipeline. Step 2 additionally
+        # verifies pattern_presence_file.csv exists after a successful return code, so
+        # the fake has to produce that one marker file too.
+        def _fake_run_step_log(cmd, log_path, cwd=None):
+            cmd_str = " ".join(str(c) for c in cmd)
+            if "run_extract_all.py" in cmd_str:
+                presence_csv = out_root / "results" / "analysis" / "pattern_presence_file.csv"
+                presence_csv.parent.mkdir(parents=True, exist_ok=True)
+                presence_csv.write_text("schema_version,analysis_run_id,domain\n", encoding="utf-8")
+            return (0, "", "")
+
+        monkeypatch.setattr(orchestrator_module, "_write_segment_records", lambda *a, **k: None)
+        monkeypatch.setattr(orchestrator_module, "run_step_log", _fake_run_step_log)
+        monkeypatch.setattr(orchestrator_module, "write_results_registry", lambda **k: 0)
+        if annotate_raises:
+            def _raises(*a, **k):
+                raise RuntimeError("boom during annotation")
+            monkeypatch.setattr(orchestrator_module, "annotate_name_target_combined_files", _raises)
+
+        records_dir = tmp_path / "records"
+        records_dir.mkdir(parents=True)
+        exports_dir = tmp_path / "exports"
+        exports_dir.mkdir(parents=True)
+        join_policy = tmp_path / "join_policy.json"
+        join_policy.write_text("{}", encoding="utf-8")
+        registry_file = tmp_path / "run_registry.csv"
+        manifest_file = tmp_path / "segment_manifest.csv"
+        results_registry_file = tmp_path / "results_registry.csv"
+        name_key_results_csv = tmp_path / "name_key_results.csv"
+        _write_csv(name_key_results_csv, NAME_KEY_FIELDS, [])
+
+        reg_row = {
+            "segment_id": "seg1", "run_type": "bundle", "output_folder": "seg1",
+            "status": "pending", "notes": "", "last_run_utc": "",
+        }
+        mrow = {"segment_id": "seg1", "segment_level": "0", "file_count": "1", "population_hash": ""}
+        registry = [dict(reg_row)]
+        reg_index = {"seg1": 0}
+
+        result = orchestrator_module._run_one_segment(
+            idx=1, total=1, reg_row=reg_row, mrow=mrow,
+            membership={"seg1": ["f1.json"]},
+            records_dir=records_dir, exports_dir=exports_dir, segments_root=tmp_path / "segments",
+            repo_root=_REPO_ROOT, join_policy=join_policy,
+            skip_bi_merge=False,
+            registry=registry, reg_index=reg_index, registry_file=registry_file,
+            manifest_file=manifest_file, results_registry_file=results_registry_file,
+            registry_lock=threading.Lock(), counters={"complete": 0, "failed": 0, "skipped": 0, "failed_ids": []},
+            counters_lock=threading.Lock(), worker_id=1, bundle_workers=1,
+            comparison_target="name", name_key_results_csv=name_key_results_csv,
+        )
+        return {"result": result, "registry": registry}
+
+    def test_annotation_failure_marks_segment_failed_not_complete(self, tmp_path, monkeypatch):
+        outcome = self._run(tmp_path, annotate_raises=True, monkeypatch=monkeypatch)
+        assert outcome["registry"][0]["status"] == "failed"
+        assert "bi_merge_name" in outcome["registry"][0]["notes"]
+
+    def test_no_annotation_failure_still_marks_segment_complete(self, tmp_path, monkeypatch):
+        # Contrast case: without the injected failure, the same fully-stubbed run
+        # reaches "complete" -- proves the failure assertion above is actually
+        # exercising the annotation-failure path, not some unrelated stub gap.
+        outcome = self._run(tmp_path, annotate_raises=False, monkeypatch=monkeypatch)
+        assert outcome["registry"][0]["status"] == "complete"
+
+
+class TestClearStaleNameAllFailureFailsTheSegment:
+    """PR review (chatgpt-codex-connector, #391, third round): _clear_stale_name_all_
+    before_run() is called before _run_one_segment()'s try/except machinery and its
+    registry-update block. Left unguarded, a persistent failure there (retry_fs_op
+    exhausting every attempt, not just a transient one) would propagate straight out of
+    _run_one_segment() -- the ThreadPoolExecutor caller's generic "unhandled exception"
+    handler only updates in-memory counters/segment_results, never registry_file, so the
+    segment's registry row (and bundle_provenance.csv) would be left at whatever they
+    were before this run -- often status=complete from a prior successful run -- and the
+    next non-forced run would skip it forever, silently reading stale Power BI output."""
+
+    def _run(self, tmp_path: Path, *, clear_raises: bool, monkeypatch) -> dict:
+        import threading
+        import run_segment_orchestrator as orchestrator_module
+
+        out_root = tmp_path / "segments" / "seg1"
+
+        def _fake_run_step_log(cmd, log_path, cwd=None):
+            cmd_str = " ".join(str(c) for c in cmd)
+            if "run_extract_all.py" in cmd_str:
+                presence_csv = out_root / "results" / "analysis" / "pattern_presence_file.csv"
+                presence_csv.parent.mkdir(parents=True, exist_ok=True)
+                presence_csv.write_text("schema_version,analysis_run_id,domain\n", encoding="utf-8")
+            return (0, "", "")
+
+        monkeypatch.setattr(orchestrator_module, "_write_segment_records", lambda *a, **k: None)
+        monkeypatch.setattr(orchestrator_module, "run_step_log", _fake_run_step_log)
+        monkeypatch.setattr(orchestrator_module, "write_results_registry", lambda **k: 0)
+        monkeypatch.setattr(orchestrator_module, "annotate_name_target_combined_files", lambda *a, **k: {})
+        if clear_raises:
+            def _raises(*a, **k):
+                raise PermissionError("[WinError 5] Access is denied (persistent lock)")
+            monkeypatch.setattr(orchestrator_module, "_clear_stale_name_all_before_run", _raises)
+
+        records_dir = tmp_path / "records"
+        records_dir.mkdir(parents=True)
+        exports_dir = tmp_path / "exports"
+        exports_dir.mkdir(parents=True)
+        join_policy = tmp_path / "join_policy.json"
+        join_policy.write_text("{}", encoding="utf-8")
+        registry_file = tmp_path / "run_registry.csv"
+        manifest_file = tmp_path / "segment_manifest.csv"
+        results_registry_file = tmp_path / "results_registry.csv"
+        name_key_results_csv = tmp_path / "name_key_results.csv"
+        _write_csv(name_key_results_csv, NAME_KEY_FIELDS, [])
+
+        # Registry row starts as "complete" from a fictional prior successful run, so a
+        # regression (the exception escaping without updating the registry) would leave
+        # it looking exactly like a real prior success rather than a fresh "pending" --
+        # the scenario the review comment specifically describes.
+        reg_row = {
+            "segment_id": "seg1", "run_type": "bundle", "output_folder": "seg1",
+            "status": "complete", "notes": "", "last_run_utc": "2026-01-01T00:00:00Z",
+        }
+        mrow = {"segment_id": "seg1", "segment_level": "0", "file_count": "1", "population_hash": ""}
+        registry = [dict(reg_row)]
+        reg_index = {"seg1": 0}
+
+        result = orchestrator_module._run_one_segment(
+            idx=1, total=1, reg_row=reg_row, mrow=mrow,
+            membership={"seg1": ["f1.json"]},
+            records_dir=records_dir, exports_dir=exports_dir, segments_root=tmp_path / "segments",
+            repo_root=_REPO_ROOT, join_policy=join_policy,
+            skip_bi_merge=False,
+            registry=registry, reg_index=reg_index, registry_file=registry_file,
+            manifest_file=manifest_file, results_registry_file=results_registry_file,
+            registry_lock=threading.Lock(), counters={"complete": 0, "failed": 0, "skipped": 0, "failed_ids": []},
+            counters_lock=threading.Lock(), worker_id=1, bundle_workers=1,
+            comparison_target="name", name_key_results_csv=name_key_results_csv,
+        )
+        return {"result": result, "registry": registry}
+
+    def test_persistent_clear_failure_does_not_escape_and_marks_segment_failed(self, tmp_path, monkeypatch):
+        # The core assertion: the exception must NOT propagate out of _run_one_segment()
+        # (it must be caught internally), and the registry row must flip from its
+        # starting "complete" to "failed" rather than being left untouched.
+        outcome = self._run(tmp_path, clear_raises=True, monkeypatch=monkeypatch)
+        assert outcome["registry"][0]["status"] == "failed"
+        assert "clear_stale_name_all" in outcome["registry"][0]["notes"]
+
+    def test_no_clear_failure_still_marks_segment_complete(self, tmp_path, monkeypatch):
+        # Contrast case, same rationale as the annotation-failure tests above.
+        outcome = self._run(tmp_path, clear_raises=False, monkeypatch=monkeypatch)
+        assert outcome["registry"][0]["status"] == "complete"

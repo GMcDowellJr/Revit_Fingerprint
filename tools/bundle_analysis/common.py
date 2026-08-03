@@ -4,13 +4,39 @@ import base64
 import csv
 import hashlib
 import math
+import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Dict, Iterable, List, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence
 
 SCHEMA_VERSION = "2.1"
 ROW_KEY_DOMAINS = {"object_styles_model", "object_styles_annotation", "view_category_overrides"}
 SHAPE_GATED_DOMAINS = {"dimension_types", "arrowheads"}
+
+
+def retry_fs_op(op, *args, attempts: int = 5, delay_seconds: float = 1.0) -> None:
+    """Run a filesystem-mutating callable (shutil.move / shutil.rmtree), retrying with
+    backoff on OSError (covers Windows' PermissionError / WinError 5 "Access is denied").
+
+    A cloud-synced segments root (OneDrive, etc.) can hold a transient lock on a
+    just-written file or folder while its sync client is still uploading/indexing it,
+    even though nothing in this process holds a handle -- the name-projection bundle leg
+    both writes and immediately relocates dozens of small per-domain files in one pass,
+    which is exactly the window this can hit. Retrying after a short pause is the
+    standard mitigation; a genuine permissions problem still surfaces once every attempt
+    is exhausted. Shared by run_bundle_analysis.py's out_dir/name_all relocation and
+    run_segment_orchestrator.py's stale-output pre-clean, both of which mutate the same
+    segments-root tree."""
+    last_exc: Optional[OSError] = None
+    for attempt in range(attempts):
+        try:
+            op(*args)
+            return
+        except OSError as exc:
+            last_exc = exc
+            if attempt < attempts - 1:
+                time.sleep(delay_seconds * (attempt + 1))
+    raise last_exc
 
 
 def read_csv_rows(path: Path) -> List[Dict[str, str]]:

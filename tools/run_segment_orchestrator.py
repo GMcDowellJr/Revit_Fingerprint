@@ -37,8 +37,8 @@ from typing import Any, Dict, List, Optional
 
 # Allow import of bundle_analysis package from the same tools/ directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bundle_analysis.common import atomic_write_csv
-from bundle_analysis.name_projection_adapter import normalize_export_run_id
+from bundle_analysis.common import atomic_write_csv, retry_fs_op
+from bundle_analysis.name_projection_adapter import annotate_name_target_combined_files, normalize_export_run_id
 from build_results_registry import write_results_registry
 
 VALID_COMPARISON_TARGETS = {"config", "name", "both"}
@@ -773,8 +773,12 @@ def _segment_has_name_leg_output(out_root: Path) -> bool:
     a reliable "name leg already ran" marker, independent of run_registry.csv's single
     whole-segment `status` column, which has no notion of per-leg completion. Used so a
     segment already marked complete under a config-only run isn't skipped once the operator
-    later asks for --comparison-target name/both -- see PR #390 review."""
-    return (out_root / "results" / "bundle_analysis" / "name" / "bundle_provenance.csv").is_file()
+    later asks for --comparison-target name/both -- see PR #390 review.
+
+    bundle_provenance.csv lives at bundle_analysis/name_all/ (the flat, single-path-segment
+    BI-facing output location -- see run_bundle_analysis_for_target()'s docstring), not
+    under the internal bundle_analysis/name/ staging path."""
+    return (out_root / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv").is_file()
 
 
 def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozenset] = None) -> dict:
@@ -920,6 +924,27 @@ def validate_membership_against_manifest(
     return errors
 
 
+def _clear_stale_name_all_before_run(out_root: Path, run_type: str, comparison_target: str, log) -> None:
+    """Clear this segment's stale name-leg BI-facing output before any step of this run
+    begins -- not just before step 3b, and not only inside
+    run_bundle_analysis_for_target()'s own upfront clear. A failure in step 2b
+    (name-pattern generation) or step 3 (config bundle, which gates step 3b even under
+    comparison_target=both) skips step 3b entirely, so run_bundle_analysis_for_target()
+    is never invoked at all and its own clear never runs -- without this, Power BI would
+    keep reading name_all/ from an old successful run even though this run is recorded
+    as failed (PR review, #391, second round).
+
+    Only fires for segments this call actually intends to (re)run with name-leg work --
+    already-complete segments are filtered out of plan_to_run before _run_one_segment()
+    is ever invoked, so their still-current name_all/ is never touched by this function.
+    """
+    if run_type == "bundle" and comparison_target in ("name", "both"):
+        stale_name_all = out_root / "results" / "bundle_analysis" / "name_all"
+        if stale_name_all.is_dir():
+            log(f"[orchestrator]   clearing stale {stale_name_all} before name-leg regeneration")
+            retry_fs_op(shutil.rmtree, str(stale_name_all))
+
+
 def _run_one_segment(
     idx: int,
     total: int,
@@ -954,7 +979,7 @@ def _run_one_segment(
     the existing join_hash leg: re-cluster this segment's slice of a corpus-wide
     name_key_results.csv (tools/apply_name_key_policy.py, computed once up front -- see
     _filter_name_key_csv_to_segment()'s docstring for why no per-segment JSON re-parse is
-    needed), then bundle-mine it into results/bundle_analysis/name/all/, mirroring
+    needed), then bundle-mine it into results/bundle_analysis/name_all/, mirroring
     results/bundle_analysis/all/ for the config leg but using join_key_name_identity as the
     join instead of join_hash.
     """
@@ -997,6 +1022,22 @@ def _run_one_segment(
         def log(msg: str) -> None:
             log_f.write(msg + "\n")
             log_f.flush()
+
+        # Caught here (rather than left to propagate) so a persistent lock -- retry_fs_op
+        # exhausting every attempt, not just a transient one -- still routes through
+        # step_failed and the registry-update block below. An uncaught exception this
+        # early would escape _run_one_segment() entirely; the ThreadPoolExecutor caller's
+        # generic "unhandled exception" handler only updates in-memory counters/
+        # segment_results, never registry_file, leaving the segment's registry row (and
+        # bundle_provenance.csv) at whatever they were before this run -- often
+        # status=complete from a prior successful run -- so the next non-forced run would
+        # skip it forever, silently reading stale Power BI output (PR review, #391, third
+        # round).
+        try:
+            _clear_stale_name_all_before_run(out_root, run_type, comparison_target, log)
+        except Exception as exc:
+            step_failed = "clear_stale_name_all"
+            failure_notes = f"step=clear_stale_name_all error={exc}"
 
         # Step 1 — Prepare: directories, export_run_ids.txt, segment-level records
         log(f"[orchestrator]   step 1/3 prepare...")
@@ -1145,7 +1186,11 @@ def _run_one_segment(
             # does for identity_items_by_domain/*.csv before a fresh regenerate.
             name_bundle_analysis_dir = out_root / "results" / "bundle_analysis" / "name"
             if name_bundle_analysis_dir.is_dir():
-                shutil.rmtree(name_bundle_analysis_dir)
+                # retry_fs_op: a cloud-synced segments root (OneDrive, etc.) can hold a
+                # transient lock on a file/folder this pipeline just finished writing on
+                # the previous run, producing a Windows PermissionError ([WinError 5]
+                # Access is denied) on an otherwise-correct rmtree.
+                retry_fs_op(shutil.rmtree, str(name_bundle_analysis_dir))
             name_bundle_cmd = [
                 sys.executable,
                 str(repo_root / "tools" / "bundle_analysis" / "run_bundle_analysis.py"),
@@ -1194,21 +1239,42 @@ def _run_one_segment(
             log(f"[orchestrator]   bi_merge elapsed={t_merge}s")
 
         # Name-projection BI merge (opt-in; mirrors the config-leg merge above but reads
-        # bundle_analysis/name/all/ and the name-target domain set)
+        # bundle_analysis/name_all/ -- the flat, single-path-segment location
+        # run_bundle_analysis_for_target() relocates the name leg's ALL-view output to, so
+        # it matches the Power BI model's pPurgeView folder-splice convention -- and the
+        # name-target domain set)
         if step_failed is None and run_type == "bundle" and comparison_target in ("name", "both") and not skip_bi_merge:
             t_merge_name_start = time.monotonic()
             try:
                 active_domains_name = _active_domains_from_name_patterns(
                     out_root / "results" / "name_key" / "patterns" / "name"
                 )
-                bundle_analysis_name_dir = out_root / "results" / "bundle_analysis" / "name" / "all"
+                bundle_analysis_name_dir = out_root / "results" / "bundle_analysis" / "name_all"
                 merge_result_name = merge_bi_outputs(bundle_analysis_name_dir, active_domains=active_domains_name)
                 total_files_name = sum(v["files_merged"] for v in merge_result_name.values())
                 total_rows_name = sum(v["rows_written"] for v in merge_result_name.values())
                 log(
                     f"[orchestrator] bi_merge_name segment={sid} files_merged={total_files_name} rows_written={total_rows_name}"
                 )
+                # PR3 BI-output-compatibility brief's "Column-shape constraint": every
+                # *_combined.csv under name_all/ must additionally declare
+                # comparison_target/coverage_class/provenance_note per row, strictly
+                # additive to the existing typed columns the Power BI model already reads.
+                annotate_stats = annotate_name_target_combined_files(bundle_analysis_name_dir)
+                log(f"[orchestrator] bi_merge_name_annotate segment={sid} files_annotated={len(annotate_stats)}")
             except Exception as merge_exc:
+                # Unlike the config leg's own bi_merge above (deliberately non-fatal --
+                # its "complete" status has no separate output-verifying marker),
+                # a failure here MUST fail the segment. _segment_has_name_leg_output()
+                # only checks that bundle_provenance.csv exists, which step 3b already
+                # wrote successfully before this block ever runs -- so a merge/annotate
+                # failure logged as a mere warning would still record status=complete,
+                # and a later non-forced run would then skip this segment forever,
+                # permanently leaving Power BI with combined files that are stale or
+                # missing the required comparison_target/coverage_class/provenance_note
+                # columns (PR review, #391, second round).
+                step_failed = "bi_merge_name"
+                failure_notes = f"step=bi_merge_name error={merge_exc}"
                 log(f"[WARN orchestrator] bi_merge_name failed for segment={sid}: {merge_exc}")
             t_merge_name = int(time.monotonic() - t_merge_name_start)
             log(f"[orchestrator]   bi_merge_name elapsed={t_merge_name}s")
@@ -1736,7 +1802,7 @@ def main() -> None:
         help="config (default, unchanged behavior/output): join_hash only, exactly as "
              "before this flag existed. name/both additionally re-cluster this segment's "
              "slice of --name-key-results-csv (PR1's join_key_name_identity) and bundle-mine "
-             "it into results/bundle_analysis/name/all/, alongside the existing "
+             "it into results/bundle_analysis/name_all/, alongside the existing "
              "results/bundle_analysis/{all,used}/ config-target output.",
     )
     ap.add_argument(
