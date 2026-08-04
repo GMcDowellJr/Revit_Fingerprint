@@ -29,11 +29,29 @@
 #        When False, no file is written (OUT is still returned).
 #        Default: False
 #
+#   IN[4] enable_crosswalk (bool)
+#        Whether to emit a Phase -> using-views crosswalk (one row per
+#        Phase: how many non-template views have that Phase as their
+#        VIEW_PHASE parameter, plus a small name sample). Appended as a
+#        new position rather than inserted between IN[1] and IN[2] so
+#        existing positional callers (output_directory/write_json) don't
+#        silently shift.
+#        Default: False
+#
+#   IN[5] max_views_to_scan (int)
+#        When crosswalk enabled, scan at most N views (post-collector,
+#        pre-template-filter) for VIEW_PHASE assignments.
+#        Default: 2000
+#
 # Notes:
 #   - Modeled after exporter domain behavior: phases are global, order matters, and name+sequence are the main
 #     cross-project signature candidates; UniqueId is document-scoped evidence only.
 #   - Discovery prefers doc.Phases (preserves document ordering), with collector fallback.
-#   - Crosswalk is empty here (no natural relationship validated in this probe).
+#   - Crosswalk: phases are referenced by views (VIEW_PHASE) and, indirectly, by every phased element's
+#     Created/Demolished phase -- the latter is corpus-scale element data, out of scope for a single-file
+#     breadth probe, so this crosswalk covers the view-level reference only. A phase with
+#     used_by_view_count == 0 has no view referencing it directly (not the same as "unused" corpus-wide,
+#     since elements can still carry it as Created/Demolished phase).
 
 import clr
 
@@ -48,7 +66,7 @@ clr.AddReference("RevitAPI")
 from Autodesk.Revit.DB import (
     FilteredElementCollector, ElementId,
     StorageType, UnitUtils, UnitTypeId, UnitFormatUtils,
-    Phase
+    Phase, View, BuiltInParameter
 )
 
 try:
@@ -66,6 +84,9 @@ include_phase_parameters = IN[1] if len(IN) > 1 and IN[1] is not None else True
 # IN[3] write_json (bool) — enable/disable file write
 output_directory = IN[2] if len(IN) > 2 and IN[2] is not None else None
 write_json = IN[3] if len(IN) > 3 and IN[3] is not None else False
+
+enable_crosswalk = IN[4] if len(IN) > 4 and IN[4] is not None else False
+max_views_to_scan = IN[5] if len(IN) > 5 and IN[5] is not None else 2000
 
 
 # -------------------------
@@ -485,12 +506,99 @@ def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200)
         })
     return records
 
+# -------------------------
+# Crosswalk (optional): Phase -> using-views. Reuses the same view-scan/
+# get_Parameter pattern probe_phase_filters.py already uses for VIEW_PHASE_FILTER,
+# applied here to VIEW_PHASE. One row per discovered Phase (not per view) --
+# an aggregated usage count is the directly useful governance signal
+# ("is this phase actually referenced by anything"), not a raw per-view join.
+# -------------------------
+
+def _get_view_phase_param(v):
+    bip = _safe(lambda: BuiltInParameter.VIEW_PHASE, None)
+    if bip is not None:
+        p = _safe(lambda: v.get_Parameter(bip), None)
+        if p is not None:
+            return ("VIEW_PHASE", p)
+    p = _safe(lambda: v.LookupParameter("Phase"), None)
+    if p is not None:
+        return ("Phase", p)
+    return (None, None)
+
+phase_usage = {}  # phase_id_int -> {"view_count": int, "sample_view_names": [...]}
+if enable_crosswalk:
+    scan_views = _safe(lambda: list(FilteredElementCollector(doc).OfClass(View).ToElements()), default=[])
+    try:
+        vcap = int(max_views_to_scan)
+        if vcap >= 0:
+            scan_views = scan_views[:vcap]
+    except:
+        pass
+
+    for v in scan_views:
+        if v is None:
+            continue
+        is_template = _safe(lambda: bool(v.IsTemplate), False)
+        if is_template:
+            continue
+        _matched_name, p = _get_view_phase_param(v)
+        pv = _format_param_contract(p)
+        if pv.get("storage") != "ElementId" or pv.get("raw") is None:
+            continue
+        ph_id = int(pv.get("raw"))
+        entry = phase_usage.setdefault(ph_id, {"view_count": 0, "sample_view_names": []})
+        entry["view_count"] += 1
+        vname = _safe(lambda: v.Name, None)
+        if vname and len(entry["sample_view_names"]) < 5:
+            entry["sample_view_names"].append(vname)
+
+optional_crosswalk = []
+
+
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
+for i, ph in enumerate(phases):
+    pid = _safe(lambda: ph.Id.IntegerValue, None)
+    if pid is None:
+        continue
+    pname = _safe(lambda: ph.Name, None)
+    ph_ws_id_obj = _safe(lambda: ph.WorksetId, None)
+    ph_ws_name, _ph_ws_resolved = _resolve_workset(doc, ph_ws_id_obj)
+    ph_ws_id_int = _safe(lambda: ph_ws_id_obj.IntegerValue, None) if ph_ws_id_obj is not None else None
+    usage = phase_usage.get(pid, {"view_count": 0, "sample_view_names": []})
+    optional_crosswalk.append({
+        "phase.id": pid,
+        "phase.name": pname,
+        "phase.workset_id": ph_ws_id_int,
+        "phase.workset_name": ph_ws_name,
+        "phase.is_used_by_any_view": usage["view_count"] > 0,
+        "used_by_view_count": usage["view_count"],
+        "sample_view_names": usage["sample_view_names"],
+    })
+
 _reflection_records_0 = _run_reflection_sweep(phases, "Phase", "phases")
 _reflection_records = _reflection_records_0
 
 OUT = [
     {"domain": "phases", "kind": "inventory", "records": records},
-    {"domain": "phases", "kind": "crosswalk", "records": []},
+    {"domain": "phases", "kind": "crosswalk", "records": optional_crosswalk},
     {"domain": "phases", "kind": "reflection", "records": _reflection_records},
 ]
 

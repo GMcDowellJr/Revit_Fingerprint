@@ -13,7 +13,7 @@
 #   {
 #     "kind": "crosswalk",
 #     "domain": "view_filter_definitions",
-#     "records": []                         # no natural crosswalk emitted here
+#     "records": optional_crosswalk         # ParameterFilterElement -> applying views/templates
 #   }
 # ]
 #
@@ -39,6 +39,22 @@
 #        Hard safety cap on number of rules flattened per filter.
 #        Default: 200
 #
+#   IN[5] enable_crosswalk (bool)
+#        Whether to emit a ParameterFilterElement -> applying-views/templates
+#        crosswalk (one row per filter: how many live views and how many
+#        view templates have it in View.GetFilters(), plus a small name
+#        sample). Same View.GetFilters() call probe_view_filter_applications.py
+#        already uses, applied from the filter's side instead of the view's
+#        side -- that probe's crosswalk tells you what a given view applies;
+#        this one tells you whether a given filter is used by anything at
+#        all (orphan/adoption signal). Appended as a new position rather
+#        than inserted earlier so existing positional callers don't shift.
+#        Default: False
+#
+#   IN[6] max_views_to_scan (int)
+#        When crosswalk enabled, scan at most N views+templates for applied
+#        filters. Default: 2000
+#
 # Reference pattern: probe_arrowheads.py :contentReference[oaicite:0]{index=0}
 
 
@@ -63,7 +79,8 @@ from Autodesk.Revit.DB import (
     ParameterFilterElement,
     LogicalAndFilter,
     LogicalOrFilter,
-    ElementParameterFilter
+    ElementParameterFilter,
+    View
 )
 
 doc = DocumentManager.Instance.CurrentDBDocument
@@ -73,6 +90,8 @@ per_category_sig_limit = IN[1] if len(IN) > 1 and IN[1] is not None else 5
 write_json = IN[2] if len(IN) > 2 and IN[2] is not None else False
 out_path = IN[3] if len(IN) > 3 and IN[3] is not None else None
 max_rules_to_read_per_filter = IN[4] if len(IN) > 4 and IN[4] is not None else 200
+enable_crosswalk = IN[5] if len(IN) > 5 and IN[5] is not None else False
+max_views_to_scan = IN[6] if len(IN) > 6 and IN[6] is not None else 2000
 
 
 # -------------------------
@@ -678,6 +697,92 @@ def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200)
 _reflection_records_0 = _run_reflection_sweep(selected, "ParameterFilterElement", "view_filter_definitions")
 _reflection_records = _reflection_records_0
 
+# -------------------------
+# Crosswalk (optional): ParameterFilterElement -> applying views/templates.
+# Reuses the exact View.GetFilters() call probe_view_filter_applications.py
+# already uses, from the filter's side instead of the view's side. One row
+# per discovered filter (from `filters`, the full pre-bucket-sample list --
+# every definition gets a crosswalk row, not just the reflection-sampled
+# subset), aggregated usage counts rather than a raw per-view join, since
+# "is this filter used by anything" is the directly useful governance
+# question (orphan/purge-candidate signal).
+# -------------------------
+
+filter_usage = {}  # filter_id_int -> {"live_view_count": int, "template_count": int, "sample_names": [...]}
+if enable_crosswalk:
+    scan_views = _safe(lambda: list(FilteredElementCollector(doc).OfClass(View).ToElements()), default=[])
+    try:
+        vcap = int(max_views_to_scan)
+        if vcap >= 0:
+            scan_views = scan_views[:vcap]
+    except:
+        pass
+
+    for v in scan_views:
+        if v is None:
+            continue
+        is_template = _safe(lambda: bool(v.IsTemplate), False)
+        # Guarded: some view types can throw on GetFilters (same guard
+        # probe_view_filter_applications.py uses).
+        fids = _safe(lambda: list(v.GetFilters()), default=None)
+        if not fids:
+            continue
+        vname = _safe(lambda: v.Name, None)
+        for fid_obj in fids:
+            fid = _safe(lambda: fid_obj.IntegerValue, None)
+            if fid is None:
+                continue
+            entry = filter_usage.setdefault(fid, {"live_view_count": 0, "template_count": 0, "sample_names": []})
+            if is_template:
+                entry["template_count"] += 1
+            else:
+                entry["live_view_count"] += 1
+            if vname and len(entry["sample_names"]) < 5:
+                entry["sample_names"].append(vname)
+
+optional_crosswalk = []
+
+
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
+for f in filters:
+    fid = _safe(lambda: f.Id.IntegerValue, None)
+    if fid is None:
+        continue
+    fname = _safe(lambda: f.Name, None)
+    f_ws_id_obj = _safe(lambda: f.WorksetId, None)
+    f_ws_name, _f_ws_resolved = _resolve_workset(doc, f_ws_id_obj)
+    f_ws_id_int = _safe(lambda: f_ws_id_obj.IntegerValue, None) if f_ws_id_obj is not None else None
+    usage = filter_usage.get(fid, {"live_view_count": 0, "template_count": 0, "sample_names": []})
+    total = usage["live_view_count"] + usage["template_count"]
+    optional_crosswalk.append({
+        "filter.id": fid,
+        "filter.name": fname,
+        "filter.workset_id": f_ws_id_int,
+        "filter.workset_name": f_ws_name,
+        "filter.is_applied_anywhere": total > 0,
+        "applied_live_view_count": usage["live_view_count"],
+        "applied_template_count": usage["template_count"],
+        "sample_applied_names": usage["sample_names"],
+    })
+
 OUT_payload = [
     {
         "kind": "reflection",
@@ -692,7 +797,7 @@ OUT_payload = [
     {
         "kind": "crosswalk",
         "domain": "view_filter_definitions",
-        "records": []
+        "records": optional_crosswalk
     }
 ]
 

@@ -296,11 +296,37 @@ for pk in sorted(param_index.keys()):
 
 optional_crosswalk = []
 
+
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
 for m in selected:
+    ws_id_obj = _safe(lambda: m.WorksetId, None)
+    ws_name, ws_resolved = _resolve_workset(doc, ws_id_obj)
+    ws_id_int = _safe(lambda: ws_id_obj.IntegerValue, None) if ws_id_obj is not None else None
+
     row = {
         "material.id": _safe(lambda: m.Id.IntegerValue, None),
         "material.name": _safe_name(m),
         "material.class": _safe(lambda: m.MaterialClass, None),
+        "material.workset_id": ws_id_int,
+        "material.workset_name": ws_name,
         "appearance_asset.id": None,
         "appearance_asset.name": None,
         "appearance_asset.resolved": False,

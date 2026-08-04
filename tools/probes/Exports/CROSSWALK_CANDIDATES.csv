@@ -1,0 +1,223 @@
+member,domain_count,domain,key_kind,key,example_display,run_count
+AssemblyInstanceId,20,arrowheads,reflection,refl.ArrowheadType.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,browser_organization,reflection,refl.BrowserOrganization.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,ceiling_types,reflection,refl.CeilingType.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,fill_patterns,reflection,refl.FillPatternElement.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,floor_types,reflection,refl.FloorType.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,identity,reflection,refl.ProjectInformation.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,line_patterns,reflection,refl.LinePatternElement.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,line_styles,reflection,refl.GraphicsStyle.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,loaded_family_types,reflection,refl.FamilySymbol.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,materials,reflection,refl.AppearanceAssetElement.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,materials,reflection,refl.Material.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,phase_filters,reflection,refl.PhaseFilter.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,phase_graphics,reflection,refl.View.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,phases,reflection,refl.Phase.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,roof_types,reflection,refl.RoofType.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,text_types,reflection,refl.TextNoteType.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,view_filter_applications,reflection,refl.ParameterFilterElement.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,view_filter_definitions,reflection,refl.ParameterFilterElement.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,view_templates,reflection,refl.View.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,views,reflection,refl.View.AssemblyInstanceId,-1,3
+AssemblyInstanceId,20,wall_types,reflection,refl.WallType.AssemblyInstanceId,-1,3
+GroupId,20,arrowheads,reflection,refl.ArrowheadType.GroupId,-1,3
+GroupId,20,browser_organization,reflection,refl.BrowserOrganization.GroupId,-1,3
+GroupId,20,ceiling_types,reflection,refl.CeilingType.GroupId,-1,3
+GroupId,20,fill_patterns,reflection,refl.FillPatternElement.GroupId,-1,3
+GroupId,20,floor_types,reflection,refl.FloorType.GroupId,-1,3
+GroupId,20,identity,reflection,refl.ProjectInformation.GroupId,-1,3
+GroupId,20,line_patterns,reflection,refl.LinePatternElement.GroupId,-1,3
+GroupId,20,line_styles,reflection,refl.GraphicsStyle.GroupId,-1,3
+GroupId,20,loaded_family_types,reflection,refl.FamilySymbol.GroupId,-1,3
+GroupId,20,materials,reflection,refl.AppearanceAssetElement.GroupId,-1,3
+GroupId,20,materials,reflection,refl.Material.GroupId,-1,3
+GroupId,20,phase_filters,reflection,refl.PhaseFilter.GroupId,-1,3
+GroupId,20,phase_graphics,reflection,refl.View.GroupId,-1,3
+GroupId,20,phases,reflection,refl.Phase.GroupId,-1,3
+GroupId,20,roof_types,reflection,refl.RoofType.GroupId,-1,3
+GroupId,20,text_types,reflection,refl.TextNoteType.GroupId,-1,3
+GroupId,20,view_filter_applications,reflection,refl.ParameterFilterElement.GroupId,-1,3
+GroupId,20,view_filter_definitions,reflection,refl.ParameterFilterElement.GroupId,-1,3
+GroupId,20,view_templates,reflection,refl.View.GroupId,-1,3
+GroupId,20,views,reflection,refl.View.GroupId,-1,3
+GroupId,20,wall_types,reflection,refl.WallType.GroupId,-1,3
+LevelId,20,arrowheads,reflection,refl.ArrowheadType.LevelId,-1,3
+LevelId,20,browser_organization,reflection,refl.BrowserOrganization.LevelId,-1,3
+LevelId,20,ceiling_types,reflection,refl.CeilingType.LevelId,-1,3
+LevelId,20,fill_patterns,reflection,refl.FillPatternElement.LevelId,-1,3
+LevelId,20,floor_types,reflection,refl.FloorType.LevelId,-1,3
+LevelId,20,identity,reflection,refl.ProjectInformation.LevelId,-1,3
+LevelId,20,line_patterns,reflection,refl.LinePatternElement.LevelId,-1,3
+LevelId,20,line_styles,reflection,refl.GraphicsStyle.LevelId,-1,3
+LevelId,20,loaded_family_types,reflection,refl.FamilySymbol.LevelId,-1,3
+LevelId,20,materials,reflection,refl.AppearanceAssetElement.LevelId,-1,3
+LevelId,20,materials,reflection,refl.Material.LevelId,-1,3
+LevelId,20,phase_filters,reflection,refl.PhaseFilter.LevelId,-1,3
+LevelId,20,phase_graphics,reflection,refl.View.LevelId,-1,3
+LevelId,20,phases,reflection,refl.Phase.LevelId,-1,3
+LevelId,20,roof_types,reflection,refl.RoofType.LevelId,-1,3
+LevelId,20,text_types,reflection,refl.TextNoteType.LevelId,-1,3
+LevelId,20,view_filter_applications,reflection,refl.ParameterFilterElement.LevelId,-1,3
+LevelId,20,view_filter_definitions,reflection,refl.ParameterFilterElement.LevelId,-1,3
+LevelId,20,view_templates,reflection,refl.View.LevelId,-1,3
+LevelId,20,views,reflection,refl.View.LevelId,-1,3
+LevelId,20,wall_types,reflection,refl.WallType.LevelId,-1,3
+CreatedPhaseId,19,arrowheads,reflection,refl.ArrowheadType.CreatedPhaseId,-1,3
+CreatedPhaseId,19,browser_organization,reflection,refl.BrowserOrganization.CreatedPhaseId,-1,3
+CreatedPhaseId,19,ceiling_types,reflection,refl.CeilingType.CreatedPhaseId,-1,3
+CreatedPhaseId,19,fill_patterns,reflection,refl.FillPatternElement.CreatedPhaseId,-1,3
+CreatedPhaseId,19,floor_types,reflection,refl.FloorType.CreatedPhaseId,-1,3
+CreatedPhaseId,19,identity,reflection,refl.ProjectInformation.CreatedPhaseId,-1,3
+CreatedPhaseId,19,line_patterns,reflection,refl.LinePatternElement.CreatedPhaseId,-1,3
+CreatedPhaseId,19,line_styles,reflection,refl.GraphicsStyle.CreatedPhaseId,-1,3
+CreatedPhaseId,19,loaded_family_types,reflection,refl.FamilySymbol.CreatedPhaseId,-1,3
+CreatedPhaseId,19,materials,reflection,refl.AppearanceAssetElement.CreatedPhaseId,-1,3
+CreatedPhaseId,19,materials,reflection,refl.Material.CreatedPhaseId,-1,3
+CreatedPhaseId,19,phase_filters,reflection,refl.PhaseFilter.CreatedPhaseId,-1,3
+CreatedPhaseId,19,phase_graphics,reflection,refl.View.CreatedPhaseId,-1,3
+CreatedPhaseId,19,roof_types,reflection,refl.RoofType.CreatedPhaseId,-1,3
+CreatedPhaseId,19,text_types,reflection,refl.TextNoteType.CreatedPhaseId,-1,3
+CreatedPhaseId,19,view_filter_applications,reflection,refl.ParameterFilterElement.CreatedPhaseId,-1,3
+CreatedPhaseId,19,view_filter_definitions,reflection,refl.ParameterFilterElement.CreatedPhaseId,-1,3
+CreatedPhaseId,19,view_templates,reflection,refl.View.CreatedPhaseId,-1,3
+CreatedPhaseId,19,views,reflection,refl.View.CreatedPhaseId,-1,3
+CreatedPhaseId,19,wall_types,reflection,refl.WallType.CreatedPhaseId,-1,3
+DemolishedPhaseId,19,arrowheads,reflection,refl.ArrowheadType.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,browser_organization,reflection,refl.BrowserOrganization.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,ceiling_types,reflection,refl.CeilingType.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,fill_patterns,reflection,refl.FillPatternElement.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,floor_types,reflection,refl.FloorType.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,identity,reflection,refl.ProjectInformation.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,line_patterns,reflection,refl.LinePatternElement.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,line_styles,reflection,refl.GraphicsStyle.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,loaded_family_types,reflection,refl.FamilySymbol.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,materials,reflection,refl.AppearanceAssetElement.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,materials,reflection,refl.Material.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,phase_filters,reflection,refl.PhaseFilter.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,phase_graphics,reflection,refl.View.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,roof_types,reflection,refl.RoofType.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,text_types,reflection,refl.TextNoteType.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,view_filter_applications,reflection,refl.ParameterFilterElement.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,view_filter_definitions,reflection,refl.ParameterFilterElement.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,view_templates,reflection,refl.View.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,views,reflection,refl.View.DemolishedPhaseId,-1,3
+DemolishedPhaseId,19,wall_types,reflection,refl.WallType.DemolishedPhaseId,-1,3
+OwnerViewId,16,arrowheads,reflection,refl.ArrowheadType.OwnerViewId,-1,3
+OwnerViewId,16,browser_organization,reflection,refl.BrowserOrganization.OwnerViewId,-1,3
+OwnerViewId,16,ceiling_types,reflection,refl.CeilingType.OwnerViewId,-1,3
+OwnerViewId,16,fill_patterns,reflection,refl.FillPatternElement.OwnerViewId,-1,3
+OwnerViewId,16,floor_types,reflection,refl.FloorType.OwnerViewId,-1,3
+OwnerViewId,16,identity,reflection,refl.ProjectInformation.OwnerViewId,-1,3
+OwnerViewId,16,line_patterns,reflection,refl.LinePatternElement.OwnerViewId,-1,3
+OwnerViewId,16,line_styles,reflection,refl.GraphicsStyle.OwnerViewId,-1,3
+OwnerViewId,16,loaded_family_types,reflection,refl.FamilySymbol.OwnerViewId,-1,3
+OwnerViewId,16,materials,reflection,refl.AppearanceAssetElement.OwnerViewId,-1,3
+OwnerViewId,16,materials,reflection,refl.Material.OwnerViewId,-1,3
+OwnerViewId,16,phase_graphics,reflection,refl.View.OwnerViewId,-1,3
+OwnerViewId,16,phases,reflection,refl.Phase.OwnerViewId,-1,3
+OwnerViewId,16,roof_types,reflection,refl.RoofType.OwnerViewId,-1,3
+OwnerViewId,16,text_types,reflection,refl.TextNoteType.OwnerViewId,-1,3
+OwnerViewId,16,view_filter_definitions,reflection,refl.ParameterFilterElement.OwnerViewId,-1,3
+OwnerViewId,16,wall_types,reflection,refl.WallType.OwnerViewId,-1,3
+Coarse Scale Fill Pattern,4,ceiling_types,param,p.Coarse Scale Fill Pattern,,3
+Coarse Scale Fill Pattern,4,floor_types,param,p.Coarse Scale Fill Pattern,,3
+Coarse Scale Fill Pattern,4,roof_types,param,p.Coarse Scale Fill Pattern,,3
+Coarse Scale Fill Pattern,4,wall_types,param,p.Coarse Scale Fill Pattern,<Solid fill>,3
+DeckProfileId,4,ceiling_types,reflection,refl.CompoundStructureLayer.DeckProfileId,-1,3
+DeckProfileId,4,floor_types,reflection,refl.CompoundStructureLayer.DeckProfileId,-1,3
+DeckProfileId,4,roof_types,reflection,refl.CompoundStructureLayer.DeckProfileId,-1,3
+DeckProfileId,4,wall_types,reflection,refl.CompoundStructureLayer.DeckProfileId,-1,3
+Type Image,4,ceiling_types,param,p.Type Image,,3
+Type Image,4,floor_types,param,p.Type Image,,3
+Type Image,4,roof_types,param,p.Type Image,,3
+Type Image,4,wall_types,param,p.Type Image,,3
+AnalysisDisplayStyleId,3,phase_graphics,reflection,refl.View.AnalysisDisplayStyleId,-1,3
+AnalysisDisplayStyleId,3,view_templates,reflection,refl.View.AnalysisDisplayStyleId,-1,3
+AnalysisDisplayStyleId,3,views,reflection,refl.View.AnalysisDisplayStyleId,-1,3
+AssociatedAssemblyInstanceId,3,phase_graphics,reflection,refl.View.AssociatedAssemblyInstanceId,-1,3
+AssociatedAssemblyInstanceId,3,view_templates,reflection,refl.View.AssociatedAssemblyInstanceId,-1,3
+AssociatedAssemblyInstanceId,3,views,reflection,refl.View.AssociatedAssemblyInstanceId,-1,3
+CutBackgroundPatternId,3,materials,reflection,refl.Material.CutBackgroundPatternId,-1,3
+CutBackgroundPatternId,3,view_category_overrides,reflection,refl.OverrideGraphicSettings.CutBackgroundPatternId,-1,3
+CutBackgroundPatternId,3,view_filter_applications,reflection,refl.OverrideGraphicSettings.CutBackgroundPatternId,-1,3
+CutForegroundPatternId,3,materials,reflection,refl.Material.CutForegroundPatternId,-1,3
+CutForegroundPatternId,3,view_category_overrides,reflection,refl.OverrideGraphicSettings.CutForegroundPatternId,-1,3
+CutForegroundPatternId,3,view_filter_applications,reflection,refl.OverrideGraphicSettings.CutForegroundPatternId,-1,3
+SurfaceBackgroundPatternId,3,materials,reflection,refl.Material.SurfaceBackgroundPatternId,-1,3
+SurfaceBackgroundPatternId,3,view_category_overrides,reflection,refl.OverrideGraphicSettings.SurfaceBackgroundPatternId,-1,3
+SurfaceBackgroundPatternId,3,view_filter_applications,reflection,refl.OverrideGraphicSettings.SurfaceBackgroundPatternId,-1,3
+SurfaceForegroundPatternId,3,materials,reflection,refl.Material.SurfaceForegroundPatternId,-1,3
+SurfaceForegroundPatternId,3,view_category_overrides,reflection,refl.OverrideGraphicSettings.SurfaceForegroundPatternId,-1,3
+SurfaceForegroundPatternId,3,view_filter_applications,reflection,refl.OverrideGraphicSettings.SurfaceForegroundPatternId,20,3
+TargetId,3,phase_graphics,reflection,refl.View.TargetId,-1,3
+TargetId,3,view_templates,reflection,refl.View.TargetId,-1,2
+TargetId,3,views,reflection,refl.View.TargetId,-1,3
+BodyTextTypeId,2,phase_graphics,reflection,refl.View.BodyTextTypeId,10352,3
+BodyTextTypeId,2,view_templates,reflection,refl.View.BodyTextTypeId,2622,2
+Border 1 Type,2,roof_types,param,p.Border 1 Type,,3
+Border 1 Type,2,wall_types,param,p.Border 1 Type,,3
+Border 2 Type,2,roof_types,param,p.Border 2 Type,,3
+Border 2 Type,2,wall_types,param,p.Border 2 Type,,3
+Curtain Panel,2,roof_types,param,p.Curtain Panel,,3
+Curtain Panel,2,wall_types,param,p.Curtain Panel,5553205,3
+CutLinePatternId,2,view_category_overrides,reflection,refl.OverrideGraphicSettings.CutLinePatternId,-1,3
+CutLinePatternId,2,view_filter_applications,param,vfa.ogs.cut_line_pattern_id,,3
+CutLinePatternId,2,view_filter_applications,reflection,refl.OverrideGraphicSettings.CutLinePatternId,-1,3
+Default Analysis Display Style,2,phase_graphics,param,p.Default Analysis Display Style,,3
+Default Analysis Display Style,2,views,param,param.Default Analysis Display Style,,3
+Guide Grid,2,phase_graphics,param,p.Guide Grid,,3
+Guide Grid,2,views,param,param.Guide Grid,,3
+HeaderTextTypeId,2,phase_graphics,reflection,refl.View.HeaderTextTypeId,1198417,3
+HeaderTextTypeId,2,view_templates,reflection,refl.View.HeaderTextTypeId,4279,2
+Interior Type,2,roof_types,param,p.Interior Type,,3
+Interior Type,2,wall_types,param,p.Interior Type,,3
+Leader Arrowhead,2,dimension_types,param,p.Leader Arrowhead,Standard_Open Dot,3
+Leader Arrowhead,2,text_types,param,p.Leader Arrowhead,Arrow Filled 20 Degree,3
+None,2,phase_graphics,param,p.None,LEVEL 1 PLAN,3
+None,2,views,param,param.None,LEVEL 1 PLAN,3
+Phase Filter,2,view_templates,param,p.Phase Filter,Show All,3
+Phase Filter,2,views,param,param.Phase Filter,Show All,3
+ProjectionLinePatternId,2,view_category_overrides,reflection,refl.OverrideGraphicSettings.ProjectionLinePatternId,-1,3
+ProjectionLinePatternId,2,view_filter_applications,reflection,refl.OverrideGraphicSettings.ProjectionLinePatternId,-1,3
+Range: Base Level,2,phase_graphics,param,p.Range: Base Level,,3
+Range: Base Level,2,views,param,param.Range: Base Level,,3
+Range: Top Level,2,phase_graphics,param,p.Range: Top Level,,3
+Range: Top Level,2,views,param,param.Range: Top Level,,3
+Referencing Sheet Collection,2,phase_graphics,param,p.Referencing Sheet Collection,,3
+Referencing Sheet Collection,2,views,param,param.Referencing Sheet Collection,,3
+Scope Box,2,phase_graphics,param,p.Scope Box,,3
+Scope Box,2,views,param,param.Scope Box,,3
+Sheet Collection,2,phase_graphics,param,p.Sheet Collection,,3
+Sheet Collection,2,views,param,param.Sheet Collection,,3
+SheetCollectionId,2,phase_graphics,reflection,refl.View.SheetCollectionId,-1,3
+SheetCollectionId,2,views,reflection,refl.View.SheetCollectionId,-1,3
+TitleTextTypeId,2,phase_graphics,reflection,refl.View.TitleTextTypeId,1198417,3
+TitleTextTypeId,2,view_templates,reflection,refl.View.TitleTextTypeId,2628,2
+Visible In Option,2,phase_graphics,param,p.Visible In Option,,1
+Visible In Option,2,views,param,param.Visible In Option,,1
+WorksetId,2,browser_organization,reflection,refl.BrowserOrganization.WorksetId,54,3
+WorksetId,2,fill_patterns,reflection,refl.FillPatternElement.WorksetId,7,3
+Associated Datum,1,views,param,param.Associated Datum,,3
+Centerline Pattern,1,dimension_types,param,p.Centerline Pattern,CENTER,3
+Centerline Symbol,1,dimension_types,param,p.Centerline Symbol,ANG-Centerline,3
+Centerline Tick Mark,1,dimension_types,param,p.Centerline Tick Mark,-2,3
+cut_bg_pattern_id,1,view_filter_applications,param,vfa.ogs.cut_bg_pattern_id,,3
+cut_fg_pattern_id,1,view_filter_applications,param,vfa.ogs.cut_fg_pattern_id,<Solid fill>,3
+cut_line_pattern,1,view_category_overrides,param,eff.cut_line_pattern,,3
+ElementId,1,browser_organization,reflection,refl.FolderItemInfo.ElementId,-1012106,3
+Image,1,materials,param,p.Image,,3
+Interior Tick Mark,1,dimension_types,param,p.Interior Tick Mark,"Diagonal 3/64""",3
+Leader Tick Mark,1,dimension_types,param,p.Leader Tick Mark,,3
+line_pattern_cut,1,object_styles,param,c.line_pattern_cut,,3
+line_pattern_projection,1,object_styles,param,c.line_pattern_projection,,3
+Parent View,1,views,param,param.Parent View,WALL SECTION 1C at 102.6 (4x5/6),1
+Phase,1,views,param,param.Phase,New Construction,3
+proj_line_pattern_id,1,view_filter_applications,param,vfa.ogs.proj_line_pattern_id,,3
+projection_line_pattern,1,view_category_overrides,param,eff.projection_line_pattern,-3000010,3
+SortingParameterId,1,browser_organization,reflection,refl.BrowserOrganization.SortingParameterId,-1005112,3
+StructuralMaterialId,1,floor_types,reflection,refl.FloorType.StructuralMaterialId,-1,3
+surf_bg_pattern_id,1,view_filter_applications,param,vfa.ogs.surf_bg_pattern_id,,3
+surf_fg_pattern_id,1,view_filter_applications,param,vfa.ogs.surf_fg_pattern_id,<Solid fill>,3
+Symbol,1,dimension_types,param,p.Symbol,Spot Elevation - Crosshair,3
+Tick Mark,1,dimension_types,param,p.Tick Mark,"Diagonal 1/16""",3
+Witness Line Tick Mark,1,dimension_types,param,p.Witness Line Tick Mark,,3

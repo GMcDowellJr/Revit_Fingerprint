@@ -459,8 +459,40 @@ for key in sorted(inventory.keys()):
         }
     })
 
-# No natural crosswalk for project identity
+# ProjectInformation -> its own workset. Re-fetches doc.ProjectInformation
+# rather than reusing `pi` from the inventory section above, since that's
+# only defined when include_project_information_params is True.
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
 crosswalk_records = []
+_pi_cw = _safe(lambda: doc.ProjectInformation, None)
+if _pi_cw is not None:
+    _pi_ws_id_obj = _safe(lambda: _pi_cw.WorksetId, None)
+    _pi_ws_name, _pi_ws_resolved = _resolve_workset(doc, _pi_ws_id_obj)
+    _pi_ws_id_int = _safe(lambda: _pi_ws_id_obj.IntegerValue, None) if _pi_ws_id_obj is not None else None
+    crosswalk_records.append({
+        "project_info.element_id": _safe(lambda: _pi_cw.Id.IntegerValue, None),
+        "project_info.name": _safe(lambda: _pi_cw.Name, None),
+        "project_info.workset_id": _pi_ws_id_int,
+        "project_info.workset_name": _pi_ws_name,
+    })
 
 
 # -------------------------

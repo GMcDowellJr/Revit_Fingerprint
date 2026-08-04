@@ -393,11 +393,103 @@ if discover_err:
     )
     raise SystemExit
 
+import gc
+
+# ---------------------------------------------------------------------------
+# Incremental, crash-safe write.
+#
+# The combined payload is written to a temp file AS EACH PROBE COMPLETES,
+# not buffered in memory and dumped in one shot at the end. Two independent
+# problems this fixes (see the 2026-08-04 worksets truncation: a run
+# interrupted partway lost every probe's output -- including everything
+# that had already finished cleanly -- with the file left mid-token and no
+# exception ever surfaced, because nothing touched disk until the last
+# line of the script):
+#
+#   1. Whatever completed before an interruption is already on disk and
+#      readable, instead of the whole run's output being lost regardless
+#      of how much of it had already succeeded.
+#   2. A domain's records are written and the in-memory reference dropped
+#      immediately after, instead of every domain being retained for the
+#      whole run (some probes -- loaded_family_types, identity,
+#      phase_graphics -- produce hundreds of records each). Peak memory
+#      tracks roughly one probe's working set, not the sum of all of them.
+#
+# The temp file is only ever renamed onto the real target path (an atomic
+# os.replace, same filesystem) after the JSON has been fully and validly
+# closed out -- a reader can never observe a partially-written file at the
+# expected filename, only the previous good file or the complete new one.
+#
+# This assumes (true for every current probe_*.py) that each domain is
+# contributed by exactly one probe file, so a domain's block can be
+# streamed and closed the moment that probe finishes. See _flush_domain
+# for what happens in the (currently never-hit) case where that stops
+# being true.
+# ---------------------------------------------------------------------------
+
+
+def _json_block(value):
+    """Render a value as an indented JSON fragment suitable for splicing
+    into the hand-written envelope below. Not re-indented to visually align
+    under its parent key -- purely cosmetic, doesn't affect validity, and
+    every consumer (json.load) is indent-agnostic."""
+    return json.dumps(value, indent=2, sort_keys=True)
+
+
 results = []
-combined_domains = {}
 ok_count = 0
 failed_count = 0
 probes_run_names = []
+written_domains = set()
+_first_domain_written = False
+
+fname = "probes_{}_{}.json".format(REVIT_VERSION, RUN_ID)
+target = os.path.join(out_dir, fname)
+tmp_target = target + ".tmp-{}".format(os.getpid())
+
+file_written = None
+write_error = None
+partial_file = None  # set from the first byte written until the final rename succeeds
+
+try:
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    tmp_f = open(tmp_target, "w", encoding="utf-8")
+    tmp_f.write('{\n  "domains": {\n')
+    partial_file = tmp_target
+except Exception as ex:
+    tmp_f = None
+    write_error = "open_tmp_failed: {}: {}".format(type(ex).__name__, ex)
+
+
+def _flush_domain(domain, entries):
+    global _first_domain_written
+    if tmp_f is None:
+        return False
+    key = domain
+    if domain in written_domains:
+        # A second probe declared a domain another probe already streamed
+        # and closed. Doesn't happen with any probe_*.py today -- each
+        # domain has exactly one owning probe file -- but streaming can't
+        # retroactively merge into an already-closed block, and silently
+        # emitting a duplicate JSON key would make json.load quietly keep
+        # only the last one, discarding the first. Write it under a
+        # clearly-flagged side key instead so nothing is lost and the
+        # conflict is visible in the file.
+        key = "{}__unmerged_duplicate_probe_output_{}".format(domain, len(written_domains))
+    if _first_domain_written:
+        tmp_f.write(",\n")
+    tmp_f.write('    "{}": '.format(key))
+    tmp_f.write(_json_block(entries))
+    _first_domain_written = True
+    written_domains.add(domain)
+    try:
+        tmp_f.flush()
+        os.fsync(tmp_f.fileno())
+    except Exception:
+        pass  # best-effort durability; a failed fsync isn't fatal here
+    return True
+
 
 for path in probe_files:
     # Filter on the filename/domain guess BEFORE executing: a probe can do a
@@ -442,18 +534,18 @@ for path in probe_files:
 
     if declared_domains:
         # Standard probe contract: OUT is a list of {"kind":..., "domain":...}
-        # entries. Merge per declared domain (normally just one per probe)
-        # into the shared combined_domains dict.
+        # entries. Stream per declared domain (normally just one per probe)
+        # straight to the temp file rather than accumulating in memory.
         for domain in declared_domains:
             domain_entries = [e for e in out_value if isinstance(e, dict) and e.get("domain") == domain]
-            combined_domains.setdefault(domain, []).extend(domain_entries)
+            _flush_domain(domain, domain_entries)
         record["status"] = "ok"
         record["domains_written"] = declared_domains
     else:
         # Non-standard OUT shape (e.g. a findings dict rather than a
         # domain-tagged list). Still capture it rather than dropping it,
         # tagged under the probe's own filename stem so nothing is lost.
-        combined_domains.setdefault(domain_guess, []).append(out_value)
+        _flush_domain(domain_guess, [out_value])
         record["status"] = "ok_nonstandard_shape"
         record["domains_written"] = [domain_guess]
 
@@ -461,35 +553,60 @@ for path in probe_files:
     probes_run_names.append(domain_guess)
     results.append(record)
 
+    # Drop this probe's payload before moving to the next one so peak
+    # memory tracks one probe's working set, not the accumulated total.
+    # gc.collect() is a deliberate extra nudge, not just refcounting relief:
+    # probes hold pythonnet-wrapped Revit API objects (FilteredElement
+    # Collector results, sampled Views/Worksets/...), and references that
+    # cross the CLR/Python boundary don't always get reclaimed as promptly
+    # on refcount alone as pure-Python objects do.
+    out_value = None
+    declared_domains = None
+    gc.collect()
+
 status = "ok" if failed_count == 0 else ("degraded" if ok_count > 0 else "failed")
 
-combined_payload = {
-    "run_metadata": {
-        "run_id": RUN_ID,
-        "extraction_date": EXTRACTION_DATE,
-        "revit_version": REVIT_VERSION,
-        "tool_version": TOOL_VERSION,
-        "document": DOCUMENT_IDENTITY,
-        "source": "thin_runner",
-        "probes_run": sorted(probes_run_names),
-    },
-    "domains": combined_domains,
+run_metadata = {
+    "run_id": RUN_ID,
+    "extraction_date": EXTRACTION_DATE,
+    "revit_version": REVIT_VERSION,
+    "tool_version": TOOL_VERSION,
+    "document": DOCUMENT_IDENTITY,
+    "source": "thin_runner",
+    "probes_run": sorted(probes_run_names),
 }
 
-file_written = None
-write_error = None
-if ok_count > 0:
-    try:
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-        fname = "probes_{}_{}.json".format(REVIT_VERSION, RUN_ID)
-        target = os.path.join(out_dir, fname)
-        with open(target, "w", encoding="utf-8") as f:
-            json.dump(combined_payload, f, indent=2, sort_keys=True)
-        file_written = target
-    except Exception as ex:
-        write_error = "{}: {}".format(type(ex).__name__, ex)
-        status = "degraded" if status == "ok" else status
+if tmp_f is not None:
+    if ok_count > 0:
+        try:
+            tmp_f.write('\n  },\n  "run_metadata": ')
+            tmp_f.write(_json_block(run_metadata))
+            tmp_f.write("\n}\n")
+            tmp_f.flush()
+            os.fsync(tmp_f.fileno())
+            tmp_f.close()
+            os.replace(tmp_target, target)  # atomic on the same filesystem
+            file_written = target
+            partial_file = None
+        except Exception as ex:
+            write_error = "{}: {}".format(type(ex).__name__, ex)
+            status = "degraded" if status == "ok" else status
+            try:
+                tmp_f.close()
+            except Exception:
+                pass
+    else:
+        # Nothing succeeded -- matches the previous behavior of never
+        # producing a probes_<version>_<run_id>.json at all in this case.
+        try:
+            tmp_f.close()
+        except Exception:
+            pass
+        try:
+            os.remove(tmp_target)
+        except Exception:
+            pass
+        partial_file = None
 
 OUT = json.dumps(
     {
@@ -500,6 +617,7 @@ OUT = json.dumps(
         "output_directory": out_dir,
         "file_written": file_written,
         "file_write_error": write_error,
+        "partial_file": partial_file,
         "probes_discovered": len(probe_files),
         "probes_run": len(results),
         "probes_ok": ok_count,

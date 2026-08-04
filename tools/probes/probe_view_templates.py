@@ -428,14 +428,40 @@ for pk in sorted(param_index.keys()):
 # Optional Crosswalk: View (non-template) -> ViewTemplate
 # -------------------------
 
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
 optional_crosswalk = []
 
-# Build template name lookup
+# Build template name + workset lookup (keyed to the template itself, not
+# the referencing view -- a template's own WorksetId is the thing missing
+# from every other probe's WorksetId reflection member, not the view's).
 template_name_by_id = {}
+template_workset_by_id = {}
 for t in templates:
     tid = _safe(lambda: t.Id.IntegerValue, None)
     if tid is not None and tid not in template_name_by_id:
         template_name_by_id[tid] = _safe_view_name(t)
+        t_ws_id_obj = _safe(lambda: t.WorksetId, None)
+        t_ws_name, _t_ws_resolved = _resolve_workset(doc, t_ws_id_obj)
+        t_ws_id_int = _safe(lambda: t_ws_id_obj.IntegerValue, None) if t_ws_id_obj is not None else None
+        template_workset_by_id[tid] = (t_ws_id_int, t_ws_name)
 
 if enable_crosswalk:
     # Keep crosswalk compact: one representative non-template view per distinct template id
@@ -465,13 +491,17 @@ if enable_crosswalk:
             ref = _safe(lambda: doc.GetElement(tid), None)
             tname = _safe(lambda: _safe_view_name(ref), None) if ref is not None else None
 
+        t_ws_id_int, t_ws_name = template_workset_by_id.get(tid_int, (None, None))
+
         row = {
             "view.id": _safe(lambda: v.Id.IntegerValue, None),
             "view.name": _safe(lambda: _safe_view_name(v), None),
             "view.view_type": _viewtype_bucket(v),
             "template.id": tid_int,
             "template.name": tname,
-            "template.resolved": True if tname is not None else False
+            "template.resolved": True if tname is not None else False,
+            "template.workset_id": t_ws_id_int,
+            "template.workset_name": t_ws_name,
         }
 
         # Keep only resolved mappings (signal > noise)

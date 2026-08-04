@@ -1,19 +1,51 @@
-# Dynamo Python (Revit) -- Full-Pull Probe: ceiling_types (INVENTORY + FULL RECORDS)
+# Dynamo Python (Revit) — Breadth Probe: ceiling_types (INVENTORY OUTPUT)
 #
 # OUT = [
 #   {
-#     "kind": "full_records",
+#     "kind": "reflection",
 #     "domain": "ceiling_types",
-#     "records": [...]      # ONE ROW PER CeilingType, ALL parameters + ALL computed fields.
-#                            # No sampling, no bucketing -- every ceiling_types type in the file.
+#     "records": [...],
+#     "file_written": "<path>|None",        # present only if write_json=True
+#     "file_write_error": "<error>|None"    # present only on failure
 #   },
 #   {
 #     "kind": "inventory",
 #     "domain": "ceiling_types",
-#     "records": [...]      # aggregated breadth view (q_counts/example) over the SAME full set
+#     "records": [...]      # aggregated breadth view (q_counts/example) over every CeilingType, no sampling
 #   },
-#   { "file_written": "<path>|None", "file_write_error": "<error>|None" }  -- appended to full_records[0]
+#   {
+#     "kind": "crosswalk",
+#     "domain": "ceiling_types",
+#     "records": [...]      # one row per (CeilingType, CompoundStructureLayer): resolves layer.MaterialId
+#                            # against the document, same as every other domain's crosswalk. Every type and
+#                            # every layer is walked -- no sampling -- since this is a cheap per-type/per-layer
+#                            # collector-and-lookup, not a corpus-scale scan.
+#   }
 # ]
+#
+# Reworked from a "full_records" (kind=full_records, one uncapped row per
+# CeilingType with every parameter + every computed field) shape to the
+# standard inventory/reflection/crosswalk contract every other domain probe
+# uses. Two reasons:
+#   1. "full_records" isn't in build_probe_inventory.py's _MERGE_KINDS, so
+#      none of this data ever reached PROBE_INVENTORY.csv/md -- it showed up
+#      only as an "unrecognized entry" diagnostic, every run.
+#   2. Pre-committing to "pull every parameter, one full row per instance" is
+#      an extraction-scope decision -- that's what an eventual real
+#      domains/ceiling_types.py-equivalent extractor decides, informed BY
+#      probe data, not something the probe itself should pre-bake. The
+#      aggregated inventory view already carries the same breadth signal
+#      (same per-key q_counts/example this file always computed, just no
+#      longer routed through an intermediate uncapped per-instance list).
+#
+# The one thing "full_records" was carrying that inventory/reflection
+# genuinely couldn't reconstruct -- per-layer CompoundStructureLayer.MaterialId
+# -- is now a real crosswalk instead of an inert per-instance field: each
+# layer's material reference is resolved against the document (name +
+# resolved boolean), the same way materials.py resolves appearance/
+# structural/thermal asset references. That's the connection worth walking
+# here, not layer_count/total_width alone (see probe_wall_types.py, which
+# this crosswalk design also applies to).
 #
 # CeilingType has no Kind distinction (wall-only) and no wrap-at-inserts/ends
 # surface (gated to family == "wall" in domains/compound_types.py's
@@ -234,8 +266,9 @@ except:
     pass
 
 
-# Bounded sample for the reflection sweep only (full_records stays
-# uncapped by design).
+# Bounded sample for the reflection sweep only -- inventory/crosswalk above
+# stay uncapped by design (every type, every layer; see max_layers_per_type
+# for the one deliberate per-type layer cap).
 _reflect_type_samples = all_types[:60]
 _reflect_cs_samples = []
 _reflect_layer_samples = []
@@ -249,101 +282,46 @@ for _rt in _reflect_type_samples:
                 _reflect_layer_samples.append(_rlayer)
 
 
-def _build_full_record(t):
-    """One record per ceiling_types type: ALL Revit parameters + ALL computed fields."""
-    name = _safe(lambda: _safe_type_name(t), None)
-
-    all_params = {}
-    params = _safe(lambda: list(t.GetOrderedParameters()), default=None)
-    if params is None:
-        params = _safe(lambda: list(t.Parameters), default=[])
-    for p in params:
-        dn = _safe(lambda: _safe_param_def_name(p), None)
-        if not dn:
-            continue
-        all_params["p.{}".format(dn)] = _format_param_contract(p)
-
-    computed = {}
-    computed["ct.type_name"] = _contract_from_value("ok", "String", name, name, name)
+def _resolve_material(mat_id_int):
+    """Resolve a Material ElementId (int) to (name, resolved_bool). Same
+    pattern _format_param_contract already uses for ElementId parameters,
+    applied to a CompoundStructureLayer.MaterialId instead."""
+    if mat_id_int is None or mat_id_int < 0:
+        return (None, False)
+    ref = _safe(lambda: doc.GetElement(ElementId(mat_id_int)), None)
+    if ref is None:
+        return (None, False)
+    name = _safe(lambda: ref.Name, None)
+    return (name, name is not None)
 
 
-    cs = _safe(lambda: t.GetCompoundStructure(), None)
-    has_cs = cs is not None
-    computed["ct.has_compound_structure"] = _contract_from_value("ok", "Integer", int(has_cs), str(has_cs), int(has_cs))
-
-    if has_cs:
-        layers = _safe(lambda: list(cs.GetLayers()), [])
-        computed["ct.layer_count"] = _contract_from_value("ok", "Integer", len(layers), str(len(layers)), len(layers))
-
-        max_l = None
-        try:
-            max_l = int(max_layers_per_type)
-        except:
-            max_l = 30
-
-        total_thickness_ft = 0.0
-        thickness_unreadable = False
-        layer_detail = []
-        for i, layer in enumerate(layers):
-            if max_l is not None and max_l >= 0 and i >= max_l:
-                break
-            w = _safe(lambda: layer.Width, None)
-            if w is None:
-                thickness_unreadable = True
-            else:
-                total_thickness_ft += w
-            fnv = _safe(lambda: layer.Function, None)
-            fn_r2 = _multi_repr(fnv)
-            mat_id = _safe(lambda: layer.MaterialId, None)
-            mat_id_int = _safe(lambda: mat_id.IntegerValue, None) if mat_id is not None else None
-            layer_detail.append({
-                "layer_index": i,
-                "function.str()": fn_r2.get("str()"),
-                "width_ft": w,
-                "width_in": _to_inches(w) if w is not None else None,
-                "material_id": mat_id_int,
-                "is_structural_material": _safe(lambda: bool(layer.IsStructuralMaterial), None),
-                "is_variable_width": _safe(lambda: bool(layer.IsVariableWidth), None),
-            })
-
-        tt_in = None if thickness_unreadable else _to_inches(total_thickness_ft)
-        computed["ct.total_thickness_in"] = _contract_from_value(
-            "unreadable" if thickness_unreadable else "ok", "Double", tt_in, tt_in, tt_in)
-        computed["ct.layer_detail"] = layer_detail
-
-        sweeps = _safe(lambda: list(cs.GetWallSweepsInfo()), [])
-        sweeps_present = (len(sweeps) > 0)
-        computed["ct.has_embedded_sweeps"] = _contract_from_value("ok", "Integer", int(sweeps_present), str(sweeps_present), int(sweeps_present))
-    else:
-        computed["ct.layer_count"] = _contract_from_value("unsupported.not_applicable", "Integer", None, None, None)
-        computed["ct.total_thickness_in"] = _contract_from_value("unsupported.not_applicable", "Double", None, None, None)
-        computed["ct.layer_detail"] = []
-        computed["ct.has_embedded_sweeps"] = _contract_from_value("unsupported.not_applicable", "Integer", None, None, None)
-
-    fill_p = _safe(lambda: t.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_PATTERN_ID_FOR_LEGEND), None)
-    computed["ct.coarse_fill_pattern"] = _format_param_contract(fill_p) if fill_p is not None else _contract_from_value("missing", "None", None, None, None)
-    color_p = _safe(lambda: t.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_COLOR), None)
-    computed["ct.coarse_fill_color"] = _format_param_contract(color_p) if color_p is not None else _contract_from_value("missing", "None", None, None, None)
-
-    return {
-        "ceiling_types.name": name,
-        "ceiling_types.id": _safe(lambda: t.Id.IntegerValue, None),
-        "params": all_params,
-        "computed": computed,
-    }
-
-
-full_records = []
-for t in all_types:
-    full_records.append(_build_full_record(t))
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
 
 
 param_index = {}
+
 
 def _ensure_entry(pk):
     if pk not in param_index:
         param_index[pk] = {"storage_types": set(), "q_counts": {}, "example": None}
     return param_index[pk]
+
 
 def _maybe_set_example(entry, pv):
     if pv is None or not isinstance(pv, dict):
@@ -354,6 +332,7 @@ def _maybe_set_example(entry, pv):
         return
     if ex.get("q") != "ok" and pv.get("q") == "ok":
         entry["example"] = dict(pv)
+
 
 def _observe(pk, pv):
     entry = _ensure_entry(pk)
@@ -366,13 +345,104 @@ def _observe(pk, pv):
     entry["q_counts"][q] = entry["q_counts"].get(q, 0) + 1
     _maybe_set_example(entry, pv)
 
-for rec in full_records:
-    for pk, pv in rec["params"].items():
-        _observe(pk, pv)
-    for ck, cv in rec["computed"].items():
-        if ck in ("ct.layer_detail",):
+
+try:
+    _max_l = int(max_layers_per_type)
+except:
+    _max_l = 30
+
+optional_crosswalk = []
+total_records = 0
+
+for t in all_types:
+    total_records += 1
+    name = _safe(lambda: _safe_type_name(t), None)
+    type_id = _safe(lambda: t.Id.IntegerValue, None)
+    ws_id_obj = _safe(lambda: t.WorksetId, None)
+    ws_name, ws_resolved = _resolve_workset(doc, ws_id_obj)
+    ws_id_int = _safe(lambda: ws_id_obj.IntegerValue, None) if ws_id_obj is not None else None
+
+    # --- Real Parameters ---
+    params = _safe(lambda: list(t.GetOrderedParameters()), default=None)
+    if params is None:
+        params = _safe(lambda: list(t.Parameters), default=[])
+    for p in params:
+        dn = _safe(lambda: _safe_param_def_name(p), None)
+        if not dn:
             continue
-        _observe(ck, cv)
+        _observe("p.{}".format(dn), _format_param_contract(p))
+
+    # --- Synthesized, exporter-modeled surfaces (same computed set the old
+    # full_records "computed" dict carried, observed directly instead of
+    # via an intermediate per-instance record) ---
+    _observe("ct.type_name", _contract_from_value("ok", "String", name, name, name))
+
+    cs = _safe(lambda: t.GetCompoundStructure(), None)
+    has_cs = cs is not None
+    _observe("ct.has_compound_structure", _contract_from_value("ok", "Integer", int(has_cs), str(has_cs), int(has_cs)))
+
+    if has_cs:
+        layers = _safe(lambda: list(cs.GetLayers()), [])
+        _observe("ct.layer_count", _contract_from_value("ok", "Integer", len(layers), str(len(layers)), len(layers)))
+
+        # CompoundStructureLayer has no IsStructuralMaterial/IsVariableWidth
+        # property in the modern API (confirmed against Autodesk's own old->new
+        # API migration notes: "Variable -- N/A: Not a part of the layer class,
+        # use CompoundStructure.VariableLayerIndex instead"; the structural-
+        # material concept is the same story, via StructuralMaterialIndex).
+        # Both are a single index on the CompoundStructure identifying which
+        # ONE layer holds that role, not a per-layer flag -- compute once per
+        # type and compare against each layer's index.
+        struct_mat_idx = _safe(lambda: cs.StructuralMaterialIndex, None)
+        var_layer_idx = _safe(lambda: cs.VariableLayerIndex, None)
+
+        total_thickness_ft = 0.0
+        thickness_unreadable = False
+        for i, layer in enumerate(layers):
+            if _max_l is not None and _max_l >= 0 and i >= _max_l:
+                break
+            w = _safe(lambda: layer.Width, None)
+            if w is None:
+                thickness_unreadable = True
+            else:
+                total_thickness_ft += w
+            fnv = _safe(lambda: layer.Function, None)
+            fn_str = _multi_repr(fnv).get("str()")
+            mat_id = _safe(lambda: layer.MaterialId, None)
+            mat_id_int = _safe(lambda: mat_id.IntegerValue, None) if mat_id is not None else None
+            mat_name, mat_resolved = _resolve_material(mat_id_int)
+
+            optional_crosswalk.append({
+                "ceiling_type.id": type_id,
+                "ceiling_type.name": name,
+                "ceiling_type.workset_id": ws_id_int,
+                "ceiling_type.workset_name": ws_name,
+                "layer.index": i,
+                "layer.function": fn_str,
+                "layer.width_in": _to_inches(w) if w is not None else None,
+                "layer.is_structural_material": bool(struct_mat_idx is not None and struct_mat_idx >= 0 and i == struct_mat_idx),
+                "layer.is_variable_width": bool(var_layer_idx is not None and var_layer_idx >= 0 and i == var_layer_idx),
+                "layer.material_id": mat_id_int,
+                "layer.material_name": mat_name,
+                "layer.material_resolved": mat_resolved,
+            })
+
+        tt_in = None if thickness_unreadable else _to_inches(total_thickness_ft)
+        _observe("ct.total_thickness_in", _contract_from_value(
+            "unreadable" if thickness_unreadable else "ok", "Double", tt_in, tt_in, tt_in))
+
+        sweeps = _safe(lambda: list(cs.GetWallSweepsInfo()), [])
+        sweeps_present = (len(sweeps) > 0)
+        _observe("ct.has_embedded_sweeps", _contract_from_value("ok", "Integer", int(sweeps_present), str(sweeps_present), int(sweeps_present)))
+    else:
+        _observe("ct.layer_count", _contract_from_value("unsupported.not_applicable", "Integer", None, None, None))
+        _observe("ct.total_thickness_in", _contract_from_value("unsupported.not_applicable", "Double", None, None, None))
+        _observe("ct.has_embedded_sweeps", _contract_from_value("unsupported.not_applicable", "Integer", None, None, None))
+
+    fill_p = _safe(lambda: t.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_PATTERN_ID_FOR_LEGEND), None)
+    _observe("ct.coarse_fill_pattern", _format_param_contract(fill_p) if fill_p is not None else _contract_from_value("missing", "None", None, None, None))
+    color_p = _safe(lambda: t.get_Parameter(BuiltInParameter.COARSE_SCALE_FILL_COLOR), None)
+    _observe("ct.coarse_fill_color", _format_param_contract(color_p) if color_p is not None else _contract_from_value("missing", "None", None, None, None))
 
 param_inventory = []
 for pk in sorted(param_index.keys()):
@@ -380,7 +450,7 @@ for pk in sorted(param_index.keys()):
     param_inventory.append({
         "domain": "ceiling_types",
         "param_key": pk,
-        "total_records": len(full_records),
+        "total_records": total_records,
         "example": e["example"],
         "observed": {
             "storage_types": sorted(list(e["storage_types"])),
@@ -394,9 +464,9 @@ for pk in sorted(param_index.keys()):
 # -------------------------
 # Complements the curated/dynamic capture above with a breadth-only sweep of
 # a bounded sample of the discovered types' .NET properties and zero-arg
-# methods (full_records above stays uncapped by design -- this sample cap is
-# just to keep the .NET reflection walk bounded on large projects). This is
-# diagnostics/breadth, not identity.
+# methods (inventory/crosswalk above stay uncapped by design -- this sample
+# cap is just to keep the .NET reflection walk bounded on large projects).
+# This is diagnostics/breadth, not identity.
 
 _REFLECTION_SKIP = set([
     "Equals", "GetHashCode", "GetType", "ToString", "MemberwiseClone",
@@ -576,9 +646,9 @@ def _probe_wrap(domain, out_payload):
 
 OUT_payload = [
     {
-        "kind": "full_records",
+        "kind": "reflection",
         "domain": "ceiling_types",
-        "records": full_records
+        "records": _reflection_records
     },
     {
         "kind": "inventory",
@@ -586,9 +656,9 @@ OUT_payload = [
         "records": param_inventory
     },
     {
-        "kind": "reflection",
+        "kind": "crosswalk",
         "domain": "ceiling_types",
-        "records": _reflection_records
+        "records": optional_crosswalk
     }
 ]
 

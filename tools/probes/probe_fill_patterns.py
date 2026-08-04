@@ -558,6 +558,25 @@ if enable_crosswalk:
 
     seen_line_pattern_ids = set()
 
+    def _resolve_workset(doc, ws_id_obj):
+        """Resolve an Element.WorksetId value to (name, resolved_bool) via
+        WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+        distinct .NET type from ElementId (both happen to expose
+        .IntegerValue, which is why reflection reports this member as
+        ElementId-storage), and Workset is not derived from Element, so
+        doc.GetElement() would never resolve it even with the right type
+        assumed."""
+        if ws_id_obj is None:
+            return (None, False)
+        wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+        if wt_table is None:
+            return (None, False)
+        ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+        if ws is None:
+            return (None, False)
+        name = _safe(lambda: ws.Name, None)
+        return (name, name is not None)
+
     for fpe in selected:
         if len(optional_crosswalk) >= int(crosswalk_limit):
             break
@@ -569,6 +588,9 @@ if enable_crosswalk:
         fp_id = _safe(lambda: fpe.Id.IntegerValue, None)
         fp_name = _safe(lambda: _safe_type_name(fpe), None)
         fp_target = _safe(lambda: str(fp.Target), None)
+        fp_ws_id_obj = _safe(lambda: fpe.WorksetId, None)
+        fp_ws_name, _fp_ws_resolved = _resolve_workset(doc, fp_ws_id_obj)
+        fp_ws_id_int = _safe(lambda: fp_ws_id_obj.IntegerValue, None) if fp_ws_id_obj is not None else None
 
         grids = _safe(lambda: fp.GetFillGrids(), default=None)
         if grids is None:
@@ -608,6 +630,8 @@ if enable_crosswalk:
                 "fill_pattern.id": fp_id,
                 "fill_pattern.name": fp_name,
                 "fill_pattern.target": fp_target,
+                "fill_pattern.workset_id": fp_ws_id_int,
+                "fill_pattern.workset_name": fp_ws_name,
                 "grid.index": gi,
                 "line_pattern.id": lp_id,
                 "line_pattern.name": lp_name,

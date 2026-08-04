@@ -15,7 +15,9 @@
 #   {
 #     "kind": "inventory",
 #     "domain": "wall_types",
-#     "records": param_inventory,
+#     "records": param_inventory,   # real p.* Parameters PLUS synthesized wall_type.kind /
+#                                    # compound_structure.present|layer_count|total_width_in
+#                                    # (moved here from crosswalk -- see below)
 #     "diagnostics": {...},
 #     "file_written": "<path>|None",
 #     "file_write_error": "<error>|None"
@@ -23,7 +25,14 @@
 #   {
 #     "kind": "crosswalk",
 #     "domain": "wall_types",
-#     "records": [...]   # wall type -> compound structure / layer summary
+#     "records": [...]   # one row per (WallType, CompoundStructureLayer): resolves
+#                         # layer.MaterialId against the document. Reworked from a
+#                         # one-row-per-type compound-structure summary (layer_count/
+#                         # total_width only, no material reference at all) to this
+#                         # layer-grain material-resolution join, matching
+#                         # ceiling_types/floor_types/roof_types -- the summary facts
+#                         # this crosswalk used to carry moved to inventory above, so
+#                         # crosswalk's row grain is unambiguous (one row = one layer).
 #   },
 #   {
 #     "kind": "reflection",
@@ -293,6 +302,81 @@ for wt in selected:
         entry["observed_on_kinds"].add(kind_label)
         _maybe_set_example(entry, pv)
 
+def _observe_synth(pk, pv, kind_label):
+    """Same accumulation logic the real-Parameter loop above uses, for the
+    synthesized (non-Parameter) facts below -- wall_type.kind and the
+    compound-structure summary. These used to live only in the crosswalk
+    (see the old row-per-type shape below); moved to inventory so crosswalk
+    can be exclusively the layer->material join, keeping crosswalk's
+    rows_in_domain unambiguous (one row = one layer, not a mix of one
+    type-summary row and N layer rows)."""
+    if pk not in param_index:
+        param_index[pk] = {
+            "storage_types": set(),
+            "q_counts": {"ok": 0, "missing": 0, "unreadable": 0, "unsupported": 0},
+            "example": None,
+            "observed_on_kinds": set(),
+            "_seen_obs": set(),
+            "unique_value_count": 0,
+        }
+    entry = param_index[pk]
+    q = pv.get("q") or "unreadable"
+    st = pv.get("storage")
+    norm = pv.get("norm")
+    obs_sig = (pk, str(st), str(norm))
+    if obs_sig not in entry["_seen_obs"]:
+        entry["_seen_obs"].add(obs_sig)
+        entry["unique_value_count"] += 1
+    if st:
+        entry["storage_types"].add(st)
+    if q not in entry["q_counts"]:
+        entry["q_counts"][q] = 0
+    entry["q_counts"][q] += 1
+    entry["observed_on_kinds"].add(kind_label)
+    _maybe_set_example(entry, pv)
+
+
+def _pv(q, storage, raw, display=None, norm=None):
+    return {
+        "q": q, "storage": storage, "raw": raw,
+        "display": display if display is not None else raw,
+        "norm": norm if norm is not None else raw,
+    }
+
+
+for wt in selected:
+    kind_label, _kind_int = _wall_kind_label(wt)
+
+    _observe_synth("wall_type.kind", _pv("ok" if kind_label else "missing", "String", kind_label), kind_label)
+
+    cs = _safe(lambda: wt.GetCompoundStructure(), None)
+    has_cs = cs is not None
+    _observe_synth("compound_structure.present", _pv("ok", "Integer", int(has_cs), display=str(has_cs)), kind_label)
+
+    if has_cs:
+        layers = _safe(lambda: list(cs.GetLayers() or []), default=[])
+        _observe_synth("compound_structure.layer_count", _pv("ok", "Integer", len(layers)), kind_label)
+
+        total = 0.0
+        any_w = False
+        for layer in layers:
+            w = _safe(lambda: layer.Width, None)
+            if w is not None:
+                try:
+                    total += float(w) * 12.0
+                    any_w = True
+                except:
+                    pass
+        total_width_in = round(total, 4) if any_w else None
+        _observe_synth(
+            "compound_structure.total_width_in",
+            _pv("ok" if any_w else "unreadable", "Double", total_width_in),
+            kind_label,
+        )
+    else:
+        _observe_synth("compound_structure.layer_count", _pv("unsupported.not_applicable", "Integer", None), kind_label)
+        _observe_synth("compound_structure.total_width_in", _pv("unsupported.not_applicable", "Double", None), kind_label)
+
 param_inventory = []
 for pk in sorted(param_index.keys()):
     e = param_index[pk]
@@ -310,40 +394,89 @@ for pk in sorted(param_index.keys()):
     })
 
 # -------------------------
-# Crosswalk: wall type -> compound structure / layer summary
+# Crosswalk: wall type -> compound structure layer -> material.
+# One row per (WallType, CompoundStructureLayer), resolving each layer's
+# MaterialId against the document -- same design now used by
+# ceiling_types/floor_types/roof_types (see probe_ceiling_types.py for the
+# rationale). The type-level summary this crosswalk used to carry
+# (wall_type.kind, compound_structure.present/layer_count/total_width_in)
+# moved to inventory above so crosswalk's rows_in_domain means one
+# unambiguous thing: one layer, not a mix of type-summary and layer rows.
 # -------------------------
+
+
+def _resolve_material(mat_id_int):
+    if mat_id_int is None or mat_id_int < 0:
+        return (None, False)
+    ref = _safe(lambda: doc.GetElement(ElementId(mat_id_int)), None)
+    if ref is None:
+        return (None, False)
+    name = _safe(lambda: ref.Name, None)
+    return (name, name is not None)
+
 
 optional_crosswalk = []
 
+
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
 for wt in selected:
-    kind_label, kind_int = _wall_kind_label(wt)
-    row = {
-        "wall_type.id": _safe(lambda: wt.Id.IntegerValue, None),
-        "wall_type.name": _safe_type_name(wt),
-        "wall_type.kind": kind_label,
-        "compound_structure.present": False,
-        "compound_structure.layer_count": None,
-        "compound_structure.total_width_in": None,
-    }
+    type_id = _safe(lambda: wt.Id.IntegerValue, None)
+    type_name = _safe_type_name(wt)
+    ws_id_obj = _safe(lambda: wt.WorksetId, None)
+    ws_name, ws_resolved = _resolve_workset(doc, ws_id_obj)
+    ws_id_int = _safe(lambda: ws_id_obj.IntegerValue, None) if ws_id_obj is not None else None
 
     cs = _safe(lambda: wt.GetCompoundStructure(), None)
-    if cs is not None:
-        row["compound_structure.present"] = True
-        layers = _safe(lambda: list(cs.GetLayers() or []), default=[])
-        row["compound_structure.layer_count"] = len(layers)
-        total = 0.0
-        any_w = False
-        for layer in layers:
-            w = _safe(lambda: layer.Width, None)
-            if w is not None:
-                try:
-                    total += float(w) * 12.0
-                    any_w = True
-                except:
-                    pass
-        row["compound_structure.total_width_in"] = round(total, 4) if any_w else None
+    if cs is None:
+        continue
+    layers = _safe(lambda: list(cs.GetLayers() or []), default=[])
 
-    optional_crosswalk.append(row)
+    # See probe_ceiling_types.py: CompoundStructureLayer has no
+    # IsStructuralMaterial/IsVariableWidth in the modern API -- both are a
+    # single index on CompoundStructure (StructuralMaterialIndex /
+    # VariableLayerIndex), not a per-layer flag.
+    struct_mat_idx = _safe(lambda: cs.StructuralMaterialIndex, None)
+    var_layer_idx = _safe(lambda: cs.VariableLayerIndex, None)
+
+    for i, layer in enumerate(layers):
+        w = _safe(lambda: layer.Width, None)
+        fnv = _safe(lambda: layer.Function, None)
+        mat_id = _safe(lambda: layer.MaterialId, None)
+        mat_id_int = _safe(lambda: mat_id.IntegerValue, None) if mat_id is not None else None
+        mat_name, mat_resolved = _resolve_material(mat_id_int)
+
+        optional_crosswalk.append({
+            "wall_type.id": type_id,
+            "wall_type.name": type_name,
+            "wall_type.workset_id": ws_id_int,
+            "wall_type.workset_name": ws_name,
+            "layer.index": i,
+            "layer.function": _safe(lambda: str(fnv), None),
+            "layer.width_in": (round(float(w) * 12.0, 4) if w is not None else None),
+            "layer.is_structural_material": bool(struct_mat_idx is not None and struct_mat_idx >= 0 and i == struct_mat_idx),
+            "layer.is_variable_width": bool(var_layer_idx is not None and var_layer_idx >= 0 and i == var_layer_idx),
+            "layer.material_id": mat_id_int,
+            "layer.material_name": mat_name,
+            "layer.material_resolved": mat_resolved,
+        })
 
 # -------------------------
 # Reflection sweep (breadth): non-Parameter .NET members via reflection

@@ -607,12 +607,40 @@ def _category_line_pattern_id(cat, gst):
     except:
         return ElementId.InvalidElementId
 
-# Build quick lookup: pattern_id -> name
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
+# Build quick lookup: pattern_id -> name / workset. The crosswalk row's
+# subject is a line-style Category (linestyle.category_id/.name), and
+# Category is not an Element -- it has no WorksetId at all. The pattern it
+# resolves to (pattern.id/.name) IS an Element (LinePatternElement), so
+# that's the side WorksetId belongs on.
 pattern_name_by_id = {}
+pattern_workset_by_id = {}
 for pe in all_patterns:
     pid = _safe(lambda: pe.Id.IntegerValue, None)
     if pid is not None and pid not in pattern_name_by_id:
         pattern_name_by_id[pid] = _safe_elem_name(pe)
+        pe_ws_id_obj = _safe(lambda: pe.WorksetId, None)
+        pe_ws_name, _pe_ws_resolved = _resolve_workset(doc, pe_ws_id_obj)
+        pe_ws_id_int = _safe(lambda: pe_ws_id_obj.IntegerValue, None) if pe_ws_id_obj is not None else None
+        pattern_workset_by_id[pid] = (pe_ws_id_int, pe_ws_name)
 
 if enable_crosswalk:
     crosswalk_limit = IN[5] if len(IN) > 5 and IN[5] is not None else 50
@@ -659,6 +687,10 @@ if enable_crosswalk:
             row["pattern.resolved"] = True if row["pattern.name"] is not None else False
             if not row["pattern.resolved"]:
                 continue
+
+            p_ws_id_int, p_ws_name = pattern_workset_by_id.get(raw, (None, None))
+            row["pattern.workset_id"] = p_ws_id_int
+            row["pattern.workset_name"] = p_ws_name
 
             seen.add(k)
             optional_crosswalk.append(row)

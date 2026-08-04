@@ -467,6 +467,25 @@ if enable_crosswalk:
     # Keep compact: one row per distinct phasefilter id
     seen_pf_ids = set()
 
+    def _resolve_workset(doc, ws_id_obj):
+        """Resolve an Element.WorksetId value to (name, resolved_bool) via
+        WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+        distinct .NET type from ElementId (both happen to expose
+        .IntegerValue, which is why reflection reports this member as
+        ElementId-storage), and Workset is not derived from Element, so
+        doc.GetElement() would never resolve it even with the right type
+        assumed."""
+        if ws_id_obj is None:
+            return (None, False)
+        wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+        if wt_table is None:
+            return (None, False)
+        ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+        if ws is None:
+            return (None, False)
+        name = _safe(lambda: ws.Name, None)
+        return (name, name is not None)
+
     # Prefer templates for crosswalk signal
     crosswalk_views = templates if len(templates) > 0 else selected_views
 
@@ -499,9 +518,15 @@ if enable_crosswalk:
         if not resolved:
             continue
 
+        v_ws_id_obj = _safe(lambda: v.WorksetId, None)
+        v_ws_name, _v_ws_resolved = _resolve_workset(doc, v_ws_id_obj)
+        v_ws_id_int = _safe(lambda: v_ws_id_obj.IntegerValue, None) if v_ws_id_obj is not None else None
+
         row = {
             "view_template.id": _safe(lambda: v.Id.IntegerValue, None),
             "view_template.name": _safe(lambda: _safe_elem_name(v), None),
+            "view_template.workset_id": v_ws_id_int,
+            "view_template.workset_name": v_ws_name,
             "phase_filter_param.matched_name": matched_name,
             "phase_filter_param": pv,
             "phasefilter.resolved": resolved,

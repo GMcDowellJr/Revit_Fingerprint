@@ -533,6 +533,25 @@ if enable_crosswalk:
     # Relationship-breadth key: (line_pattern_id, graphics_style_type)
     seen_rel = set()
 
+    def _resolve_workset(doc, ws_id_obj):
+        """Resolve an Element.WorksetId value to (name, resolved_bool) via
+        WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+        distinct .NET type from ElementId (both happen to expose
+        .IntegerValue, which is why reflection reports this member as
+        ElementId-storage), and Workset is not derived from Element, so
+        doc.GetElement() would never resolve it even with the right type
+        assumed."""
+        if ws_id_obj is None:
+            return (None, False)
+        wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+        if wt_table is None:
+            return (None, False)
+        ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+        if ws is None:
+            return (None, False)
+        name = _safe(lambda: ws.Name, None)
+        return (name, name is not None)
+
     scanned = 0
     for gs in hits:
         if crosswalk_scan_limit >= 0 and scanned >= crosswalk_scan_limit:
@@ -565,11 +584,16 @@ if enable_crosswalk:
             continue
 
         style_name = _safe(lambda: c.Name, None) or _safe(lambda: gs.Name, None)
+        gs_ws_id_obj = _safe(lambda: gs.WorksetId, None)
+        gs_ws_name, _gs_ws_resolved = _resolve_workset(doc, gs_ws_id_obj)
+        gs_ws_id_int = _safe(lambda: gs_ws_id_obj.IntegerValue, None) if gs_ws_id_obj is not None else None
 
         row = {
             "line_style.id": _safe(lambda: gs.Id.IntegerValue, None),
             "line_style.type": str(gst),
             "line_style.name": style_name,
+            "line_style.workset_id": gs_ws_id_int,
+            "line_style.workset_name": gs_ws_name,
             "line_pattern.resolved": True if (pat_int is not None and pat_name is not None) else False,
             "line_pattern.id": pat_int,
             "line_pattern.name": pat_name

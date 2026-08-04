@@ -33,6 +33,13 @@ entries *across* runs for the same domain, picking one representative
 example per key using the same scoring heuristic the probes already use
 internally.
 
+A probe's "crosswalk"-kind entries (join rows -- materials' asset links,
+views' view->template link, worksets' owned-element counts, ...) don't fit
+that per-key model (no single param_key/member_key), so they're profiled
+separately, per COLUMN, into a second pair of output files:
+PROBE_CROSSWALK.md/.csv -- present/resolution rates per join column, across
+every run. See write_crosswalk_csv/write_crosswalk_markdown.
+
 This tool is pure Python 3 (no Revit/CLR dependency) and is meant to be run
 from a developer machine against the probe JSON files checked into
 tools/probes/.
@@ -142,7 +149,85 @@ def _new_agg():
     }
 
 
-def _merge_entries_for_domain(domains, diagnostics, domain, entries, basename, seen_tag, revit_version, warn_prefix, warnings):
+# ---------------------------------------------------------------------------
+# Crosswalk column profiling.
+#
+# crosswalk records aren't key/value observations the way inventory/reflection
+# records are (see _merge_entries_for_domain) -- they're join rows with
+# several named columns and no single param_key/member_key to dedupe on
+# (materials: appearance_asset.id/material.class/structural_asset.resolved/...;
+# worksets: workset.id/owned_element_count; views: view.has_template/
+# view.template_name; ...). So instead of one aggregate per key, this profiles
+# one aggregate per COLUMN, across every row seen for that domain across every
+# run: how often the column is present, how often it actually resolved to a
+# non-null value, what values look like. That's the question crosswalk data
+# actually exists to answer -- "is this join reliable enough to build on" --
+# and it reuses the exact same seen_tags/revit_versions/source_files tracking
+# the param/reflection aggregates already use.
+# ---------------------------------------------------------------------------
+
+_CROSSWALK_UNIQUE_VALUE_CAP = 500  # cap the distinct-value set per column so
+                                    # a high-cardinality id-like column (e.g.
+                                    # material.id) can't blow up memory; row/
+                                    # present/null counts stay exact regardless
+
+
+def _new_crosswalk_col_agg():
+    return {
+        "value_types": set(),
+        "present_count": 0,      # rows where this column key existed at all
+        "null_count": 0,         # ...and the value was None
+        "non_null_count": 0,     # ...and the value was not None
+        "unique_values": set(),
+        "unique_value_count_capped": False,
+        "example": None,
+        "_example_set": False,
+        "seen_tags": set(),
+        "revit_versions": set(),
+        "source_files": set(),
+    }
+
+
+def _crosswalk_value_sig(v):
+    return "{}:{}".format(type(v).__name__, v)
+
+
+def _merge_crosswalk_records(crosswalk_domains, crosswalk_row_counts, domain, records, basename, seen_tag, revit_version):
+    """Profiles one crosswalk entry's records into crosswalk_domains[domain][column].
+    Mirrors _merge_entries_for_domain's per-run bookkeeping (seen_tags/
+    revit_versions/source_files) but keyed by column name instead of a single
+    param_key/member_key, since crosswalk rows don't have one."""
+    for rec in records:
+        crosswalk_row_counts[domain] = crosswalk_row_counts.get(domain, 0) + 1
+        if not isinstance(rec, dict):
+            continue
+        cols = crosswalk_domains.setdefault(domain, OrderedDict())
+        for col_key, value in rec.items():
+            agg = cols.get(col_key)
+            if agg is None:
+                agg = _new_crosswalk_col_agg()
+                cols[col_key] = agg
+            agg["seen_tags"].add(seen_tag)
+            if revit_version:
+                agg["revit_versions"].add(revit_version)
+            agg["source_files"].add(basename)
+            agg["value_types"].add(type(value).__name__)
+            agg["present_count"] += 1
+            if value is None:
+                agg["null_count"] += 1
+                continue
+            agg["non_null_count"] += 1
+            if len(agg["unique_values"]) < _CROSSWALK_UNIQUE_VALUE_CAP:
+                agg["unique_values"].add(_crosswalk_value_sig(value))
+            else:
+                agg["unique_value_count_capped"] = True
+            if not agg["_example_set"]:
+                agg["example"] = value
+                agg["_example_set"] = True
+
+
+def _merge_entries_for_domain(domains, diagnostics, domain, entries, basename, seen_tag, revit_version, warn_prefix, warnings,
+                               crosswalk_domains=None, crosswalk_row_counts=None):
     diag = diagnostics.setdefault(domain, {"crosswalk_count": 0, "opaque_count": 0, "unrecognized_entry_count": 0, "seen_tags": []})
     if seen_tag not in diag["seen_tags"]:
         diag["seen_tags"].append(seen_tag)
@@ -159,7 +244,13 @@ def _merge_entries_for_domain(domains, diagnostics, domain, entries, basename, s
 
         kind = entry.get("kind")
         if kind == "crosswalk":
-            diag["crosswalk_count"] += len(entry.get("records") or [])
+            records = entry.get("records") or []
+            diag["crosswalk_count"] += len(records)
+            if crosswalk_domains is not None:
+                _merge_crosswalk_records(
+                    crosswalk_domains, crosswalk_row_counts, domain, records,
+                    basename, seen_tag, revit_version,
+                )
             continue
 
         if kind not in _MERGE_KINDS:
@@ -207,13 +298,20 @@ def _merge_entries_for_domain(domains, diagnostics, domain, entries, basename, s
 
 def merge_probe_files(run_files, legacy_files, warnings):
     """
-    Returns (domains, diagnostics).
+    Returns (domains, diagnostics, crosswalk_domains, crosswalk_row_counts).
     domains: OrderedDict domain -> bucket ("param"|"reflection") -> key -> aggregate dict.
     diagnostics: OrderedDict domain -> {"crosswalk_count", "opaque_count",
                  "unrecognized_entry_count", "seen_tags": [...]}
+    crosswalk_domains: OrderedDict domain -> column -> aggregate dict (see
+                 _new_crosswalk_col_agg).
+    crosswalk_row_counts: dict domain -> total crosswalk rows seen (the
+                 denominator for a column's coverage, independent of any
+                 particular column's presence).
     """
     domains = OrderedDict()
     diagnostics = OrderedDict()
+    crosswalk_domains = OrderedDict()
+    crosswalk_row_counts = {}
 
     for path, fname_meta in run_files:
         basename = os.path.basename(path)
@@ -242,6 +340,7 @@ def merge_probe_files(run_files, legacy_files, warnings):
             _merge_entries_for_domain(
                 domains, diagnostics, domain, entries, basename, seen_tag, revit_version,
                 warn_prefix=basename, warnings=warnings,
+                crosswalk_domains=crosswalk_domains, crosswalk_row_counts=crosswalk_row_counts,
             )
 
     for path, fname_meta in legacy_files:
@@ -279,9 +378,10 @@ def merge_probe_files(run_files, legacy_files, warnings):
             _merge_entries_for_domain(
                 domains, diagnostics, domain, entries, basename, date, None,
                 warn_prefix=basename, warnings=warnings,
+                crosswalk_domains=crosswalk_domains, crosswalk_row_counts=crosswalk_row_counts,
             )
 
-    return domains, diagnostics
+    return domains, diagnostics, crosswalk_domains, crosswalk_row_counts
 
 
 def _fmt_q_counts(q_counts):
@@ -347,6 +447,139 @@ def write_csv(domains, out_csv, warnings):
     return len(rows)
 
 
+def _fmt_rate(numerator, denominator):
+    if not denominator:
+        return ""
+    return "{:.1f}%".format(100.0 * numerator / denominator)
+
+
+def write_crosswalk_csv(crosswalk_domains, crosswalk_row_counts, out_csv, warnings):
+    rows = []
+    for domain in sorted(crosswalk_domains.keys()):
+        cols = crosswalk_domains[domain]
+        total_rows = crosswalk_row_counts.get(domain, 0)
+        for col_key in sorted(cols.keys()):
+            agg = cols[col_key]
+            rows.append({
+                "domain": domain,
+                "column": col_key,
+                "rows_in_domain": total_rows,
+                "present_count": agg["present_count"],
+                "present_rate": _fmt_rate(agg["present_count"], total_rows),
+                "non_null_count": agg["non_null_count"],
+                "null_count": agg["null_count"],
+                "resolution_rate": _fmt_rate(agg["non_null_count"], agg["present_count"]),
+                "value_types": ";".join(sorted(agg["value_types"])),
+                "unique_value_count": len(agg["unique_values"]),
+                "unique_value_count_capped": agg["unique_value_count_capped"],
+                "example": agg["example"],
+                "revit_versions_seen": ";".join(sorted(agg["revit_versions"])),
+                "first_seen": min(agg["seen_tags"]) if agg["seen_tags"] else "",
+                "last_seen": max(agg["seen_tags"]) if agg["seen_tags"] else "",
+                "run_count": len(agg["seen_tags"]),
+                "source_files": ";".join(sorted(agg["source_files"])),
+            })
+
+    fieldnames = [
+        "domain", "column", "rows_in_domain", "present_count", "present_rate",
+        "non_null_count", "null_count", "resolution_rate",
+        "value_types", "unique_value_count", "unique_value_count_capped", "example",
+        "revit_versions_seen", "first_seen", "last_seen", "run_count", "source_files",
+    ]
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(out_csv)), exist_ok=True)
+    except OSError:
+        pass
+    with open(out_csv, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for row in rows:
+            w.writerow(row)
+    return len(rows)
+
+
+def write_crosswalk_markdown(crosswalk_domains, crosswalk_row_counts, out_md, run_file_count, legacy_file_count):
+    lines = []
+    lines.append("# Probe Crosswalk (auto-generated)")
+    lines.append("")
+    lines.append(
+        "Generated by `tools/probes/build_probe_inventory.py`. Do not hand-edit -- "
+        "rerun the script after adding/updating probe output files."
+    )
+    lines.append("")
+    lines.append(
+        "Crosswalk records are join rows (materials' appearance/structural/thermal "
+        "asset links, views' view->template link, worksets' owned-element counts, "
+        "browser_organization's folder-item->definition resolution, ...) -- they have "
+        "several named columns and no single param_key/member_key the way inventory/"
+        "reflection records do, so `PROBE_INVENTORY.csv`/`.md` only counts them as a "
+        "diagnostic. This report profiles each **column** instead: how often it's "
+        "present, how often it actually resolves to a non-null value, and what the "
+        "values look like -- across every `probes_<revit_version>_<run_id>.json` run "
+        "found ({} found) and legacy `probe_<domain>_<date>.json` file ({} found). "
+        "That's the question crosswalk data exists to answer: is this join reliable "
+        "enough to build on.".format(run_file_count, legacy_file_count)
+    )
+    lines.append("")
+    lines.append(
+        "`present_rate` = how often the column key showed up in a row at all, out of "
+        "every crosswalk row seen for that domain. `resolution_rate` = of the rows "
+        "where the column was present, how many resolved to a non-null value (a "
+        "present-but-null column, e.g. `structural_asset.id` when a material has no "
+        "structural asset assigned, is a real, valid, unresolved join -- not missing "
+        "data)."
+    )
+    lines.append("")
+
+    if not crosswalk_domains:
+        lines.append("_No crosswalk records found in any probe run._")
+        lines.append("")
+    else:
+        lines.append("## Domains with crosswalk data")
+        lines.append("")
+        lines.append("| domain | rows | columns |")
+        lines.append("|---|---|---|")
+        for domain in sorted(crosswalk_domains.keys()):
+            lines.append("| `{}` | {} | {} |".format(
+                domain, crosswalk_row_counts.get(domain, 0), len(crosswalk_domains[domain])
+            ))
+        lines.append("")
+
+        for domain in sorted(crosswalk_domains.keys()):
+            cols = crosswalk_domains[domain]
+            total_rows = crosswalk_row_counts.get(domain, 0)
+            lines.append("## domain — `{}` ({} row(s))".format(domain, total_rows))
+            lines.append("")
+            for col_key in sorted(cols.keys()):
+                agg = cols[col_key]
+                lines.append("- **column** — `{}`".format(col_key))
+                lines.append("  - present — {} / {} rows ({})".format(
+                    agg["present_count"], total_rows, _fmt_rate(agg["present_count"], total_rows) or "n/a"
+                ))
+                lines.append("  - resolved (non-null) — {} / {} present ({})".format(
+                    agg["non_null_count"], agg["present_count"],
+                    _fmt_rate(agg["non_null_count"], agg["present_count"]) or "n/a"
+                ))
+                lines.append("  - value_types — `{}`".format(", ".join(sorted(agg["value_types"])) or "(none)"))
+                uv_note = " (capped at {})".format(_CROSSWALK_UNIQUE_VALUE_CAP) if agg["unique_value_count_capped"] else ""
+                lines.append("  - unique_value_count — `{}{}`".format(len(agg["unique_values"]), uv_note))
+                lines.append("  - example — `{}`".format(agg["example"]))
+                lines.append("  - revit_versions_seen — `{}`".format(", ".join(sorted(agg["revit_versions"])) or "(unknown)"))
+                lines.append("  - seen — {} run(s), {}–{}".format(
+                    len(agg["seen_tags"]),
+                    min(agg["seen_tags"]) if agg["seen_tags"] else "?",
+                    max(agg["seen_tags"]) if agg["seen_tags"] else "?",
+                ))
+                lines.append("")
+
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(out_md)), exist_ok=True)
+    except OSError:
+        pass
+    with open(out_md, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def scan_domain_coverage(domains_dir):
     """Best-effort: list domain module names under domains_dir. Returns None
     if the directory can't be found (this tool must still work standalone)."""
@@ -402,6 +635,13 @@ def write_markdown(domains, diagnostics, out_md, skipped, warnings, domain_modul
     lines.append("")
     if diagnostics:
         lines.append("`runs` counts distinct `extraction_date`/legacy-filename-date tags seen for that domain; see the CSV's `first_seen`/`last_seen` columns for the actual timestamps.")
+        lines.append("")
+    if any(diag.get("crosswalk_count") for diag in diagnostics.values()):
+        lines.append(
+            "Domains with nonzero `crosswalk records` above have a per-column resolution "
+            "profile in `PROBE_CROSSWALK.md`/`.csv` -- how often each join column is "
+            "present and how often it actually resolves, not just a raw row count."
+        )
         lines.append("")
 
     if domain_module_names is not None:
@@ -469,12 +709,12 @@ def write_markdown(domains, diagnostics, out_md, skipped, warnings, domain_modul
         f.write("\n".join(lines) + "\n")
 
 
-def build(probes_dir, out_md, out_csv, domains_dir, force=False):
+def build(probes_dir, out_md, out_csv, domains_dir, force=False, out_crosswalk_md=None, out_crosswalk_csv=None):
     warnings = []
     run_files, legacy_files, skipped = discover_probe_files(probes_dir)
-    domains, diagnostics = merge_probe_files(run_files, legacy_files, warnings)
+    domains, diagnostics, crosswalk_domains, crosswalk_row_counts = merge_probe_files(run_files, legacy_files, warnings)
 
-    if not domains and not force:
+    if not domains and not crosswalk_domains and not force:
         # Refuse to clobber a populated CSV/Markdown with empty output.
         # This covers two cases: (a) no probe_*.json/probes_*.json inputs
         # were found at all, and (b) inputs were found by filename but every
@@ -489,6 +729,8 @@ def build(probes_dir, out_md, out_csv, domains_dir, force=False):
             "files_skipped": len(skipped),
             "domains": 0,
             "csv_rows": None,
+            "crosswalk_domains": 0,
+            "crosswalk_csv_rows": None,
             "warnings": warnings,
             "skipped": skipped,
             "refused_empty_rebuild": True,
@@ -497,12 +739,20 @@ def build(probes_dir, out_md, out_csv, domains_dir, force=False):
     domain_module_names = scan_domain_coverage(domains_dir) if domains_dir else None
     row_count = write_csv(domains, out_csv, warnings)
     write_markdown(domains, diagnostics, out_md, skipped, warnings, domain_module_names, len(run_files), len(legacy_files))
+
+    crosswalk_row_total = 0
+    if out_crosswalk_csv and out_crosswalk_md:
+        crosswalk_row_total = write_crosswalk_csv(crosswalk_domains, crosswalk_row_counts, out_crosswalk_csv, warnings)
+        write_crosswalk_markdown(crosswalk_domains, crosswalk_row_counts, out_crosswalk_md, len(run_files), len(legacy_files))
+
     return {
         "run_files_matched": len(run_files),
         "legacy_files_matched": len(legacy_files),
         "files_skipped": len(skipped),
         "domains": len(domains),
         "csv_rows": row_count,
+        "crosswalk_domains": len(crosswalk_domains),
+        "crosswalk_csv_rows": crosswalk_row_total if (out_crosswalk_csv and out_crosswalk_md) else None,
         "warnings": warnings,
         "skipped": skipped,
         "refused_empty_rebuild": False,
@@ -515,6 +765,16 @@ def main(argv=None):
     parser.add_argument("--probes-dir", default=default_probes_dir)
     parser.add_argument("--out-md", default=None)
     parser.add_argument("--out-csv", default=None)
+    parser.add_argument(
+        "--out-crosswalk-md", default=None,
+        help="Where to write the crosswalk column-profile report. Default: "
+        "PROBE_CROSSWALK.md next to --out-md.",
+    )
+    parser.add_argument(
+        "--out-crosswalk-csv", default=None,
+        help="Where to write the crosswalk column-profile CSV. Default: "
+        "PROBE_CROSSWALK.csv next to --out-csv.",
+    )
     parser.add_argument(
         "--domains-dir",
         default=None,
@@ -533,13 +793,18 @@ def main(argv=None):
     probes_dir = os.path.abspath(args.probes_dir)
     out_md = args.out_md or os.path.join(probes_dir, "PROBE_INVENTORY.md")
     out_csv = args.out_csv or os.path.join(probes_dir, "PROBE_INVENTORY.csv")
+    out_crosswalk_md = args.out_crosswalk_md or os.path.join(os.path.dirname(os.path.abspath(out_md)), "PROBE_CROSSWALK.md")
+    out_crosswalk_csv = args.out_crosswalk_csv or os.path.join(os.path.dirname(os.path.abspath(out_csv)), "PROBE_CROSSWALK.csv")
     domains_dir = args.domains_dir
     if domains_dir is None:
         # Best-effort default: tools/probes/../../domains
         candidate = os.path.abspath(os.path.join(probes_dir, "..", "..", "domains"))
         domains_dir = candidate if os.path.isdir(candidate) else None
 
-    result = build(probes_dir, out_md, out_csv, domains_dir, force=args.force)
+    result = build(
+        probes_dir, out_md, out_csv, domains_dir, force=args.force,
+        out_crosswalk_md=out_crosswalk_md, out_crosswalk_csv=out_crosswalk_csv,
+    )
 
     if result.get("refused_empty_rebuild"):
         matched = result["run_files_matched"] + result["legacy_files_matched"]
@@ -570,6 +835,10 @@ def main(argv=None):
     print("  csv rows written     : {}".format(result["csv_rows"]))
     print("  markdown             : {}".format(out_md))
     print("  csv                  : {}".format(out_csv))
+    print("  crosswalk domains    : {}".format(result["crosswalk_domains"]))
+    print("  crosswalk csv rows   : {}".format(result["crosswalk_csv_rows"]))
+    print("  crosswalk markdown   : {}".format(out_crosswalk_md))
+    print("  crosswalk csv        : {}".format(out_crosswalk_csv))
     if result["warnings"]:
         print("  warnings             : {}".format(len(result["warnings"])))
         for w in result["warnings"][:10]:

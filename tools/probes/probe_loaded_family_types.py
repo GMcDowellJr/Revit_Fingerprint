@@ -8,6 +8,18 @@
 #     "summary": summary,
 #     "file_written": "<path>|None",
 #     "file_write_error": "<error>|None"
+#   },
+#   {
+#     "kind": "reflection",
+#     "domain": "loaded_family_types",
+#     "records": [...]
+#   },
+#   {
+#     "kind": "crosswalk",
+#     "domain": "loaded_family_types",
+#     "records": [...]   # FamilySymbol -> its own workset (new -- this domain had no
+#                         # crosswalk kind at all before; reuses the existing 60-item
+#                         # capped reflection sample, no extra collector cost)
 #   }
 # ]
 #
@@ -522,6 +534,49 @@ def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200)
 _reflection_records_0 = _run_reflection_sweep(_reflect_samples, "FamilySymbol", "loaded_family_types")
 _reflection_records = _reflection_records_0
 
+# -------------------------
+# Crosswalk (new): FamilySymbol -> its own workset. loaded_family_types had
+# no crosswalk kind at all before this -- reuses the same 60-item capped
+# sample the reflection sweep already collected (_reflect_samples), so this
+# adds no extra collector cost.
+# -------------------------
+
+
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
+optional_crosswalk = []
+for sym in _reflect_samples:
+    sym_id = _safe(lambda: sym.Id.IntegerValue, None)
+    if sym_id is None:
+        continue
+    sym_name = _safe(lambda: sym.Name, None)
+    ws_id_obj = _safe(lambda: sym.WorksetId, None)
+    ws_name, _ws_resolved = _resolve_workset(doc, ws_id_obj)
+    ws_id_int = _safe(lambda: ws_id_obj.IntegerValue, None) if ws_id_obj is not None else None
+    optional_crosswalk.append({
+        "family_symbol.id": sym_id,
+        "family_symbol.name": sym_name,
+        "family_symbol.workset_id": ws_id_int,
+        "family_symbol.workset_name": ws_name,
+    })
+
 OUT_payload = [
     {
         "kind": "inventory",
@@ -533,6 +588,11 @@ OUT_payload = [
         "kind": "reflection",
         "domain": "loaded_family_types",
         "records": _reflection_records
+    },
+    {
+        "kind": "crosswalk",
+        "domain": "loaded_family_types",
+        "records": optional_crosswalk
     },
 ]
 

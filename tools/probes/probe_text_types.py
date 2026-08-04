@@ -598,6 +598,25 @@ def _find_leader_arrow_param(t):
             return cand, p
     return None, None
 
+
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
 if enable_crosswalk:
     # Optional extra input: max crosswalk rows to emit (default 25)
     crosswalk_limit = IN[5] if len(IN) > 5 and IN[5] is not None else 25
@@ -629,9 +648,15 @@ if enable_crosswalk:
             if ah_name is None:
                 ah_name = _safe(lambda: _safe_type_name(ref), None)
 
+        tt_ws_id_obj = _safe(lambda: tt.WorksetId, None)
+        tt_ws_name, _tt_ws_resolved = _resolve_workset(doc, tt_ws_id_obj)
+        tt_ws_id_int = _safe(lambda: tt_ws_id_obj.IntegerValue, None) if tt_ws_id_obj is not None else None
+
         row = {
             "text_type.id": _safe(lambda: tt.Id.IntegerValue, None),
             "text_type.name": _safe(lambda: _safe_type_name(tt), None),
+            "text_type.workset_id": tt_ws_id_int,
+            "text_type.workset_name": tt_ws_name,
             "leader_arrow_param.matched_name": matched,
             "leader_arrow_param": pv,
             "arrowhead.resolved": True if ah_name is not None else False,

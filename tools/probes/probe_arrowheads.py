@@ -441,12 +441,36 @@ def _collect_dimension_types_with_tick_param():
             continue
     return hits_local
 
-# arrowhead name lookup (from all hits, not just selected)
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
+# arrowhead name + workset lookup (from all hits, not just selected)
 arrowhead_name_by_id = {}
+arrowhead_workset_by_id = {}
 for t in hits:
     tid = _safe(lambda: t.Id.IntegerValue, None)
     if tid is not None and tid not in arrowhead_name_by_id:
         arrowhead_name_by_id[tid] = _safe_type_name(t)
+        t_ws_id_obj = _safe(lambda: t.WorksetId, None)
+        t_ws_name, _t_ws_resolved = _resolve_workset(doc, t_ws_id_obj)
+        t_ws_id_int = _safe(lambda: t_ws_id_obj.IntegerValue, None) if t_ws_id_obj is not None else None
+        arrowhead_workset_by_id[tid] = (t_ws_id_int, t_ws_name)
 
 if enable_crosswalk:
     # Optional extra input: max crosswalk rows to emit (default 25)
@@ -502,6 +526,10 @@ if enable_crosswalk:
         # Keep only resolved mappings (signal > noise)
         if not row["arrowhead.resolved"]:
             continue
+
+        ah_ws_id_int, ah_ws_name = arrowhead_workset_by_id.get(ah_id, (None, None))
+        row["arrowhead.workset_id"] = ah_ws_id_int
+        row["arrowhead.workset_name"] = ah_ws_name
 
         seen_arrowhead_ids.add(ah_id)
         optional_crosswalk.append(row)

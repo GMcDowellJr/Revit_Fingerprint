@@ -517,11 +517,35 @@ def _get_view_phase_filter_param(v):
 
     return (None, None)
 
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
 phase_filter_name_by_id = {}
+phase_filter_workset_by_id = {}
 for pf in phase_filters:
     pid = _safe(lambda: pf.Id.IntegerValue, None)
     if pid is not None and pid not in phase_filter_name_by_id:
         phase_filter_name_by_id[pid] = _safe(lambda: _safe_elem_name(pf), None)
+        pf_ws_id_obj = _safe(lambda: pf.WorksetId, None)
+        pf_ws_name, _pf_ws_resolved = _resolve_workset(doc, pf_ws_id_obj)
+        pf_ws_id_int = _safe(lambda: pf_ws_id_obj.IntegerValue, None) if pf_ws_id_obj is not None else None
+        phase_filter_workset_by_id[pid] = (pf_ws_id_int, pf_ws_name)
 
 if enable_crosswalk:
     views = _safe(
@@ -583,6 +607,10 @@ if enable_crosswalk:
 
         if not row["phase_filter.resolved"]:
             continue
+
+        pf_ws_id_int, pf_ws_name = phase_filter_workset_by_id.get(pf_id, (None, None))
+        row["phase_filter.workset_id"] = pf_ws_id_int
+        row["phase_filter.workset_name"] = pf_ws_name
 
         seen_pf_ids.add(pf_id)
         optional_crosswalk.append(row)

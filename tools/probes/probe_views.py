@@ -1,464 +1,795 @@
-# -*- coding: utf-8 -*-
-"""
-probe_views.py
-Dynamo CPython3 — run inside Revit against a workshared project file.
+# tools/probes/probe_views.py
+#
+# Dynamo Python (Revit) — Breadth Probe: views (INVENTORY OUTPUT)
+#
+# OUT = [
+#   {
+#     "kind": "reflection",
+#     "domain": "views",
+#     "records": [...],
+#     "file_written": "<path>|None",        # present only if write_json=True
+#     "file_write_error": "<error>|None"    # present only on failure
+#   },
+#   {
+#     "kind": "inventory",
+#     "domain": "views",
+#     "records": [...]
+#   },
+#   {
+#     "kind": "crosswalk",
+#     "domain": "views",
+#     "records": [...]
+#   }
+# ]
+#
+# Reworked from the original bespoke findings-dict probe to match the
+# reflection/inventory/crosswalk contract every other domain probe uses.
+# Two concrete reasons, not just consistency:
+#   1. tools/probes/build_probe_inventory.py's merge step requires each OUT
+#      entry to be a dict with a "kind"; the old probe emitted
+#      OUT = json.dumps(findings, ...) (a single string), so views output
+#      was silently counted as an "unrecognized_entry" and never made it
+#      into PROBE_INVENTORY.csv/md.
+#   2. View IS an Element -- it has real BuiltInParameters/shared
+#      parameters, but the old probe never walked them; it only hand-coded
+#      two BIPs (VIEW_PHASE, VIEW_PHASE_FILTER) plus a fixed CLR-property
+#      list. Running the same param_inventory walk every other domain
+#      uses picks up every parameter actually present on sampled views
+#      (Phase, Phase Filter, and anything else) without having to name
+#      each one in advance -- plus the reflection sweep for everything
+#      that isn't a Parameter at all (Discipline, DetailLevel, Scale,
+#      ViewTemplateId, IsCallout, ...).
+#
+# The known API constraint that non-graphical view subtypes (schedules,
+# sheets, legends, System Browser, "Internal"/ProjectBrowser views) throw
+# on CLR properties like Discipline/CropBoxActive/IsSectionBoxActive is
+# preserved -- not by special-casing those view types, but simply by
+# letting the reflection sweep's per-member ok_count/error_count surface
+# it, same as it does for every other domain.
+#
+# Inputs:
+#   IN[0] max_views_per_viewtype (int)
+#        Cap on how many View instances to sample PER distinct ViewType,
+#        for the reflection/inventory/crosswalk sweep. Full-corpus counts
+#        (by_viewtype_int, template_count, etc.) are still computed over
+#        every view regardless of this cap.
+#        Default: 5
+#
+#   IN[1] max_views_total (int)
+#        Overall cap on the combined per-viewtype sample, in case a file
+#        has many distinct ViewTypes.
+#        Default: 300
+#
+#   IN[2] enable_crosswalk (bool)
+#        Whether to emit View -> ViewTemplate crosswalk (has_template,
+#        template_name) for the sampled views. Cheap (ElementId lookups on
+#        already-sampled views), default on.
+#        Default: True
+#
+#   IN[3] write_json (bool)
+#        When True, serialize OUT to a valid JSON file on disk.
+#        Default: False
+#
+#   IN[4] output_directory (str)
+#        Directory path where JSON will be written.
+#        Filename is fixed as: probes_<revit_version>_<run_id>.json
+#        If None, falls back to RVT directory, then TEMP.
 
-Probes:
-  1.  FilteredElementCollector(doc).OfClass(View) — collector works, total count
-  2.  ViewType enum integer values (all members)
-  3.  ViewDiscipline enum integer values (all members)
-  4.  ViewDetailLevel enum integer values
-  5.  View.IsFromLinkedFile — exists? callable? returns bool?
-  6.  View.IsCallout — attribute access
-  7.  View.IsDependent / GetPrimaryViewId() — dependent view detection
-  8.  View.IsTemplate — template vs live view split
-  9.  View.ViewTemplateId — exists, InvalidElementId (-1) for no template
-  10. View.Scale — value type, schedules/sheets return?
-  11. View.Discipline — enum, int conversion works?
-  12. View.DetailLevel — enum, int conversion works?
-  13. BuiltInParameter.VIEW_PHASE — get_Parameter works? returns ElementId?
-  14. BuiltInParameter.VIEW_PHASE_FILTER — same
-  15. ViewSchedule — IsTitleblockRevisionSchedule attribute
-  16. View counts: by IsTemplate, by ViewType integer, linked vs local
-  17. Sample records (non-template, 1 per ViewType bucket)
 
-Output: JSON findings dict via OUT.
-"""
-
+import clr
+import os
 import json
-import traceback
+from datetime import datetime
 
-findings = {
-    "probe": "views",
-    "status": "ok",
-    "imports": {},
-    "viewtype_ints": {},
-    "viewdiscipline_ints": {},
-    "viewdetaillevel_ints": {},
-    "bip_probe": {},
-    "isFromLinkedFile_probe": {},
-    "counts": {},
-    "schedule_probe": {},
-    "sample_by_viewtype": {},
-    "errors": [],
-    "notes": [],
-}
+clr.AddReference("RevitServices")
+from RevitServices.Persistence import DocumentManager
 
-def _safe(v):
-    try:
-        return str(v)
-    except Exception:
-        return "<error>"
-
-def _int_enum(val):
-    """Convert a Revit enum value to int via str coercion (CPython3 pattern)."""
-    try:
-        return int(str(val))
-    except Exception:
-        return None
+clr.AddReference("RevitAPI")
+from Autodesk.Revit.DB import (
+    FilteredElementCollector, ElementId,
+    StorageType, UnitUtils, UnitTypeId, UnitFormatUtils,
+    BuiltInParameter, View
+)
 
 try:
-    from RevitServices.Persistence import DocumentManager
-    doc = DocumentManager.Instance.CurrentDBDocument
-
-    # ── 1. Imports ──────────────────────────────────────────────────────────
-    View = None
+    from Autodesk.Revit.DB import ViewSchedule
+except:
     ViewSchedule = None
+
+try:
+    from Autodesk.Revit.DB import ViewSheet
+except:
     ViewSheet = None
-    ViewType = None
-    ViewDiscipline = None
-    ViewDetailLevel = None
-    BuiltInParameter = None
-    FilteredElementCollector = None
-    ElementId = None
 
+try:
+    from Autodesk.Revit.DB import SpecTypeId
+except:
+    SpecTypeId = None
+
+doc = DocumentManager.Instance.CurrentDBDocument
+
+max_views_per_viewtype = IN[0] if len(IN) > 0 and IN[0] is not None else 5
+max_views_total = IN[1] if len(IN) > 1 and IN[1] is not None else 300
+enable_crosswalk = IN[2] if len(IN) > 2 and IN[2] is not None else True
+write_json = IN[3] if len(IN) > 3 and IN[3] is not None else False
+out_path = IN[4] if len(IN) > 4 and IN[4] is not None else None
+
+
+# -------------------------
+# Helpers (defensive) -- same param-contract engine every other domain
+# probe with real Parameters uses (copied verbatim from probe_phase_filters.py
+# so this file stays self-contained).
+# -------------------------
+
+def _safe(fn, default=None):
     try:
-        from Autodesk.Revit.DB import FilteredElementCollector, ElementId
-        findings["imports"]["FilteredElementCollector"] = "ok"
-    except Exception as e:
-        findings["imports"]["FilteredElementCollector"] = "FAILED: " + str(e)
+        return fn()
+    except:
+        return default
 
+
+def _safe_elem_name(elem):
     try:
-        from Autodesk.Revit.DB import View
-        findings["imports"]["View"] = "ok"
-    except Exception as e:
-        findings["imports"]["View"] = "FAILED: " + str(e)
-
-    try:
-        from Autodesk.Revit.DB import ViewSchedule
-        findings["imports"]["ViewSchedule"] = "ok"
-    except Exception as e:
-        findings["imports"]["ViewSchedule"] = "FAILED: " + str(e)
-
-    try:
-        from Autodesk.Revit.DB import ViewSheet
-        findings["imports"]["ViewSheet"] = "ok"
-    except Exception as e:
-        findings["imports"]["ViewSheet"] = "FAILED: " + str(e)
-
-    try:
-        from Autodesk.Revit.DB import ViewType
-        findings["imports"]["ViewType"] = "ok"
-    except Exception as e:
-        findings["imports"]["ViewType"] = "FAILED: " + str(e)
-
-    try:
-        from Autodesk.Revit.DB import ViewDiscipline
-        findings["imports"]["ViewDiscipline"] = "ok"
-    except Exception as e:
-        findings["imports"]["ViewDiscipline"] = "FAILED: " + str(e)
-
-    try:
-        from Autodesk.Revit.DB import ViewDetailLevel
-        findings["imports"]["ViewDetailLevel"] = "ok"
-    except Exception as e:
-        findings["imports"]["ViewDetailLevel"] = "FAILED: " + str(e)
-
-    try:
-        from Autodesk.Revit.DB import BuiltInParameter
-        findings["imports"]["BuiltInParameter"] = "ok"
-    except Exception as e:
-        findings["imports"]["BuiltInParameter"] = "FAILED: " + str(e)
-
-    # ── 2. ViewType integer values ──────────────────────────────────────────
-    if ViewType is not None:
-        vt_names = [
-            "FloorPlan", "CeilingPlan", "Elevation", "ThreeD", "DrawingSheet",
-            "DraftingView", "Legend", "EngineeringPlan", "AreaPlan",
-            "Section", "Detail", "CostReport", "LoadsReport", "PresureLossReport",
-            "ColumnSchedule", "PanelSchedule", "Schedule", "Walkthrough",
-            "Rendering", "SystemBrowser", "ProjectBrowser",
-        ]
-        for name in vt_names:
-            try:
-                attr = getattr(ViewType, name, "NOT_FOUND")
-                if attr == "NOT_FOUND":
-                    findings["viewtype_ints"][name] = "NOT_FOUND"
-                else:
-                    findings["viewtype_ints"][name] = _int_enum(attr)
-            except Exception as e:
-                findings["viewtype_ints"][name] = "ERROR: " + str(e)
-    else:
-        findings["viewtype_ints"]["note"] = "ViewType import failed"
-
-    # ── 3. ViewDiscipline integer values ────────────────────────────────────
-    if ViewDiscipline is not None:
-        vd_names = [
-            "Undefined", "Architectural", "Structural", "Mechanical",
-            "Electrical", "Plumbing", "Coordination",
-        ]
-        for name in vd_names:
-            try:
-                attr = getattr(ViewDiscipline, name, "NOT_FOUND")
-                findings["viewdiscipline_ints"][name] = _int_enum(attr) if attr != "NOT_FOUND" else "NOT_FOUND"
-            except Exception as e:
-                findings["viewdiscipline_ints"][name] = "ERROR: " + str(e)
-    else:
-        findings["viewdiscipline_ints"]["note"] = "ViewDiscipline import failed"
-
-    # ── 4. ViewDetailLevel integer values ───────────────────────────────────
-    if ViewDetailLevel is not None:
-        for name in ("Undefined", "Coarse", "Medium", "Fine"):
-            try:
-                attr = getattr(ViewDetailLevel, name, "NOT_FOUND")
-                findings["viewdetaillevel_ints"][name] = _int_enum(attr) if attr != "NOT_FOUND" else "NOT_FOUND"
-            except Exception as e:
-                findings["viewdetaillevel_ints"][name] = "ERROR: " + str(e)
-    else:
-        findings["viewdetaillevel_ints"]["note"] = "ViewDetailLevel import failed"
-
-    # ── 5–16. Collector probes ──────────────────────────────────────────────
-    if FilteredElementCollector is not None and View is not None:
-
+        n = elem.Name
+        if n:
+            return n
+    except:
+        pass
+    for bip in (BuiltInParameter.SYMBOL_NAME_PARAM, BuiltInParameter.ALL_MODEL_TYPE_NAME):
         try:
-            col = list(FilteredElementCollector(doc).OfClass(View))
-            findings["counts"]["total_view_elements"] = len(col)
-        except Exception as e:
-            findings["errors"].append("collector_ofclass_view: " + str(e))
-            col = []
+            p = elem.get_Parameter(bip)
+            if p is not None:
+                s = p.AsString()
+                if s:
+                    return s
+        except:
+            pass
+    return None
 
-        # Partition by IsTemplate and ViewType
-        template_count = 0
-        live_count = 0
-        linked_count = 0
-        no_linked_attr = 0
-        counts_by_vt = {}
-        no_template_count = 0
 
-        # One sample per viewtype bucket (non-template only)
-        samples = {}
+def _safe_param_def_name(p):
+    try:
+        d = p.Definition
+        return d.Name if d is not None else None
+    except:
+        return None
 
-        invalid_eid = None
-        if ElementId is not None:
+
+def _safe_get_datatype(p):
+    try:
+        d = p.Definition
+        if d is None:
+            return None
+        return d.GetDataType()
+    except:
+        return None
+
+
+def _is_length_datatype(dt):
+    if dt is None or SpecTypeId is None:
+        return False
+    try:
+        return dt == SpecTypeId.Length
+    except:
+        return False
+
+
+def _is_angle_datatype(dt):
+    if dt is None or SpecTypeId is None:
+        return False
+    try:
+        return dt == SpecTypeId.Angle
+    except:
+        return False
+
+
+def _fmt_display(p, raw_double=None):
+    try:
+        if raw_double is not None:
+            dt = _safe_get_datatype(p)
+            if dt is not None:
+                return UnitFormatUtils.Format(doc.GetUnits(), dt, raw_double, False)
+            return str(raw_double)
+        return p.AsValueString()
+    except:
+        return _safe(lambda: p.AsValueString(), None)
+
+
+def _format_param_contract(p):
+    if p is None:
+        return {"q": "missing", "storage": "None", "raw": None, "display": None, "norm": None}
+
+    st = _safe(lambda: p.StorageType, None)
+    if st is None:
+        return {"q": "unreadable", "storage": None, "raw": None, "display": None, "norm": None}
+
+    if st == StorageType.String:
+        raw = _safe(lambda: p.AsString(), None)
+        return {"q": "ok", "storage": "String", "raw": raw, "display": raw, "norm": raw}
+
+    if st == StorageType.Integer:
+        raw = _safe(lambda: p.AsInteger(), None)
+        disp = _fmt_display(p, None)
+        return {
+            "q": "ok", "storage": "Integer", "raw": raw,
+            "display": disp if disp is not None else (str(raw) if raw is not None else None),
+            "norm": raw
+        }
+
+    if st == StorageType.Double:
+        raw = _safe(lambda: p.AsDouble(), None)
+        disp = _fmt_display(p, raw)
+        dt = _safe_get_datatype(p)
+        if raw is None:
+            norm = None
+        elif _is_length_datatype(dt):
+            norm = _safe(lambda: UnitUtils.ConvertFromInternalUnits(raw, UnitTypeId.Inches), raw)
+        elif _is_angle_datatype(dt):
+            norm = _safe(lambda: UnitUtils.ConvertFromInternalUnits(raw, UnitTypeId.Degrees), raw)
+        else:
+            norm = raw
+        return {"q": "ok", "storage": "Double", "raw": raw, "display": disp, "norm": norm}
+
+    if st == StorageType.ElementId:
+        eid = _safe(lambda: p.AsElementId(), None)
+        if eid is None or eid == ElementId.InvalidElementId:
+            return {"q": "ok", "storage": "ElementId", "raw": None, "display": None, "norm": None}
+
+        raw = _safe(lambda: eid.IntegerValue, None)
+        ref_name = None
+        ref = _safe(lambda: doc.GetElement(eid), None)
+        if ref is not None:
+            ref_name = _safe(lambda: _safe_elem_name(ref), None)
+
+        return {
+            "q": "ok", "storage": "ElementId", "raw": raw,
+            "display": ref_name if ref_name is not None else (str(raw) if raw is not None else None),
+            "norm": raw
+        }
+
+    return {"q": "unsupported", "storage": str(st), "raw": None, "display": None, "norm": None}
+
+
+def _pv(q, storage, raw, display=None, norm=None):
+    # Coerce anything that isn't already a JSON-native type (None/bool/int/
+    # float/str) to a string before it can reach json.dump(). Fixes a real
+    # 2026-08-04 failure: workset.unique_id passed ws.UniqueId straight
+    # through as `raw` (Workset.UniqueId is System.Guid, not System.String,
+    # unlike Element.UniqueId) and json.dump() threw "TypeError: Object of
+    # type Guid is not JSON serializable" partway through writing the
+    # combined file -- silently corrupting it at the real output path
+    # under the old non-atomic writer. Every _pv() caller across these
+    # probes funnels through here, so this is the one place that needs to
+    # guard against a future call site making the same mistake.
+    def _coerce(v):
+        if v is None or isinstance(v, (bool, int, float, str)):
+            return v
+        try:
+            return str(v)
+        except:
+            return None
+    raw = _coerce(raw)
+    disp = _coerce(display) if display is not None else raw
+    nrm = _coerce(norm) if norm is not None else raw
+    return {"q": q, "storage": storage, "raw": raw, "display": disp, "norm": nrm}
+
+
+def _int_enum(val):
+    try:
+        return int(str(val))
+    except:
+        return None
+
+
+def _view_kind_classification(v):
+    """is_sheet / is_schedule / is_legend / is_internal -- derived, not a
+    raw Parameter or CLR property read, so it lives here rather than being
+    left to the reflection sweep to (not) find."""
+    is_sheet = bool(ViewSheet is not None and _safe(lambda: isinstance(v, ViewSheet), False))
+    is_schedule = bool(ViewSchedule is not None and _safe(lambda: isinstance(v, ViewSchedule), False))
+    vt_int = _safe(lambda: _int_enum(v.ViewType), None)
+    # Non-graphical ViewType buckets (Legend, SystemBrowser, "Internal"
+    # project-browser views, and schedules/sheets above) are the ones that
+    # throw on Discipline/CropBoxActive/etc. -- the reflection sweep's
+    # per-member error_count captures that directly, keyed by nothing more
+    # than vt_int, so there's no need to hand-classify each one here too.
+    return is_sheet, is_schedule, vt_int
+
+
+# -------------------------
+# Discovery: sample views across every distinct ViewType found (non-template).
+# -------------------------
+
+all_views = _safe(lambda: list(FilteredElementCollector(doc).OfClass(View)), [])
+
+counts_by_viewtype = {}
+template_count = 0
+live_count = 0
+
+buckets = {}  # vt_key(str) -> [View, ...] (up to max_views_per_viewtype)
+
+for v in all_views:
+    is_template = _safe(lambda: bool(v.IsTemplate), False)
+    if is_template:
+        template_count += 1
+        continue
+    live_count += 1
+
+    vt_int = _safe(lambda: _int_enum(v.ViewType), None)
+    vt_key = str(vt_int) if vt_int is not None else "unknown"
+    counts_by_viewtype[vt_key] = counts_by_viewtype.get(vt_key, 0) + 1
+
+    bucket = buckets.setdefault(vt_key, [])
+    try:
+        cap = int(max_views_per_viewtype)
+    except:
+        cap = 5
+    if len(bucket) < cap:
+        bucket.append(v)
+
+selected = []
+for vt_key in sorted(buckets.keys()):
+    selected.extend(buckets[vt_key])
+try:
+    total_cap = int(max_views_total)
+except:
+    total_cap = 300
+selected = selected[:total_cap]
+
+# -------------------------
+# Inventory: real Parameter walk (BuiltInParameter + shared params) over
+# sampled views, exactly like every other domain -- this is what picks up
+# Phase / Phase Filter / Sheet Number / etc. without hand-listing BIPs.
+# Synthesized rows are added alongside for the handful of View facts that
+# are CLR properties, not Parameters, but that are still exporter-modeled
+# derived facts rather than raw reflection targets (has_template /
+# template_name via crosswalk covers that half; classification stays here).
+# -------------------------
+
+param_index = {}
+
+
+def _maybe_set_example(entry, pv):
+    if pv is None:
+        return
+    ex = entry.get("example")
+    if ex is None:
+        entry["example"] = pv
+        return
+    if ex.get("q") != "ok" and pv.get("q") == "ok":
+        entry["example"] = pv
+
+
+def _add_inventory_obs(param_key, pv, bucket=None):
+    if param_key not in param_index:
+        param_index[param_key] = {
+            "storage_types": set(),
+            "q_counts": {"ok": 0, "missing": 0, "unreadable": 0, "unsupported": 0},
+            "example": None,
+            "observed_on_buckets": set(),
+        }
+    entry = param_index[param_key]
+    st = pv.get("storage")
+    q = pv.get("q") or "unreadable"
+    if st:
+        entry["storage_types"].add(st)
+    if q not in entry["q_counts"]:
+        entry["q_counts"][q] = 0
+    entry["q_counts"][q] += 1
+    if bucket:
+        entry["observed_on_buckets"].add(bucket)
+    _maybe_set_example(entry, pv)
+
+
+for v in selected:
+    vt_int = _safe(lambda: _int_enum(v.ViewType), None)
+    bucket = str(vt_int) if vt_int is not None else "unknown"
+
+    # --- Real Parameters (union over sampled views) ---
+    params = _safe(lambda: list(v.GetOrderedParameters()), None)
+    if params is None:
+        params = _safe(lambda: list(v.Parameters), [])
+
+    for p in params:
+        dn = _safe(lambda: _safe_param_def_name(p), None)
+        if not dn:
+            continue
+        pv = _format_param_contract(p)
+        _add_inventory_obs("param.{}".format(dn), pv, bucket=bucket)
+
+    # --- Synthesized, exporter-modeled surfaces not covered by Parameters ---
+    is_sheet, is_schedule, _vt = _view_kind_classification(v)
+
+    _add_inventory_obs("view.is_sheet", _pv("ok", "Integer", int(is_sheet), display=str(is_sheet)), bucket)
+    _add_inventory_obs("view.is_schedule", _pv("ok", "Integer", int(is_schedule), display=str(is_schedule)), bucket)
+
+    is_callout = _safe(lambda: bool(v.IsCallout), None)
+    _add_inventory_obs(
+        "view.is_callout",
+        _pv("ok" if is_callout is not None else "unreadable", "Integer",
+            int(is_callout) if is_callout is not None else None, display=str(is_callout)),
+        bucket,
+    )
+
+    pv_id = _safe(lambda: v.GetPrimaryViewId(), None)
+    is_dependent = None
+    if pv_id is not None:
+        is_dependent = bool(_safe(lambda: pv_id.IntegerValue, -1) != -1)
+    _add_inventory_obs(
+        "view.is_dependent",
+        _pv("ok" if is_dependent is not None else "unreadable", "Integer",
+            int(is_dependent) if is_dependent is not None else None, display=str(is_dependent)),
+        bucket,
+    )
+
+    if is_schedule and ViewSchedule is not None:
+        tb = _safe(lambda: bool(v.IsTitleblockRevisionSchedule), None)
+        _add_inventory_obs(
+            "view.is_titleblock_revision_schedule",
+            _pv("ok" if tb is not None else "unreadable", "Integer",
+                int(tb) if tb is not None else None, display=str(tb)),
+            bucket,
+        )
+
+    if is_sheet and ViewSheet is not None:
+        sn = _safe(lambda: getattr(v, "SheetNumber", None), None)
+        _add_inventory_obs("view.sheet_number", _pv("ok" if sn else "missing", "String", sn), bucket)
+
+# Doc-level counts, folded in as single-bucket synthesized rows.
+_add_inventory_obs("doc.view_template_count", _pv("ok", "Integer", template_count), "doc")
+_add_inventory_obs("doc.view_live_count", _pv("ok", "Integer", live_count), "doc")
+_add_inventory_obs("doc.view_total_count", _pv("ok", "Integer", len(all_views)), "doc")
+for vt_key in sorted(counts_by_viewtype.keys()):
+    _add_inventory_obs("viewtype.{}.collector_count".format(vt_key), _pv("ok", "Integer", counts_by_viewtype[vt_key]), "doc")
+
+param_inventory = []
+for k in sorted(param_index.keys()):
+    e = param_index[k]
+    param_inventory.append({
+        "domain": "views",
+        "param_key": k,
+        "example": e["example"],
+        "observed": {
+            "storage_types": sorted(e["storage_types"]),
+            "q_counts": e["q_counts"],
+            "observed_on_buckets": sorted(e["observed_on_buckets"]),
+        },
+        "selected_views_sample_count": len(selected),
+    })
+
+# -------------------------
+# Crosswalk: View -> ViewTemplate (has_template / template_id / template_name),
+# one row per sampled view. Cheap -- ElementId lookups on views already in
+# `selected`, not an additional collector pass.
+# -------------------------
+
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
+optional_crosswalk = []
+if enable_crosswalk:
+    for v in selected:
+        vt_int = _safe(lambda: _int_enum(v.ViewType), None)
+        tmpl_id = _safe(lambda: v.ViewTemplateId, None)
+        tmpl_int = _safe(lambda: tmpl_id.IntegerValue, None)
+        has_template = bool(tmpl_int is not None and int(tmpl_int) != -1)
+        template_name = None
+        if has_template:
+            tmpl_elem = _safe(lambda: doc.GetElement(tmpl_id), None)
+            if tmpl_elem is not None:
+                template_name = _safe(lambda: _safe_elem_name(tmpl_elem), None)
+
+        ws_id_obj = _safe(lambda: v.WorksetId, None)
+        ws_name, ws_resolved = _resolve_workset(doc, ws_id_obj)
+        ws_id_int = _safe(lambda: ws_id_obj.IntegerValue, None) if ws_id_obj is not None else None
+
+        # Schedule-only: BodyTextTypeId/HeaderTextTypeId/TitleTextTypeId are
+        # real ViewSchedule properties (confirmed against Autodesk's own API
+        # docs -- "Defines the default text style used for the .../.../...
+        # section of the schedule"), referencing a TextNoteType. Unlike
+        # WorksetId, doc.GetElement() IS the right resolution call here --
+        # no trap this time, these are genuine ElementIds. None on
+        # non-schedule views (the properties don't exist there at all).
+        body_tt_id = body_tt_name = None
+        header_tt_id = header_tt_name = None
+        title_tt_id = title_tt_name = None
+        if ViewSchedule is not None and _safe(lambda: isinstance(v, ViewSchedule), False):
+            _btt = _safe(lambda: v.BodyTextTypeId, None)
+            body_tt_id = _safe(lambda: _btt.IntegerValue, None) if _btt is not None else None
+            if body_tt_id is not None and body_tt_id >= 0:
+                _btt_elem = _safe(lambda: doc.GetElement(_btt), None)
+                body_tt_name = _safe(lambda: _btt_elem.Name, None) if _btt_elem is not None else None
+
+            _htt = _safe(lambda: v.HeaderTextTypeId, None)
+            header_tt_id = _safe(lambda: _htt.IntegerValue, None) if _htt is not None else None
+            if header_tt_id is not None and header_tt_id >= 0:
+                _htt_elem = _safe(lambda: doc.GetElement(_htt), None)
+                header_tt_name = _safe(lambda: _htt_elem.Name, None) if _htt_elem is not None else None
+
+            _ttt = _safe(lambda: v.TitleTextTypeId, None)
+            title_tt_id = _safe(lambda: _ttt.IntegerValue, None) if _ttt is not None else None
+            if title_tt_id is not None and title_tt_id >= 0:
+                _ttt_elem = _safe(lambda: doc.GetElement(_ttt), None)
+                title_tt_name = _safe(lambda: _ttt_elem.Name, None) if _ttt_elem is not None else None
+
+        optional_crosswalk.append({
+            "view.id": _safe(lambda: v.Id.IntegerValue, None),
+            "view.name": _safe(lambda: v.Name, None),
+            "view.viewtype_int": vt_int,
+            "view.has_template": has_template,
+            "view.template_id": int(tmpl_int) if (tmpl_int is not None and int(tmpl_int) != -1) else None,
+            "view.template_name": template_name,
+            "view.workset_id": ws_id_int,
+            "view.workset_name": ws_name,
+            "schedule.body_text_type_id": body_tt_id,
+            "schedule.body_text_type_name": body_tt_name,
+            "schedule.header_text_type_id": header_tt_id,
+            "schedule.header_text_type_name": header_tt_name,
+            "schedule.title_text_type_id": title_tt_id,
+            "schedule.title_text_type_name": title_tt_name,
+        })
+
+# -------------------------
+# Reflection sweep (breadth): non-Parameter .NET members via reflection.
+# Identical engine to every other domain probe (copied verbatim, not
+# imported -- each probe_*.py must remain a self-contained, paste-able
+# Dynamo Python node). This is what surfaces Discipline / DetailLevel /
+# Scale / CropBoxActive / etc. (and anything not yet known to matter)
+# without hand-coding each one, and its per-member error_count is exactly
+# what shows the "View must have a Discipline property"-style exceptions
+# on non-graphical view subtypes -- expected API behavior, not a probe bug.
+# -------------------------
+
+_REFLECTION_SKIP = set([
+    "Equals", "GetHashCode", "GetType", "ToString", "MemberwiseClone",
+    "Dispose", "GetEnumerator", "Clone",
+])
+
+
+def _reflect_member_names(obj):
+    out = []
+    if obj is None:
+        return out
+    try:
+        t = obj.GetType()
+    except:
+        return out
+    try:
+        for p in t.GetProperties():
             try:
-                invalid_eid = ElementId.InvalidElementId
-            except Exception:
+                n = p.Name
+                if n in _REFLECTION_SKIP or n.startswith("_"):
+                    continue
+                if p.GetIndexParameters():
+                    continue
+                out.append(("property", n))
+            except:
                 pass
-
-        for v in col:
-            # IsTemplate
-            is_template = False
+    except:
+        pass
+    try:
+        for m in t.GetMethods():
             try:
-                is_template = bool(v.IsTemplate)
-            except Exception:
+                n = m.Name
+                if n in _REFLECTION_SKIP or n.startswith("_"):
+                    continue
+                if n.startswith("get_") or n.startswith("set_") or n.startswith("add_") or n.startswith("remove_"):
+                    continue
+                if m.GetParameters().Length != 0:
+                    continue
+                if m.IsSpecialName:
+                    continue
+                out.append(("method", n))
+            except:
                 pass
+    except:
+        pass
+    seen = set()
+    uniq = []
+    for kind, n in out:
+        if n in seen:
+            continue
+        seen.add(n)
+        uniq.append((kind, n))
+    return sorted(uniq, key=lambda x: x[1])
 
-            if is_template:
-                template_count += 1
-                continue
-            live_count += 1
 
-            # ViewType integer
-            vt_int = None
-            try:
-                vt_int = _int_enum(v.ViewType)
-            except Exception:
-                pass
-            vt_key = str(vt_int) if vt_int is not None else "unknown"
-            counts_by_vt[vt_key] = counts_by_vt.get(vt_key, 0) + 1
+def _reflect_try_get(obj, member_kind, name):
+    if member_kind == "method":
+        # SAFETY: never invoke a reflection-discovered method (see
+        # module-level design rationale in every other probe_*.py).
+        return (True, "<method not invoked>", None)
+    try:
+        v = getattr(obj, name)
+    except Exception as ex:
+        return (False, None, "{}: {}".format(type(ex).__name__, ex))
+    return (True, v, None)
 
-            # IsFromLinkedFile probe (first time we encounter it)
-            if "checked" not in findings["isFromLinkedFile_probe"]:
-                findings["isFromLinkedFile_probe"]["checked"] = True
-                try:
-                    attr = getattr(v, "IsFromLinkedFile", "ATTR_NOT_FOUND")
-                    if attr == "ATTR_NOT_FOUND":
-                        findings["isFromLinkedFile_probe"]["attribute_exists"] = False
-                        findings["isFromLinkedFile_probe"]["note"] = "attribute not found"
-                    else:
-                        findings["isFromLinkedFile_probe"]["attribute_exists"] = True
-                        # Is it callable?
-                        if callable(attr):
-                            try:
-                                result = attr()
-                                findings["isFromLinkedFile_probe"]["callable"] = True
-                                findings["isFromLinkedFile_probe"]["sample_result"] = bool(result)
-                                findings["isFromLinkedFile_probe"]["result_type"] = type(result).__name__
-                            except Exception as ce:
-                                findings["isFromLinkedFile_probe"]["callable"] = True
-                                findings["isFromLinkedFile_probe"]["call_error"] = str(ce)
-                        else:
-                            findings["isFromLinkedFile_probe"]["callable"] = False
-                            findings["isFromLinkedFile_probe"]["value"] = _safe(attr)
-                            findings["isFromLinkedFile_probe"]["result_type"] = type(attr).__name__
-                except Exception as e:
-                    findings["isFromLinkedFile_probe"]["error"] = str(e)
 
-            # Count linked views
-            try:
-                is_linked_attr = getattr(v, "IsFromLinkedFile", None)
-                if is_linked_attr is None:
-                    no_linked_attr += 1
-                elif callable(is_linked_attr):
-                    if is_linked_attr():
-                        linked_count += 1
-                else:
-                    if bool(is_linked_attr):
-                        linked_count += 1
-            except Exception:
-                no_linked_attr += 1
+def _reflect_contract(raw_v):
+    if raw_v is None:
+        return {"q": "missing", "storage": "None", "raw": None, "display": None, "norm": None}
+    if isinstance(raw_v, bool):
+        return {"q": "ok", "storage": "Integer", "raw": int(raw_v), "display": str(raw_v), "norm": int(raw_v)}
+    if isinstance(raw_v, int):
+        return {"q": "ok", "storage": "Integer", "raw": raw_v, "display": str(raw_v), "norm": raw_v}
+    if isinstance(raw_v, float):
+        return {"q": "ok", "storage": "Double", "raw": raw_v, "display": str(raw_v), "norm": raw_v}
+    if isinstance(raw_v, str):
+        return {"q": "ok", "storage": "String", "raw": raw_v, "display": raw_v, "norm": raw_v}
+    try:
+        if hasattr(raw_v, "IntegerValue"):
+            iv = int(raw_v.IntegerValue)
+            return {"q": "ok", "storage": "ElementId", "raw": iv, "display": str(iv), "norm": iv}
+    except:
+        pass
+    try:
+        if hasattr(raw_v, "ToString"):
+            s = raw_v.ToString()
+            if s and "Autodesk.Revit" not in s and "System." not in s:
+                return {"q": "ok", "storage": "None", "raw": None, "display": s, "norm": s}
+    except:
+        pass
+    return {"q": "unsupported", "storage": "None", "raw": None, "display": None, "norm": None}
 
-            # Per-viewtype sample (first non-template per vt_key, up to 8 buckets)
-            if vt_key not in samples and len(samples) < 10:
-                rec = {
-                    "ViewType_int": vt_int,
-                    "Name": None,
-                    "IsCallout": None,
-                    "IsDependent": None,
-                    "ViewTemplateId_int": None,
-                    "has_template": None,
-                    "Scale": None,
-                    "Scale_type": None,
-                    "Discipline_int": None,
-                    "DetailLevel_int": None,
-                    "phase_bip_ok": None,
-                    "phase_value": None,
-                    "phase_filter_bip_ok": None,
-                    "phase_filter_value": None,
-                    "is_schedule": False,
-                    "is_sheet": False,
-                    "IsFromLinkedFile_result": None,
+
+def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200):
+    idx = {}
+    for obj in sample_objs:
+        if obj is None:
+            continue
+        for member_kind, name in _reflect_member_names(obj)[:max_members]:
+            ok, raw_v, err = _reflect_try_get(obj, member_kind, name)
+            key = "refl.{}.{}".format(type_label, name)
+            if key not in idx:
+                idx[key] = {
+                    "domain": domain_name, "member_key": key, "member_kind": member_kind,
+                    "type_label": type_label, "example": None,
+                    "ok_count": 0, "error_count": 0, "unique_value_count": 0, "_seen": set(),
                 }
+            e = idx[key]
+            if not ok:
+                e["error_count"] += 1
+                continue
+            contract = _reflect_contract(raw_v)
+            e["ok_count"] += 1
+            sig = (str(contract.get("storage")), str(contract.get("norm")))
+            if sig not in e["_seen"]:
+                e["_seen"].add(sig)
+                e["unique_value_count"] += 1
+            if e["example"] is None or (contract.get("display") is not None and e["example"].get("display") is None):
+                e["example"] = contract
+    records = []
+    for key in sorted(idx.keys()):
+        e = idx[key]
+        records.append({
+            "domain": e["domain"], "member_key": e["member_key"], "member_kind": e["member_kind"],
+            "type_label": e["type_label"], "example": e["example"],
+            "observed": {"ok_count": e["ok_count"], "error_count": e["error_count"], "unique_value_count": e["unique_value_count"]},
+        })
+    return records
 
-                # Name
-                try:
-                    rec["Name"] = _safe(getattr(v, "Name", None))
-                except Exception:
-                    pass
 
-                # IsCallout
-                try:
-                    rec["IsCallout"] = bool(getattr(v, "IsCallout", None))
-                except Exception as e:
-                    rec["IsCallout"] = "ERROR: " + str(e)
+_reflection_records = _run_reflection_sweep(selected, "View", "views")
 
-                # IsDependent — via GetPrimaryViewId()
-                try:
-                    pv_id = v.GetPrimaryViewId()
-                    if invalid_eid is not None:
-                        rec["IsDependent"] = (pv_id != invalid_eid)
-                    else:
-                        rec["IsDependent"] = (getattr(pv_id, "IntegerValue", -1) != -1)
-                    rec["GetPrimaryViewId_ok"] = True
-                except Exception as e:
-                    rec["IsDependent"] = "ERROR: " + str(e)
-                    rec["GetPrimaryViewId_ok"] = False
+OUT_payload = [
+    {
+        "kind": "reflection",
+        "domain": "views",
+        "records": _reflection_records
+    },
+    {
+        "kind": "inventory",
+        "domain": "views",
+        "records": param_inventory
+    },
+    {
+        "kind": "crosswalk",
+        "domain": "views",
+        "records": optional_crosswalk
+    }
+]
 
-                # ViewTemplateId
-                try:
-                    tmpl_id = v.ViewTemplateId
-                    tmpl_int = getattr(tmpl_id, "IntegerValue", None)
-                    rec["ViewTemplateId_int"] = int(tmpl_int) if tmpl_int is not None else None
-                    rec["has_template"] = (tmpl_int is not None and int(tmpl_int) != -1)
-                    if rec["has_template"]:
-                        try:
-                            tmpl_elem = doc.GetElement(tmpl_id)
-                            rec["template_name"] = _safe(getattr(tmpl_elem, "Name", None))
-                        except Exception:
-                            pass
-                except Exception as e:
-                    rec["ViewTemplateId_int"] = "ERROR: " + str(e)
+# Optional: write to JSON for future reference (valid JSON, stable order)
+file_written = None
+write_error = None
 
-                # Scale
-                try:
-                    scale_raw = getattr(v, "Scale", "ATTR_NOT_FOUND")
-                    if scale_raw == "ATTR_NOT_FOUND":
-                        rec["Scale"] = "ATTR_NOT_FOUND"
-                    else:
-                        rec["Scale"] = _safe(scale_raw)
-                        rec["Scale_type"] = type(scale_raw).__name__
-                        try:
-                            rec["Scale_int"] = int(scale_raw)
-                        except Exception:
-                            rec["Scale_int"] = "not_int"
-                except Exception as e:
-                    rec["Scale"] = "ERROR: " + str(e)
+# -------------------------
+# Unified run metadata (release-separated, not date-filename-separated)
+# -------------------------
 
-                # Discipline
-                try:
-                    disc_raw = getattr(v, "Discipline", None)
-                    rec["Discipline_int"] = _int_enum(disc_raw)
-                    rec["Discipline_raw"] = _safe(disc_raw)
-                except Exception as e:
-                    rec["Discipline_int"] = "ERROR: " + str(e)
+import uuid as _uuid_mod
 
-                # DetailLevel
-                try:
-                    dl_raw = getattr(v, "DetailLevel", None)
-                    rec["DetailLevel_int"] = _int_enum(dl_raw)
-                    rec["DetailLevel_raw"] = _safe(dl_raw)
-                except Exception as e:
-                    rec["DetailLevel_int"] = "ERROR: " + str(e)
 
-                # VIEW_PHASE BIP
-                if BuiltInParameter is not None:
-                    try:
-                        phase_bip = getattr(BuiltInParameter, "VIEW_PHASE", None)
-                        if phase_bip is None:
-                            rec["phase_bip_ok"] = "BIP_NOT_FOUND"
-                        else:
-                            param = v.get_Parameter(phase_bip)
-                            if param is None:
-                                rec["phase_bip_ok"] = False
-                                rec["phase_value"] = "param_is_None"
-                            else:
-                                rec["phase_bip_ok"] = True
-                                try:
-                                    eid = param.AsElementId()
-                                    eid_int = getattr(eid, "IntegerValue", None)
-                                    rec["phase_value"] = int(eid_int) if eid_int is not None else None
-                                    if eid_int and int(eid_int) != -1:
-                                        phase_elem = doc.GetElement(eid)
-                                        rec["phase_name"] = _safe(getattr(phase_elem, "Name", None))
-                                except Exception as pe:
-                                    rec["phase_value"] = "AsElementId_error: " + str(pe)
-                    except Exception as e:
-                        rec["phase_bip_ok"] = "ERROR: " + str(e)
+def _probe_revit_version():
+    try:
+        _uiapp = DocumentManager.Instance.CurrentUIApplication
+        _app = _uiapp.Application if _uiapp is not None else None
+        v = _safe(lambda: _app.VersionNumber, None)
+        return str(v) if v else None
+    except:
+        return None
 
-                    # VIEW_PHASE_FILTER BIP
-                    try:
-                        pf_bip = getattr(BuiltInParameter, "VIEW_PHASE_FILTER", None)
-                        if pf_bip is None:
-                            rec["phase_filter_bip_ok"] = "BIP_NOT_FOUND"
-                        else:
-                            param = v.get_Parameter(pf_bip)
-                            if param is None:
-                                rec["phase_filter_bip_ok"] = False
-                                rec["phase_filter_value"] = "param_is_None"
-                            else:
-                                rec["phase_filter_bip_ok"] = True
-                                try:
-                                    eid = param.AsElementId()
-                                    eid_int = getattr(eid, "IntegerValue", None)
-                                    rec["phase_filter_value"] = int(eid_int) if eid_int is not None else None
-                                    if eid_int and int(eid_int) != -1:
-                                        pf_elem = doc.GetElement(eid)
-                                        rec["phase_filter_name"] = _safe(getattr(pf_elem, "Name", None))
-                                except Exception as pe:
-                                    rec["phase_filter_value"] = "AsElementId_error: " + str(pe)
-                    except Exception as e:
-                        rec["phase_filter_bip_ok"] = "ERROR: " + str(e)
 
-                # Schedule-specific
-                if ViewSchedule is not None:
-                    try:
-                        if isinstance(v, ViewSchedule):
-                            rec["is_schedule"] = True
-                            try:
-                                rec["IsTitleblockRevisionSchedule"] = bool(v.IsTitleblockRevisionSchedule)
-                            except Exception as e:
-                                rec["IsTitleblockRevisionSchedule"] = "ERROR: " + str(e)
-                    except Exception:
-                        pass
+def _probe_document_identity():
+    return {
+        "title": _safe(lambda: doc.Title, None),
+        "path_name": _safe(lambda: doc.PathName, None),
+        "is_workshared": _safe(lambda: bool(doc.IsWorkshared), None),
+    }
 
-                # Sheet-specific
-                if ViewSheet is not None:
-                    try:
-                        if isinstance(v, ViewSheet):
-                            rec["is_sheet"] = True
-                            try:
-                                rec["SheetNumber"] = _safe(getattr(v, "SheetNumber", None))
-                            except Exception as e:
-                                rec["SheetNumber"] = "ERROR: " + str(e)
-                    except Exception:
-                        pass
 
-                # No-template tracking
-                if rec.get("has_template") is False:
-                    no_template_count += 1
+def _probe_run_id():
+    try:
+        return datetime.now().strftime("%Y%m%dT%H%M%S") + "-" + _uuid_mod.uuid4().hex[:6]
+    except:
+        return _uuid_mod.uuid4().hex[:12]
 
-                samples[vt_key] = rec
 
-        findings["counts"]["template_count"] = template_count
-        findings["counts"]["live_count"] = live_count
-        findings["counts"]["linked_count"] = linked_count
-        findings["counts"]["no_linked_attr_count"] = no_linked_attr
-        findings["counts"]["no_template_assigned_count"] = no_template_count
-        findings["counts"]["by_viewtype_int"] = counts_by_vt
-        findings["sample_by_viewtype"] = samples
+_PROBE_RUN_ID = _probe_run_id()
+_PROBE_REVIT_VERSION = _probe_revit_version() or "unknown"
 
-        # Schedule-specific probe: IsTitleblockRevisionSchedule
-        if ViewSchedule is not None:
-            try:
-                sched_col = [v for v in col if not v.IsTemplate]
-                titleblock_sched_count = 0
-                for v in sched_col:
-                    try:
-                        if isinstance(v, ViewSchedule) and v.IsTitleblockRevisionSchedule:
-                            titleblock_sched_count += 1
-                    except Exception:
-                        pass
-                findings["schedule_probe"]["IsTitleblockRevisionSchedule_count"] = titleblock_sched_count
-                findings["schedule_probe"]["status"] = "ok"
-            except Exception as e:
-                findings["schedule_probe"]["status"] = "ERROR: " + str(e)
 
-    else:
-        findings["notes"].append("Collector probes skipped — View or FilteredElementCollector import failed")
+def _probe_wrap(domain, out_payload):
+    return {
+        "run_metadata": {
+            "run_id": _PROBE_RUN_ID,
+            "extraction_date": datetime.now().isoformat(),
+            "revit_version": _PROBE_REVIT_VERSION,
+            "tool_version": None,
+            "document": _probe_document_identity(),
+            "source": "single_probe",
+            "probe": domain,
+        },
+        "domains": {domain: out_payload},
+    }
 
-except Exception as e:
-    findings["status"] = "failed"
-    findings["errors"].append("top_level: " + str(e))
-    findings["traceback"] = traceback.format_exc()
 
-OUT = json.dumps(findings, indent=2, sort_keys=True)
+if write_json:
+    try:
+        rvt_path = _safe(lambda: doc.PathName, None)
+        default_dir = None
+
+        if rvt_path and isinstance(rvt_path, str) and len(rvt_path) > 0:
+            default_dir = _safe(lambda: os.path.dirname(rvt_path), None)
+
+        if not default_dir:
+            default_dir = os.environ.get("TEMP") or os.environ.get("TMP") or os.getcwd()
+
+        fixed_name = "probes_{}_{}.json".format(_PROBE_REVIT_VERSION, _PROBE_RUN_ID)
+
+        target_dir = out_path if out_path else default_dir
+        target_path = os.path.join(target_dir, fixed_name)
+
+        if target_dir and not os.path.exists(target_dir):
+            os.makedirs(target_dir)
+
+        with open(target_path, "w") as f:
+            json.dump(_probe_wrap("views", OUT_payload), f, indent=2, sort_keys=True)
+
+        file_written = target_path
+
+    except Exception as ex:
+        write_error = "{}: {}".format(type(ex).__name__, ex)
+
+OUT_payload[0]["file_written"] = file_written
+if write_error:
+    OUT_payload[0]["file_write_error"] = write_error
+
+OUT = OUT_payload
