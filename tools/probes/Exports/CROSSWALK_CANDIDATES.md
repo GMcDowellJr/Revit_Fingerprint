@@ -7,6 +7,7 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 | member | domains | example |
 |---|---|---|
 | `AssemblyInstanceId` | 20 | `-1` |
+| `GetTypeId` | 20 | `-1` |
 | `GroupId` | 20 | `-1` |
 | `LevelId` | 20 | `-1` |
 | `CreatedPhaseId` | 19 | `-1` |
@@ -19,21 +20,22 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 | `AssociatedAssemblyInstanceId` | 3 | `-1` |
 | `CutBackgroundPatternId` | 3 | `-1` |
 | `CutForegroundPatternId` | 3 | `-1` |
+| `GetTemporaryViewPropertiesId` | 3 | `-1` |
 | `SurfaceBackgroundPatternId` | 3 | `-1` |
 | `SurfaceForegroundPatternId` | 3 | `-1` |
 | `TargetId` | 3 | `-1` |
-| `BodyTextTypeId` | 2 | `10352` |
+| `BodyTextTypeId` | 2 | `2622` |
 | `Border 1 Type` | 2 | `` |
 | `Border 2 Type` | 2 | `` |
 | `Curtain Panel` | 2 | `` |
 | `CutLinePatternId` | 2 | `-1` |
 | `Default Analysis Display Style` | 2 | `` |
 | `Guide Grid` | 2 | `` |
-| `HeaderTextTypeId` | 2 | `1198417` |
+| `HeaderTextTypeId` | 2 | `4279` |
 | `Interior Type` | 2 | `` |
-| `Leader Arrowhead` | 2 | `Standard_Open Dot` |
-| `None` | 2 | `LEVEL 1 PLAN` |
-| `Phase Filter` | 2 | `Show All` |
+| `Leader Arrowhead` | 2 | `Dot Filled-Small` |
+| `None` | 2 | `` |
+| `Phase Filter` | 2 | `Show Previous + New` |
 | `ProjectionLinePatternId` | 2 | `-1` |
 | `Range: Base Level` | 2 | `` |
 | `Range: Top Level` | 2 | `` |
@@ -41,32 +43,31 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 | `Scope Box` | 2 | `` |
 | `Sheet Collection` | 2 | `` |
 | `SheetCollectionId` | 2 | `-1` |
-| `TitleTextTypeId` | 2 | `1198417` |
-| `Visible In Option` | 2 | `` |
+| `TitleTextTypeId` | 2 | `2628` |
 | `WorksetId` | 2 | `54` |
 | `Associated Datum` | 1 | `` |
-| `Centerline Pattern` | 1 | `CENTER` |
+| `Centerline Pattern` | 1 | `-3000010` |
 | `Centerline Symbol` | 1 | `ANG-Centerline` |
 | `Centerline Tick Mark` | 1 | `-2` |
 | `cut_bg_pattern_id` | 1 | `` |
-| `cut_fg_pattern_id` | 1 | `<Solid fill>` |
+| `cut_fg_pattern_id` | 1 | `` |
 | `cut_line_pattern` | 1 | `` |
 | `ElementId` | 1 | `-1012106` |
+| `GetPrimaryViewId` | 1 | `-1` |
 | `Image` | 1 | `` |
-| `Interior Tick Mark` | 1 | `Diagonal 3/64"` |
+| `Interior Tick Mark` | 1 | `Diagonal-Medium` |
 | `Leader Tick Mark` | 1 | `` |
 | `line_pattern_cut` | 1 | `` |
 | `line_pattern_projection` | 1 | `` |
-| `Parent View` | 1 | `WALL SECTION 1C at 102.6 (4x5/6)` |
 | `Phase` | 1 | `New Construction` |
 | `proj_line_pattern_id` | 1 | `` |
-| `projection_line_pattern` | 1 | `-3000010` |
+| `projection_line_pattern` | 1 | `` |
 | `SortingParameterId` | 1 | `-1005112` |
 | `StructuralMaterialId` | 1 | `-1` |
 | `surf_bg_pattern_id` | 1 | `` |
-| `surf_fg_pattern_id` | 1 | `<Solid fill>` |
-| `Symbol` | 1 | `Spot Elevation - Crosshair` |
-| `Tick Mark` | 1 | `Diagonal 1/16"` |
+| `surf_fg_pattern_id` | 1 | `` |
+| `Symbol` | 1 | `Sym - Spot Coordinate - 0000` |
+| `Tick Mark` | 1 | `22 Degree Filled Arrow-Medium` |
 | `Witness Line Tick Mark` | 1 | `` |
 
 ## `AssemblyInstanceId` (20 domain(s))
@@ -92,6 +93,30 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 - `view_templates` -- `refl.View.AssemblyInstanceId` = `-1`
 - `views` -- `refl.View.AssemblyInstanceId` = `-1`
 - `wall_types` -- `refl.WallType.AssemblyInstanceId` = `-1`
+
+## `GetTypeId` (20 domain(s))
+
+- `arrowheads` -- `refl.ArrowheadType.GetTypeId` = `-1`
+- `browser_organization` -- `refl.BrowserOrganization.GetTypeId` = `-1`
+- `ceiling_types` -- `refl.CeilingType.GetTypeId` = `-1`
+- `fill_patterns` -- `refl.FillPatternElement.GetTypeId` = `-1`
+- `floor_types` -- `refl.FloorType.GetTypeId` = `-1`
+- `identity` -- `refl.ProjectInformation.GetTypeId` = `-1`
+- `line_patterns` -- `refl.LinePatternElement.GetTypeId` = `-1`
+- `line_styles` -- `refl.GraphicsStyle.GetTypeId` = `-1`
+- `loaded_family_types` -- `refl.FamilySymbol.GetTypeId` = `-1`
+- `materials` -- `refl.AppearanceAssetElement.GetTypeId` = `-1`
+- `materials` -- `refl.Material.GetTypeId` = `-1`
+- `phase_filters` -- `refl.PhaseFilter.GetTypeId` = `-1`
+- `phase_graphics` -- `refl.View.GetTypeId` = `-1`
+- `phases` -- `refl.Phase.GetTypeId` = `-1`
+- `roof_types` -- `refl.RoofType.GetTypeId` = `-1`
+- `text_types` -- `refl.TextNoteType.GetTypeId` = `-1`
+- `view_filter_applications` -- `refl.ParameterFilterElement.GetTypeId` = `-1`
+- `view_filter_definitions` -- `refl.ParameterFilterElement.GetTypeId` = `-1`
+- `view_templates` -- `refl.View.GetTypeId` = `-1`
+- `views` -- `refl.View.GetTypeId` = `146934`
+- `wall_types` -- `refl.WallType.GetTypeId` = `-1`
 
 ## `GroupId` (20 domain(s))
 
@@ -252,6 +277,12 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 - `view_category_overrides` -- `refl.OverrideGraphicSettings.CutForegroundPatternId` = `-1`
 - `view_filter_applications` -- `refl.OverrideGraphicSettings.CutForegroundPatternId` = `-1`
 
+## `GetTemporaryViewPropertiesId` (3 domain(s))
+
+- `phase_graphics` -- `refl.View.GetTemporaryViewPropertiesId` = `-1`
+- `view_templates` -- `refl.View.GetTemporaryViewPropertiesId` = `-1`
+- `views` -- `refl.View.GetTemporaryViewPropertiesId` = `-1`
+
 ## `SurfaceBackgroundPatternId` (3 domain(s))
 
 - `materials` -- `refl.Material.SurfaceBackgroundPatternId` = `-1`
@@ -262,7 +293,7 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 - `materials` -- `refl.Material.SurfaceForegroundPatternId` = `-1`
 - `view_category_overrides` -- `refl.OverrideGraphicSettings.SurfaceForegroundPatternId` = `-1`
-- `view_filter_applications` -- `refl.OverrideGraphicSettings.SurfaceForegroundPatternId` = `20`
+- `view_filter_applications` -- `refl.OverrideGraphicSettings.SurfaceForegroundPatternId` = `-1`
 
 ## `TargetId` (3 domain(s))
 
@@ -272,7 +303,7 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 ## `BodyTextTypeId` (2 domain(s))
 
-- `phase_graphics` -- `refl.View.BodyTextTypeId` = `10352`
+- `phase_graphics` -- `refl.View.BodyTextTypeId` = `2622`
 - `view_templates` -- `refl.View.BodyTextTypeId` = `2622`
 
 ## `Border 1 Type` (2 domain(s))
@@ -288,7 +319,7 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 ## `Curtain Panel` (2 domain(s))
 
 - `roof_types` -- `p.Curtain Panel` = ``
-- `wall_types` -- `p.Curtain Panel` = `5553205`
+- `wall_types` -- `p.Curtain Panel` = ``
 
 ## `CutLinePatternId` (2 domain(s))
 
@@ -308,7 +339,7 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 ## `HeaderTextTypeId` (2 domain(s))
 
-- `phase_graphics` -- `refl.View.HeaderTextTypeId` = `1198417`
+- `phase_graphics` -- `refl.View.HeaderTextTypeId` = `4279`
 - `view_templates` -- `refl.View.HeaderTextTypeId` = `4279`
 
 ## `Interior Type` (2 domain(s))
@@ -318,17 +349,17 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 ## `Leader Arrowhead` (2 domain(s))
 
-- `dimension_types` -- `p.Leader Arrowhead` = `Standard_Open Dot`
-- `text_types` -- `p.Leader Arrowhead` = `Arrow Filled 20 Degree`
+- `dimension_types` -- `p.Leader Arrowhead` = `Dot Filled-Small`
+- `text_types` -- `p.Leader Arrowhead` = `22 Degree Filled Arrow-Medium`
 
 ## `None` (2 domain(s))
 
-- `phase_graphics` -- `p.None` = `LEVEL 1 PLAN`
-- `views` -- `param.None` = `LEVEL 1 PLAN`
+- `phase_graphics` -- `p.None` = ``
+- `views` -- `param.None` = `SEA LEVEL`
 
 ## `Phase Filter` (2 domain(s))
 
-- `view_templates` -- `p.Phase Filter` = `Show All`
+- `view_templates` -- `p.Phase Filter` = `Show Previous + New`
 - `views` -- `param.Phase Filter` = `Show All`
 
 ## `ProjectionLinePatternId` (2 domain(s))
@@ -368,13 +399,8 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 ## `TitleTextTypeId` (2 domain(s))
 
-- `phase_graphics` -- `refl.View.TitleTextTypeId` = `1198417`
+- `phase_graphics` -- `refl.View.TitleTextTypeId` = `2628`
 - `view_templates` -- `refl.View.TitleTextTypeId` = `2628`
-
-## `Visible In Option` (2 domain(s))
-
-- `phase_graphics` -- `p.Visible In Option` = ``
-- `views` -- `param.Visible In Option` = ``
 
 ## `WorksetId` (2 domain(s))
 
@@ -387,7 +413,7 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 ## `Centerline Pattern` (1 domain(s))
 
-- `dimension_types` -- `p.Centerline Pattern` = `CENTER`
+- `dimension_types` -- `p.Centerline Pattern` = `-3000010`
 
 ## `Centerline Symbol` (1 domain(s))
 
@@ -403,7 +429,7 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 ## `cut_fg_pattern_id` (1 domain(s))
 
-- `view_filter_applications` -- `vfa.ogs.cut_fg_pattern_id` = `<Solid fill>`
+- `view_filter_applications` -- `vfa.ogs.cut_fg_pattern_id` = ``
 
 ## `cut_line_pattern` (1 domain(s))
 
@@ -413,13 +439,17 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 - `browser_organization` -- `refl.FolderItemInfo.ElementId` = `-1012106`
 
+## `GetPrimaryViewId` (1 domain(s))
+
+- `phase_graphics` -- `refl.View.GetPrimaryViewId` = `-1`
+
 ## `Image` (1 domain(s))
 
 - `materials` -- `p.Image` = ``
 
 ## `Interior Tick Mark` (1 domain(s))
 
-- `dimension_types` -- `p.Interior Tick Mark` = `Diagonal 3/64"`
+- `dimension_types` -- `p.Interior Tick Mark` = `Diagonal-Medium`
 
 ## `Leader Tick Mark` (1 domain(s))
 
@@ -433,10 +463,6 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 - `object_styles` -- `c.line_pattern_projection` = ``
 
-## `Parent View` (1 domain(s))
-
-- `views` -- `param.Parent View` = `WALL SECTION 1C at 102.6 (4x5/6)`
-
 ## `Phase` (1 domain(s))
 
 - `views` -- `param.Phase` = `New Construction`
@@ -447,7 +473,7 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 ## `projection_line_pattern` (1 domain(s))
 
-- `view_category_overrides` -- `eff.projection_line_pattern` = `-3000010`
+- `view_category_overrides` -- `eff.projection_line_pattern` = ``
 
 ## `SortingParameterId` (1 domain(s))
 
@@ -463,15 +489,15 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 ## `surf_fg_pattern_id` (1 domain(s))
 
-- `view_filter_applications` -- `vfa.ogs.surf_fg_pattern_id` = `<Solid fill>`
+- `view_filter_applications` -- `vfa.ogs.surf_fg_pattern_id` = ``
 
 ## `Symbol` (1 domain(s))
 
-- `dimension_types` -- `p.Symbol` = `Spot Elevation - Crosshair`
+- `dimension_types` -- `p.Symbol` = `Sym - Spot Coordinate - 0000`
 
 ## `Tick Mark` (1 domain(s))
 
-- `dimension_types` -- `p.Tick Mark` = `Diagonal 1/16"`
+- `dimension_types` -- `p.Tick Mark` = `22 Degree Filled Arrow-Medium`
 
 ## `Witness Line Tick Mark` (1 domain(s))
 
