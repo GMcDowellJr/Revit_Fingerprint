@@ -75,6 +75,11 @@ try:
 except:
     SpecTypeId = None
 
+try:
+    from Autodesk.Revit.DB import ViewSchedule
+except:
+    ViewSchedule = None
+
 doc = DocumentManager.Instance.CurrentDBDocument
 
 max_views_to_inspect = IN[0] if len(IN) > 0 and IN[0] is not None else 200
@@ -436,6 +441,87 @@ for pk in sorted(param_index.keys()):
 # -------------------------
 
 optional_crosswalk = []
+
+
+def _resolve_workset_for_view_crosswalk(doc, ws_id_obj):
+    """Same _resolve_workset pattern as every other probe (WorksetTable.GetWorkset(),
+    not doc.GetElement() -- see the identical helper further down in this file for
+    the full rationale). Named distinctly here because this block runs before the
+    enable_crosswalk-gated block below defines its own copy."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
+def _resolve_filter_name(fid_int):
+    if fid_int is None:
+        return None
+    fe = _safe(lambda: doc.GetElement(ElementId(fid_int)), None)
+    return _safe(lambda: fe.Name, None) if fe is not None else None
+
+
+# View -> BodyTextTypeId/HeaderTextTypeId/TitleTextTypeId (ViewSchedule-only,
+# same as probe_views.py) and GetFilters()/GetOrderedFilters() (any View).
+# Unconditional -- not gated behind enable_crosswalk, which only governs the
+# heavier ViewTemplate -> PhaseFilter join below.
+for v in selected_views:
+    v_id = _safe(lambda: v.Id.IntegerValue, None)
+    if v_id is None:
+        continue
+    v_name = _safe(lambda: _safe_elem_name(v), None)
+    v_ws_id_obj = _safe(lambda: v.WorksetId, None)
+    v_ws_name, _v_ws_resolved = _resolve_workset_for_view_crosswalk(doc, v_ws_id_obj)
+    v_ws_id_int = _safe(lambda: v_ws_id_obj.IntegerValue, None) if v_ws_id_obj is not None else None
+
+    body_tt_id = header_tt_id = title_tt_id = None
+    body_tt_name = header_tt_name = title_tt_name = None
+    if ViewSchedule is not None and _safe(lambda: isinstance(v, ViewSchedule), False):
+        _btt = _safe(lambda: v.BodyTextTypeId, None)
+        body_tt_id = _safe(lambda: _btt.IntegerValue, None) if _btt is not None else None
+        if body_tt_id is not None and body_tt_id >= 0:
+            _btt_elem = _safe(lambda: doc.GetElement(_btt), None)
+            body_tt_name = _safe(lambda: _btt_elem.Name, None) if _btt_elem is not None else None
+
+        _htt = _safe(lambda: v.HeaderTextTypeId, None)
+        header_tt_id = _safe(lambda: _htt.IntegerValue, None) if _htt is not None else None
+        if header_tt_id is not None and header_tt_id >= 0:
+            _htt_elem = _safe(lambda: doc.GetElement(_htt), None)
+            header_tt_name = _safe(lambda: _htt_elem.Name, None) if _htt_elem is not None else None
+
+        _ttt = _safe(lambda: v.TitleTextTypeId, None)
+        title_tt_id = _safe(lambda: _ttt.IntegerValue, None) if _ttt is not None else None
+        if title_tt_id is not None and title_tt_id >= 0:
+            _ttt_elem = _safe(lambda: doc.GetElement(_ttt), None)
+            title_tt_name = _safe(lambda: _ttt_elem.Name, None) if _ttt_elem is not None else None
+
+    get_filters_ids = _safe(lambda: list(v.GetFilters() or []), default=[])
+    get_filters_names = [_resolve_filter_name(_safe(lambda fid=fid: fid.IntegerValue, None)) for fid in get_filters_ids]
+    get_ordered_filters_ids = _safe(lambda: list(v.GetOrderedFilters() or []), default=[])
+    get_ordered_filters_names = [_resolve_filter_name(_safe(lambda fid=fid: fid.IntegerValue, None)) for fid in get_ordered_filters_ids]
+
+    optional_crosswalk.append({
+        "view.id": v_id,
+        "view.name": v_name,
+        "view.workset_id": v_ws_id_int,
+        "view.workset_name": v_ws_name,
+        "body_text_type.id": body_tt_id,
+        "body_text_type.name": body_tt_name,
+        "header_text_type.id": header_tt_id,
+        "header_text_type.name": header_tt_name,
+        "title_text_type.id": title_tt_id,
+        "title_text_type.name": title_tt_name,
+        "get_filters.ids": [_safe(lambda fid=fid: fid.IntegerValue, None) for fid in get_filters_ids],
+        "get_filters.names": get_filters_names,
+        "get_ordered_filters.ids": [_safe(lambda fid=fid: fid.IntegerValue, None) for fid in get_ordered_filters_ids],
+        "get_ordered_filters.names": get_ordered_filters_names,
+    })
 
 # Candidate parameter names (varies by localization/templates; keep flexible)
 VIEW_PHASE_FILTER_PARAM_CANDIDATES = [
