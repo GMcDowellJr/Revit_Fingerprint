@@ -538,6 +538,8 @@ _ALLOWLISTED_REFLECTION_METHODS = {
 # but shares the same allowlist name and the same removal; re-evaluate
 # independently against a live Subelement instance before re-adding either.
 
+_METHOD_NOT_INVOKED_SENTINEL = "<method not invoked>"
+
 def _reflect_try_get(obj, member_kind, name):
     if member_kind == "method":
         if name not in _ALLOWLISTED_REFLECTION_METHODS:
@@ -548,7 +550,7 @@ def _reflect_try_get(obj, member_kind, name):
             # query method from a side-effecting one by name alone for
             # anything outside the allowlist's ground-truth-verified set.
             # Record that the method exists without calling it.
-            return (True, "<method not invoked>", None)
+            return (True, _METHOD_NOT_INVOKED_SENTINEL, None)
         try:
             v = getattr(obj, name)()
         except Exception as ex:
@@ -563,6 +565,13 @@ def _reflect_try_get(obj, member_kind, name):
 def _reflect_contract(raw_v):
     if raw_v is None:
         return {"q": "missing", "storage": "None", "raw": None, "display": None, "norm": None}
+    if raw_v == _METHOD_NOT_INVOKED_SENTINEL:
+        # A non-allowlisted method's placeholder is a real Python str, so
+        # without this check it falls into the generic str branch below and
+        # comes out as q="ok" -- indistinguishable from genuinely invoked
+        # string data. Checked before isinstance(raw_v, str) specifically so
+        # it never reaches that branch.
+        return {"q": "not_invoked", "storage": "None", "raw": None, "display": None, "norm": None}
     if isinstance(raw_v, bool):
         return {"q": "ok", "storage": "Integer", "raw": int(raw_v), "display": str(raw_v), "norm": int(raw_v)}
     if isinstance(raw_v, int):
@@ -632,12 +641,14 @@ def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200)
             if key not in idx:
                 idx[key] = {
                     "domain": domain_name, "member_key": key, "member_kind": member_kind,
-                    "type_label": type_label, "example": None,
+                    "type_label": type_label, "example": None, "example_error": None,
                     "ok_count": 0, "error_count": 0, "unique_value_count": 0, "_seen": set(),
                 }
             e = idx[key]
             if not ok:
                 e["error_count"] += 1
+                if e["example_error"] is None and err:
+                    e["example_error"] = err
                 continue
             contract = _reflect_contract(raw_v)
             e["ok_count"] += 1
@@ -652,7 +663,7 @@ def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200)
         e = idx[key]
         records.append({
             "domain": e["domain"], "member_key": e["member_key"], "member_kind": e["member_kind"],
-            "type_label": e["type_label"], "example": e["example"],
+            "type_label": e["type_label"], "example": e["example"], "example_error": e["example_error"],
             "observed": {"ok_count": e["ok_count"], "error_count": e["error_count"], "unique_value_count": e["unique_value_count"]},
         })
     return records

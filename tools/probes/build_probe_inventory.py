@@ -141,6 +141,12 @@ def _new_agg():
         "storage_types": set(),
         "q_counts": {},
         "example": None,
+        "example_error": None,  # first-seen representative exception message
+                                 # for a reflection key that has errored at
+                                 # least once; only surfaced in the CSV when
+                                 # this key's merged ok_count == 0 (see
+                                 # write_csv) so it doesn't clutter rows that
+                                 # already have real invoked data
         "seen_tags": set(),  # human-readable "extraction_date|revit_version" or "date" tags
         "revit_versions": set(),
         "source_files": set(),
@@ -295,6 +301,9 @@ def _merge_entries_for_domain(domains, diagnostics, domain, entries, basename, s
             if _example_score(candidate) > _example_score(agg["example"]):
                 agg["example"] = candidate
 
+            if agg.get("example_error") is None and rec.get("example_error"):
+                agg["example_error"] = rec.get("example_error")
+
 
 def merge_probe_files(run_files, legacy_files, warnings):
     """
@@ -406,6 +415,12 @@ def write_csv(domains, out_csv, warnings):
             for key in sorted(bkeys.keys()):
                 agg = bkeys[key]
                 ex = _fmt_example(agg["example"])
+                # Only surface the captured exception text for keys that
+                # never produced a real invoked value (ok_count == 0) -- a
+                # key with at least one real "ok" example doesn't need it,
+                # and showing it there would clutter a row that already has
+                # real data with a leftover error from some other sample.
+                example_error = agg.get("example_error") if agg.get("ok_count", 0) == 0 else None
                 rows.append(
                     {
                         "domain": domain,
@@ -421,6 +436,7 @@ def write_csv(domains, out_csv, warnings):
                         "example_raw": ex.get("raw"),
                         "example_display": ex.get("display"),
                         "example_norm": ex.get("norm"),
+                        "example_error": example_error,
                         "revit_versions_seen": ";".join(sorted(agg["revit_versions"])),
                         "first_seen": min(agg["seen_tags"]) if agg["seen_tags"] else "",
                         "last_seen": max(agg["seen_tags"]) if agg["seen_tags"] else "",
@@ -432,7 +448,7 @@ def write_csv(domains, out_csv, warnings):
     fieldnames = [
         "domain", "key_kind", "key", "member_kind", "type_label",
         "storage_types", "q_counts", "unique_value_count",
-        "example_q", "example_storage", "example_raw", "example_display", "example_norm",
+        "example_q", "example_storage", "example_raw", "example_display", "example_norm", "example_error",
         "revit_versions_seen", "first_seen", "last_seen", "run_count", "source_files",
     ]
     try:
@@ -693,6 +709,8 @@ def write_markdown(domains, diagnostics, out_md, skipped, warnings, domain_modul
                 lines.append("  - example — q=`{}` storage=`{}` raw=`{}` display=`{}` norm=`{}`".format(
                     ex.get("q"), ex.get("storage"), ex.get("raw"), ex.get("display"), ex.get("norm")
                 ))
+                if agg.get("ok_count", 0) == 0 and agg.get("example_error"):
+                    lines.append("  - example_error — `{}`".format(agg["example_error"]))
                 lines.append("  - revit_versions_seen — `{}`".format(", ".join(sorted(agg["revit_versions"])) or "(unknown)"))
                 lines.append("  - seen — {} run(s), {}–{}".format(
                     len(agg["seen_tags"]),
