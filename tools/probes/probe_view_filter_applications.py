@@ -812,7 +812,9 @@ _ALLOWLISTED_REFLECTION_METHODS = {
 # but shares the same allowlist name and the same removal; re-evaluate
 # independently against a live Subelement instance before re-adding either.
 
-_METHOD_NOT_INVOKED_SENTINEL = "<method not invoked>"
+_METHOD_NOT_INVOKED_SENTINEL = object()  # unique marker object, not a string --
+# see the identity check in _reflect_contract below for why this must never be
+# comparable-by-value to a real Revit return.
 
 def _reflect_try_get(obj, member_kind, name):
     if member_kind == "method":
@@ -839,12 +841,15 @@ def _reflect_try_get(obj, member_kind, name):
 def _reflect_contract(raw_v):
     if raw_v is None:
         return {"q": "missing", "storage": "None", "raw": None, "display": None, "norm": None}
-    if raw_v == _METHOD_NOT_INVOKED_SENTINEL:
-        # A non-allowlisted method's placeholder is a real Python str, so
-        # without this check it falls into the generic str branch below and
-        # comes out as q="ok" -- indistinguishable from genuinely invoked
-        # string data. Checked before isinstance(raw_v, str) specifically so
-        # it never reaches that branch.
+    if raw_v is _METHOD_NOT_INVOKED_SENTINEL:
+        # Identity check ("is"), not equality -- _METHOD_NOT_INVOKED_SENTINEL is a
+        # unique object(), never a string, specifically so a genuine reflected
+        # property or allowlisted-method return whose real value happens to be
+        # the literal text "<method not invoked>" cannot collide with this
+        # placeholder and get misclassified/dropped (flagged in PR #398 review:
+        # an earlier version of this check compared by value against a string
+        # constant, which had exactly that collision risk). Checked before
+        # isinstance(raw_v, str) specifically so it never reaches that branch.
         return {"q": "not_invoked", "storage": "None", "raw": None, "display": None, "norm": None}
     if isinstance(raw_v, bool):
         return {"q": "ok", "storage": "Integer", "raw": int(raw_v), "display": str(raw_v), "norm": int(raw_v)}
