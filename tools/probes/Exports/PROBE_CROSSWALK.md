@@ -44,7 +44,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `20`
   - example — `22 Degree Filled Arrow-Medium`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `arrowhead.resolved`
   - present — 20 / 20 rows (100.0%)
@@ -53,7 +53,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `arrowhead.type_id`
   - present — 20 / 20 rows (100.0%)
@@ -62,7 +62,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `20`
   - example — `2584`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `arrowhead.workset_id`
   - present — 20 / 20 rows (100.0%)
@@ -71,7 +71,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `32`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `arrowhead.workset_name`
   - present — 20 / 20 rows (100.0%)
@@ -80,7 +80,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Arrowhead Styles`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `dim_type.id`
   - present — 20 / 20 rows (100.0%)
@@ -89,7 +89,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `20`
   - example — `18877`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `dim_type.name`
   - present — 20 / 20 rows (100.0%)
@@ -98,7 +98,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `19`
   - example — `Medium-Arrow-Round-1/8`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `tick_param`
   - present — 20 / 20 rows (100.0%)
@@ -107,7 +107,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `20`
   - example — `{'display': '22 Degree Filled Arrow-Medium', 'norm': 2584, 'q': 'ok', 'raw': 2584, 'storage': 'ElementId'}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `tick_param.matched_name`
   - present — 20 / 20 rows (100.0%)
@@ -116,7 +116,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Tick Mark`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `browser_organization` (5 row(s))
 
@@ -127,7 +127,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Family and Type`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `bip_name`
   - present — 5 / 5 rows (100.0%)
@@ -136,7 +136,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `VIEW_TYPE`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `category`
   - present — 5 / 5 rows (100.0%)
@@ -145,7 +145,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `views`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `definition_built_in_parameter`
   - present — 5 / 5 rows (100.0%)
@@ -154,7 +154,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `-1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `definition_name`
   - present — 5 / 5 rows (100.0%)
@@ -163,7 +163,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `Sheet Classification`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `depth`
   - present — 5 / 5 rows (100.0%)
@@ -172,7 +172,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `0`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `display_name`
   - present — 5 / 5 rows (100.0%)
@@ -181,7 +181,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `Family and Type`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `display_name_source`
   - present — 5 / 5 rows (100.0%)
@@ -190,7 +190,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `bip_label`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `eid_int`
   - present — 5 / 5 rows (100.0%)
@@ -199,7 +199,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `-1012106`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `folder_item_name`
   - present — 5 / 5 rows (100.0%)
@@ -208,7 +208,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `???`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `is_shared_param`
   - present — 5 / 5 rows (100.0%)
@@ -217,7 +217,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `kind`
   - present — 5 / 5 rows (100.0%)
@@ -226,7 +226,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `builtin_parameter`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `skip`
   - present — 5 / 5 rows (100.0%)
@@ -235,7 +235,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `ceiling_types` (11 row(s))
 
@@ -246,7 +246,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `6`
   - example — `1536`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `ceiling_type.name`
   - present — 11 / 11 rows (100.0%)
@@ -255,7 +255,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `6`
   - example — `Roof Soffit 1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `ceiling_type.workset_id`
   - present — 11 / 11 rows (100.0%)
@@ -264,7 +264,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `53`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `ceiling_type.workset_name`
   - present — 11 / 11 rows (100.0%)
@@ -273,7 +273,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `Roof Soffit Settings`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.function`
   - present — 11 / 11 rows (100.0%)
@@ -282,7 +282,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.index`
   - present — 11 / 11 rows (100.0%)
@@ -291,7 +291,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `0`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.is_structural_material`
   - present — 11 / 11 rows (100.0%)
@@ -300,7 +300,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.is_variable_width`
   - present — 11 / 11 rows (100.0%)
@@ -309,7 +309,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_id`
   - present — 11 / 11 rows (100.0%)
@@ -318,7 +318,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `7`
   - example — `-1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_name`
   - present — 11 / 11 rows (100.0%)
@@ -327,7 +327,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `6`
   - example — `ACT - 24" x 24" - 0000`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_resolved`
   - present — 11 / 11 rows (100.0%)
@@ -336,7 +336,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.width_in`
   - present — 11 / 11 rows (100.0%)
@@ -345,7 +345,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `11.999999999999998`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `dimension_types` (5 row(s))
 
@@ -356,7 +356,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `22 Degree Filled Arrow-Medium`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `arrowhead.resolved`
   - present — 5 / 5 rows (100.0%)
@@ -365,7 +365,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `arrowhead.type_id`
   - present — 5 / 5 rows (100.0%)
@@ -374,7 +374,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `2584`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `dim_type.id`
   - present — 5 / 5 rows (100.0%)
@@ -383,7 +383,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `18877`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `dim_type.name`
   - present — 5 / 5 rows (100.0%)
@@ -392,7 +392,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `Medium-Arrow-Round-1/8`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `dim_type.shape`
   - present — 5 / 5 rows (100.0%)
@@ -401,7 +401,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `Radial|2`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `dim_type.shape_family`
   - present — 5 / 5 rows (100.0%)
@@ -410,7 +410,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `radial`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `dim_type.shape_label`
   - present — 5 / 5 rows (100.0%)
@@ -419,7 +419,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `Radial`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `tick_param`
   - present — 5 / 5 rows (100.0%)
@@ -428,7 +428,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `{'display': '22 Degree Filled Arrow-Medium', 'norm': 2584, 'q': 'ok', 'raw': 2584, 'storage': 'ElementId'}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `tick_param.matched_name`
   - present — 5 / 5 rows (100.0%)
@@ -437,7 +437,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Tick Mark`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `floor_types` (9 row(s))
 
@@ -448,7 +448,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `7`
   - example — `1534`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `floor_type.name`
   - present — 9 / 9 rows (100.0%)
@@ -457,7 +457,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `7`
   - example — `Foundation Slab`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `floor_type.workset_id`
   - present — 9 / 9 rows (100.0%)
@@ -466,7 +466,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `84`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `floor_type.workset_name`
   - present — 9 / 9 rows (100.0%)
@@ -475,7 +475,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `Foundation Slab Types`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.function`
   - present — 9 / 9 rows (100.0%)
@@ -484,7 +484,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.index`
   - present — 9 / 9 rows (100.0%)
@@ -493,7 +493,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `0`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.is_structural_material`
   - present — 9 / 9 rows (100.0%)
@@ -502,7 +502,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.is_variable_width`
   - present — 9 / 9 rows (100.0%)
@@ -511,7 +511,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_id`
   - present — 9 / 9 rows (100.0%)
@@ -520,7 +520,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `8`
   - example — `-1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_name`
   - present — 9 / 9 rows (100.0%)
@@ -529,7 +529,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `7`
   - example — `Schematic Material - 0000`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_resolved`
   - present — 9 / 9 rows (100.0%)
@@ -538,7 +538,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.width_in`
   - present — 9 / 9 rows (100.0%)
@@ -547,7 +547,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `7`
   - example — `11.999999999999998`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `identity` (1 row(s))
 
@@ -558,7 +558,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `33144`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `project_info.name`
   - present — 1 / 1 rows (100.0%)
@@ -567,7 +567,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Kaiser Permanente San Rafael Replacement Hospital`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `project_info.workset_id`
   - present — 1 / 1 rows (100.0%)
@@ -576,7 +576,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `4`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `project_info.workset_name`
   - present — 1 / 1 rows (100.0%)
@@ -585,7 +585,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Project Info`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `line_patterns` (50 row(s))
 
@@ -596,7 +596,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `50`
   - example — `2379934`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `linestyle.graphics_style_type`
   - present — 50 / 50 rows (100.0%)
@@ -605,7 +605,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Projection`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `linestyle.name`
   - present — 50 / 50 rows (100.0%)
@@ -614,7 +614,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `50`
   - example — `_MATCH LINE`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `pattern.id`
   - present — 50 / 50 rows (100.0%)
@@ -623,7 +623,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `50`
   - example — `266924`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `pattern.name`
   - present — 50 / 50 rows (100.0%)
@@ -632,7 +632,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `50`
   - example — `Double dash`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `pattern.resolved`
   - present — 50 / 50 rows (100.0%)
@@ -641,7 +641,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `pattern.workset_id`
   - present — 50 / 50 rows (100.0%)
@@ -650,7 +650,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `9`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `pattern.workset_name`
   - present — 50 / 50 rows (100.0%)
@@ -659,7 +659,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Line Patterns`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `line_styles` (64 row(s))
 
@@ -670,7 +670,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `64`
   - example — `27`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `line_pattern.name`
   - present — 64 / 64 rows (100.0%)
@@ -679,7 +679,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `62`
   - example — `Dash`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `line_pattern.resolved`
   - present — 64 / 64 rows (100.0%)
@@ -688,7 +688,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `line_style.id`
   - present — 64 / 64 rows (100.0%)
@@ -697,7 +697,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `64`
   - example — `195`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `line_style.name`
   - present — 64 / 64 rows (100.0%)
@@ -706,7 +706,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `64`
   - example — `<Hidden Lines>`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `line_style.type`
   - present — 64 / 64 rows (100.0%)
@@ -715,7 +715,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `line_style.workset_id`
   - present — 64 / 64 rows (100.0%)
@@ -724,7 +724,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `8`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `line_style.workset_name`
   - present — 64 / 64 rows (100.0%)
@@ -733,7 +733,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Line Styles`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `loaded_family_types` (60 row(s))
 
@@ -744,7 +744,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `60`
   - example — `9176524`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `family_symbol.name`
   - present — 60 / 60 rows (100.0%)
@@ -753,7 +753,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `0`
   - example — `None`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `family_symbol.workset_id`
   - present — 60 / 60 rows (100.0%)
@@ -762,7 +762,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `41`
   - example — `6173`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `family_symbol.workset_name`
   - present — 60 / 60 rows (100.0%)
@@ -771,7 +771,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `41`
   - example — `Family  : Casework : +066_Upper`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `materials` (134 row(s))
 
@@ -782,7 +782,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `123`
   - example — `23550`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `appearance_asset.name`
   - present — 134 / 134 rows (100.0%)
@@ -791,7 +791,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `123`
   - example — `Generic`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `appearance_asset.resolved`
   - present — 134 / 134 rows (100.0%)
@@ -800,7 +800,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `material.class`
   - present — 134 / 134 rows (100.0%)
@@ -809,7 +809,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `26`
   - example — `Unassigned`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `material.id`
   - present — 134 / 134 rows (100.0%)
@@ -818,7 +818,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `134`
   - example — `39`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `material.name`
   - present — 134 / 134 rows (100.0%)
@@ -827,7 +827,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `134`
   - example — `Default`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `material.workset_id`
   - present — 134 / 134 rows (100.0%)
@@ -836,7 +836,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `10`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `material.workset_name`
   - present — 134 / 134 rows (100.0%)
@@ -845,7 +845,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Materials`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `structural_asset.id`
   - present — 134 / 134 rows (100.0%)
@@ -854,7 +854,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `9`
   - example — `23553`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `structural_asset.name`
   - present — 134 / 134 rows (100.0%)
@@ -863,7 +863,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `9`
   - example — `Glass - Soda Lime`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `structural_asset.resolved`
   - present — 134 / 134 rows (100.0%)
@@ -872,7 +872,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `thermal_asset.id`
   - present — 134 / 134 rows (100.0%)
@@ -881,7 +881,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `6`
   - example — `23554`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `thermal_asset.name`
   - present — 134 / 134 rows (100.0%)
@@ -890,7 +890,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `Glass - Lime Window`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `thermal_asset.resolved`
   - present — 134 / 134 rows (100.0%)
@@ -899,7 +899,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `object_styles` (50 row(s))
 
@@ -910,7 +910,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `category.name`
   - present — 50 / 50 rows (100.0%)
@@ -919,7 +919,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `49`
   - example — `MEP Fabrication Ductwork`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `category.parent_name`
   - present — 50 / 50 rows (100.0%)
@@ -928,7 +928,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `6`
   - example — `MEP Fabrication Ductwork`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `category.type`
   - present — 50 / 50 rows (100.0%)
@@ -937,7 +937,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `cut.line_pattern`
   - present — 50 / 50 rows (100.0%)
@@ -946,7 +946,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `{'name': '0_Hidden2', 'type_id': 23692}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `material`
   - present — 50 / 50 rows (100.0%)
@@ -955,7 +955,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `{'name': None, 'type_id': None}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `projection.line_pattern`
   - present — 50 / 50 rows (100.0%)
@@ -964,7 +964,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `6`
   - example — `{'name': None, 'type_id': -3000010}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `phase_filters` (4 row(s))
 
@@ -975,7 +975,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `4`
   - example — `1912`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phase_filter.name`
   - present — 4 / 4 rows (100.0%)
@@ -984,7 +984,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `4`
   - example — `Show All`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phase_filter.resolved`
   - present — 4 / 4 rows (100.0%)
@@ -993,7 +993,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phase_filter.workset_id`
   - present — 4 / 4 rows (100.0%)
@@ -1002,7 +1002,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `13`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phase_filter.workset_name`
   - present — 4 / 4 rows (100.0%)
@@ -1011,7 +1011,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Phase Settings`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phase_filter_param`
   - present — 4 / 4 rows (100.0%)
@@ -1020,7 +1020,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `4`
   - example — `{'display': 'Show All', 'norm': 1912, 'q': 'ok', 'raw': 1912, 'storage': 'ElementId'}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phase_filter_param.matched_name`
   - present — 4 / 4 rows (100.0%)
@@ -1029,7 +1029,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `-1012103`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.id`
   - present — 4 / 4 rows (100.0%)
@@ -1038,7 +1038,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `4`
   - example — `1106`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.name`
   - present — 4 / 4 rows (100.0%)
@@ -1047,7 +1047,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `4`
   - example — `Project View`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `phase_graphics` (5 row(s))
 
@@ -1058,7 +1058,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `{'display': 'Show Previous + New', 'norm': 1909, 'q': 'ok', 'raw': 1909, 'storage': 'ElementId'}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phase_filter_param.matched_name`
   - present — 5 / 5 rows (100.0%)
@@ -1067,7 +1067,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `BuiltInParameter.VIEW_PHASE_FILTER`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phasefilter.id`
   - present — 5 / 5 rows (100.0%)
@@ -1076,7 +1076,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `1909`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phasefilter.name`
   - present — 5 / 5 rows (100.0%)
@@ -1085,7 +1085,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `Show Previous + New`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phasefilter.resolved`
   - present — 5 / 5 rows (100.0%)
@@ -1094,7 +1094,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view_template.id`
   - present — 5 / 5 rows (100.0%)
@@ -1103,7 +1103,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `68914`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view_template.name`
   - present — 5 / 5 rows (100.0%)
@@ -1112,7 +1112,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `Floor Plan - Simple - 1/8"`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view_template.workset_id`
   - present — 5 / 5 rows (100.0%)
@@ -1121,7 +1121,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `232`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view_template.workset_name`
   - present — 5 / 5 rows (100.0%)
@@ -1130,7 +1130,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `View Template "Floor Plan - Simple - 1/8""`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `phases` (3 row(s))
 
@@ -1141,7 +1141,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phase.is_used_by_any_view`
   - present — 3 / 3 rows (100.0%)
@@ -1150,7 +1150,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phase.name`
   - present — 3 / 3 rows (100.0%)
@@ -1159,7 +1159,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `Existing`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phase.workset_id`
   - present — 3 / 3 rows (100.0%)
@@ -1168,7 +1168,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `13`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `phase.workset_name`
   - present — 3 / 3 rows (100.0%)
@@ -1177,7 +1177,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Phase Settings`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `sample_view_names`
   - present — 3 / 3 rows (100.0%)
@@ -1186,7 +1186,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `['Drawing Index - Simple', '{3D - jason.luWP6AS}', 'Multi-Category Schedule', 'SITE PLAN - LEVEL 1 - SITEWORK 11X17 - EXISTING CONDITIONS', 'SITE PLAN - LEVEL 1 - SITEWORK 22X34 - EXISTING CONDITIONS']`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `used_by_view_count`
   - present — 3 / 3 rows (100.0%)
@@ -1195,7 +1195,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `7`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `roof_types` (4 row(s))
 
@@ -1206,7 +1206,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.index`
   - present — 4 / 4 rows (100.0%)
@@ -1215,7 +1215,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `0`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.is_structural_material`
   - present — 4 / 4 rows (100.0%)
@@ -1224,7 +1224,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.is_variable_width`
   - present — 4 / 4 rows (100.0%)
@@ -1233,7 +1233,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_id`
   - present — 4 / 4 rows (100.0%)
@@ -1242,7 +1242,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `82272`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_name`
   - present — 4 / 4 rows (100.0%)
@@ -1251,7 +1251,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `Schematic Material - Transparent - 0000`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_resolved`
   - present — 4 / 4 rows (100.0%)
@@ -1260,7 +1260,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.width_in`
   - present — 4 / 4 rows (100.0%)
@@ -1269,7 +1269,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `4`
   - example — `5.999999999999999`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `roof_type.id`
   - present — 4 / 4 rows (100.0%)
@@ -1278,7 +1278,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `4`
   - example — `1531`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `roof_type.name`
   - present — 4 / 4 rows (100.0%)
@@ -1287,7 +1287,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `4`
   - example — `Roof-6"`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `roof_type.workset_id`
   - present — 4 / 4 rows (100.0%)
@@ -1296,7 +1296,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `15`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `roof_type.workset_name`
   - present — 4 / 4 rows (100.0%)
@@ -1305,7 +1305,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Roof Types`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `text_types` (5 row(s))
 
@@ -1316,7 +1316,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `22 Degree Filled Arrow-Medium`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `arrowhead.resolved`
   - present — 5 / 5 rows (100.0%)
@@ -1325,7 +1325,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `arrowhead.type_id`
   - present — 5 / 5 rows (100.0%)
@@ -1334,7 +1334,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `2584`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `leader_arrow_param`
   - present — 5 / 5 rows (100.0%)
@@ -1343,7 +1343,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `{'display': '22 Degree Filled Arrow-Medium', 'norm': 2584, 'q': 'ok', 'raw': 2584, 'storage': 'ElementId'}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `leader_arrow_param.matched_name`
   - present — 5 / 5 rows (100.0%)
@@ -1352,7 +1352,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Leader Arrowhead`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `text_type.id`
   - present — 5 / 5 rows (100.0%)
@@ -1361,7 +1361,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `1643`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `text_type.name`
   - present — 5 / 5 rows (100.0%)
@@ -1370,7 +1370,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `Notes-Medium`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `text_type.workset_id`
   - present — 5 / 5 rows (100.0%)
@@ -1379,7 +1379,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `24`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `text_type.workset_name`
   - present — 5 / 5 rows (100.0%)
@@ -1388,7 +1388,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Text Types`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `units` (151 row(s))
 
@@ -1399,7 +1399,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `8`
   - example — `autodesk.spec.discipline:electrical-1.0.0`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `discipline.ui_label`
   - present — 151 / 151 rows (100.0%)
@@ -1408,7 +1408,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `0`
   - example — `None`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `discipline.ui_label_err`
   - present — 151 / 151 rows (100.0%)
@@ -1417,7 +1417,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `missing:discipline ForgeTypeId object not available`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `discipline.ui_label_q`
   - present — 151 / 151 rows (100.0%)
@@ -1426,7 +1426,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `missing`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `spec.id`
   - present — 151 / 151 rows (100.0%)
@@ -1435,7 +1435,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `151`
   - example — `autodesk.spec.aec.electrical:apparentPower-2.0.0`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `spec.member_name`
   - present — 151 / 151 rows (100.0%)
@@ -1444,7 +1444,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `151`
   - example — `ApparentPower`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `spec.ui_label`
   - present — 151 / 151 rows (100.0%)
@@ -1453,7 +1453,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `129`
   - example — `Apparent Power`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `spec.ui_label_err`
   - present — 151 / 151 rows (100.0%)
@@ -1462,7 +1462,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `unreadable:LabelUtils has no compatible spec label method`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `spec.ui_label_q`
   - present — 151 / 151 rows (100.0%)
@@ -1471,7 +1471,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `ok`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `view_category_overrides` (200 row(s))
 
@@ -1482,7 +1482,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `26`
   - example — `{'line_color.rgb': {'display': '0|0|0', 'norm': '0|0|0', 'q': 'ok', 'raw': '0|0|0', 'storage': 'String'}, 'line_pattern_cut': {'display': None, 'norm': None, 'q': 'ok', 'raw': None, 'storage': 'ElementId'}, 'line_pattern_projection': {'display': None, 'norm': None, 'q': 'ok', 'raw': None, 'storage': 'ElementId'}, 'line_weight_cut': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'Integer'}, 'line_weight_projection': {'display': '2', 'norm': 2, 'q': 'ok', 'raw': 2, 'storage': 'Integer'}, 'material': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'ElementId'}}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `category.is_subcategory`
   - present — 200 / 200 rows (100.0%)
@@ -1491,7 +1491,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `category.name`
   - present — 200 / 200 rows (100.0%)
@@ -1500,7 +1500,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `90`
   - example — `Electrical Equipment`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `category.parent_name`
   - present — 200 / 200 rows (100.0%)
@@ -1509,7 +1509,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `34`
   - example — `Walls`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `category.path`
   - present — 200 / 200 rows (100.0%)
@@ -1518,7 +1518,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `127`
   - example — `Electrical Equipment|self`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `delta_flags`
   - present — 200 / 200 rows (100.0%)
@@ -1527,7 +1527,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `4`
   - example — `{'delta.cut_line_color.rgb': {'display': '0', 'norm': 0, 'q': 'ok', 'raw': 0, 'storage': 'Integer'}, 'delta.cut_line_pattern': {'display': '0', 'norm': 0, 'q': 'ok', 'raw': 0, 'storage': 'Integer'}, 'delta.cut_line_weight': {'display': '0', 'norm': 0, 'q': 'ok', 'raw': 0, 'storage': 'Integer'}, 'delta.halftone': {'display': '1', 'norm': 1, 'q': 'ok', 'raw': 1, 'storage': 'Integer'}, 'delta.projection_line_color.rgb': {'display': '0', 'norm': 0, 'q': 'ok', 'raw': 0, 'storage': 'Integer'}, 'delta.projection_line_pattern': {'display': '0', 'norm': 0, 'q': 'ok', 'raw': 0, 'storage': 'Integer'}, 'delta.projection_line_weight': {'display': '0', 'norm': 0, 'q': 'ok', 'raw': 0, 'storage': 'Integer'}, 'delta.transparency': {'display': '1', 'norm': 1, 'q': 'ok', 'raw': 1, 'storage': 'Integer'}}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `effective`
   - present — 200 / 200 rows (100.0%)
@@ -1536,7 +1536,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `22`
   - example — `{'cut_line_color.rgb': {'display': '0|0|0', 'norm': '0|0|0', 'q': 'ok', 'raw': '0|0|0', 'storage': 'String'}, 'cut_line_pattern': {'display': None, 'norm': None, 'q': 'ok', 'raw': None, 'storage': 'ElementId'}, 'cut_line_weight': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'Integer'}, 'halftone': {'display': 'True', 'norm': 1, 'q': 'ok', 'raw': 1, 'storage': 'Integer'}, 'projection_line_color.rgb': {'display': '0|0|0', 'norm': '0|0|0', 'q': 'ok', 'raw': '0|0|0', 'storage': 'String'}, 'projection_line_pattern': {'display': None, 'norm': None, 'q': 'ok', 'raw': None, 'storage': 'ElementId'}, 'projection_line_weight': {'display': '2', 'norm': 2, 'q': 'ok', 'raw': 2, 'storage': 'Integer'}, 'transparency': {'display': '100', 'norm': 100, 'q': 'ok', 'raw': 100, 'storage': 'Integer'}}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `has_override`
   - present — 200 / 200 rows (100.0%)
@@ -1545,7 +1545,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.bucket`
   - present — 200 / 200 rows (100.0%)
@@ -1554,7 +1554,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `is_template=1|has_template=0|viewtype=3`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.id`
   - present — 200 / 200 rows (100.0%)
@@ -1563,7 +1563,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `68928`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.is_template`
   - present — 200 / 200 rows (100.0%)
@@ -1572,7 +1572,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.name`
   - present — 200 / 200 rows (100.0%)
@@ -1581,7 +1581,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `3`
   - example — `Elevation - Interior - 1/4"`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `view_filter_applications` (41 row(s))
 
@@ -1592,7 +1592,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Autodesk.Revit.DB.ParameterFilterElement`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `filter.id`
   - present — 41 / 41 rows (100.0%)
@@ -1601,7 +1601,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `18`
   - example — `68536`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `filter.name`
   - present — 41 / 41 rows (100.0%)
@@ -1610,7 +1610,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `18`
   - example — `Owner Furnished Contractor Installed`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `filter.order_index`
   - present — 41 / 41 rows (100.0%)
@@ -1619,7 +1619,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `9`
   - example — `0`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `filter.visibility`
   - present — 41 / 41 rows (100.0%)
@@ -1628,7 +1628,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `filter.workset_id`
   - present — 41 / 41 rows (100.0%)
@@ -1637,7 +1637,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `85`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `filter.workset_name`
   - present — 41 / 41 rows (100.0%)
@@ -1646,7 +1646,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Filters`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `ogs.has_any_override`
   - present — 41 / 41 rows (100.0%)
@@ -1655,7 +1655,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `ogs.overrides`
   - present — 41 / 41 rows (100.0%)
@@ -1664,7 +1664,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `13`
   - example — `{'vfa.ogs.cut_bg_pattern_color.hex': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.cut_bg_pattern_color.rgb': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.cut_bg_pattern_id': {'display': None, 'norm': None, 'q': 'ok', 'raw': None, 'storage': 'ElementId'}, 'vfa.ogs.cut_fg_pattern_color.hex': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.cut_fg_pattern_color.rgb': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.cut_fg_pattern_id': {'display': None, 'norm': None, 'q': 'ok', 'raw': None, 'storage': 'ElementId'}, 'vfa.ogs.cut_line_color.hex': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.cut_line_color.rgb': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.cut_line_pattern_id': {'display': None, 'norm': None, 'q': 'ok', 'raw': None, 'storage': 'ElementId'}, 'vfa.ogs.cut_line_weight': {'display': '-1', 'norm': -1, 'q': 'ok', 'raw': -1, 'storage': 'Integer'}, 'vfa.ogs.halftone': {'display': 'False', 'norm': 0, 'q': 'ok', 'raw': 0, 'storage': 'Integer'}, 'vfa.ogs.proj_line_color.hex': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.proj_line_color.rgb': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.proj_line_pattern_id': {'display': None, 'norm': None, 'q': 'ok', 'raw': None, 'storage': 'ElementId'}, 'vfa.ogs.proj_line_weight': {'display': '-1', 'norm': -1, 'q': 'ok', 'raw': -1, 'storage': 'Integer'}, 'vfa.ogs.surf_bg_pattern_color.hex': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.surf_bg_pattern_color.rgb': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.surf_bg_pattern_id': {'display': None, 'norm': None, 'q': 'ok', 'raw': None, 'storage': 'ElementId'}, 'vfa.ogs.surf_fg_pattern_color.hex': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.surf_fg_pattern_color.rgb': {'display': None, 'norm': None, 'q': 'missing', 'raw': None, 'storage': 'String'}, 'vfa.ogs.surf_fg_pattern_id': {'display': None, 'norm': None, 'q': 'ok', 'raw': None, 'storage': 'ElementId'}, 'vfa.ogs.transparency': {'display': '0', 'norm': 0, 'q': 'ok', 'raw': 0, 'storage': 'Integer'}}`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `ogs.present`
   - present — 41 / 41 rows (100.0%)
@@ -1673,7 +1673,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `ogs.sig_hash`
   - present — 41 / 41 rows (100.0%)
@@ -1682,7 +1682,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `13`
   - example — `7e45f762c7e2b21d67fc5b7c147c398b616e48c1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `pfe.category_count`
   - present — 41 / 41 rows (100.0%)
@@ -1691,7 +1691,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `4`
   - example — `4`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `pfe.category_names_sample`
   - present — 41 / 41 rows (100.0%)
@@ -1700,7 +1700,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `[]`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `pfe.is_parameter_filter_element`
   - present — 41 / 41 rows (100.0%)
@@ -1709,7 +1709,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.id`
   - present — 41 / 41 rows (100.0%)
@@ -1718,7 +1718,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `15`
   - example — `68914`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.is_template`
   - present — 41 / 41 rows (100.0%)
@@ -1727,7 +1727,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.name`
   - present — 41 / 41 rows (100.0%)
@@ -1736,7 +1736,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `15`
   - example — `Floor Plan - Simple - 1/8"`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.view_type`
   - present — 41 / 41 rows (100.0%)
@@ -1745,7 +1745,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `view_filter_definitions` (61 row(s))
 
@@ -1756,7 +1756,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `11`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `applied_template_count`
   - present — 61 / 61 rows (100.0%)
@@ -1765,7 +1765,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `5`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `filter.id`
   - present — 61 / 61 rows (100.0%)
@@ -1774,7 +1774,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `61`
   - example — `68527`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `filter.is_applied_anywhere`
   - present — 61 / 61 rows (100.0%)
@@ -1783,7 +1783,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `filter.name`
   - present — 61 / 61 rows (100.0%)
@@ -1792,7 +1792,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `61`
   - example — `Fire Rated Partitions - 1 Hour`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `filter.workset_id`
   - present — 61 / 61 rows (100.0%)
@@ -1801,7 +1801,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `85`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `filter.workset_name`
   - present — 61 / 61 rows (100.0%)
@@ -1810,7 +1810,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Filters`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `sample_applied_names`
   - present — 61 / 61 rows (100.0%)
@@ -1819,7 +1819,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `16`
   - example — `['z_Filters - Fire Rated Wall/Door Check', 'Model QC-Level 1-Fire Rating Check']`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `view_templates` (50 row(s))
 
@@ -1830,7 +1830,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `50`
   - example — `191928`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `template.name`
   - present — 50 / 50 rows (100.0%)
@@ -1839,7 +1839,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `50`
   - example — `A - Schedule`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `template.resolved`
   - present — 50 / 50 rows (100.0%)
@@ -1848,7 +1848,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `template.workset_id`
   - present — 50 / 50 rows (100.0%)
@@ -1857,7 +1857,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `50`
   - example — `407`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `template.workset_name`
   - present — 50 / 50 rows (100.0%)
@@ -1866,7 +1866,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `50`
   - example — `View Template "A - Schedule"`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.id`
   - present — 50 / 50 rows (100.0%)
@@ -1875,7 +1875,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `50`
   - example — `4219`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.name`
   - present — 50 / 50 rows (100.0%)
@@ -1884,7 +1884,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `49`
   - example — `Drawing Index - Simple`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.view_type`
   - present — 50 / 50 rows (100.0%)
@@ -1893,7 +1893,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `7`
   - example — `5|5`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `views` (52 row(s))
 
@@ -1904,7 +1904,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `2622`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `schedule.body_text_type_name`
   - present — 52 / 52 rows (100.0%)
@@ -1913,7 +1913,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `0`
   - example — `None`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `schedule.header_text_type_id`
   - present — 52 / 52 rows (100.0%)
@@ -1922,7 +1922,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `4279`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `schedule.header_text_type_name`
   - present — 52 / 52 rows (100.0%)
@@ -1931,7 +1931,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `0`
   - example — `None`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `schedule.title_text_type_id`
   - present — 52 / 52 rows (100.0%)
@@ -1940,7 +1940,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `2628`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `schedule.title_text_type_name`
   - present — 52 / 52 rows (100.0%)
@@ -1949,7 +1949,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `0`
   - example — `None`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.has_template`
   - present — 52 / 52 rows (100.0%)
@@ -1958,7 +1958,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.id`
   - present — 52 / 52 rows (100.0%)
@@ -1967,7 +1967,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `52`
   - example — `49370`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.name`
   - present — 52 / 52 rows (100.0%)
@@ -1976,7 +1976,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `51`
   - example — `SEA LEVEL`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.template_id`
   - present — 52 / 52 rows (100.0%)
@@ -1985,7 +1985,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `11`
   - example — `146920`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.template_name`
   - present — 52 / 52 rows (100.0%)
@@ -1994,7 +1994,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `11`
   - example — `z_Floor Plan - Do Not Rename`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.viewtype_int`
   - present — 52 / 52 rows (100.0%)
@@ -2003,7 +2003,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `12`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.workset_id`
   - present — 52 / 52 rows (100.0%)
@@ -2012,7 +2012,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `52`
   - example — `225`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `view.workset_name`
   - present — 52 / 52 rows (100.0%)
@@ -2021,7 +2021,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `52`
   - example — `View "Floor Plan: SEA LEVEL"`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `wall_types` (45 row(s))
 
@@ -2032,7 +2032,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `6`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.index`
   - present — 45 / 45 rows (100.0%)
@@ -2041,7 +2041,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `7`
   - example — `0`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.is_structural_material`
   - present — 45 / 45 rows (100.0%)
@@ -2050,7 +2050,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.is_variable_width`
   - present — 45 / 45 rows (100.0%)
@@ -2059,7 +2059,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `False`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_id`
   - present — 45 / 45 rows (100.0%)
@@ -2068,7 +2068,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `22`
   - example — `82272`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_name`
   - present — 45 / 45 rows (100.0%)
@@ -2077,7 +2077,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `21`
   - example — `Schematic Material - Transparent - 0000`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.material_resolved`
   - present — 45 / 45 rows (100.0%)
@@ -2086,7 +2086,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `2`
   - example — `True`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `layer.width_in`
   - present — 45 / 45 rows (100.0%)
@@ -2095,7 +2095,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `19`
   - example — `4.875`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `wall_type.id`
   - present — 45 / 45 rows (100.0%)
@@ -2104,7 +2104,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `20`
   - example — `82254`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `wall_type.name`
   - present — 45 / 45 rows (100.0%)
@@ -2113,7 +2113,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `20`
   - example — `Interior Generic_5" Nominal`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `wall_type.workset_id`
   - present — 45 / 45 rows (100.0%)
@@ -2122,7 +2122,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `14`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `wall_type.workset_name`
   - present — 45 / 45 rows (100.0%)
@@ -2131,7 +2131,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `1`
   - example — `Wall Types`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 ## domain — `worksets` (183 row(s))
 
@@ -2142,7 +2142,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `51`
   - example — `4`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `workset.id`
   - present — 183 / 183 rows (100.0%)
@@ -2151,7 +2151,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `183`
   - example — `185`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `workset.kind`
   - present — 183 / 183 rows (100.0%)
@@ -2160,7 +2160,7 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `4`
   - example — `1`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
 - **column** — `workset.name`
   - present — 183 / 183 rows (100.0%)
@@ -2169,5 +2169,5 @@ Crosswalk records are join rows (materials' appearance/structural/thermal asset 
   - unique_value_count — `169`
   - example — `Family  : Curtain Panels : System Panel`
   - revit_versions_seen — `2025`
-  - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
+  - seen — 1 run(s), 2026-08-04T18:12:00.042589–2026-08-04T18:12:00.042589
 
