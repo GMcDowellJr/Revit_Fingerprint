@@ -660,6 +660,40 @@ def _reflect_try_get(obj, member_kind, name):
         return (False, None, "{}: {}".format(type(ex).__name__, ex))
     return (True, v, None)
 
+def _reflect_collection_is_elementid_typed(raw_v):
+    # Best-effort check of the collection's declared/generic item type (not
+    # its contents) via CLR reflection -- the only way to confirm an EMPTY
+    # collection actually holds ElementIds, since there are no items to
+    # duck-type against. Checks the object's own generic type arguments
+    # (e.g. List<ElementId>) and any implemented generic interface (e.g. a
+    # concrete type implementing IList<ElementId> without itself being
+    # generic). Returns False (not "unknown") on any reflection failure --
+    # this function only ever widens confidence, never narrows it.
+    try:
+        t = raw_v.GetType()
+    except:
+        return False
+    type_candidates = []
+    try:
+        if t.IsGenericType:
+            type_candidates.append(t)
+    except:
+        pass
+    try:
+        for iface in t.GetInterfaces():
+            if getattr(iface, "IsGenericType", False):
+                type_candidates.append(iface)
+    except:
+        pass
+    for tc in type_candidates:
+        try:
+            for arg in tc.GetGenericArguments():
+                if getattr(arg, "FullName", None) == "Autodesk.Revit.DB.ElementId":
+                    return True
+        except:
+            continue
+    return False
+
 def _reflect_contract(raw_v):
     if raw_v is None:
         return {"q": "missing", "storage": "None", "raw": None, "display": None, "norm": None}
@@ -686,10 +720,19 @@ def _reflect_contract(raw_v):
         pass
     try:
         ids = []
+        saw_item = False
         for item in raw_v:
+            saw_item = True
             if not hasattr(item, "IntegerValue"):
                 raise TypeError("non-ElementId item in collection")
             ids.append(int(item.IntegerValue))
+        if not saw_item and not _reflect_collection_is_elementid_typed(raw_v):
+            # Empty collection whose item type we can't confirm is ElementId
+            # (e.g. Element.GetEntitySchemaGuids() -> IList<Guid> with 0
+            # schemas attached) -- iterating an empty collection never runs
+            # the per-item .IntegerValue check above, so an unconfirmed
+            # empty collection must not be classified as an ElementId list.
+            raise TypeError("empty collection of unconfirmed item type")
         disp = ",".join(str(i) for i in ids)
         return {"q": "ok", "storage": "ElementIdList", "raw": ids, "display": disp, "norm": tuple(ids)}
     except:
