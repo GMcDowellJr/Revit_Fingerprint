@@ -183,6 +183,21 @@ def _resolve_workset(doc, ws_id_obj):
     return (name, name is not None)
 
 
+def _resolve_similar_type(sid_int):
+    """Resolve a GetSimilarTypes() id via a document-wide doc.GetElement()
+    lookup -- GetSimilarTypes() is not formally documented as
+    same-category-only (see Step 0 findings), and BrowserOrganization is
+    not a type-family element the way WallType/CeilingType/etc. are, so
+    there is no own-category id->name dict to reuse here at all."""
+    if sid_int is None:
+        return (None, False)
+    ref = _safe(lambda: doc.GetElement(ElementId(sid_int)), None)
+    if ref is None:
+        return (None, False)
+    name = _safe(lambda: ref.Name, None)
+    return (name, name is not None)
+
+
 def _try_get_definition_record(elem):
     """RevitLookup-style definition name/GUID data for ParameterElement-like values."""
     rec = {}
@@ -389,6 +404,9 @@ def _add_inventory_obs(param_key, pv, bucket=None):
 # -------------------------
 
 _browserorg_objs = []  # for reflection sweep
+_org_crosswalk_records = []  # one row per (org, get_similar_types entry), plus one
+                              # workset-only row per org so WorksetId (already resolved
+                              # above into inventory) also reaches the crosswalk export
 
 doc_is_family = _safe(lambda: bool(doc.IsFamilyDocument), None)
 _add_inventory_obs(
@@ -434,6 +452,32 @@ if BrowserOrganization is not None:
             _pv("ok" if org_ws_id_int is not None else "unreadable", "Integer", org_ws_id_int, display=org_ws_name),
             category,
         )
+
+        # Promote WorksetId into the crosswalk export -- resolution already
+        # happens above via _resolve_workset(), it just never reached a
+        # "kind": "crosswalk" record before (inventory only), so
+        # find_crosswalk_candidates.py never saw it as covered.
+        _org_crosswalk_records.append({
+            "browser_organization.id": org_id_int,
+            "browser_organization.category": category,
+            "browser_organization.workset_id": org_ws_id_int,
+            "browser_organization.workset_name": org_ws_name,
+        })
+
+        similar_ids = _safe(lambda: list(org.GetSimilarTypes() or []), default=[])
+        for si, sid in enumerate(similar_ids):
+            sid_int = _safe(lambda: sid.IntegerValue, None) if sid is not None else None
+            s_name, s_resolved = _resolve_similar_type(sid_int)
+            _org_crosswalk_records.append({
+                "browser_organization.id": org_id_int,
+                "browser_organization.category": category,
+                "browser_organization.workset_id": org_ws_id_int,
+                "browser_organization.workset_name": org_ws_name,
+                "get_similar_types.index": si,
+                "get_similar_types.id": sid_int,
+                "get_similar_types.name": s_name,
+                "get_similar_types.resolved": s_resolved,
+            })
 
         # Sort criteria
         sp = _safe(lambda: org.SortingParameterId, None)
@@ -510,7 +554,7 @@ for k in sorted(param_index.keys()):
         },
     })
 
-optional_crosswalk = _folder_item_records
+optional_crosswalk = _org_crosswalk_records + _folder_item_records
 
 # -------------------------
 # Reflection sweep (breadth): non-Parameter .NET members via reflection,

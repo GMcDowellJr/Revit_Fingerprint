@@ -717,6 +717,20 @@ def _resolve_workset(doc, ws_id_obj):
     return (name, name is not None)
 
 
+def _resolve_similar_type(sid_int):
+    """Resolve a GetSimilarTypes() id via a document-wide doc.GetElement()
+    lookup -- GetSimilarTypes() is not formally documented as
+    same-category-only (see Step 0 findings), so this must not assume the
+    returned id is necessarily another FamilySymbol."""
+    if sid_int is None:
+        return (None, False)
+    ref = _safe(lambda: doc.GetElement(ElementId(sid_int)), None)
+    if ref is None:
+        return (None, False)
+    name = _safe(lambda: ref.Name, None)
+    return (name, name is not None)
+
+
 optional_crosswalk = []
 for sym in _reflect_samples:
     sym_id = _safe(lambda: sym.Id.IntegerValue, None)
@@ -732,6 +746,21 @@ for sym in _reflect_samples:
         "family_symbol.workset_id": ws_id_int,
         "family_symbol.workset_name": ws_name,
     })
+
+    similar_ids = _safe(lambda: list(sym.GetSimilarTypes() or []), default=[])
+    for si, sid in enumerate(similar_ids):
+        sid_int = _safe(lambda: sid.IntegerValue, None) if sid is not None else None
+        s_name, s_resolved = _resolve_similar_type(sid_int)
+        optional_crosswalk.append({
+            "family_symbol.id": sym_id,
+            "family_symbol.name": sym_name,
+            "family_symbol.workset_id": ws_id_int,
+            "family_symbol.workset_name": ws_name,
+            "get_similar_types.index": si,
+            "get_similar_types.id": sid_int,
+            "get_similar_types.name": s_name,
+            "get_similar_types.resolved": s_resolved,
+        })
 
 OUT_payload = [
     {

@@ -275,6 +275,20 @@ def _resolve_material(mat_id_int):
     return (name, name is not None)
 
 
+def _resolve_similar_type(sid_int):
+    """Resolve a GetSimilarTypes() id via a document-wide doc.GetElement()
+    lookup, not a RoofType-only id->name dict -- GetSimilarTypes() is not
+    formally documented as same-category-only (see Step 0 findings), so
+    this must not assume the returned id is necessarily another RoofType."""
+    if sid_int is None:
+        return (None, False)
+    ref = _safe(lambda: doc.GetElement(ElementId(sid_int)), None)
+    if ref is None:
+        return (None, False)
+    name = _safe(lambda: ref.Name, None)
+    return (name, name is not None)
+
+
 def _resolve_workset(doc, ws_id_obj):
     """Resolve an Element.WorksetId value to (name, resolved_bool) via
     WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
@@ -341,6 +355,21 @@ for t in all_types:
     ws_id_obj = _safe(lambda: t.WorksetId, None)
     ws_name, ws_resolved = _resolve_workset(doc, ws_id_obj)
     ws_id_int = _safe(lambda: ws_id_obj.IntegerValue, None) if ws_id_obj is not None else None
+
+    similar_ids = _safe(lambda: list(t.GetSimilarTypes() or []), default=[])
+    for si, sid in enumerate(similar_ids):
+        sid_int = _safe(lambda: sid.IntegerValue, None) if sid is not None else None
+        s_name, s_resolved = _resolve_similar_type(sid_int)
+        optional_crosswalk.append({
+            "roof_type.id": type_id,
+            "roof_type.name": name,
+            "roof_type.workset_id": ws_id_int,
+            "roof_type.workset_name": ws_name,
+            "get_similar_types.index": si,
+            "get_similar_types.id": sid_int,
+            "get_similar_types.name": s_name,
+            "get_similar_types.resolved": s_resolved,
+        })
 
     params = _safe(lambda: list(t.GetOrderedParameters()), default=None)
     if params is None:
