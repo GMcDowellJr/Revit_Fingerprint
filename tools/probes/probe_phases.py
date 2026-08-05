@@ -559,6 +559,41 @@ def _reflect_contract(raw_v):
                 return {"q": "ok", "storage": "None", "raw": None, "display": s, "norm": s}
     except:
         pass
+    try:
+        ids = []
+        saw_item = False
+        for item in raw_v:
+            saw_item = True
+            if not hasattr(item, "IntegerValue"):
+                raise TypeError("non-ElementId item in collection")
+            ids.append(int(item.IntegerValue))
+        if not saw_item:
+            # An empty collection is vacuously "every item has .IntegerValue"
+            # -- there's nothing to fail the check against, so item-by-item
+            # duck-typing alone can never tell an empty ElementId collection
+            # (GetMonitoredLinkElementIds returning [] because a type has no
+            # monitored links) apart from an empty collection of anything
+            # else (GetEntitySchemaGuids -> IList<Guid>, GetSubelements ->
+            # IList<Subelement>, both returning [] because that instance
+            # happens to have zero). A CLR generic-type reflection check
+            # (raw_v.GetType().GetGenericArguments()) was tried here and
+            # found not to reliably discriminate types against a live
+            # Revit/pythonnet session (still produced the same false
+            # positives), so it was dropped rather than kept as an
+            # unreliable safety net. Per this project's fail-soft principle
+            # (never silently collapse distinct states), an empty collection
+            # of unconfirmed item type gets its own explicit q value instead
+            # of defaulting to "ok" (would reintroduce this exact bug) or
+            # bare "unsupported" (would make it indistinguishable from a
+            # totally opaque complex-object failure). storage stays "None"
+            # (not "ElementIdList") so find_crosswalk_candidates.py's
+            # _is_elementid_typed() correctly does not treat this as a
+            # reference candidate.
+            return {"q": "unsupported.empty_type_unconfirmed", "storage": "None", "raw": [], "display": "", "norm": ()}
+        disp = ",".join(str(i) for i in ids)
+        return {"q": "ok", "storage": "ElementIdList", "raw": ids, "display": disp, "norm": tuple(ids)}
+    except:
+        pass
     return {"q": "unsupported", "storage": "None", "raw": None, "display": None, "norm": None}
 
 def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200):

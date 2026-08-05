@@ -85,7 +85,10 @@ def _read_csv_rows(path):
 
 def _is_elementid_typed(row):
     if row.get("key_kind") == "reflection":
-        return row.get("example_storage") == "ElementId"
+        # "ElementIdList" is a list of ElementIds (see _reflect_contract's
+        # ElementId-collection branch) -- still a reference to something
+        # else in the document, same as the bare "ElementId" scalar case.
+        return row.get("example_storage") in ("ElementId", "ElementIdList")
     return "ElementId" in (row.get("storage_types") or "")
 
 
