@@ -575,11 +575,11 @@ def _reflect_member_names(obj):
     return sorted(uniq, key=lambda x: x[1])
 
 # Step 0 verification (docs/probe_method_invocation_candidates_verification.md,
-# docs/method_invocation_candidates_annotated.csv): these 33 method names (34
+# docs/method_invocation_candidates_annotated.csv): these 32 method names (33
 # (declaring_class, method) pairs from the Step 0 CSV -- confirmed ground-truth
 # zero-arg/instance/non-mutating, minus Element.GetValidTypes/Subelement.
-# GetValidTypes, removed post-merge -- see the note below the dict) are
-# ground-truth confirmed, against the live
+# GetValidTypes and LinePatternElement.GetLinePattern, removed post-merge --
+# see the notes below the dict) are ground-truth confirmed, against the live
 # RevitAPI 2025 documentation (not name/return-type inference), to be
 # zero-arg, instance, non-mutating getters. Declared here as data, separate
 # from the branching logic in _reflect_try_get below, so it can be reviewed
@@ -616,7 +616,6 @@ _ALLOWLISTED_REFLECTION_METHODS = {
     "GetStructuralSection": "FamilySymbol",
     "GetThermalProperties": "FamilySymbol",
     "GetFillPattern": "FillPatternElement",
-    "GetLinePattern": "LinePatternElement",
     "GetCategories": "ParameterFilterElement",
     "GetElementFilter": "ParameterFilterElement",
     "GetReference": "Subelement",
@@ -656,6 +655,21 @@ _ALLOWLISTED_REFLECTION_METHODS = {
 # in this codebase reflects a raw Subelement object as its own type_label),
 # but shares the same allowlist name and the same removal; re-evaluate
 # independently against a live Subelement instance before re-adding either.
+
+# LinePatternElement.GetLinePattern was removed from the allowlist above
+# after a live re-run (PR #398's exception-capture work, which surfaced the
+# error text for the first time) showed it fails 100% of the time -- not
+# with a documented Revit API exception (unlike GetCalloutParentId/
+# GetExternalFileReference/GetModelToProjectionTransforms above, which each
+# match a real InvalidOperationException precondition stated on their own
+# RevitAPI doc pages), but with the same CLR/pythonnet interop binding
+# failure family as Element.GetValidTypes above: `TypeError: No method
+# matches given arguments for GetLinePattern: (<class
+# 'Autodesk.Revit.DB.LinePatternElement'>)`. The call is rejected by the
+# binder before it ever reaches Revit's implementation, so it cannot
+# succeed through `getattr(obj, name)()` regardless of model, Revit
+# version, or which element is sampled -- keeping it allowlisted only adds
+# permanent error noise for zero chance of real data.
 
 _METHOD_NOT_INVOKED_SENTINEL = object()  # unique marker object, not a string --
 # see the identity check in _reflect_contract below for why this must never be
