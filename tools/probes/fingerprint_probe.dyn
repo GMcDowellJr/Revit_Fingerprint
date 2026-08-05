@@ -110,7 +110,7 @@
       "Replication": "Disabled",
       "Description": "Allows you to select a directory on the system and returns its path",
       "HintPath": "C:\\Users\\gmcdowell\\Documents\\Revit_Fingerprint\\tools\\probes\\Exports",
-      "InputValue": "C:\\Users\\gmcdowell\\Documents\\Revit_Fingerprint\\tools\\probes\\Exports"
+      "InputValue": "C:\\Users\\gmcdowell\\OneDrive - Stantec\\Documents\\Fingerprint_Data\\probe_export"
     },
     {
       "ConcreteType": "CoreNodeModels.Input.Directory, CoreNodeModels",
@@ -385,8 +385,8 @@
       }
     ],
     "Annotations": [],
-    "X": 446.9435339347492,
-    "Y": 274.2898131632227,
-    "Zoom": 0.6238199136949366
+    "X": 364.00219535295355,
+    "Y": 186.9940595917487,
+    "Zoom": 0.30369453614697045
   }
 }

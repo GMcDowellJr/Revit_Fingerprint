@@ -693,13 +693,17 @@ _ALLOWLISTED_REFLECTION_METHODS = {
 # but shares the same allowlist name and the same removal; re-evaluate
 # independently against a live Subelement instance before re-adding either.
 
+_METHOD_NOT_INVOKED_SENTINEL = object()  # unique marker object, not a string --
+# see the identity check in _reflect_contract below for why this must never be
+# comparable-by-value to a real Revit return.
+
 def _reflect_try_get(obj, member_kind, name):
     if member_kind == "method":
         if name not in _ALLOWLISTED_REFLECTION_METHODS:
             # SAFETY: never invoke a reflection-discovered method that is not
             # on the allowlist above (see module-level design rationale in
             # every other probe_*.py).
-            return (True, "<method not invoked>", None)
+            return (True, _METHOD_NOT_INVOKED_SENTINEL, None)
         try:
             v = getattr(obj, name)()
         except Exception as ex:
@@ -715,6 +719,16 @@ def _reflect_try_get(obj, member_kind, name):
 def _reflect_contract(raw_v):
     if raw_v is None:
         return {"q": "missing", "storage": "None", "raw": None, "display": None, "norm": None}
+    if raw_v is _METHOD_NOT_INVOKED_SENTINEL:
+        # Identity check ("is"), not equality -- _METHOD_NOT_INVOKED_SENTINEL is a
+        # unique object(), never a string, specifically so a genuine reflected
+        # property or allowlisted-method return whose real value happens to be
+        # the literal text "<method not invoked>" cannot collide with this
+        # placeholder and get misclassified/dropped (flagged in PR #398 review:
+        # an earlier version of this check compared by value against a string
+        # constant, which had exactly that collision risk). Checked before
+        # isinstance(raw_v, str) specifically so it never reaches that branch.
+        return {"q": "not_invoked", "storage": "None", "raw": None, "display": None, "norm": None}
     if isinstance(raw_v, bool):
         return {"q": "ok", "storage": "Integer", "raw": int(raw_v), "display": str(raw_v), "norm": int(raw_v)}
     if isinstance(raw_v, int):
@@ -785,12 +799,14 @@ def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200)
             if key not in idx:
                 idx[key] = {
                     "domain": domain_name, "member_key": key, "member_kind": member_kind,
-                    "type_label": type_label, "example": None,
+                    "type_label": type_label, "example": None, "example_error": None,
                     "ok_count": 0, "error_count": 0, "unique_value_count": 0, "_seen": set(),
                 }
             e = idx[key]
             if not ok:
                 e["error_count"] += 1
+                if e["example_error"] is None and err:
+                    e["example_error"] = err
                 continue
             contract = _reflect_contract(raw_v)
             e["ok_count"] += 1
@@ -805,7 +821,7 @@ def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200)
         e = idx[key]
         records.append({
             "domain": e["domain"], "member_key": e["member_key"], "member_kind": e["member_kind"],
-            "type_label": e["type_label"], "example": e["example"],
+            "type_label": e["type_label"], "example": e["example"], "example_error": e["example_error"],
             "observed": {"ok_count": e["ok_count"], "error_count": e["error_count"], "unique_value_count": e["unique_value_count"]},
         })
     return records
