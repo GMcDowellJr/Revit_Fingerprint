@@ -677,14 +677,105 @@ def _reflect_member_names(obj):
         uniq.append((kind, n))
     return sorted(uniq, key=lambda x: x[1])
 
+# Step 0 verification (docs/probe_method_invocation_candidates_verification.md,
+# docs/method_invocation_candidates_annotated.csv): these 33 method names (34
+# (declaring_class, method) pairs from the Step 0 CSV -- confirmed ground-truth
+# zero-arg/instance/non-mutating, minus Element.GetValidTypes/Subelement.
+# GetValidTypes, removed post-merge -- see the note below the dict) are
+# ground-truth confirmed, against the live
+# RevitAPI 2025 documentation (not name/return-type inference), to be
+# zero-arg, instance, non-mutating getters. Declared here as data, separate
+# from the branching logic in _reflect_try_get below, so it can be reviewed
+# as one block and extended later without touching control flow.
+#
+# Keyed by method NAME only, not (declaring_class, name): this reflection
+# sweep is invoked per concrete probed type_label (e.g. "WallType",
+# "ProjectInformation", "FamilySymbol"), which is almost never the literal
+# Revit API class that actually declares the member -- e.g. Element.GetTypeId
+# is reached in this codebase via more than a dozen different concrete
+# type_labels across the probe domains, never via type_label=="Element"
+# itself, since no probe in this file reflects a bare Element instance.
+# Scoping the allowlist by declaring-class name would silently fail to match
+# nearly every real call site and defeat the point of this allowlist.
+# _reflect_member_names() below already restricts candidate methods to
+# public, non-special-name, zero-parameter methods before this allowlist is
+# ever consulted, so a name-only match here does not weaken the zero-arg/
+# no-side-effect intent the allowlist exists to enforce -- it only widens
+# which already-zero-arg, already-name-matched members get invoked. The
+# dict value (declaring class) is kept for traceability back to the Step 0
+# CSV only; it is not used in the match.
+_ALLOWLISTED_REFLECTION_METHODS = {
+    "GetTypeId": "Element",
+    "GetLayers": "CompoundStructure",
+    "GetEntitySchemaGuids": "Element",
+    "GetSubelements": "Element",
+    "GetFamilyPointLocations": "FamilySymbol",
+    "GetModelToProjectionTransforms": "View",
+    "GetRenderingAsset": "AppearanceAssetElement",
+    "GetExternalFileReference": "Element",
+    "GetMonitoredLinkElementIds": "Element",
+    "GetMonitoredLocalElementIds": "Element",
+    "GetSimilarTypes": "ElementType",
+    "GetStructuralSection": "FamilySymbol",
+    "GetThermalProperties": "FamilySymbol",
+    "GetFillPattern": "FillPatternElement",
+    "GetLinePattern": "LinePatternElement",
+    "GetCategories": "ParameterFilterElement",
+    "GetElementFilter": "ParameterFilterElement",
+    "GetReference": "Subelement",
+    "GetBackground": "View",
+    "GetCalloutParentId": "View",
+    "GetCropRegionShapeManager": "View",
+    "GetDepthCueing": "View",
+    "GetDirectContext3DHandleOverrides": "View",
+    "GetFilters": "View",
+    "GetOrderedFilters": "View",
+    "GetPointCloudOverrides": "View",
+    "GetPrimaryViewId": "View",
+    "GetReferenceCallouts": "View",
+    "GetReferenceElevations": "View",
+    "GetReferenceSections": "View",
+    "GetSketchyLines": "View",
+    "GetTemporaryViewPropertiesId": "View",
+    "GetViewDisplayModel": "View",
+}
+
+# Element.GetValidTypes / Subelement.GetValidTypes were removed from the
+# allowlist above after a live re-run (PR #395 discussion) showed
+# Element.GetValidTypes fails 100% of the time -- not with a documented
+# Revit API exception (unlike GetCalloutParentId/GetExternalFileReference/
+# GetModelToProjectionTransforms above, which each match a real
+# InvalidOperationException precondition stated on their own RevitAPI doc
+# pages), but with a CLR/pythonnet interop binding failure:
+# `TypeError: No method matches given arguments for GetValidTypes: (<class
+# '...'>)`, confirmed via a standalone diagnostic against live ElementType/
+# WallType/View objects. .NET reflection sees exactly one GetValidTypes
+# overload (declaring type Autodesk.Revit.DB.Element) -- so this isn't an
+# overload-ambiguity problem either -- the call is rejected by the binder
+# before it ever reaches Revit's implementation. This will never succeed
+# through `getattr(obj, name)()` regardless of model/version, so keeping it
+# allowlisted only adds permanent error noise with zero chance of a real
+# value. Subelement.GetValidTypes was never independently tested (no probe
+# in this codebase reflects a raw Subelement object as its own type_label),
+# but shares the same allowlist name and the same removal; re-evaluate
+# independently against a live Subelement instance before re-adding either.
+
 def _reflect_try_get(obj, member_kind, name):
     if member_kind == "method":
-        # SAFETY: never invoke a reflection-discovered method. Revit API
-        # methods can have side effects (printing, export, regenerate,
-        # delete, transaction commits, ...) and there is no reliable way to
-        # tell a safe zero-arg query method from a side-effecting one by
-        # name alone. Record that the method exists without calling it.
-        return (True, "<method not invoked>", None)
+        if name not in _ALLOWLISTED_REFLECTION_METHODS:
+            # SAFETY: never invoke a reflection-discovered method that is not
+            # on the allowlist above. Revit API methods can have side effects
+            # (printing, export, regenerate, delete, transaction commits,
+            # ...) and there is no reliable way to tell a safe zero-arg
+            # query method from a side-effecting one by name alone for
+            # anything outside the allowlist's ground-truth-verified set.
+            # Record that the method exists without calling it.
+            return (True, "<method not invoked>", None)
+        try:
+            v = getattr(obj, name)()
+        except Exception as ex:
+            return (False, None, "{}: {}".format(type(ex).__name__, ex))
+        return (True, v, None)
     try:
         v = getattr(obj, name)
     except Exception as ex:
