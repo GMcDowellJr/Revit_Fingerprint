@@ -645,40 +645,6 @@ def _reflect_try_get(obj, member_kind, name):
         return (False, None, "{}: {}".format(type(ex).__name__, ex))
     return (True, v, None)
 
-def _reflect_collection_is_elementid_typed(raw_v):
-    # Best-effort check of the collection's declared/generic item type (not
-    # its contents) via CLR reflection -- the only way to confirm an EMPTY
-    # collection actually holds ElementIds, since there are no items to
-    # duck-type against. Checks the object's own generic type arguments
-    # (e.g. List<ElementId>) and any implemented generic interface (e.g. a
-    # concrete type implementing IList<ElementId> without itself being
-    # generic). Returns False (not "unknown") on any reflection failure --
-    # this function only ever widens confidence, never narrows it.
-    try:
-        t = raw_v.GetType()
-    except:
-        return False
-    type_candidates = []
-    try:
-        if t.IsGenericType:
-            type_candidates.append(t)
-    except:
-        pass
-    try:
-        for iface in t.GetInterfaces():
-            if getattr(iface, "IsGenericType", False):
-                type_candidates.append(iface)
-    except:
-        pass
-    for tc in type_candidates:
-        try:
-            for arg in tc.GetGenericArguments():
-                if getattr(arg, "FullName", None) == "Autodesk.Revit.DB.ElementId":
-                    return True
-        except:
-            continue
-    return False
-
 def _reflect_contract(raw_v):
     if raw_v is None:
         return {"q": "missing", "storage": "None", "raw": None, "display": None, "norm": None}
@@ -711,13 +677,29 @@ def _reflect_contract(raw_v):
             if not hasattr(item, "IntegerValue"):
                 raise TypeError("non-ElementId item in collection")
             ids.append(int(item.IntegerValue))
-        if not saw_item and not _reflect_collection_is_elementid_typed(raw_v):
-            # Empty collection whose item type we can't confirm is ElementId
-            # (e.g. Element.GetEntitySchemaGuids() -> IList<Guid> with 0
-            # schemas attached) -- iterating an empty collection never runs
-            # the per-item .IntegerValue check above, so an unconfirmed
-            # empty collection must not be classified as an ElementId list.
-            raise TypeError("empty collection of unconfirmed item type")
+        if not saw_item:
+            # An empty collection is vacuously "every item has .IntegerValue"
+            # -- there's nothing to fail the check against, so item-by-item
+            # duck-typing alone can never tell an empty ElementId collection
+            # (GetMonitoredLinkElementIds returning [] because a type has no
+            # monitored links) apart from an empty collection of anything
+            # else (GetEntitySchemaGuids -> IList<Guid>, GetSubelements ->
+            # IList<Subelement>, both returning [] because that instance
+            # happens to have zero). A CLR generic-type reflection check
+            # (raw_v.GetType().GetGenericArguments()) was tried here and
+            # found not to reliably discriminate types against a live
+            # Revit/pythonnet session (still produced the same false
+            # positives), so it was dropped rather than kept as an
+            # unreliable safety net. Per this project's fail-soft principle
+            # (never silently collapse distinct states), an empty collection
+            # of unconfirmed item type gets its own explicit q value instead
+            # of defaulting to "ok" (would reintroduce this exact bug) or
+            # bare "unsupported" (would make it indistinguishable from a
+            # totally opaque complex-object failure). storage stays "None"
+            # (not "ElementIdList") so find_crosswalk_candidates.py's
+            # _is_elementid_typed() correctly does not treat this as a
+            # reference candidate.
+            return {"q": "unsupported.empty_type_unconfirmed", "storage": "None", "raw": [], "display": "", "norm": ()}
         disp = ",".join(str(i) for i in ids)
         return {"q": "ok", "storage": "ElementIdList", "raw": ids, "display": disp, "norm": tuple(ids)}
     except:
