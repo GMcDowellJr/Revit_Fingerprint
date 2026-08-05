@@ -4668,18 +4668,18 @@ Domains with nonzero `crosswalk records` above have a per-column resolution prof
 - **key** — `project_info.p._Important_Dates`
   - storage_types — `String`
   - q_counts — `missing=0;ok=1;unreadable=0;unsupported=0`
-  - example — q=`ok` storage=`String` raw=`YYYY.MM.DD, Issued for SD
-YYYY.MM.DD, Issued for DD
-YYYY.MM.DD, Issued for 60% CD
-YYYY.MM.DD, Issued for 90% CD
-YYYY.MM.DD, Issued for Construction/Tender` display=`YYYY.MM.DD, Issued for SD
-YYYY.MM.DD, Issued for DD
-YYYY.MM.DD, Issued for 60% CD
-YYYY.MM.DD, Issued for 90% CD
-YYYY.MM.DD, Issued for Construction/Tender` norm=`YYYY.MM.DD, Issued for SD
-YYYY.MM.DD, Issued for DD
-YYYY.MM.DD, Issued for 60% CD
-YYYY.MM.DD, Issued for 90% CD
+  - example — q=`ok` storage=`String` raw=`YYYY.MM.DD, Issued for SD
+YYYY.MM.DD, Issued for DD
+YYYY.MM.DD, Issued for 60% CD
+YYYY.MM.DD, Issued for 90% CD
+YYYY.MM.DD, Issued for Construction/Tender` display=`YYYY.MM.DD, Issued for SD
+YYYY.MM.DD, Issued for DD
+YYYY.MM.DD, Issued for 60% CD
+YYYY.MM.DD, Issued for 90% CD
+YYYY.MM.DD, Issued for Construction/Tender` norm=`YYYY.MM.DD, Issued for SD
+YYYY.MM.DD, Issued for DD
+YYYY.MM.DD, Issued for 60% CD
+YYYY.MM.DD, Issued for 90% CD
 YYYY.MM.DD, Issued for Construction/Tender`
   - revit_versions_seen — `2025`
   - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
@@ -4687,9 +4687,9 @@ YYYY.MM.DD, Issued for Construction/Tender`
 - **key** — `project_info.p._Linked_Model_Managers`
   - storage_types — `String`
   - q_counts — `missing=0;ok=1;unreadable=0;unsupported=0`
-  - example — q=`ok` storage=`String` raw=`First Last, Phone, Timezone
-First Last, Phone, Timezone` display=`First Last, Phone, Timezone
-First Last, Phone, Timezone` norm=`First Last, Phone, Timezone
+  - example — q=`ok` storage=`String` raw=`First Last, Phone, Timezone
+First Last, Phone, Timezone` display=`First Last, Phone, Timezone
+First Last, Phone, Timezone` norm=`First Last, Phone, Timezone
 First Last, Phone, Timezone`
   - revit_versions_seen — `2025`
   - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
@@ -4718,9 +4718,9 @@ First Last, Phone, Timezone`
 - **key** — `project_info.p._Team_Members`
   - storage_types — `String`
   - q_counts — `missing=0;ok=1;unreadable=0;unsupported=0`
-  - example — q=`ok` storage=`String` raw=`First Last, Phone, Timezone
-First Last, Phone, Timezone` display=`First Last, Phone, Timezone
-First Last, Phone, Timezone` norm=`First Last, Phone, Timezone
+  - example — q=`ok` storage=`String` raw=`First Last, Phone, Timezone
+First Last, Phone, Timezone` display=`First Last, Phone, Timezone
+First Last, Phone, Timezone` norm=`First Last, Phone, Timezone
 First Last, Phone, Timezone`
   - revit_versions_seen — `2025`
   - seen — 1 run(s), 2026-08-04T17:42:36.355728–2026-08-04T17:42:36.355728
