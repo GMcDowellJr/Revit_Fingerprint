@@ -703,6 +703,16 @@ def _reflect_contract(raw_v):
                 return {"q": "ok", "storage": "None", "raw": None, "display": s, "norm": s}
     except:
         pass
+    try:
+        ids = []
+        for item in raw_v:
+            if not hasattr(item, "IntegerValue"):
+                raise TypeError("non-ElementId item in collection")
+            ids.append(int(item.IntegerValue))
+        disp = ",".join(str(i) for i in ids)
+        return {"q": "ok", "storage": "ElementIdList", "raw": ids, "display": disp, "norm": tuple(ids)}
+    except:
+        pass
     return {"q": "unsupported", "storage": "None", "raw": None, "display": None, "norm": None}
 
 def _run_reflection_sweep(sample_objs, type_label, domain_name, max_members=200):
