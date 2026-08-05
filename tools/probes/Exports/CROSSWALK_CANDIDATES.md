@@ -14,11 +14,11 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 | `DemolishedPhaseId` | 19 | `-1` |
 | `OwnerViewId` | 16 | `-1` |
 | `GetSimilarTypes` | 8 | `2584,16144,16262,16287,16290,16295,16298,16301,16304,16310,1367006,3521007,10564675,10564682,10564687,10564698,10564701,10564710,10564715,10564888,10586723,10586728,10586733,10586744,10586748,10586750,10592747,10592773,10592780,10592783,10592788,10592789,10592795,10599177,10599189,10599196,10599207,10605268,10605287,10664954,10664959,10664962,10664973,10664976,10665083,10669503,10669569,10669580,10673814,10673817,10787620,11067539,11067542,11068630,11068633,12055941,12055960,12057331,12057754,12058080,12080493,12080506,12081857,12087538,12087541,12087544,12087551,12087552,12089862,12091898,12093395,12095260,12097708,12099932,12100644,12101821,12102497,12103653,12104545,12107496,12113032,12113039,12113048,12122721,12122724,12122757,12124501,12125556,12131726,12136161,12147430,12148197,12148782,12164494,12204328,12204331,12212283,12214257,12226110,12233158,12234864,12234865,12235644,12236407,12236995,12237000,12239177,12241654,12241658,12261693,12266761,12267119,12268860` |
-| `Coarse Scale Fill Pattern` | 4 | `` |
 | `DeckProfileId` | 4 | `-1` |
 | `Type Image` | 4 | `` |
 | `AnalysisDisplayStyleId` | 3 | `-1` |
 | `AssociatedAssemblyInstanceId` | 3 | `-1` |
+| `Coarse Scale Fill Pattern` | 3 | `` |
 | `CutBackgroundPatternId` | 3 | `-1` |
 | `CutForegroundPatternId` | 3 | `-1` |
 | `GetTemporaryViewPropertiesId` | 3 | `-1` |
@@ -37,9 +37,6 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 | `Guide Grid` | 2 | `` |
 | `HeaderTextTypeId` | 2 | `4279` |
 | `Interior Type` | 2 | `` |
-| `Leader Arrowhead` | 2 | `Dot Filled-Small` |
-| `None` | 2 | `` |
-| `Phase Filter` | 2 | `Show Previous + New` |
 | `ProjectionLinePatternId` | 2 | `-1` |
 | `Range: Base Level` | 2 | `` |
 | `Range: Top Level` | 2 | `` |
@@ -49,29 +46,24 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 | `SheetCollectionId` | 2 | `-1` |
 | `TitleTextTypeId` | 2 | `2628` |
 | `WorksetId` | 2 | `54` |
-| `Associated Datum` | 1 | `` |
+| `Bottom Level` | 1 | `` |
 | `Centerline Pattern` | 1 | `-3000010` |
-| `Centerline Symbol` | 1 | `ANG-Centerline` |
 | `Centerline Tick Mark` | 1 | `-2` |
 | `cut_bg_pattern_id` | 1 | `` |
-| `cut_fg_pattern_id` | 1 | `` |
 | `cut_line_pattern` | 1 | `` |
 | `ElementId` | 1 | `-1012106` |
 | `GetPrimaryViewId` | 1 | `-1` |
 | `Image` | 1 | `` |
-| `Interior Tick Mark` | 1 | `Diagonal-Medium` |
 | `Leader Tick Mark` | 1 | `` |
 | `line_pattern_cut` | 1 | `` |
 | `line_pattern_projection` | 1 | `` |
-| `Phase` | 1 | `New Construction` |
-| `proj_line_pattern_id` | 1 | `` |
+| `None` | 1 | `` |
+| `proj_line_pattern_id` | 1 | `-3000010` |
 | `projection_line_pattern` | 1 | `` |
 | `SortingParameterId` | 1 | `-1005112` |
 | `StructuralMaterialId` | 1 | `-1` |
-| `surf_bg_pattern_id` | 1 | `` |
 | `surf_fg_pattern_id` | 1 | `` |
-| `Symbol` | 1 | `Sym - Spot Coordinate - 0000` |
-| `Tick Mark` | 1 | `22 Degree Filled Arrow-Medium` |
+| `Top Level` | 1 | `` |
 | `Witness Line Tick Mark` | 1 | `` |
 
 ## `AssemblyInstanceId` (20 domain(s))
@@ -247,13 +239,6 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 - `text_types` -- `refl.TextNoteType.GetSimilarTypes` = `1643,2622,2628,4279,27881,27885,27889,27893,27897,27909,27913,27921,27925,27929,27933,27937,27941,1785590,1873576,1933767,1933908,2230844,4130016,4130035,4130052,4314732,4371782,5028949,5092254,5092260,6172287,6172364,6324517,7923506,7926492,10564774,10564781,10586700,10586785,10586793,10592909,10599294,10605242,10605264,10665010,10665057,10665077,10669502,10669573,11059095,11059099,11059103,11059112,11059116,11059130,11059144,11059152,11068638,12058438,12076497,12076501,12080313,12080317,12081552,12083953,12087483,12087487,12088625,12088633,12089046,12089619,12089865,12104157,12107492,12109828,12126793,12128803,12131720,12135353,12148110,12157038,12159851,12170239,12173902,12178613,12202001,12202009,12202370,12204344,12205088,12212278,12218988,12226102,12226106,12226788,12232744,12235649,12245285,12257619,12266762,12267517`
 - `wall_types` -- `refl.WallType.GetSimilarTypes` = `82254,82255,82256,82258,82259,82260,82416,502018,526686,614478,968066,1315886,1366916,1512949,2381959,2382029,2995243,3103206,4315288,4652516,4652519,4652521,4652523,4896171,5172272,5172274,6301226,6355039,6355058,6577082,6588328,6588591,8534857,8812979,9388627,9388662,9484831,9641766,9691931,9699607,10142173,10396891,10396898,10422240,10670086,10670092,11059109,11794636,11803125,11880780,11979412`
 
-## `Coarse Scale Fill Pattern` (4 domain(s))
-
-- `ceiling_types` -- `p.Coarse Scale Fill Pattern` = ``
-- `floor_types` -- `p.Coarse Scale Fill Pattern` = ``
-- `roof_types` -- `p.Coarse Scale Fill Pattern` = ``
-- `wall_types` -- `p.Coarse Scale Fill Pattern` = `<Solid fill>`
-
 ## `DeckProfileId` (4 domain(s))
 
 - `ceiling_types` -- `refl.CompoundStructureLayer.DeckProfileId` = `-1`
@@ -279,6 +264,12 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 - `phase_graphics` -- `refl.View.AssociatedAssemblyInstanceId` = `-1`
 - `view_templates` -- `refl.View.AssociatedAssemblyInstanceId` = `-1`
 - `views` -- `refl.View.AssociatedAssemblyInstanceId` = `-1`
+
+## `Coarse Scale Fill Pattern` (3 domain(s))
+
+- `ceiling_types` -- `p.Coarse Scale Fill Pattern` = ``
+- `floor_types` -- `p.Coarse Scale Fill Pattern` = ``
+- `roof_types` -- `p.Coarse Scale Fill Pattern` = ``
 
 ## `CutBackgroundPatternId` (3 domain(s))
 
@@ -324,17 +315,17 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 ## `Border 1 Type` (2 domain(s))
 
 - `roof_types` -- `p.Border 1 Type` = ``
-- `wall_types` -- `p.Border 1 Type` = ``
+- `wall_types` -- `p.Border 1 Type` = `402475`
 
 ## `Border 2 Type` (2 domain(s))
 
 - `roof_types` -- `p.Border 2 Type` = ``
-- `wall_types` -- `p.Border 2 Type` = ``
+- `wall_types` -- `p.Border 2 Type` = `402475`
 
 ## `Curtain Panel` (2 domain(s))
 
 - `roof_types` -- `p.Curtain Panel` = ``
-- `wall_types` -- `p.Curtain Panel` = ``
+- `wall_types` -- `p.Curtain Panel` = `82230`
 
 ## `CutLinePatternId` (2 domain(s))
 
@@ -375,22 +366,7 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 ## `Interior Type` (2 domain(s))
 
 - `roof_types` -- `p.Interior Type` = ``
-- `wall_types` -- `p.Interior Type` = ``
-
-## `Leader Arrowhead` (2 domain(s))
-
-- `dimension_types` -- `p.Leader Arrowhead` = `Dot Filled-Small`
-- `text_types` -- `p.Leader Arrowhead` = `22 Degree Filled Arrow-Medium`
-
-## `None` (2 domain(s))
-
-- `phase_graphics` -- `p.None` = ``
-- `views` -- `param.None` = `SEA LEVEL`
-
-## `Phase Filter` (2 domain(s))
-
-- `view_templates` -- `p.Phase Filter` = `Show Previous + New`
-- `views` -- `param.Phase Filter` = `Show All`
+- `wall_types` -- `p.Interior Type` = `402475`
 
 ## `ProjectionLinePatternId` (2 domain(s))
 
@@ -437,17 +413,13 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 - `browser_organization` -- `refl.BrowserOrganization.WorksetId` = `54`
 - `fill_patterns` -- `refl.FillPatternElement.WorksetId` = `7`
 
-## `Associated Datum` (1 domain(s))
+## `Bottom Level` (1 domain(s))
 
-- `views` -- `param.Associated Datum` = ``
+- `views` -- `param.Bottom Level` = ``
 
 ## `Centerline Pattern` (1 domain(s))
 
 - `dimension_types` -- `p.Centerline Pattern` = `-3000010`
-
-## `Centerline Symbol` (1 domain(s))
-
-- `dimension_types` -- `p.Centerline Symbol` = `ANG-Centerline`
 
 ## `Centerline Tick Mark` (1 domain(s))
 
@@ -456,10 +428,6 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 ## `cut_bg_pattern_id` (1 domain(s))
 
 - `view_filter_applications` -- `vfa.ogs.cut_bg_pattern_id` = ``
-
-## `cut_fg_pattern_id` (1 domain(s))
-
-- `view_filter_applications` -- `vfa.ogs.cut_fg_pattern_id` = ``
 
 ## `cut_line_pattern` (1 domain(s))
 
@@ -477,10 +445,6 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 - `materials` -- `p.Image` = ``
 
-## `Interior Tick Mark` (1 domain(s))
-
-- `dimension_types` -- `p.Interior Tick Mark` = `Diagonal-Medium`
-
 ## `Leader Tick Mark` (1 domain(s))
 
 - `dimension_types` -- `p.Leader Tick Mark` = ``
@@ -493,13 +457,13 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 - `object_styles` -- `c.line_pattern_projection` = ``
 
-## `Phase` (1 domain(s))
+## `None` (1 domain(s))
 
-- `views` -- `param.Phase` = `New Construction`
+- `phase_graphics` -- `p.None` = ``
 
 ## `proj_line_pattern_id` (1 domain(s))
 
-- `view_filter_applications` -- `vfa.ogs.proj_line_pattern_id` = ``
+- `view_filter_applications` -- `vfa.ogs.proj_line_pattern_id` = `-3000010`
 
 ## `projection_line_pattern` (1 domain(s))
 
@@ -513,21 +477,13 @@ Each entry below is an `ElementId`-typed inventory/reflection member -- a refere
 
 - `floor_types` -- `refl.FloorType.StructuralMaterialId` = `-1`
 
-## `surf_bg_pattern_id` (1 domain(s))
-
-- `view_filter_applications` -- `vfa.ogs.surf_bg_pattern_id` = ``
-
 ## `surf_fg_pattern_id` (1 domain(s))
 
 - `view_filter_applications` -- `vfa.ogs.surf_fg_pattern_id` = ``
 
-## `Symbol` (1 domain(s))
+## `Top Level` (1 domain(s))
 
-- `dimension_types` -- `p.Symbol` = `Sym - Spot Coordinate - 0000`
-
-## `Tick Mark` (1 domain(s))
-
-- `dimension_types` -- `p.Tick Mark` = `22 Degree Filled Arrow-Medium`
+- `views` -- `param.Top Level` = ``
 
 ## `Witness Line Tick Mark` (1 domain(s))
 

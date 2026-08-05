@@ -116,6 +116,42 @@ def _already_resolved(domain, member_norm, resolved_index):
     return False
 
 
+def _is_int_like(s):
+    if s is None:
+        return False
+    s = s.strip()
+    if not s:
+        return False
+    if s[0] in "+-":
+        s = s[1:]
+    return s.isdigit()
+
+
+def _already_resolved_via_param_display(row):
+    """Real Parameters with ElementId storage get their display value
+    auto-resolved by Revit's own Parameter.AsValueString() (e.g. a Leader
+    Arrowhead parameter's raw value 16298 displays as 'Dot Filled-Small').
+    That's a genuine resolution already, not a gap -- flagging it as an
+    unresolved crosswalk candidate is a false positive. This only applies
+    to key_kind == "param" rows: refl.* reflection members never get this
+    auto-resolution (display always equals raw there), so a member is only
+    treated as already-resolved here when display is present, differs from
+    the raw value, AND isn't itself just another bare number (guards
+    against coincidental raw-vs-display numeric mismatches that aren't a
+    real name resolution)."""
+    if row.get("key_kind") != "param":
+        return False
+    display = row.get("example_display")
+    raw = row.get("example_raw")
+    if not display:
+        return False
+    if display == raw:
+        return False
+    if _is_int_like(display):
+        return False
+    return True
+
+
 def find_candidates(inventory_rows, crosswalk_rows):
     """Returns (candidates, resolved_index) where candidates is a list of dicts:
     {member, member_norm, domain, key_kind, key, example_display, run_count}."""
@@ -131,6 +167,8 @@ def find_candidates(inventory_rows, crosswalk_rows):
             continue
         domain = row.get("domain")
         if _already_resolved(domain, member_norm, resolved_index):
+            continue
+        if _already_resolved_via_param_display(row):
             continue
         candidates.append({
             "member": member,
