@@ -55,7 +55,7 @@ clr.AddReference("RevitAPI")
 from Autodesk.Revit.DB import (
     FilteredElementCollector, ElementId, StorageType,
     BuiltInParameter, View, OverrideGraphicSettings,
-    ParameterFilterElement, Color
+    ParameterFilterElement, Color, Category
 )
 
 doc = DocumentManager.Instance.CurrentDBDocument
@@ -639,6 +639,19 @@ if enable_crosswalk:
             row["ogs.sig_hash"] = sig_hash
             row["ogs.has_any_override"] = True if sig_hash is not None else False
 
+            for src_attr, pfx in (
+                ("CutBackgroundPatternId", "cut_background_pattern"),
+                ("CutForegroundPatternId", "cut_foreground_pattern"),
+                ("SurfaceBackgroundPatternId", "surface_background_pattern"),
+                ("SurfaceForegroundPatternId", "surface_foreground_pattern"),
+            ):
+                pid = _safe(lambda src_attr=src_attr: getattr(ogs, src_attr), None) if ogs is not None else None
+                pid_int = _eid_int(pid) if pid is not None else None
+                pe = _safe(lambda pid=pid: doc.GetElement(pid), None) if pid_int is not None else None
+                row[pfx + ".id"] = pid_int
+                row[pfx + ".name"] = _safe(lambda pe=pe: pe.Name, None) if pe is not None else None
+                row[pfx + ".resolved"] = row[pfx + ".name"] is not None
+
             # Category sampling if it is a ParameterFilterElement
             if isinstance(fe, ParameterFilterElement):
                 row["pfe.is_parameter_filter_element"] = True
@@ -649,17 +662,30 @@ if enable_crosswalk:
                     pass
                 row["pfe.category_count"] = len(cats)
 
+                # GetCategories() returns Category ids (BuiltInCategory-backed,
+                # e.g. -2001100), NOT ordinary element ids -- doc.GetElement()
+                # does not reliably resolve those (returns None). Category.
+                # GetCategory(doc, id) is the correct resolution, same helper
+                # already used correctly in probe_view_filter_definitions.py's
+                # _resolve_category_name().
+                cat_ids_int = []
                 names = []
                 for cid in cats:
-                    ce = _safe(lambda: doc.GetElement(cid), None)
-                    cn = _safe(lambda: ce.Name, None) if ce is not None else None
+                    cid_int = _safe(lambda cid=cid: cid.IntegerValue, None)
+                    cat_ids_int.append(cid_int)
+                    ce = _safe(lambda cid=cid: Category.GetCategory(doc, cid), None)
+                    cn = _safe(lambda ce=ce: ce.Name, None) if ce is not None else None
                     if cn:
                         names.append(cn)
                 row["pfe.category_names_sample"] = sorted(list(set(names)))[:25]
+                row["get_categories.ids"] = cat_ids_int
+                row["get_categories.names"] = names
             else:
                 row["pfe.is_parameter_filter_element"] = False
                 row["pfe.category_count"] = None
                 row["pfe.category_names_sample"] = []
+                row["get_categories.ids"] = []
+                row["get_categories.names"] = []
 
             seen_occ.add(occ_key)
             optional_crosswalk.append(row)

@@ -565,6 +565,18 @@ for v in selected_views:
                     },
                     "delta_flags": delta_payload
                 }
+
+                for src_attr, pfx in (
+                    ("CutBackgroundPatternId", "cut_background_pattern"),
+                    ("CutForegroundPatternId", "cut_foreground_pattern"),
+                    ("SurfaceBackgroundPatternId", "surface_background_pattern"),
+                    ("SurfaceForegroundPatternId", "surface_foreground_pattern"),
+                ):
+                    pid = _safe(lambda src_attr=src_attr: getattr(ogs, src_attr), None)
+                    row[pfx + ".id"] = _eid_int(pid)
+                    row[pfx + ".name"] = _eid_name(pid) if pid is not None else None
+                    row[pfx + ".resolved"] = row[pfx + ".name"] is not None
+
                 optional_crosswalk.append(row)
 
 

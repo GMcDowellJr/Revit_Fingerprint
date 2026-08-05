@@ -336,6 +336,18 @@ for m in selected:
         "thermal_asset.id": None,
         "thermal_asset.name": None,
         "thermal_asset.resolved": False,
+        "cut_background_pattern.id": None,
+        "cut_background_pattern.name": None,
+        "cut_background_pattern.resolved": False,
+        "cut_foreground_pattern.id": None,
+        "cut_foreground_pattern.name": None,
+        "cut_foreground_pattern.resolved": False,
+        "surface_background_pattern.id": None,
+        "surface_background_pattern.name": None,
+        "surface_background_pattern.resolved": False,
+        "surface_foreground_pattern.id": None,
+        "surface_foreground_pattern.name": None,
+        "surface_foreground_pattern.resolved": False,
     }
 
     aid = _safe(lambda: m.AppearanceAssetId, None)
@@ -358,6 +370,20 @@ for m in selected:
         te = _safe(lambda: doc.GetElement(tid), None)
         row["thermal_asset.name"] = _safe_name(te)
         row["thermal_asset.resolved"] = row["thermal_asset.name"] is not None
+
+    for src_attr, pfx in (
+        ("CutBackgroundPatternId", "cut_background_pattern"),
+        ("CutForegroundPatternId", "cut_foreground_pattern"),
+        ("SurfaceBackgroundPatternId", "surface_background_pattern"),
+        ("SurfaceForegroundPatternId", "surface_foreground_pattern"),
+    ):
+        pid = _safe(lambda src_attr=src_attr: getattr(m, src_attr), None)
+        if pid is None or _safe(lambda pid=pid: pid.IntegerValue, -1) < 0:
+            continue
+        row[pfx + ".id"] = _safe(lambda pid=pid: pid.IntegerValue, None)
+        pe = _safe(lambda pid=pid: doc.GetElement(pid), None)
+        row[pfx + ".name"] = _safe_name(pe)
+        row[pfx + ".resolved"] = row[pfx + ".name"] is not None
 
     optional_crosswalk.append(row)
 
