@@ -730,10 +730,11 @@ def _reflect_member_names(obj):
     return sorted(uniq, key=lambda x: x[1])
 
 # Step 0 verification (docs/probe_method_invocation_candidates_verification.md,
-# docs/method_invocation_candidates_annotated.csv): these 34 method names (35
-# (declaring_class, method) pairs from the Step 0 CSV -- GetValidTypes is
-# declared on both Element and Subelement, independently confirmed zero-arg/
-# instance/non-mutating on each) are ground-truth confirmed, against the live
+# docs/method_invocation_candidates_annotated.csv): these 33 method names (34
+# (declaring_class, method) pairs from the Step 0 CSV -- confirmed ground-truth
+# zero-arg/instance/non-mutating, minus Element.GetValidTypes/Subelement.
+# GetValidTypes, removed post-merge -- see the note below the dict) are
+# ground-truth confirmed, against the live
 # RevitAPI 2025 documentation (not name/return-type inference), to be
 # zero-arg, instance, non-mutating getters. Declared here as data, separate
 # from the branching logic in _reflect_try_get below, so it can be reviewed
@@ -766,7 +767,6 @@ _ALLOWLISTED_REFLECTION_METHODS = {
     "GetExternalFileReference": "Element",
     "GetMonitoredLinkElementIds": "Element",
     "GetMonitoredLocalElementIds": "Element",
-    "GetValidTypes": "Element, Subelement",
     "GetSimilarTypes": "ElementType",
     "GetStructuralSection": "FamilySymbol",
     "GetThermalProperties": "FamilySymbol",
@@ -791,6 +791,26 @@ _ALLOWLISTED_REFLECTION_METHODS = {
     "GetTemporaryViewPropertiesId": "View",
     "GetViewDisplayModel": "View",
 }
+
+# Element.GetValidTypes / Subelement.GetValidTypes were removed from the
+# allowlist above after a live re-run (PR #395 discussion) showed
+# Element.GetValidTypes fails 100% of the time -- not with a documented
+# Revit API exception (unlike GetCalloutParentId/GetExternalFileReference/
+# GetModelToProjectionTransforms above, which each match a real
+# InvalidOperationException precondition stated on their own RevitAPI doc
+# pages), but with a CLR/pythonnet interop binding failure:
+# `TypeError: No method matches given arguments for GetValidTypes: (<class
+# '...'>)`, confirmed via a standalone diagnostic against live ElementType/
+# WallType/View objects. .NET reflection sees exactly one GetValidTypes
+# overload (declaring type Autodesk.Revit.DB.Element) -- so this isn't an
+# overload-ambiguity problem either -- the call is rejected by the binder
+# before it ever reaches Revit's implementation. This will never succeed
+# through `getattr(obj, name)()` regardless of model/version, so keeping it
+# allowlisted only adds permanent error noise with zero chance of a real
+# value. Subelement.GetValidTypes was never independently tested (no probe
+# in this codebase reflects a raw Subelement object as its own type_label),
+# but shares the same allowlist name and the same removal; re-evaluate
+# independently against a live Subelement instance before re-adding either.
 
 def _reflect_try_get(obj, member_kind, name):
     if member_kind == "method":
