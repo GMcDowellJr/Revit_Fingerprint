@@ -575,8 +575,16 @@ if enable_crosswalk:
     # Prefer templates for crosswalk signal
     crosswalk_views = templates if len(templates) > 0 else selected_views
 
+    # crosswalk_limit caps rows THIS loop adds, not the list's total length --
+    # optional_crosswalk already holds one unconditional row per selected_views
+    # entry (body/header/title text type + get_filters/get_ordered_filters,
+    # added above) by the time this loop starts, so comparing against the raw
+    # list length would let that pre-existing content silently starve this
+    # loop's phase-filter rows out of the cap entirely.
+    _phasefilter_rows_start = len(optional_crosswalk)
+
     for v in crosswalk_views:
-        if len(optional_crosswalk) >= int(crosswalk_limit):
+        if (len(optional_crosswalk) - _phasefilter_rows_start) >= int(crosswalk_limit):
             break
 
         is_t = _safe(lambda: v.IsTemplate, False)

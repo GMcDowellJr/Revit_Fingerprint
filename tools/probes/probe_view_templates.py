@@ -535,8 +535,16 @@ if enable_crosswalk:
     # Keep crosswalk compact: one representative non-template view per distinct template id
     seen_template_ids = set()
 
+    # crosswalk_limit caps rows THIS loop adds, not the list's total length --
+    # optional_crosswalk already holds one unconditional row per template (id/
+    # name/workset + text-type + get_filters/get_ordered_filters, added above)
+    # by the time this loop starts, so comparing against the raw list length
+    # would let that pre-existing content silently starve this loop's
+    # View -> ViewTemplate rows out of the cap entirely.
+    _template_join_rows_start = len(optional_crosswalk)
+
     for v in all_views:
-        if len(optional_crosswalk) >= int(crosswalk_limit):
+        if (len(optional_crosswalk) - _template_join_rows_start) >= int(crosswalk_limit):
             break
 
         is_t = _safe(lambda: v.IsTemplate, False)
