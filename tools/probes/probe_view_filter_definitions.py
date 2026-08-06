@@ -928,6 +928,9 @@ for f in filters:
     f_ws_id_int = _safe(lambda: f_ws_id_obj.IntegerValue, None) if f_ws_id_obj is not None else None
     usage = filter_usage.get(fid, {"live_view_count": 0, "template_count": 0, "sample_names": []})
     total = usage["live_view_count"] + usage["template_count"]
+    cat_ids = _safe(lambda: list(f.GetCategories()), default=[])
+    cat_ids_int = [_safe(lambda cid=cid: cid.IntegerValue, None) for cid in cat_ids]
+    cat_names = [_resolve_category_name(cid) for cid in cat_ids_int if cid is not None]
     optional_crosswalk.append({
         "filter.id": fid,
         "filter.name": fname,
@@ -937,6 +940,8 @@ for f in filters:
         "applied_live_view_count": usage["live_view_count"],
         "applied_template_count": usage["template_count"],
         "sample_applied_names": usage["sample_names"],
+        "get_categories.ids": cat_ids_int,
+        "get_categories.names": cat_names,
     })
 
 OUT_payload = [

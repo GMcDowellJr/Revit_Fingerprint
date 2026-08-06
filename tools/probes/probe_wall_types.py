@@ -415,6 +415,20 @@ def _resolve_material(mat_id_int):
     return (name, name is not None)
 
 
+def _resolve_similar_type(sid_int):
+    """Resolve a GetSimilarTypes() id via a document-wide doc.GetElement()
+    lookup, not a WallType-only id->name dict -- GetSimilarTypes() is not
+    formally documented as same-category-only (see Step 0 findings), so
+    this must not assume the returned id is necessarily another WallType."""
+    if sid_int is None:
+        return (None, False)
+    ref = _safe(lambda: doc.GetElement(ElementId(sid_int)), None)
+    if ref is None:
+        return (None, False)
+    name = _safe_name(ref)
+    return (name, name is not None)
+
+
 optional_crosswalk = []
 
 
@@ -443,6 +457,21 @@ for wt in selected:
     ws_id_obj = _safe(lambda: wt.WorksetId, None)
     ws_name, ws_resolved = _resolve_workset(doc, ws_id_obj)
     ws_id_int = _safe(lambda: ws_id_obj.IntegerValue, None) if ws_id_obj is not None else None
+
+    similar_ids = _safe(lambda: list(wt.GetSimilarTypes() or []), default=[])
+    for si, sid in enumerate(similar_ids):
+        sid_int = _safe(lambda: sid.IntegerValue, None) if sid is not None else None
+        s_name, s_resolved = _resolve_similar_type(sid_int)
+        optional_crosswalk.append({
+            "wall_type.id": type_id,
+            "wall_type.name": type_name,
+            "wall_type.workset_id": ws_id_int,
+            "wall_type.workset_name": ws_name,
+            "get_similar_types.index": si,
+            "get_similar_types.id": sid_int,
+            "get_similar_types.name": s_name,
+            "get_similar_types.resolved": s_resolved,
+        })
 
     cs = _safe(lambda: wt.GetCompoundStructure(), None)
     if cs is None:

@@ -617,6 +617,50 @@ def _resolve_workset(doc, ws_id_obj):
     name = _safe(lambda: ws.Name, None)
     return (name, name is not None)
 
+
+def _resolve_similar_type(sid_int):
+    """Resolve a GetSimilarTypes() id via a document-wide doc.GetElement()
+    lookup -- GetSimilarTypes() is not formally documented as
+    same-category-only (see Step 0 findings), so this must not assume the
+    returned id is necessarily another TextNoteType."""
+    if sid_int is None:
+        return (None, False)
+    ref = _safe(lambda: doc.GetElement(ElementId(sid_int)), None)
+    if ref is None:
+        return (None, False)
+    name = _safe(lambda: ref.Name, None)
+    return (name, name is not None)
+
+
+# TextNoteType -> GetSimilarTypes() crosswalk. Not gated behind
+# enable_crosswalk (unlike the TextType -> Leader Arrowhead join below) --
+# a standalone resolution, run over all_types (not the sampled `selected`
+# subset) for the same reason arrowheads' arrowhead_name_by_id is built
+# from all hits: broader coverage of the id->name lookup.
+for tt in all_types:
+    tt_id = _safe(lambda: tt.Id.IntegerValue, None)
+    if tt_id is None:
+        continue
+    tt_name = _safe(lambda: _safe_type_name(tt), None)
+    tt_ws_id_obj = _safe(lambda: tt.WorksetId, None)
+    tt_ws_name, _tt_ws_resolved = _resolve_workset(doc, tt_ws_id_obj)
+    tt_ws_id_int = _safe(lambda: tt_ws_id_obj.IntegerValue, None) if tt_ws_id_obj is not None else None
+
+    similar_ids = _safe(lambda: list(tt.GetSimilarTypes() or []), default=[])
+    for si, sid in enumerate(similar_ids):
+        sid_int = _safe(lambda: sid.IntegerValue, None) if sid is not None else None
+        s_name, s_resolved = _resolve_similar_type(sid_int)
+        optional_crosswalk.append({
+            "text_type.id": tt_id,
+            "text_type.name": tt_name,
+            "text_type.workset_id": tt_ws_id_int,
+            "text_type.workset_name": tt_ws_name,
+            "get_similar_types.index": si,
+            "get_similar_types.id": sid_int,
+            "get_similar_types.name": s_name,
+            "get_similar_types.resolved": s_resolved,
+        })
+
 if enable_crosswalk:
     # Optional extra input: max crosswalk rows to emit (default 25)
     crosswalk_limit = IN[5] if len(IN) > 5 and IN[5] is not None else 25

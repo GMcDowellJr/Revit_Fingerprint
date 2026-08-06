@@ -548,34 +548,62 @@ for pk in sorted(param_index.keys()):
 
 
 # -------------------------
-# Optional Crosswalk: FillPattern -> LinePattern (via FillGrid.LinePatternId)
+# Crosswalk: FillPatternElement -> its own id/name/workset (unconditional --
+# this domain had no crosswalk kind at all before (see Step 0 findings: zero
+# rows in PROBE_CROSSWALK.csv), so this is "built from nothing" the same way
+# loaded_family_types' crosswalk was, reusing the existing `selected` sample
+# rather than a new collector pass. NOT gated behind enable_crosswalk, unlike
+# the FillPattern -> LinePattern grid join below -- that one legitimately
+# needs the toggle (GetFillGrids() is heavier and optional), this one is a
+# cheap direct property read per already-sampled element).
 # -------------------------
 optional_crosswalk = []
+
+
+def _resolve_workset(doc, ws_id_obj):
+    """Resolve an Element.WorksetId value to (name, resolved_bool) via
+    WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
+    distinct .NET type from ElementId (both happen to expose .IntegerValue,
+    which is why reflection reports this member as ElementId-storage), and
+    Workset is not derived from Element, so doc.GetElement() would never
+    resolve it even with the right type assumed."""
+    if ws_id_obj is None:
+        return (None, False)
+    wt_table = _safe(lambda: doc.GetWorksetTable(), None)
+    if wt_table is None:
+        return (None, False)
+    ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
+    if ws is None:
+        return (None, False)
+    name = _safe(lambda: ws.Name, None)
+    return (name, name is not None)
+
+
+for fpe in selected:
+    fp_id = _safe(lambda: fpe.Id.IntegerValue, None)
+    if fp_id is None:
+        continue
+    fp_name = _safe(lambda: _safe_type_name(fpe), None)
+    fp_ws_id_obj = _safe(lambda: fpe.WorksetId, None)
+    fp_ws_name, _fp_ws_resolved = _resolve_workset(doc, fp_ws_id_obj)
+    fp_ws_id_int = _safe(lambda: fp_ws_id_obj.IntegerValue, None) if fp_ws_id_obj is not None else None
+    optional_crosswalk.append({
+        "fill_pattern.id": fp_id,
+        "fill_pattern.name": fp_name,
+        "fill_pattern.workset_id": fp_ws_id_int,
+        "fill_pattern.workset_name": fp_ws_name,
+    })
+
+
+# -------------------------
+# Optional Crosswalk: FillPattern -> LinePattern (via FillGrid.LinePatternId)
+# -------------------------
 
 if enable_crosswalk:
     # Optional extra input: max crosswalk rows to emit (default 25)
     crosswalk_limit = IN[6] if len(IN) > 6 and IN[6] is not None else 25
 
     seen_line_pattern_ids = set()
-
-    def _resolve_workset(doc, ws_id_obj):
-        """Resolve an Element.WorksetId value to (name, resolved_bool) via
-        WorksetTable.GetWorkset() -- NOT doc.GetElement(). WorksetId is a
-        distinct .NET type from ElementId (both happen to expose
-        .IntegerValue, which is why reflection reports this member as
-        ElementId-storage), and Workset is not derived from Element, so
-        doc.GetElement() would never resolve it even with the right type
-        assumed."""
-        if ws_id_obj is None:
-            return (None, False)
-        wt_table = _safe(lambda: doc.GetWorksetTable(), None)
-        if wt_table is None:
-            return (None, False)
-        ws = _safe(lambda: wt_table.GetWorkset(ws_id_obj), None)
-        if ws is None:
-            return (None, False)
-        name = _safe(lambda: ws.Name, None)
-        return (name, name is not None)
 
     for fpe in selected:
         if len(optional_crosswalk) >= int(crosswalk_limit):

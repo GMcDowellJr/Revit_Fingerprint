@@ -64,6 +64,11 @@ try:
 except:
     SpecTypeId = None
 
+try:
+    from Autodesk.Revit.DB import ViewSchedule
+except:
+    ViewSchedule = None
+
 doc = DocumentManager.Instance.CurrentDBDocument
 
 max_templates_to_inspect = IN[0] if len(IN) > 0 and IN[0] is not None else 500
@@ -463,12 +468,83 @@ for t in templates:
         t_ws_id_int = _safe(lambda: t_ws_id_obj.IntegerValue, None) if t_ws_id_obj is not None else None
         template_workset_by_id[tid] = (t_ws_id_int, t_ws_name)
 
+
+def _resolve_filter_name(fid_int):
+    if fid_int is None:
+        return None
+    fe = _safe(lambda: doc.GetElement(ElementId(fid_int)), None)
+    return _safe(lambda: fe.Name, None) if fe is not None else None
+
+
+# ViewTemplate -> BodyTextTypeId/HeaderTextTypeId/TitleTextTypeId
+# (ViewSchedule-only, same as probe_views.py) and GetFilters()/
+# GetOrderedFilters() (any View, templates included). Unconditional -- not
+# gated behind enable_crosswalk, which only governs the heavier
+# View -> ViewTemplate join below.
+for t in templates:
+    tid = _safe(lambda: t.Id.IntegerValue, None)
+    if tid is None:
+        continue
+    tname = template_name_by_id.get(tid)
+    t_ws_id_int, t_ws_name = template_workset_by_id.get(tid, (None, None))
+
+    body_tt_id = header_tt_id = title_tt_id = None
+    body_tt_name = header_tt_name = title_tt_name = None
+    if ViewSchedule is not None and _safe(lambda: isinstance(t, ViewSchedule), False):
+        _btt = _safe(lambda: t.BodyTextTypeId, None)
+        body_tt_id = _safe(lambda: _btt.IntegerValue, None) if _btt is not None else None
+        if body_tt_id is not None and body_tt_id >= 0:
+            _btt_elem = _safe(lambda: doc.GetElement(_btt), None)
+            body_tt_name = _safe(lambda: _btt_elem.Name, None) if _btt_elem is not None else None
+
+        _htt = _safe(lambda: t.HeaderTextTypeId, None)
+        header_tt_id = _safe(lambda: _htt.IntegerValue, None) if _htt is not None else None
+        if header_tt_id is not None and header_tt_id >= 0:
+            _htt_elem = _safe(lambda: doc.GetElement(_htt), None)
+            header_tt_name = _safe(lambda: _htt_elem.Name, None) if _htt_elem is not None else None
+
+        _ttt = _safe(lambda: t.TitleTextTypeId, None)
+        title_tt_id = _safe(lambda: _ttt.IntegerValue, None) if _ttt is not None else None
+        if title_tt_id is not None and title_tt_id >= 0:
+            _ttt_elem = _safe(lambda: doc.GetElement(_ttt), None)
+            title_tt_name = _safe(lambda: _ttt_elem.Name, None) if _ttt_elem is not None else None
+
+    get_filters_ids = _safe(lambda: list(t.GetFilters() or []), default=[])
+    get_filters_names = [_resolve_filter_name(_safe(lambda fid=fid: fid.IntegerValue, None)) for fid in get_filters_ids]
+    get_ordered_filters_ids = _safe(lambda: list(t.GetOrderedFilters() or []), default=[])
+    get_ordered_filters_names = [_resolve_filter_name(_safe(lambda fid=fid: fid.IntegerValue, None)) for fid in get_ordered_filters_ids]
+
+    optional_crosswalk.append({
+        "template.id": tid,
+        "template.name": tname,
+        "template.workset_id": t_ws_id_int,
+        "template.workset_name": t_ws_name,
+        "body_text_type.id": body_tt_id,
+        "body_text_type.name": body_tt_name,
+        "header_text_type.id": header_tt_id,
+        "header_text_type.name": header_tt_name,
+        "title_text_type.id": title_tt_id,
+        "title_text_type.name": title_tt_name,
+        "get_filters.ids": [_safe(lambda fid=fid: fid.IntegerValue, None) for fid in get_filters_ids],
+        "get_filters.names": get_filters_names,
+        "get_ordered_filters.ids": [_safe(lambda fid=fid: fid.IntegerValue, None) for fid in get_ordered_filters_ids],
+        "get_ordered_filters.names": get_ordered_filters_names,
+    })
+
 if enable_crosswalk:
     # Keep crosswalk compact: one representative non-template view per distinct template id
     seen_template_ids = set()
 
+    # crosswalk_limit caps rows THIS loop adds, not the list's total length --
+    # optional_crosswalk already holds one unconditional row per template (id/
+    # name/workset + text-type + get_filters/get_ordered_filters, added above)
+    # by the time this loop starts, so comparing against the raw list length
+    # would let that pre-existing content silently starve this loop's
+    # View -> ViewTemplate rows out of the cap entirely.
+    _template_join_rows_start = len(optional_crosswalk)
+
     for v in all_views:
-        if len(optional_crosswalk) >= int(crosswalk_limit):
+        if (len(optional_crosswalk) - _template_join_rows_start) >= int(crosswalk_limit):
             break
 
         is_t = _safe(lambda: v.IsTemplate, False)

@@ -472,6 +472,48 @@ for t in hits:
         t_ws_id_int = _safe(lambda: t_ws_id_obj.IntegerValue, None) if t_ws_id_obj is not None else None
         arrowhead_workset_by_id[tid] = (t_ws_id_int, t_ws_name)
 
+
+def _resolve_similar_type(sid_int):
+    """Resolve a GetSimilarTypes() id via a document-wide doc.GetElement()
+    lookup, not the ArrowheadType-only arrowhead_name_by_id dict above --
+    GetSimilarTypes() is not formally documented as same-category-only
+    (see Step 0 findings), so this must not assume the returned id is
+    necessarily another ArrowheadType."""
+    if sid_int is None:
+        return (None, False)
+    ref = _safe(lambda: doc.GetElement(ElementId(sid_int)), None)
+    if ref is None:
+        return (None, False)
+    name = _safe(lambda: ref.Name, None)
+    return (name, name is not None)
+
+
+# ArrowheadType -> GetSimilarTypes() crosswalk. Not gated behind
+# enable_crosswalk (unlike the DimensionType -> tick-mark join below) --
+# this is a standalone resolution, independent of that optional feature,
+# same "always emitted" treatment GetSimilarTypes gets in the compound-type
+# domains (wall/ceiling/floor/roof_types).
+for t in hits:
+    tid = _safe(lambda: t.Id.IntegerValue, None)
+    if tid is None:
+        continue
+    t_name = arrowhead_name_by_id.get(tid)
+    t_ws_id_int, t_ws_name = arrowhead_workset_by_id.get(tid, (None, None))
+    similar_ids = _safe(lambda: list(t.GetSimilarTypes() or []), default=[])
+    for si, sid in enumerate(similar_ids):
+        sid_int = _safe(lambda: sid.IntegerValue, None) if sid is not None else None
+        s_name, s_resolved = _resolve_similar_type(sid_int)
+        optional_crosswalk.append({
+            "arrowhead.type_id": tid,
+            "arrowhead.name": t_name,
+            "arrowhead.workset_id": t_ws_id_int,
+            "arrowhead.workset_name": t_ws_name,
+            "get_similar_types.index": si,
+            "get_similar_types.id": sid_int,
+            "get_similar_types.name": s_name,
+            "get_similar_types.resolved": s_resolved,
+        })
+
 if enable_crosswalk:
     # Optional extra input: max crosswalk rows to emit (default 25)
     crosswalk_limit = IN[5] if len(IN) > 5 and IN[5] is not None else 25
