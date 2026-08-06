@@ -197,8 +197,13 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                                   onboarding policy from policies/governance/*.json via governance_policy.py,
                                   and points readers at docs/governance_interpretation_guide.md /
                                   docs/governance_question_routes.md -- see docs/governance_evidence_package.md
-                                  and D-019/D-020/D-021/D-022
-  governance_evidence_package.py    Package manifest/health/evidence-map/findings-document builders for the
+                                  and D-019/D-020/D-021/D-022/D-023/D-024. Also emits
+                                  governance_file_inventory.json (D-023/D-024): a live Path.glob("*.csv") scan of
+                                  the export directories that names files this generator never reads (header,
+                                  inferred dtype, row count only -- never sample rows/cell values), so an escalating
+                                  reader can discover a drill-down file exists before writing an extraction script
+                                  against it.
+  governance_evidence_package.py    Package manifest/health/evidence-map/findings/file-inventory builders for the
                                   governance narrative evidence package (see docs/governance_evidence_package.md).
                                   Design-reference-only relationship to the external
                                   GMcDowellJr/llm_evidence_framework repo -- no import from or runtime dependency
@@ -533,7 +538,7 @@ A separate layer builds comparable populations across the whole model corpus and
 2. `tools/run_segment_orchestrator.py` — runs `patterns_analysis` then `bundle_analysis` stages per segment, in level order, writing per-segment output folders.
 3. `tools/governance_manifest.py` — builds a **disjoint** partition (Enterprise / each business center / each client / each named project / Generic) directly from `file_metadata.csv`. This is intentionally separate from the segment lattice's powerset — see the file's own docstring.
 4. `tools/compare_cross_segment.py` (segments) / `tools/compare_governance_populations.py` (disjoint populations) — Jaccard + containment comparisons using `join_hash` as the cross-population identity unit; bundle membership from `bundle_analysis/` is annotated on afterward.
-5. `tools/generate_governance_narrative.py` — deterministic, template-driven `governance_narrative_context.md` from the CSV outputs above. No LLM in the loop. Also emits a governance evidence package (`governance_package_manifest.json`/`_health.json`/`_evidence_map.json`/`_findings.json`/`governance_brief.md`, default on) plus static interpretation-guide/question-route docs — see `docs/governance_evidence_package.md`.
+5. `tools/generate_governance_narrative.py` — deterministic, template-driven `governance_narrative_context.md` from the CSV outputs above. No LLM in the loop. Also emits a governance evidence package (`governance_package_manifest.json`/`_health.json`/`_evidence_map.json`/`_findings.json`/`governance_brief.md`/`governance_file_inventory.json`, default on) plus static interpretation-guide/question-route docs — see `docs/governance_evidence_package.md`.
 6. `tools/governance/standards_governance_report.py` — standards governance report generation.
 7. `tools/archetype/` — separate DP1 (Decision Point 1) workflow that clusters cross-domain co-occurrence signals into candidate "archetypes" for human curation against `config/archetype/archetype_definitions.json`.
 
@@ -617,6 +622,8 @@ When working on **analysis**:
 | D-020 | Governance narrative evidence-package layer, Phase 2 — structured findings (`governance_findings.json`) with epistemic provenance (origin/fidelity/authority/limits) |
 | D-021 | Governance narrative evidence-package layer, Phase 3 — policy externalization (`policies/governance/*.json`); thresholds/domain policy/onboarding rules loaded via `tools/governance_policy.py` instead of hardcoded, with defaults preserved exactly |
 | D-022 | Governance narrative evidence-package layer, Phase 4 — interpretation/routing split: `docs/governance_interpretation_guide.md` (stable), `docs/governance_question_routes.md` (candidate routes), `governance_brief.md` (per-run, generated, computes nothing new) |
+| D-023 | Governance narrative evidence-package layer, Phase 5 — `governance_file_inventory.json`: live `Path.glob` scan of the export directory naming CSVs this generator never reads (header/dtype/row-count only, no sample values), so an escalating reader can discover a drill-down file exists; no query/fetch mechanism added, package stays single-shot |
+| D-024 | Governance narrative evidence-package layer, Phase 6 — the four files `generate_governance_narrative.py` writes no read path for (`comparison_registry.csv`, `cross_segment_file_pairs.csv`, `pattern_reuse_summary_by_domain.csv`, `project_mean_file_pair_jaccard_matrix.csv`) get full evidence-map entries instead of generic-scan treatment; `governance_evidence_map.json` grows from 33 to 35 artifacts |
 
 `DECISIONS.md` is append-only; a couple of decision numbers (D-014, D-015) have more than one entry as the decision was revised/completed in place — the latest entry for a given number is authoritative. See `DECISIONS.md` for full rationale.
 
