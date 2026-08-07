@@ -74,9 +74,10 @@
       "optional_items": [],
       "explicitly_excluded_items": [],
       "notes": [
-        "wt.type_name is a native identity_items key (domains/compound_types.py). compound_types.py",
-        "never calls build_join_key_from_policy inline for its own configuration join_hash (Step 0",
-        "A.1) -- this is a brand-new call site, not a mirror of an existing one."
+        "wt.type_name is a native identity_items key (domains/wall_types.py, via the shared",
+        "domains/compound_layers.py helpers). This domain never calls build_join_key_from_policy",
+        "inline for its own configuration join_hash (Step 0 A.1) -- this is a brand-new call site,",
+        "not a mirror of an existing one."
       ]
     },
     "floor_types": {
@@ -85,7 +86,7 @@
       "required_items": ["ft.type_name"],
       "optional_items": [],
       "explicitly_excluded_items": [],
-      "notes": ["Same situation as wall_types; new call site in domains/compound_types.py."]
+      "notes": ["Same situation as wall_types; new call site in domains/floor_types.py."]
     },
     "roof_types": {
       "join_key_schema": "name_identity.join_key.v1",
@@ -93,7 +94,7 @@
       "required_items": ["rt.type_name"],
       "optional_items": [],
       "explicitly_excluded_items": [],
-      "notes": ["Same situation as wall_types; new call site in domains/compound_types.py."]
+      "notes": ["Same situation as wall_types; new call site in domains/roof_types.py."]
     },
     "ceiling_types": {
       "join_key_schema": "name_identity.join_key.v1",
@@ -101,7 +102,7 @@
       "required_items": ["ct.type_name"],
       "optional_items": [],
       "explicitly_excluded_items": [],
-      "notes": ["Same situation as wall_types; new call site in domains/compound_types.py."]
+      "notes": ["Same situation as wall_types; new call site in domains/ceiling_types.py."]
     },
     "identity": {
       "join_key_schema": "name_identity.join_key.v1",
