@@ -2,6 +2,8 @@
 
 import importlib
 
+from domains import compound_layers
+
 
 class _Id(object):
     def __init__(self, i):
@@ -179,10 +181,10 @@ class _Doc(object):
 
 
 def _setup_module(monkeypatch):
-    m = importlib.import_module("domains.compound_types")
+    m = importlib.import_module("domains.wall_types")
     monkeypatch.setattr(m, "WallType", object)
-    monkeypatch.setattr(m, "ShellLayerType", type("_SLT", (), {"Exterior": "Exterior", "Interior": "Interior"}))
-    monkeypatch.setattr(m, "BuiltInParameter", type("_BIP", (), {
+    monkeypatch.setattr(compound_layers, "ShellLayerType", type("_SLT", (), {"Exterior": "Exterior", "Interior": "Interior"}))
+    monkeypatch.setattr(compound_layers, "BuiltInParameter", type("_BIP", (), {
         "COARSE_SCALE_FILL_PATTERN_ID_FOR_LEGEND": "BIP_FILL_PATTERN",
         "COARSE_SCALE_FILL_COLOR": "BIP_FILL_COLOR",
         "ALL_MODEL_TYPE_NAME": "BIP_TYPE_NAME",
@@ -237,7 +239,7 @@ def test_instance_count_present_on_wall_record(monkeypatch):
     wall = _basic_wall("W1")
     wall.Id = _Id(10)
     monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
-    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [])
+    monkeypatch.setattr(compound_layers, "collect_instances", lambda *a, **k: [])
     out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
     rec = out["records"][0]
     assert rec["instance_count"] == 0
@@ -249,7 +251,7 @@ def test_is_sole_type_in_category_true_when_single_wall(monkeypatch):
     wall = _basic_wall("W1")
     wall.Id = _Id(10)
     monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
-    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [])
+    monkeypatch.setattr(compound_layers, "collect_instances", lambda *a, **k: [])
     rec = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))["records"][0]
     assert rec["is_sole_type_in_category"] is True
     assert rec["is_sole_type_in_category_q"] == "ok"
@@ -262,7 +264,7 @@ def test_is_sole_type_in_category_false_when_multiple_walls(monkeypatch):
     w1.Id = _Id(10)
     w2.Id = _Id(11)
     monkeypatch.setattr(m, "collect_types", lambda *a, **k: [w1, w2])
-    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [])
+    monkeypatch.setattr(compound_layers, "collect_instances", lambda *a, **k: [])
     out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
     assert all(rec["is_sole_type_in_category"] is False for rec in out["records"])
 
@@ -272,7 +274,7 @@ def test_instance_count_not_in_identity_basis(monkeypatch):
     wall = _basic_wall("W1")
     wall.Id = _Id(10)
     monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
-    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [])
+    monkeypatch.setattr(compound_layers, "collect_instances", lambda *a, **k: [])
     rec = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))["records"][0]
     keys = {it["k"] for it in rec["identity_basis"]["items"]}
     assert "instance_count" not in keys
@@ -283,7 +285,7 @@ def test_is_sole_type_not_in_identity_basis(monkeypatch):
     wall = _basic_wall("W1")
     wall.Id = _Id(10)
     monkeypatch.setattr(m, "collect_types", lambda *a, **k: [wall])
-    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [])
+    monkeypatch.setattr(compound_layers, "collect_instances", lambda *a, **k: [])
     rec = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))["records"][0]
     keys = {it["k"] for it in rec["identity_basis"]["items"]}
     assert "is_sole_type_in_category" not in keys

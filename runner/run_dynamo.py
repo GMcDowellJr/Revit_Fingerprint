@@ -148,7 +148,7 @@ from domains import view_category_overrides_annotation
 from domains import object_styles
 from domains import fill_patterns
 from domains import materials
-from domains import compound_types
+from domains import wall_types, floor_types, roof_types, ceiling_types
 from domains import dimension_types
 from domains import loaded_family_types
 from domains import view_templates
@@ -624,7 +624,7 @@ def run_fingerprint(doc, timing=None):
             require_domain(contract_domains, "fill_patterns_model")
             legacy = _domain_run(
                 "wall_types",
-                compound_types.extract_wall_types,
+                wall_types.extract_wall_types,
                 doc, ctx, contract_domains, run_diag, runner_notes,
             )
             if legacy is not None:
@@ -652,7 +652,7 @@ def run_fingerprint(doc, timing=None):
             require_domain(contract_domains, "fill_patterns_model")
             legacy = _domain_run(
                 "floor_types",
-                compound_types.extract_floor_types,
+                floor_types.extract_floor_types,
                 doc, ctx, contract_domains, run_diag, runner_notes,
             )
             if legacy is not None:
@@ -680,7 +680,7 @@ def run_fingerprint(doc, timing=None):
             require_domain(contract_domains, "fill_patterns_model")
             legacy = _domain_run(
                 "roof_types",
-                compound_types.extract_roof_types,
+                roof_types.extract_roof_types,
                 doc, ctx, contract_domains, run_diag, runner_notes,
             )
             if legacy is not None:
@@ -708,7 +708,7 @@ def run_fingerprint(doc, timing=None):
             require_domain(contract_domains, "fill_patterns_model")
             legacy = _domain_run(
                 "ceiling_types",
-                compound_types.extract_ceiling_types,
+                ceiling_types.extract_ceiling_types,
                 doc, ctx, contract_domains, run_diag, runner_notes,
             )
             if legacy is not None:
