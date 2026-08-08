@@ -272,6 +272,7 @@ def _resolve_workset_crosswalk(doc, org, is_workshared, workset_name_to_unique_i
 
     id_pair = canonicalize_int(ws_id_int)
 
+    ws = None
     try:
         wt_table = doc.GetWorksetTable()
         ws = wt_table.GetWorkset(ws_id_obj)
@@ -284,7 +285,26 @@ def _resolve_workset_crosswalk(doc, org, is_workshared, workset_name_to_unique_i
         return id_pair, name_pair, (None, ITEM_Q_UNREADABLE)
 
     mapped_uid = (workset_name_to_unique_id or {}).get(ws_name)
-    uid_pair = canonicalize_str(mapped_uid) if mapped_uid else (None, ITEM_Q_UNREADABLE)
+    if mapped_uid:
+        uid_pair = canonicalize_str(mapped_uid)
+    else:
+        # Not every WorksetId a BrowserOrganization can reference resolves
+        # to a WorksetKind.UserWorkset -- worksets.py's "worksets" domain
+        # (Area 3) is deliberately scoped to UserWorkset only (see its
+        # module docstring), so a BrowserOrganization pinned to a
+        # StandardWorkset (e.g. Revit's own system "Views, Browser
+        # Organization"-style workset) will never appear in
+        # workset_name_to_unique_id at all -- there is no Area 3 record to
+        # join against for that case, not a join failure. Fall back to the
+        # same live Workset object already fetched above (Workset.UniqueId
+        # is a System.Guid, not a System.String, unlike Element.UniqueId --
+        # must be safe_str()-coerced, same as domains/worksets.py's own
+        # workset.unique_id handling) rather than reporting a spurious
+        # "unreadable" for a legitimately out-of-Area-3-scope workset kind.
+        try:
+            uid_pair = canonicalize_str(safe_str(ws.UniqueId)) if ws is not None else (None, ITEM_Q_UNREADABLE)
+        except Exception:
+            uid_pair = (None, ITEM_Q_UNREADABLE)
 
     return id_pair, name_pair, uid_pair
 
