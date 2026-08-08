@@ -171,7 +171,7 @@ def _discover_workset_kind_names():
     return names
 
 
-def _build_per_workset_record(ws, active_workset_id, kind_name_by_int, ctx):
+def _build_per_workset_record(ws, active_workset_id, active_workset_lookup_ok, kind_name_by_int, ctx):
     try:
         name_raw = ws.Name
     except Exception:
@@ -222,10 +222,21 @@ def _build_per_workset_record(ws, active_workset_id, kind_name_by_int, ctx):
 
     try:
         ws_id = ws.Id
+        ws_id_ok = True
     except Exception:
         ws_id = None
-    is_active = bool(active_workset_id is not None and ws_id is not None and ws_id == active_workset_id)
-    active_v, active_q = canonicalize_bool(is_active)
+        ws_id_ok = False
+
+    if not active_workset_lookup_ok or not ws_id_ok:
+        # Genuinely couldn't determine active-workset state -- must not
+        # report a confirmed "false" (see review finding on
+        # domains/worksets.py: a failed GetActiveWorksetId()/ws.Id lookup
+        # was previously indistinguishable from "confirmed not the active
+        # workset", both collapsing to q="ok"/v="false").
+        active_v, active_q = (None, ITEM_Q_UNREADABLE)
+    else:
+        is_active = bool(active_workset_id is not None and ws_id is not None and ws_id == active_workset_id)
+        active_v, active_q = canonicalize_bool(is_active)
 
     identity_items = [
         make_identity_item("workset.name", name_v, name_q),
@@ -435,13 +446,21 @@ def _read_is_workshared(doc):
 
 
 def _resolve_active_workset_id(doc, is_workshared):
+    """Returns (active_workset_id, lookup_ok).
+
+    lookup_ok is False only when GetWorksetTable()/GetActiveWorksetId()
+    itself raised on a workshared document -- distinct from "not
+    workshared" or "no active workset id resolved", neither of which are
+    failures. Callers must not treat a failed lookup the same as a
+    confirmed "no active workset" when deriving per-workset evidence.
+    """
     if not is_workshared:
-        return None
+        return None, True
     try:
         wt = doc.GetWorksetTable()
-        return wt.GetActiveWorksetId()
+        return wt.GetActiveWorksetId(), True
     except Exception:
-        return None
+        return None, False
 
 
 def _collect_user_worksets(doc, is_workshared):
@@ -530,7 +549,7 @@ def extract_worksets(doc, ctx=None):
         info["debug_v2_block_reasons"] = {"is_workshared_unreadable": True}
         return info
 
-    active_workset_id = _resolve_active_workset_id(doc, is_workshared)
+    active_workset_id, active_workset_lookup_ok = _resolve_active_workset_id(doc, is_workshared)
     user_worksets, collector_failed = _collect_user_worksets(doc, is_workshared)
 
     info["raw_count"] = len(user_worksets)
@@ -540,7 +559,7 @@ def extract_worksets(doc, ctx=None):
     v2_block_reasons = {}
 
     for ws in user_worksets:
-        rec = _build_per_workset_record(ws, active_workset_id, kind_name_by_int, ctx)
+        rec = _build_per_workset_record(ws, active_workset_id, active_workset_lookup_ok, kind_name_by_int, ctx)
         v2_records.append(rec)
         if rec.get("sig_hash"):
             v2_sig_hashes.append(rec["sig_hash"])
@@ -632,7 +651,7 @@ def extract_worksets_doc(doc, ctx=None):
 
     is_workshared, is_workshared_for_gating = _read_is_workshared(doc)
 
-    active_workset_id = _resolve_active_workset_id(doc, is_workshared_for_gating)
+    active_workset_id, _active_workset_lookup_ok = _resolve_active_workset_id(doc, is_workshared_for_gating)
     user_worksets, _collector_failed = _collect_user_worksets(doc, is_workshared_for_gating)
     kind_counts = _collect_kind_counts(doc, is_workshared_for_gating)
     active_workset_name = _resolve_active_workset_name(user_worksets, active_workset_id)
