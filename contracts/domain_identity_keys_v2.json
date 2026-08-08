@@ -1004,6 +1004,49 @@
       "minima": {
         "block_if_any_required_not_ok": true
       }
+    },
+    "worksets": {
+      "domain_family": "worksets",
+      "display_label": "Worksets",
+      "allowed_keys": [
+        "workset.name",
+        "workset.kind",
+        "workset.is_editable",
+        "workset.is_default_workset",
+        "workset.owner",
+        "workset.is_active_workset",
+        "workset.unique_id"
+      ],
+      "allowed_key_prefixes": [],
+      "required_keys": [
+        "workset.name",
+        "workset.kind",
+        "workset.is_editable",
+        "workset.is_default_workset"
+      ],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {}
+    },
+    "worksets_doc": {
+      "domain_family": "worksets",
+      "display_label": "Worksets (Document Summary)",
+      "allowed_keys": [
+        "worksets_doc.is_workshared",
+        "worksets_doc.active_workset_name",
+        "worksets_doc.count_user_workset",
+        "worksets_doc.count_standard_workset",
+        "worksets_doc.count_view_workset",
+        "worksets_doc.count_family_workset",
+        "worksets_doc.count_other_workset"
+      ],
+      "allowed_key_prefixes": [],
+      "required_keys": [],
+      "minima": {
+        "block_if_any_required_not_ok": false
+      },
+      "indexed_key_rules": {}
     }
   }
 }

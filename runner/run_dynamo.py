@@ -152,6 +152,7 @@ from domains import wall_types, floor_types, roof_types, ceiling_types
 from domains import dimension_types
 from domains import loaded_family_types
 from domains import view_templates
+from domains import worksets
 from core.manifest import build_manifest
 from core.features import build_features
 from core.join_key_policy import load_join_key_policies
@@ -985,6 +986,11 @@ def run_fingerprint(doc, timing=None):
             contracts.add_bounded_error(run_diag, domain="view_templates_schedules",
                 status=contracts.DOMAIN_STATUS_BLOCKED, code=b.code,
                 message=";".join(list(b.reasons)))
+
+    if _enabled("worksets"):
+        legacy = _domain_run("worksets", worksets.extract_worksets, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["worksets"] = legacy
 
     # Routing completeness check: verify all view templates accounted for
     # across all 5 domains. Emits a runner note if any templates fell through.
