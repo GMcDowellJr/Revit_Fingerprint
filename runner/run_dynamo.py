@@ -153,6 +153,7 @@ from domains import dimension_types
 from domains import loaded_family_types
 from domains import view_templates
 from domains import worksets
+from domains import browser_organization
 from core.manifest import build_manifest
 from core.features import build_features
 from core.join_key_policy import load_join_key_policies
@@ -467,6 +468,40 @@ def _domain_run(domain_name, fn, doc, ctx, contract_domains, run_diag, runner_no
         )
         runner_notes.append("One or more domains failed; see _contract.run_diag and _contract.domains.*.diag")
         return None
+
+def _build_workset_name_to_unique_id_ctx(worksets_legacy):
+    """Build a workset name -> unique_id crosswalk for browser_organization.
+
+    domains/worksets.py (Area 3) is out of scope to modify for the
+    browser_organization area, and doesn't currently export a ctx map of its
+    own (unlike materials.py/line_patterns.py/phases.py/object_styles.py).
+    This builds the crosswalk here, in the runner, from Area 3's own
+    already-computed "worksets" records -- not a fresh independent worksets
+    sweep -- so domains/browser_organization.py can join
+    BrowserOrganization.WorksetId-resolved names back to Area 3's actual
+    evidence instead of re-deriving worksets.py's discovery/classification
+    logic itself.
+    """
+    out = {}
+    if not isinstance(worksets_legacy, dict):
+        return out
+    for rec in worksets_legacy.get("records", None) or []:
+        if not isinstance(rec, dict):
+            continue
+        items = ((rec.get("identity_basis", None) or {}).get("items", None)) or []
+        name_v = None
+        uid_v = None
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            k = it.get("k")
+            if k == "workset.name" and it.get("q") == "ok":
+                name_v = it.get("v")
+            elif k == "workset.unique_id" and it.get("q") == "ok":
+                uid_v = it.get("v")
+        if name_v and uid_v:
+            out[name_v] = uid_v
+    return out
 
 def _enabled(domain_name):
     """
@@ -991,11 +1026,20 @@ def run_fingerprint(doc, timing=None):
         legacy = _domain_run("worksets", worksets.extract_worksets, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["worksets"] = legacy
+        # Cross-domain crosswalk for browser_organization (below): see
+        # _build_workset_name_to_unique_id_ctx's docstring for why this is
+        # built here rather than inside worksets.py.
+        ctx["workset_name_to_unique_id"] = _build_workset_name_to_unique_id_ctx(legacy)
 
     if _enabled("worksets_doc"):
         legacy = _domain_run("worksets_doc", worksets.extract_worksets_doc, doc, ctx, contract_domains, run_diag, runner_notes)
         if legacy is not None:
             fingerprint["worksets_doc"] = legacy
+
+    if _enabled("browser_organization"):
+        legacy = _domain_run("browser_organization", browser_organization.extract_browser_organization, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["browser_organization"] = legacy
 
     # Routing completeness check: verify all view templates accounted for
     # across all 5 domains. Emits a runner note if any templates fell through.
