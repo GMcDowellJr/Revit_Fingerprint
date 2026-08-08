@@ -931,6 +931,46 @@
         "Wrapping params are optional — degrade gracefully if unreadable.",
         "wt.type_name excluded per D-001 — names are labels only."
       ]
+    },
+    "worksets": {
+      "join_key_schema": "worksets.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "workset.name"
+      ],
+      "optional_items": [
+        "workset.kind",
+        "workset.is_default_workset"
+      ],
+      "explicitly_excluded_items": [
+        "workset.owner",
+        "workset.is_active_workset",
+        "workset.is_editable",
+        "workset.unique_id"
+      ],
+      "notes": [
+        "workset.name is the definition-bearing identifier (Revit does not allow duplicate workset names within a document).",
+        "workset.owner, workset.is_active_workset, and workset.is_editable are live editing-session/checkout state, not behavior — excluded from joins per the same rule that excludes them from sig_hash. IsEditable reflects whether the *current user* can edit the workset right now, not a fixed property of the workset.",
+        "workset.unique_id excluded per D-004 — Workset is not Element-backed, so UniqueId is traceability only, never identity."
+      ]
+    },
+    "worksets_doc": {
+      "join_key_schema": "worksets_doc.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [],
+      "optional_items": [
+        "worksets_doc.is_workshared",
+        "worksets_doc.active_workset_name",
+        "worksets_doc.count_user_workset",
+        "worksets_doc.count_standard_workset",
+        "worksets_doc.count_view_workset",
+        "worksets_doc.count_family_workset",
+        "worksets_doc.count_other_workset"
+      ],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "Single synthetic document-level summary record — no per-record required discriminator; all fields optional to match the record's own minima (nothing blocks it)."
+      ]
     }
   }
 }

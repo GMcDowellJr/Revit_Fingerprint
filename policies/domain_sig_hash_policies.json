@@ -1017,6 +1017,49 @@
         "wt.stack_hash_loose"
       ],
       "sig_hash_schema": "wall_types.sig_hash.v1"
+    },
+    "worksets": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "workset.is_default_workset",
+        "workset.kind",
+        "workset.name"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [
+        "workset.name",
+        "workset.kind",
+        "workset.is_default_workset"
+      ],
+      "sig_hash_schema": "worksets.sig_hash.v1"
+    },
+    "worksets_doc": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "worksets_doc.count_family_workset",
+        "worksets_doc.count_other_workset",
+        "worksets_doc.count_standard_workset",
+        "worksets_doc.count_user_workset",
+        "worksets_doc.count_view_workset",
+        "worksets_doc.is_workshared"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": false
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [],
+      "sig_hash_schema": "worksets_doc.sig_hash.v1"
     }
   },
   "identity_item_schema": "identity_items.v1",
