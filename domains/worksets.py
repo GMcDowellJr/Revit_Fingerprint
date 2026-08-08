@@ -2,32 +2,44 @@
 """
 Worksets domain extractor.
 
-Fingerprints the workset partition of a workshared document:
+Fingerprints the workset partition of a workshared document via TWO
+independent single-collector extractors, each wired with its own
+_domain_run() call in runner/run_dynamo.py (like object_styles_model /
+object_styles_annotation / ...):
 
-- One identity record per user-facing `Workset`
-  (`FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset)`).
-  `workset.name` / `workset.kind` / `workset.is_editable` /
-  `workset.is_default_workset` are the deterministic, session-independent
-  properties that drive `sig_hash`. `workset.owner` / `workset.is_active_workset`
-  are live editing-session state (who currently has the workset checked out,
-  which workset the current session happens to have active) and
-  `workset.unique_id` is non-Element-backed identity (D-004 restricts
-  `UniqueId` to element-backed entities; `Workset` is not one) -- all three
-  are captured as identity evidence (required, block-if-unreadable) so a
-  genuine API read failure still surfaces, but they are deliberately excluded
-  from `sig_basis.keys_used` so the hash stays "stable across sessions" per
+- extract_worksets() -> domain="worksets": one identity record per
+  user-facing `Workset` (`FilteredWorksetCollector(doc)
+  .OfKind(WorksetKind.UserWorkset)`). `workset.name` / `workset.kind` /
+  `workset.is_editable` / `workset.is_default_workset` are the
+  deterministic, session-independent properties that drive `sig_hash`.
+  `workset.owner` / `workset.is_active_workset` are live editing-session
+  state (who currently has the workset checked out, which workset the
+  current session happens to have active) and `workset.unique_id` is
+  non-Element-backed identity (D-004 restricts `UniqueId` to
+  element-backed entities; `Workset` is not one) -- all three are captured
+  as identity evidence (required, block-if-unreadable) so a genuine API
+  read failure still surfaces, but they are deliberately excluded from
+  `sig_basis.keys_used` so the hash stays "stable across sessions" per
   CLAUDE.md's hash-semantics rules.
-- One synthetic document-level record (`domain="worksets_doc"`,
-  `record_id="worksets:_doc"`) summarizing `doc.IsWorkshared`, the active
-  workset's name, and a population count per `WorksetKind` (all kinds, not
-  just `UserWorkset`). Document-level fields are optional (never block the
-  record) so a doc-level read hiccup can never take down the per-workset
-  records -- this is why doc-level facts are emitted as a *separate* domain
-  ("worksets_doc") rather than folded into the "worksets" per-record schema:
-  record.v2's `required_keys` are enforced uniformly across every record of
-  a domain, and the two record shapes have no required keys in common.
+- extract_worksets_doc() -> domain="worksets_doc": a single synthetic
+  document-level record (`record_id="worksets:_doc"`) summarizing
+  `doc.IsWorkshared`, the active workset's name, and a population count per
+  `WorksetKind` (all kinds, not just `UserWorkset`). Document-level fields
+  are optional (never block the record). `worksets_doc.active_workset_name`
+  is captured as evidence but excluded from `sig_basis.keys_used` for the
+  same session-stability reason as `workset.is_active_workset` above.
 
-This is a GLOBAL domain -- worksets are defined once per document.
+These are two separate top-level domains -- not one "worksets" payload with
+a "worksets_doc"-tagged record folded in -- because
+tools/export_to_flat_tables.py derives each flattened row's `domain` from
+the top-level fingerprint key the runner stores the payload under
+(`fingerprint[domain_name] = legacy`), not from the record's own `domain`
+field. A record.v2 domain's `required_keys` are also enforced uniformly
+across every record of that domain, and the per-workset and doc-level
+record shapes have no required keys in common, so one contract entry can't
+express "required for one shape, optional for the other" either.
+
+This is a GLOBAL domain family -- worksets are defined once per document.
 
 Per-record identity: `workset.name` (Workset is not Element-backed, so
 UniqueId is traceability evidence only, per D-004 -- never the record key).
@@ -99,6 +111,20 @@ _WORKSET_KIND_FIELD_SUFFIX = (
     ("ViewWorkset", "view_workset"),
     ("FamilyWorkset", "family_workset"),
     ("OtherWorkset", "other_workset"),
+)
+
+# Document-level identity keys that drive worksets_doc's sig_hash. Excludes
+# worksets_doc.active_workset_name for the same reason WORKSETS_SEMANTIC_KEYS
+# excludes workset.is_active_workset: it reflects whichever workset the
+# current session happens to have active, so the same saved model can
+# produce a different active-workset name across sessions -- hashing it
+# would break "stable across sessions" even though the per-workset active
+# flag is already deliberately kept out of the hash for the same reason.
+WORKSETS_DOC_SEMANTIC_KEYS = tuple(
+    sorted(
+        {"worksets_doc.is_workshared"}
+        | {"worksets_doc.count_{}".format(suffix) for _kind, suffix in _WORKSET_KIND_FIELD_SUFFIX}
+    )
 )
 
 # CLR enum members to skip during dir()/getattr introspection (matches
@@ -324,7 +350,8 @@ def _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts
     # hiccup must not take down the per-workset records or leave the
     # summary record entirely absent.
     status = STATUS_DEGRADED if any_incomplete else STATUS_OK
-    sig_hash = make_hash(serialize_identity_items(doc_items_sorted))
+    semantic_items = [it for it in doc_items_sorted if it.get("k") in WORKSETS_DOC_SEMANTIC_KEYS]
+    sig_hash = make_hash(serialize_identity_items(semantic_items))
 
     rec = build_record_v2(
         domain="worksets_doc",
@@ -355,24 +382,83 @@ def _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts
         emit_selectors=True,
     )
 
+    unknown_keys = {"worksets_doc.active_workset_name"}
     rec["phase2"] = {
         "schema": "phase2.worksets_doc.v1",
         "grouping_basis": "phase2.hypothesis",
         "cosmetic_items": phase2_sorted_items([]),
         "coordination_items": phase2_sorted_items([]),
-        "unknown_items": phase2_sorted_items([]),
+        "unknown_items": phase2_sorted_items(
+            [dict(it) for it in doc_items_sorted if it.get("k") in unknown_keys]
+        ),
     }
     rec["sig_basis"] = {
         "schema": "worksets_doc.sig_basis.v1",
-        "keys_used": [it.get("k") for it in doc_items_sorted],
+        "keys_used": list(WORKSETS_DOC_SEMANTIC_KEYS),
     }
 
     return rec
 
 
+def _resolve_active_workset_id(doc, is_workshared):
+    if not is_workshared:
+        return None
+    try:
+        wt = doc.GetWorksetTable()
+        return wt.GetActiveWorksetId()
+    except Exception:
+        return None
+
+
+def _collect_user_worksets(doc, is_workshared):
+    """Returns (worksets, collector_failed).
+
+    collector_failed distinguishes "the collector genuinely threw" from
+    "the collector ran and legitimately returned zero worksets" -- callers
+    must not treat the former as an empty-population state (see review
+    finding on domains/worksets.py: silently downgrading a collector
+    exception to an empty list let the domain report success while every
+    real record disappeared).
+    """
+    if not is_workshared:
+        return [], False
+    try:
+        return list(FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset)), False
+    except Exception:
+        return [], True
+
+
+def _collect_kind_counts(doc, is_workshared):
+    kind_counts = {}
+    if not is_workshared:
+        return kind_counts
+    for kind_name, _suffix in _WORKSET_KIND_FIELD_SUFFIX:
+        kind_attr = getattr(WorksetKind, kind_name, None)
+        if kind_attr is None:
+            kind_counts[kind_name] = None
+            continue
+        try:
+            kind_counts[kind_name] = len(list(FilteredWorksetCollector(doc).OfKind(kind_attr)))
+        except Exception:
+            kind_counts[kind_name] = None
+    return kind_counts
+
+
+def _resolve_active_workset_name(user_worksets, active_workset_id):
+    if active_workset_id is None:
+        return None
+    for ws in user_worksets:
+        try:
+            if ws.Id == active_workset_id:
+                return ws.Name
+        except Exception:
+            continue
+    return None
+
+
 def extract_worksets(doc, ctx=None):
     """
-    Extract Worksets fingerprint from document.
+    Extract per-UserWorkset identity records (domain="worksets").
 
     Args:
         doc: Revit Document
@@ -407,44 +493,10 @@ def extract_worksets(doc, ctx=None):
     except Exception:
         is_workshared = False
 
-    active_workset_id = None
-    if is_workshared:
-        try:
-            wt = doc.GetWorksetTable()
-            active_workset_id = wt.GetActiveWorksetId()
-        except Exception:
-            active_workset_id = None
-
-    user_worksets = []
-    if is_workshared:
-        try:
-            user_worksets = list(FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset))
-        except Exception:
-            user_worksets = []
+    active_workset_id = _resolve_active_workset_id(doc, is_workshared)
+    user_worksets, collector_failed = _collect_user_worksets(doc, is_workshared)
 
     info["raw_count"] = len(user_worksets)
-
-    kind_counts = {}
-    if is_workshared:
-        for kind_name, _suffix in _WORKSET_KIND_FIELD_SUFFIX:
-            kind_attr = getattr(WorksetKind, kind_name, None)
-            if kind_attr is None:
-                kind_counts[kind_name] = None
-                continue
-            try:
-                kind_counts[kind_name] = len(list(FilteredWorksetCollector(doc).OfKind(kind_attr)))
-            except Exception:
-                kind_counts[kind_name] = None
-
-    active_workset_name = None
-    if is_workshared and active_workset_id is not None:
-        for ws in user_worksets:
-            try:
-                if ws.Id == active_workset_id:
-                    active_workset_name = ws.Name
-                    break
-            except Exception:
-                continue
 
     v2_records = []
     v2_sig_hashes = []
@@ -458,11 +510,6 @@ def extract_worksets(doc, ctx=None):
         else:
             v2_block_reasons["record_blocked:{}".format(rec.get("record_id"))] = True
 
-    doc_rec = _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts, ctx)
-    v2_records.append(doc_rec)
-    if doc_rec.get("sig_hash"):
-        v2_sig_hashes.append(doc_rec["sig_hash"])
-
     info["records"] = sorted(v2_records, key=lambda r: safe_str(r.get("record_id", "")))
     info["count"] = len(v2_records)
     info["record_rows"] = [
@@ -474,7 +521,14 @@ def extract_worksets(doc, ctx=None):
         for r in info["records"]
     ]
 
-    if v2_sig_hashes:
+    if collector_failed:
+        # A genuine API/collector failure must never look like a legitimate
+        # empty population -- surface it as an explicit block reason so the
+        # runner does not apply its empty-population exemption.
+        info["hash_v2"] = None
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {"user_worksets_collector_unreadable": True}
+    elif v2_sig_hashes:
         info["hash_v2"] = make_hash(sorted(v2_sig_hashes))
         info["debug_v2_blocked"] = False
         info["debug_v2_block_reasons"] = {}
@@ -482,5 +536,78 @@ def extract_worksets(doc, ctx=None):
         info["hash_v2"] = None
         info["debug_v2_blocked"] = True
         info["debug_v2_block_reasons"] = v2_block_reasons or {"no_nonblocked_records": True}
+
+    return info
+
+
+def extract_worksets_doc(doc, ctx=None):
+    """
+    Extract the single document-level worksets summary record
+    (domain="worksets_doc").
+
+    Emitted as its own top-level domain rather than appended to
+    extract_worksets()'s "worksets" records: tools/export_to_flat_tables.py
+    derives each flattened row's `domain` from the top-level fingerprint key
+    the runner stores the payload under (`fingerprint[domain] = legacy`),
+    not from the per-record `domain` field -- so a "worksets_doc"-tagged
+    record folded into the "worksets" payload would flatten as domain
+    "worksets" and the worksets_doc contract/join-key-policy entries would
+    never be reached. Two independent single-collector extractors, wired
+    with two separate _domain_run() calls (like object_styles_model /
+    object_styles_annotation / ...), keeps each record shape under its own
+    correctly-attributed domain.
+
+    Args:
+        doc: Revit Document
+        ctx: Context dictionary (unused)
+
+    Returns:
+        Dictionary with count, hash_v2, records, record_rows.
+    """
+    info = {
+        "count": 0,
+        "raw_count": 0,
+        "records": [],
+        "record_rows": [],
+
+        "hash_v2": None,
+        "debug_v2_blocked": False,
+        "debug_v2_block_reasons": {},
+    }
+
+    if FilteredWorksetCollector is None or WorksetKind is None:
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {"WorksetKind_unavailable": True}
+        return info
+
+    try:
+        is_workshared = bool(getattr(doc, "IsWorkshared", False))
+    except Exception:
+        is_workshared = False
+
+    active_workset_id = _resolve_active_workset_id(doc, is_workshared)
+    user_worksets, _collector_failed = _collect_user_worksets(doc, is_workshared)
+    kind_counts = _collect_kind_counts(doc, is_workshared)
+    active_workset_name = _resolve_active_workset_name(user_worksets, active_workset_id)
+
+    doc_rec = _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts, ctx)
+
+    info["records"] = [doc_rec]
+    info["count"] = 1
+    info["raw_count"] = 1
+    info["record_rows"] = [{
+        "record_key": safe_str(doc_rec.get("record_id", "")),
+        "sig_hash": doc_rec.get("sig_hash", None),
+        "name": safe_str((doc_rec.get("label", {}) or {}).get("display", "")),
+    }]
+
+    if doc_rec.get("sig_hash"):
+        info["hash_v2"] = doc_rec["sig_hash"]
+        info["debug_v2_blocked"] = False
+        info["debug_v2_block_reasons"] = {}
+    else:
+        info["hash_v2"] = None
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {"doc_record_blocked": True}
 
     return info

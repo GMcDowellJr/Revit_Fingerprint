@@ -992,6 +992,11 @@ def run_fingerprint(doc, timing=None):
         if legacy is not None:
             fingerprint["worksets"] = legacy
 
+    if _enabled("worksets_doc"):
+        legacy = _domain_run("worksets_doc", worksets.extract_worksets_doc, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["worksets_doc"] = legacy
+
     # Routing completeness check: verify all view templates accounted for
     # across all 5 domains. Emits a runner note if any templates fell through.
     try:

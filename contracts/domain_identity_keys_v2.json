@@ -1024,6 +1024,14 @@
         "workset.is_editable",
         "workset.is_default_workset"
       ],
+      "sig_hash_schema": "worksets.sig_hash.v1",
+      "sig_hash_keys": [
+        "workset.is_default_workset",
+        "workset.is_editable",
+        "workset.kind",
+        "workset.name"
+      ],
+      "sig_hash_key_prefixes": [],
       "minima": {
         "block_if_any_required_not_ok": true
       },
@@ -1043,6 +1051,16 @@
       ],
       "allowed_key_prefixes": [],
       "required_keys": [],
+      "sig_hash_schema": "worksets_doc.sig_hash.v1",
+      "sig_hash_keys": [
+        "worksets_doc.count_family_workset",
+        "worksets_doc.count_other_workset",
+        "worksets_doc.count_standard_workset",
+        "worksets_doc.count_user_workset",
+        "worksets_doc.count_view_workset",
+        "worksets_doc.is_workshared"
+      ],
+      "sig_hash_key_prefixes": [],
       "minima": {
         "block_if_any_required_not_ok": false
       },
