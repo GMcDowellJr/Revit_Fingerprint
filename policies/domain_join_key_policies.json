@@ -940,17 +940,17 @@
       ],
       "optional_items": [
         "workset.kind",
-        "workset.is_editable",
         "workset.is_default_workset"
       ],
       "explicitly_excluded_items": [
         "workset.owner",
         "workset.is_active_workset",
+        "workset.is_editable",
         "workset.unique_id"
       ],
       "notes": [
         "workset.name is the definition-bearing identifier (Revit does not allow duplicate workset names within a document).",
-        "workset.owner and workset.is_active_workset are live editing-session state, not behavior — excluded from joins per the same rule that excludes them from sig_hash.",
+        "workset.owner, workset.is_active_workset, and workset.is_editable are live editing-session/checkout state, not behavior — excluded from joins per the same rule that excludes them from sig_hash. IsEditable reflects whether the *current user* can edit the workset right now, not a fixed property of the workset.",
         "workset.unique_id excluded per D-004 — Workset is not Element-backed, so UniqueId is traceability only, never identity."
       ]
     },

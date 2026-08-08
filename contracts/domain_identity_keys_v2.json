@@ -1021,13 +1021,11 @@
       "required_keys": [
         "workset.name",
         "workset.kind",
-        "workset.is_editable",
         "workset.is_default_workset"
       ],
       "sig_hash_schema": "worksets.sig_hash.v1",
       "sig_hash_keys": [
         "workset.is_default_workset",
-        "workset.is_editable",
         "workset.kind",
         "workset.name"
       ],

@@ -10,16 +10,18 @@ object_styles_annotation / ...):
 - extract_worksets() -> domain="worksets": one identity record per
   user-facing `Workset` (`FilteredWorksetCollector(doc)
   .OfKind(WorksetKind.UserWorkset)`). `workset.name` / `workset.kind` /
-  `workset.is_editable` / `workset.is_default_workset` are the
-  deterministic, session-independent properties that drive `sig_hash`.
-  `workset.owner` / `workset.is_active_workset` are live editing-session
-  state (who currently has the workset checked out, which workset the
-  current session happens to have active) and `workset.unique_id` is
-  non-Element-backed identity (D-004 restricts `UniqueId` to
-  element-backed entities; `Workset` is not one) -- all three are captured
-  as identity evidence (required, block-if-unreadable) so a genuine API
-  read failure still surfaces, but they are deliberately excluded from
-  `sig_basis.keys_used` so the hash stays "stable across sessions" per
+  `workset.is_default_workset` are the deterministic, session-independent
+  properties that drive `sig_hash` (required, block-if-unreadable).
+  `workset.owner` / `workset.is_active_workset` / `workset.is_editable` are
+  live editing-session/checkout state -- who currently has the workset
+  checked out, which workset the current session happens to have active,
+  and whether the workset can currently be edited *by the current user*
+  (changes with borrow/ownership state, not with the saved model) -- and
+  `workset.unique_id` is non-Element-backed identity (D-004 restricts
+  `UniqueId` to element-backed entities; `Workset` is not one). All four are
+  captured as identity evidence (present, contributing to a degraded status
+  if unreadable, but not required/blocking) and are deliberately excluded
+  from `sig_basis.keys_used` so the hash stays "stable across sessions" per
   CLAUDE.md's hash-semantics rules.
 - extract_worksets_doc() -> domain="worksets_doc": a single synthetic
   document-level record (`record_id="worksets:_doc"`) summarizing
@@ -84,11 +86,13 @@ except ImportError:
 
 
 # Per-workset identity keys that drive sig_hash. Deliberately excludes
-# workset.owner / workset.is_active_workset (live session state) and
-# workset.unique_id (non-Element-backed, traceability only per D-004).
+# workset.owner / workset.is_active_workset / workset.is_editable (all live
+# session/checkout state -- IsEditable reflects whether the *current user*
+# can currently edit the workset, which changes with borrow/ownership state
+# and session context, not with the saved model) and workset.unique_id
+# (non-Element-backed, traceability only per D-004).
 WORKSETS_SEMANTIC_KEYS = (
     "workset.is_default_workset",
-    "workset.is_editable",
     "workset.kind",
     "workset.name",
 )
@@ -96,7 +100,6 @@ WORKSETS_SEMANTIC_KEYS = (
 _WORKSETS_REQUIRED_KEYS = (
     "workset.name",
     "workset.kind",
-    "workset.is_editable",
     "workset.is_default_workset",
 )
 
@@ -291,7 +294,7 @@ def _build_per_workset_record(ws, active_workset_id, kind_name_by_int, ctx):
     )
 
     cosmetic_keys = {"workset.owner"}
-    unknown_keys = {"workset.is_active_workset", "workset.unique_id"}
+    unknown_keys = {"workset.is_active_workset", "workset.is_editable", "workset.unique_id"}
     rec["phase2"] = {
         "schema": "phase2.worksets.v1",
         "grouping_basis": "phase2.hypothesis",
@@ -532,7 +535,20 @@ def extract_worksets(doc, ctx=None):
         info["hash_v2"] = make_hash(sorted(v2_sig_hashes))
         info["debug_v2_blocked"] = False
         info["debug_v2_block_reasons"] = {}
+    elif not v2_records:
+        # Legitimately empty population -- most commonly a non-workshared
+        # document, where zero UserWorksets is the expected, normal state,
+        # not a failure. debug_v2_blocked must stay False here so the
+        # runner's empty-population exemption (raw_count == 0 and not
+        # debug_v2_blocked) applies instead of marking every non-workshared
+        # document's "worksets" domain as blocked.
+        info["hash_v2"] = None
+        info["debug_v2_blocked"] = False
+        info["debug_v2_block_reasons"] = {}
     else:
+        # Records existed (is_workshared, collector succeeded) but every one
+        # of them was individually blocked -- a genuine problem, distinct
+        # from the legitimately-empty case above.
         info["hash_v2"] = None
         info["debug_v2_blocked"] = True
         info["debug_v2_block_reasons"] = v2_block_reasons or {"no_nonblocked_records": True}
