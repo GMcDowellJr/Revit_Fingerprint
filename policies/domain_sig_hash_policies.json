@@ -1065,6 +1065,7 @@
       "allowed_item_prefixes": [],
       "allowed_items": [
         "bo.category",
+        "bo.filter_has_value",
         "bo.sorting_order",
         "bo.sorting_parameter_id"
       ],
@@ -1075,7 +1076,8 @@
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
         "sig_hash is computed post-extraction from canonical identity_basis.items.",
-        "Hand-added, not via a full generate_sig_hash_policy.py re-run, matching the worksets/worksets_doc entries above -- the checked-in policy file has hand-curated notes for other domains that a wholesale regeneration would overwrite."
+        "Hand-added, not via a full generate_sig_hash_policy.py re-run, matching the worksets/worksets_doc entries above -- the checked-in policy file has hand-curated notes for other domains that a wholesale regeneration would overwrite.",
+        "bo.filter_has_value is semantic (drives sig_hash) but not required -- an unreadable read degrades the record rather than blocking it."
       ],
       "required_items": [
         "bo.category",

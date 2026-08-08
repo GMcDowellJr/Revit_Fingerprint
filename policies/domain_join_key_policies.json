@@ -980,7 +980,8 @@
       ],
       "optional_items": [
         "bo.sorting_order",
-        "bo.sorting_parameter_id"
+        "bo.sorting_parameter_id",
+        "bo.filter_has_value"
       ],
       "explicitly_excluded_items": [
         "bo.family_name",

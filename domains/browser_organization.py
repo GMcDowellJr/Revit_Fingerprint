@@ -18,9 +18,16 @@ API call produced this org), not a Revit-read property, so it is always
 `ITEM_Q_OK` whenever a record is built at all.
 
 Fields (per tools/probes/probe_browser_organization.py, confirmed at Step 0):
-- `bo.category` / `bo.sorting_order` / `bo.sorting_parameter_id`: semantic
-  (drive `sig_hash`) -- these are the org's actual configured grouping/
-  sorting behavior.
+- `bo.category` / `bo.sorting_order` / `bo.sorting_parameter_id` /
+  `bo.filter_has_value`: semantic (drive `sig_hash`) -- these are the org's
+  actual configured grouping/sorting/filtering behavior. `bo.filter_has_value`
+  (`org.GetParameters("Filter")[0].HasValue`) is included so two otherwise-
+  identical browser organizations that differ only in whether a browser
+  filter is configured do not silently collapse to the same `sig_hash` --
+  the probe confirmed this read succeeds for every probed organization (see
+  audit_results/audit_11_domain_extractor_delta_step0_findings.md Sec. 4.3's
+  `filter_param_has_value` correction), so it is captured even though the
+  task's original field list omitted it.
 - `bo.sorting_parameter_id` resolves to a human-readable parameter name via
   `dir()`/`getattr` `BuiltInParameter` introspection (same proven pattern as
   the probe's `bip_lookup` and `domains/worksets.py`'s `WorksetKind`
@@ -107,6 +114,7 @@ from core.record_v2 import (
     canonicalize_str,
     canonicalize_str_allow_empty,
     canonicalize_int,
+    canonicalize_bool,
     make_identity_item,
     serialize_identity_items,
     build_record_v2,
@@ -142,10 +150,18 @@ _ORG_CATEGORIES = (
 # per the Phase-2 bucket rule, never behavior).
 BROWSER_ORGANIZATION_SEMANTIC_KEYS = (
     "bo.category",
+    "bo.filter_has_value",
     "bo.sorting_order",
     "bo.sorting_parameter_id",
 )
 
+# bo.filter_has_value is deliberately NOT required: a read failure there
+# (org.GetParameters("Filter") returning no "Filter" parameter, or the read
+# itself throwing) still contributes a distinct, non-"ok" value to the
+# sig_hash preimage above (never silently collapsed into the "no filter"
+# state), but must not block the whole record over a single non-essential
+# evidence field the way an unreadable bo.category/sorting_order/
+# sorting_parameter_id would.
 _BROWSER_ORGANIZATION_REQUIRED_KEYS = (
     "bo.category",
     "bo.sorting_order",
@@ -308,6 +324,25 @@ def _build_record(category, org, doc, is_workshared, bip_lookup, workset_name_to
     fam_v, fam_q = canonicalize_str_allow_empty(fam_raw)
 
     try:
+        filter_params = list(org.GetParameters("Filter") or [])
+    except Exception:
+        filter_params = None
+    if filter_params is None:
+        filter_v, filter_q = (None, ITEM_Q_UNREADABLE)
+    elif not filter_params:
+        # No "Filter" parameter found on this org -- confirmed present for
+        # every probed organization at Step 0, so treat an absent parameter
+        # as an unexpected read gap rather than a legitimate not-applicable
+        # state (fail-soft: don't collapse "couldn't read it" into "N/A").
+        filter_v, filter_q = (None, ITEM_Q_UNREADABLE)
+    else:
+        try:
+            has_value = bool(filter_params[0].HasValue)
+            filter_v, filter_q = canonicalize_bool(has_value)
+        except Exception:
+            filter_v, filter_q = (None, ITEM_Q_UNREADABLE)
+
+    try:
         oid_int = org.Id.IntegerValue
     except Exception:
         oid_int = None
@@ -327,6 +362,7 @@ def _build_record(category, org, doc, is_workshared, bip_lookup, workset_name_to
         make_identity_item("bo.category", category_v, category_q),
         make_identity_item("bo.sorting_order", so_v, so_q),
         make_identity_item("bo.sorting_parameter_id", sp_v, sp_q),
+        make_identity_item("bo.filter_has_value", filter_v, filter_q),
         make_identity_item("bo.family_name", fam_v, fam_q),
         make_identity_item("bo.org_id", oid_v, oid_q),
         make_identity_item("bo.unique_id", uid_v, uid_q),
@@ -489,29 +525,29 @@ def extract_browser_organization(doc, ctx=None):
         for r in info["records"]
     ]
 
-    if v2_sig_hashes:
+    if read_errors or v2_block_reasons:
+        # A category read failure or an individually-blocked record must
+        # never be silently absorbed into a partial-success aggregate hash
+        # just because other categories/records happened to succeed -- that
+        # would make an incomplete extraction indistinguishable from a
+        # complete one. Block the aggregate whenever either occurs, even if
+        # v2_sig_hashes is non-empty.
+        info["hash_v2"] = None
+        info["debug_v2_blocked"] = True
+        reasons = dict(v2_block_reasons)
+        for cat in read_errors:
+            reasons["category_unreadable:{}".format(cat)] = True
+        info["debug_v2_block_reasons"] = reasons
+    elif v2_sig_hashes:
         info["hash_v2"] = make_hash(sorted(v2_sig_hashes))
         info["debug_v2_blocked"] = False
         info["debug_v2_block_reasons"] = {}
-    elif not v2_records:
-        if read_errors:
-            # A genuine API/getter failure on every category must never look
-            # like a legitimate empty population.
-            info["hash_v2"] = None
-            info["debug_v2_blocked"] = True
-            info["debug_v2_block_reasons"] = {"browser_organization_getters_unreadable": True}
-        else:
-            # Legitimately empty population (e.g. a family document, where
-            # the Project Browser concept BrowserOrganization models does
-            # not apply) -- not a failure.
-            info["hash_v2"] = None
-            info["debug_v2_blocked"] = False
-            info["debug_v2_block_reasons"] = {}
     else:
-        # Records existed but every one of them was individually blocked --
-        # a genuine problem, distinct from the legitimately-empty case above.
+        # Zero records, zero read errors -- legitimately empty population
+        # (e.g. a family document, where the Project Browser concept
+        # BrowserOrganization models does not apply) -- not a failure.
         info["hash_v2"] = None
-        info["debug_v2_blocked"] = True
-        info["debug_v2_block_reasons"] = v2_block_reasons or {"no_nonblocked_records": True}
+        info["debug_v2_blocked"] = False
+        info["debug_v2_block_reasons"] = {}
 
     return info

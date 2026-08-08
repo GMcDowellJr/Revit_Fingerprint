@@ -1071,6 +1071,7 @@
         "bo.category",
         "bo.sorting_order",
         "bo.sorting_parameter_id",
+        "bo.filter_has_value",
         "bo.family_name",
         "bo.org_id",
         "bo.unique_id",
@@ -1087,6 +1088,7 @@
       "sig_hash_schema": "browser_organization.sig_hash.v1",
       "sig_hash_keys": [
         "bo.category",
+        "bo.filter_has_value",
         "bo.sorting_order",
         "bo.sorting_parameter_id"
       ],
