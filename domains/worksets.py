@@ -315,12 +315,22 @@ def _build_per_workset_record(ws, active_workset_id, kind_name_by_int, ctx):
 
 
 def _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts, ctx):
+    # is_workshared: True/False when Document.IsWorkshared read successfully;
+    # None when the read itself failed. None must produce "unreadable"
+    # everywhere below, never the same "not applicable" state a confirmed
+    # non-workshared document produces -- those are genuinely different
+    # observations (see _read_is_workshared's docstring).
     doc_items = []
 
-    is_workshared_v, is_workshared_q = canonicalize_bool(is_workshared)
+    if is_workshared is None:
+        is_workshared_v, is_workshared_q = (None, ITEM_Q_UNREADABLE)
+    else:
+        is_workshared_v, is_workshared_q = canonicalize_bool(is_workshared)
     doc_items.append(make_identity_item("worksets_doc.is_workshared", is_workshared_v, is_workshared_q))
 
-    if not is_workshared:
+    if is_workshared is None:
+        awn_v, awn_q = (None, ITEM_Q_UNREADABLE)
+    elif not is_workshared:
         awn_v, awn_q = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
     elif active_workset_name:
         awn_v, awn_q = canonicalize_str(active_workset_name)
@@ -330,7 +340,9 @@ def _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts
 
     for kind_name, suffix in _WORKSET_KIND_FIELD_SUFFIX:
         key = "worksets_doc.count_{}".format(suffix)
-        if not is_workshared:
+        if is_workshared is None:
+            cv, cq = (None, ITEM_Q_UNREADABLE)
+        elif not is_workshared:
             cv, cq = (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
         else:
             cnt = kind_counts.get(kind_name)
@@ -401,6 +413,25 @@ def _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts
     }
 
     return rec
+
+
+def _read_is_workshared(doc):
+    """Returns (is_workshared, is_workshared_for_gating).
+
+    is_workshared: True/False when Document.IsWorkshared read successfully;
+    None when the read itself raised. Callers must not silently coerce None
+    to False for record evidence -- a genuine API/read failure must not
+    look like an ordinary non-workshared document with zero worksets (see
+    review finding on domains/worksets.py).
+    is_workshared_for_gating: a definite bool safe to gate collector calls
+    on -- False (skip collection) whenever the read failed, since nothing
+    downstream can be trusted without first knowing worksharing state.
+    """
+    try:
+        v = bool(getattr(doc, "IsWorkshared", False))
+        return v, v
+    except Exception:
+        return None, False
 
 
 def _resolve_active_workset_id(doc, is_workshared):
@@ -491,10 +522,13 @@ def extract_worksets(doc, ctx=None):
 
     kind_name_by_int = _discover_workset_kind_names()
 
-    try:
-        is_workshared = bool(getattr(doc, "IsWorkshared", False))
-    except Exception:
-        is_workshared = False
+    is_workshared, _is_workshared_for_gating = _read_is_workshared(doc)
+    if is_workshared is None:
+        # Can't determine worksharing state at all -- do not let this look
+        # like an ordinary non-workshared document with zero worksets.
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {"is_workshared_unreadable": True}
+        return info
 
     active_workset_id = _resolve_active_workset_id(doc, is_workshared)
     user_worksets, collector_failed = _collect_user_worksets(doc, is_workshared)
@@ -596,16 +630,16 @@ def extract_worksets_doc(doc, ctx=None):
         info["debug_v2_block_reasons"] = {"WorksetKind_unavailable": True}
         return info
 
-    try:
-        is_workshared = bool(getattr(doc, "IsWorkshared", False))
-    except Exception:
-        is_workshared = False
+    is_workshared, is_workshared_for_gating = _read_is_workshared(doc)
 
-    active_workset_id = _resolve_active_workset_id(doc, is_workshared)
-    user_worksets, _collector_failed = _collect_user_worksets(doc, is_workshared)
-    kind_counts = _collect_kind_counts(doc, is_workshared)
+    active_workset_id = _resolve_active_workset_id(doc, is_workshared_for_gating)
+    user_worksets, _collector_failed = _collect_user_worksets(doc, is_workshared_for_gating)
+    kind_counts = _collect_kind_counts(doc, is_workshared_for_gating)
     active_workset_name = _resolve_active_workset_name(user_worksets, active_workset_id)
 
+    # is_workshared may be None (unreadable) here -- _build_doc_level_record
+    # marks worksets_doc.is_workshared as unreadable rather than a definite
+    # "false" in that case, matching the per-workset domain's guard above.
     doc_rec = _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts, ctx)
 
     info["records"] = [doc_rec]
