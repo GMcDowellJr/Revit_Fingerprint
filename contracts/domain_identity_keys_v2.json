@@ -783,7 +783,10 @@
         "text_type.line_weight",
         "text_type.show_border",
         "text_type.leader_border_offset_in",
-        "text_type.tab_size_in"
+        "text_type.tab_size_in",
+        "text_type.leader_arrowhead_sig_hash",
+        "text_type.leader_arrowhead_uid",
+        "text_type.leader_arrowhead_name"
       ],
       "allowed_key_prefixes": [],
       "required_keys": [
