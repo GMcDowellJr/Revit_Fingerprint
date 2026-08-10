@@ -435,7 +435,20 @@
         "identity.is_workshared",
         "identity.revit_version_number",
         "identity.revit_version_name",
-        "identity.revit_build"
+        "identity.revit_build",
+        "project_info.name",
+        "project_info.number",
+        "project_info.status",
+        "project_info.address",
+        "project_info.issue_date",
+        "project_info.client_name",
+        "project_info.building_name",
+        "project_info.organization_name",
+        "project_info.organization_description",
+        "project_info.ifc_building_guid",
+        "project_info.ifc_project_guid",
+        "project_info.ifc_site_guid",
+        "project_info.office"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -443,12 +456,15 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "project_info.* added by D-025 (identity domain expansion); hand-patched here rather than",
+        "via a full tools/generate_sig_hash_policy.py regen, which would also clobber unrelated",
+        "hand-tuned notes on other domains that have drifted from a strict mechanical regen."
       ],
       "required_items": [
         "identity.is_workshared"
       ],
-      "sig_hash_schema": "identity.sig_hash.v1"
+      "sig_hash_schema": "identity.sig_hash.v2"
     },
     "line_patterns": {
       "allowed_item_prefixes": [],

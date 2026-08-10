@@ -12,6 +12,60 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **`identity` domain expansion: `project_info.*` fields (D-025):**
+  `domains/identity.py` now reads `doc.ProjectInformation` and adds 13 new
+  identity items to its existing single `record_id="document"` record.
+  Twelve are read via the `BuiltInParameter` enum (locale-independent,
+  unlike matching by display name): `project_info.name`
+  (`ProjectInformation.Name`), `.number`, `.status`, `.address`,
+  `.issue_date`, `.client_name`, `.building_name`, `.organization_name`,
+  `.organization_description`, and `.ifc_building_guid`/`.ifc_project_guid`/
+  `.ifc_site_guid` (`IFC_BUILDING_GUID`/`IFC_PROJECT_GUID`/`IFC_SITE_GUID`,
+  confirmed real built-ins via `tools/archetype/bip_lookup.json`). All twelve
+  report `q=unreadable` if the `Parameter` object itself is absent (an
+  unexpected API/document gap) and `q=missing` if it's present but blank.
+  The remaining field, `.office` (Stantec's shared parameter), is read via
+  its confirmed GUID (`Element.get_Parameter(Guid("6b61afc7-13eb-4af5-8b65-
+  889f978af4f3"))`) rather than `LookupParameter("Office")` by display name,
+  which the Revit API can otherwise resolve to an arbitrary same-named
+  parameter if a project contains more than one "Office" definition; it
+  reports `q=unsupported.not_applicable` (not `q=unreadable`) when the
+  shared parameter definition isn't loaded — the expected, legitimate state
+  on any non-Stantec-template project, not a read failure.
+  **Hash-breaking:** these fields are included in `identity_items` /
+  `identity_basis.items` / `sig_hash` (an explicit, documented exception to
+  the "names are metadata only" default rule — see D-025 for the full
+  rationale and the mitigations applied: excluded from the join-key policy,
+  excluded from status/status_reasons/identity_quality computation). Every
+  `identity` domain `sig_hash` changes going forward; previously captured
+  values are not comparable — `identity.py`'s `sig_basis.schema`
+  (`identity.sig_basis.v1` → `.v2`) and both
+  `contracts/domain_identity_keys_v2.json`'s and the hand-patched
+  `policies/domain_sig_hash_policies.json`'s `sig_hash_schema`
+  (`identity.sig_hash.v1` → `.v2`) are bumped so a consumer comparing
+  `sig_hash` across a pre-D-025 and post-D-025 export can tell the two hash
+  definitions apart instead of reading the mismatch as fingerprint drift.
+  `phase2.semantic_keys` ("Phase-2 behavior-defining") stays exactly the
+  pre-D-025 `is_workshared`/`revit_version_number`/`revit_build` core —
+  `project_info.*` is naming/label metadata, not Phase-2-semantic content —
+  while a separate `sig_basis.keys_used` selector correctly lists every
+  `identity_items` key actually hashed (fixing a pre-existing drift where
+  `identity.revit_version_name` was hashed but missing from that list).
+  Office's Address/City/State/Zip/Country/Telephone/Fax/Legal Entity
+  sub-fields are deliberately NOT implemented pending confirmation of their
+  exact parameter names against a real Stantec-template project (no live
+  Revit/Dynamo access was available to confirm them).
+  `contracts/domain_identity_keys_v2.json` and
+  `policies/domain_join_key_policies.json`/`policies/domain_sig_hash_policies.json`
+  updated accordingly (the latter hand-patched, not regenerated, to avoid
+  clobbering unrelated hand-tuned notes on other domains). No change to
+  `file_metadata.csv`, `tools/build_segment_manifest.py`, or any governance
+  narrative file — confirmed zero overlap in Step 0
+  (`audit_results/audit_11_domain_extractor_delta_step0_findings.md` §5).
+  Refined through several PR-review rounds after the initial implementation
+  (which read `Office` and the three IFC GUID fields by display name via
+  `LookupParameter`, and left the hash schemas unversioned) — see DECISIONS.md
+  D-025 for the full history of what changed and why.
 - **Name-target bundle BI output location correction (PR3 follow-up):**
   `run_bundle_analysis_for_target()` (`tools/bundle_analysis/run_bundle_analysis.py`) now
   relocates the `--comparison-target name` leg's completed ALL-view output from the

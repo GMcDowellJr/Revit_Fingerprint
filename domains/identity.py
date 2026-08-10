@@ -7,8 +7,14 @@ Captures project metadata including:
 - Central path / file path
 - Worksharing status
 - Revit version information
+- ProjectInformation fields (project_info.*): built-in project metadata
+  (number/status/address/issue date/client/building/organization/IFC GUIDs)
+  plus the Stantec "Office" shared parameter, where present.
 
-This is not a fingerprinted domain (no hash) - purely metadata.
+Despite the module summary above, this domain DOES compute a real sig_hash
+(see identity_items / build_record_v2 below) from a subset of its captured
+fields -- the "no hash" description is stale relative to the code and is not
+updated here beyond this note, per this change's own scope boundary.
 """
 
 import os
@@ -41,6 +47,8 @@ from core.record_v2 import (
     STATUS_DEGRADED,
     STATUS_OK,
     ITEM_Q_OK,
+    ITEM_Q_UNREADABLE,
+    ITEM_Q_UNSUPPORTED_NOT_APPLICABLE,
     build_record_v2,
     canonicalize_bool,
     canonicalize_str,
@@ -51,9 +59,192 @@ from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy, compute_projection_status
 
 try:
-    from Autodesk.Revit.DB import WorksharingUtils
+    from Autodesk.Revit.DB import WorksharingUtils, BuiltInParameter
 except ImportError:
     WorksharingUtils = None
+    BuiltInParameter = None
+
+try:
+    from System import Guid
+except ImportError:
+    Guid = None
+
+
+# ---------------------------
+# project_info.* field tables
+# ---------------------------
+#
+# Built-ins: present on ProjectInformation for every Revit project regardless
+# of template (confirmed via tools/probes/probe_identity.py's definition_origin
+# classifier -- see audit_results/audit_11_domain_extractor_delta_step0_findings.md
+# section 5.2). Read via BuiltInParameter so behavior is independent of Revit's
+# display-language locale (LookupParameter-by-name is locale-sensitive). The
+# three IFC GUID fields are ALSO confirmed built-ins (PR review follow-up):
+# tools/archetype/bip_lookup.json (a generated BuiltInParameter id->name
+# registry consumed elsewhere, e.g. domains/browser_organization.py) records
+# IFC_PROJECT_GUID/IFC_BUILDING_GUID/IFC_SITE_GUID as real enum members, not
+# custom/shared parameters -- moved here from the named-field table below.
+_PROJECT_INFO_BUILTIN_FIELDS = (
+    ("project_info.number", "PROJECT_NUMBER"),
+    ("project_info.status", "PROJECT_STATUS"),
+    ("project_info.address", "PROJECT_ADDRESS"),
+    ("project_info.issue_date", "PROJECT_ISSUE_DATE"),
+    ("project_info.client_name", "CLIENT_NAME"),
+    ("project_info.building_name", "PROJECT_BUILDING_NAME"),
+    ("project_info.organization_name", "PROJECT_ORGANIZATION_NAME"),
+    ("project_info.organization_description", "PROJECT_ORGANIZATION_DESCRIPTION"),
+    ("project_info.ifc_building_guid", "IFC_BUILDING_GUID"),
+    ("project_info.ifc_project_guid", "IFC_PROJECT_GUID"),
+    ("project_info.ifc_site_guid", "IFC_SITE_GUID"),
+)
+
+# Named (shared/custom) fields: NOT guaranteed present on every document.
+# "Office" is the only remaining entry -- a confirmed real Stantec-authored
+# shared parameter (GUID 6b61afc7-13eb-4af5-8b65-889f978af4f3, per audit 5.2),
+# read via that GUID (see _PROJECT_INFO_SHARED_GUIDS below), not by display
+# name. A missing definition is legitimate absence
+# (ITEM_Q_UNSUPPORTED_NOT_APPLICABLE), not a read failure.
+#
+# NOT implemented here: Office's Address/City/State/Zip/Country/Telephone/Fax/
+# Legal Entity sub-fields. Per this task's own instruction, their exact
+# parameter names must be confirmed against a real Stantec-template project
+# before assuming the probe-data list -- this sandbox has no live Revit/Dynamo
+# access to do that confirmation, so they are deferred rather than guessed.
+_PROJECT_INFO_NAMED_FIELDS = (
+    ("project_info.office", "Office"),
+)
+
+# GUID-based overrides for entries in _PROJECT_INFO_NAMED_FIELDS whose shared-
+# parameter GUID is confirmed (audit 5.2). Element.get_Parameter(Guid) reads
+# the exact bound definition; LookupParameter(name) instead matches by display
+# name and, per Revit API behavior, can resolve to an arbitrary same-named
+# parameter if a project happens to contain more than one definition sharing
+# that display name (e.g. a stray project/local parameter also called
+# "Office").
+_PROJECT_INFO_SHARED_GUIDS = {
+    "project_info.office": "6b61afc7-13eb-4af5-8b65-889f978af4f3",
+}
+
+
+def _param_raw_str(p):
+    """Best-effort string extraction from a Parameter, tolerant of storage type."""
+    raw = p.AsString()
+    if raw is None:
+        raw = p.AsValueString()
+    return raw
+
+
+def _read_project_info_builtin_item(pi, key, bip_name):
+    """Read a ProjectInformation field via BuiltInParameter enum.
+
+    Built-ins are expected to exist on every project's ProjectInformation
+    element; a missing Parameter object (not just an empty value) is treated
+    as unreadable rather than missing, since that would indicate something
+    unexpected about the document/API surface rather than a normal blank field.
+    """
+    if pi is None or BuiltInParameter is None:
+        return make_identity_item(key, None, ITEM_Q_UNREADABLE)
+
+    bip = getattr(BuiltInParameter, bip_name, None)
+    if bip is None:
+        return make_identity_item(key, None, ITEM_Q_UNREADABLE)
+
+    try:
+        p = pi.get_Parameter(bip)
+    except Exception:
+        return make_identity_item(key, None, ITEM_Q_UNREADABLE)
+
+    if p is None:
+        return make_identity_item(key, None, ITEM_Q_UNREADABLE)
+
+    try:
+        raw = _param_raw_str(p)
+    except Exception:
+        return make_identity_item(key, None, ITEM_Q_UNREADABLE)
+
+    v, q = canonicalize_str(raw)
+    return make_identity_item(key, v, q)
+
+
+def _read_project_info_named_item(pi, key, param_name, guid_str=None):
+    """Read a ProjectInformation field by display name (shared/custom
+    parameters without a stable BuiltInParameter id) -- or, when guid_str is
+    given (see _PROJECT_INFO_SHARED_GUIDS), by the shared parameter's GUID via
+    Element.get_Parameter(Guid), which resolves the exact bound definition
+    instead of matching by display name (LookupParameter can otherwise return
+    an arbitrary same-named parameter if more than one exists in a project).
+
+    Distinguishes "parameter definition not loaded on this document" (q=
+    unsupported.not_applicable -- e.g. Stantec's Office on a non-Stantec
+    project) from "parameter present but unreadable" (q=unreadable) and from
+    "parameter present with no value" (q=missing, via canonicalize_str).
+    """
+    if pi is None:
+        return make_identity_item(key, None, ITEM_Q_UNREADABLE)
+
+    if guid_str and Guid is not None:
+        try:
+            p = pi.get_Parameter(Guid(guid_str))
+        except Exception:
+            return make_identity_item(key, None, ITEM_Q_UNREADABLE)
+    else:
+        try:
+            p = pi.LookupParameter(param_name)
+        except Exception:
+            return make_identity_item(key, None, ITEM_Q_UNREADABLE)
+
+    if p is None:
+        return make_identity_item(key, None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
+
+    try:
+        raw = _param_raw_str(p)
+    except Exception:
+        return make_identity_item(key, None, ITEM_Q_UNREADABLE)
+
+    v, q = canonicalize_str(raw)
+    return make_identity_item(key, v, q)
+
+
+def _extract_project_info_items(doc):
+    """Build project_info.* identity items from doc.ProjectInformation.
+
+    Returns a list of IdentityItem dicts (unsorted); callers merge into the
+    domain's identity_items list.
+    """
+    try:
+        pi = doc.ProjectInformation
+    except Exception:
+        pi = None
+
+    items = []
+
+    if pi is None:
+        # ProjectInformation is a well-known singleton element; its absence is
+        # a real gap, not a normal per-field condition -- mark every field
+        # unreadable rather than silently omitting them.
+        for key, _bip_name in _PROJECT_INFO_BUILTIN_FIELDS:
+            items.append(make_identity_item(key, None, ITEM_Q_UNREADABLE))
+        for key, _param_name in _PROJECT_INFO_NAMED_FIELDS:
+            items.append(make_identity_item(key, None, ITEM_Q_UNREADABLE))
+        items.append(make_identity_item("project_info.name", None, ITEM_Q_UNREADABLE))
+        return items
+
+    # project_info.name: ProjectInformation.Name (matches the established
+    # tools/probes/probe_identity.py mechanism/key), not LookupParameter("Project Name").
+    try:
+        name_v, name_q = canonicalize_str(pi.Name)
+    except Exception:
+        name_v, name_q = None, ITEM_Q_UNREADABLE
+    items.append(make_identity_item("project_info.name", name_v, name_q))
+
+    for key, bip_name in _PROJECT_INFO_BUILTIN_FIELDS:
+        items.append(_read_project_info_builtin_item(pi, key, bip_name))
+
+    for key, param_name in _PROJECT_INFO_NAMED_FIELDS:
+        guid_str = _PROJECT_INFO_SHARED_GUIDS.get(key)
+        items.append(_read_project_info_named_item(pi, key, param_name, guid_str=guid_str))
+
+    return items
 
 def _phase2_build_lineage_items(info):
     """
@@ -192,7 +383,12 @@ def extract(doc, ctx=None):
     rb_v, rb_q = canonicalize_str(info.get("revit_build", None))
     identity_items.append(make_identity_item("identity.revit_build", rb_v, rb_q))
 
-    identity_items = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
+    # status/status_reasons are computed from the original core items only
+    # (worksharing/version/build) -- see D-025. project_info.* fields are merged
+    # in afterward: they fully participate in identity_basis.items and sig_hash,
+    # but blank/not-applicable ProjectInfo fields (extremely common in practice --
+    # e.g. Office is absent by design on any non-Stantec-template project) must
+    # not flip this domain's record status to degraded on every ordinary export.
     status_reasons = []
     if any(it.get("q") != ITEM_Q_OK for it in identity_items):
         status_reasons = [
@@ -202,6 +398,10 @@ def extract(doc, ctx=None):
         ]
 
     status = STATUS_OK if not status_reasons else STATUS_DEGRADED
+
+    identity_items = identity_items + _extract_project_info_items(doc)
+    identity_items = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
+
     sig_preimage = serialize_identity_items(identity_items)
     sig_hash = make_hash(sig_preimage) if status != STATUS_BLOCKED else None
 
@@ -216,6 +416,25 @@ def extract(doc, ctx=None):
         emit_selectors=True,
     )
 
+    # sig_basis.keys_used must describe what sig_hash actually hashes (all of
+    # identity_items, per serialize_identity_items(identity_items) above) --
+    # computed dynamically rather than hardcoded so it can't drift from the
+    # real hash inputs as fields are added (this also fixes a pre-existing gap
+    # where "identity.revit_version_name" was hashed but absent from this list).
+    #
+    # This is DELIBERATELY a separate selector from phase2.semantic_keys just
+    # below (PR review follow-up): "what sig_hash hashes" and "what Phase-2
+    # calls behavior-defining" are different questions. project_info.* items
+    # are naming/label metadata (D-025's own framing) included in sig_hash as
+    # an explicit, documented exception -- they must not also be reported as
+    # Phase-2 "semantic" (behavior-defining) content, or consumers of
+    # phase2.semantic_keys would see ordinary metadata edits (e.g. a project
+    # address correction) as semantic/behavioral differences.
+    sig_basis_keys_used = sorted(it["k"] for it in identity_items)
+
+    # phase2.semantic_keys: unchanged by D-025 -- still just the pre-existing
+    # worksharing/version/build behavioral core. "identity.revit_version_name"
+    # stays excluded, as before (it lives in cosmetic_items below instead).
     semantic_keys = sorted(["identity.is_workshared", "identity.revit_version_number", "identity.revit_build"])
     info["phase2"].pop("semantic_items", None)
     info["phase2"]["semantic_keys"] = semantic_keys
@@ -264,8 +483,12 @@ def extract(doc, ctx=None):
     rec_v2["join_key_name_identity"] = name_key
     rec_v2["phase2"] = info["phase2"]
     rec_v2["sig_basis"] = {
-        "schema": "identity.sig_basis.v1",
-        "keys_used": semantic_keys,
+        # v2 (D-025): sig_hash preimage now includes project_info.* content;
+        # bumped so consumers comparing sig_hash across exports can tell a
+        # pre-D-025 export apart from a post-D-025 one instead of reading an
+        # ordinary schema-version difference as fingerprint drift.
+        "schema": "identity.sig_basis.v2",
+        "keys_used": sig_basis_keys_used,
     }
 
     # Back-compat conveniences while the ecosystem pivots to record.v2.
