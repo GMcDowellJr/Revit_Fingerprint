@@ -56,9 +56,14 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `identity.key.not_allowed` for either field and the analysis-side
   `sig_hash` stage (`core/sig_hash_builder.py`) reconstructs the same
   preimage as the extractor's inline hash instead of silently dropping the 2
-  new items. `policies/domain_join_key_policies.json`'s `loaded_family_types`
-  entry is left unchanged — these 2 fields are not join-key candidates in
-  this PR.
+  new items. `policies/domain_join_key_policies.json`'s `loaded_family_types.
+  explicitly_excluded_items` is updated to add `lft.structural_material_type`/
+  `lft.is_active` — without this, `tools/discover_join_policy.py`'s default
+  `discover`/`harsh` modes build join-key candidates from every emitted
+  identity-item key not explicitly excluded, so the 2 new fields (`is_active`
+  in particular — operational per-symbol usage state, not a definitional
+  family property) would have been nominated as join-key candidates despite
+  not being intended as such.
   **Schema version bump:** `sig_hash_schema` for this domain is pinned to
   `loaded_family_types.sig_hash.v2` (was the generator's implicit
   `...v1` default) in both `contracts/domain_identity_keys_v2.json` and
