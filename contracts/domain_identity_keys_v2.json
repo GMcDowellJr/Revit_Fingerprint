@@ -783,9 +783,26 @@
         "text_type.line_weight",
         "text_type.show_border",
         "text_type.leader_border_offset_in",
-        "text_type.tab_size_in"
+        "text_type.tab_size_in",
+        "text_type.leader_arrowhead_sig_hash",
+        "text_type.leader_arrowhead_uid",
+        "text_type.leader_arrowhead_name"
       ],
       "allowed_key_prefixes": [],
+      "sig_hash_keys": [
+        "text_type.font",
+        "text_type.size_in",
+        "text_type.bold",
+        "text_type.italic",
+        "text_type.underline",
+        "text_type.color_rgb",
+        "text_type.width_factor",
+        "text_type.background",
+        "text_type.line_weight",
+        "text_type.show_border",
+        "text_type.leader_border_offset_in",
+        "text_type.tab_size_in"
+      ],
       "required_keys": [
         "text_type.font",
         "text_type.size_in",
@@ -798,7 +815,11 @@
       "minima": {
         "block_if_any_required_not_ok": true
       },
-      "indexed_key_rules": {}
+      "indexed_key_rules": {},
+      "notes": [
+        "text_type.leader_arrowhead_sig_hash/_uid/_name are registered as allowed_keys (governed identity data, visible for join-key/pattern analysis) but deliberately excluded from sig_hash_keys: leader_arrowhead_uid is file-local (D-004 restricts UID use to element-backed identities), leader_arrowhead_name is cosmetic/presentation metadata, and promoting leader_arrowhead_sig_hash itself to hash-contributing is a separate future decision tied to the paused hash-composition discussion, not bundled into this registration change.",
+        "Without this sig_hash_keys override, tools/generate_sig_hash_policy.py would default the sig_hash preimage to every allowed_keys entry on the next policy regeneration, silently pulling the UID/name fields into text_types sig_hash and making identical text types hash differently purely due to per-file arrowhead UID/name — see core/sig_hash_builder.py's build_sig_hash_from_policy, which hashes every policy-allowed item, not just required_keys."
+      ]
     },
     "units": {
       "domain_family": "units",
