@@ -765,7 +765,13 @@
         "units.unit_type_id",
         "units.symbol_type_id",
         "units.accuracy",
-        "units.rounding_method"
+        "units.rounding_method",
+        "units.use_default",
+        "units.use_digit_grouping",
+        "units.use_plus_prefix",
+        "units.suppress_leading_zeros",
+        "units.suppress_spaces",
+        "units.suppress_trailing_zeros"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {

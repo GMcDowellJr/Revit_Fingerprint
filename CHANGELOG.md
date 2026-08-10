@@ -12,6 +12,35 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **`units` domain: 6 per-spec boolean formatting flags:**
+  `domains/units.py`'s existing per-spec `FormatOptions` loop now reads
+  `units.use_default`, `units.use_digit_grouping`, `units.use_plus_prefix`,
+  `units.suppress_leading_zeros`, `units.suppress_spaces`,
+  `units.suppress_trailing_zeros` off the same `fmt` object already used
+  for `accuracy`/`rounding_method`, canonicalized via
+  `core.record_v2.canonicalize_bool` (newly imported). Optional (not
+  required — `q=unreadable` on a `FormatOptions` read failure, mirroring
+  `accuracy`/`rounding_method`, never blocks the record).
+  **Hash-breaking:** all 6 keys added to `UNITS_SEMANTIC_KEYS`, so every
+  `units` per-spec `sig_hash` changes going forward — these are genuine
+  numeric-formatting behavior properties, not presentation/naming, so
+  belong in the hash per the existing `accuracy`/`rounding_method`
+  precedent. Also added to the `phase2.semantic_keys` hypothesis bucket
+  (alongside `rounding_method`) so they don't fall into `unknown_items`.
+  `contracts/domain_identity_keys_v2.json`'s `units.allowed_keys` and
+  `policies/domain_sig_hash_policies.json`'s `units.allowed_items`
+  updated accordingly (the latter hand-patched, not regenerated, to avoid
+  clobbering unrelated hand-tuned notes on other domains — same approach
+  as the `identity`/D-025 entry below). `required_keys` (`units.spec`,
+  `units.unit_type_id`) unchanged; existing `accuracy`/`rounding_method`/
+  `spec`/`symbol_type_id`/`unit_type_id` values and statuses unchanged.
+  The doc-level `decimal_symbol`/`digit_grouping_amount`/
+  `digit_grouping_symbol` fields from the same work item are NOT included
+  here — see the flagged design conflict reported separately (a bare
+  `record_id="units:_doc"` record fails contract validation because
+  `units.required_keys` has no conditional-required exemption; needs a
+  `worksets_doc`-style sibling-domain resolution or a contract change,
+  not a mechanical add).
 - **`identity` domain expansion: `project_info.*` fields (D-025):**
   `domains/identity.py` now reads `doc.ProjectInformation` and adds 13 new
   identity items to its existing single `record_id="document"` record.

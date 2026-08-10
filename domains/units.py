@@ -41,6 +41,7 @@ from core.record_v2 import (
     canonicalize_str,
     canonicalize_enum,
     canonicalize_float,
+    canonicalize_bool,
     ITEM_Q_OK,
     ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
@@ -76,6 +77,12 @@ UNITS_SEMANTIC_KEYS = tuple(
             "units.spec",
             "units.symbol_type_id",
             "units.unit_type_id",
+            "units.use_default",
+            "units.use_digit_grouping",
+            "units.use_plus_prefix",
+            "units.suppress_leading_zeros",
+            "units.suppress_spaces",
+            "units.suppress_trailing_zeros",
         }
     )
 )
@@ -248,6 +255,66 @@ def extract(doc, ctx=None):
                 rm_v, rm_q = (None, ITEM_Q_UNREADABLE)
         items.append(make_identity_item("units.rounding_method", rm_v, rm_q))
 
+        # use_default (optional)
+        if fmt is None:
+            ud_v, ud_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            try:
+                ud_v, ud_q = canonicalize_bool(getattr(fmt, "UseDefault", None))
+            except Exception:
+                ud_v, ud_q = (None, ITEM_Q_UNREADABLE)
+        items.append(make_identity_item("units.use_default", ud_v, ud_q))
+
+        # use_digit_grouping (optional)
+        if fmt is None:
+            udg_v, udg_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            try:
+                udg_v, udg_q = canonicalize_bool(getattr(fmt, "UseDigitGrouping", None))
+            except Exception:
+                udg_v, udg_q = (None, ITEM_Q_UNREADABLE)
+        items.append(make_identity_item("units.use_digit_grouping", udg_v, udg_q))
+
+        # use_plus_prefix (optional)
+        if fmt is None:
+            upp_v, upp_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            try:
+                upp_v, upp_q = canonicalize_bool(getattr(fmt, "UsePlusPrefix", None))
+            except Exception:
+                upp_v, upp_q = (None, ITEM_Q_UNREADABLE)
+        items.append(make_identity_item("units.use_plus_prefix", upp_v, upp_q))
+
+        # suppress_leading_zeros (optional)
+        if fmt is None:
+            slz_v, slz_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            try:
+                slz_v, slz_q = canonicalize_bool(getattr(fmt, "SuppressLeadingZeros", None))
+            except Exception:
+                slz_v, slz_q = (None, ITEM_Q_UNREADABLE)
+        items.append(make_identity_item("units.suppress_leading_zeros", slz_v, slz_q))
+
+        # suppress_spaces (optional)
+        if fmt is None:
+            ssp_v, ssp_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            try:
+                ssp_v, ssp_q = canonicalize_bool(getattr(fmt, "SuppressSpaces", None))
+            except Exception:
+                ssp_v, ssp_q = (None, ITEM_Q_UNREADABLE)
+        items.append(make_identity_item("units.suppress_spaces", ssp_v, ssp_q))
+
+        # suppress_trailing_zeros (optional)
+        if fmt is None:
+            stz_v, stz_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            try:
+                stz_v, stz_q = canonicalize_bool(getattr(fmt, "SuppressTrailingZeros", None))
+            except Exception:
+                stz_v, stz_q = (None, ITEM_Q_UNREADABLE)
+        items.append(make_identity_item("units.suppress_trailing_zeros", stz_v, stz_q))
+
         # Sort items by k for validator determinism.
         items_sorted = sorted(items, key=lambda it: it.get("k", ""))
 
@@ -339,6 +406,12 @@ def extract(doc, ctx=None):
             "units.spec",
             "units.unit_type_id",
             "units.rounding_method",
+            "units.use_default",
+            "units.use_digit_grouping",
+            "units.use_plus_prefix",
+            "units.suppress_leading_zeros",
+            "units.suppress_spaces",
+            "units.suppress_trailing_zeros",
         }
         cosmetic_keys = {
             "units.symbol_type_id",
