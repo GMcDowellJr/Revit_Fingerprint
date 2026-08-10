@@ -131,3 +131,40 @@ def test_text_types_sig_hash_excludes_name_includes_behavioral_items():
     behavioral_items = [it for it in items if it["k"] in allowed]
     expected = make_hash(serialize_identity_items(behavioral_items))
     assert sig_hash == expected
+
+
+def test_object_styles_model_sig_hash_excludes_area9_additions():
+    # Area 9 additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name)
+    # register as identity_basis.items via allowed_keys in the registry, but sig_hash_keys
+    # pins the policy's sig-hash preimage to the pre-existing set so the analysis-side
+    # sig_hash_builder does not widen the hash to include them (open bucket question, see
+    # CHANGELOG.md/PR description).
+    policy = get_domain_sig_hash_policy(load_sig_hash_policies(os.path.join("policies", "domain_sig_hash_policies.json")), "object_styles_model")
+    allowed = set(policy["allowed_items"])
+    new_keys = {
+        "obj_style.can_add_subcategory",
+        "obj_style.has_material_quantities",
+        "obj_style.is_cuttable",
+        "obj_style.parent_name",
+    }
+    assert not (new_keys & allowed)
+
+    items = [
+        {"k": "obj_style.row_key", "v": "Walls|self", "q": "ok"},
+        {"k": "obj_style.weight.projection", "v": "2", "q": "ok"},
+        {"k": "obj_style.weight.cut", "v": "3", "q": "ok"},
+        {"k": "obj_style.color.rgb", "v": "10-20-30", "q": "ok"},
+        {"k": "obj_style.pattern_ref.sig_hash", "v": "a" * 32, "q": "ok"},
+        {"k": "obj_style.material_sig_hash", "v": "b" * 32, "q": "ok"},
+        {"k": "obj_style.can_add_subcategory", "v": "true", "q": "ok"},
+        {"k": "obj_style.has_material_quantities", "v": "false", "q": "ok"},
+        {"k": "obj_style.is_cuttable", "v": "false", "q": "ok"},
+        {"k": "obj_style.parent_name", "v": None, "q": "missing"},
+    ]
+    sig_hash, status, _, hash_items = build_sig_hash_from_policy(domain_policy=policy, items=items)
+    assert status == "ok"
+    hashed_keys = [it["k"] for it in hash_items]
+    assert not (new_keys & set(hashed_keys))
+    behavioral_items = [it for it in items if it["k"] in allowed]
+    expected = make_hash(serialize_identity_items(behavioral_items))
+    assert sig_hash == expected
