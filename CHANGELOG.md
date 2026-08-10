@@ -12,6 +12,34 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **`loaded_family_types` domain: `structural_material_type`/`is_active` identity fields (Area 12):**
+  `domains/loaded_family_types.py`'s existing per-family loop now reads
+  `FamilySymbol.StructuralMaterialType` (via `canonicalize_str`, same
+  read-then-canonicalize pattern already used for `cat_name_v`/`fam_name_v`)
+  and `FamilySymbol.IsActive` (via `canonicalize_bool`, the same pattern
+  already used for `fam_is_editable_v`/`fam_is_in_place_v`) off `first`, the
+  representative `FamilySymbol` for the family group — a new read site, not a
+  new call pattern. Both are plain-property reads confirmed `ok` 60/60 across
+  every probed sample (`audit_results/audit_11_domain_extractor_delta_step0_findings.md`
+  §12); no new `ITEM_Q_*` status category is introduced — unreadable/missing
+  still collapse through the file's existing `_safe_attr` + `canonicalize_*`
+  convention. Added as `lft.structural_material_type` and `lft.is_active` in
+  `identity_items`. `CanHaveStructuralSection`/`HasThermalProperties` are
+  explicitly out of scope for this change (zero-arg methods, not on the
+  probe's safety allowlist, no structural-model probe coverage yet).
+  **Hash-breaking:** unlike `object_styles`/`units` (which gate `sig_hash`
+  through an explicit allowed-key filter), `loaded_family_types`'s `sig_hash`
+  is `make_hash(serialize_identity_items(identity_items))` with no filtering
+  step, so every item in `identity_items` already contributes to `sig_hash`
+  by construction — adding these 2 items necessarily changes `sig_hash` for
+  every record in this domain; full re-extraction required (consistent with
+  the existing D-015 "hash-breaking" precedent for domain-shape changes).
+  This PR intentionally touches only `domains/loaded_family_types.py`:
+  `contracts/domain_identity_keys_v2.json`'s `loaded_family_types.allowed_keys`/
+  `required_keys`/`optional` and `policies/domain_join_key_policies.json`'s
+  `loaded_family_types` entry are left unchanged for now — the 2 new fields
+  are governed hash inputs but are not yet registered in the analysis-side
+  key registry or join-key policy; that sync is deferred to a follow-up.
 - **`line_styles` domain: `parent_cat.id`/`parent_cat.name` metadata fields (Area 11):**
   `domains/line_styles.py`'s existing per-subcategory loop (`sc`, iterating
   `Category.SubCategories` under `OST_Lines`) now also reads `sc.Parent`
