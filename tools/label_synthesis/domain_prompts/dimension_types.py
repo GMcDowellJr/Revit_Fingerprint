@@ -613,7 +613,17 @@ def _format_identity_items(
         v = kv[k]
 
         if k in _OPAQUE_KEYS:
-            lines.append(f"{label}: [present — consistent configuration]")
+            # Show a short, stable discriminator (not the full digest) so two
+            # records referencing different configurations still produce
+            # different prompts -- a bare "[present]" literal made every value
+            # of an opaque key collapse to the same prompt text regardless of
+            # which configuration was actually referenced, which could merge
+            # behaviorally distinct join-hash clusters under one synthesized
+            # label (PR #413 review). ref is truncated to 8 chars for real
+            # hash digests; short symbolic values (e.g. "<Solid>") pass through
+            # unchanged since they're already interpretable and short.
+            ref = v[:8] if len(v) > 8 else v
+            lines.append(f"{label}: [present, ref={ref} — consistent configuration]")
             continue
         if k == "dim_type.accuracy":
             lines.append(f"{label}: {_fmt_accuracy(v)}")
