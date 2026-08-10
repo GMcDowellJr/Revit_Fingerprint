@@ -85,14 +85,13 @@
         "dim_type.witness_line_length_in",
         "dim_type.equality_text",
         "dim_type.equality_witness_display",
-        "dim_type.centerline_pattern_name",
+        "dim_type.centerline_pattern_sig_hash",
         "dim_type.centerline_symbol_name",
         "dim_type.centerline_tick_mark_sig_hash",
         "dim_type.interior_tick_mark_sig_hash",
         "dim_type.interior_tick_mark_display",
         "dim_type.text_offset_in",
         "dim_type.alternate_units",
-        "dim_type.alternate_units_format_id",
         "dim_type.alternate_units_prefix",
         "dim_type.alternate_units_suffix"
       ],
@@ -143,7 +142,6 @@
         "dim_type.tick_mark_line_weight",
         "dim_type.text_offset_in",
         "dim_type.alternate_units",
-        "dim_type.alternate_units_format_id",
         "dim_type.alternate_units_prefix",
         "dim_type.alternate_units_suffix"
       ],
@@ -198,7 +196,7 @@
         "dim_type.witness_line_tick_mark_sig_hash",
         "dim_type.equality_text",
         "dim_type.equality_witness_display",
-        "dim_type.centerline_pattern_name",
+        "dim_type.centerline_pattern_sig_hash",
         "dim_type.centerline_symbol_name",
         "dim_type.centerline_tick_mark_sig_hash",
         "dim_type.interior_tick_mark_sig_hash",
@@ -207,7 +205,6 @@
         "dim_type.dimension_string_type",
         "dim_type.show_opening_height",
         "dim_type.alternate_units",
-        "dim_type.alternate_units_format_id",
         "dim_type.alternate_units_prefix",
         "dim_type.alternate_units_suffix"
       ],
@@ -258,7 +255,6 @@
         "dim_type.tick_mark_line_weight",
         "dim_type.text_offset_in",
         "dim_type.alternate_units",
-        "dim_type.alternate_units_format_id",
         "dim_type.alternate_units_prefix",
         "dim_type.alternate_units_suffix"
       ],
@@ -315,7 +311,6 @@
         "dim_type.text_offset_from_leader_in",
         "dim_type.text_offset_from_symbol_in",
         "dim_type.alternate_units",
-        "dim_type.alternate_units_format_id",
         "dim_type.alternate_units_prefix",
         "dim_type.alternate_units_suffix"
       ],
@@ -375,7 +370,6 @@
         "dim_type.text_offset_from_leader_in",
         "dim_type.text_offset_from_symbol_in",
         "dim_type.alternate_units",
-        "dim_type.alternate_units_format_id",
         "dim_type.alternate_units_prefix",
         "dim_type.alternate_units_suffix"
       ],
@@ -425,7 +419,6 @@
         "dim_type.rotate_with_component",
         "dim_type.text_offset_from_leader_in",
         "dim_type.alternate_units",
-        "dim_type.alternate_units_format_id",
         "dim_type.alternate_units_prefix",
         "dim_type.alternate_units_suffix"
       ],

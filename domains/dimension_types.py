@@ -49,6 +49,7 @@ from core.dimension_type_helpers import (
     _read_leader_arrowhead,
     _read_arrowhead_ref_sig_hash,
     _read_element_ref_name,
+    _read_line_pattern_ref_sig_hash,
     _build_alternate_units_items,
     get_type_display_name,
     SHAPE_LINEAR,
@@ -365,8 +366,8 @@ def extract_linear(doc, ctx=None):
             # Note: this is the Linear/Angular Dimension Style "Centerline" tab, a distinct
             # Revit feature from Radial/Diameter's Center Mark (dim_type.center_marks) --
             # confirmed by probe observed_on_shapes (Linear/Angular only, never Radial/Diameter).
-            centerline_pattern_name_v, centerline_pattern_name_q = _read_element_ref_name(
-                d, doc, ui_names=["Centerline Pattern"]
+            centerline_pattern_sig_hash_v, centerline_pattern_sig_hash_q = _read_line_pattern_ref_sig_hash(
+                d, ctx, doc, ui_names=["Centerline Pattern"]
             )
             centerline_symbol_name_v, centerline_symbol_name_q = _read_element_ref_name(
                 d, doc, ui_names=["Centerline Symbol"]
@@ -431,7 +432,7 @@ def extract_linear(doc, ctx=None):
                 make_identity_item("dim_type.witness_line_tick_mark_sig_hash", witness_line_tick_mark_sig_hash_v, witness_line_tick_mark_sig_hash_q),
                 make_identity_item("dim_type.equality_text", equality_text_v, equality_text_q),
                 make_identity_item("dim_type.equality_witness_display", equality_witness_display_v, equality_witness_display_q),
-                make_identity_item("dim_type.centerline_pattern_name", centerline_pattern_name_v, centerline_pattern_name_q),
+                make_identity_item("dim_type.centerline_pattern_sig_hash", centerline_pattern_sig_hash_v, centerline_pattern_sig_hash_q),
                 make_identity_item("dim_type.centerline_symbol_name", centerline_symbol_name_v, centerline_symbol_name_q),
                 make_identity_item("dim_type.centerline_tick_mark_sig_hash", centerline_tick_mark_sig_hash_v, centerline_tick_mark_sig_hash_q),
                 make_identity_item("dim_type.interior_tick_mark_sig_hash", interior_tick_mark_sig_hash_v, interior_tick_mark_sig_hash_q),
@@ -480,7 +481,7 @@ def extract_linear(doc, ctx=None):
                 "dim_type.witness_line_tick_mark_sig_hash",
                 "dim_type.centerline_tick_mark_sig_hash",
                 "dim_type.interior_tick_mark_sig_hash",
-                "dim_type.centerline_pattern_name",
+                "dim_type.centerline_pattern_sig_hash",
                 "dim_type.centerline_symbol_name",
             })
 
@@ -827,8 +828,8 @@ def extract_angular(doc, ctx=None):
                 equality_witness_display_v, equality_witness_display_q = (None, ITEM_Q_UNREADABLE)
 
             # --- Area 7 §4b: centerline / interior tick marks (linear/angular only) ---
-            centerline_pattern_name_v, centerline_pattern_name_q = _read_element_ref_name(
-                d, doc, ui_names=["Centerline Pattern"]
+            centerline_pattern_sig_hash_v, centerline_pattern_sig_hash_q = _read_line_pattern_ref_sig_hash(
+                d, ctx, doc, ui_names=["Centerline Pattern"]
             )
             centerline_symbol_name_v, centerline_symbol_name_q = _read_element_ref_name(
                 d, doc, ui_names=["Centerline Symbol"]
@@ -876,7 +877,7 @@ def extract_angular(doc, ctx=None):
                 make_identity_item("dim_type.witness_line_length_in", witness_line_length_v, witness_line_length_q),
                 make_identity_item("dim_type.equality_text", equality_text_v, equality_text_q),
                 make_identity_item("dim_type.equality_witness_display", equality_witness_display_v, equality_witness_display_q),
-                make_identity_item("dim_type.centerline_pattern_name", centerline_pattern_name_v, centerline_pattern_name_q),
+                make_identity_item("dim_type.centerline_pattern_sig_hash", centerline_pattern_sig_hash_v, centerline_pattern_sig_hash_q),
                 make_identity_item("dim_type.centerline_symbol_name", centerline_symbol_name_v, centerline_symbol_name_q),
                 make_identity_item("dim_type.centerline_tick_mark_sig_hash", centerline_tick_mark_sig_hash_v, centerline_tick_mark_sig_hash_q),
                 make_identity_item("dim_type.interior_tick_mark_sig_hash", interior_tick_mark_sig_hash_v, interior_tick_mark_sig_hash_q),
@@ -910,7 +911,7 @@ def extract_angular(doc, ctx=None):
                 "dim_type.leader_tick_mark_sig_hash",
                 "dim_type.centerline_tick_mark_sig_hash",
                 "dim_type.interior_tick_mark_sig_hash",
-                "dim_type.centerline_pattern_name",
+                "dim_type.centerline_pattern_sig_hash",
                 "dim_type.centerline_symbol_name",
             })
 

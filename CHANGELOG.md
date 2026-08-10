@@ -46,19 +46,32 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   - **§4 equality/centerline/tick-weight** (linear/angular only, correcting this area's
     own initial radial/diameter guess): `dim_type.equality_text`/`_witness_display`
     (`dim_type.equality_formula` dropped — probe storage=`None`/unsupported, not a
-    plain-parameter read); `dim_type.centerline_pattern_name`/`_symbol_name` (new
-    generic `core/dimension_type_helpers._read_element_ref_name()` helper — name-only
-    resolution, not routed through `arrowheads_by_type_id` since these aren't
-    confirmed arrowhead-family references) and `dim_type.centerline_tick_mark_sig_hash`/
+    plain-parameter read); `dim_type.centerline_symbol_name` (new generic
+    `core/dimension_type_helpers._read_element_ref_name()` helper — name-only
+    resolution, not routed through `arrowheads_by_type_id` since it isn't a confirmed
+    arrowhead-family reference) and `dim_type.centerline_tick_mark_sig_hash`/
     `dim_type.interior_tick_mark_sig_hash`/`_display`. `dim_type.tick_mark_line_weight`
     (angular/diameter/linear/radial — distinct from the existing `dim_type.line_weight`).
+    `dim_type.centerline_pattern_sig_hash` (linear/angular only) resolves via a new
+    `core/dimension_type_helpers._read_line_pattern_ref_sig_hash()` helper — the same
+    `ctx["line_pattern_uid_to_hash"]`/`ctx["line_pattern_special_values"]` resolution
+    `domains/object_styles.py`/`domains/line_styles.py` already use for their own
+    `GetLinePatternId()` references, so a built-in pattern id (e.g. the probe's
+    `-3000010`, "Solid") resolves to the same `"<Solid>"` sentinel those domains use
+    instead of collapsing to the same `missing` value as "no centerline pattern"
+    (PR #412 review fix — an earlier revision routed this through a plain
+    `doc.GetElement()` name lookup that returned `missing` for built-in pattern ids,
+    losing the distinction between "Solid" and "none").
   - **§5 alternate units** (all 7 partitions): `dim_type.alternate_units`,
-    `dim_type.alternate_units_format_id`, `dim_type.alternate_units_prefix`/`_suffix`.
-    `core/dimension_type_helpers._read_unit_format_info()` gained an `alternate=False`
-    parameter selecting `GetAlternateUnitsFormatOptions()` over `GetUnitsFormatOptions()`;
-    its exact API name is a best-effort guess (not independently confirmed against a
-    live Revit API in this pass) that fails soft to `ITEM_Q_UNSUPPORTED_NOT_APPLICABLE`
-    on any exception, never a hard failure.
+    `dim_type.alternate_units_prefix`/`_suffix`. `dim_type.alternate_units_format_id`
+    was dropped (PR #412 review fix): it required
+    `DimensionType.GetAlternateUnitsFormatOptions()`, an accessor not confirmed to
+    exist on the Revit surface this repo's committed probe data represents (raises
+    `AttributeError` there) — since every extractor added it as a non-required item and
+    the status-reason loop counts any non-OK optional item, this made every
+    dimension-type record degrade without the field ever capturing real data. Rather
+    than ship a field permanently pinned to `unsupported_not_applicable`, it was
+    removed along with `_read_unit_format_info()`'s `alternate=` parameter.
   - **§6 `Suppress Spaces`** (all 7 partitions, wherever `_read_unit_format_info()` is
     already called): extends that function's return tuple with `suppress_spaces_v/_q`
     read off the same `FormatOptions` object as `rounding`/`accuracy` — same
@@ -77,7 +90,7 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   a mass field-addition pass without a live Revit run to per-family-verify blocking
   behavior against. New ElementId-referenced sig_hash/name fields (`leader_tick_mark_sig_hash`,
   `witness_line_tick_mark_sig_hash`, `centerline_tick_mark_sig_hash`,
-  `interior_tick_mark_sig_hash`, `centerline_pattern_name`, `centerline_symbol_name`,
+  `interior_tick_mark_sig_hash`, `centerline_pattern_sig_hash`, `centerline_symbol_name`,
   `leader_arrowhead_uid`/`_name`/`_sig_hash`) are added to each partition's existing
   "missing is acceptable" status-reason exemption set (same treatment as the
   pre-existing `dim_type.tick_mark_sig_hash`), since a negative/absent reference

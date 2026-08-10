@@ -574,30 +574,32 @@ def _read_tick_mark_sig_hash(d, ctx, doc=None):
 # Unit Format Info Reader
 # ---------------------------------------------------------------------------
 
-def _read_unit_format_info(d, alternate=False):
+def _read_unit_format_info(d):
     """
-    Read UnitsFormatOptions (or, when alternate=True, AlternateUnitsFormatOptions)
-    from a DimensionType and return a tuple of
+    Read UnitsFormatOptions from a DimensionType and return a tuple of
     (unit_format_id_v, unit_format_id_q, rounding_v, rounding_q, accuracy_v, accuracy_q,
      suppress_spaces_v, suppress_spaces_q).
 
     Handles UseDefault by returning ("use_default", ITEM_Q_OK) for all four.
-    Handles unsupported (e.g., SpotSlope, or a shape with no alternate-units tab)
-    by returning (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE).
+    Handles unsupported (e.g., SpotSlope) by returning
+    (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE).
 
     suppress_spaces (Area 7 §6) is read off the same FormatOptions object as
     rounding/accuracy -- same FormatOptions-boolean-flag gap Area 8 documented
     for units.py, just on DimensionType.GetUnitsFormatOptions() instead of the
-    doc-level Units object. Only meaningful for the primary (alternate=False)
-    call per Area 7 §6 scope; callers reading the alternate cluster should
-    ignore this element of the tuple.
+    doc-level Units object.
 
-    GetAlternateUnitsFormatOptions() (Area 7 §5) is a best-effort mirror of
-    GetUnitsFormatOptions() -- its exact name is not independently confirmed
-    against a live Revit API in this pass, so any AttributeError/exception
-    calling it fails soft to UNSUPPORTED_NOT_APPLICABLE via the same
-    _units_fo_not_applicable()-style handling as the primary path, never a
-    hard failure.
+    NOTE: an earlier revision of this function accepted an alternate= flag
+    selecting DimensionType.GetAlternateUnitsFormatOptions() for Area 7 §5's
+    dim_type.alternate_units_format_id field. That accessor does not exist on
+    the Revit surface this repo's committed probe data represents (raises
+    AttributeError there), so every call fell through to
+    ITEM_Q_UNSUPPORTED_NOT_APPLICABLE -- making dim_type.alternate_units_format_id
+    degrade every dimension-type record without ever capturing real data
+    (PR #412 review). The field and the alternate= parameter were removed
+    rather than shipped against an unverified accessor; dim_type.alternate_units
+    (the master toggle) and dim_type.alternate_units_prefix/_suffix (plain
+    String parameters, unaffected by this issue) are retained.
     """
 
     def _units_fo_not_applicable(ex):
@@ -625,10 +627,7 @@ def _read_unit_format_info(d, alternate=False):
     fo = None
     fo_exc = None
     try:
-        if alternate:
-            fo = d.GetAlternateUnitsFormatOptions()
-        else:
-            fo = d.GetUnitsFormatOptions()
+        fo = d.GetUnitsFormatOptions()
     except Exception as ex:
         fo_exc = ex
 
@@ -835,18 +834,28 @@ def _read_element_ref_name(d, doc, ui_names):
     """
     Generic ElementId-parameter -> referenced element's display name
     resolver, for fields that reference a named element but are NOT known
-    to be covered by ctx["arrowheads_by_type_id"] (e.g. Centerline Pattern,
-    a line-pattern reference, and Centerline Symbol, which the probe's
-    sample value ("ANG-Centerline") suggests is a line-style/annotation
-    symbol name rather than an arrowhead -- see Area 7 §4 open question).
-    Resolves by name only, not sig_hash, to avoid asserting an unconfirmed
-    ctx map lookup.
+    to be covered by ctx["arrowheads_by_type_id"] (e.g. Centerline Symbol,
+    which the probe's sample value ("ANG-Centerline") suggests is a
+    line-style/annotation symbol name rather than an arrowhead -- see
+    Area 7 §4 open question). Resolves by name only, not sig_hash, to
+    avoid asserting an unconfirmed ctx map lookup.
+
+    NOT used for Centerline Pattern: that field is a genuine LinePatternId
+    reference (confirmed by the probe's -3000010 example, the same built-in
+    "Solid" pattern id domains/object_styles.py already special-cases) and
+    is resolved via _read_line_pattern_ref_sig_hash() instead, which handles
+    negative/built-in pattern ids through ctx["line_pattern_special_values"]
+    the same way object_styles.py/line_styles.py already do (PR #412 review:
+    this function's doc.GetElement() lookup returns None/missing for a
+    built-in pattern id, collapsing "Solid" and "no pattern" to the same
+    identity value).
 
     Unlike _read_arrowhead_ref_sig_hash (which treats a negative ElementId
     as "no reference" -- built-in tick-mark constants like -2 mean "None"),
     this treats only IntegerValue == 0/None as "no reference": negative
-    built-in ids here (e.g. -3000010 for a built-in line pattern such as
-    "Solid") are real, resolvable references, not a "none selected" state.
+    built-in ids in general are potentially real, resolvable references,
+    not necessarily a "none selected" state -- see _read_line_pattern_ref_sig_hash
+    for the field where that distinction actually matters.
     """
     try:
         p = first_param(d, ui_names=ui_names)
@@ -890,12 +899,98 @@ def _read_element_ref_name(d, doc, ui_names):
 
 
 # ---------------------------------------------------------------------------
+# Line-Pattern-Reference Resolver (Centerline Pattern)
+# ---------------------------------------------------------------------------
+
+def _read_line_pattern_ref_sig_hash(d, ctx, doc, ui_names):
+    """
+    ElementId-parameter -> line-pattern sig_hash resolver for fields that
+    reference a LinePatternElement (e.g. Centerline Pattern), mirroring the
+    established 3-tier resolution domains/object_styles.py and
+    domains/line_styles.py already use for their own line-pattern references
+    (Category.GetLinePatternId()) rather than a plain doc.GetElement() name
+    lookup, which returns None/missing for a negative/built-in pattern id
+    (PR #412 review) -- collapsing "Solid" and "no pattern selected" to the
+    same identity value and hash.
+
+    Resolution order, matching object_styles.py/line_styles.py exactly:
+      1. IntegerValue > 0 and present in ctx["line_pattern_id_to_value"]
+         (pre-canonicalized value for well-known pattern ids).
+      2. IntegerValue > 0, not in (1): resolve doc.GetElement(id).UniqueId
+         through ctx["line_pattern_uid_to_hash"] (populated by
+         domains/line_patterns.py, which runs before dimension_types in
+         runner/run_dynamo.py -- same soft cross-domain dependency already
+         used by _read_arrowhead_ref_sig_hash/_read_tick_mark_sig_hash, no
+         hard require_domain() call).
+      3. IntegerValue <= 0 (a negative built-in pattern id, e.g. -3000010
+         for "Solid"): ctx["line_pattern_special_values"]["solid"].
+      4. No parameter/value/ctx coverage: ITEM_Q_MISSING.
+
+    Returns:
+        (sig_hash_v, sig_hash_q)
+    """
+    try:
+        p = first_param(d, ui_names=ui_names)
+        if p is None or not getattr(p, "HasValue", False):
+            return (None, ITEM_Q_MISSING)
+
+        eid = None
+        try:
+            eid = p.AsElementId()
+        except Exception:
+            return (None, ITEM_Q_UNREADABLE)
+
+        if eid is None:
+            return (None, ITEM_Q_MISSING)
+
+        id_int = getattr(eid, "IntegerValue", 0)
+
+        lp_id_to_value = (ctx or {}).get("line_pattern_id_to_value", {}) if ctx is not None else {}
+        if not isinstance(lp_id_to_value, dict):
+            lp_id_to_value = {}
+        lp_uid_to_sig_hash = (ctx or {}).get("line_pattern_uid_to_hash", None) if ctx is not None else None
+        lp_special_values = (ctx or {}).get("line_pattern_special_values", {}) if ctx is not None else {}
+        if not isinstance(lp_special_values, dict):
+            lp_special_values = {}
+
+        if id_int > 0:
+            pid_key = safe_str(id_int)
+            if pid_key in lp_id_to_value:
+                return canonicalize_str(lp_id_to_value.get(pid_key))
+
+            if not isinstance(lp_uid_to_sig_hash, dict):
+                return (None, ITEM_Q_MISSING)
+
+            try:
+                lp_elem = doc.GetElement(eid) if doc is not None else None
+                lp_uid = canon_str(getattr(lp_elem, "UniqueId", None)) if lp_elem else None
+            except Exception:
+                return (None, ITEM_Q_UNREADABLE)
+
+            if lp_uid and lp_uid in lp_uid_to_sig_hash:
+                # ctx["line_pattern_uid_to_hash"] maps uid -> sig_hash string directly
+                # (domains/line_patterns.py:500), unlike arrowheads_by_type_id's
+                # {type_id: {"sig_hash": ...}} shape.
+                sig_hash = lp_uid_to_sig_hash.get(lp_uid, None)
+                if sig_hash:
+                    return (safe_str(sig_hash), ITEM_Q_OK)
+            return (None, ITEM_Q_MISSING)
+        else:
+            solid_v = lp_special_values.get("solid", None)
+            if solid_v:
+                return canonicalize_str(solid_v)
+            return (None, ITEM_Q_MISSING)
+    except Exception:
+        return (None, ITEM_Q_UNREADABLE)
+
+
+# ---------------------------------------------------------------------------
 # Alternate Units Cluster (Area 7 §5)
 # ---------------------------------------------------------------------------
 
 def _build_alternate_units_items(d):
     """
-    Read the Alternate Units cluster: master toggle, format id, prefix, suffix.
+    Read the Alternate Units cluster: master toggle, prefix, suffix.
 
     Per Greg's correction (Area 7 §5), Revit's UI repeats the Alternate Units
     parameter set across all dimension-type families -- observed on every
@@ -904,9 +999,14 @@ def _build_alternate_units_items(d):
     not gated to a subset of shapes the way Witness Lines/Centerline/Equality
     are.
 
+    dim_type.alternate_units_format_id (the unit-type-id counterpart to
+    dim_type.unit_format_id) was dropped: it required
+    DimensionType.GetAlternateUnitsFormatOptions(), an accessor not
+    confirmed to exist on the Revit surface this repo's probe data
+    represents -- see _read_unit_format_info()'s docstring (PR #412 review).
+
     Returns a list of identity item dicts:
       - dim_type.alternate_units
-      - dim_type.alternate_units_format_id
       - dim_type.alternate_units_prefix
       - dim_type.alternate_units_suffix
     """
@@ -920,16 +1020,6 @@ def _build_alternate_units_items(d):
     except Exception:
         au_v, au_q = (None, ITEM_Q_UNREADABLE)
     items.append(make_identity_item("dim_type.alternate_units", au_v, au_q))
-
-    # alternate_units_format_id (same shape as dim_type.unit_format_id, off
-    # the alternate FormatOptions object; rounding/accuracy intentionally
-    # not surfaced here -- not part of Area 7 §5's requested field set)
-    try:
-        _alt_fo = _read_unit_format_info(d, alternate=True)
-        alt_fmt_v, alt_fmt_q = _alt_fo[0], _alt_fo[1]
-    except Exception:
-        alt_fmt_v, alt_fmt_q = (None, ITEM_Q_UNREADABLE)
-    items.append(make_identity_item("dim_type.alternate_units_format_id", alt_fmt_v, alt_fmt_q))
 
     # alternate_units_prefix
     try:
