@@ -153,7 +153,14 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `explicitly_excluded_items` in `policies/domain_join_key_policies.json` gain the same two
   keys, matching `text_types`' existing `leader_arrowhead_uid`/`_name` exclusions, so
   `tools/discover_join_policy.py`'s `discover`/`harsh` modes can't nominate them as join-key
-  candidates.
+  candidates. `_OPAQUE_KEYS` also gains the other 5 new `*_sig_hash` reference-hash fields
+  (`leader_tick_mark_sig_hash`, `witness_line_tick_mark_sig_hash`,
+  `centerline_tick_mark_sig_hash`, `interior_tick_mark_sig_hash`,
+  `centerline_pattern_sig_hash`), matching the pre-existing `tick_mark_sig_hash`/
+  `leader_arrowhead_sig_hash` treatment (PR #412 review, 5th round): the raw digest isn't
+  interpretable, so label-synthesis prompts show a presence note instead of the value,
+  keeping canonical labels dependent on the referenced configuration rather than opaque
+  implementation details.
 - **`loaded_family_types` domain: `structural_material_type`/`is_active` identity fields (Area 12):**
   `domains/loaded_family_types.py`'s existing per-family loop now reads
   `FamilySymbol.StructuralMaterialType` (via `canonicalize_str`, same

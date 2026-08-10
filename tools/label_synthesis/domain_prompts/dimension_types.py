@@ -467,6 +467,13 @@ _SKIP_KEYS = {
 _OPAQUE_KEYS = {
     "dim_type.tick_mark_sig_hash",
     "dim_type.leader_arrowhead_sig_hash",
+    # Area 7 §2/§3/§4 reference-hash fields (PR #412 review) -- same treatment:
+    # the digest itself isn't interpretable, only its presence/absence is.
+    "dim_type.leader_tick_mark_sig_hash",
+    "dim_type.witness_line_tick_mark_sig_hash",
+    "dim_type.centerline_tick_mark_sig_hash",
+    "dim_type.interior_tick_mark_sig_hash",
+    "dim_type.centerline_pattern_sig_hash",
 }
 
 # Text appearance keys — show only when non-default or differentiating
