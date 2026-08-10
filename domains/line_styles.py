@@ -459,21 +459,29 @@ def extract(doc, ctx=None):
 
             # Parent category (metadata only — never in hash/sig/join).
             # A subcategory with no parent resolves Category.Parent to None; that is a
-            # correct absent value (q=missing), not a read failure.
+            # correct absent value (q=missing). A raised exception on the Parent read
+            # itself is a genuine read failure (q=unreadable) and must not be collapsed
+            # into the same "no parent" state.
+            _parent_read_failed = False
             try:
                 parent_cat_obj = sc.Parent
             except Exception:
                 parent_cat_obj = None
-            try:
-                _pcid_raw = getattr(getattr(parent_cat_obj, "Id", None), "IntegerValue", None) if parent_cat_obj is not None else None
-                _pcid_v, _pcid_q = canonicalize_int(_pcid_raw)
-            except Exception:
+                _parent_read_failed = True
+            if _parent_read_failed:
                 _pcid_v, _pcid_q = (None, ITEM_Q_UNREADABLE)
-            try:
-                _pcname_raw = getattr(parent_cat_obj, "Name", None) if parent_cat_obj is not None else None
-                _pcname_v, _pcname_q = canonicalize_str(_pcname_raw)
-            except Exception:
                 _pcname_v, _pcname_q = (None, ITEM_Q_UNREADABLE)
+            else:
+                try:
+                    _pcid_raw = getattr(getattr(parent_cat_obj, "Id", None), "IntegerValue", None) if parent_cat_obj is not None else None
+                    _pcid_v, _pcid_q = canonicalize_int(_pcid_raw)
+                except Exception:
+                    _pcid_v, _pcid_q = (None, ITEM_Q_UNREADABLE)
+                try:
+                    _pcname_raw = getattr(parent_cat_obj, "Name", None) if parent_cat_obj is not None else None
+                    _pcname_v, _pcname_q = canonicalize_str(_pcname_raw)
+                except Exception:
+                    _pcname_v, _pcname_q = (None, ITEM_Q_UNREADABLE)
             p2_unknown.append(make_identity_item("line_style.parent_cat.id", _pcid_v, _pcid_q))
             p2_unknown.append(make_identity_item("line_style.parent_cat.name", _pcname_v, _pcname_q))
 
