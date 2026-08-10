@@ -254,7 +254,23 @@ def extract(doc, ctx=None):
         fam_is_in_place_v, fam_is_in_place_q = canonicalize_bool(_safe_attr(fam, "IsInPlace", None))
         fam_is_editable_v, fam_is_editable_q = canonicalize_bool(_safe_attr(fam, "IsEditable", None))
         struct_material_type_v, struct_material_type_q = canonicalize_str(_safe_attr(first, "StructuralMaterialType", None))
-        is_active_v, is_active_q = canonicalize_bool(_safe_attr(first, "IsActive", None))
+        # IsActive is per-symbol (type) state, not per-family, and the probe corpus
+        # observed both True/False within a single project — reading only `first`
+        # would make the family-level hash depend on collect_types()'s arbitrary
+        # ordering. Aggregate across all types in the family instead, mirroring the
+        # any_true/all_true -> true/partial/false pattern already used above for
+        # lftp.has_value.
+        is_active_pairs = [canonicalize_bool(_safe_attr(sym, "IsActive", None)) for sym in fam_syms]
+        if any(q == ITEM_Q_UNREADABLE for _, q in is_active_pairs):
+            is_active_v, is_active_q = None, ITEM_Q_UNREADABLE
+        elif all(q == ITEM_Q_MISSING for _, q in is_active_pairs):
+            is_active_v, is_active_q = None, ITEM_Q_MISSING
+        else:
+            actives = [v == "true" for v, q in is_active_pairs if q == ITEM_Q_OK]
+            any_active = any(actives)
+            all_active = all(actives) if actives else False
+            is_active_v = "true" if all_active else ("partial" if any_active else "false")
+            is_active_q = ITEM_Q_OK
 
         fam_symbol_count_raw = None
         try:

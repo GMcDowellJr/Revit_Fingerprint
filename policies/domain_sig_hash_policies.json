@@ -525,7 +525,9 @@
         "lft.family_is_in_place",
         "lft.family_is_editable",
         "lft.family_symbol_count",
-        "lft.type_count"
+        "lft.type_count",
+        "lft.structural_material_type",
+        "lft.is_active"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
