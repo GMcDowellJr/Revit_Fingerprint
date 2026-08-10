@@ -12,6 +12,30 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **`line_styles` domain: `parent_cat.id`/`parent_cat.name` metadata fields (Area 11):**
+  `domains/line_styles.py`'s existing per-subcategory loop (`sc`, iterating
+  `Category.SubCategories` under `OST_Lines`) now also reads `sc.Parent`
+  (the same `Category.Parent` call pattern already used by
+  `domains/object_styles.py:440` for its purge-lookup helper — no new
+  traversal idiom introduced) and emits `line_style.parent_cat.id`
+  (`canonicalize_int` of `Id.IntegerValue`) and `line_style.parent_cat.name`
+  (`canonicalize_str` of `Name`). A subcategory with no parent (a genuinely
+  top-level category) canonicalizes `None` to `q=missing`/`v=null`, not
+  `unreadable` — actual API read failures still canonicalize to
+  `unreadable`. **Bucket placement**: added to `phase2.unknown_items`,
+  matching the existing treatment of `line_style.source_element_id`/
+  `source_unique_id` in this file (metadata/traceability, never in
+  hash/sig/join) rather than `identity_basis.items`. This was an open
+  design question per the task scoping and is being resolved here as
+  "cosmetic/traceability metadata, not identity" — flagging for
+  confirmation rather than assuming it's settled; if `parent_cat` should
+  instead be identity-affecting, that's a separate, deliberate follow-up.
+  **Non-hash-breaking:** not added to `LINE_STYLE_SEMANTIC_KEYS`, so
+  `sig_hash`/`join_key` are unchanged. `contracts/domain_identity_keys_v2.json`'s
+  `line_styles.allowed_keys` is intentionally left unchanged — it does not
+  currently list `source_element_id`/`source_unique_id` either, since that
+  registry governs `identity_basis.items`/sig-hash-policy keys, not the
+  phase2 `unknown_items` bucket.
 - **`object_styles` domain family: 5 per-category identity fields (Area 9):**
   `domains/object_styles.py`'s existing per-`Category` loop (shared by all 4
   `object_styles_*` partitions) now reads `Category.CanAddSubcategory`,
