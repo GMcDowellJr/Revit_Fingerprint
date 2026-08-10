@@ -346,6 +346,32 @@ def test_extract_end_to_end_includes_project_info_in_sig_hash_and_leaves_status_
     assert set(rec["sig_basis"]["keys_used"]) == set(items_by_k.keys())
 
 
+def test_phase2_semantic_keys_excludes_project_info_and_stays_the_pre_d025_core(monkeypatch):
+    """phase2.semantic_keys ("Phase-2 behavior-defining") must stay decoupled
+    from sig_basis.keys_used ("what sig_hash actually hashes") -- project_info.*
+    is naming/label metadata included in sig_hash as an explicit D-025
+    exception, not Phase-2-semantic content, and identity.revit_version_name
+    must stay excluded exactly as it was pre-D-025 (PR review follow-up)."""
+    monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
+    doc = FakeDoc(_stantec_like_pi())
+
+    result = identity_module.extract(doc, ctx=None)
+    rec = result["records"][0]
+
+    assert rec["phase2"]["semantic_keys"] == [
+        "identity.is_workshared",
+        "identity.revit_build",
+        "identity.revit_version_number",
+    ]
+    assert set(rec["phase2"]["semantic_keys"]).isdisjoint(_EXPECTED_KEYS)
+
+    # sig_basis.keys_used, in contrast, DOES include every project_info.* key
+    # (that's the actual D-025 hash-composition change).
+    assert _EXPECTED_KEYS.issubset(set(rec["sig_basis"]["keys_used"]))
+    assert "identity.revit_version_name" in rec["sig_basis"]["keys_used"]
+    assert "identity.revit_version_name" not in rec["phase2"]["semantic_keys"]
+
+
 def test_extract_end_to_end_non_stantec_project_stays_status_ok(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
     doc = FakeDoc(_non_stantec_pi())

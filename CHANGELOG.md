@@ -66,6 +66,15 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   file) — `tools/generate_sig_hash_policy.py`'s `build_policy()` defaults any
   domain without that key to `<domain>.sig_hash.v1`, so the next regeneration
   would otherwise have silently erased the version bump.
+  **Fourth PR-review follow-up:** `phase2.semantic_keys` ("Phase-2
+  behavior-defining") and `sig_basis.keys_used` ("what sig_hash actually
+  hashes") are now two separate selectors instead of one shared dynamically-
+  computed list — the shared version incorrectly reported every
+  `project_info.*` naming/label field, and `identity.revit_version_name`
+  (previously cosmetic-only), as Phase-2 semantic content. `semantic_keys` is
+  back to the pre-D-025 `is_workshared`/`revit_version_number`/`revit_build`
+  core; `sig_basis_keys_used` keeps the fix from the prior commit (all
+  `identity_items` keys).
   `contracts/domain_identity_keys_v2.json` and
   `policies/domain_join_key_policies.json`/`policies/domain_sig_hash_policies.json`
   updated accordingly (the latter hand-patched, not regenerated, to avoid

@@ -421,7 +421,21 @@ def extract(doc, ctx=None):
     # computed dynamically rather than hardcoded so it can't drift from the
     # real hash inputs as fields are added (this also fixes a pre-existing gap
     # where "identity.revit_version_name" was hashed but absent from this list).
-    semantic_keys = sorted(it["k"] for it in identity_items)
+    #
+    # This is DELIBERATELY a separate selector from phase2.semantic_keys just
+    # below (PR review follow-up): "what sig_hash hashes" and "what Phase-2
+    # calls behavior-defining" are different questions. project_info.* items
+    # are naming/label metadata (D-025's own framing) included in sig_hash as
+    # an explicit, documented exception -- they must not also be reported as
+    # Phase-2 "semantic" (behavior-defining) content, or consumers of
+    # phase2.semantic_keys would see ordinary metadata edits (e.g. a project
+    # address correction) as semantic/behavioral differences.
+    sig_basis_keys_used = sorted(it["k"] for it in identity_items)
+
+    # phase2.semantic_keys: unchanged by D-025 -- still just the pre-existing
+    # worksharing/version/build behavioral core. "identity.revit_version_name"
+    # stays excluded, as before (it lives in cosmetic_items below instead).
+    semantic_keys = sorted(["identity.is_workshared", "identity.revit_version_number", "identity.revit_build"])
     info["phase2"].pop("semantic_items", None)
     info["phase2"]["semantic_keys"] = semantic_keys
 
@@ -474,7 +488,7 @@ def extract(doc, ctx=None):
         # pre-D-025 export apart from a post-D-025 one instead of reading an
         # ordinary schema-version difference as fingerprint drift.
         "schema": "identity.sig_basis.v2",
-        "keys_used": semantic_keys,
+        "keys_used": sig_basis_keys_used,
     }
 
     # Back-compat conveniences while the ecosystem pivots to record.v2.

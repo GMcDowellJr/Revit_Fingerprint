@@ -1154,6 +1154,17 @@ To limit the blast radius of that call:
   list that had already drifted from what `sig_hash` actually hashes) is now
   computed dynamically as every `identity_items` key, fixing that drift as a
   side effect rather than as a second, separate hash-algorithm change.
+  **Fourth PR-review follow-up:** that fix was initially applied by having
+  `phase2.semantic_keys` share the same dynamically-computed list as
+  `sig_basis.keys_used` — which was wrong, because it made every newly-hashed
+  `project_info.*` naming/label field (and `identity.revit_version_name`,
+  previously cosmetic-only) look like Phase-2 "semantic" (behavior-defining)
+  content, contradicting this same decision's framing of `project_info.*` as
+  metadata whose hash inclusion is an explicit exception, not a behavioral
+  reclassification. `sig_basis_keys_used` (all `identity_items` keys, what
+  `sig_hash` actually hashes) and `semantic_keys` (unchanged from pre-D-025:
+  just `is_workshared`/`revit_version_number`/`revit_build`, what Phase-2
+  calls behavior-defining) are now two separate variables/selectors.
 
 ### Consequences
 - `identity` domain `sig_hash` values change for every export going forward —
