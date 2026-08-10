@@ -423,7 +423,9 @@
         "lft.shape_gate.category_id",
         "lft.type_parameter_count",
         "lft.family_symbol_count",
-        "lft.type_count"
+        "lft.type_count",
+        "lft.structural_material_type",
+        "lft.is_active"
       ],
       "notes": [
         "Records are at family granularity (one per Family element, not per type).",
@@ -440,6 +442,14 @@
         "",
         "lft.family_is_in_place / lft.family_is_editable optionally narrow matches to",
         "loaded-only or in-place-only subsets.",
+        "",
+        "lft.structural_material_type / lft.is_active (Area 12) are governed sig_hash inputs but",
+        "are explicitly excluded from join-key discovery: is_active is an operational activation",
+        "state (per-symbol usage history, not a definitional property of the family), and",
+        "structural_material_type, while stable per family in the probed corpus, has no probe",
+        "evidence yet establishing it as a cross-project join discriminator. Without this exclusion",
+        "tools/discover_join_policy.py's default discover/harsh modes would nominate both as",
+        "candidates from every emitted identity-item key.",
         "",
         "Excluded from any parameter-row (lftp.*) discovery promotion:",
         "  bip:-1002001 Type Name      -- circular alias of lft.type_name (removed field)",

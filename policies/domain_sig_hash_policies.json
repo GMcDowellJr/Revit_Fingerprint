@@ -525,7 +525,9 @@
         "lft.family_is_in_place",
         "lft.family_is_editable",
         "lft.family_symbol_count",
-        "lft.type_count"
+        "lft.type_count",
+        "lft.structural_material_type",
+        "lft.is_active"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -539,7 +541,7 @@
         "lft.shape_gate.category",
         "lft.type_parameter_schema_hash"
       ],
-      "sig_hash_schema": "loaded_family_types.sig_hash.v1"
+      "sig_hash_schema": "loaded_family_types.sig_hash.v2"
     },
     "materials": {
       "allowed_item_prefixes": [],

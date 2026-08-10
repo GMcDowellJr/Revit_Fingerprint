@@ -12,6 +12,97 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **`loaded_family_types` domain: `structural_material_type`/`is_active` identity fields (Area 12):**
+  `domains/loaded_family_types.py`'s existing per-family loop now reads
+  `FamilySymbol.StructuralMaterialType` (via `canonicalize_str`, same
+  read-then-canonicalize pattern already used for `cat_name_v`/`fam_name_v`)
+  off `first`, the representative `FamilySymbol` for the family group — a new
+  read site, not a new call pattern (the Area 12 probe observed
+  `unique_value_count=1` for this property in every sampled family, i.e. it
+  does not vary by type within a family, so reading a single representative
+  symbol is safe). Both fields are plain-property reads confirmed `ok` 60/60
+  across every probed sample
+  (`audit_results/audit_11_domain_extractor_delta_step0_findings.md` §12); no
+  new `ITEM_Q_*` status category is introduced — unreadable/missing still
+  collapse through the file's existing `_safe_attr` + `canonicalize_*`
+  convention. `CanHaveStructuralSection`/`HasThermalProperties` are
+  explicitly out of scope for this change (zero-arg methods, not on the
+  probe's safety allowlist, no structural-model probe coverage yet).
+  `FamilySymbol.IsActive`, by contrast, **is** per-symbol (type) state — the
+  same probe observed both `True`/`False` within a project — so reading it
+  off a single `first` symbol would make the family-level record depend on
+  `collect_types()`'s (unordered) enumeration order, violating the
+  determinism invariant. Instead it is aggregated via `canonicalize_bool`
+  over every symbol in the family group to a `"true"`/`"false"`/`"partial"`
+  tri-state (mirroring the `any_true`/`all_true` -> `has_value_agg` pattern
+  already used in this file for `lftp.has_value`), with `ITEM_Q_UNREADABLE`
+  dominant over `ITEM_Q_MISSING` dominant over `ITEM_Q_OK` across the group.
+  Added as `lft.structural_material_type` and `lft.is_active` in
+  `identity_items`.
+  **Hash-breaking:** unlike `object_styles`/`units` (which gate `sig_hash`
+  through an explicit allowed-key filter), `loaded_family_types`'s `sig_hash`
+  is `make_hash(serialize_identity_items(identity_items))` with no filtering
+  step, so every item in `identity_items` already contributes to `sig_hash`
+  by construction — adding these 2 items necessarily changes `sig_hash` for
+  every record in this domain; full re-extraction required (consistent with
+  the existing D-015 "hash-breaking" precedent for domain-shape changes).
+  `contracts/domain_identity_keys_v2.json`'s `loaded_family_types.allowed_keys`/
+  `optional` and `policies/domain_sig_hash_policies.json`'s
+  `loaded_family_types.allowed_items` are updated to register both new keys
+  (hand-patched, not regenerated via `tools/generate_sig_hash_policy.py`, to
+  avoid clobbering unrelated hand-tuned notes on other domains — same
+  precedent as the Area 9 `object_styles` entry above), so
+  `validators.record_v2.validate_record_v2()` no longer reports
+  `identity.key.not_allowed` for either field and the analysis-side
+  `sig_hash` stage (`core/sig_hash_builder.py`) reconstructs the same
+  preimage as the extractor's inline hash instead of silently dropping the 2
+  new items. `policies/domain_join_key_policies.json`'s `loaded_family_types.
+  explicitly_excluded_items` is updated to add `lft.structural_material_type`/
+  `lft.is_active` — without this, `tools/discover_join_policy.py`'s default
+  `discover`/`harsh` modes build join-key candidates from every emitted
+  identity-item key not explicitly excluded, so the 2 new fields (`is_active`
+  in particular — operational per-symbol usage state, not a definitional
+  family property) would have been nominated as join-key candidates despite
+  not being intended as such.
+  **`core/sig_hash_builder.py` status-gating fix (shared, not `loaded_family_types`-only):**
+  the analysis-side `sig_hash` rehash stage (`tools/run_extract_all.py`'s
+  `sig_hash` stage, and `apply_sig_hash_policy_to_record()`) previously
+  derived `degraded`/`blocked` status only from `required_items` quality —
+  any non-required item that is still part of the hash preimage
+  (`allowed_items`) but not `q=ok` was silently invisible to the recomputed
+  status. This meant `lft.is_active` going `missing`/`unreadable` for a
+  family (a real, expected scenario per the Area 12 probe) would have the
+  extractor correctly report `status=degraded`, but the analysis-side
+  rehash stage would overwrite it back to `status=ok` with `status_reasons=
+  []`, since `is_active` is `allowed` but deliberately not `required` (see
+  `optional_items` reasoning above). Fixed generally in
+  `build_sig_hash_from_policy()`: any hashed item not in `required_items`
+  that is not `q=ok` now degrades status too (reason
+  `identity.incomplete:optional_not_ok:<k>`), while `blocked` remains gated
+  on `required_items` only — an optional-item read failure degrades, it
+  never blocks. This changes analysis-side status recomputation for every
+  domain that uses `core/sig_hash_builder.py`, not just `loaded_family_types`
+  — a deliberate, repo-owner-directed decision (PR review follow-up) over
+  the narrower alternative of promoting `lft.is_active` to `required_items`
+  for this domain only, which would have made a mid-symbol read failure
+  `status=blocked`/`sig_hash=None` (harsher than the extractor's own
+  `degraded`). New coverage:
+  `tests/test_sig_hash_policy_builder.py::test_sig_hash_builder_degrades_when_optional_hash_item_not_ok`.
+  **Schema version bump:** `sig_hash_schema` for this domain is pinned to
+  `loaded_family_types.sig_hash.v2` (was the generator's implicit
+  `...v1` default) in both `contracts/domain_identity_keys_v2.json` and
+  `policies/domain_sig_hash_policies.json`, following the same precedent as
+  the `identity` domain's D-025 `sig_hash_schema` pin — otherwise
+  `tools/generate_sig_hash_policy.py` regenerating the policy file would
+  silently drop back to the `v1` label despite the widened preimage,
+  making pre/post-PR hashes look like the same hash definition to
+  drift-detection consumers and risking a mis-reported "drift" finding.
+  **`is_active` missing-quality fix:** the per-symbol aggregation now checks
+  `any(...ITEM_Q_MISSING...)` (not `all(...)`) before falling through to the
+  OK-only aggregation branch — a single symbol with an unreadable `IsActive`
+  read no longer gets silently dropped from the readable subset (which would
+  have reported `q=ok` off a partially-observed family); it now correctly
+  propagates to `q=missing` and `status=degraded` for the whole record.
 - **`line_styles` domain: `parent_cat.id`/`parent_cat.name` metadata fields (Area 11):**
   `domains/line_styles.py`'s existing per-subcategory loop (`sc`, iterating
   `Category.SubCategories` under `OST_Lines`) now also reads `sc.Parent`

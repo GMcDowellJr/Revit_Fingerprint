@@ -49,6 +49,29 @@ def test_sig_hash_builder_blocks_when_required_not_ok():
     assert "identity.incomplete:required_not_ok:a" in reasons
 
 
+def test_sig_hash_builder_degrades_when_optional_hash_item_not_ok():
+    # A non-required item that is still part of the hash preimage (allowed_items)
+    # must not be silently invisible to status -- it degrades (never blocks) the
+    # record even though only required_items gates the blocked path.
+    policy = {
+        "sig_hash_schema": "x.sig_hash.v1",
+        "hash_alg": "md5_utf8_join_pipe",
+        "allowed_items": ["a", "b"],
+        "allowed_item_prefixes": [],
+        "required_items": ["a"],
+        "minima": {"block_if_any_required_not_ok": True},
+    }
+    items = [
+        make_identity_item("a", "1", ITEM_Q_OK),
+        make_identity_item("b", None, ITEM_Q_MISSING),
+    ]
+    sig_hash, status, reasons, hash_items = build_sig_hash_from_policy(domain_policy=policy, items=items)
+    assert status == "degraded"
+    assert sig_hash is not None
+    assert "identity.incomplete:optional_not_ok:b" in reasons
+    assert [it["k"] for it in hash_items] == ["a", "b"]
+
+
 def test_sig_hash_builder_degrades_when_required_not_ok_and_block_disabled():
     policy = {
         "allowed_items": ["a"],
