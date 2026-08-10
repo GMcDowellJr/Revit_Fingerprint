@@ -404,7 +404,7 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
             if is_subcategory:
                 pn_v, pn_q = canonicalize_str(parent_name)
             else:
-                pn_v, pn_q = None, ITEM_Q_OK
+                pn_v, pn_q = None, ITEM_Q_MISSING
             identity_items.append(make_identity_item("obj_style.parent_name", pn_v, pn_q))
 
             if kind == "model":

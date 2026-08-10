@@ -159,7 +159,7 @@ def test_object_styles_model_sig_hash_excludes_area9_additions():
         {"k": "obj_style.can_add_subcategory", "v": "true", "q": "ok"},
         {"k": "obj_style.has_material_quantities", "v": "false", "q": "ok"},
         {"k": "obj_style.is_cuttable", "v": "false", "q": "ok"},
-        {"k": "obj_style.parent_name", "v": None, "q": "ok"},
+        {"k": "obj_style.parent_name", "v": None, "q": "missing"},
     ]
     sig_hash, status, _, hash_items = build_sig_hash_from_policy(domain_policy=policy, items=items)
     assert status == "ok"

@@ -22,9 +22,12 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   (not a fresh `cat.Parent` call, which returns missing for top-level
   categories in this API — see `audit_results/audit_11_domain_extractor_delta_step0_findings.md`
   §9.2). `parent_name` is `q=ok`/`v=<name>` for subcategories and
-  `q=ok`/`v=None` for genuinely top-level categories (a confirmed absence,
-  not a read failure — same tri-state convention as `text_types`'
-  `leader_arrowhead`). A 5th field, `obj_style.tab` (Model/Annotation/
+  `q=missing`/`v=None` for genuinely top-level categories, per the
+  record.v2 sentinel policy (`v: null` + `q: "missing"` for a confirmed
+  absent value, never a bare sentinel literal) and matching the probe's
+  own classification (§9.3: `ok=364; missing=279` for top-level rows) —
+  not `unreadable`, which stays reserved for actual read failures. A 5th
+  field, `obj_style.tab` (Model/Annotation/
   Analytical/Imported), is derived from which `extract_*`/`kind` partition
   produced the record (no new Category read) and added to the existing
   `phase2.coordination_items` bucket, matching `obj_style.category_type`/

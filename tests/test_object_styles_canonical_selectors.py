@@ -5,7 +5,7 @@ import json
 from core.hashing import make_hash
 from core.join_key_builder import build_join_key_from_policy
 from core.join_key_policy import get_domain_join_key_policy, load_join_key_policies
-from core.record_v2 import ITEM_Q_OK, build_record_v2, make_identity_item, serialize_identity_items
+from core.record_v2 import ITEM_Q_MISSING, ITEM_Q_OK, build_record_v2, make_identity_item, serialize_identity_items
 from validators.record_v2 import validate_record_v2
 
 
@@ -74,7 +74,7 @@ def _area9_identity_items(*, is_subcategory):
         make_identity_item(
             "obj_style.parent_name",
             "Walls" if is_subcategory else None,
-            ITEM_Q_OK,
+            ITEM_Q_OK if is_subcategory else ITEM_Q_MISSING,
         ),
     ]
     return sorted(items, key=lambda d: str(d.get("k", "")))
@@ -96,9 +96,13 @@ def test_object_styles_model_area9_fields_pass_contract_validation_for_subcatego
     assert validate_record_v2(rec, registry) == []
 
 
-def test_object_styles_model_parent_name_ok_and_none_for_top_level_category():
-    # A genuinely top-level category (no parent) is a confirmed, valid absence -- q=ok,
-    # not missing/unreadable -- so it isn't misreported as a read failure.
+def test_object_styles_model_parent_name_missing_and_none_for_top_level_category():
+    # A genuinely top-level category (no parent) is None/unset -- per the record.v2 sentinel
+    # policy (CLAUDE.md: "Identity values (v) MUST NOT contain sentinel literals -- use
+    # v: null + q: 'missing' instead"), that's q=missing, not q=ok and not q=unreadable
+    # (unreadable is reserved for actual read failures/exceptions). Matches the probe's own
+    # classification (audit_results/audit_11_domain_extractor_delta_step0_findings.md §9.3:
+    # ok=364; missing=279 for top-level rows).
     registry = _domain_identity_registry_v2()
     identity_items = _area9_identity_items(is_subcategory=False)
     rec = build_record_v2(
@@ -114,4 +118,4 @@ def test_object_styles_model_parent_name_ok_and_none_for_top_level_category():
     assert validate_record_v2(rec, registry) == []
     parent_name_item = next(it for it in rec["identity_basis"]["items"] if it["k"] == "obj_style.parent_name")
     assert parent_name_item["v"] is None
-    assert parent_name_item["q"] == ITEM_Q_OK
+    assert parent_name_item["q"] == ITEM_Q_MISSING
