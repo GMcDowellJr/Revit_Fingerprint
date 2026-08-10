@@ -40,6 +40,16 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `sig_basis.keys_used` is now computed dynamically from `identity_items`
   instead of a hardcoded list, which also fixes a pre-existing drift where
   `identity.revit_version_name` was hashed but missing from that list.
+  **PR review follow-ups:** `Office` is now read via its confirmed shared-
+  parameter GUID (`Element.get_Parameter(Guid("6b61afc7-13eb-4af5-8b65-
+  889f978af4f3"))`) instead of `LookupParameter("Office")` by display name,
+  which the Revit API can otherwise resolve to an arbitrary same-named
+  parameter if a project contains more than one "Office" definition; and
+  `identity.py`'s `sig_basis.schema` (`identity.sig_basis.v1` → `.v2`) and
+  `policies/domain_sig_hash_policies.json`'s `sig_hash_schema`
+  (`identity.sig_hash.v1` → `.v2`) are both bumped so a consumer comparing
+  `sig_hash` across a pre-D-025 and post-D-025 export can tell the two hash
+  definitions apart instead of reading the mismatch as fingerprint drift.
   `contracts/domain_identity_keys_v2.json` and
   `policies/domain_join_key_policies.json`/`policies/domain_sig_hash_policies.json`
   updated accordingly (the latter hand-patched, not regenerated, to avoid

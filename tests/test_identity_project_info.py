@@ -31,6 +31,22 @@ class FakeBuiltInParameter:
     PROJECT_ORGANIZATION_DESCRIPTION = "BIP.PROJECT_ORGANIZATION_DESCRIPTION"
 
 
+class FakeGuid:
+    """Stand-in for System.Guid: equality/hash by string value."""
+
+    def __init__(self, s):
+        self.s = str(s)
+
+    def __eq__(self, other):
+        return isinstance(other, FakeGuid) and self.s == other.s
+
+    def __hash__(self):
+        return hash(self.s)
+
+    def __repr__(self):
+        return "FakeGuid({!r})".format(self.s)
+
+
 class FakeProjectInformation:
     """Fake ProjectInformation element.
 
@@ -40,18 +56,27 @@ class FakeProjectInformation:
     named_values: dict of display name -> raw string (only consulted for names
         in named_present; a name present with value None simulates a defined-
         but-blank parameter).
+    guid_values: dict of GUID string -> raw string, consulted when get_Parameter
+        is called with a FakeGuid (i.e. the code took the GUID-based read path);
+        a GUID absent from this dict simulates the shared parameter definition
+        not being loaded on this document.
     """
 
-    def __init__(self, name, builtin_values, named_present, named_values=None):
+    def __init__(self, name, builtin_values, named_present, named_values=None, guid_values=None):
         self.Name = name
         self._builtin_values = builtin_values
         self._named_present = named_present
         self._named_values = named_values or {}
+        self._guid_values = guid_values or {}
 
-    def get_Parameter(self, bip_token):
-        if bip_token not in self._builtin_values:
+    def get_Parameter(self, token):
+        if isinstance(token, FakeGuid):
+            if token.s not in self._guid_values:
+                return None
+            return FakeParameter(self._guid_values[token.s])
+        if token not in self._builtin_values:
             return None
-        return FakeParameter(self._builtin_values[bip_token])
+        return FakeParameter(self._builtin_values[token])
 
     def LookupParameter(self, name):
         if name not in self._named_present:
@@ -71,6 +96,9 @@ _ALL_BUILTIN_VALUES = {
 }
 
 
+_OFFICE_SHARED_PARAM_GUID = "6b61afc7-13eb-4af5-8b65-889f978af4f3"
+
+
 def _stantec_like_pi():
     return FakeProjectInformation(
         name="Test Project",
@@ -82,6 +110,10 @@ def _stantec_like_pi():
             "IfcSite GUID": "1AB2c3D4e5F6G7H8I9J0Kn",
             "Office": "Denver",
         },
+        # Kept consistent with named_values so the fixture behaves the same
+        # whether identity_module.Guid is available (GUID-based read) or not
+        # (LookupParameter-by-name fallback).
+        guid_values={_OFFICE_SHARED_PARAM_GUID: "Denver"},
     )
 
 
@@ -181,6 +213,38 @@ def test_office_and_ifc_guids_resolve_ok_when_present(monkeypatch):
     assert items["project_info.ifc_building_guid"]["q"] == ITEM_Q_OK
     assert items["project_info.ifc_project_guid"]["q"] == ITEM_Q_OK
     assert items["project_info.ifc_site_guid"]["q"] == ITEM_Q_OK
+
+
+def test_office_is_read_via_shared_parameter_guid_when_available(monkeypatch):
+    """Office must be read via Element.get_Parameter(Guid), not LookupParameter
+    by display name -- LookupParameter can resolve to an arbitrary same-named
+    parameter if a project happens to contain more than one "Office" definition.
+    Proven here by making LookupParameter("Office") resolve to nothing while the
+    confirmed GUID resolves to a real value; only the GUID-based read succeeds."""
+    monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
+    monkeypatch.setattr(identity_module, "Guid", FakeGuid)
+
+    pi = FakeProjectInformation(
+        name="GUID Office Project",
+        builtin_values=_ALL_BUILTIN_VALUES,
+        named_present={"IfcBuilding GUID", "IfcProject GUID", "IfcSite GUID"},  # no "Office" by name
+        guid_values={_OFFICE_SHARED_PARAM_GUID: "Denver"},
+    )
+    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(pi)))
+    assert items["project_info.office"]["q"] == ITEM_Q_OK
+    assert items["project_info.office"]["v"] == "Denver"
+
+
+def test_office_falls_back_to_lookup_by_name_when_guid_type_unavailable(monkeypatch):
+    """Outside a .NET runtime (e.g. this pytest environment without System.Guid),
+    identity_module.Guid is None and the code must fall back to LookupParameter
+    by name rather than crashing or always reporting not_applicable."""
+    monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
+    monkeypatch.setattr(identity_module, "Guid", None)
+
+    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(_stantec_like_pi())))
+    assert items["project_info.office"]["q"] == ITEM_Q_OK
+    assert items["project_info.office"]["v"] == "Denver"
 
 
 def test_office_and_ifc_guids_are_not_applicable_when_absent_not_unreadable(monkeypatch):

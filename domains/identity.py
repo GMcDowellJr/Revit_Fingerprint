@@ -64,6 +64,11 @@ except ImportError:
     WorksharingUtils = None
     BuiltInParameter = None
 
+try:
+    from System import Guid
+except ImportError:
+    Guid = None
+
 
 # ---------------------------
 # project_info.* field tables
@@ -91,9 +96,8 @@ _PROJECT_INFO_BUILTIN_FIELDS = (
 # fields were named explicitly in this task's spec (consistent with
 # probe_identity.py's `project_info.p.{ParamName}` generic-walk convention)
 # but, like Office, are only present on documents that have used IFC
-# export/mapping -- read by display name via LookupParameter, and a missing
-# definition is legitimate absence (ITEM_Q_UNSUPPORTED_NOT_APPLICABLE), not a
-# read failure.
+# export/mapping -- a missing definition is legitimate absence
+# (ITEM_Q_UNSUPPORTED_NOT_APPLICABLE), not a read failure.
 #
 # NOT implemented here: Office's Address/City/State/Zip/Country/Telephone/Fax/
 # Legal Entity sub-fields. Per this task's own instruction, their exact
@@ -106,6 +110,18 @@ _PROJECT_INFO_NAMED_FIELDS = (
     ("project_info.ifc_site_guid", "IfcSite GUID"),
     ("project_info.office", "Office"),
 )
+
+# GUID-based overrides for entries in _PROJECT_INFO_NAMED_FIELDS whose shared-
+# parameter GUID is confirmed (audit 5.2). Element.get_Parameter(Guid) reads
+# the exact bound definition; LookupParameter(name) instead matches by display
+# name and, per Revit API behavior, can resolve to an arbitrary same-named
+# parameter if a project happens to contain more than one definition sharing
+# that display name (e.g. a stray project/local parameter also called
+# "Office"). Fields with no confirmed GUID (the three IFC GUID fields) keep
+# using LookupParameter by name.
+_PROJECT_INFO_SHARED_GUIDS = {
+    "project_info.office": "6b61afc7-13eb-4af5-8b65-889f978af4f3",
+}
 
 
 def _param_raw_str(p):
@@ -148,9 +164,13 @@ def _read_project_info_builtin_item(pi, key, bip_name):
     return make_identity_item(key, v, q)
 
 
-def _read_project_info_named_item(pi, key, param_name):
+def _read_project_info_named_item(pi, key, param_name, guid_str=None):
     """Read a ProjectInformation field by display name (shared/custom
-    parameters without a stable BuiltInParameter id).
+    parameters without a stable BuiltInParameter id) -- or, when guid_str is
+    given (see _PROJECT_INFO_SHARED_GUIDS), by the shared parameter's GUID via
+    Element.get_Parameter(Guid), which resolves the exact bound definition
+    instead of matching by display name (LookupParameter can otherwise return
+    an arbitrary same-named parameter if more than one exists in a project).
 
     Distinguishes "parameter definition not loaded on this document" (q=
     unsupported.not_applicable -- e.g. Stantec's Office on a non-Stantec
@@ -160,10 +180,16 @@ def _read_project_info_named_item(pi, key, param_name):
     if pi is None:
         return make_identity_item(key, None, ITEM_Q_UNREADABLE)
 
-    try:
-        p = pi.LookupParameter(param_name)
-    except Exception:
-        return make_identity_item(key, None, ITEM_Q_UNREADABLE)
+    if guid_str and Guid is not None:
+        try:
+            p = pi.get_Parameter(Guid(guid_str))
+        except Exception:
+            return make_identity_item(key, None, ITEM_Q_UNREADABLE)
+    else:
+        try:
+            p = pi.LookupParameter(param_name)
+        except Exception:
+            return make_identity_item(key, None, ITEM_Q_UNREADABLE)
 
     if p is None:
         return make_identity_item(key, None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE)
@@ -213,7 +239,8 @@ def _extract_project_info_items(doc):
         items.append(_read_project_info_builtin_item(pi, key, bip_name))
 
     for key, param_name in _PROJECT_INFO_NAMED_FIELDS:
-        items.append(_read_project_info_named_item(pi, key, param_name))
+        guid_str = _PROJECT_INFO_SHARED_GUIDS.get(key)
+        items.append(_read_project_info_named_item(pi, key, param_name, guid_str=guid_str))
 
     return items
 
@@ -440,7 +467,11 @@ def extract(doc, ctx=None):
     rec_v2["join_key_name_identity"] = name_key
     rec_v2["phase2"] = info["phase2"]
     rec_v2["sig_basis"] = {
-        "schema": "identity.sig_basis.v1",
+        # v2 (D-025): sig_hash preimage now includes project_info.* content;
+        # bumped so consumers comparing sig_hash across exports can tell a
+        # pre-D-025 export apart from a post-D-025 one instead of reading an
+        # ordinary schema-version difference as fingerprint drift.
+        "schema": "identity.sig_basis.v2",
         "keys_used": semantic_keys,
     }
 

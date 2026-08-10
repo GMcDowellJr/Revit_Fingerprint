@@ -464,7 +464,7 @@
       "required_items": [
         "identity.is_workshared"
       ],
-      "sig_hash_schema": "identity.sig_hash.v1"
+      "sig_hash_schema": "identity.sig_hash.v2"
     },
     "line_patterns": {
       "allowed_item_prefixes": [],

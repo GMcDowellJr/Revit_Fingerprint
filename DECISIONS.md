@@ -1116,7 +1116,19 @@ To limit the blast radius of that call:
   (definition present, value blank) and `q=unreadable` (read exception).
 - Built-ins are read via `BuiltInParameter` enum (`pi.get_Parameter(...)`),
   not `LookupParameter` by display name, so behavior does not depend on
-  Revit's UI display-language locale.
+  Revit's UI display-language locale. `Office` is likewise read via its
+  confirmed shared-parameter GUID (`Element.get_Parameter(Guid(...))`, GUID
+  `6b61afc7-13eb-4af5-8b65-889f978af4f3`) rather than `LookupParameter("Office")`
+  by display name, which the Revit API can resolve to an arbitrary same-named
+  parameter if a project happens to contain more than one "Office" definition
+  (PR review follow-up); the three IFC GUID fields have no confirmed GUID of
+  their own and still use `LookupParameter` by name.
+- `identity.py`'s `sig_basis.schema` is bumped `identity.sig_basis.v1` →
+  `.v2`, and the hand-patched `policies/domain_sig_hash_policies.json` entry's
+  `sig_hash_schema` likewise `identity.sig_hash.v1` → `.v2` (PR review
+  follow-up), so a consumer comparing `sig_hash` across a pre-D-025 export and
+  a post-D-025 export can tell the two hash definitions apart instead of
+  reading the resulting hash mismatch as fingerprint drift.
 - Office's Address/City/State/Zip/Country/Telephone/Fax/Legal Entity
   sub-fields are deliberately NOT implemented: their exact parameter names
   need confirmation against a real Stantec-template project, which this
