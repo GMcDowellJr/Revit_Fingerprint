@@ -263,10 +263,13 @@ def extract(doc, ctx=None):
         is_active_pairs = [canonicalize_bool(_safe_attr(sym, "IsActive", None)) for sym in fam_syms]
         if any(q == ITEM_Q_UNREADABLE for _, q in is_active_pairs):
             is_active_v, is_active_q = None, ITEM_Q_UNREADABLE
-        elif all(q == ITEM_Q_MISSING for _, q in is_active_pairs):
+        elif any(q == ITEM_Q_MISSING for _, q in is_active_pairs):
+            # A single missing read must not be silently dropped from the
+            # aggregate by the OK-only filter below -- that would let a
+            # partially-unobserved family report q=ok off the readable subset.
             is_active_v, is_active_q = None, ITEM_Q_MISSING
         else:
-            actives = [v == "true" for v, q in is_active_pairs if q == ITEM_Q_OK]
+            actives = [v == "true" for v, q in is_active_pairs]
             any_active = any(actives)
             all_active = all(actives) if actives else False
             is_active_v = "true" if all_active else ("partial" if any_active else "false")

@@ -544,6 +544,7 @@
       "minima": {
         "block_if_any_required_not_ok": true
       },
+      "sig_hash_schema": "loaded_family_types.sig_hash.v2",
       "notes": [
         "Records are emitted at family granularity (one record per Family element, not per FamilySymbol).",
         "lft.family_name is label-only — excluded from identity_basis so sig_hash is name-independent.",
@@ -555,6 +556,7 @@
         "lft.structural_material_type is read from the family's representative FamilySymbol (Area 12 probe: constant across a family's types, unique_value_count=1 in every sampled case).",
         "lft.is_active is a per-symbol (type) property, not per-family, and was observed to vary within a family in the Area 12 probe corpus; it is aggregated across all of a family's types to true/false/partial rather than read off a single arbitrary type, so the family record stays independent of collect_types() ordering.",
         "sig_hash = f(category + schema_hash + is_in_place + is_editable + counts + structural_material_type + is_active).",
+        "sig_hash_schema is pinned to loaded_family_types.sig_hash.v2 (not the generator's default loaded_family_types.sig_hash.v1) because Area 12 changed the sig_hash preimage composition -- tools/generate_sig_hash_policy.py's build_policy() defaults any domain without this override to '<domain>.sig_hash.v1', which would silently erase the version bump on the next regeneration and make post-Area-12 hashes appear compatible with the old preimage (PR review follow-up, same precedent as the identity domain's D-025 sig_hash_schema pin above).",
         "join_hash discovery: schema_hash is the behavioral anchor; individual parameter value items",
         "  (from parameter_rows) are future discovery work (see domain future-steps)."
       ]

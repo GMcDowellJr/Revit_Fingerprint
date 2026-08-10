@@ -541,7 +541,7 @@
         "lft.shape_gate.category",
         "lft.type_parameter_schema_hash"
       ],
-      "sig_hash_schema": "loaded_family_types.sig_hash.v1"
+      "sig_hash_schema": "loaded_family_types.sig_hash.v2"
     },
     "materials": {
       "allowed_item_prefixes": [],

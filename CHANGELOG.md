@@ -59,6 +59,21 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   new items. `policies/domain_join_key_policies.json`'s `loaded_family_types`
   entry is left unchanged — these 2 fields are not join-key candidates in
   this PR.
+  **Schema version bump:** `sig_hash_schema` for this domain is pinned to
+  `loaded_family_types.sig_hash.v2` (was the generator's implicit
+  `...v1` default) in both `contracts/domain_identity_keys_v2.json` and
+  `policies/domain_sig_hash_policies.json`, following the same precedent as
+  the `identity` domain's D-025 `sig_hash_schema` pin — otherwise
+  `tools/generate_sig_hash_policy.py` regenerating the policy file would
+  silently drop back to the `v1` label despite the widened preimage,
+  making pre/post-PR hashes look like the same hash definition to
+  drift-detection consumers and risking a mis-reported "drift" finding.
+  **`is_active` missing-quality fix:** the per-symbol aggregation now checks
+  `any(...ITEM_Q_MISSING...)` (not `all(...)`) before falling through to the
+  OK-only aggregation branch — a single symbol with an unreadable `IsActive`
+  read no longer gets silently dropped from the readable subset (which would
+  have reported `q=ok` off a partially-observed family); it now correctly
+  propagates to `q=missing` and `status=degraded` for the whole record.
 - **`line_styles` domain: `parent_cat.id`/`parent_cat.name` metadata fields (Area 11):**
   `domains/line_styles.py`'s existing per-subcategory loop (`sc`, iterating
   `Category.SubCategories` under `OST_Lines`) now also reads `sc.Parent`
