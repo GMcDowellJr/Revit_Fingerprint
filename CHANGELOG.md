@@ -64,6 +64,30 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   in particular — operational per-symbol usage state, not a definitional
   family property) would have been nominated as join-key candidates despite
   not being intended as such.
+  **`core/sig_hash_builder.py` status-gating fix (shared, not `loaded_family_types`-only):**
+  the analysis-side `sig_hash` rehash stage (`tools/run_extract_all.py`'s
+  `sig_hash` stage, and `apply_sig_hash_policy_to_record()`) previously
+  derived `degraded`/`blocked` status only from `required_items` quality —
+  any non-required item that is still part of the hash preimage
+  (`allowed_items`) but not `q=ok` was silently invisible to the recomputed
+  status. This meant `lft.is_active` going `missing`/`unreadable` for a
+  family (a real, expected scenario per the Area 12 probe) would have the
+  extractor correctly report `status=degraded`, but the analysis-side
+  rehash stage would overwrite it back to `status=ok` with `status_reasons=
+  []`, since `is_active` is `allowed` but deliberately not `required` (see
+  `optional_items` reasoning above). Fixed generally in
+  `build_sig_hash_from_policy()`: any hashed item not in `required_items`
+  that is not `q=ok` now degrades status too (reason
+  `identity.incomplete:optional_not_ok:<k>`), while `blocked` remains gated
+  on `required_items` only — an optional-item read failure degrades, it
+  never blocks. This changes analysis-side status recomputation for every
+  domain that uses `core/sig_hash_builder.py`, not just `loaded_family_types`
+  — a deliberate, repo-owner-directed decision (PR review follow-up) over
+  the narrower alternative of promoting `lft.is_active` to `required_items`
+  for this domain only, which would have made a mid-symbol read failure
+  `status=blocked`/`sig_hash=None` (harsher than the extractor's own
+  `degraded`). New coverage:
+  `tests/test_sig_hash_policy_builder.py::test_sig_hash_builder_degrades_when_optional_hash_item_not_ok`.
   **Schema version bump:** `sig_hash_schema` for this domain is pinned to
   `loaded_family_types.sig_hash.v2` (was the generator's implicit
   `...v1` default) in both `contracts/domain_identity_keys_v2.json` and

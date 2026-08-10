@@ -44,8 +44,12 @@ def build_sig_hash_from_policy(
 ) -> Tuple[Optional[str], str, List[str], List[Dict[str, Any]]]:
     """Return (sig_hash, status, status_reasons, hash_items).
 
-    The builder hashes every emitted identity item allowed by policy. Required
-    items control block/degrade semantics; they are not the full hash selector.
+    The builder hashes every emitted identity item allowed by policy.
+    Required items control block semantics (and degrade semantics on their
+    own); any non-required item that is part of the hash preimage but is not
+    q=ok also degrades status (never blocks) -- an incomplete item that
+    contributes to the hash must not be silently invisible to the record's
+    reported status.
     """
     pol = domain_policy or {}
     allowed = list(pol.get("allowed_items") or [])
@@ -81,7 +85,15 @@ def build_sig_hash_from_policy(
         blocked_hash = make_hash(preimage) if hash_items else None
         return blocked_hash, STATUS_BLOCKED, sorted(set(reasons)), hash_items
 
-    if required_not_ok:
+    optional_not_ok: List[str] = []
+    for it in hash_items:
+        k = it.get("k")
+        q = it.get("q")
+        if isinstance(k, str) and k not in required and q != ITEM_Q_OK:
+            optional_not_ok.append(k)
+            reasons.append("identity.incomplete:optional_not_ok:%s" % k)
+
+    if required_not_ok or optional_not_ok:
         status = STATUS_DEGRADED
     else:
         status = STATUS_OK
