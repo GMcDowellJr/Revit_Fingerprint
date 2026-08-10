@@ -12,6 +12,41 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **`identity` domain expansion: `project_info.*` fields (D-025):**
+  `domains/identity.py` now reads `doc.ProjectInformation` and adds 13 new
+  identity items to its existing single `record_id="document"` record:
+  `project_info.name` (`ProjectInformation.Name`), `.number`, `.status`,
+  `.address`, `.issue_date`, `.client_name`, `.building_name`,
+  `.organization_name`, `.organization_description` (all confirmed Revit
+  built-ins, read via `BuiltInParameter` so behavior is locale-independent),
+  plus `.ifc_building_guid`, `.ifc_project_guid`, `.ifc_site_guid`, and
+  `.office` (Stantec's shared parameter, GUID
+  `6b61afc7-13eb-4af5-8b65-889f978af4f3`) — all four read by display name via
+  `LookupParameter` since they have no stable `BuiltInParameter` id.
+  **Hash-breaking:** these fields are included in `identity_items` /
+  `identity_basis.items` / `sig_hash` (an explicit, documented exception to
+  the "names are metadata only" default rule — see D-025 for the full
+  rationale and the mitigations applied: excluded from the join-key policy,
+  excluded from status/status_reasons/identity_quality computation). Every
+  `identity` domain `sig_hash` changes going forward; previously captured
+  values are not comparable. `project_info.office`/`.ifc_*_guid` report
+  `q=unsupported.not_applicable` (not `q=unreadable`) when the shared
+  parameter definition isn't loaded in the document — this is the expected,
+  legitimate state on any non-Stantec-template project, not a read failure.
+  Office's Address/City/State/Zip/Country/Telephone/Fax/Legal Entity
+  sub-fields are deliberately NOT implemented pending confirmation of their
+  exact parameter names against a real Stantec-template project (no live
+  Revit/Dynamo access was available to confirm them). `identity.py`'s
+  `sig_basis.keys_used` is now computed dynamically from `identity_items`
+  instead of a hardcoded list, which also fixes a pre-existing drift where
+  `identity.revit_version_name` was hashed but missing from that list.
+  `contracts/domain_identity_keys_v2.json` and
+  `policies/domain_join_key_policies.json`/`policies/domain_sig_hash_policies.json`
+  updated accordingly (the latter hand-patched, not regenerated, to avoid
+  clobbering unrelated hand-tuned notes on other domains). No change to
+  `file_metadata.csv`, `tools/build_segment_manifest.py`, or any governance
+  narrative file — confirmed zero overlap in Step 0
+  (`audit_results/audit_11_domain_extractor_delta_step0_findings.md` §5).
 - **Name-target bundle BI output location correction (PR3 follow-up):**
   `run_bundle_analysis_for_target()` (`tools/bundle_analysis/run_bundle_analysis.py`) now
   relocates the `--comparison-target name` leg's completed ALL-view output from the

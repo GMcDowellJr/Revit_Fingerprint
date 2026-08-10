@@ -329,7 +329,20 @@
         "identity.central_path",
         "identity.central_path_norm",
         "identity.filename",
-        "identity.project_title"
+        "identity.project_title",
+        "project_info.name",
+        "project_info.number",
+        "project_info.status",
+        "project_info.address",
+        "project_info.issue_date",
+        "project_info.client_name",
+        "project_info.building_name",
+        "project_info.organization_name",
+        "project_info.organization_description",
+        "project_info.ifc_building_guid",
+        "project_info.ifc_project_guid",
+        "project_info.ifc_site_guid",
+        "project_info.office"
       ],
       "shape_gating": {
         "discriminator_key": "identity.is_workshared",
@@ -347,7 +360,8 @@
       "notes": [
         "Pilot for canonical evidence superset + selectors in the identity domain.",
         "join_hash uses policy-required items only; optional items remain in identity_basis.items for future exploration.",
-        "File-local identifiers remain excluded from canonical identity evidence and join-key hashing."
+        "File-local identifiers remain excluded from canonical identity evidence and join-key hashing.",
+        "project_info.* (D-025) is human-entered/naming ProjectInformation metadata -- explicitly excluded from cross-project join-key matching for the same reason identity.project_title is, even though (unlike project_title) it is included in identity_basis.items/sig_hash."
       ]
     },
     "line_patterns": {

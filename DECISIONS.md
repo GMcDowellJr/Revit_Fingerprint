@@ -1055,6 +1055,100 @@ silently falling through to `--summary`'s directory.
 
 ---
 
+## D-025 — `identity` domain expansion: `project_info.*` fields, included in sig_hash
+
+### Status
+Accepted (2026-08-10)
+
+### Context
+`domains/identity.py` captured only worksharing status, Revit version/build,
+and file-local lineage signals (central path, filename, project title). It
+never read `doc.ProjectInformation` at all. Step 0 for this area (`audit_
+results/audit_11_domain_extractor_delta_step0_findings.md` §5) confirmed: (1)
+zero overlap with `tools/build_segment_manifest.py`, which never reads Revit
+and sources its governance labels (`client_label`/`discipline_label`/etc.)
+from a hand-curated `file_metadata.csv`, not from `ProjectInformation`; (2)
+the requested built-in fields (Project Number/Status/Address/Issue Date,
+Client Name, Building Name, Organization Name/Description) are confirmed
+Revit built-ins, present on every project's `ProjectInformation` element
+regardless of template; (3) `Office` is a confirmed Stantec-authored shared
+parameter (GUID `6b61afc7-13eb-4af5-8b65-889f978af4f3`), null by design on
+any non-Stantec-template project.
+
+This creates real tension with this project's own non-negotiable rule
+("Names are metadata only — never included in behavior hashes unless
+explicitly stated", with D-010's phase-name hash inclusion as the only prior
+exception): most of these new fields (project name, client name, building
+name, organization name/description, address) are literally human-entered
+naming/labeling metadata, not technical behavior. `identity.py`'s existing
+design, however, hashes every item it puts in `identity_items` indiscriminately
+(no separate non-hashed identity_basis slot exists in record.v2 today — the
+precedent for "descriptive but non-hashed" signals, e.g. `project_title`, is
+to live only in `phase2.unknown_items`, entirely outside `identity_basis.items`
+and `sig_hash`).
+
+### Decision
+`project_info.*` items ARE included in `identity_items` / `identity_basis.items`
+/ `sig_hash` for the `identity` domain — a second explicit, documented
+exception to the "names are metadata only" default rule, alongside D-010.
+This was a deliberate scope call for this domain (the identity domain's own
+module docstring already described itself as "metadata only", and its
+sig_hash was already a thin worksharing/version/build fingerprint, not a
+behavioral one in the sense other domains use) rather than something forced
+by the record.v2 schema.
+
+To limit the blast radius of that call:
+- `project_info.*` is explicitly excluded from the identity `join_key` policy
+  (`policies/domain_join_key_policies.json`) — it does not participate in
+  cross-project join-key matching, the same treatment `identity.project_title`
+  already got.
+- `status`/`status_reasons`/`identity_quality` remain driven only by the
+  pre-existing core items (`is_workshared`/`revit_version_number`/
+  `revit_version_name`/`revit_build`) — project_info.* fields being blank or
+  legitimately not-applicable (both extremely common: many real projects leave
+  Client Name/Project Status blank, and `Office` is absent on every
+  non-Stantec project by design) must not flip this domain's record status to
+  degraded on every ordinary export.
+- Built-ins use `q=unreadable` only if the `Parameter` object itself is
+  missing (an unexpected API/document gap); shared/custom fields (`Office`,
+  the three IFC GUID fields) use `q=unsupported.not_applicable` when
+  `LookupParameter` finds no definition at all, distinct from `q=missing`
+  (definition present, value blank) and `q=unreadable` (read exception).
+- Built-ins are read via `BuiltInParameter` enum (`pi.get_Parameter(...)`),
+  not `LookupParameter` by display name, so behavior does not depend on
+  Revit's UI display-language locale.
+- Office's Address/City/State/Zip/Country/Telephone/Fax/Legal Entity
+  sub-fields are deliberately NOT implemented: their exact parameter names
+  need confirmation against a real Stantec-template project, which this
+  change's environment had no live Revit/Dynamo access to do — guessing names
+  that might not match real Stantec parameters was rejected in favor of
+  leaving them for a follow-up once that confirmation is possible.
+- `identity.py`'s `sig_basis.keys_used` (previously a hardcoded 3-of-4-item
+  list that had already drifted from what `sig_hash` actually hashes) is now
+  computed dynamically as every `identity_items` key, fixing that drift as a
+  side effect rather than as a second, separate hash-algorithm change.
+
+### Consequences
+- `identity` domain `sig_hash` values change for every export going forward —
+  expected and intentional, since real project-metadata content is now part
+  of the hash input, not a change to *how* hashes are computed. Previously
+  captured `identity` sig_hash values are not comparable to post-D-025 values.
+- `contracts/domain_identity_keys_v2.json`'s `identity.allowed_keys` and the
+  hand-patched `identity` entry in `policies/domain_sig_hash_policies.json`
+  both grow to include the 13 new `project_info.*` keys (the latter was
+  hand-patched rather than regenerated via `tools/generate_sig_hash_policy.py`,
+  since a full regen would also clobber unrelated hand-tuned `notes` on other
+  domains that have already drifted from a strict mechanical regen).
+- `file_metadata.csv` / `tools/build_segment_manifest.py` / the governance
+  narrative pipeline are unchanged — `project_info.*` are raw Revit reads and
+  are not assumed to reconcile with `file_metadata.csv`'s separately-curated
+  `client_label`/etc.; a later PR may find they frequently disagree, which is
+  worth flagging, not resolved here.
+- Office's 8 sub-fields remain a known gap pending live-Revit confirmation of
+  their exact parameter names.
+
+---
+
 ## Notes
 
 - This document is **append-only**.
