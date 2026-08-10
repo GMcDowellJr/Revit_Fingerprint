@@ -94,12 +94,28 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `leader_arrowhead_uid`/`_name`/`_sig_hash`) are added to each partition's existing
   "missing is acceptable" status-reason exemption set (same treatment as the
   pre-existing `dim_type.tick_mark_sig_hash`), since a negative/absent reference
-  legitimately means "none selected," not a data gap.
-  **Hash-breaking (content-driven, not an algorithm change):** every new identity item
-  is included in each partition's `identity_items`/`serialize_identity_items()` preimage
-  by construction (matching the existing `loaded_family_types`/Area 12 precedent above),
-  so `sig_hash` changes for every record across all 7 `dimension_types_*` domains; full
-  re-extraction required (D-015 "hash-breaking" precedent).
+  legitimately means "none selected," not a data gap. `dim_type.centerline_pattern_sig_hash`
+  is the one exception: an unresolved *positive* reference (custom pattern id present but
+  its ctx dependency map missing or not covering that id) returns `ITEM_Q_UNREADABLE`, not
+  `ITEM_Q_MISSING`, so it is **not** exempted — a genuinely-unresolved custom pattern must
+  degrade the record rather than silently reading as "no pattern selected" (PR #412 review;
+  see `core/dimension_type_helpers._read_line_pattern_ref_sig_hash()`).
+  **Hash-breaking (content-driven, not an algorithm change):** new identity items are
+  included in each partition's `identity_items`/`serialize_identity_items()` preimage by
+  construction (matching the existing `loaded_family_types`/Area 12 precedent above), so
+  `sig_hash` changes for every record across all 7 `dimension_types_*` domains; full
+  re-extraction required (D-015 "hash-breaking" precedent). **Exception:** in the 3 spot
+  partitions, `dim_type.leader_arrowhead_uid`/`_name` are excluded from the sig_hash
+  preimage specifically (filtered out immediately before `serialize_identity_items()`) even
+  though they remain in `identity_items`/`identity_basis.items` for visibility — a raw
+  Revit `UniqueId` and a cosmetic name are file-local/presentation metadata (D-004; Hash
+  Semantics: "Names are metadata only"), and including them would have made two files with
+  a semantically-identical spot dimension type (same arrowhead style/name) hash differently
+  purely because `UniqueId` is per-file-random. This is the fix for a real regression the
+  original Area 7 commit shipped: the contract's `sig_hash_keys` pin only governs the
+  *analysis-side* reconstruction (`core/sig_hash_builder.py`, not wired into live
+  extraction), so it never actually kept the uid/name out of the canonical extracted
+  `sig_hash`/`hash_v2` until this extractor-level exclusion was added (PR #412 review).
   `contracts/domain_identity_keys_v2.json`'s 7 `dimension_types_*` blocks are updated
   (`allowed_keys` only — no new `required_keys`); the 3 spot domains additionally get an
   explicit `sig_hash_keys` override (hand-patched, not regenerated via

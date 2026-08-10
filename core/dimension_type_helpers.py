@@ -924,7 +924,17 @@ def _read_line_pattern_ref_sig_hash(d, ctx, doc, ui_names):
          hard require_domain() call).
       3. IntegerValue <= 0 (a negative built-in pattern id, e.g. -3000010
          for "Solid"): ctx["line_pattern_special_values"]["solid"].
-      4. No parameter/value/ctx coverage: ITEM_Q_MISSING.
+      4. No parameter/value at all: ITEM_Q_MISSING (a genuine "no centerline
+         pattern selected" state).
+
+    A positive IntegerValue that cannot be resolved (ctx["line_pattern_uid_to_hash"]
+    absent entirely -- e.g. line_patterns excluded from this run's domain
+    allowlist -- or present but missing this specific pattern's uid) is a real,
+    unresolved reference, not an absence: it returns ITEM_Q_UNREADABLE, not
+    ITEM_Q_MISSING, so it isn't silently treated as "no pattern" and doesn't
+    fall into the caller's missing-is-acceptable exemption (different custom
+    centerline patterns must not collapse to the same identity value just
+    because they're all unresolved -- PR #412 review).
 
     Returns:
         (sig_hash_v, sig_hash_q)
@@ -959,7 +969,9 @@ def _read_line_pattern_ref_sig_hash(d, ctx, doc, ui_names):
                 return canonicalize_str(lp_id_to_value.get(pid_key))
 
             if not isinstance(lp_uid_to_sig_hash, dict):
-                return (None, ITEM_Q_MISSING)
+                # line_patterns didn't run / ctx map never populated for this
+                # extraction -- an unresolved dependency, not "no pattern selected".
+                return (None, ITEM_Q_UNREADABLE)
 
             try:
                 lp_elem = doc.GetElement(eid) if doc is not None else None
@@ -974,7 +986,9 @@ def _read_line_pattern_ref_sig_hash(d, ctx, doc, ui_names):
                 sig_hash = lp_uid_to_sig_hash.get(lp_uid, None)
                 if sig_hash:
                     return (safe_str(sig_hash), ITEM_Q_OK)
-            return (None, ITEM_Q_MISSING)
+            # Positive reference we could not resolve (uid missing, or not found
+            # in the map) -- unresolved dependency, not "no pattern selected".
+            return (None, ITEM_Q_UNREADABLE)
         else:
             solid_v = lp_special_values.get("solid", None)
             if solid_v:

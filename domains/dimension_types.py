@@ -2149,7 +2149,20 @@ def extract_spot_elevation(doc, ctx=None):
             else:
                 status = STATUS_OK
 
-            preimage = serialize_identity_items(identity_items)
+            # dim_type.leader_arrowhead_uid/_name are file-local/cosmetic metadata
+            # (D-004 restricts UniqueId use to element-backed identities; names are
+            # metadata only per the Hash Semantics rule) -- kept in identity_items for
+            # governance/join-key visibility but excluded from the sig_hash preimage
+            # itself, matching the contract's sig_hash_keys pin for these 3 domains.
+            # Without this, two files with a semantically-identical spot dimension
+            # type (same arrowhead style/name) would hash differently purely because
+            # Revit UniqueIds are per-file-random (PR #412 review).
+            _SIG_HASH_EXCLUDED_KEYS = frozenset({
+                "dim_type.leader_arrowhead_uid",
+                "dim_type.leader_arrowhead_name",
+            })
+            sig_hash_items = [it for it in identity_items if it.get("k") not in _SIG_HASH_EXCLUDED_KEYS]
+            preimage = serialize_identity_items(sig_hash_items)
             sig_hash = None if blocked else make_hash(preimage)
 
             try:
@@ -2613,7 +2626,20 @@ def extract_spot_coordinate(doc, ctx=None):
             else:
                 status = STATUS_OK
 
-            preimage = serialize_identity_items(identity_items)
+            # dim_type.leader_arrowhead_uid/_name are file-local/cosmetic metadata
+            # (D-004 restricts UniqueId use to element-backed identities; names are
+            # metadata only per the Hash Semantics rule) -- kept in identity_items for
+            # governance/join-key visibility but excluded from the sig_hash preimage
+            # itself, matching the contract's sig_hash_keys pin for these 3 domains.
+            # Without this, two files with a semantically-identical spot dimension
+            # type (same arrowhead style/name) would hash differently purely because
+            # Revit UniqueIds are per-file-random (PR #412 review).
+            _SIG_HASH_EXCLUDED_KEYS = frozenset({
+                "dim_type.leader_arrowhead_uid",
+                "dim_type.leader_arrowhead_name",
+            })
+            sig_hash_items = [it for it in identity_items if it.get("k") not in _SIG_HASH_EXCLUDED_KEYS]
+            preimage = serialize_identity_items(sig_hash_items)
             sig_hash = None if blocked else make_hash(preimage)
 
             try:
@@ -2940,7 +2966,20 @@ def extract_spot_slope(doc, ctx=None):
             else:
                 status = STATUS_OK
 
-            preimage = serialize_identity_items(identity_items)
+            # dim_type.leader_arrowhead_uid/_name are file-local/cosmetic metadata
+            # (D-004 restricts UniqueId use to element-backed identities; names are
+            # metadata only per the Hash Semantics rule) -- kept in identity_items for
+            # governance/join-key visibility but excluded from the sig_hash preimage
+            # itself, matching the contract's sig_hash_keys pin for these 3 domains.
+            # Without this, two files with a semantically-identical spot dimension
+            # type (same arrowhead style/name) would hash differently purely because
+            # Revit UniqueIds are per-file-random (PR #412 review).
+            _SIG_HASH_EXCLUDED_KEYS = frozenset({
+                "dim_type.leader_arrowhead_uid",
+                "dim_type.leader_arrowhead_name",
+            })
+            sig_hash_items = [it for it in identity_items if it.get("k") not in _SIG_HASH_EXCLUDED_KEYS]
+            preimage = serialize_identity_items(sig_hash_items)
             sig_hash = None if blocked else make_hash(preimage)
 
             try:
