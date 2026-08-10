@@ -1137,7 +1137,13 @@ To limit the blast radius of that call:
   `sig_hash_schema` likewise `identity.sig_hash.v1` → `.v2` (PR review
   follow-up), so a consumer comparing `sig_hash` across a pre-D-025 export and
   a post-D-025 export can tell the two hash definitions apart instead of
-  reading the resulting hash mismatch as fingerprint drift.
+  reading the resulting hash mismatch as fingerprint drift. **Third PR-review
+  follow-up:** the `.v2` override is also recorded as `sig_hash_schema` in
+  `contracts/domain_identity_keys_v2.json`'s `identity` block itself, not just
+  the derived `policies/domain_sig_hash_policies.json` file — the generator
+  (`tools/generate_sig_hash_policy.py`'s `build_policy()`) defaults any domain
+  lacking that key to `<domain>.sig_hash.v1`, so without this the next
+  regeneration would have silently reverted the version bump.
 - Office's Address/City/State/Zip/Country/Telephone/Fax/Legal Entity
   sub-fields are deliberately NOT implemented: their exact parameter names
   need confirmation against a real Stantec-template project, which this

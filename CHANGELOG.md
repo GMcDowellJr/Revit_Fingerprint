@@ -60,6 +60,12 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   unreadable/missing semantics as the other built-ins rather than Office's
   not_applicable semantics. `Office` is now the only `project_info.*` field
   read by name/GUID rather than `BuiltInParameter`.
+  **Third PR-review follow-up:** `contracts/domain_identity_keys_v2.json`'s
+  `identity` block now also carries `"sig_hash_schema": "identity.sig_hash.v2"`
+  directly (not just the derived `policies/domain_sig_hash_policies.json`
+  file) — `tools/generate_sig_hash_policy.py`'s `build_policy()` defaults any
+  domain without that key to `<domain>.sig_hash.v1`, so the next regeneration
+  would otherwise have silently erased the version bump.
   `contracts/domain_identity_keys_v2.json` and
   `policies/domain_join_key_policies.json`/`policies/domain_sig_hash_policies.json`
   updated accordingly (the latter hand-patched, not regenerated, to avoid
