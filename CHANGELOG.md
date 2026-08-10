@@ -160,7 +160,14 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `leader_arrowhead_sig_hash` treatment (PR #412 review, 5th round): the raw digest isn't
   interpretable, so label-synthesis prompts show a presence note instead of the value,
   keeping canonical labels dependent on the referenced configuration rather than opaque
-  implementation details.
+  implementation details. **Follow-up fix (PR #413 review):** adding a key to
+  `_OPAQUE_KEYS` alone doesn't make `_format_identity_items()` emit its presence note —
+  the note is only produced inside the `priority_order` loop, and the separate
+  remaining-items loop further down explicitly skips every `_OPAQUE_KEYS` member. Without
+  also adding the 5 new keys to `priority_order`, they were silently omitted from the
+  prompt entirely (worse than the original raw-digest bug: two configurations differing
+  only in these fields now produced identical prompts with no signal at all). Added all 5
+  to `priority_order`, verified their presence notes now emit correctly.
 - **`loaded_family_types` domain: `structural_material_type`/`is_active` identity fields (Area 12):**
   `domains/loaded_family_types.py`'s existing per-family loop now reads
   `FamilySymbol.StructuralMaterialType` (via `canonicalize_str`, same

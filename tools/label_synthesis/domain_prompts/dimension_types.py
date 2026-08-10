@@ -592,6 +592,16 @@ def _format_identity_items(
         "dim_type.rounding",
         "dim_type.tick_mark_sig_hash",
         "dim_type.leader_arrowhead_sig_hash",
+        # Area 7 reference-hash fields (PR #413 review): must be in priority_order
+        # for their _OPAQUE_KEYS presence-note branch (below) to ever run -- the
+        # remaining-items loop further down explicitly skips _OPAQUE_KEYS members,
+        # so a key that's only in _OPAQUE_KEYS and not here is silently omitted
+        # from the prompt entirely rather than shown as a presence note.
+        "dim_type.leader_tick_mark_sig_hash",
+        "dim_type.witness_line_tick_mark_sig_hash",
+        "dim_type.centerline_tick_mark_sig_hash",
+        "dim_type.interior_tick_mark_sig_hash",
+        "dim_type.centerline_pattern_sig_hash",
     ]
 
     emitted = set()
