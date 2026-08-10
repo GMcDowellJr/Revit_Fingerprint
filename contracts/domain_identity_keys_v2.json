@@ -1063,6 +1063,40 @@
         "block_if_any_required_not_ok": false
       },
       "indexed_key_rules": {}
+    },
+    "browser_organization": {
+      "domain_family": "browser_organization",
+      "display_label": "Browser Organization",
+      "allowed_keys": [
+        "bo.category",
+        "bo.sorting_order",
+        "bo.sorting_parameter_id",
+        "bo.filter_has_value",
+        "bo.family_name",
+        "bo.org_id",
+        "bo.unique_id",
+        "bo.workset_id",
+        "bo.workset_name",
+        "bo.workset_unique_id"
+      ],
+      "allowed_key_prefixes": [],
+      "required_keys": [
+        "bo.category",
+        "bo.sorting_order",
+        "bo.sorting_parameter_id"
+      ],
+      "sig_hash_schema": "browser_organization.sig_hash.v1",
+      "sig_hash_keys": [
+        "bo.category",
+        "bo.filter_has_value",
+        "bo.sorting_order",
+        "bo.sorting_parameter_id"
+      ],
+      "sig_hash_key_prefixes": [],
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "indexed_key_rules": {}
     }
   }
 }

@@ -1060,6 +1060,31 @@
       ],
       "required_items": [],
       "sig_hash_schema": "worksets_doc.sig_hash.v1"
+    },
+    "browser_organization": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "bo.category",
+        "bo.filter_has_value",
+        "bo.sorting_order",
+        "bo.sorting_parameter_id"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": true
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "Hand-added, not via a full generate_sig_hash_policy.py re-run, matching the worksets/worksets_doc entries above -- the checked-in policy file has hand-curated notes for other domains that a wholesale regeneration would overwrite.",
+        "bo.filter_has_value is semantic (drives sig_hash) but not required -- an unreadable read degrades the record rather than blocking it."
+      ],
+      "required_items": [
+        "bo.category",
+        "bo.sorting_order",
+        "bo.sorting_parameter_id"
+      ],
+      "sig_hash_schema": "browser_organization.sig_hash.v1"
     }
   },
   "identity_item_schema": "identity_items.v1",

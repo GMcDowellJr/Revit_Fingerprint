@@ -971,6 +971,32 @@
       "notes": [
         "Single synthetic document-level summary record — no per-record required discriminator; all fields optional to match the record's own minima (nothing blocks it)."
       ]
+    },
+    "browser_organization": {
+      "join_key_schema": "browser_organization.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [
+        "bo.category"
+      ],
+      "optional_items": [
+        "bo.sorting_order",
+        "bo.sorting_parameter_id",
+        "bo.filter_has_value"
+      ],
+      "explicitly_excluded_items": [
+        "bo.family_name",
+        "bo.org_id",
+        "bo.unique_id",
+        "bo.workset_id",
+        "bo.workset_name",
+        "bo.workset_unique_id"
+      ],
+      "notes": [
+        "bo.category is the definition-bearing identifier — Revit exposes at most one BrowserOrganization per category (views/sheets/schedules) per document.",
+        "bo.family_name is a Revit-internal display label, not behavior — excluded from joins per the naming-is-metadata rule.",
+        "bo.org_id/bo.unique_id excluded — BrowserOrganization ids are not expected to be stable/comparable across documents.",
+        "bo.workset_id/bo.workset_name/bo.workset_unique_id are coordination items (cross-model, name-based resolution) — excluded from joins per the same rule that excludes them from sig_hash."
+      ]
     }
   }
 }
