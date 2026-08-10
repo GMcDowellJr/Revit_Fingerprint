@@ -12,6 +12,64 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **`units` domain: 6 per-spec boolean formatting flags:**
+  `domains/units.py`'s existing per-spec `FormatOptions` loop now reads
+  `units.use_default`, `units.use_digit_grouping`, `units.use_plus_prefix`,
+  `units.suppress_leading_zeros`, `units.suppress_spaces`,
+  `units.suppress_trailing_zeros` off the same `fmt` object already used
+  for `accuracy`/`rounding_method`, canonicalized via
+  `core.record_v2.canonicalize_bool` (newly imported). Optional (not
+  required — `q=unreadable` on a `FormatOptions` read failure, mirroring
+  `accuracy`/`rounding_method`, never blocks the record).
+  **Hash-breaking:** all 6 keys added to `UNITS_SEMANTIC_KEYS`, so every
+  `units` per-spec `sig_hash` changes going forward — these are genuine
+  numeric-formatting behavior properties, not presentation/naming, so
+  belong in the hash per the existing `accuracy`/`rounding_method`
+  precedent. Also added to the `phase2.semantic_keys` hypothesis bucket
+  (alongside `rounding_method`) so they don't fall into `unknown_items`.
+  `contracts/domain_identity_keys_v2.json`'s `units.allowed_keys` and
+  `policies/domain_sig_hash_policies.json`'s `units.allowed_items`
+  updated accordingly (the latter hand-patched, not regenerated, to avoid
+  clobbering unrelated hand-tuned notes on other domains — same approach
+  as the `identity`/D-025 entry below). `required_keys` (`units.spec`,
+  `units.unit_type_id`) unchanged; existing `accuracy`/`rounding_method`/
+  `spec`/`symbol_type_id`/`unit_type_id` values and statuses unchanged.
+- **New `units_doc` domain: doc-level formatting fields:**
+  `domains/units.py` gains `extract_units_doc(doc, ctx=None)`, a second,
+  independent top-level domain (`domain="units_doc"`) emitting a single
+  synthetic record `record_id="units:_doc"` with
+  `units_doc.decimal_symbol` / `units_doc.digit_grouping_amount` /
+  `units_doc.digit_grouping_symbol`, read off `doc.GetUnits()` directly
+  (`Units.DecimalSymbol`/`DigitGroupingAmount`/`DigitGroupingSymbol`) —
+  document-level cardinality, not per-spec. `decimal_symbol` and
+  `digit_grouping_symbol` are Revit API enums, canonicalized via
+  `canonicalize_enum` (same as `units.rounding_method`);
+  `digit_grouping_amount` is an int, via `canonicalize_int` (newly
+  imported). All 3 fields optional/never-block, matching
+  `worksets_doc.active_workset_name`'s degraded-not-blocked precedent —
+  `status=degraded` (not `blocked`) with `sig_hash` still computed if
+  `doc.GetUnits()` itself fails.
+  **Why a separate domain, not a record folded into `domain="units"`:**
+  a bare `record_id="units:_doc"` under `domain="units"` fails contract
+  validation — `units.required_keys` (`units.spec`, `units.unit_type_id`,
+  `block_if_any_required_not_ok`) has no conditional-required exemption,
+  and a doc-level record has neither field to supply. Confirmed by direct
+  test before deciding the fix (`identity.required_key.missing:units.spec`,
+  `identity.required_key.missing:units.unit_type_id`,
+  `identity.key.not_allowed:units.decimal_symbol` etc.). Mirrors
+  `domains/worksets.py`'s `worksets`/`worksets_doc` split exactly (same
+  problem, same resolution, same rationale in that file's own docstring)
+  — a `worksets_doc`-style sibling domain, wired independently in
+  `runner/run_dynamo.py` (`_enabled("units_doc")` →
+  `units.extract_units_doc`), with its own contract entry
+  (`required_keys: []`, `block_if_any_required_not_ok: false`) in
+  `contracts/domain_identity_keys_v2.json`, its own hand-patched entry in
+  `policies/domain_sig_hash_policies.json`, and its own entry in
+  `policies/domain_join_key_policies.json` (all fields optional, no
+  required discriminator — same rationale as `worksets_doc`'s policy
+  notes). This was flagged as a design decision rather than a mechanical
+  add (see `audit_results/audit_11_domain_extractor_delta_step0_findings.md`
+  §8.3) and confirmed with the requester before implementing.
 - **`identity` domain expansion: `project_info.*` fields (D-025):**
   `domains/identity.py` now reads `doc.ProjectInformation` and adds 13 new
   identity items to its existing single `record_id="document"` record.

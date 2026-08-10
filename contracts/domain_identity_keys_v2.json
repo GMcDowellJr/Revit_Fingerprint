@@ -766,7 +766,13 @@
         "units.unit_type_id",
         "units.symbol_type_id",
         "units.accuracy",
-        "units.rounding_method"
+        "units.rounding_method",
+        "units.use_default",
+        "units.use_digit_grouping",
+        "units.use_plus_prefix",
+        "units.suppress_leading_zeros",
+        "units.suppress_spaces",
+        "units.suppress_trailing_zeros"
       ],
       "required_keys": [
         "units.spec",
@@ -774,6 +780,19 @@
       ],
       "minima": {
         "block_if_any_required_not_ok": true
+      }
+    },
+    "units_doc": {
+      "domain_family": "units",
+      "display_label": "Units (Document Summary)",
+      "allowed_keys": [
+        "units_doc.decimal_symbol",
+        "units_doc.digit_grouping_amount",
+        "units_doc.digit_grouping_symbol"
+      ],
+      "required_keys": [],
+      "minima": {
+        "block_if_any_required_not_ok": false
       }
     },
     "view_category_overrides_annotation": {

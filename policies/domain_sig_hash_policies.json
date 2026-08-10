@@ -765,7 +765,13 @@
         "units.unit_type_id",
         "units.symbol_type_id",
         "units.accuracy",
-        "units.rounding_method"
+        "units.rounding_method",
+        "units.use_default",
+        "units.use_digit_grouping",
+        "units.use_plus_prefix",
+        "units.suppress_leading_zeros",
+        "units.suppress_spaces",
+        "units.suppress_trailing_zeros"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -780,6 +786,24 @@
         "units.unit_type_id"
       ],
       "sig_hash_schema": "units.sig_hash.v1"
+    },
+    "units_doc": {
+      "allowed_item_prefixes": [],
+      "allowed_items": [
+        "units_doc.decimal_symbol",
+        "units_doc.digit_grouping_amount",
+        "units_doc.digit_grouping_symbol"
+      ],
+      "hash_alg": "md5_utf8_join_pipe",
+      "minima": {
+        "block_if_any_required_not_ok": false
+      },
+      "notes": [
+        "Generated from contracts/domain_identity_keys_v2.json.",
+        "sig_hash is computed post-extraction from canonical identity_basis.items."
+      ],
+      "required_items": [],
+      "sig_hash_schema": "units_doc.sig_hash.v1"
     },
     "view_category_overrides_annotation": {
       "allowed_item_prefixes": [],

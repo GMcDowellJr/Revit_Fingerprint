@@ -1,15 +1,24 @@
 # -*- coding: utf-8 -*-
 
+import enum
+import json
+
 from core.hashing import make_hash
 from core.join_key_builder import build_join_key_from_policy
 from core.join_key_policy import get_domain_join_key_policy, load_join_key_policies
 from core.record_v2 import ITEM_Q_OK, make_identity_item, serialize_identity_items
-from domains.units import UNITS_SEMANTIC_KEYS
+from domains.units import UNITS_SEMANTIC_KEYS, UNITS_DOC_SEMANTIC_KEYS, extract_units_doc
+from validators.record_v2 import validate_record_v2
 
 
 def _units_policy():
     policies = load_join_key_policies("policies/domain_join_key_policies.json")
     return get_domain_join_key_policy(policies, "units")
+
+
+def _domain_identity_registry_v2():
+    with open("contracts/domain_identity_keys_v2.json", "r") as f:
+        return json.load(f)
 
 
 def test_units_join_selectors_and_sig_basis_are_distinct():
@@ -47,3 +56,80 @@ def test_units_join_selectors_and_sig_basis_are_distinct():
 
     # Pilot requirement: semantic hash should remain independent from join hash.
     assert sig_hash != join_key["join_hash"]
+
+
+def test_units_boolean_formatting_flags_are_semantic():
+    for key in (
+        "units.use_default",
+        "units.use_digit_grouping",
+        "units.use_plus_prefix",
+        "units.suppress_leading_zeros",
+        "units.suppress_spaces",
+        "units.suppress_trailing_zeros",
+    ):
+        assert key in UNITS_SEMANTIC_KEYS
+
+
+class _FakeDecimalSymbol(enum.Enum):
+    Dot = 0
+    Comma = 1
+
+
+class _FakeDigitGroupingSymbol(enum.Enum):
+    Comma = 0
+    Period = 1
+
+
+class _FakeUnits(object):
+    DecimalSymbol = _FakeDecimalSymbol.Dot
+    DigitGroupingAmount = 3
+    DigitGroupingSymbol = _FakeDigitGroupingSymbol.Comma
+
+
+class _FakeDoc(object):
+    def GetUnits(self):
+        return _FakeUnits()
+
+
+class _FakeDocUnitsUnreadable(object):
+    def GetUnits(self):
+        raise RuntimeError("boom")
+
+
+def test_extract_units_doc_emits_exactly_one_populated_record():
+    result = extract_units_doc(_FakeDoc(), ctx={})
+
+    assert result["count"] == 1
+    assert len(result["records"]) == 1
+    assert result["debug_v2_blocked"] is False
+
+    rec = result["records"][0]
+    assert rec["record_id"] == "units:_doc"
+    assert rec["domain"] == "units_doc"
+    assert rec["status"] == "ok"
+    assert rec["sig_hash"] is not None
+
+    items_by_k = {it["k"]: it for it in rec["identity_basis"]["items"]}
+    assert set(items_by_k.keys()) == set(UNITS_DOC_SEMANTIC_KEYS)
+    for k, it in items_by_k.items():
+        assert it["q"] == ITEM_Q_OK, "expected q=ok for {}".format(k)
+
+    assert items_by_k["units_doc.decimal_symbol"]["v"] == "Dot"
+    assert items_by_k["units_doc.digit_grouping_amount"]["v"] == "3"
+    assert items_by_k["units_doc.digit_grouping_symbol"]["v"] == "Comma"
+
+    violations = validate_record_v2(rec, _domain_identity_registry_v2())
+    assert violations == []
+
+
+def test_extract_units_doc_never_blocks_on_read_failure():
+    result = extract_units_doc(_FakeDocUnitsUnreadable(), ctx={})
+
+    assert result["count"] == 1
+    assert result["debug_v2_blocked"] is False
+
+    rec = result["records"][0]
+    assert rec["status"] == "degraded"
+    assert rec["sig_hash"] is not None
+    for it in rec["identity_basis"]["items"]:
+        assert it["q"] == "unreadable"

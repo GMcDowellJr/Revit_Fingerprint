@@ -592,6 +592,11 @@ def run_fingerprint(doc, timing=None):
         if legacy is not None:
             fingerprint["units"] = legacy
 
+    if _enabled("units_doc"):
+        legacy = _domain_run("units_doc", units.extract_units_doc, doc, ctx, contract_domains, run_diag, runner_notes)
+        if legacy is not None:
+            fingerprint["units_doc"] = legacy
+
     # Global style domains (locked semantics)
     # NOTE: line_patterns must run first to populate ctx mappings consumed by object_styles/line_styles.
     if _enabled("line_patterns"):
