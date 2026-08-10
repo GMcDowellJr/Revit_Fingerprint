@@ -12,6 +12,148 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **`dimension_types` domain family: field expansion across all 7 partitions (Area 7):**
+  Adds ~25 new identity items across `dimension_types_linear`/`_angular`/`_radial`/
+  `_diameter`/`_spot_elevation`/`_spot_coordinate`/`_spot_slope`, closing the gap
+  identified in `audit_results/audit_11_domain_extractor_delta_step0_findings.md`
+  §7. All fields are read via the existing `first_param(bip_names=..., ui_names=...)`
+  pattern (`core/rows.py`) and verified against the repo's already-committed probe
+  run data (`tools/probes/Exports/probes_2025_*.json`, 3 consistent runs, per-shape
+  `observed_on_shapes` breakdown) rather than a fresh live-Revit run in this pass —
+  where the probe data corrected this area's own initial family-applicability
+  guesses (Centerline/Interior Tick Mark/Equality are Linear+Angular only, **not**
+  Radial/Diameter as originally guessed; Alternate Units genuinely applies to all 7
+  partitions per Greg's correction, not just Linear), the probe evidence was
+  followed over the guess.
+  - **§1 spot-family Leader Arrowhead cluster** (`extract_spot_elevation`/
+    `_spot_coordinate`/`_spot_slope`): new shared helper
+    `core/dimension_type_helpers._read_leader_arrowhead()` (mirrors the working
+    `domains/text_types.py` Leader Arrowhead read/resolve pattern — `BuiltInParameter.
+    LEADER_ARROWHEAD` → `ctx["arrowheads_by_type_id"]`) implements the
+    previously-reserved-but-never-implemented `dim_type.leader_arrowhead_sig_hash`
+    identity key, plus new `dim_type.leader_arrowhead_uid`/`_name` (file-local/cosmetic
+    metadata, same status as `text_type.leader_arrowhead_uid`/`_name`) and ordinary
+    `dim_type.leader_arrowhead_line_weight`/`dim_type.leader_line_weight` reads.
+  - **§2 linear/angular/radial/diameter leader config**: `dim_type.leader_tick_mark_sig_hash`
+    (new generic `core/dimension_type_helpers._read_arrowhead_ref_sig_hash()` helper,
+    reused for the other tick-mark-family fields below), `dim_type.leader_type`,
+    `dim_type.show_leader_when_text_moves` — a distinct Revit feature from §1's spot
+    Leader Arrowhead despite the shared word "leader"; no shared helper or key-naming
+    prefix between the two.
+  - **§3 witness lines** (linear/angular only): `dim_type.witness_line_extension_in`/
+    `_gap_to_element_in`/`_length_in`, plus `dim_type.witness_line_tick_mark_sig_hash`
+    (Linear only — confirmed asymmetry vs. Angular, consistent across all 3 probe runs).
+  - **§4 equality/centerline/tick-weight** (linear/angular only, correcting this area's
+    own initial radial/diameter guess): `dim_type.equality_text`/`_witness_display`
+    (`dim_type.equality_formula` dropped — probe storage=`None`/unsupported, not a
+    plain-parameter read); `dim_type.centerline_symbol_name` (new generic
+    `core/dimension_type_helpers._read_element_ref_name()` helper — name-only
+    resolution, not routed through `arrowheads_by_type_id` since it isn't a confirmed
+    arrowhead-family reference) and `dim_type.centerline_tick_mark_sig_hash`/
+    `dim_type.interior_tick_mark_sig_hash`/`_display`. `dim_type.tick_mark_line_weight`
+    (angular/diameter/linear/radial — distinct from the existing `dim_type.line_weight`).
+    `dim_type.centerline_pattern_sig_hash` (linear/angular only) resolves via a new
+    `core/dimension_type_helpers._read_line_pattern_ref_sig_hash()` helper — the same
+    `ctx["line_pattern_uid_to_hash"]`/`ctx["line_pattern_special_values"]` resolution
+    `domains/object_styles.py`/`domains/line_styles.py` already use for their own
+    `GetLinePatternId()` references, so a built-in pattern id (e.g. the probe's
+    `-3000010`, "Solid") resolves to the same `"<Solid>"` sentinel those domains use
+    instead of collapsing to the same `missing` value as "no centerline pattern"
+    (PR #412 review fix — an earlier revision routed this through a plain
+    `doc.GetElement()` name lookup that returned `missing` for built-in pattern ids,
+    losing the distinction between "Solid" and "none").
+  - **§5 alternate units** (all 7 partitions): `dim_type.alternate_units`,
+    `dim_type.alternate_units_prefix`/`_suffix`. `dim_type.alternate_units_format_id`
+    was dropped (PR #412 review fix): it required
+    `DimensionType.GetAlternateUnitsFormatOptions()`, an accessor not confirmed to
+    exist on the Revit surface this repo's committed probe data represents (raises
+    `AttributeError` there) — since every extractor added it as a non-required item and
+    the status-reason loop counts any non-OK optional item, this made every
+    dimension-type record degrade without the field ever capturing real data. Rather
+    than ship a field permanently pinned to `unsupported_not_applicable`, it was
+    removed along with `_read_unit_format_info()`'s `alternate=` parameter.
+  - **§6 `Suppress Spaces`** (all 7 partitions, wherever `_read_unit_format_info()` is
+    already called): extends that function's return tuple with `suppress_spaces_v/_q`
+    read off the same `FormatOptions` object as `rounding`/`accuracy` — same
+    `FormatOptions`-boolean-flag gap Area 8 documented for `units.py`, applied here to
+    `DimensionType.GetUnitsFormatOptions()` instead of the doc-level `Units` object.
+  - **§7 provisional cluster**: implemented with probe-confirmed family assignments —
+    `dim_type.text_offset_in` (angular/diameter/linear/radial), `dim_type.
+    text_offset_from_leader_in` (all 3 spot partitions), `dim_type.
+    text_offset_from_symbol_in` (spot_elevation/spot_coordinate only — not spot_slope,
+    consistent with spot_slope having no `symbol_name` field either), `dim_type.
+    dimension_string_type`/`dim_type.show_opening_height` (linear only), `dim_type.
+    rotate_with_component` (all 3 spot partitions), `dim_type.elevation_base`
+    (spot_elevation only), `dim_type.coordinate_base` (spot_coordinate only).
+  All new fields are non-required/non-blocking enrichment (added to each partition's
+  `identity_items`/hash preimage but never `required_qs`) — a conservative posture for
+  a mass field-addition pass without a live Revit run to per-family-verify blocking
+  behavior against. New ElementId-referenced sig_hash/name fields (`leader_tick_mark_sig_hash`,
+  `witness_line_tick_mark_sig_hash`, `centerline_tick_mark_sig_hash`,
+  `interior_tick_mark_sig_hash`, `centerline_pattern_sig_hash`, `centerline_symbol_name`,
+  `leader_arrowhead_uid`/`_name`/`_sig_hash`) are added to each partition's existing
+  "missing is acceptable" status-reason exemption set (same treatment as the
+  pre-existing `dim_type.tick_mark_sig_hash`), since a negative/absent reference
+  legitimately means "none selected," not a data gap. All 4 of `_read_arrowhead_ref_sig_hash()`
+  (`leader_tick_mark_sig_hash`/`witness_line_tick_mark_sig_hash`/`centerline_tick_mark_sig_hash`/
+  `interior_tick_mark_sig_hash`), `_read_leader_arrowhead()`'s `sig_hash` element, and
+  `_read_line_pattern_ref_sig_hash()` (`centerline_pattern_sig_hash`, both its positive-id and
+  negative/built-in branches) distinguish a genuine "no reference selected" state
+  (`ITEM_Q_MISSING`, still exempted) from a *real* reference — positive custom id, or a
+  negative built-in id like "Solid" — that could not be resolved because its ctx dependency
+  map (`arrowheads_by_type_id`/`line_pattern_uid_to_hash`/`line_pattern_special_values`) was
+  never populated or doesn't cover that id (`ITEM_Q_UNREADABLE`, **not** exempted). Without
+  this distinction, distinct custom/built-in tick marks, arrowheads, or centerline patterns
+  that are all unresolved for the same reason (e.g. `arrowheads`/`line_patterns` excluded
+  from a given run's domain allowlist) would silently collapse to the same identity value
+  and hash instead of degrading the record (PR #412 review, two rounds:
+  `core/dimension_type_helpers._read_line_pattern_ref_sig_hash()`'s positive-id branch first,
+  then its negative/built-in branch plus `_read_arrowhead_ref_sig_hash()`/
+  `_read_leader_arrowhead()` in a follow-up round).
+  **Hash-breaking (content-driven, not an algorithm change):** new identity items are
+  included in each partition's `identity_items`/`serialize_identity_items()` preimage by
+  construction (matching the existing `loaded_family_types`/Area 12 precedent above), so
+  `sig_hash` changes for every record across all 7 `dimension_types_*` domains; full
+  re-extraction required (D-015 "hash-breaking" precedent). **Exception:** in the 3 spot
+  partitions, `dim_type.leader_arrowhead_uid`/`_name` are excluded from the sig_hash
+  preimage specifically (filtered out immediately before `serialize_identity_items()`) even
+  though they remain in `identity_items`/`identity_basis.items` for visibility — a raw
+  Revit `UniqueId` and a cosmetic name are file-local/presentation metadata (D-004; Hash
+  Semantics: "Names are metadata only"), and including them would have made two files with
+  a semantically-identical spot dimension type (same arrowhead style/name) hash differently
+  purely because `UniqueId` is per-file-random. This is the fix for a real regression the
+  original Area 7 commit shipped: the contract's `sig_hash_keys` pin only governs the
+  *analysis-side* reconstruction (`core/sig_hash_builder.py`, not wired into live
+  extraction), so it never actually kept the uid/name out of the canonical extracted
+  `sig_hash`/`hash_v2` until this extractor-level exclusion was added (PR #412 review).
+  `contracts/domain_identity_keys_v2.json`'s 7 `dimension_types_*` blocks are updated
+  (`allowed_keys` only — no new `required_keys`); the 3 spot domains additionally get an
+  explicit `sig_hash_keys` override (hand-patched, not regenerated via
+  `tools/generate_sig_hash_policy.py`, to avoid clobbering unrelated hand-tuned notes
+  on other domains — same precedent as the `loaded_family_types`/Area 12 entry above)
+  pinning the analysis-side sig_hash preimage to exclude `dim_type.leader_arrowhead_uid`/
+  `_name` (file-local/cosmetic) while retaining `dim_type.leader_arrowhead_sig_hash`
+  itself (content-derived, already an `allowed_keys` entry before this change) —
+  same silent-drift risk `tools/generate_sig_hash_policy.py` defaulting the preimage to
+  every `allowed_keys` entry that the Area 10 `text_types` `leader_arrowhead` pin
+  addressed. `policies/domain_sig_hash_policies.json`'s 7 `dimension_types_*` blocks are
+  hand-patched to match (same clobber-avoidance rationale).
+  **Schema version bump (PR #412 review, 4th round):** all 7 `dimension_types_*` blocks'
+  `sig_hash_schema` is bumped from the implicit `.sig_hash.v1` to an explicit `.sig_hash.v2`
+  in both `contracts/domain_identity_keys_v2.json` and the hand-patched
+  `policies/domain_sig_hash_policies.json`, matching the `loaded_family_types`/Area 12
+  precedent — the analysis-side hash preimage (`allowed_items`) widened for every record in
+  all 7 partitions, so consumers comparing pre-/post-change extractions need the version to
+  distinguish real drift from an incompatible hash-definition change.
+  **Label-synthesis/join-key exclusions (PR #412 review, 4th round):**
+  `tools/label_synthesis/domain_prompts/dimension_types.py`'s `_SKIP_KEYS` gains
+  `dim_type.leader_arrowhead_uid`/`_name` (same treatment as the pre-existing
+  `tick_mark_uid` entries) so a per-file-random UID and cosmetic name aren't presented to
+  label-synthesis prompts as behavioral parameters. The 3 spot domains'
+  `explicitly_excluded_items` in `policies/domain_join_key_policies.json` gain the same two
+  keys, matching `text_types`' existing `leader_arrowhead_uid`/`_name` exclusions, so
+  `tools/discover_join_policy.py`'s `discover`/`harsh` modes can't nominate them as join-key
+  candidates.
 - **`loaded_family_types` domain: `structural_material_type`/`is_active` identity fields (Area 12):**
   `domains/loaded_family_types.py`'s existing per-family loop now reads
   `FamilySymbol.StructuralMaterialType` (via `canonicalize_str`, same

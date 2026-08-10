@@ -24,6 +24,7 @@ from core.record_v2 import (
     canonicalize_str_allow_empty,
     canonicalize_int,
     canonicalize_float,
+    canonicalize_bool,
     ITEM_Q_OK,
     ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
@@ -45,6 +46,11 @@ from core.dimension_type_helpers import (
     _read_tick_mark_sig_hash,
     _read_unit_format_info,
     _read_prefix_suffix,
+    _read_leader_arrowhead,
+    _read_arrowhead_ref_sig_hash,
+    _read_element_ref_name,
+    _read_line_pattern_ref_sig_hash,
+    _build_alternate_units_items,
     get_type_display_name,
     SHAPE_LINEAR,
     SHAPE_LINEAR_FIXED,
@@ -256,7 +262,8 @@ def extract_linear(doc, ctx=None):
             # Unit format info
             (unit_format_id_v, unit_format_id_q,
              rounding_v, rounding_q,
-             accuracy_v, accuracy_q) = _read_unit_format_info(d)
+             accuracy_v, accuracy_q,
+             suppress_spaces_v, suppress_spaces_q) = _read_unit_format_info(d)
 
             # Prefix/Suffix
             prefix_v, prefix_q, suffix_v, suffix_q = _read_prefix_suffix(d)
@@ -280,6 +287,130 @@ def extract_linear(doc, ctx=None):
             except Exception:
                 witness_v, witness_q = (None, ITEM_Q_UNREADABLE)
 
+            # --- Area 7 §2: linear/angular/radial/diameter leader config ---
+            # (dimension-line leader, distinct from the spot-family Leader Arrowhead in §1)
+            leader_tick_mark_sig_hash_v, leader_tick_mark_sig_hash_q = _read_arrowhead_ref_sig_hash(
+                d, ctx, ui_names=["Leader Tick Mark"]
+            )
+            leader_type_v, leader_type_q = (None, ITEM_Q_MISSING)
+            try:
+                p_lt = first_param(d, ui_names=["Leader Type"])
+                lt_raw = _as_value_string(p_lt) if p_lt is not None else None
+                leader_type_v, leader_type_q = canonicalize_str(lt_raw)
+            except Exception:
+                leader_type_v, leader_type_q = (None, ITEM_Q_UNREADABLE)
+            show_leader_when_text_moves_v, show_leader_when_text_moves_q = (None, ITEM_Q_MISSING)
+            try:
+                p_slwtm = first_param(d, ui_names=["Show Leader When Text Moves"])
+                slwtm_raw = _as_value_string(p_slwtm) if p_slwtm is not None else None
+                show_leader_when_text_moves_v, show_leader_when_text_moves_q = canonicalize_str(slwtm_raw)
+            except Exception:
+                show_leader_when_text_moves_v, show_leader_when_text_moves_q = (None, ITEM_Q_UNREADABLE)
+            # Tick Mark Line Weight (§4): the tick-mark glyph's own weight, distinct from
+            # dim_type.line_weight (the overall dimension line weight)
+            tick_mark_line_weight_v, tick_mark_line_weight_q = (None, ITEM_Q_MISSING)
+            try:
+                p_tmlw = first_param(d, ui_names=["Tick Mark Line Weight"])
+                tmlw_int = _as_int(p_tmlw) if p_tmlw is not None else None
+                tick_mark_line_weight_v, tick_mark_line_weight_q = canonicalize_int(tmlw_int)
+            except Exception:
+                tick_mark_line_weight_v, tick_mark_line_weight_q = (None, ITEM_Q_UNREADABLE)
+
+            # --- Area 7 §3: witness lines (linear/angular only) ---
+            witness_line_extension_v, witness_line_extension_q = (None, ITEM_Q_MISSING)
+            try:
+                p_wle = first_param(d, ui_names=["Witness Line Extension"])
+                wle_ft = _as_double(p_wle) if p_wle is not None else None
+                witness_line_extension_v, witness_line_extension_q = canonicalize_float(_fmt_in_from_ft(wle_ft))
+            except Exception:
+                witness_line_extension_v, witness_line_extension_q = (None, ITEM_Q_UNREADABLE)
+            witness_line_gap_v, witness_line_gap_q = (None, ITEM_Q_MISSING)
+            try:
+                p_wlg = first_param(d, ui_names=["Witness Line Gap to Element"])
+                wlg_ft = _as_double(p_wlg) if p_wlg is not None else None
+                witness_line_gap_v, witness_line_gap_q = canonicalize_float(_fmt_in_from_ft(wlg_ft))
+            except Exception:
+                witness_line_gap_v, witness_line_gap_q = (None, ITEM_Q_UNREADABLE)
+            witness_line_length_v, witness_line_length_q = (None, ITEM_Q_MISSING)
+            try:
+                p_wll = first_param(d, ui_names=["Witness Line Length"])
+                wll_ft = _as_double(p_wll) if p_wll is not None else None
+                witness_line_length_v, witness_line_length_q = canonicalize_float(_fmt_in_from_ft(wll_ft))
+            except Exception:
+                witness_line_length_v, witness_line_length_q = (None, ITEM_Q_UNREADABLE)
+            # Witness Line Tick Mark: Linear only per probe data (not Angular, an asymmetry
+            # confirmed consistent across all 3 probe runs, not a sampling artifact)
+            witness_line_tick_mark_sig_hash_v, witness_line_tick_mark_sig_hash_q = _read_arrowhead_ref_sig_hash(
+                d, ctx, ui_names=["Witness Line Tick Mark"]
+            )
+
+            # --- Area 7 §4a: equality dimensions (linear/angular only) ---
+            equality_text_v, equality_text_q = (None, ITEM_Q_MISSING)
+            try:
+                p_eqt = first_param(d, ui_names=["Equality Text"])
+                eqt_raw = _as_string(p_eqt) if p_eqt is not None else None
+                equality_text_v, equality_text_q = canonicalize_str_allow_empty(eqt_raw)
+            except Exception:
+                equality_text_v, equality_text_q = (None, ITEM_Q_UNREADABLE)
+            equality_witness_display_v, equality_witness_display_q = (None, ITEM_Q_MISSING)
+            try:
+                p_ewd = first_param(d, ui_names=["Equality Witness Display"])
+                ewd_raw = _as_value_string(p_ewd) if p_ewd is not None else None
+                equality_witness_display_v, equality_witness_display_q = canonicalize_str(ewd_raw)
+            except Exception:
+                equality_witness_display_v, equality_witness_display_q = (None, ITEM_Q_UNREADABLE)
+            # Equality Formula intentionally dropped: probe storage=None/unsupported, not a
+            # plain-parameter read like Equality Text/Equality Witness Display (Area 7 §4a).
+
+            # --- Area 7 §4b: centerline / interior tick marks (linear/angular only) ---
+            # Note: this is the Linear/Angular Dimension Style "Centerline" tab, a distinct
+            # Revit feature from Radial/Diameter's Center Mark (dim_type.center_marks) --
+            # confirmed by probe observed_on_shapes (Linear/Angular only, never Radial/Diameter).
+            centerline_pattern_sig_hash_v, centerline_pattern_sig_hash_q = _read_line_pattern_ref_sig_hash(
+                d, ctx, doc, ui_names=["Centerline Pattern"]
+            )
+            centerline_symbol_name_v, centerline_symbol_name_q = _read_element_ref_name(
+                d, doc, ui_names=["Centerline Symbol"]
+            )
+            centerline_tick_mark_sig_hash_v, centerline_tick_mark_sig_hash_q = _read_arrowhead_ref_sig_hash(
+                d, ctx, ui_names=["Centerline Tick Mark"]
+            )
+            interior_tick_mark_sig_hash_v, interior_tick_mark_sig_hash_q = _read_arrowhead_ref_sig_hash(
+                d, ctx, ui_names=["Interior Tick Mark"]
+            )
+            interior_tick_mark_display_v, interior_tick_mark_display_q = (None, ITEM_Q_MISSING)
+            try:
+                p_itmd = first_param(d, ui_names=["Interior Tick Mark Display"])
+                itmd_raw = _as_value_string(p_itmd) if p_itmd is not None else None
+                interior_tick_mark_display_v, interior_tick_mark_display_q = canonicalize_str(itmd_raw)
+            except Exception:
+                interior_tick_mark_display_v, interior_tick_mark_display_q = (None, ITEM_Q_UNREADABLE)
+
+            # --- Area 7 §7: Text Offset (Angular/Diameter/Linear/Radial per probe) ---
+            text_offset_v, text_offset_q = (None, ITEM_Q_MISSING)
+            try:
+                p_toff = first_param(d, ui_names=["Text Offset"])
+                toff_ft = _as_double(p_toff) if p_toff is not None else None
+                text_offset_v, text_offset_q = canonicalize_float(_fmt_in_from_ft(toff_ft))
+            except Exception:
+                text_offset_v, text_offset_q = (None, ITEM_Q_UNREADABLE)
+
+            # --- Area 7 §7: Dimension String Type / Show Opening Height (Linear only per probe) ---
+            dimension_string_type_v, dimension_string_type_q = (None, ITEM_Q_MISSING)
+            try:
+                p_dst2 = first_param(d, ui_names=["Dimension String Type"])
+                dst2_raw = _as_value_string(p_dst2) if p_dst2 is not None else None
+                dimension_string_type_v, dimension_string_type_q = canonicalize_str(dst2_raw)
+            except Exception:
+                dimension_string_type_v, dimension_string_type_q = (None, ITEM_Q_UNREADABLE)
+            show_opening_height_v, show_opening_height_q = (None, ITEM_Q_MISSING)
+            try:
+                p_soh = first_param(d, ui_names=["Show Opening Height"])
+                soh_int = _as_int(p_soh) if p_soh is not None else None
+                show_opening_height_v, show_opening_height_q = canonicalize_bool(soh_int)
+            except Exception:
+                show_opening_height_v, show_opening_height_q = (None, ITEM_Q_UNREADABLE)
+
             # --- Build identity items ---
             core_items = [
                 make_identity_item("dim_type.shape", shape_v, shape_q),
@@ -290,10 +421,30 @@ def extract_linear(doc, ctx=None):
                 make_identity_item("dim_type.rounding", rounding_v, rounding_q),
                 make_identity_item("dim_type.prefix", prefix_v, prefix_q),
                 make_identity_item("dim_type.suffix", suffix_v, suffix_q),
+                make_identity_item("dim_type.suppress_spaces", suppress_spaces_v, suppress_spaces_q),
+                make_identity_item("dim_type.leader_tick_mark_sig_hash", leader_tick_mark_sig_hash_v, leader_tick_mark_sig_hash_q),
+                make_identity_item("dim_type.leader_type", leader_type_v, leader_type_q),
+                make_identity_item("dim_type.show_leader_when_text_moves", show_leader_when_text_moves_v, show_leader_when_text_moves_q),
+                make_identity_item("dim_type.tick_mark_line_weight", tick_mark_line_weight_v, tick_mark_line_weight_q),
+                make_identity_item("dim_type.witness_line_extension_in", witness_line_extension_v, witness_line_extension_q),
+                make_identity_item("dim_type.witness_line_gap_to_element_in", witness_line_gap_v, witness_line_gap_q),
+                make_identity_item("dim_type.witness_line_length_in", witness_line_length_v, witness_line_length_q),
+                make_identity_item("dim_type.witness_line_tick_mark_sig_hash", witness_line_tick_mark_sig_hash_v, witness_line_tick_mark_sig_hash_q),
+                make_identity_item("dim_type.equality_text", equality_text_v, equality_text_q),
+                make_identity_item("dim_type.equality_witness_display", equality_witness_display_v, equality_witness_display_q),
+                make_identity_item("dim_type.centerline_pattern_sig_hash", centerline_pattern_sig_hash_v, centerline_pattern_sig_hash_q),
+                make_identity_item("dim_type.centerline_symbol_name", centerline_symbol_name_v, centerline_symbol_name_q),
+                make_identity_item("dim_type.centerline_tick_mark_sig_hash", centerline_tick_mark_sig_hash_v, centerline_tick_mark_sig_hash_q),
+                make_identity_item("dim_type.interior_tick_mark_sig_hash", interior_tick_mark_sig_hash_v, interior_tick_mark_sig_hash_q),
+                make_identity_item("dim_type.interior_tick_mark_display", interior_tick_mark_display_v, interior_tick_mark_display_q),
+                make_identity_item("dim_type.text_offset_in", text_offset_v, text_offset_q),
+                make_identity_item("dim_type.dimension_string_type", dimension_string_type_v, dimension_string_type_q),
+                make_identity_item("dim_type.show_opening_height", show_opening_height_v, show_opening_height_q),
             ]
 
             text_items = _build_text_appearance_items(d)
-            all_items = core_items + text_items
+            alt_units_items = _build_alternate_units_items(d)
+            all_items = core_items + text_items + alt_units_items
 
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
@@ -307,6 +458,11 @@ def extract_linear(doc, ctx=None):
                 prefix_q,
                 suffix_q,
             ]
+            # Area 7 additions (suppress_spaces, alternate units, leader config, witness-line
+            # detail, equality, centerline/interior tick marks, text offset, dimension string
+            # type, show opening height) are non-blocking enrichment -- not added to
+            # required_qs, matching the existing treatment of text/appearance and other
+            # optional-enrichment fields in this domain.
             # witness_line_control: soft-required — only contributes to blocking if
             # successfully read (q=OK appended to list has no blocking effect; this
             # pattern ensures the field never blocks on lookup failure)
@@ -316,14 +472,26 @@ def extract_linear(doc, ctx=None):
 
             blocked = any(q != ITEM_Q_OK for q in required_qs)
 
+            # ElementId-referenced sig_hash items where MISSING legitimately means
+            # "no reference selected" (e.g. tick mark/leader arrowhead set to None),
+            # not a data gap -- same treatment as the pre-existing tick_mark_sig_hash.
+            _OPTIONAL_REF_SIG_HASH_KEYS = frozenset({
+                "dim_type.tick_mark_sig_hash",
+                "dim_type.leader_tick_mark_sig_hash",
+                "dim_type.witness_line_tick_mark_sig_hash",
+                "dim_type.centerline_tick_mark_sig_hash",
+                "dim_type.interior_tick_mark_sig_hash",
+                "dim_type.centerline_pattern_sig_hash",
+                "dim_type.centerline_symbol_name",
+            })
+
             status_reasons = []
             for it in identity_items:
                 q = it.get("q")
                 k = it.get("k", "")
                 if q == ITEM_Q_OK:
                     continue
-                # tick_mark_sig_hash missing is acceptable
-                if q == ITEM_Q_MISSING and k == "dim_type.tick_mark_sig_hash":
+                if q == ITEM_Q_MISSING and k in _OPTIONAL_REF_SIG_HASH_KEYS:
                     continue
                 status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
@@ -567,7 +735,8 @@ def extract_angular(doc, ctx=None):
             # Unit format info
             (unit_format_id_v, unit_format_id_q,
              rounding_v, rounding_q,
-             accuracy_v, accuracy_q) = _read_unit_format_info(d)
+             accuracy_v, accuracy_q,
+             suppress_spaces_v, suppress_spaces_q) = _read_unit_format_info(d)
 
             # Prefix/Suffix
             prefix_v, prefix_q, suffix_v, suffix_q = _read_prefix_suffix(d)
@@ -591,6 +760,103 @@ def extract_angular(doc, ctx=None):
             except Exception:
                 witness_v, witness_q = (None, ITEM_Q_UNREADABLE)
 
+            # --- Area 7 §2: linear/angular/radial/diameter leader config ---
+            leader_tick_mark_sig_hash_v, leader_tick_mark_sig_hash_q = _read_arrowhead_ref_sig_hash(
+                d, ctx, ui_names=["Leader Tick Mark"]
+            )
+            leader_type_v, leader_type_q = (None, ITEM_Q_MISSING)
+            try:
+                p_lt = first_param(d, ui_names=["Leader Type"])
+                lt_raw = _as_value_string(p_lt) if p_lt is not None else None
+                leader_type_v, leader_type_q = canonicalize_str(lt_raw)
+            except Exception:
+                leader_type_v, leader_type_q = (None, ITEM_Q_UNREADABLE)
+            show_leader_when_text_moves_v, show_leader_when_text_moves_q = (None, ITEM_Q_MISSING)
+            try:
+                p_slwtm = first_param(d, ui_names=["Show Leader When Text Moves"])
+                slwtm_raw = _as_value_string(p_slwtm) if p_slwtm is not None else None
+                show_leader_when_text_moves_v, show_leader_when_text_moves_q = canonicalize_str(slwtm_raw)
+            except Exception:
+                show_leader_when_text_moves_v, show_leader_when_text_moves_q = (None, ITEM_Q_UNREADABLE)
+            tick_mark_line_weight_v, tick_mark_line_weight_q = (None, ITEM_Q_MISSING)
+            try:
+                p_tmlw = first_param(d, ui_names=["Tick Mark Line Weight"])
+                tmlw_int = _as_int(p_tmlw) if p_tmlw is not None else None
+                tick_mark_line_weight_v, tick_mark_line_weight_q = canonicalize_int(tmlw_int)
+            except Exception:
+                tick_mark_line_weight_v, tick_mark_line_weight_q = (None, ITEM_Q_UNREADABLE)
+
+            # --- Area 7 §3: witness lines (linear/angular only) ---
+            witness_line_extension_v, witness_line_extension_q = (None, ITEM_Q_MISSING)
+            try:
+                p_wle = first_param(d, ui_names=["Witness Line Extension"])
+                wle_ft = _as_double(p_wle) if p_wle is not None else None
+                witness_line_extension_v, witness_line_extension_q = canonicalize_float(_fmt_in_from_ft(wle_ft))
+            except Exception:
+                witness_line_extension_v, witness_line_extension_q = (None, ITEM_Q_UNREADABLE)
+            witness_line_gap_v, witness_line_gap_q = (None, ITEM_Q_MISSING)
+            try:
+                p_wlg = first_param(d, ui_names=["Witness Line Gap to Element"])
+                wlg_ft = _as_double(p_wlg) if p_wlg is not None else None
+                witness_line_gap_v, witness_line_gap_q = canonicalize_float(_fmt_in_from_ft(wlg_ft))
+            except Exception:
+                witness_line_gap_v, witness_line_gap_q = (None, ITEM_Q_UNREADABLE)
+            witness_line_length_v, witness_line_length_q = (None, ITEM_Q_MISSING)
+            try:
+                p_wll = first_param(d, ui_names=["Witness Line Length"])
+                wll_ft = _as_double(p_wll) if p_wll is not None else None
+                witness_line_length_v, witness_line_length_q = canonicalize_float(_fmt_in_from_ft(wll_ft))
+            except Exception:
+                witness_line_length_v, witness_line_length_q = (None, ITEM_Q_UNREADABLE)
+            # Witness Line Tick Mark intentionally NOT read here: probe data shows it is
+            # Linear-only (Angular never observed), consistent across all 3 probe runs.
+
+            # --- Area 7 §4a: equality dimensions (linear/angular only) ---
+            equality_text_v, equality_text_q = (None, ITEM_Q_MISSING)
+            try:
+                p_eqt = first_param(d, ui_names=["Equality Text"])
+                eqt_raw = _as_string(p_eqt) if p_eqt is not None else None
+                equality_text_v, equality_text_q = canonicalize_str_allow_empty(eqt_raw)
+            except Exception:
+                equality_text_v, equality_text_q = (None, ITEM_Q_UNREADABLE)
+            equality_witness_display_v, equality_witness_display_q = (None, ITEM_Q_MISSING)
+            try:
+                p_ewd = first_param(d, ui_names=["Equality Witness Display"])
+                ewd_raw = _as_value_string(p_ewd) if p_ewd is not None else None
+                equality_witness_display_v, equality_witness_display_q = canonicalize_str(ewd_raw)
+            except Exception:
+                equality_witness_display_v, equality_witness_display_q = (None, ITEM_Q_UNREADABLE)
+
+            # --- Area 7 §4b: centerline / interior tick marks (linear/angular only) ---
+            centerline_pattern_sig_hash_v, centerline_pattern_sig_hash_q = _read_line_pattern_ref_sig_hash(
+                d, ctx, doc, ui_names=["Centerline Pattern"]
+            )
+            centerline_symbol_name_v, centerline_symbol_name_q = _read_element_ref_name(
+                d, doc, ui_names=["Centerline Symbol"]
+            )
+            centerline_tick_mark_sig_hash_v, centerline_tick_mark_sig_hash_q = _read_arrowhead_ref_sig_hash(
+                d, ctx, ui_names=["Centerline Tick Mark"]
+            )
+            interior_tick_mark_sig_hash_v, interior_tick_mark_sig_hash_q = _read_arrowhead_ref_sig_hash(
+                d, ctx, ui_names=["Interior Tick Mark"]
+            )
+            interior_tick_mark_display_v, interior_tick_mark_display_q = (None, ITEM_Q_MISSING)
+            try:
+                p_itmd = first_param(d, ui_names=["Interior Tick Mark Display"])
+                itmd_raw = _as_value_string(p_itmd) if p_itmd is not None else None
+                interior_tick_mark_display_v, interior_tick_mark_display_q = canonicalize_str(itmd_raw)
+            except Exception:
+                interior_tick_mark_display_v, interior_tick_mark_display_q = (None, ITEM_Q_UNREADABLE)
+
+            # --- Area 7 §7: Text Offset (Angular/Diameter/Linear/Radial per probe) ---
+            text_offset_v, text_offset_q = (None, ITEM_Q_MISSING)
+            try:
+                p_toff = first_param(d, ui_names=["Text Offset"])
+                toff_ft = _as_double(p_toff) if p_toff is not None else None
+                text_offset_v, text_offset_q = canonicalize_float(_fmt_in_from_ft(toff_ft))
+            except Exception:
+                text_offset_v, text_offset_q = (None, ITEM_Q_UNREADABLE)
+
             # --- Build identity items ---
             core_items = [
                 make_identity_item("dim_type.shape", shape_v, shape_q),
@@ -601,10 +867,27 @@ def extract_angular(doc, ctx=None):
                 make_identity_item("dim_type.rounding", rounding_v, rounding_q),
                 make_identity_item("dim_type.prefix", prefix_v, prefix_q),
                 make_identity_item("dim_type.suffix", suffix_v, suffix_q),
+                make_identity_item("dim_type.suppress_spaces", suppress_spaces_v, suppress_spaces_q),
+                make_identity_item("dim_type.leader_tick_mark_sig_hash", leader_tick_mark_sig_hash_v, leader_tick_mark_sig_hash_q),
+                make_identity_item("dim_type.leader_type", leader_type_v, leader_type_q),
+                make_identity_item("dim_type.show_leader_when_text_moves", show_leader_when_text_moves_v, show_leader_when_text_moves_q),
+                make_identity_item("dim_type.tick_mark_line_weight", tick_mark_line_weight_v, tick_mark_line_weight_q),
+                make_identity_item("dim_type.witness_line_extension_in", witness_line_extension_v, witness_line_extension_q),
+                make_identity_item("dim_type.witness_line_gap_to_element_in", witness_line_gap_v, witness_line_gap_q),
+                make_identity_item("dim_type.witness_line_length_in", witness_line_length_v, witness_line_length_q),
+                make_identity_item("dim_type.equality_text", equality_text_v, equality_text_q),
+                make_identity_item("dim_type.equality_witness_display", equality_witness_display_v, equality_witness_display_q),
+                make_identity_item("dim_type.centerline_pattern_sig_hash", centerline_pattern_sig_hash_v, centerline_pattern_sig_hash_q),
+                make_identity_item("dim_type.centerline_symbol_name", centerline_symbol_name_v, centerline_symbol_name_q),
+                make_identity_item("dim_type.centerline_tick_mark_sig_hash", centerline_tick_mark_sig_hash_v, centerline_tick_mark_sig_hash_q),
+                make_identity_item("dim_type.interior_tick_mark_sig_hash", interior_tick_mark_sig_hash_v, interior_tick_mark_sig_hash_q),
+                make_identity_item("dim_type.interior_tick_mark_display", interior_tick_mark_display_v, interior_tick_mark_display_q),
+                make_identity_item("dim_type.text_offset_in", text_offset_v, text_offset_q),
             ]
 
             text_items = _build_text_appearance_items(d)
-            all_items = core_items + text_items
+            alt_units_items = _build_alternate_units_items(d)
+            all_items = core_items + text_items + alt_units_items
 
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
@@ -619,8 +902,18 @@ def extract_angular(doc, ctx=None):
             # witness_line_control: soft-required — only contributes when successfully read
             if witness_q == ITEM_Q_OK:
                 required_qs.append(witness_q)
-            # text/appearance fields are cross-family alignment, not primary identity — not blocking
+            # text/appearance fields, and all Area 7 additions, are cross-family alignment /
+            # non-blocking enrichment — not blocking
             blocked = any(q != ITEM_Q_OK for q in required_qs)
+
+            _OPTIONAL_REF_SIG_HASH_KEYS = frozenset({
+                "dim_type.tick_mark_sig_hash",
+                "dim_type.leader_tick_mark_sig_hash",
+                "dim_type.centerline_tick_mark_sig_hash",
+                "dim_type.interior_tick_mark_sig_hash",
+                "dim_type.centerline_pattern_sig_hash",
+                "dim_type.centerline_symbol_name",
+            })
 
             status_reasons = []
             for it in identity_items:
@@ -628,7 +921,7 @@ def extract_angular(doc, ctx=None):
                 k = it.get("k", "")
                 if q == ITEM_Q_OK:
                     continue
-                if q == ITEM_Q_MISSING and k == "dim_type.tick_mark_sig_hash":
+                if q == ITEM_Q_MISSING and k in _OPTIONAL_REF_SIG_HASH_KEYS:
                     continue
                 status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
@@ -869,7 +1162,8 @@ def extract_radial(doc, ctx=None):
             # Unit format info
             (unit_format_id_v, unit_format_id_q,
              rounding_v, rounding_q,
-             accuracy_v, accuracy_q) = _read_unit_format_info(d)
+             accuracy_v, accuracy_q,
+             suppress_spaces_v, suppress_spaces_q) = _read_unit_format_info(d)
 
             # Tick mark sig hash
             tick_sig_hash_v, tick_sig_hash_q = _read_tick_mark_sig_hash(d, ctx, doc)
@@ -916,6 +1210,41 @@ def extract_radial(doc, ctx=None):
             except Exception:
                 radius_symbol_text_v, radius_symbol_text_q = (None, ITEM_Q_UNREADABLE)
 
+            # --- Area 7 §2/§4c: leader config + tick weight (angular/diameter/linear/radial) ---
+            leader_tick_mark_sig_hash_v, leader_tick_mark_sig_hash_q = _read_arrowhead_ref_sig_hash(
+                d, ctx, ui_names=["Leader Tick Mark"]
+            )
+            leader_type_v, leader_type_q = (None, ITEM_Q_MISSING)
+            try:
+                p_lt = first_param(d, ui_names=["Leader Type"])
+                lt_raw = _as_value_string(p_lt) if p_lt is not None else None
+                leader_type_v, leader_type_q = canonicalize_str(lt_raw)
+            except Exception:
+                leader_type_v, leader_type_q = (None, ITEM_Q_UNREADABLE)
+            show_leader_when_text_moves_v, show_leader_when_text_moves_q = (None, ITEM_Q_MISSING)
+            try:
+                p_slwtm = first_param(d, ui_names=["Show Leader When Text Moves"])
+                slwtm_raw = _as_value_string(p_slwtm) if p_slwtm is not None else None
+                show_leader_when_text_moves_v, show_leader_when_text_moves_q = canonicalize_str(slwtm_raw)
+            except Exception:
+                show_leader_when_text_moves_v, show_leader_when_text_moves_q = (None, ITEM_Q_UNREADABLE)
+            tick_mark_line_weight_v, tick_mark_line_weight_q = (None, ITEM_Q_MISSING)
+            try:
+                p_tmlw = first_param(d, ui_names=["Tick Mark Line Weight"])
+                tmlw_int = _as_int(p_tmlw) if p_tmlw is not None else None
+                tick_mark_line_weight_v, tick_mark_line_weight_q = canonicalize_int(tmlw_int)
+            except Exception:
+                tick_mark_line_weight_v, tick_mark_line_weight_q = (None, ITEM_Q_UNREADABLE)
+
+            # --- Area 7 §7: Text Offset (Angular/Diameter/Linear/Radial per probe) ---
+            text_offset_v, text_offset_q = (None, ITEM_Q_MISSING)
+            try:
+                p_toff = first_param(d, ui_names=["Text Offset"])
+                toff_ft = _as_double(p_toff) if p_toff is not None else None
+                text_offset_v, text_offset_q = canonicalize_float(_fmt_in_from_ft(toff_ft))
+            except Exception:
+                text_offset_v, text_offset_q = (None, ITEM_Q_UNREADABLE)
+
             # --- Build identity items ---
             core_items = [
                 make_identity_item("dim_type.shape", shape_v, shape_q),
@@ -926,10 +1255,17 @@ def extract_radial(doc, ctx=None):
                 make_identity_item("dim_type.radius_symbol_location", radius_symbol_location_v, radius_symbol_location_q),
                 make_identity_item("dim_type.radius_symbol_text", radius_symbol_text_v, radius_symbol_text_q),
                 make_identity_item("dim_type.unit_format_id", unit_format_id_v, unit_format_id_q),
+                make_identity_item("dim_type.suppress_spaces", suppress_spaces_v, suppress_spaces_q),
+                make_identity_item("dim_type.leader_tick_mark_sig_hash", leader_tick_mark_sig_hash_v, leader_tick_mark_sig_hash_q),
+                make_identity_item("dim_type.leader_type", leader_type_v, leader_type_q),
+                make_identity_item("dim_type.show_leader_when_text_moves", show_leader_when_text_moves_v, show_leader_when_text_moves_q),
+                make_identity_item("dim_type.tick_mark_line_weight", tick_mark_line_weight_v, tick_mark_line_weight_q),
+                make_identity_item("dim_type.text_offset_in", text_offset_v, text_offset_q),
             ]
 
             text_items = _build_text_appearance_items(d)
-            all_items = core_items + text_items
+            alt_units_items = _build_alternate_units_items(d)
+            all_items = core_items + text_items + alt_units_items
 
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
@@ -942,9 +1278,15 @@ def extract_radial(doc, ctx=None):
                 center_mark_size_q,
                 unit_format_id_q,
             ]
-            # text/appearance fields are cross-family alignment, not primary identity — not blocking
+            # text/appearance fields, and all Area 7 additions, are cross-family alignment /
+            # non-blocking enrichment — not blocking
 
             blocked = any(q != ITEM_Q_OK for q in required_qs)
+
+            _OPTIONAL_REF_SIG_HASH_KEYS = frozenset({
+                "dim_type.tick_mark_sig_hash",
+                "dim_type.leader_tick_mark_sig_hash",
+            })
 
             status_reasons = []
             for it in identity_items:
@@ -952,7 +1294,7 @@ def extract_radial(doc, ctx=None):
                 k = it.get("k", "")
                 if q == ITEM_Q_OK:
                     continue
-                if q == ITEM_Q_MISSING and k == "dim_type.tick_mark_sig_hash":
+                if q == ITEM_Q_MISSING and k in _OPTIONAL_REF_SIG_HASH_KEYS:
                     continue
                 status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
@@ -1193,7 +1535,8 @@ def extract_diameter(doc, ctx=None):
             # Unit format info
             (unit_format_id_v, unit_format_id_q,
              rounding_v, rounding_q,
-             accuracy_v, accuracy_q) = _read_unit_format_info(d)
+             accuracy_v, accuracy_q,
+             suppress_spaces_v, suppress_spaces_q) = _read_unit_format_info(d)
 
             # Tick mark sig hash
             tick_sig_hash_v, tick_sig_hash_q = _read_tick_mark_sig_hash(d, ctx, doc)
@@ -1240,6 +1583,41 @@ def extract_diameter(doc, ctx=None):
             except Exception:
                 diameter_symbol_text_v, diameter_symbol_text_q = (None, ITEM_Q_UNREADABLE)
 
+            # --- Area 7 §2/§4c: leader config + tick weight (angular/diameter/linear/radial) ---
+            leader_tick_mark_sig_hash_v, leader_tick_mark_sig_hash_q = _read_arrowhead_ref_sig_hash(
+                d, ctx, ui_names=["Leader Tick Mark"]
+            )
+            leader_type_v, leader_type_q = (None, ITEM_Q_MISSING)
+            try:
+                p_lt = first_param(d, ui_names=["Leader Type"])
+                lt_raw = _as_value_string(p_lt) if p_lt is not None else None
+                leader_type_v, leader_type_q = canonicalize_str(lt_raw)
+            except Exception:
+                leader_type_v, leader_type_q = (None, ITEM_Q_UNREADABLE)
+            show_leader_when_text_moves_v, show_leader_when_text_moves_q = (None, ITEM_Q_MISSING)
+            try:
+                p_slwtm = first_param(d, ui_names=["Show Leader When Text Moves"])
+                slwtm_raw = _as_value_string(p_slwtm) if p_slwtm is not None else None
+                show_leader_when_text_moves_v, show_leader_when_text_moves_q = canonicalize_str(slwtm_raw)
+            except Exception:
+                show_leader_when_text_moves_v, show_leader_when_text_moves_q = (None, ITEM_Q_UNREADABLE)
+            tick_mark_line_weight_v, tick_mark_line_weight_q = (None, ITEM_Q_MISSING)
+            try:
+                p_tmlw = first_param(d, ui_names=["Tick Mark Line Weight"])
+                tmlw_int = _as_int(p_tmlw) if p_tmlw is not None else None
+                tick_mark_line_weight_v, tick_mark_line_weight_q = canonicalize_int(tmlw_int)
+            except Exception:
+                tick_mark_line_weight_v, tick_mark_line_weight_q = (None, ITEM_Q_UNREADABLE)
+
+            # --- Area 7 §7: Text Offset (Angular/Diameter/Linear/Radial per probe) ---
+            text_offset_v, text_offset_q = (None, ITEM_Q_MISSING)
+            try:
+                p_toff = first_param(d, ui_names=["Text Offset"])
+                toff_ft = _as_double(p_toff) if p_toff is not None else None
+                text_offset_v, text_offset_q = canonicalize_float(_fmt_in_from_ft(toff_ft))
+            except Exception:
+                text_offset_v, text_offset_q = (None, ITEM_Q_UNREADABLE)
+
             # --- Build identity items ---
             core_items = [
                 make_identity_item("dim_type.shape", shape_v, shape_q),
@@ -1250,10 +1628,17 @@ def extract_diameter(doc, ctx=None):
                 make_identity_item("dim_type.diameter_symbol_location", diameter_symbol_location_v, diameter_symbol_location_q),
                 make_identity_item("dim_type.diameter_symbol_text", diameter_symbol_text_v, diameter_symbol_text_q),
                 make_identity_item("dim_type.unit_format_id", unit_format_id_v, unit_format_id_q),
+                make_identity_item("dim_type.suppress_spaces", suppress_spaces_v, suppress_spaces_q),
+                make_identity_item("dim_type.leader_tick_mark_sig_hash", leader_tick_mark_sig_hash_v, leader_tick_mark_sig_hash_q),
+                make_identity_item("dim_type.leader_type", leader_type_v, leader_type_q),
+                make_identity_item("dim_type.show_leader_when_text_moves", show_leader_when_text_moves_v, show_leader_when_text_moves_q),
+                make_identity_item("dim_type.tick_mark_line_weight", tick_mark_line_weight_v, tick_mark_line_weight_q),
+                make_identity_item("dim_type.text_offset_in", text_offset_v, text_offset_q),
             ]
 
             text_items = _build_text_appearance_items(d)
-            all_items = core_items + text_items
+            alt_units_items = _build_alternate_units_items(d)
+            all_items = core_items + text_items + alt_units_items
 
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
@@ -1266,9 +1651,15 @@ def extract_diameter(doc, ctx=None):
                 center_mark_size_q,
                 unit_format_id_q,
             ]
-            # text/appearance fields are cross-family alignment, not primary identity — not blocking
+            # text/appearance fields, and all Area 7 additions, are cross-family alignment /
+            # non-blocking enrichment — not blocking
 
             blocked = any(q != ITEM_Q_OK for q in required_qs)
+
+            _OPTIONAL_REF_SIG_HASH_KEYS = frozenset({
+                "dim_type.tick_mark_sig_hash",
+                "dim_type.leader_tick_mark_sig_hash",
+            })
 
             status_reasons = []
             for it in identity_items:
@@ -1276,7 +1667,7 @@ def extract_diameter(doc, ctx=None):
                 k = it.get("k", "")
                 if q == ITEM_Q_OK:
                     continue
-                if q == ITEM_Q_MISSING and k == "dim_type.tick_mark_sig_hash":
+                if q == ITEM_Q_MISSING and k in _OPTIONAL_REF_SIG_HASH_KEYS:
                     continue
                 status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
@@ -1562,7 +1953,8 @@ def extract_spot_elevation(doc, ctx=None):
             # Unit format info
             (unit_format_id_v, unit_format_id_q,
              _rounding_v, _rounding_q,
-             _accuracy_v, _accuracy_q) = _read_unit_format_info(d)
+             _accuracy_v, _accuracy_q,
+             suppress_spaces_v, suppress_spaces_q) = _read_unit_format_info(d)
 
             # Elevation Indicator
             elevation_indicator_v, elevation_indicator_q = (None, ITEM_Q_MISSING)
@@ -1639,6 +2031,55 @@ def extract_spot_elevation(doc, ctx=None):
             # Symbol name (ElementId resolved to name; no ctx map available for sig_hash)
             symbol_name_v, symbol_name_q = _read_symbol_name(d, doc)
 
+            # --- Area 7 §1: Leader Arrowhead cluster (shared helper) ---
+            (leader_arrowhead_uid_v, leader_arrowhead_uid_q,
+             leader_arrowhead_name_v, leader_arrowhead_name_q,
+             leader_arrowhead_sig_hash_v, leader_arrowhead_sig_hash_q) = _read_leader_arrowhead(d, ctx, doc)
+            leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q = (None, ITEM_Q_MISSING)
+            try:
+                p_alw = first_param(d, ui_names=["Leader Arrowhead Line Weight"])
+                alw_int = _as_int(p_alw) if p_alw is not None else None
+                leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q = canonicalize_int(alw_int)
+            except Exception:
+                leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q = (None, ITEM_Q_UNREADABLE)
+            leader_line_weight_v, leader_line_weight_q = (None, ITEM_Q_MISSING)
+            try:
+                p_llw = first_param(d, ui_names=["Leader Line Weight"])
+                llw_int = _as_int(p_llw) if p_llw is not None else None
+                leader_line_weight_v, leader_line_weight_q = canonicalize_int(llw_int)
+            except Exception:
+                leader_line_weight_v, leader_line_weight_q = (None, ITEM_Q_UNREADABLE)
+
+            # --- Area 7 §7: Rotate with Component / Elevation Base / Text Offsets (spot family) ---
+            rotate_with_component_v, rotate_with_component_q = (None, ITEM_Q_MISSING)
+            try:
+                p_rwc = first_param(d, ui_names=["Rotate with Component"])
+                rwc_int = _as_int(p_rwc) if p_rwc is not None else None
+                rotate_with_component_v, rotate_with_component_q = canonicalize_bool(rwc_int)
+            except Exception:
+                rotate_with_component_v, rotate_with_component_q = (None, ITEM_Q_UNREADABLE)
+            elevation_base_v, elevation_base_q = (None, ITEM_Q_MISSING)
+            try:
+                p_eb = first_param(d, ui_names=["Elevation Base"])
+                eb_raw = _as_value_string(p_eb) if p_eb is not None else None
+                elevation_base_v, elevation_base_q = canonicalize_str(eb_raw)
+            except Exception:
+                elevation_base_v, elevation_base_q = (None, ITEM_Q_UNREADABLE)
+            text_offset_from_leader_v, text_offset_from_leader_q = (None, ITEM_Q_MISSING)
+            try:
+                p_tofl = first_param(d, ui_names=["Text Offset from Leader"])
+                tofl_ft = _as_double(p_tofl) if p_tofl is not None else None
+                text_offset_from_leader_v, text_offset_from_leader_q = canonicalize_float(_fmt_in_from_ft(tofl_ft))
+            except Exception:
+                text_offset_from_leader_v, text_offset_from_leader_q = (None, ITEM_Q_UNREADABLE)
+            text_offset_from_symbol_v, text_offset_from_symbol_q = (None, ITEM_Q_MISSING)
+            try:
+                p_tofs = first_param(d, ui_names=["Text Offset from Symbol"])
+                tofs_ft = _as_double(p_tofs) if p_tofs is not None else None
+                text_offset_from_symbol_v, text_offset_from_symbol_q = canonicalize_float(_fmt_in_from_ft(tofs_ft))
+            except Exception:
+                text_offset_from_symbol_v, text_offset_from_symbol_q = (None, ITEM_Q_UNREADABLE)
+
             # --- Build identity items ---
             core_items = [
                 make_identity_item("dim_type.shape", shape_v, shape_q),
@@ -1652,10 +2093,21 @@ def extract_spot_elevation(doc, ctx=None):
                 make_identity_item("dim_type.text_orientation", text_orientation_v, text_orientation_q),
                 make_identity_item("dim_type.text_location", text_location_v, text_location_q),
                 make_identity_item("dim_type.symbol_name", symbol_name_v, symbol_name_q),
+                make_identity_item("dim_type.suppress_spaces", suppress_spaces_v, suppress_spaces_q),
+                make_identity_item("dim_type.leader_arrowhead_uid", leader_arrowhead_uid_v, leader_arrowhead_uid_q),
+                make_identity_item("dim_type.leader_arrowhead_name", leader_arrowhead_name_v, leader_arrowhead_name_q),
+                make_identity_item("dim_type.leader_arrowhead_sig_hash", leader_arrowhead_sig_hash_v, leader_arrowhead_sig_hash_q),
+                make_identity_item("dim_type.leader_arrowhead_line_weight", leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q),
+                make_identity_item("dim_type.leader_line_weight", leader_line_weight_v, leader_line_weight_q),
+                make_identity_item("dim_type.rotate_with_component", rotate_with_component_v, rotate_with_component_q),
+                make_identity_item("dim_type.elevation_base", elevation_base_v, elevation_base_q),
+                make_identity_item("dim_type.text_offset_from_leader_in", text_offset_from_leader_v, text_offset_from_leader_q),
+                make_identity_item("dim_type.text_offset_from_symbol_in", text_offset_from_symbol_v, text_offset_from_symbol_q),
             ]
 
             text_items = _build_text_appearance_items(d)
-            all_items = core_items + text_items
+            alt_units_items = _build_alternate_units_items(d)
+            all_items = core_items + text_items + alt_units_items
 
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
@@ -1663,6 +2115,9 @@ def extract_spot_elevation(doc, ctx=None):
             # Indicator fields, text placement, and symbol_name are non-blocking:
             # SpotElevationFixed records may not expose all indicator params,
             # and missing optional fields should degrade (not block) a record.
+            # All Area 7 additions (leader arrowhead cluster, alternate units,
+            # suppress_spaces, rotate_with_component, elevation_base, text offsets)
+            # are likewise non-blocking enrichment.
             required_qs = [
                 shape_q,
                 unit_format_id_q,
@@ -1671,11 +2126,19 @@ def extract_spot_elevation(doc, ctx=None):
 
             blocked = any(q != ITEM_Q_OK for q in required_qs)
 
+            _OPTIONAL_REF_SIG_HASH_KEYS = frozenset({
+                "dim_type.leader_arrowhead_uid",
+                "dim_type.leader_arrowhead_name",
+                "dim_type.leader_arrowhead_sig_hash",
+            })
+
             status_reasons = []
             for it in identity_items:
                 q = it.get("q")
                 k = it.get("k", "")
                 if q == ITEM_Q_OK:
+                    continue
+                if q == ITEM_Q_MISSING and k in _OPTIONAL_REF_SIG_HASH_KEYS:
                     continue
                 status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
@@ -1686,7 +2149,20 @@ def extract_spot_elevation(doc, ctx=None):
             else:
                 status = STATUS_OK
 
-            preimage = serialize_identity_items(identity_items)
+            # dim_type.leader_arrowhead_uid/_name are file-local/cosmetic metadata
+            # (D-004 restricts UniqueId use to element-backed identities; names are
+            # metadata only per the Hash Semantics rule) -- kept in identity_items for
+            # governance/join-key visibility but excluded from the sig_hash preimage
+            # itself, matching the contract's sig_hash_keys pin for these 3 domains.
+            # Without this, two files with a semantically-identical spot dimension
+            # type (same arrowhead style/name) would hash differently purely because
+            # Revit UniqueIds are per-file-random (PR #412 review).
+            _SIG_HASH_EXCLUDED_KEYS = frozenset({
+                "dim_type.leader_arrowhead_uid",
+                "dim_type.leader_arrowhead_name",
+            })
+            sig_hash_items = [it for it in identity_items if it.get("k") not in _SIG_HASH_EXCLUDED_KEYS]
+            preimage = serialize_identity_items(sig_hash_items)
             sig_hash = None if blocked else make_hash(preimage)
 
             try:
@@ -1940,7 +2416,8 @@ def extract_spot_coordinate(doc, ctx=None):
             # Unit format info
             (unit_format_id_v, unit_format_id_q,
              _rounding_v, _rounding_q,
-             _accuracy_v, _accuracy_q) = _read_unit_format_info(d)
+             _accuracy_v, _accuracy_q,
+             suppress_spaces_v, suppress_spaces_q) = _read_unit_format_info(d)
 
             # Top Coordinate (storage=Integer/enum, display='North / South' — use AsValueString)
             top_coordinate_v, top_coordinate_q = (None, ITEM_Q_MISSING)
@@ -2026,6 +2503,55 @@ def extract_spot_coordinate(doc, ctx=None):
             # Symbol name (ElementId resolved to name; no ctx map available for sig_hash)
             symbol_name_v, symbol_name_q = _read_symbol_name(d, doc)
 
+            # --- Area 7 §1: Leader Arrowhead cluster (shared helper) ---
+            (leader_arrowhead_uid_v, leader_arrowhead_uid_q,
+             leader_arrowhead_name_v, leader_arrowhead_name_q,
+             leader_arrowhead_sig_hash_v, leader_arrowhead_sig_hash_q) = _read_leader_arrowhead(d, ctx, doc)
+            leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q = (None, ITEM_Q_MISSING)
+            try:
+                p_alw = first_param(d, ui_names=["Leader Arrowhead Line Weight"])
+                alw_int = _as_int(p_alw) if p_alw is not None else None
+                leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q = canonicalize_int(alw_int)
+            except Exception:
+                leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q = (None, ITEM_Q_UNREADABLE)
+            leader_line_weight_v, leader_line_weight_q = (None, ITEM_Q_MISSING)
+            try:
+                p_llw = first_param(d, ui_names=["Leader Line Weight"])
+                llw_int = _as_int(p_llw) if p_llw is not None else None
+                leader_line_weight_v, leader_line_weight_q = canonicalize_int(llw_int)
+            except Exception:
+                leader_line_weight_v, leader_line_weight_q = (None, ITEM_Q_UNREADABLE)
+
+            # --- Area 7 §7: Rotate with Component / Coordinate Base / Text Offsets (spot family) ---
+            rotate_with_component_v, rotate_with_component_q = (None, ITEM_Q_MISSING)
+            try:
+                p_rwc = first_param(d, ui_names=["Rotate with Component"])
+                rwc_int = _as_int(p_rwc) if p_rwc is not None else None
+                rotate_with_component_v, rotate_with_component_q = canonicalize_bool(rwc_int)
+            except Exception:
+                rotate_with_component_v, rotate_with_component_q = (None, ITEM_Q_UNREADABLE)
+            coordinate_base_v, coordinate_base_q = (None, ITEM_Q_MISSING)
+            try:
+                p_cb = first_param(d, ui_names=["Coordinate Base"])
+                cb_raw = _as_value_string(p_cb) if p_cb is not None else None
+                coordinate_base_v, coordinate_base_q = canonicalize_str(cb_raw)
+            except Exception:
+                coordinate_base_v, coordinate_base_q = (None, ITEM_Q_UNREADABLE)
+            text_offset_from_leader_v, text_offset_from_leader_q = (None, ITEM_Q_MISSING)
+            try:
+                p_tofl = first_param(d, ui_names=["Text Offset from Leader"])
+                tofl_ft = _as_double(p_tofl) if p_tofl is not None else None
+                text_offset_from_leader_v, text_offset_from_leader_q = canonicalize_float(_fmt_in_from_ft(tofl_ft))
+            except Exception:
+                text_offset_from_leader_v, text_offset_from_leader_q = (None, ITEM_Q_UNREADABLE)
+            text_offset_from_symbol_v, text_offset_from_symbol_q = (None, ITEM_Q_MISSING)
+            try:
+                p_tofs = first_param(d, ui_names=["Text Offset from Symbol"])
+                tofs_ft = _as_double(p_tofs) if p_tofs is not None else None
+                text_offset_from_symbol_v, text_offset_from_symbol_q = canonicalize_float(_fmt_in_from_ft(tofs_ft))
+            except Exception:
+                text_offset_from_symbol_v, text_offset_from_symbol_q = (None, ITEM_Q_UNREADABLE)
+
             # --- Build identity items ---
             core_items = [
                 make_identity_item("dim_type.shape", shape_v, shape_q),
@@ -2040,15 +2566,29 @@ def extract_spot_coordinate(doc, ctx=None):
                 make_identity_item("dim_type.text_orientation", text_orientation_v, text_orientation_q),
                 make_identity_item("dim_type.text_location", text_location_v, text_location_q),
                 make_identity_item("dim_type.symbol_name", symbol_name_v, symbol_name_q),
+                make_identity_item("dim_type.suppress_spaces", suppress_spaces_v, suppress_spaces_q),
+                make_identity_item("dim_type.leader_arrowhead_uid", leader_arrowhead_uid_v, leader_arrowhead_uid_q),
+                make_identity_item("dim_type.leader_arrowhead_name", leader_arrowhead_name_v, leader_arrowhead_name_q),
+                make_identity_item("dim_type.leader_arrowhead_sig_hash", leader_arrowhead_sig_hash_v, leader_arrowhead_sig_hash_q),
+                make_identity_item("dim_type.leader_arrowhead_line_weight", leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q),
+                make_identity_item("dim_type.leader_line_weight", leader_line_weight_v, leader_line_weight_q),
+                make_identity_item("dim_type.rotate_with_component", rotate_with_component_v, rotate_with_component_q),
+                make_identity_item("dim_type.coordinate_base", coordinate_base_v, coordinate_base_q),
+                make_identity_item("dim_type.text_offset_from_leader_in", text_offset_from_leader_v, text_offset_from_leader_q),
+                make_identity_item("dim_type.text_offset_from_symbol_in", text_offset_from_symbol_v, text_offset_from_symbol_q),
             ]
 
             text_items = _build_text_appearance_items(d)
-            all_items = core_items + text_items
+            alt_units_items = _build_alternate_units_items(d)
+            all_items = core_items + text_items + alt_units_items
 
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
             # Required qualities for blocking
             # include_elevation, elevation_indicator, indicator_prefix, symbol_name are optional — not blocking
+            # All Area 7 additions (leader arrowhead cluster, alternate units,
+            # suppress_spaces, rotate_with_component, coordinate_base, text offsets)
+            # are likewise non-blocking enrichment.
             required_qs = [
                 shape_q,
                 unit_format_id_q,
@@ -2063,11 +2603,19 @@ def extract_spot_coordinate(doc, ctx=None):
 
             blocked = any(q != ITEM_Q_OK for q in required_qs)
 
+            _OPTIONAL_REF_SIG_HASH_KEYS = frozenset({
+                "dim_type.leader_arrowhead_uid",
+                "dim_type.leader_arrowhead_name",
+                "dim_type.leader_arrowhead_sig_hash",
+            })
+
             status_reasons = []
             for it in identity_items:
                 q = it.get("q")
                 k = it.get("k", "")
                 if q == ITEM_Q_OK:
+                    continue
+                if q == ITEM_Q_MISSING and k in _OPTIONAL_REF_SIG_HASH_KEYS:
                     continue
                 status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
@@ -2078,7 +2626,20 @@ def extract_spot_coordinate(doc, ctx=None):
             else:
                 status = STATUS_OK
 
-            preimage = serialize_identity_items(identity_items)
+            # dim_type.leader_arrowhead_uid/_name are file-local/cosmetic metadata
+            # (D-004 restricts UniqueId use to element-backed identities; names are
+            # metadata only per the Hash Semantics rule) -- kept in identity_items for
+            # governance/join-key visibility but excluded from the sig_hash preimage
+            # itself, matching the contract's sig_hash_keys pin for these 3 domains.
+            # Without this, two files with a semantically-identical spot dimension
+            # type (same arrowhead style/name) would hash differently purely because
+            # Revit UniqueIds are per-file-random (PR #412 review).
+            _SIG_HASH_EXCLUDED_KEYS = frozenset({
+                "dim_type.leader_arrowhead_uid",
+                "dim_type.leader_arrowhead_name",
+            })
+            sig_hash_items = [it for it in identity_items if it.get("k") not in _SIG_HASH_EXCLUDED_KEYS]
+            preimage = serialize_identity_items(sig_hash_items)
             sig_hash = None if blocked else make_hash(preimage)
 
             try:
@@ -2282,7 +2843,8 @@ def extract_spot_slope(doc, ctx=None):
             # Unit format info
             (unit_format_id_v, unit_format_id_q,
              _rounding_v, _rounding_q,
-             _accuracy_v, _accuracy_q) = _read_unit_format_info(d)
+             _accuracy_v, _accuracy_q,
+             suppress_spaces_v, suppress_spaces_q) = _read_unit_format_info(d)
 
             # Slope Direction / Read Convention (storage=Integer/enum — use AsValueString)
             slope_direction_v, slope_direction_q = (None, ITEM_Q_MISSING)
@@ -2306,21 +2868,72 @@ def extract_spot_slope(doc, ctx=None):
             except Exception:
                 leader_line_length_v, leader_line_length_q = (None, ITEM_Q_UNREADABLE)
 
+            # --- Area 7 §1: Leader Arrowhead cluster (shared helper) ---
+            (leader_arrowhead_uid_v, leader_arrowhead_uid_q,
+             leader_arrowhead_name_v, leader_arrowhead_name_q,
+             leader_arrowhead_sig_hash_v, leader_arrowhead_sig_hash_q) = _read_leader_arrowhead(d, ctx, doc)
+            leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q = (None, ITEM_Q_MISSING)
+            try:
+                p_alw = first_param(d, ui_names=["Leader Arrowhead Line Weight"])
+                alw_int = _as_int(p_alw) if p_alw is not None else None
+                leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q = canonicalize_int(alw_int)
+            except Exception:
+                leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q = (None, ITEM_Q_UNREADABLE)
+            leader_line_weight_v, leader_line_weight_q = (None, ITEM_Q_MISSING)
+            try:
+                p_llw = first_param(d, ui_names=["Leader Line Weight"])
+                llw_int = _as_int(p_llw) if p_llw is not None else None
+                leader_line_weight_v, leader_line_weight_q = canonicalize_int(llw_int)
+            except Exception:
+                leader_line_weight_v, leader_line_weight_q = (None, ITEM_Q_UNREADABLE)
+
+            # --- Area 7 §7: Rotate with Component / Text Offset from Leader (spot family) ---
+            # Coordinate Base/Elevation Base don't apply to Spot Slope (spot_coordinate/
+            # spot_elevation only). Text Offset from Symbol also not observed on Spot Slope
+            # in probe data (consistent with Spot Slope having no "Symbol" field either --
+            # see the absence of a symbol_name identity item in this domain).
+            rotate_with_component_v, rotate_with_component_q = (None, ITEM_Q_MISSING)
+            try:
+                p_rwc = first_param(d, ui_names=["Rotate with Component"])
+                rwc_int = _as_int(p_rwc) if p_rwc is not None else None
+                rotate_with_component_v, rotate_with_component_q = canonicalize_bool(rwc_int)
+            except Exception:
+                rotate_with_component_v, rotate_with_component_q = (None, ITEM_Q_UNREADABLE)
+            text_offset_from_leader_v, text_offset_from_leader_q = (None, ITEM_Q_MISSING)
+            try:
+                p_tofl = first_param(d, ui_names=["Text Offset from Leader"])
+                tofl_ft = _as_double(p_tofl) if p_tofl is not None else None
+                text_offset_from_leader_v, text_offset_from_leader_q = canonicalize_float(_fmt_in_from_ft(tofl_ft))
+            except Exception:
+                text_offset_from_leader_v, text_offset_from_leader_q = (None, ITEM_Q_UNREADABLE)
+
             # --- Build identity items ---
             core_items = [
                 make_identity_item("dim_type.shape", shape_v, shape_q),
                 make_identity_item("dim_type.unit_format_id", unit_format_id_v, unit_format_id_q),
                 make_identity_item("dim_type.slope_direction", slope_direction_v, slope_direction_q),
                 make_identity_item("dim_type.leader_line_length", leader_line_length_v, leader_line_length_q),
+                make_identity_item("dim_type.suppress_spaces", suppress_spaces_v, suppress_spaces_q),
+                make_identity_item("dim_type.leader_arrowhead_uid", leader_arrowhead_uid_v, leader_arrowhead_uid_q),
+                make_identity_item("dim_type.leader_arrowhead_name", leader_arrowhead_name_v, leader_arrowhead_name_q),
+                make_identity_item("dim_type.leader_arrowhead_sig_hash", leader_arrowhead_sig_hash_v, leader_arrowhead_sig_hash_q),
+                make_identity_item("dim_type.leader_arrowhead_line_weight", leader_arrowhead_line_weight_v, leader_arrowhead_line_weight_q),
+                make_identity_item("dim_type.leader_line_weight", leader_line_weight_v, leader_line_weight_q),
+                make_identity_item("dim_type.rotate_with_component", rotate_with_component_v, rotate_with_component_q),
+                make_identity_item("dim_type.text_offset_from_leader_in", text_offset_from_leader_v, text_offset_from_leader_q),
             ]
 
             text_items = _build_text_appearance_items(d)
-            all_items = core_items + text_items
+            alt_units_items = _build_alternate_units_items(d)
+            all_items = core_items + text_items + alt_units_items
 
             identity_items = sorted(all_items, key=lambda it: it.get("k", ""))
 
             # Required qualities for blocking
             # leader_line_length is optional enrichment — not blocking
+            # All Area 7 additions (leader arrowhead cluster, alternate units,
+            # suppress_spaces, rotate_with_component, text_offset_from_leader) are
+            # likewise non-blocking enrichment.
             required_qs = [
                 shape_q,
                 unit_format_id_q,
@@ -2330,11 +2943,19 @@ def extract_spot_slope(doc, ctx=None):
 
             blocked = any(q != ITEM_Q_OK for q in required_qs)
 
+            _OPTIONAL_REF_SIG_HASH_KEYS = frozenset({
+                "dim_type.leader_arrowhead_uid",
+                "dim_type.leader_arrowhead_name",
+                "dim_type.leader_arrowhead_sig_hash",
+            })
+
             status_reasons = []
             for it in identity_items:
                 q = it.get("q")
                 k = it.get("k", "")
                 if q == ITEM_Q_OK:
+                    continue
+                if q == ITEM_Q_MISSING and k in _OPTIONAL_REF_SIG_HASH_KEYS:
                     continue
                 status_reasons.append("identity.incomplete:{}:{}".format(q, k))
 
@@ -2345,7 +2966,20 @@ def extract_spot_slope(doc, ctx=None):
             else:
                 status = STATUS_OK
 
-            preimage = serialize_identity_items(identity_items)
+            # dim_type.leader_arrowhead_uid/_name are file-local/cosmetic metadata
+            # (D-004 restricts UniqueId use to element-backed identities; names are
+            # metadata only per the Hash Semantics rule) -- kept in identity_items for
+            # governance/join-key visibility but excluded from the sig_hash preimage
+            # itself, matching the contract's sig_hash_keys pin for these 3 domains.
+            # Without this, two files with a semantically-identical spot dimension
+            # type (same arrowhead style/name) would hash differently purely because
+            # Revit UniqueIds are per-file-random (PR #412 review).
+            _SIG_HASH_EXCLUDED_KEYS = frozenset({
+                "dim_type.leader_arrowhead_uid",
+                "dim_type.leader_arrowhead_name",
+            })
+            sig_hash_items = [it for it in identity_items if it.get("k") not in _SIG_HASH_EXCLUDED_KEYS]
+            preimage = serialize_identity_items(sig_hash_items)
             sig_hash = None if blocked else make_hash(preimage)
 
             try:

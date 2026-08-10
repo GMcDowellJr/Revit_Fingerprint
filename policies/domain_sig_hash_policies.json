@@ -74,7 +74,26 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_tick_mark_sig_hash",
+        "dim_type.leader_type",
+        "dim_type.show_leader_when_text_moves",
+        "dim_type.tick_mark_line_weight",
+        "dim_type.witness_line_extension_in",
+        "dim_type.witness_line_gap_to_element_in",
+        "dim_type.witness_line_length_in",
+        "dim_type.equality_text",
+        "dim_type.equality_witness_display",
+        "dim_type.centerline_pattern_sig_hash",
+        "dim_type.centerline_symbol_name",
+        "dim_type.centerline_tick_mark_sig_hash",
+        "dim_type.interior_tick_mark_sig_hash",
+        "dim_type.interior_tick_mark_display",
+        "dim_type.text_offset_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -94,7 +113,7 @@
         "dim_type.prefix",
         "dim_type.suffix"
       ],
-      "sig_hash_schema": "dimension_types_angular.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_angular.sig_hash.v2"
     },
     "dimension_types_diameter": {
       "allowed_item_prefixes": [],
@@ -115,7 +134,16 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_tick_mark_sig_hash",
+        "dim_type.leader_type",
+        "dim_type.show_leader_when_text_moves",
+        "dim_type.tick_mark_line_weight",
+        "dim_type.text_offset_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -135,7 +163,7 @@
         "dim_type.diameter_symbol_text",
         "dim_type.unit_format_id"
       ],
-      "sig_hash_schema": "dimension_types_diameter.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_diameter.sig_hash.v2"
     },
     "dimension_types_linear": {
       "allowed_item_prefixes": [],
@@ -156,7 +184,29 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_tick_mark_sig_hash",
+        "dim_type.leader_type",
+        "dim_type.show_leader_when_text_moves",
+        "dim_type.tick_mark_line_weight",
+        "dim_type.witness_line_extension_in",
+        "dim_type.witness_line_gap_to_element_in",
+        "dim_type.witness_line_length_in",
+        "dim_type.witness_line_tick_mark_sig_hash",
+        "dim_type.equality_text",
+        "dim_type.equality_witness_display",
+        "dim_type.centerline_pattern_sig_hash",
+        "dim_type.centerline_symbol_name",
+        "dim_type.centerline_tick_mark_sig_hash",
+        "dim_type.interior_tick_mark_sig_hash",
+        "dim_type.interior_tick_mark_display",
+        "dim_type.text_offset_in",
+        "dim_type.dimension_string_type",
+        "dim_type.show_opening_height",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -176,7 +226,7 @@
         "dim_type.prefix",
         "dim_type.suffix"
       ],
-      "sig_hash_schema": "dimension_types_linear.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_linear.sig_hash.v2"
     },
     "dimension_types_radial": {
       "allowed_item_prefixes": [],
@@ -197,7 +247,16 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_tick_mark_sig_hash",
+        "dim_type.leader_type",
+        "dim_type.show_leader_when_text_moves",
+        "dim_type.tick_mark_line_weight",
+        "dim_type.text_offset_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -217,7 +276,7 @@
         "dim_type.radius_symbol_text",
         "dim_type.unit_format_id"
       ],
-      "sig_hash_schema": "dimension_types_radial.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_radial.sig_hash.v2"
     },
     "dimension_types_spot_coordinate": {
       "allowed_item_prefixes": [],
@@ -243,7 +302,17 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_arrowhead_line_weight",
+        "dim_type.leader_line_weight",
+        "dim_type.rotate_with_component",
+        "dim_type.coordinate_base",
+        "dim_type.text_offset_from_leader_in",
+        "dim_type.text_offset_from_symbol_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -267,7 +336,7 @@
         "dim_type.text_location",
         "dim_type.symbol_name"
       ],
-      "sig_hash_schema": "dimension_types_spot_coordinate.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_spot_coordinate.sig_hash.v2"
     },
     "dimension_types_spot_elevation": {
       "allowed_item_prefixes": [],
@@ -292,7 +361,17 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_arrowhead_line_weight",
+        "dim_type.leader_line_weight",
+        "dim_type.rotate_with_component",
+        "dim_type.elevation_base",
+        "dim_type.text_offset_from_leader_in",
+        "dim_type.text_offset_from_symbol_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -315,7 +394,7 @@
         "dim_type.text_location",
         "dim_type.symbol_name"
       ],
-      "sig_hash_schema": "dimension_types_spot_elevation.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_spot_elevation.sig_hash.v2"
     },
     "dimension_types_spot_slope": {
       "allowed_item_prefixes": [],
@@ -333,7 +412,15 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_arrowhead_line_weight",
+        "dim_type.leader_line_weight",
+        "dim_type.rotate_with_component",
+        "dim_type.text_offset_from_leader_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -349,7 +436,7 @@
         "dim_type.slope_direction",
         "dim_type.leader_line_length"
       ],
-      "sig_hash_schema": "dimension_types_spot_slope.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_spot_slope.sig_hash.v2"
     },
     "fill_patterns_drafting": {
       "allowed_item_prefixes": [

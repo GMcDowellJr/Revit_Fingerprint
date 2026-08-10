@@ -194,7 +194,9 @@
       "explicitly_excluded_items": [
         "dim_type.name",
         "dim_type.tick_mark_uid",
-        "dim_attr.tick_mark_uid"
+        "dim_attr.tick_mark_uid",
+        "dim_type.leader_arrowhead_uid",
+        "dim_type.leader_arrowhead_name"
       ],
       "notes": [
         "Domain family: dimension_types.",
@@ -223,7 +225,9 @@
       "explicitly_excluded_items": [
         "dim_type.name",
         "dim_type.tick_mark_uid",
-        "dim_attr.tick_mark_uid"
+        "dim_attr.tick_mark_uid",
+        "dim_type.leader_arrowhead_uid",
+        "dim_type.leader_arrowhead_name"
       ],
       "notes": [
         "Domain family: dimension_types.",
@@ -246,7 +250,9 @@
       "explicitly_excluded_items": [
         "dim_type.name",
         "dim_type.tick_mark_uid",
-        "dim_attr.tick_mark_uid"
+        "dim_attr.tick_mark_uid",
+        "dim_type.leader_arrowhead_uid",
+        "dim_type.leader_arrowhead_name"
       ],
       "notes": [
         "Domain family: dimension_types.",

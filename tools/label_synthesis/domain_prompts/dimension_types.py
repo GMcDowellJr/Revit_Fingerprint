@@ -457,6 +457,10 @@ _SKIP_KEYS = {
     "dim_type.name",
     "dim_type.tick_mark_uid",
     "dim_attr.tick_mark_uid",
+    # Area 7 §1: file-local Revit UID / cosmetic arrowhead name (PR #412 review) --
+    # same treatment as tick_mark_uid above and text_types' equivalent skip keys.
+    "dim_type.leader_arrowhead_uid",
+    "dim_type.leader_arrowhead_name",
 }
 
 # Opaque hash keys — show presence note, not value
