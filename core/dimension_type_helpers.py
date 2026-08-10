@@ -11,7 +11,17 @@ Provides:
   - get_type_display_name() for DimensionType display names
   - _build_text_appearance_items() for text/appearance identity items
   - _read_tick_mark_sig_hash() for tick mark arrowhead sig hash lookup
-  - _read_unit_format_info() for UnitsFormatOptions reading
+  - _read_unit_format_info() for primary/alternate UnitsFormatOptions reading
+  - _read_leader_arrowhead() for the spot-family Leader Arrowhead cluster
+    (Area 7 §1) -- shared by the 3 spot dimension_types partitions so the
+    text_types.py-derived resolve pattern isn't duplicated 3 times
+  - _read_arrowhead_ref_sig_hash() -- generic ElementId-param -> arrowheads
+    sig_hash resolver for the other tick-mark-family fields (Leader Tick
+    Mark, Centerline Tick Mark, Interior Tick Mark, Witness Line Tick Mark)
+  - _read_element_ref_name() -- generic ElementId-param -> referenced
+    element's display name resolver (Centerline Pattern/Symbol; no ctx
+    sig_hash map coverage confirmed for these, unlike the arrowhead family)
+  - _build_alternate_units_items() for the Alternate Units cluster (Area 7 §5)
 
 Pure-Python and Revit-agnostic except where guarded by try/except ImportError.
 No domain imports.
@@ -564,13 +574,30 @@ def _read_tick_mark_sig_hash(d, ctx, doc=None):
 # Unit Format Info Reader
 # ---------------------------------------------------------------------------
 
-def _read_unit_format_info(d):
+def _read_unit_format_info(d, alternate=False):
     """
-    Read UnitsFormatOptions from a DimensionType and return a tuple of
-    (unit_format_id_v, unit_format_id_q, rounding_v, rounding_q, accuracy_v, accuracy_q).
+    Read UnitsFormatOptions (or, when alternate=True, AlternateUnitsFormatOptions)
+    from a DimensionType and return a tuple of
+    (unit_format_id_v, unit_format_id_q, rounding_v, rounding_q, accuracy_v, accuracy_q,
+     suppress_spaces_v, suppress_spaces_q).
 
-    Handles UseDefault by returning ("use_default", ITEM_Q_OK) for all three.
-    Handles unsupported (e.g., SpotSlope) by returning (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE).
+    Handles UseDefault by returning ("use_default", ITEM_Q_OK) for all four.
+    Handles unsupported (e.g., SpotSlope, or a shape with no alternate-units tab)
+    by returning (None, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE).
+
+    suppress_spaces (Area 7 §6) is read off the same FormatOptions object as
+    rounding/accuracy -- same FormatOptions-boolean-flag gap Area 8 documented
+    for units.py, just on DimensionType.GetUnitsFormatOptions() instead of the
+    doc-level Units object. Only meaningful for the primary (alternate=False)
+    call per Area 7 §6 scope; callers reading the alternate cluster should
+    ignore this element of the tuple.
+
+    GetAlternateUnitsFormatOptions() (Area 7 §5) is a best-effort mirror of
+    GetUnitsFormatOptions() -- its exact name is not independently confirmed
+    against a live Revit API in this pass, so any AttributeError/exception
+    calling it fails soft to UNSUPPORTED_NOT_APPLICABLE via the same
+    _units_fo_not_applicable()-style handling as the primary path, never a
+    hard failure.
     """
 
     def _units_fo_not_applicable(ex):
@@ -580,6 +607,7 @@ def _read_unit_format_info(d):
         return (
             "notsupported" in tname
             or "invalidoperation" in tname
+            or "attributeerror" in tname
             or "not supported" in msg_l
             or "not applicable" in msg_l
             or "unsupported" in msg_l
@@ -591,11 +619,16 @@ def _read_unit_format_info(d):
     rounding_q = ITEM_Q_UNSUPPORTED_NOT_APPLICABLE
     accuracy_v = None
     accuracy_q = ITEM_Q_UNSUPPORTED_NOT_APPLICABLE
+    suppress_spaces_v = None
+    suppress_spaces_q = ITEM_Q_UNSUPPORTED_NOT_APPLICABLE
 
     fo = None
     fo_exc = None
     try:
-        fo = d.GetUnitsFormatOptions()
+        if alternate:
+            fo = d.GetAlternateUnitsFormatOptions()
+        else:
+            fo = d.GetUnitsFormatOptions()
     except Exception as ex:
         fo_exc = ex
 
@@ -604,6 +637,7 @@ def _read_unit_format_info(d):
             unit_format_id_q = ITEM_Q_UNREADABLE
             rounding_q = ITEM_Q_UNREADABLE
             accuracy_q = ITEM_Q_UNREADABLE
+            suppress_spaces_q = ITEM_Q_UNREADABLE
         # else: leave as UNSUPPORTED_NOT_APPLICABLE
     else:
         use_default = getattr(fo, "UseDefault", None)
@@ -611,6 +645,7 @@ def _read_unit_format_info(d):
             unit_format_id_v, unit_format_id_q = ("use_default", ITEM_Q_OK)
             rounding_v, rounding_q = ("use_default", ITEM_Q_OK)
             accuracy_v, accuracy_q = ("use_default", ITEM_Q_OK)
+            suppress_spaces_v, suppress_spaces_q = ("use_default", ITEM_Q_OK)
         else:
             try:
                 forge_type_id_obj = fo.GetUnitTypeId()
@@ -631,7 +666,17 @@ def _read_unit_format_info(d):
             except Exception:
                 accuracy_v, accuracy_q = (None, ITEM_Q_UNREADABLE)
 
-    return (unit_format_id_v, unit_format_id_q, rounding_v, rounding_q, accuracy_v, accuracy_q)
+            try:
+                suppress_spaces_v, suppress_spaces_q = canonicalize_bool(getattr(fo, "SuppressSpaces", None))
+            except Exception:
+                suppress_spaces_v, suppress_spaces_q = (None, ITEM_Q_UNREADABLE)
+
+    return (
+        unit_format_id_v, unit_format_id_q,
+        rounding_v, rounding_q,
+        accuracy_v, accuracy_q,
+        suppress_spaces_v, suppress_spaces_q,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -667,3 +712,241 @@ def _read_prefix_suffix(d):
             suffix_v, suffix_q = (None, ITEM_Q_UNREADABLE)
 
     return (prefix_v, prefix_q, suffix_v, suffix_q)
+
+
+# ---------------------------------------------------------------------------
+# Leader Arrowhead Reader (Area 7 §1 -- spot-family leader/arrowhead cluster)
+# ---------------------------------------------------------------------------
+
+def _read_leader_arrowhead(d, ctx, doc):
+    """
+    Read the Leader Arrowhead parameter (BuiltInParameter.LEADER_ARROWHEAD)
+    and resolve it to uid/name/sig_hash, mirroring the working pattern
+    already shipped in domains/text_types.py (same field, read for the
+    text_types domain). Shared here so the 3 spot dimension_types partitions
+    (extract_spot_elevation/_spot_coordinate/_spot_slope) don't each
+    duplicate the read-and-resolve logic.
+
+    Returns:
+        (uid_v, uid_q, name_v, name_q, sig_hash_v, sig_hash_q)
+    """
+    uid_v, uid_q = (None, ITEM_Q_MISSING)
+    name_v, name_q = (None, ITEM_Q_MISSING)
+    sig_hash_v, sig_hash_q = (None, ITEM_Q_MISSING)
+
+    try:
+        p_arrow = first_param(d, bip_names=["LEADER_ARROWHEAD"], ui_names=["Leader Arrowhead"])
+        if p_arrow is not None and getattr(p_arrow, "HasValue", False):
+            arrow_id = None
+            try:
+                arrow_id = p_arrow.AsElementId()
+            except Exception:
+                arrow_id = None
+
+            if arrow_id is not None and getattr(arrow_id, "IntegerValue", 0) > 0:
+                arrow = None
+                try:
+                    arrow = doc.GetElement(arrow_id) if doc is not None else None
+                except Exception:
+                    arrow = None
+
+                if arrow is not None:
+                    try:
+                        arrow_uid = getattr(arrow, "UniqueId", None)
+                        uid_v, uid_q = canonicalize_str(arrow_uid) if arrow_uid else (None, ITEM_Q_MISSING)
+                    except Exception:
+                        uid_v, uid_q = (None, ITEM_Q_UNREADABLE)
+
+                    try:
+                        arrow_name = get_type_display_name(arrow)
+                        if arrow_name in (None, S_MISSING, S_UNREADABLE):
+                            arrow_name = getattr(arrow, "Name", None)
+                        name_v, name_q = canonicalize_str(arrow_name)
+                    except Exception:
+                        name_v, name_q = (None, ITEM_Q_UNREADABLE)
+
+                    try:
+                        ah_map = (ctx or {}).get("arrowheads_by_type_id", {}) if ctx is not None else {}
+                        k = safe_str(getattr(arrow_id, "IntegerValue", None))
+                        if k and isinstance(ah_map, dict) and k in ah_map:
+                            sh = ah_map.get(k, {}).get("sig_hash", None)
+                            if sh:
+                                sig_hash_v, sig_hash_q = (safe_str(sh), ITEM_Q_OK)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+    return (uid_v, uid_q, name_v, name_q, sig_hash_v, sig_hash_q)
+
+
+# ---------------------------------------------------------------------------
+# Generic tick-mark-family ElementId -> arrowheads sig_hash resolver
+# ---------------------------------------------------------------------------
+
+def _read_arrowhead_ref_sig_hash(d, ctx, bip_names=None, ui_names=None):
+    """
+    Generic ElementId-parameter -> ctx["arrowheads_by_type_id"] sig_hash
+    resolver, generalizing the pattern already used by _read_tick_mark_sig_hash
+    (kept separate/unchanged to avoid touching its established Tick Mark
+    call sites). Shared by the other tick-mark-style fields added in
+    Area 7: Leader Tick Mark (§2), Centerline Tick Mark, Interior Tick Mark
+    (§4), and Witness Line Tick Mark (§3) -- all reference an
+    arrowhead/tick-mark-style element the same way the existing Tick Mark
+    field does.
+
+    Returns:
+        (sig_hash_v, sig_hash_q) where sig_hash_q is ITEM_Q_OK if resolved,
+        ITEM_Q_MISSING otherwise (no reference, or a negative/built-in id
+        not present in the arrowheads collector -- e.g. a "None" selection).
+    """
+    sig_hash = None
+
+    try:
+        p = first_param(d, bip_names=bip_names, ui_names=ui_names)
+        if p is not None and getattr(p, "HasValue", False):
+            eid = None
+            try:
+                eid = p.AsElementId()
+            except Exception:
+                eid = None
+
+            if eid is not None and getattr(eid, "IntegerValue", 0) > 0:
+                try:
+                    ah_map = (ctx or {}).get("arrowheads_by_type_id", {}) if ctx is not None else {}
+                    k = safe_str(getattr(eid, "IntegerValue", None))
+                    if k and isinstance(ah_map, dict) and k in ah_map:
+                        sig_hash = ah_map.get(k, {}).get("sig_hash", None)
+                except Exception:
+                    sig_hash = None
+    except Exception:
+        sig_hash = None
+
+    if sig_hash:
+        return (safe_str(sig_hash), ITEM_Q_OK)
+    return (None, ITEM_Q_MISSING)
+
+
+# ---------------------------------------------------------------------------
+# Generic named-element-reference resolver (no ctx sig_hash map coverage)
+# ---------------------------------------------------------------------------
+
+def _read_element_ref_name(d, doc, ui_names):
+    """
+    Generic ElementId-parameter -> referenced element's display name
+    resolver, for fields that reference a named element but are NOT known
+    to be covered by ctx["arrowheads_by_type_id"] (e.g. Centerline Pattern,
+    a line-pattern reference, and Centerline Symbol, which the probe's
+    sample value ("ANG-Centerline") suggests is a line-style/annotation
+    symbol name rather than an arrowhead -- see Area 7 §4 open question).
+    Resolves by name only, not sig_hash, to avoid asserting an unconfirmed
+    ctx map lookup.
+
+    Unlike _read_arrowhead_ref_sig_hash (which treats a negative ElementId
+    as "no reference" -- built-in tick-mark constants like -2 mean "None"),
+    this treats only IntegerValue == 0/None as "no reference": negative
+    built-in ids here (e.g. -3000010 for a built-in line pattern such as
+    "Solid") are real, resolvable references, not a "none selected" state.
+    """
+    try:
+        p = first_param(d, ui_names=ui_names)
+        if p is None or not getattr(p, "HasValue", False):
+            return (None, ITEM_Q_MISSING)
+
+        eid = None
+        try:
+            eid = p.AsElementId()
+        except Exception:
+            return (None, ITEM_Q_UNREADABLE)
+
+        if eid is None or getattr(eid, "IntegerValue", 0) == 0:
+            return (None, ITEM_Q_MISSING)
+
+        elem = None
+        try:
+            elem = doc.GetElement(eid) if doc is not None else None
+        except Exception:
+            return (None, ITEM_Q_UNREADABLE)
+
+        if elem is None:
+            return (None, ITEM_Q_MISSING)
+
+        name = None
+        try:
+            name = get_type_display_name(elem)
+            if name in (None, S_MISSING, S_UNREADABLE):
+                name = getattr(elem, "Name", None)
+        except Exception:
+            try:
+                name = getattr(elem, "Name", None)
+            except Exception:
+                name = None
+
+        if name:
+            return canonicalize_str(name)
+        return (None, ITEM_Q_MISSING)
+    except Exception:
+        return (None, ITEM_Q_UNREADABLE)
+
+
+# ---------------------------------------------------------------------------
+# Alternate Units Cluster (Area 7 §5)
+# ---------------------------------------------------------------------------
+
+def _build_alternate_units_items(d):
+    """
+    Read the Alternate Units cluster: master toggle, format id, prefix, suffix.
+
+    Per Greg's correction (Area 7 §5), Revit's UI repeats the Alternate Units
+    parameter set across all dimension-type families -- observed on every
+    shape in probe data (linear/angular/radial/diameter/all 3 spot families),
+    not just Linear. Presence/absence is captured as real per-type signal,
+    not gated to a subset of shapes the way Witness Lines/Centerline/Equality
+    are.
+
+    Returns a list of identity item dicts:
+      - dim_type.alternate_units
+      - dim_type.alternate_units_format_id
+      - dim_type.alternate_units_prefix
+      - dim_type.alternate_units_suffix
+    """
+    items = []
+
+    # alternate_units (master toggle)
+    try:
+        p_au = first_param(d, ui_names=["Alternate Units"])
+        au_int = _as_int(p_au) if p_au is not None else None
+        au_v, au_q = canonicalize_bool(au_int)
+    except Exception:
+        au_v, au_q = (None, ITEM_Q_UNREADABLE)
+    items.append(make_identity_item("dim_type.alternate_units", au_v, au_q))
+
+    # alternate_units_format_id (same shape as dim_type.unit_format_id, off
+    # the alternate FormatOptions object; rounding/accuracy intentionally
+    # not surfaced here -- not part of Area 7 §5's requested field set)
+    try:
+        _alt_fo = _read_unit_format_info(d, alternate=True)
+        alt_fmt_v, alt_fmt_q = _alt_fo[0], _alt_fo[1]
+    except Exception:
+        alt_fmt_v, alt_fmt_q = (None, ITEM_Q_UNREADABLE)
+    items.append(make_identity_item("dim_type.alternate_units_format_id", alt_fmt_v, alt_fmt_q))
+
+    # alternate_units_prefix
+    try:
+        p_pfx = first_param(d, ui_names=["Alternate Units Prefix"])
+        pfx_raw = _as_string(p_pfx) if p_pfx is not None else None
+        pfx_v, pfx_q = canonicalize_str_allow_empty(pfx_raw)
+    except Exception:
+        pfx_v, pfx_q = (None, ITEM_Q_UNREADABLE)
+    items.append(make_identity_item("dim_type.alternate_units_prefix", pfx_v, pfx_q))
+
+    # alternate_units_suffix
+    try:
+        p_sfx = first_param(d, ui_names=["Alternate Units Suffix"])
+        sfx_raw = _as_string(p_sfx) if p_sfx is not None else None
+        sfx_v, sfx_q = canonicalize_str_allow_empty(sfx_raw)
+    except Exception:
+        sfx_v, sfx_q = (None, ITEM_Q_UNREADABLE)
+    items.append(make_identity_item("dim_type.alternate_units_suffix", sfx_v, sfx_q))
+
+    return items

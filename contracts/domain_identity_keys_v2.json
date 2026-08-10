@@ -94,7 +94,27 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_tick_mark_sig_hash",
+        "dim_type.leader_type",
+        "dim_type.show_leader_when_text_moves",
+        "dim_type.tick_mark_line_weight",
+        "dim_type.witness_line_extension_in",
+        "dim_type.witness_line_gap_to_element_in",
+        "dim_type.witness_line_length_in",
+        "dim_type.equality_text",
+        "dim_type.equality_witness_display",
+        "dim_type.centerline_pattern_name",
+        "dim_type.centerline_symbol_name",
+        "dim_type.centerline_tick_mark_sig_hash",
+        "dim_type.interior_tick_mark_sig_hash",
+        "dim_type.interior_tick_mark_display",
+        "dim_type.text_offset_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_format_id",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "required_keys": [
         "dim_type.shape",
@@ -108,7 +128,10 @@
       ],
       "minima": {
         "block_if_any_required_not_ok": true
-      }
+      },
+      "notes": [
+        "Area 7 (§2 leader config, §3 witness lines, §4 equality/centerline/tick weight, §5 alternate units, §6 suppress_spaces, §7 text offset) added dim_type.suppress_spaces through dim_type.alternate_units_suffix above as non-required enrichment identity items -- verified via the repo's committed probe run data (tools/probes/Exports/probes_2025_*.json, 3 consistent runs) rather than a fresh live-Revit run in this pass. No sig_hash_keys override added for this domain: it had none before this change, so these new allowed_keys flow into the analysis-side sig_hash preimage the same way its pre-existing allowed_keys always have -- a content-driven addition, not an algorithm change."
+      ]
     },
     "dimension_types_diameter": {
       "domain_family": "dimension_types",
@@ -130,7 +153,17 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_tick_mark_sig_hash",
+        "dim_type.leader_type",
+        "dim_type.show_leader_when_text_moves",
+        "dim_type.tick_mark_line_weight",
+        "dim_type.text_offset_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_format_id",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "required_keys": [
         "dim_type.shape",
@@ -144,7 +177,10 @@
       ],
       "minima": {
         "block_if_any_required_not_ok": true
-      }
+      },
+      "notes": [
+        "Area 7 (§2 leader config, §4c tick weight, §5 alternate units, §6 suppress_spaces, §7 text offset) added dim_type.suppress_spaces through dim_type.alternate_units_suffix above as non-required enrichment identity items -- Witness Lines/Equality/Centerline do NOT apply to Radial/Diameter per probe observed_on_shapes (Linear/Angular only), correcting an initial guess that they might. Verified via the repo's committed probe run data (tools/probes/Exports/probes_2025_*.json, 3 consistent runs) rather than a fresh live-Revit run in this pass. No sig_hash_keys override added: this domain had none before this change, so new allowed_keys flow into the analysis-side sig_hash preimage the same way its pre-existing allowed_keys always have."
+      ]
     },
     "dimension_types_linear": {
       "domain_family": "dimension_types",
@@ -166,7 +202,30 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_tick_mark_sig_hash",
+        "dim_type.leader_type",
+        "dim_type.show_leader_when_text_moves",
+        "dim_type.tick_mark_line_weight",
+        "dim_type.witness_line_extension_in",
+        "dim_type.witness_line_gap_to_element_in",
+        "dim_type.witness_line_length_in",
+        "dim_type.witness_line_tick_mark_sig_hash",
+        "dim_type.equality_text",
+        "dim_type.equality_witness_display",
+        "dim_type.centerline_pattern_name",
+        "dim_type.centerline_symbol_name",
+        "dim_type.centerline_tick_mark_sig_hash",
+        "dim_type.interior_tick_mark_sig_hash",
+        "dim_type.interior_tick_mark_display",
+        "dim_type.text_offset_in",
+        "dim_type.dimension_string_type",
+        "dim_type.show_opening_height",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_format_id",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "required_keys": [
         "dim_type.shape",
@@ -180,7 +239,10 @@
       ],
       "minima": {
         "block_if_any_required_not_ok": true
-      }
+      },
+      "notes": [
+        "Area 7 (§2 leader config, §3 witness lines, §4 equality/centerline/tick weight, §5 alternate units, §6 suppress_spaces, §7 dimension string type/show opening height/text offset) added dim_type.suppress_spaces through dim_type.alternate_units_suffix above as non-required enrichment identity items. dim_type.witness_line_tick_mark_sig_hash, dim_type.dimension_string_type, and dim_type.show_opening_height are Linear-only (not Angular) per probe observed_on_shapes, confirmed consistent across all 3 committed probe runs. Verified via the repo's committed probe run data (tools/probes/Exports/probes_2025_*.json) rather than a fresh live-Revit run in this pass. No sig_hash_keys override added: this domain had none before this change, so new allowed_keys flow into the analysis-side sig_hash preimage the same way its pre-existing allowed_keys always have."
+      ]
     },
     "dimension_types_radial": {
       "domain_family": "dimension_types",
@@ -202,7 +264,17 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_tick_mark_sig_hash",
+        "dim_type.leader_type",
+        "dim_type.show_leader_when_text_moves",
+        "dim_type.tick_mark_line_weight",
+        "dim_type.text_offset_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_format_id",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "required_keys": [
         "dim_type.shape",
@@ -216,7 +288,10 @@
       ],
       "minima": {
         "block_if_any_required_not_ok": true
-      }
+      },
+      "notes": [
+        "Area 7 (§2 leader config, §4c tick weight, §5 alternate units, §6 suppress_spaces, §7 text offset) added dim_type.suppress_spaces through dim_type.alternate_units_suffix above as non-required enrichment identity items -- Witness Lines/Equality/Centerline do NOT apply to Radial/Diameter per probe observed_on_shapes (Linear/Angular only), correcting an initial guess that they might. Verified via the repo's committed probe run data (tools/probes/Exports/probes_2025_*.json, 3 consistent runs) rather than a fresh live-Revit run in this pass. No sig_hash_keys override added: this domain had none before this change, so new allowed_keys flow into the analysis-side sig_hash preimage the same way its pre-existing allowed_keys always have."
+      ]
     },
     "dimension_types_spot_coordinate": {
       "domain_family": "dimension_types",
@@ -243,7 +318,20 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_arrowhead_uid",
+        "dim_type.leader_arrowhead_name",
+        "dim_type.leader_arrowhead_line_weight",
+        "dim_type.leader_line_weight",
+        "dim_type.rotate_with_component",
+        "dim_type.coordinate_base",
+        "dim_type.text_offset_from_leader_in",
+        "dim_type.text_offset_from_symbol_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_format_id",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "required_keys": [
         "dim_type.shape",
@@ -261,7 +349,47 @@
       ],
       "minima": {
         "block_if_any_required_not_ok": true
-      }
+      },
+      "sig_hash_keys": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.top_coordinate",
+        "dim_type.bottom_coordinate",
+        "dim_type.north_south_indicator",
+        "dim_type.east_west_indicator",
+        "dim_type.include_elevation",
+        "dim_type.elevation_indicator",
+        "dim_type.indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_name",
+        "dim_type.leader_arrowhead_sig_hash",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_arrowhead_line_weight",
+        "dim_type.leader_line_weight",
+        "dim_type.rotate_with_component",
+        "dim_type.coordinate_base",
+        "dim_type.text_offset_from_leader_in",
+        "dim_type.text_offset_from_symbol_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_format_id",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
+      ],
+      "notes": [
+        "Area 7 §1 implements the previously-reserved (allowed-but-unimplemented) dim_type.leader_arrowhead_sig_hash via a shared core/dimension_type_helpers._read_leader_arrowhead() helper (also used by spot_elevation/spot_slope), and additionally registers dim_type.leader_arrowhead_uid/dim_type.leader_arrowhead_name -- same Area 10 precedent (text_type.leader_arrowhead_uid/_name) for file-local/cosmetic metadata that should be visible for join-key/pattern analysis but not hash-contributing.",
+        "sig_hash_keys is pinned to the pre-Area-7 allowed_keys plus every genuinely-new Area 7 key EXCEPT dim_type.leader_arrowhead_uid and dim_type.leader_arrowhead_name: leader_arrowhead_uid is file-local (D-004 restricts UID use to element-backed identities) and leader_arrowhead_name is cosmetic/presentation metadata, so both are excluded the same way Area 10 excluded text_type.leader_arrowhead_uid/_name. dim_type.leader_arrowhead_sig_hash itself is retained in sig_hash_keys (it was already an allowed_keys entry before this PR, and is content-derived from the referenced arrowhead, not file-local/cosmetic). Without this override, tools/generate_sig_hash_policy.py would default the sig_hash preimage to every allowed_keys entry including the uid/name pair on the next policy regeneration -- see core/sig_hash_builder.py's build_sig_hash_from_policy, which hashes every policy-allowed item, not just required_keys.",
+        "Area 7 §5/§6/§7 (alternate units, suppress_spaces, rotate_with_component, coordinate_base, text offsets) are non-required content-driven enrichment items, included in sig_hash_keys like any other identity item -- verified via the repo's committed probe run data (tools/probes/Exports/probes_2025_*.json, 3 consistent runs) rather than a fresh live-Revit run in this pass."
+      ]
     },
     "dimension_types_spot_elevation": {
       "domain_family": "dimension_types",
@@ -287,7 +415,20 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_arrowhead_uid",
+        "dim_type.leader_arrowhead_name",
+        "dim_type.leader_arrowhead_line_weight",
+        "dim_type.leader_line_weight",
+        "dim_type.rotate_with_component",
+        "dim_type.elevation_base",
+        "dim_type.text_offset_from_leader_in",
+        "dim_type.text_offset_from_symbol_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_format_id",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "required_keys": [
         "dim_type.shape",
@@ -304,7 +445,46 @@
       ],
       "minima": {
         "block_if_any_required_not_ok": true
-      }
+      },
+      "sig_hash_keys": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.elevation_indicator",
+        "dim_type.elevation_indicator_as_prefix_suffix",
+        "dim_type.top_indicator",
+        "dim_type.bottom_indicator",
+        "dim_type.top_indicator_as_prefix_suffix",
+        "dim_type.bottom_indicator_as_prefix_suffix",
+        "dim_type.text_orientation",
+        "dim_type.text_location",
+        "dim_type.symbol_name",
+        "dim_type.leader_arrowhead_sig_hash",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_arrowhead_line_weight",
+        "dim_type.leader_line_weight",
+        "dim_type.rotate_with_component",
+        "dim_type.elevation_base",
+        "dim_type.text_offset_from_leader_in",
+        "dim_type.text_offset_from_symbol_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_format_id",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
+      ],
+      "notes": [
+        "Area 7 §1 implements the previously-reserved (allowed-but-unimplemented) dim_type.leader_arrowhead_sig_hash via a shared core/dimension_type_helpers._read_leader_arrowhead() helper (also used by spot_coordinate/spot_slope), and additionally registers dim_type.leader_arrowhead_uid/dim_type.leader_arrowhead_name -- same Area 10 precedent (text_type.leader_arrowhead_uid/_name) for file-local/cosmetic metadata that should be visible for join-key/pattern analysis but not hash-contributing.",
+        "sig_hash_keys is pinned to the pre-Area-7 allowed_keys plus every genuinely-new Area 7 key EXCEPT dim_type.leader_arrowhead_uid and dim_type.leader_arrowhead_name: leader_arrowhead_uid is file-local (D-004 restricts UID use to element-backed identities) and leader_arrowhead_name is cosmetic/presentation metadata, so both are excluded the same way Area 10 excluded text_type.leader_arrowhead_uid/_name. dim_type.leader_arrowhead_sig_hash itself is retained in sig_hash_keys (it was already an allowed_keys entry before this PR, and is content-derived from the referenced arrowhead, not file-local/cosmetic). Without this override, tools/generate_sig_hash_policy.py would default the sig_hash preimage to every allowed_keys entry including the uid/name pair on the next policy regeneration -- see core/sig_hash_builder.py's build_sig_hash_from_policy, which hashes every policy-allowed item, not just required_keys.",
+        "Area 7 §5/§6/§7 (alternate units, suppress_spaces, rotate_with_component, elevation_base, text offsets) are non-required content-driven enrichment items, included in sig_hash_keys like any other identity item -- verified via the repo's committed probe run data (tools/probes/Exports/probes_2025_*.json, 3 consistent runs) rather than a fresh live-Revit run in this pass."
+      ]
     },
     "dimension_types_spot_slope": {
       "domain_family": "dimension_types",
@@ -323,7 +503,18 @@
         "dim_type.text_width_factor",
         "dim_type.text_background",
         "dim_type.color_rgb",
-        "dim_type.line_weight"
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_arrowhead_uid",
+        "dim_type.leader_arrowhead_name",
+        "dim_type.leader_arrowhead_line_weight",
+        "dim_type.leader_line_weight",
+        "dim_type.rotate_with_component",
+        "dim_type.text_offset_from_leader_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_format_id",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
       ],
       "required_keys": [
         "dim_type.shape",
@@ -333,7 +524,37 @@
       ],
       "minima": {
         "block_if_any_required_not_ok": true
-      }
+      },
+      "sig_hash_keys": [
+        "dim_type.shape",
+        "dim_type.unit_format_id",
+        "dim_type.slope_direction",
+        "dim_type.leader_line_length",
+        "dim_type.leader_arrowhead_sig_hash",
+        "dim_type.text_font",
+        "dim_type.text_size_in",
+        "dim_type.text_bold",
+        "dim_type.text_italic",
+        "dim_type.text_underline",
+        "dim_type.text_width_factor",
+        "dim_type.text_background",
+        "dim_type.color_rgb",
+        "dim_type.line_weight",
+        "dim_type.suppress_spaces",
+        "dim_type.leader_arrowhead_line_weight",
+        "dim_type.leader_line_weight",
+        "dim_type.rotate_with_component",
+        "dim_type.text_offset_from_leader_in",
+        "dim_type.alternate_units",
+        "dim_type.alternate_units_format_id",
+        "dim_type.alternate_units_prefix",
+        "dim_type.alternate_units_suffix"
+      ],
+      "notes": [
+        "Area 7 §1 implements the previously-reserved (allowed-but-unimplemented) dim_type.leader_arrowhead_sig_hash via a shared core/dimension_type_helpers._read_leader_arrowhead() helper (also used by spot_elevation/spot_coordinate), and additionally registers dim_type.leader_arrowhead_uid/dim_type.leader_arrowhead_name -- same Area 10 precedent (text_type.leader_arrowhead_uid/_name) for file-local/cosmetic metadata that should be visible for join-key/pattern analysis but not hash-contributing.",
+        "sig_hash_keys is pinned to the pre-Area-7 allowed_keys plus every genuinely-new Area 7 key EXCEPT dim_type.leader_arrowhead_uid and dim_type.leader_arrowhead_name: leader_arrowhead_uid is file-local (D-004 restricts UID use to element-backed identities) and leader_arrowhead_name is cosmetic/presentation metadata, so both are excluded the same way Area 10 excluded text_type.leader_arrowhead_uid/_name. dim_type.leader_arrowhead_sig_hash itself is retained in sig_hash_keys (it was already an allowed_keys entry before this PR, and is content-derived from the referenced arrowhead, not file-local/cosmetic). Without this override, tools/generate_sig_hash_policy.py would default the sig_hash preimage to every allowed_keys entry including the uid/name pair on the next policy regeneration -- see core/sig_hash_builder.py's build_sig_hash_from_policy, which hashes every policy-allowed item, not just required_keys.",
+        "Area 7 §5/§6/§7 (alternate units, suppress_spaces, rotate_with_component, text_offset_from_leader) are non-required content-driven enrichment items, included in sig_hash_keys like any other identity item -- verified via the repo's committed probe run data (tools/probes/Exports/probes_2025_*.json, 3 consistent runs) rather than a fresh live-Revit run in this pass. Text Offset from Symbol and Coordinate/Elevation Base intentionally NOT added here: not observed on SpotSlope in probe data, consistent with Spot Slope having no Symbol field either."
+      ]
     },
     "fill_patterns_drafting": {
       "domain_family": "fill_patterns",
