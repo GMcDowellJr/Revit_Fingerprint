@@ -23,6 +23,7 @@ from core.record_v2 import (
     ITEM_Q_UNSUPPORTED_NOT_APPLICABLE,
     canonicalize_str,
     canonicalize_int,
+    canonicalize_bool,
     make_identity_item,
     serialize_identity_items,
     build_record_v2,
@@ -382,6 +383,30 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
                 lp_sig_hash_v, lp_sig_hash_q = canonicalize_str(lp_special_values.get("solid", None))
             identity_items.append(make_identity_item("obj_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
 
+            try:
+                can_add_sub_v, can_add_sub_q = canonicalize_bool(cat_obj.CanAddSubcategory)
+            except Exception:
+                can_add_sub_v, can_add_sub_q = None, ITEM_Q_UNREADABLE
+            identity_items.append(make_identity_item("obj_style.can_add_subcategory", can_add_sub_v, can_add_sub_q))
+
+            try:
+                has_mat_qty_v, has_mat_qty_q = canonicalize_bool(cat_obj.HasMaterialQuantities)
+            except Exception:
+                has_mat_qty_v, has_mat_qty_q = None, ITEM_Q_UNREADABLE
+            identity_items.append(make_identity_item("obj_style.has_material_quantities", has_mat_qty_v, has_mat_qty_q))
+
+            try:
+                is_cuttable_v, is_cuttable_q = canonicalize_bool(cat_obj.IsCuttable)
+            except Exception:
+                is_cuttable_v, is_cuttable_q = None, ITEM_Q_UNREADABLE
+            identity_items.append(make_identity_item("obj_style.is_cuttable", is_cuttable_v, is_cuttable_q))
+
+            if is_subcategory:
+                pn_v, pn_q = canonicalize_str(parent_name)
+            else:
+                pn_v, pn_q = None, ITEM_Q_OK
+            identity_items.append(make_identity_item("obj_style.parent_name", pn_v, pn_q))
+
             if kind == "model":
                 identity_items.append(_material_ref_item(doc, cat_obj))
 
@@ -441,10 +466,13 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
                 ct_v, ct_q = canonicalize_str(category_type_labels.get(cat_type_int, safe_str(cat_type_int)))
             except Exception:
                 ct_v, ct_q = (None, ITEM_Q_UNREADABLE)
+            tab_labels = {"model": "Model", "annotation": "Annotation", "analytical": "Analytical", "imported": "Imported"}
+            tab_v = tab_labels.get(kind, None)
             coordination_items = [
                 make_identity_item("obj_style.domain_family", "object_styles", ITEM_Q_OK),
                 make_identity_item("obj_style.category_type", ct_v, ct_q),
                 make_identity_item("obj_style.is_subcategory", "true" if row_name != "self" else "false", ITEM_Q_OK),
+                make_identity_item("obj_style.tab", tab_v, ITEM_Q_OK if tab_v else ITEM_Q_UNREADABLE),
             ]
 
             unknown_items = []

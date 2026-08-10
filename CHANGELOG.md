@@ -12,6 +12,40 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **`object_styles` domain family: 5 per-category identity fields (Area 9):**
+  `domains/object_styles.py`'s existing per-`Category` loop (shared by all 4
+  `object_styles_*` partitions) now reads `Category.CanAddSubcategory`,
+  `Category.HasMaterialQuantities`, and `Category.IsCuttable` off the same
+  `cat_obj` already used for line weight/color/pattern reads (canonicalized
+  via `core.record_v2.canonicalize_bool`), plus a new `obj_style.parent_name`
+  identity item derived from the loop's already-tracked `parent` variable
+  (not a fresh `cat.Parent` call, which returns missing for top-level
+  categories in this API — see `audit_results/audit_11_domain_extractor_delta_step0_findings.md`
+  §9.2). `parent_name` is `q=ok`/`v=<name>` for subcategories and
+  `q=ok`/`v=None` for genuinely top-level categories (a confirmed absence,
+  not a read failure — same tri-state convention as `text_types`'
+  `leader_arrowhead`). A 5th field, `obj_style.tab` (Model/Annotation/
+  Analytical/Imported), is derived from which `extract_*`/`kind` partition
+  produced the record (no new Category read) and added to the existing
+  `phase2.coordination_items` bucket, matching `obj_style.category_type`/
+  `obj_style.is_subcategory` — **not** hash-contributing.
+  **Non-hash-breaking:** `can_add_subcategory`/`has_material_quantities`/
+  `is_cuttable`/`parent_name` are added to `identity_basis.items` but not to
+  `_MODEL_SEMANTIC_KEYS`/`_NON_MODEL_SEMANTIC_KEYS`, so the extractor's
+  inline `sig_hash` is unchanged. `contracts/domain_identity_keys_v2.json`'s
+  `object_styles_{model,annotation,analytical,imported}.allowed_keys`
+  updated to register all 4 new keys; a new `sig_hash_keys` override pins
+  each domain's sig-hash preimage to its pre-existing key set so the
+  analysis-side `policies/domain_sig_hash_policies.json` (hand-patched, not
+  regenerated, to avoid clobbering unrelated hand-tuned notes on other
+  domains) doesn't silently widen via `allowed_items` defaulting from
+  `allowed_keys`.
+  **Open question, not resolved here:** whether `obj_style.tab` should stay
+  a coordination-bucket field (current default, conservative, matches the
+  `dim_type.leader_arrowhead_sig_hash` allowed-not-required precedent) or
+  be promoted to a true hash-contributing identity item — flagged for Greg
+  to confirm; if promoted, that is a separate, deliberate hash-breaking
+  follow-up, not an accidental side effect of this change.
 - **`units` domain: 6 per-spec boolean formatting flags:**
   `domains/units.py`'s existing per-spec `FormatOptions` loop now reads
   `units.use_default`, `units.use_digit_grouping`, `units.use_plus_prefix`,

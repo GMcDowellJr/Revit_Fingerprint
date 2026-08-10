@@ -577,7 +577,11 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
+        "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
+        "as identity_basis.items without widening the sig_hash preimage -- open design question,",
+        "see CHANGELOG.md/PR description."
       ],
       "required_items": [
         "obj_style.row_key"
@@ -598,7 +602,11 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
+        "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
+        "as identity_basis.items without widening the sig_hash preimage -- open design question,",
+        "see CHANGELOG.md/PR description."
       ],
       "required_items": [
         "obj_style.row_key"
@@ -619,7 +627,11 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
+        "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
+        "as identity_basis.items without widening the sig_hash preimage -- open design question,",
+        "see CHANGELOG.md/PR description."
       ],
       "required_items": [
         "obj_style.row_key"
@@ -642,7 +654,11 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
+        "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
+        "as identity_basis.items without widening the sig_hash preimage -- open design question,",
+        "see CHANGELOG.md/PR description."
       ],
       "required_items": [
         "obj_style.row_key"

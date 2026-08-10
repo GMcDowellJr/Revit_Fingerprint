@@ -594,6 +594,16 @@
         "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash",
+        "obj_style.can_add_subcategory",
+        "obj_style.has_material_quantities",
+        "obj_style.is_cuttable",
+        "obj_style.parent_name"
+      ],
+      "sig_hash_keys": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
         "obj_style.pattern_ref.sig_hash"
       ],
       "required_keys": [
@@ -607,6 +617,16 @@
       "domain_family": "object_styles",
       "display_label": "Object Styles — Annotation",
       "allowed_keys": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash",
+        "obj_style.can_add_subcategory",
+        "obj_style.has_material_quantities",
+        "obj_style.is_cuttable",
+        "obj_style.parent_name"
+      ],
+      "sig_hash_keys": [
         "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
@@ -625,6 +645,16 @@
         "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash",
+        "obj_style.can_add_subcategory",
+        "obj_style.has_material_quantities",
+        "obj_style.is_cuttable",
+        "obj_style.parent_name"
+      ],
+      "sig_hash_keys": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.color.rgb",
         "obj_style.pattern_ref.sig_hash"
       ],
       "required_keys": [
@@ -638,6 +668,18 @@
       "domain_family": "object_styles",
       "display_label": "Object Styles — Model",
       "allowed_keys": [
+        "obj_style.row_key",
+        "obj_style.weight.projection",
+        "obj_style.weight.cut",
+        "obj_style.color.rgb",
+        "obj_style.pattern_ref.sig_hash",
+        "obj_style.material_sig_hash",
+        "obj_style.can_add_subcategory",
+        "obj_style.has_material_quantities",
+        "obj_style.is_cuttable",
+        "obj_style.parent_name"
+      ],
+      "sig_hash_keys": [
         "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.weight.cut",
