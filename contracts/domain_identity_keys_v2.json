@@ -782,6 +782,19 @@
         "block_if_any_required_not_ok": true
       }
     },
+    "units_doc": {
+      "domain_family": "units",
+      "display_label": "Units (Document Summary)",
+      "allowed_keys": [
+        "units_doc.decimal_symbol",
+        "units_doc.digit_grouping_amount",
+        "units_doc.digit_grouping_symbol"
+      ],
+      "required_keys": [],
+      "minima": {
+        "block_if_any_required_not_ok": false
+      }
+    },
     "view_category_overrides_annotation": {
       "domain_family": "view_category_overrides",
       "display_label": "View Category Overrides — Annotation",

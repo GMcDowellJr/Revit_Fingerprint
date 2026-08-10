@@ -695,6 +695,20 @@
         "DECISION: Accuracy affects display only, not technical behavior - treat as refinement."
       ]
     },
+    "units_doc": {
+      "join_key_schema": "units_doc.join_key.v1",
+      "hash_alg": "md5_utf8_join_pipe",
+      "required_items": [],
+      "optional_items": [
+        "units_doc.decimal_symbol",
+        "units_doc.digit_grouping_amount",
+        "units_doc.digit_grouping_symbol"
+      ],
+      "explicitly_excluded_items": [],
+      "notes": [
+        "Single synthetic document-level summary record -- no per-record required discriminator; all fields optional to match the record's own minima (nothing blocks it)."
+      ]
+    },
     "view_category_overrides": {
       "join_key_schema": "view_category_overrides.join_key.v1",
       "hash_alg": "md5_utf8_join_pipe",

@@ -6,15 +6,28 @@ Captures project units settings including:
 - Format options for 38 specs across all Revit disciplines
   (Common, Electrical, HVAC, Piping, Structural)
 - Unit types and symbols
-- Accuracy and rounding settings
+- Accuracy, rounding, and formatting-flag settings
 
 All specs are extracted for every document regardless of discipline.
 GetFormatOptions returns a valid FormatOptions object for all specs
 on any live document. ITEM_Q_UNREADABLE is a defensive fallback only
 and is not expected to fire in normal execution.
 
-Identity is emitted as record.v2 per-spec records,
+Identity is emitted as record.v2 per-spec records (domain="units"),
 with per-record sig_hash derived from identity_items.
+
+extract_units_doc() emits a second, independent top-level domain
+(domain="units_doc") for the 3 document-level formatting fields
+(decimal_symbol, digit_grouping_amount, digit_grouping_symbol) that come
+off doc.GetUnits() directly rather than any per-spec FormatOptions. This
+mirrors domains/worksets.py's worksets/worksets_doc split: a synthetic
+doc-level record has no real units.spec/units.unit_type_id to supply, and
+those are required_keys for domain "units" (block_if_any_required_not_ok),
+so the doc-level record must live under its own domain with its own
+(empty) required_keys rather than being folded into a "units:_doc"
+record_id under domain "units". record_id still uses the same
+family-prefixed "_doc" suffix convention as worksets_doc for
+readability; only the `domain` differs.
 """
 
 import os
@@ -42,6 +55,7 @@ from core.record_v2 import (
     canonicalize_enum,
     canonicalize_float,
     canonicalize_bool,
+    canonicalize_int,
     ITEM_Q_OK,
     ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
@@ -83,6 +97,20 @@ UNITS_SEMANTIC_KEYS = tuple(
             "units.suppress_leading_zeros",
             "units.suppress_spaces",
             "units.suppress_trailing_zeros",
+        }
+    )
+)
+
+# Document-level (domain="units_doc") semantic keys -- all 3 fields are
+# genuine formatting behavior (not session/presentation state), so all 3
+# drive units_doc's sig_hash, unlike worksets_doc's active_workset_name
+# exclusion.
+UNITS_DOC_SEMANTIC_KEYS = tuple(
+    sorted(
+        {
+            "units_doc.decimal_symbol",
+            "units_doc.digit_grouping_amount",
+            "units_doc.digit_grouping_symbol",
         }
     )
 )
@@ -458,3 +486,143 @@ def extract(doc, ctx=None):
         result["debug_v2_block_reasons"] = v2_block_reasons or {"no_nonblocked_records": True}
 
     return result
+
+
+def extract_units_doc(doc, ctx=None):
+    """
+    Extract the single document-level units summary record
+    (domain="units_doc").
+
+    Emitted as its own top-level domain rather than a "units:_doc"-tagged
+    record folded into extract()'s "units" payload: a synthetic doc-level
+    record has no real units.spec/units.unit_type_id to supply, and those
+    are domain "units"'s required_keys (block_if_any_required_not_ok), so
+    it would fail contract validation there. It also would not flatten
+    under the right domain regardless -- tools/export_to_flat_tables.py
+    derives each flattened row's `domain` from the top-level fingerprint
+    key the runner stores the payload under, not from the record's own
+    `domain` field (see domains/worksets.py's extract_worksets_doc, which
+    solves the identical problem the same way).
+
+    Document-level fields are optional (never block): a doc-level read
+    hiccup must not leave the summary record entirely absent.
+
+    Args:
+        doc: Revit Document
+        ctx: Context dictionary (unused)
+
+    Returns:
+        Dictionary with count, hash_v2, records, record_rows.
+    """
+    info = {
+        "count": 0,
+        "raw_count": 0,
+        "records": [],
+        "record_rows": [],
+
+        "hash_v2": None,
+        "debug_v2_blocked": False,
+        "debug_v2_block_reasons": {},
+    }
+
+    try:
+        u = doc.GetUnits()
+    except Exception:
+        u = None
+
+    if u is None:
+        ds_v, ds_q = (None, ITEM_Q_UNREADABLE)
+        dga_v, dga_q = (None, ITEM_Q_UNREADABLE)
+        dgs_v, dgs_q = (None, ITEM_Q_UNREADABLE)
+    else:
+        try:
+            ds_v, ds_q = canonicalize_enum(getattr(u, "DecimalSymbol", None))
+        except Exception:
+            ds_v, ds_q = (None, ITEM_Q_UNREADABLE)
+        try:
+            dga_v, dga_q = canonicalize_int(getattr(u, "DigitGroupingAmount", None))
+        except Exception:
+            dga_v, dga_q = (None, ITEM_Q_UNREADABLE)
+        try:
+            dgs_v, dgs_q = canonicalize_enum(getattr(u, "DigitGroupingSymbol", None))
+        except Exception:
+            dgs_v, dgs_q = (None, ITEM_Q_UNREADABLE)
+
+    doc_items = [
+        make_identity_item("units_doc.decimal_symbol", ds_v, ds_q),
+        make_identity_item("units_doc.digit_grouping_amount", dga_v, dga_q),
+        make_identity_item("units_doc.digit_grouping_symbol", dgs_v, dgs_q),
+    ]
+    doc_items_sorted = sorted(doc_items, key=lambda it: it.get("k", ""))
+
+    status_reasons = []
+    any_incomplete = False
+    for it in doc_items_sorted:
+        if it.get("q") != ITEM_Q_OK:
+            any_incomplete = True
+            status_reasons.append("identity.incomplete:{}:{}".format(it.get("q"), it.get("k")))
+
+    status = STATUS_DEGRADED if any_incomplete else STATUS_OK
+    semantic_items = [it for it in doc_items_sorted if it.get("k") in set(UNITS_DOC_SEMANTIC_KEYS)]
+    sig_hash = make_hash(serialize_identity_items(semantic_items))
+
+    rec = build_record_v2(
+        domain="units_doc",
+        record_id="units:_doc",
+        status=status,
+        status_reasons=sorted(set(status_reasons)),
+        sig_hash=sig_hash,
+        identity_items=doc_items_sorted,
+        required_qs=[],
+        label={
+            "display": "Units (Document Summary)",
+            "quality": "system",
+            "provenance": "none",
+            "components": {},
+        },
+    )
+    rec["is_purgeable"] = None
+    rec["is_purgeable_q"] = "unsupported_not_applicable"
+
+    pol = get_domain_join_key_policy((ctx or {}).get("join_key_policies"), "units_doc")
+    rec["join_key"], _missing = build_join_key_from_policy(
+        domain_policy=pol,
+        identity_items=doc_items_sorted,
+        include_optional_items=False,
+        emit_keys_used=True,
+        hash_optional_items=False,
+        emit_items=False,
+        emit_selectors=True,
+    )
+
+    rec["phase2"] = {
+        "schema": "phase2.units_doc.v1",
+        "grouping_basis": "phase2.hypothesis",
+        "cosmetic_items": phase2_sorted_items([]),
+        "coordination_items": phase2_sorted_items([]),
+        "unknown_items": phase2_sorted_items([]),
+    }
+    rec["sig_basis"] = {
+        "schema": "units_doc.sig_basis.v1",
+        "keys_used": list(UNITS_DOC_SEMANTIC_KEYS),
+    }
+
+    info["records"] = [rec]
+    info["count"] = 1
+    info["raw_count"] = 1
+    info["record_rows"] = [{
+        "record_key": safe_str(rec.get("record_id", "")),
+        "sig_hash": rec.get("sig_hash", None),
+        "name": safe_str((rec.get("label", {}) or {}).get("display", "")),
+    }]
+
+    if rec.get("sig_hash"):
+        info["hash_v2"] = rec["sig_hash"]
+        info["debug_v2_blocked"] = False
+        info["debug_v2_block_reasons"] = {}
+    else:
+        info["hash_v2"] = None
+        info["debug_v2_blocked"] = True
+        info["debug_v2_block_reasons"] = {"record_blocked:units:_doc": True}
+
+    return info
