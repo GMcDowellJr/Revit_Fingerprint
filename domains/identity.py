@@ -78,7 +78,12 @@ except ImportError:
 # of template (confirmed via tools/probes/probe_identity.py's definition_origin
 # classifier -- see audit_results/audit_11_domain_extractor_delta_step0_findings.md
 # section 5.2). Read via BuiltInParameter so behavior is independent of Revit's
-# display-language locale (LookupParameter-by-name is locale-sensitive).
+# display-language locale (LookupParameter-by-name is locale-sensitive). The
+# three IFC GUID fields are ALSO confirmed built-ins (PR review follow-up):
+# tools/archetype/bip_lookup.json (a generated BuiltInParameter id->name
+# registry consumed elsewhere, e.g. domains/browser_organization.py) records
+# IFC_PROJECT_GUID/IFC_BUILDING_GUID/IFC_SITE_GUID as real enum members, not
+# custom/shared parameters -- moved here from the named-field table below.
 _PROJECT_INFO_BUILTIN_FIELDS = (
     ("project_info.number", "PROJECT_NUMBER"),
     ("project_info.status", "PROJECT_STATUS"),
@@ -88,15 +93,16 @@ _PROJECT_INFO_BUILTIN_FIELDS = (
     ("project_info.building_name", "PROJECT_BUILDING_NAME"),
     ("project_info.organization_name", "PROJECT_ORGANIZATION_NAME"),
     ("project_info.organization_description", "PROJECT_ORGANIZATION_DESCRIPTION"),
+    ("project_info.ifc_building_guid", "IFC_BUILDING_GUID"),
+    ("project_info.ifc_project_guid", "IFC_PROJECT_GUID"),
+    ("project_info.ifc_site_guid", "IFC_SITE_GUID"),
 )
 
 # Named (shared/custom) fields: NOT guaranteed present on every document.
-# "Office" is confirmed as a real Stantec-authored shared parameter (GUID
-# 6b61afc7-13eb-4af5-8b65-889f978af4f3, per audit 5.2). The three IFC GUID
-# fields were named explicitly in this task's spec (consistent with
-# probe_identity.py's `project_info.p.{ParamName}` generic-walk convention)
-# but, like Office, are only present on documents that have used IFC
-# export/mapping -- a missing definition is legitimate absence
+# "Office" is the only remaining entry -- a confirmed real Stantec-authored
+# shared parameter (GUID 6b61afc7-13eb-4af5-8b65-889f978af4f3, per audit 5.2),
+# read via that GUID (see _PROJECT_INFO_SHARED_GUIDS below), not by display
+# name. A missing definition is legitimate absence
 # (ITEM_Q_UNSUPPORTED_NOT_APPLICABLE), not a read failure.
 #
 # NOT implemented here: Office's Address/City/State/Zip/Country/Telephone/Fax/
@@ -105,9 +111,6 @@ _PROJECT_INFO_BUILTIN_FIELDS = (
 # before assuming the probe-data list -- this sandbox has no live Revit/Dynamo
 # access to do that confirmation, so they are deferred rather than guessed.
 _PROJECT_INFO_NAMED_FIELDS = (
-    ("project_info.ifc_building_guid", "IfcBuilding GUID"),
-    ("project_info.ifc_project_guid", "IfcProject GUID"),
-    ("project_info.ifc_site_guid", "IfcSite GUID"),
     ("project_info.office", "Office"),
 )
 
@@ -117,8 +120,7 @@ _PROJECT_INFO_NAMED_FIELDS = (
 # name and, per Revit API behavior, can resolve to an arbitrary same-named
 # parameter if a project happens to contain more than one definition sharing
 # that display name (e.g. a stray project/local parameter also called
-# "Office"). Fields with no confirmed GUID (the three IFC GUID fields) keep
-# using LookupParameter by name.
+# "Office").
 _PROJECT_INFO_SHARED_GUIDS = {
     "project_info.office": "6b61afc7-13eb-4af5-8b65-889f978af4f3",
 }

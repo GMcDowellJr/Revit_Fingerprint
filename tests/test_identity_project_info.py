@@ -29,6 +29,9 @@ class FakeBuiltInParameter:
     PROJECT_BUILDING_NAME = "BIP.PROJECT_BUILDING_NAME"
     PROJECT_ORGANIZATION_NAME = "BIP.PROJECT_ORGANIZATION_NAME"
     PROJECT_ORGANIZATION_DESCRIPTION = "BIP.PROJECT_ORGANIZATION_DESCRIPTION"
+    IFC_BUILDING_GUID = "BIP.IFC_BUILDING_GUID"
+    IFC_PROJECT_GUID = "BIP.IFC_PROJECT_GUID"
+    IFC_SITE_GUID = "BIP.IFC_SITE_GUID"
 
 
 class FakeGuid:
@@ -93,6 +96,9 @@ _ALL_BUILTIN_VALUES = {
     FakeBuiltInParameter.PROJECT_BUILDING_NAME: "Tower A",
     FakeBuiltInParameter.PROJECT_ORGANIZATION_NAME: "Stantec",
     FakeBuiltInParameter.PROJECT_ORGANIZATION_DESCRIPTION: "Architecture",
+    FakeBuiltInParameter.IFC_BUILDING_GUID: "1AB2c3D4e5F6G7H8I9J0Kl",
+    FakeBuiltInParameter.IFC_PROJECT_GUID: "1AB2c3D4e5F6G7H8I9J0Km",
+    FakeBuiltInParameter.IFC_SITE_GUID: "1AB2c3D4e5F6G7H8I9J0Kn",
 }
 
 
@@ -103,13 +109,8 @@ def _stantec_like_pi():
     return FakeProjectInformation(
         name="Test Project",
         builtin_values=_ALL_BUILTIN_VALUES,
-        named_present={"IfcBuilding GUID", "IfcProject GUID", "IfcSite GUID", "Office"},
-        named_values={
-            "IfcBuilding GUID": "1AB2c3D4e5F6G7H8I9J0Kl",
-            "IfcProject GUID": "1AB2c3D4e5F6G7H8I9J0Km",
-            "IfcSite GUID": "1AB2c3D4e5F6G7H8I9J0Kn",
-            "Office": "Denver",
-        },
+        named_present={"Office"},
+        named_values={"Office": "Denver"},
         # Kept consistent with named_values so the fixture behaves the same
         # whether identity_module.Guid is available (GUID-based read) or not
         # (LookupParameter-by-name fallback).
@@ -118,6 +119,11 @@ def _stantec_like_pi():
 
 
 def _non_stantec_pi():
+    # IFC GUID fields are true BuiltInParameter members (confirmed via
+    # tools/archetype/bip_lookup.json), unrelated to firm identity -- they
+    # still resolve from the same _ALL_BUILTIN_VALUES here. What actually
+    # distinguishes a "non-Stantec" project is the absence of the Office
+    # shared parameter definition (named_present stays empty).
     return FakeProjectInformation(
         name="Non-Stantec Project",
         builtin_values=_ALL_BUILTIN_VALUES,
@@ -227,7 +233,7 @@ def test_office_is_read_via_shared_parameter_guid_when_available(monkeypatch):
     pi = FakeProjectInformation(
         name="GUID Office Project",
         builtin_values=_ALL_BUILTIN_VALUES,
-        named_present={"IfcBuilding GUID", "IfcProject GUID", "IfcSite GUID"},  # no "Office" by name
+        named_present=set(),  # no "Office" resolvable by display name
         guid_values={_OFFICE_SHARED_PARAM_GUID: "Denver"},
     )
     items = _as_dict(identity_module._extract_project_info_items(_DocForPI(pi)))
@@ -247,24 +253,47 @@ def test_office_falls_back_to_lookup_by_name_when_guid_type_unavailable(monkeypa
     assert items["project_info.office"]["v"] == "Denver"
 
 
-def test_office_and_ifc_guids_are_not_applicable_when_absent_not_unreadable(monkeypatch):
+def test_office_is_not_applicable_when_shared_param_absent_not_unreadable(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
     items = _as_dict(identity_module._extract_project_info_items(_DocForPI(_non_stantec_pi())))
 
-    for key in (
-        "project_info.office",
-        "project_info.ifc_building_guid",
-        "project_info.ifc_project_guid",
-        "project_info.ifc_site_guid",
-    ):
-        assert items[key]["q"] == ITEM_Q_UNSUPPORTED_NOT_APPLICABLE, (
-            "{} should be legitimately-absent not_applicable on a project without the "
-            "shared parameter loaded, not unreadable/missing".format(key)
-        )
-        assert items[key]["v"] is None
+    assert items["project_info.office"]["q"] == ITEM_Q_UNSUPPORTED_NOT_APPLICABLE, (
+        "project_info.office should be legitimately-absent not_applicable on a project "
+        "without the shared parameter loaded, not unreadable/missing"
+    )
+    assert items["project_info.office"]["v"] is None
 
-    # Built-ins are unaffected by the shared parameter being absent.
+    # Built-ins -- including the IFC GUID fields, which are true BuiltInParameter
+    # members unrelated to Office/firm identity -- are unaffected by Office's
+    # shared parameter definition being absent.
     assert items["project_info.client_name"]["q"] == ITEM_Q_OK
+    assert items["project_info.ifc_building_guid"]["q"] == ITEM_Q_OK
+    assert items["project_info.ifc_project_guid"]["q"] == ITEM_Q_OK
+    assert items["project_info.ifc_site_guid"]["q"] == ITEM_Q_OK
+
+
+def test_ifc_guid_builtins_follow_same_semantics_as_other_builtins(monkeypatch):
+    """IFC GUID fields are true BuiltInParameter members (PR review follow-up),
+    not shared/custom parameters -- so their absence semantics must match the
+    other built-ins (missing Parameter object => unreadable, blank value =>
+    missing), not the shared-parameter not_applicable semantics Office uses."""
+    monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
+
+    blank_builtins = dict(_ALL_BUILTIN_VALUES)
+    blank_builtins[FakeBuiltInParameter.IFC_BUILDING_GUID] = None
+    del blank_builtins[FakeBuiltInParameter.IFC_PROJECT_GUID]  # simulate no Parameter object at all
+
+    pi = FakeProjectInformation(
+        name="Mixed IFC Project",
+        builtin_values=blank_builtins,
+        named_present=set(),
+    )
+    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(pi)))
+
+    assert items["project_info.ifc_building_guid"]["q"] == ITEM_Q_MISSING
+    assert items["project_info.ifc_building_guid"]["v"] is None
+    assert items["project_info.ifc_project_guid"]["q"] == ITEM_Q_UNREADABLE
+    assert items["project_info.ifc_site_guid"]["q"] == ITEM_Q_OK
 
 
 def test_named_field_present_but_blank_is_missing_not_not_applicable(monkeypatch):

@@ -50,6 +50,16 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   (`identity.sig_hash.v1` → `.v2`) are both bumped so a consumer comparing
   `sig_hash` across a pre-D-025 and post-D-025 export can tell the two hash
   definitions apart instead of reading the mismatch as fingerprint drift.
+  **Second PR-review follow-up:** the three IFC GUID fields
+  (`project_info.ifc_building_guid`/`.ifc_project_guid`/`.ifc_site_guid`) are
+  real `BuiltInParameter` members (`IFC_BUILDING_GUID`/`IFC_PROJECT_GUID`/
+  `IFC_SITE_GUID`, confirmed via `tools/archetype/bip_lookup.json`), not
+  custom/shared parameters as originally implemented — moved from
+  `LookupParameter`-by-name into the `BuiltInParameter` table alongside the
+  other built-ins, so they're now locale-independent and follow the same
+  unreadable/missing semantics as the other built-ins rather than Office's
+  not_applicable semantics. `Office` is now the only `project_info.*` field
+  read by name/GUID rather than `BuiltInParameter`.
   `contracts/domain_identity_keys_v2.json` and
   `policies/domain_join_key_policies.json`/`policies/domain_sig_hash_policies.json`
   updated accordingly (the latter hand-patched, not regenerated, to avoid

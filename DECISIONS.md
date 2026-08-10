@@ -1110,19 +1110,28 @@ To limit the blast radius of that call:
   non-Stantec project by design) must not flip this domain's record status to
   degraded on every ordinary export.
 - Built-ins use `q=unreadable` only if the `Parameter` object itself is
-  missing (an unexpected API/document gap); shared/custom fields (`Office`,
-  the three IFC GUID fields) use `q=unsupported.not_applicable` when
-  `LookupParameter` finds no definition at all, distinct from `q=missing`
-  (definition present, value blank) and `q=unreadable` (read exception).
+  missing (an unexpected API/document gap); `Office` — the only remaining
+  shared/custom field — uses `q=unsupported.not_applicable` when its
+  definition isn't found at all, distinct from `q=missing` (definition
+  present, value blank) and `q=unreadable` (read exception).
 - Built-ins are read via `BuiltInParameter` enum (`pi.get_Parameter(...)`),
   not `LookupParameter` by display name, so behavior does not depend on
-  Revit's UI display-language locale. `Office` is likewise read via its
-  confirmed shared-parameter GUID (`Element.get_Parameter(Guid(...))`, GUID
+  Revit's UI display-language locale. **Second PR-review follow-up:** the
+  three IFC GUID fields turned out to be real `BuiltInParameter` members too
+  (`IFC_BUILDING_GUID`/`IFC_PROJECT_GUID`/`IFC_SITE_GUID`, confirmed via
+  `tools/archetype/bip_lookup.json`, a generated BuiltInParameter id→name
+  registry already consumed elsewhere in this repo, e.g.
+  `domains/browser_organization.py`) — not custom/shared parameters as
+  originally assumed — and were moved from the named/shared-field table into
+  the built-in table, so they now follow the same unreadable/missing
+  semantics as the other built-ins rather than Office's not_applicable
+  semantics. `Office` itself is read via its confirmed shared-parameter GUID
+  (`Element.get_Parameter(Guid(...))`, GUID
   `6b61afc7-13eb-4af5-8b65-889f978af4f3`) rather than `LookupParameter("Office")`
   by display name, which the Revit API can resolve to an arbitrary same-named
   parameter if a project happens to contain more than one "Office" definition
-  (PR review follow-up); the three IFC GUID fields have no confirmed GUID of
-  their own and still use `LookupParameter` by name.
+  (first PR-review follow-up); it is the only field left using
+  `LookupParameter`-style name resolution (by GUID, not display name).
 - `identity.py`'s `sig_basis.schema` is bumped `identity.sig_basis.v1` →
   `.v2`, and the hand-patched `policies/domain_sig_hash_policies.json` entry's
   `sig_hash_schema` likewise `identity.sig_hash.v1` → `.v2` (PR review
