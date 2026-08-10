@@ -138,6 +138,22 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   every `allowed_keys` entry that the Area 10 `text_types` `leader_arrowhead` pin
   addressed. `policies/domain_sig_hash_policies.json`'s 7 `dimension_types_*` blocks are
   hand-patched to match (same clobber-avoidance rationale).
+  **Schema version bump (PR #412 review, 4th round):** all 7 `dimension_types_*` blocks'
+  `sig_hash_schema` is bumped from the implicit `.sig_hash.v1` to an explicit `.sig_hash.v2`
+  in both `contracts/domain_identity_keys_v2.json` and the hand-patched
+  `policies/domain_sig_hash_policies.json`, matching the `loaded_family_types`/Area 12
+  precedent — the analysis-side hash preimage (`allowed_items`) widened for every record in
+  all 7 partitions, so consumers comparing pre-/post-change extractions need the version to
+  distinguish real drift from an incompatible hash-definition change.
+  **Label-synthesis/join-key exclusions (PR #412 review, 4th round):**
+  `tools/label_synthesis/domain_prompts/dimension_types.py`'s `_SKIP_KEYS` gains
+  `dim_type.leader_arrowhead_uid`/`_name` (same treatment as the pre-existing
+  `tick_mark_uid` entries) so a per-file-random UID and cosmetic name aren't presented to
+  label-synthesis prompts as behavioral parameters. The 3 spot domains'
+  `explicitly_excluded_items` in `policies/domain_join_key_policies.json` gain the same two
+  keys, matching `text_types`' existing `leader_arrowhead_uid`/`_name` exclusions, so
+  `tools/discover_join_policy.py`'s `discover`/`harsh` modes can't nominate them as join-key
+  candidates.
 - **`loaded_family_types` domain: `structural_material_type`/`is_active` identity fields (Area 12):**
   `domains/loaded_family_types.py`'s existing per-family loop now reads
   `FamilySymbol.StructuralMaterialType` (via `canonicalize_str`, same

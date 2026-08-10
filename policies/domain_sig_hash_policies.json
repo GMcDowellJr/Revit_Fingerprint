@@ -113,7 +113,7 @@
         "dim_type.prefix",
         "dim_type.suffix"
       ],
-      "sig_hash_schema": "dimension_types_angular.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_angular.sig_hash.v2"
     },
     "dimension_types_diameter": {
       "allowed_item_prefixes": [],
@@ -163,7 +163,7 @@
         "dim_type.diameter_symbol_text",
         "dim_type.unit_format_id"
       ],
-      "sig_hash_schema": "dimension_types_diameter.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_diameter.sig_hash.v2"
     },
     "dimension_types_linear": {
       "allowed_item_prefixes": [],
@@ -226,7 +226,7 @@
         "dim_type.prefix",
         "dim_type.suffix"
       ],
-      "sig_hash_schema": "dimension_types_linear.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_linear.sig_hash.v2"
     },
     "dimension_types_radial": {
       "allowed_item_prefixes": [],
@@ -276,7 +276,7 @@
         "dim_type.radius_symbol_text",
         "dim_type.unit_format_id"
       ],
-      "sig_hash_schema": "dimension_types_radial.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_radial.sig_hash.v2"
     },
     "dimension_types_spot_coordinate": {
       "allowed_item_prefixes": [],
@@ -336,7 +336,7 @@
         "dim_type.text_location",
         "dim_type.symbol_name"
       ],
-      "sig_hash_schema": "dimension_types_spot_coordinate.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_spot_coordinate.sig_hash.v2"
     },
     "dimension_types_spot_elevation": {
       "allowed_item_prefixes": [],
@@ -394,7 +394,7 @@
         "dim_type.text_location",
         "dim_type.symbol_name"
       ],
-      "sig_hash_schema": "dimension_types_spot_elevation.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_spot_elevation.sig_hash.v2"
     },
     "dimension_types_spot_slope": {
       "allowed_item_prefixes": [],
@@ -436,7 +436,7 @@
         "dim_type.slope_direction",
         "dim_type.leader_line_length"
       ],
-      "sig_hash_schema": "dimension_types_spot_slope.sig_hash.v1"
+      "sig_hash_schema": "dimension_types_spot_slope.sig_hash.v2"
     },
     "fill_patterns_drafting": {
       "allowed_item_prefixes": [
