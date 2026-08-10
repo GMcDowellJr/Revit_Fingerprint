@@ -726,6 +726,14 @@ def _read_leader_arrowhead(d, ctx, doc):
     (extract_spot_elevation/_spot_coordinate/_spot_slope) don't each
     duplicate the read-and-resolve logic.
 
+    A positive Leader Arrowhead reference that resolves to a real element but
+    is absent from ctx["arrowheads_by_type_id"] (e.g. the arrowheads domain
+    excluded from this run's domain allowlist, or its record blocked) yields
+    sig_hash_q=ITEM_Q_UNREADABLE, not ITEM_Q_MISSING: it is an unresolved
+    dependency, not "no arrowhead selected" -- spot types using different
+    arrowhead definitions must not silently collapse to the same hash just
+    because they're both unresolved (PR #412 review).
+
     Returns:
         (uid_v, uid_q, name_v, name_q, sig_hash_v, sig_hash_q)
     """
@@ -767,12 +775,17 @@ def _read_leader_arrowhead(d, ctx, doc):
                     try:
                         ah_map = (ctx or {}).get("arrowheads_by_type_id", {}) if ctx is not None else {}
                         k = safe_str(getattr(arrow_id, "IntegerValue", None))
+                        sh = None
                         if k and isinstance(ah_map, dict) and k in ah_map:
                             sh = ah_map.get(k, {}).get("sig_hash", None)
-                            if sh:
-                                sig_hash_v, sig_hash_q = (safe_str(sh), ITEM_Q_OK)
+                        if sh:
+                            sig_hash_v, sig_hash_q = (safe_str(sh), ITEM_Q_OK)
+                        else:
+                            # Positive reference, real element resolved, but no
+                            # sig_hash available -- unresolved dependency.
+                            sig_hash_v, sig_hash_q = (None, ITEM_Q_UNREADABLE)
                     except Exception:
-                        pass
+                        sig_hash_v, sig_hash_q = (None, ITEM_Q_UNREADABLE)
     except Exception:
         pass
 
@@ -795,11 +808,20 @@ def _read_arrowhead_ref_sig_hash(d, ctx, bip_names=None, ui_names=None):
     field does.
 
     Returns:
-        (sig_hash_v, sig_hash_q) where sig_hash_q is ITEM_Q_OK if resolved,
-        ITEM_Q_MISSING otherwise (no reference, or a negative/built-in id
-        not present in the arrowheads collector -- e.g. a "None" selection).
+        (sig_hash_v, sig_hash_q) where sig_hash_q is:
+          - ITEM_Q_OK if resolved
+          - ITEM_Q_MISSING for a genuine "no reference" state: no
+            parameter/value, or a negative/built-in id (e.g. a "None"
+            tick-mark selection)
+          - ITEM_Q_UNREADABLE for a positive reference that could not be
+            resolved (ctx["arrowheads_by_type_id"] absent entirely -- e.g.
+            arrowheads excluded from this run's domain allowlist -- or
+            present but missing this id) -- an unresolved dependency, not
+            an absence; distinct custom tick marks must not collapse to the
+            same hash just because they're both unresolved (PR #412 review)
     """
     sig_hash = None
+    positive_unresolved = False
 
     try:
         p = first_param(d, bip_names=bip_names, ui_names=ui_names)
@@ -808,7 +830,7 @@ def _read_arrowhead_ref_sig_hash(d, ctx, bip_names=None, ui_names=None):
             try:
                 eid = p.AsElementId()
             except Exception:
-                eid = None
+                return (None, ITEM_Q_UNREADABLE)
 
             if eid is not None and getattr(eid, "IntegerValue", 0) > 0:
                 try:
@@ -816,13 +838,17 @@ def _read_arrowhead_ref_sig_hash(d, ctx, bip_names=None, ui_names=None):
                     k = safe_str(getattr(eid, "IntegerValue", None))
                     if k and isinstance(ah_map, dict) and k in ah_map:
                         sig_hash = ah_map.get(k, {}).get("sig_hash", None)
+                    if not sig_hash:
+                        positive_unresolved = True
                 except Exception:
-                    sig_hash = None
+                    positive_unresolved = True
     except Exception:
-        sig_hash = None
+        return (None, ITEM_Q_UNREADABLE)
 
     if sig_hash:
         return (safe_str(sig_hash), ITEM_Q_OK)
+    if positive_unresolved:
+        return (None, ITEM_Q_UNREADABLE)
     return (None, ITEM_Q_MISSING)
 
 
@@ -927,14 +953,15 @@ def _read_line_pattern_ref_sig_hash(d, ctx, doc, ui_names):
       4. No parameter/value at all: ITEM_Q_MISSING (a genuine "no centerline
          pattern selected" state).
 
-    A positive IntegerValue that cannot be resolved (ctx["line_pattern_uid_to_hash"]
-    absent entirely -- e.g. line_patterns excluded from this run's domain
-    allowlist -- or present but missing this specific pattern's uid) is a real,
-    unresolved reference, not an absence: it returns ITEM_Q_UNREADABLE, not
-    ITEM_Q_MISSING, so it isn't silently treated as "no pattern" and doesn't
-    fall into the caller's missing-is-acceptable exemption (different custom
-    centerline patterns must not collapse to the same identity value just
-    because they're all unresolved -- PR #412 review).
+    Both (2) and (3) return ITEM_Q_UNREADABLE, not ITEM_Q_MISSING, when their
+    ctx map coverage is unavailable (line_patterns excluded from this run's
+    domain allowlist, or present but missing this specific id/sentinel): a
+    real reference (positive custom pattern, or negative built-in pattern
+    such as "Solid") that could not be resolved is an unresolved dependency,
+    not an absence. It must not be silently treated as "no pattern" or fall
+    into the caller's missing-is-acceptable exemption -- different custom or
+    built-in centerline patterns must not collapse to the same identity value
+    just because they're all unresolved (PR #412 review).
 
     Returns:
         (sig_hash_v, sig_hash_q)
@@ -993,7 +1020,15 @@ def _read_line_pattern_ref_sig_hash(d, ctx, doc, ui_names):
             solid_v = lp_special_values.get("solid", None)
             if solid_v:
                 return canonicalize_str(solid_v)
-            return (None, ITEM_Q_MISSING)
+            # A real negative/built-in pattern reference (e.g. -3000010 for
+            # "Solid") that we could not resolve to a known sentinel because
+            # line_patterns didn't run / ctx["line_pattern_special_values"]
+            # was never populated for this extraction -- an unresolved
+            # dependency, not "no pattern selected" (PR #412 review). This
+            # branch cannot import domains/line_patterns.py's
+            # LINE_PATTERN_SYMBOLIC_SOLID constant directly to resolve it
+            # independently -- Core must not depend on Domains.
+            return (None, ITEM_Q_UNREADABLE)
     except Exception:
         return (None, ITEM_Q_UNREADABLE)
 

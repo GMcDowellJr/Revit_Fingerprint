@@ -94,12 +94,22 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `leader_arrowhead_uid`/`_name`/`_sig_hash`) are added to each partition's existing
   "missing is acceptable" status-reason exemption set (same treatment as the
   pre-existing `dim_type.tick_mark_sig_hash`), since a negative/absent reference
-  legitimately means "none selected," not a data gap. `dim_type.centerline_pattern_sig_hash`
-  is the one exception: an unresolved *positive* reference (custom pattern id present but
-  its ctx dependency map missing or not covering that id) returns `ITEM_Q_UNREADABLE`, not
-  `ITEM_Q_MISSING`, so it is **not** exempted — a genuinely-unresolved custom pattern must
-  degrade the record rather than silently reading as "no pattern selected" (PR #412 review;
-  see `core/dimension_type_helpers._read_line_pattern_ref_sig_hash()`).
+  legitimately means "none selected," not a data gap. All 4 of `_read_arrowhead_ref_sig_hash()`
+  (`leader_tick_mark_sig_hash`/`witness_line_tick_mark_sig_hash`/`centerline_tick_mark_sig_hash`/
+  `interior_tick_mark_sig_hash`), `_read_leader_arrowhead()`'s `sig_hash` element, and
+  `_read_line_pattern_ref_sig_hash()` (`centerline_pattern_sig_hash`, both its positive-id and
+  negative/built-in branches) distinguish a genuine "no reference selected" state
+  (`ITEM_Q_MISSING`, still exempted) from a *real* reference — positive custom id, or a
+  negative built-in id like "Solid" — that could not be resolved because its ctx dependency
+  map (`arrowheads_by_type_id`/`line_pattern_uid_to_hash`/`line_pattern_special_values`) was
+  never populated or doesn't cover that id (`ITEM_Q_UNREADABLE`, **not** exempted). Without
+  this distinction, distinct custom/built-in tick marks, arrowheads, or centerline patterns
+  that are all unresolved for the same reason (e.g. `arrowheads`/`line_patterns` excluded
+  from a given run's domain allowlist) would silently collapse to the same identity value
+  and hash instead of degrading the record (PR #412 review, two rounds:
+  `core/dimension_type_helpers._read_line_pattern_ref_sig_hash()`'s positive-id branch first,
+  then its negative/built-in branch plus `_read_arrowhead_ref_sig_hash()`/
+  `_read_leader_arrowhead()` in a follow-up round).
   **Hash-breaking (content-driven, not an algorithm change):** new identity items are
   included in each partition's `identity_items`/`serialize_identity_items()` preimage by
   construction (matching the existing `loaded_family_types`/Area 12 precedent above), so
