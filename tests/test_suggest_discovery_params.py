@@ -112,77 +112,91 @@ def test_solve_candidate_fields_and_k_trims_fields_when_budget_too_small_for_min
     assert _cumulative_subset_count(max_fields, 2) <= 100
 
 
-def test_suggest_params_for_domain_flags_infeasible_required_baseline_stays_budget_safe():
-    # discover_join_policy.py's actual pareto_search() has no required-fields-aware
-    # enumeration (plain itertools.combinations over every candidate up to max_k),
-    # so once required_count exceeds the budget-derived discover_max_k, bumping
-    # max_k to represent it is provably infeasible at the SAME pool/budget --
-    # solve_candidate_fields_and_k already returns the largest affordable k, so
-    # anything beyond it can never fit the identical budget (monotonicity of
-    # Sum C(pool, i)). Must stay at the safe discover_max_k, not silently
-    # recommend a command that would enumerate billions of subsets.
+def test_suggest_params_for_domain_required_baseline_never_makes_harsh_infeasible():
+    # tools/pareto_joinkey_search.py's pareto_search() now guarantees required-field
+    # inclusion STRUCTURALLY -- every subset it tries is built as required_fields +
+    # a combination of the remaining fields, not selected combinatorially out of the
+    # whole pool -- so representing the required baseline costs exactly ONE
+    # evaluation (the "zero extra fields" case) regardless of how large
+    # required_count is. A required baseline that used to make the OLD (required-
+    # count-as-combinatorial-floor) model infeasible must now stay feasible, with
+    # harsh_max_k = required_count + however many extra fields fit the (tight)
+    # budget on top.
     stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 40}
     result = suggest_params_for_domain(stats, required_count=8, subset_budget=2000, min_k=2)
-    assert result["suggested_max_k_harsh_validate"] == result["suggested_max_k_discover"]
-    assert result["harsh_pareto_feasible"] is False
-    assert "too large for harsh/validate Pareto search" in result["notes"]
-    assert "--search-modes greedy" in result["notes"]
+    assert result["harsh_pareto_feasible"] is True
+    assert result["suggested_max_k_harsh_validate"] == 10  # 8 required + 2 affordable extras
+    assert "--search-modes greedy" not in result["notes"]
 
 
-def test_suggest_params_for_domain_harsh_feasible_when_required_count_within_discover_k():
-    # required_count already <= discover_max_k -- no infeasibility, no bump needed.
+def test_suggest_params_for_domain_harsh_max_k_grows_independently_of_discover_max_k():
+    # harsh/validate's max_k is required_count + max_extra_k, computed against its
+    # own (optional-inflated) extra-field pool and budget -- a fundamentally
+    # different computation than discover mode's data-only pool, so the two values
+    # no longer need to match even when required_count is small relative to
+    # discover_max_k (an earlier version of this logic capped harsh_max_k at
+    # discover_max_k unless a bump was "needed"; that framing no longer applies).
     stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 10}
     result = suggest_params_for_domain(stats, required_count=2, subset_budget=100000, min_k=2)
     assert result["harsh_pareto_feasible"] is True
-    assert result["suggested_max_k_harsh_validate"] == result["suggested_max_k_discover"]
-    assert "too large for harsh/validate" not in result["notes"]
+    assert result["suggested_max_k_harsh_validate"] == 12  # 2 required + 10 affordable extras
 
 
-def test_suggest_params_for_domain_optional_items_inflate_pool_but_do_not_require_a_single_subset():
-    # Codex finding (corrects an earlier over-conservative version of this logic):
-    # optional_items enlarge the harsh/validate candidate POOL discover_join_policy.py
-    # searches over (unconditionally, like required_items), but -- unlike required
-    # fields -- nothing forces them to all co-occur together in one selected subset:
-    # validate mode's post-hoc filter only demands required fields be a subset of
-    # `selected` (harsh imposes no such constraint on selected at all). So a domain
-    # with NO required fields and a large optional_items list (Codex's own example:
-    # 10 data candidates, 0 required, 20 optional) must still be FEASIBLE -- Pareto
-    # can validly explore small subsets from the larger pool -- even though the
-    # larger pool means harsh/validate's affordable max_k ends up smaller than
-    # discover mode's (2 vs 10 here), not infeasible.
+def test_suggest_params_for_domain_harsh_infeasible_only_when_subset_budget_below_one():
+    # The only way harsh_pareto_feasible can be False now: --subset-budget itself
+    # is degenerate (< 1), since even the required-only ("zero extras") candidate
+    # can't be said to fit a sub-1 budget. This is a config-sanity check, not a
+    # reachable state from any real required/optional baseline.
+    stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 10}
+    result = suggest_params_for_domain(stats, required_count=2, subset_budget=0, min_k=2)
+    assert result["harsh_pareto_feasible"] is False
+    assert "too small to evaluate even the required-only baseline" in result["notes"]
+
+
+def test_suggest_params_for_domain_optional_items_inflate_extra_pool_not_the_required_floor():
+    # optional_items DO inflate the harsh/validate extra-field pool
+    # discover_join_policy.py's work_candidates unconditionally includes, unlike
+    # required fields (which pareto_search() now includes structurally, at zero
+    # combinatorial cost -- see the tests above). A domain with NO required fields
+    # and a large optional_items list (Codex's original example: 10 data
+    # candidates, 0 required, 20 optional) is still fully feasible -- Pareto can
+    # validly explore subsets up to whatever max_extra_k the inflated pool affords
+    # within budget, even though that's smaller than discover mode's own max_k
+    # (which never has to deal with the optional-items inflation at all).
     stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 10}
     result = suggest_params_for_domain(stats, required_count=0, optional_count=20, subset_budget=2000, min_k=2)
     assert result["harsh_pareto_feasible"] is True
+    assert result["suggested_max_k_harsh_validate"] == 2
     assert result["suggested_max_k_harsh_validate"] < result["suggested_max_k_discover"]
-    assert result["suggested_max_k_harsh_validate"] > 0
-    assert "enlarges the harsh/validate candidate pool" in result["notes"]
+    assert "enlarges the harsh/validate extra-field pool" in result["notes"]
 
 
 def test_suggest_params_for_domain_required_items_alone_bump_harsh_max_k_independent_of_optional():
     # required_count (8) exceeds discover_max_k (5, capped by the tiny data
-    # candidate pool here) and must be bumped, independent of optional_count
-    # (0) -- the minimum k that can represent selecting the full required
-    # baseline as one subset is required_count alone, never required_count +
-    # optional_count (see the finding test above).
+    # candidate pool here) but this is no longer a feasibility concern --
+    # pareto_search() guarantees required-field inclusion structurally, so
+    # harsh_max_k = required_count + however many extras the (here: identical to
+    # discover's, since optional_count=0) pool affords within budget.
     stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 5}
     result = suggest_params_for_domain(stats, required_count=8, optional_count=0, subset_budget=10**9, min_k=1)
     assert result["harsh_pareto_feasible"] is True
-    assert result["suggested_max_k_harsh_validate"] == 8
+    assert result["suggested_max_k_harsh_validate"] == 13  # 8 required + 5 affordable extras (full field pool)
     assert result["suggested_max_k_harsh_validate"] > result["suggested_max_k_discover"]
-    assert "exceeds the discover-mode budget max_k" in result["notes"]
 
 
-def test_suggest_params_for_domain_dedupes_pool_size_when_required_fields_overlap_candidates():
-    # Codex finding: harsh_pool_size was computed as a pessimistic arithmetic sum
-    # (max_candidate_fields + required_count + optional_count), but
+def test_suggest_params_for_domain_dedupes_extra_pool_when_required_fields_overlap_candidates():
     # discover_join_policy.py's actual work_candidates is a DEDUPLICATED union --
     # required fields normally overlap the observed candidate pool (they were
-    # presumably discovered as legitimate identity items). Codex's own example:
-    # 10 observed candidates, 7 required fields drawn FROM those same 10 -- the
-    # real pool is 10 (967 subsets through k=7), not the arithmetic 17 (41,225
-    # subsets), which would falsely exceed a --subset-budget of 2000. Supplying
-    # the actual field names must recover feasibility that count-only sizing
-    # missed.
+    # presumably discovered as legitimate identity items). Codex's original
+    # example: 10 observed candidates, 7 required fields drawn FROM those same 10
+    # -- the true extra-field pool (fields NOT already guaranteed by the required
+    # baseline) is only 3, not the naive max_candidate_fields=10. Supplying the
+    # actual field names lets harsh_max_k reflect that true, smaller extra pool
+    # instead of the pessimistic "assume zero overlap" fallback, which treats all
+    # 10 observed fields as available extras on top of the (already-guaranteed)
+    # required 7 -- inflating the reported max_k without actually costing more at
+    # search time (pareto_search()'s real extra-field list is bounded by the true
+    # overlap regardless), just making the estimate less precise.
     candidate_names = [f"field{i}" for i in range(10)]
     required_names = candidate_names[:7]
     stats = {
@@ -194,14 +208,17 @@ def test_suggest_params_for_domain_dedupes_pool_size_when_required_fields_overla
         subset_budget=2000, min_k=2,
     )
     assert with_names["harsh_pareto_feasible"] is True
-    assert with_names["suggested_max_k_harsh_validate"] == with_names["suggested_max_k_discover"]
+    assert with_names["suggested_max_k_harsh_validate"] == 10  # 7 required + 3 true extras (dedup'd)
 
     # Without names (count-only, the fallback every existing caller/test uses),
-    # the pessimistic arithmetic sum still marks this infeasible -- confirms the
-    # fix is specifically about using names when available, not a budget change.
+    # the pessimistic "assume zero overlap" estimate is LARGER, not smaller --
+    # it doesn't know 7 of the 10 observed fields ARE the required ones, so it
+    # offers all 10 as extras on top of the required baseline.
     stats_no_names = {k: v for k, v in stats.items() if k != "candidate_field_names_ranked"}
     without_names = suggest_params_for_domain(stats_no_names, required_count=7, optional_count=0, subset_budget=2000, min_k=2)
-    assert without_names["harsh_pareto_feasible"] is False
+    assert without_names["harsh_pareto_feasible"] is True
+    assert without_names["suggested_max_k_harsh_validate"] == 17  # 7 required + 10 (undeduplicated) extras
+    assert without_names["suggested_max_k_harsh_validate"] > with_names["suggested_max_k_harsh_validate"]
 
 
 def test_suggest_params_for_domain_recommends_stratify_by_file_id_on_real_concentration():

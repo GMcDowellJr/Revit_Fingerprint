@@ -8,7 +8,7 @@ import pytest
 pd = pytest.importorskip("pandas")
 
 from tools.compute_governance_thresholds import compute_alignment_rates, compute_thresholds, jenks_natural_breaks
-from tools.phase2_analysis.split_detection_file_level import compute_named_cluster_flags
+from tools.patterns_analysis._archive.split_detection_file_level import compute_named_cluster_flags
 from tools.run_split_detection_all import _inject_split_contract_headers
 
 

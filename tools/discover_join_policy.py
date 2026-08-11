@@ -601,39 +601,22 @@ def main() -> None:
                 # Without this, a sample-only "fragmentation=0" could be pinned as
                 # policy despite fragmenting on records the sample never saw.
                 #
-                # Uses verify_cfg, built to match whichever effective gates
-                # ACTUALLY produced `metrics` (the sample metrics) for this
-                # search_mode -- not always the same gates:
-                #
-                # - greedy: discover_greedy() strips gates.required_fields from its
-                #   OWN scoring once `selected` is required-inclusive (see
-                #   tools/join_key_discovery/greedy.py), so `metrics` already
-                #   reflects the real `selected` (e.g. req + a challenger field).
-                #   Verifying with the unstripped cfg here would compare that
-                #   against full metrics computed with req alone (base_required =
-                #   gates.required_fields, ignoring `selected` entirely) -- an
-                #   apples-to-oranges mismatch that can manufacture a false
-                #   divergence (or mask a real one). So verification strips the
-                #   same gate, matching greedy's own scoring.
-                # - pareto: _pareto_search_adapter()/pareto_search() still scores
-                #   every sample candidate with the ORIGINAL (unstripped) cfg, so
-                #   `metrics` reflects gates.required_fields (i.e. req alone),
-                #   regardless of which literal subset `selected` names (Pareto's
-                #   own known, separate gap -- see the comment above the cfg
-                #   construction, not something this verification step should try
-                #   to paper over on its own). Stripping the gate for verification
-                #   here while the sample scoring stayed unstripped would
-                #   reintroduce the exact same kind of mismatch this fix exists to
-                #   prevent, just in the opposite direction (comparing a
-                #   required-only sample against a selected-subset full score). So
-                #   pareto verification keeps the original, unstripped cfg,
-                #   preserving the same effective candidate semantics the sample
-                #   metrics were computed with.
-                if search_mode == "greedy":
-                    verify_gates = {k: v for k, v in (cfg.get("gates") or {}).items() if k != "required_fields"}
-                    verify_cfg = {**cfg, "gates": verify_gates}
-                else:
-                    verify_cfg = cfg
+                # Uses verify_cfg, NOT the original cfg: cfg's gates.required_fields
+                # (set for validate/harsh modes) would make score_candidate silently
+                # fall back to req alone regardless of `selected` -- exactly the
+                # override both discover_greedy() (tools/join_key_discovery/greedy.py)
+                # and pareto_search() (tools/pareto_joinkey_search.py) now strip for
+                # their OWN scoring once `selected`/every tried subset is
+                # required-inclusive by construction. `metrics` (the sample metrics)
+                # already reflects the real selected/tried subset for BOTH search
+                # modes, so verifying with the unstripped cfg here would compare that
+                # against full metrics computed with req alone -- an apples-to-oranges
+                # mismatch that can manufacture a false divergence (or mask a real
+                # one) whenever `selected` differs from req. Stripping the same gate
+                # for verification, unconditional on search_mode, keeps it consistent
+                # with whichever engine actually produced `selected`.
+                verify_gates = {k: v for k, v in (cfg.get("gates") or {}).items() if k != "required_fields"}
+                verify_cfg = {**cfg, "gates": verify_gates}
                 full_verify_status = "skipped_no_full_verify_flag"
                 metrics_full: Dict[str, object] = {}
                 diverges = False
