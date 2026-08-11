@@ -180,7 +180,7 @@ name projection's actual clustering basis, so it cannot simply be reused verbati
 | 5 | CAD-import exclusion unavailable for name-target | **Semantic** (confirmed) | Real limitation of what name-identity data represents for the one domain the signal applies to (`view_category_overrides`), and that domain is structurally excluded from name-target entirely (§2). Unification cannot manufacture CAD-import evidence that was never captured under the name projection. |
 | 6 | Row-key/shape-gated scope quirk (`ROW_KEY_DOMAINS`/`SHAPE_GATED_DOMAINS` pre-D-015 names) | **Representational / moot, confirmed pre-existing** | audit_8 already correctly scoped this as a `config`-target quirk unrelated to unification; out of scope here too (fixing it changes `config` output, violating the byte-identical requirement). |
 | 7 | USED view / latent-purgeable filtering blocked for name-target | **Semantic** (confirmed) | `source_cluster_id`'s trailing hash is `join_key_name_identity`'s hash, not `sig_hash` — cross-referencing it against `records/latent_purgeable.csv` (a `sig_hash`-keyed artifact) would silently compare the wrong identity space. No column rename fixes this; it requires either a name-projection-native purgeability signal (does not exist) or an explicit permanent block. Unification does not change this — it only means the block can now be expressed as "USED view requires `comparison_target=config`" in one place instead of the adapter's ad hoc guard. |
-| 8 | Placeholder-exclusion / `records.csv`'s `is_purgeable` dependency | **Semantic** (confirmed) | Same root cause as #7 — `is_purgeable` is a `sig_hash`-space artifact with no name-projection equivalent. |
+| 8 | Placeholder-exclusion / `records.csv`'s `is_purgeable` dependency | **Representational** (re-classified — see below) | `is_purgeable` is a **record-level** column on `records.csv` (`tools/extractor.py:999/1155`, read straight off the record.v2 JSON), not something joined through `sig_hash`. `placeholder_exclusions_legacy.py::compute_placeholder_exclusions()` confirms this directly: it groups rows by `(domain, export_run_id)` and counts truthy `is_purgeable` per group — it never reads `sig_hash`, `join_hash`, or `source_cluster_id` anywhere. Unlike item 7 (USED view), which genuinely cross-references a `sig_hash`-keyed artifact (`latent_purgeable.csv`) through `source_cluster_id`'s trailing hash, placeholder exclusion never enters the pattern-clustering layer at all — it is computed entirely upstream of `comparison_target`. The actual blocker audit_8 hit (`analysis_dir` pointing at `Results_v21/name_key/patterns/name/`, which has no `records/` subtree) is a path-resolution/wiring gap: phase0's `records.csv` exists independent of `comparison_target` and could be pointed at directly once export-run-id normalization (§2) is in place. This was originally mis-classified by analogy to item 7 without checking `placeholder_exclusions_legacy.py`'s actual read surface. (Flagged in PR review.) |
 | 9 | `--compute-share-profile` needs `pattern_share_pct`/`is_dominant_pattern` | **Representational, contingent on #3** | Once the presence/dominance computation is ported/shared (§2), these fields exist natively for name-target with the same semantics they have for config-target — the values are computed from record→file membership, which name-projection data has in full. audit_8 filed this as blocked because PR2 never computed it, not because the name projection lacks the underlying evidence. **Re-classifying this item is the biggest scope change from audit_8**: unification, if it includes porting the presence computation, closes this gap rather than just relocating it. |
 | 10 | `--compare` / `reference_bundle.json` baseline | **Semantic** (confirmed) | No name-projection reference baseline exists or is remotely close to being defined (D-024/D-025-style baseline work would be required); orthogonal to the shape-unification question. |
 | 11 | `--roles` / `file_metadata.csv` filtering | **Representational** (confirmed, already noted as composing cleanly) | No change from audit_8. |
@@ -188,12 +188,19 @@ name projection's actual clustering basis, so it cannot simply be reused verbati
 
 **Net correction to audit_8's framing**: item 9 (share-profile) was filed as a hard semantic
 gap in the PR3 brief's original scoping, but Step 0's read shows it is representational
-*conditional on* closing item 3's presence-computation gap. Only 7, 8, and 10 survive as
-genuine semantic gaps — CAD-import (5) is best read as a *specific instance* of "the config
-projection's `view_category_overrides` family has evidence the name projection structurally
-cannot have," not a separate general-purpose gap, since the mechanism (label substring match)
-would degrade to always-false even if ported verbatim. Item 6 was already correctly scoped
-as moot/pre-existing in audit_8.
+*conditional on* closing item 3's presence-computation gap. Item 8 (placeholder exclusion) was
+also mis-filed as semantic by analogy to item 7 (USED view) without verifying against
+`placeholder_exclusions_legacy.py`'s actual read surface — it never touches `sig_hash`/
+`join_hash` at all and is purely a wiring gap, not a data-availability one. **Only 7 and 10
+survive as genuine semantic gaps** — CAD-import (5) is best read as a *specific instance* of
+"the config projection's `view_category_overrides` family has evidence the name projection
+structurally cannot have," not a separate general-purpose gap, since the mechanism (label
+substring match) would degrade to always-false even if ported verbatim. Item 6 was already
+correctly scoped as moot/pre-existing in audit_8. This is a second, larger correction to
+audit_8's original scoping than the share-profile one: of the four items audit_8 flagged as
+blocked-for-comparison_target=name, only USED-view purgeability (7) and the `--compare`
+reference baseline (10) turn out to be genuine limits of what name-identity data represents;
+share-profile (9) and placeholder-exclusion (8) are both closeable by unification.
 
 ## 4. Q1 — Which direction should unification go?
 
