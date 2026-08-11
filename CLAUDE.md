@@ -417,7 +417,7 @@ The runner populates `ctx` for domain cross-references:
 - `phase_filter_uid_to_hash` — phase_filters → view_templates
 - `view_filter_uid_to_hash` / `view_filter_uid_to_sig_hash_v2` — view_filter_definitions → view_templates
 - `line_pattern_uid_to_hash` — line_patterns → object_styles, line_styles
-- `object_style_model_row_key_to_sig_hash` — object_styles_model → view_category_overrides
+- `object_style_row_key_to_sig_hash` — object_styles_model → view_category_overrides
 - `object_style_annotation_row_key_to_sig_hash` — object_styles_annotation → view_category_overrides
 - `material_uid_to_name` / `material_uid_to_class` — materials → compound_types
 
