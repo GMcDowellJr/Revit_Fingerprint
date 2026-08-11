@@ -138,26 +138,46 @@ rows:
     source instead of re-running `apply_name_key_policy.py`'s own file discovery), not reuse
     `_iter_export_paths()`'s cascade as-is. (Flagged in PR review — P1, more severe than the
     `files_total` gap above since it loses data, not just a denominator.)
-- **Identity-items reuse for label resolution is real for only 7 of the 25 eligible domains,
-  not all of them.** `core/name_key_coverage.py`'s own docstring is explicit: for the 18
+- **Identity-items reuse for label resolution is unsafe for the 18 Widened domains, and NOT
+  proven safe for the 7 Native ones either — the Native/Widened split does not settle this
+  question by itself.** `core/name_key_coverage.py`'s own docstring is explicit: for the 18
   **Widened** domains, "the name key is built from a value pulled from a phase2 bucket or raw
   `label.display`/`label.components` at the name-key call site only — it is **NOT** a subset of
-  `identity_items`/`identity_basis.items`" the way a Native domain's name key is. The claim that
-  identity_items are "a per-record artifact independent of which join_hash scheme clusters
-  them" only holds for the 7 **Native** domains (`NATIVE_DOMAINS` already includes `phases` as
-  one of its 7 members — `phases, materials, text_types, wall_types, floor_types, roof_types,
-  ceiling_types` — not 7 Native plus `phases` as an 8th; corrected from an earlier miscount in
-  this doc, flagged in PR review) — for the other 18,
+  `identity_items`/`identity_basis.items`" the way a Native domain's name key is. For those 18,
   reusing phase0's config-basis `identity_items_by_record` would feed `resolve_pattern_label()`
   and `find_near_duplicate_merges()` evidence that has no defined relationship to
-  `join_key_name_identity`'s actual clustering basis for that domain. Concretely,
-  `find_near_duplicate_merges()` could merge two name-identity clusters that are genuinely
-  distinct under the name projection (different `label.display`/phase2-bucket values) but
-  happen to share identical `identity_items` under the config projection, silently assigning
-  them the same `pattern_label_human`. A unified writer must either source Widened-domain label
-  evidence from the name-projection-native value the name key was actually built from (not
-  `identity_items`), or explicitly disable near-duplicate merging / fall back to the generic
-  label for Widened domains under `comparison_target=name`. (Flagged in PR review.)
+  `join_key_name_identity`'s actual clustering basis for that domain: `find_near_duplicate_
+  merges()` could merge two name-identity clusters that are genuinely distinct under the name
+  projection (different `label.display`/phase2-bucket values) but happen to share identical
+  `identity_items` under the config projection, silently assigning them the same
+  `pattern_label_human`.
+
+  The initial version of this section claimed the 7 **Native** domains (`NATIVE_DOMAINS`:
+  `phases, materials, text_types, wall_types, floor_types, roof_types, ceiling_types` —
+  `phases` is one of the 7, not an 8th on top of it, corrected from an earlier miscount in this
+  doc) were safe by construction, since "Native" means the name-key item is itself present in
+  `identity_items`. **This is wrong for label-resolution purposes.** "Native" only says the
+  join-key *value* is somewhere in `identity_items` — it says nothing about which items the
+  per-domain label-synthesis **synopsis formatter** actually reads to build
+  `pattern_label_human`, and that formatter's evidence selection is independent of the join
+  key in either projection. Confirmed concretely for `text_types`: its name-key policy
+  (`policies/domain_name_key_policies.json`) clusters on `text_type.name` alone
+  (`required_items: ["text_type.name"]`), but `tools/label_synthesis/synopsis_formatters/
+  text_types.py` never reads `text_type.name` at all — it builds the label purely from
+  `text_type.font`, `text_type.size_in`, `text_type.bold`/`italic`/`underline`,
+  `text_type.show_border`, `text_type.background`. Two text_type records with different names
+  (hence different name-identity clusters) but identical font/size/style would receive the
+  same `pattern_label_human` if the config-basis label machinery were reused unchanged — the
+  same class of failure as the Widened-domain case above, just triggered by a different
+  mechanism (formatter evidence divergent from the join key, rather than the join key itself
+  being absent from `identity_items`). A unified writer needs a per-domain check of each
+  synopsis formatter's actual input keys against that domain's name-key `required_items`
+  before treating *any* domain's label evidence as safe to reuse verbatim — Native-vs-Widened
+  is not a sufficient test on its own, and this Step 0 pass has not audited the other 6 Native
+  domains' formatters to know how many of them share `text_types`' problem. Until that audit
+  exists, source label evidence from a name-projection-native value or fall back to the
+  generic label for every domain under `comparison_target=name`, not just the Widened 18.
+  (Flagged in PR review.)
 - **Label resolution (`pattern_label_human`, `semantic_group`)**: both are already optional
   and gracefully degrade to the generic fallback when their backing files
   (`Results_v21/label_synthesis/*`, keyed by domain/join_hash/pattern_id) are absent
@@ -169,8 +189,10 @@ rows:
   `tools/label_synthesis/`) — but the **column and fallback machinery in `domain_patterns.csv`
   itself already supports "no label synthesis has run for this hash space" as a first-class
   state** (`pattern_label_human == pattern_label_fallback`, `pattern_label_source` says so).
-  This is a data-availability gap, not a shape gap for the 7 Native domains; for the 18
-  Widened domains it is compounded by the evidence-source gap above.
+  This is a data-availability gap in the general case, but per the bullet above, it is not
+  enough on its own to establish safety even for Native domains — the fallback machinery
+  matters regardless of domain class, since `text_types` shows a Native domain's formatter can
+  diverge from the join key too.
 - **`is_cad_import`**: audit_8 item 5 flagged this as unavailable for name-target, but a
   closer read shows the config-target mechanism itself doesn't work today, independent of
   `comparison_target`. `_remap_vco_domain()` (`tools/extractor.py:424`) drops any
@@ -191,10 +213,13 @@ target-independent export manifest for `files_total`/`exports` (see the first bu
 config-specific business logic — it is a general "cluster records by (domain, schema, hash),
 then compute per-file participation stats" algorithm that happens to only have one caller
 today. Label resolution (`pattern_label_human`/`semantic_group`) is a separate matter: the
-*mechanism* is shape-agnostic (second/third bullets above), but for the 18 Widened domains the
-*evidence it would be fed* (config-basis `identity_items`) has no defined correspondence to the
-name projection's actual clustering basis, so it cannot simply be reused verbatim the way the
-7 Native domains' evidence can.
+*mechanism* is shape-agnostic (third/fourth bullets above), but the *evidence it would be fed*
+(config-basis `identity_items`, filtered through each domain's own label-synthesis synopsis
+formatter) has no defined correspondence to the name projection's actual clustering basis for
+either domain class — confirmed unsafe for all 18 Widened domains by construction, and
+confirmed unsafe for at least one of the 7 Native domains (`text_types`) by its formatter's
+actual code. Treat verbatim identity-items reuse for label purposes as unverified for every
+eligible domain until a per-domain formatter audit says otherwise, not just for the 18.
 
 ## 3. Re-classified audit_8 delta catalog
 
