@@ -83,7 +83,7 @@ rows:
   missing_required`) supplies the same information under different key names
   (`export_file`→`export_run_id`, `record_id`→ *not* `record_pk` — see below) plus a `status`
   gate PR2 already applies (`status == "ok"`). Structurally compatible after a rename, with
-  three real gaps, not one:
+  four real gaps, not one:
   - **`record_pk` is a flatten-time composite (`f"{file_id}|{domain}|{record_ordinal}"`,
     `tools/extractor.py:1129`), not `record_id`** (record.v2's own `record_id` field, what
     `apply_name_key_policy.py` emits) — resolving it requires a join through phase0's own
@@ -116,13 +116,38 @@ rows:
     unified writer needs a separate, target-independent export-manifest input (phase0's
     `file_metadata.csv`/`meta_rows`, already produced regardless of `comparison_target`) for
     this, not something derivable by renaming name-key columns. (Flagged in PR review.)
-- **Identity-items reuse for label resolution is real for only 8 of the 25 eligible domains,
+  - **A deeper version of the same problem: `apply_name_key_policy.py::_iter_export_paths()`
+    can silently drop entire eligible export files, not just miscount them, when run in
+    `--export-dir` mode.** It is a directory-level, all-or-nothing priority cascade: if *any*
+    `*.details.json` file exists anywhere in the directory, it returns *only* the details
+    files — never falling through to `*.index.json` or plain `*.json` files even if they also
+    exist alongside. `tools/extractor.py::_iter_export_files()` does not work this way: it
+    processes fingerprint, split-pair (details/index), *and* plain `*.json` surfaces together
+    in one merged list (`tools/extractor.py:67–104`), so a directory mixing split-export models
+    with legacy/plain single-file JSON exports is fully covered. Under
+    `apply_name_key_policy.py --export-dir`, the moment that directory contains even one
+    `*.details.json` file, every plain `*.json` export in it is dropped from
+    `name_key_results.csv` **entirely** — not just from the file-presence denominator (which
+    the `file_metadata.csv`/`meta_rows` fix above addresses), but from the record-level
+    membership rows themselves. Adding `file_metadata.csv` fixes `files_total`/`is_candidate_
+    standard`'s denominator; it does nothing to restore the missing pattern membership, so
+    `pattern_size_records`/`pattern_size_files`, per-file shares, and dominance would all
+    still be computed from an incomplete record population for any corpus with this mixed
+    shape. A unified input adapter must enumerate/pair every export surface the way
+    `_iter_export_files()` does (or reconstruct name-key rows from a complete phase-0 record
+    source instead of re-running `apply_name_key_policy.py`'s own file discovery), not reuse
+    `_iter_export_paths()`'s cascade as-is. (Flagged in PR review — P1, more severe than the
+    `files_total` gap above since it loses data, not just a denominator.)
+- **Identity-items reuse for label resolution is real for only 7 of the 25 eligible domains,
   not all of them.** `core/name_key_coverage.py`'s own docstring is explicit: for the 18
   **Widened** domains, "the name key is built from a value pulled from a phase2 bucket or raw
   `label.display`/`label.components` at the name-key call site only — it is **NOT** a subset of
   `identity_items`/`identity_basis.items`" the way a Native domain's name key is. The claim that
   identity_items are "a per-record artifact independent of which join_hash scheme clusters
-  them" only holds for the 7 **Native** domains plus `phases` (8 of 25) — for the other 18,
+  them" only holds for the 7 **Native** domains (`NATIVE_DOMAINS` already includes `phases` as
+  one of its 7 members — `phases, materials, text_types, wall_types, floor_types, roof_types,
+  ceiling_types` — not 7 Native plus `phases` as an 8th; corrected from an earlier miscount in
+  this doc, flagged in PR review) — for the other 18,
   reusing phase0's config-basis `identity_items_by_record` would feed `resolve_pattern_label()`
   and `find_near_duplicate_merges()` evidence that has no defined relationship to
   `join_key_name_identity`'s actual clustering basis for that domain. Concretely,
@@ -144,8 +169,8 @@ rows:
   `tools/label_synthesis/`) — but the **column and fallback machinery in `domain_patterns.csv`
   itself already supports "no label synthesis has run for this hash space" as a first-class
   state** (`pattern_label_human == pattern_label_fallback`, `pattern_label_source` says so).
-  This is a data-availability gap, not a shape gap for the 8 Native/`phases` domains; for the
-  18 Widened domains it is compounded by the evidence-source gap above.
+  This is a data-availability gap, not a shape gap for the 7 Native domains; for the 18
+  Widened domains it is compounded by the evidence-source gap above.
 - **`is_cad_import`**: audit_8 item 5 flagged this as unavailable for name-target, but a
   closer read shows the config-target mechanism itself doesn't work today, independent of
   `comparison_target`. `_remap_vco_domain()` (`tools/extractor.py:424`) drops any
@@ -169,7 +194,7 @@ today. Label resolution (`pattern_label_human`/`semantic_group`) is a separate m
 *mechanism* is shape-agnostic (second/third bullets above), but for the 18 Widened domains the
 *evidence it would be fed* (config-basis `identity_items`) has no defined correspondence to the
 name projection's actual clustering basis, so it cannot simply be reused verbatim the way the
-8 Native/`phases` domains' evidence can.
+7 Native domains' evidence can.
 
 ## 3. Re-classified audit_8 delta catalog
 
