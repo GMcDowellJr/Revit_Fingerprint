@@ -40,7 +40,7 @@ Cross-referenced against `audit_results/audit_8_bundle_pipeline_name_projection.
 | `pattern_label_human` | ✅ `resolve_pattern_label()` (label-synthesis pipeline, gracefully falls back to `pattern_label` when inputs absent) | ✅ | ❌ missing | copied from PR2's `pattern_label` (i.e. always the fallback value) |
 | `pattern_label_source` | ✅ | ✅ | ❌ missing | synthesized `"name_projection_pattern_label"` |
 | `pattern_label_fallback` | ✅ | ✅ | ❌ missing | synthesized `""` |
-| `is_cad_import` | ✅ substring check on `resolved_label`, `domain == "view_category_overrides"` only | ✅ | ❌ missing (**and structurally can never be non-false** — VCO domains are all in `EXCLUDED_DOMAINS`, see §3 item 5) | synthesized `""` (→ false) |
+| `is_cad_import` | ⚠️ substring check on `resolved_label`, `domain == "view_category_overrides"` only — **effectively dead in production**, see §3 item 5 | ✅ (copies whatever config produced, i.e. always `""`/false today) | ❌ missing (structurally can never be non-false — VCO domains are all in `EXCLUDED_DOMAINS`) | synthesized `""` (→ false) |
 | `semantic_group` | ✅ `_load_semantic_groups()` (label-synthesis cache, keyed `domain→pattern_id`, gracefully empty when absent) | ✅ | ❌ missing | synthesized `""` |
 | `join_key_schema` | ❌ not a column (folded into `source_cluster_id` only) | ❌ | ✅ present natively | **appended** (needed by `derive_scope_key()`/`SHAPE_GATED_DOMAINS`) |
 | `join_hash` | ❌ not a column | ❌ | ✅ present natively | dropped |
@@ -146,16 +146,18 @@ rows:
   state** (`pattern_label_human == pattern_label_fallback`, `pattern_label_source` says so).
   This is a data-availability gap, not a shape gap for the 8 Native/`phases` domains; for the
   18 Widened domains it is compounded by the evidence-source gap above.
-- **`is_cad_import`**: audit_8 item 5 already correctly flags this as unavailable for
-  name-target, but the mechanism is worth restating precisely: it is not that name-projection
-  records lack import evidence in general — it's that the *only* domain this flag is computed
-  for (`view_category_overrides`, keyed on a `.dwg`/`Imports in families|` substring match on
-  the resolved label) is itself in `EXCLUDED_DOMAINS` (`no_name_like_key`) for the entire
-  domain family (`view_category_overrides`, `_model`, `_annotation`). So under
-  `comparison_target=name` this column is not just always-false by missing data — it is
-  **always false by construction**, because the one domain it could ever be true for never
-  appears in name-target patterns at all. Confirms audit_8 item 5/6's conclusion from a
-  different angle.
+- **`is_cad_import`**: audit_8 item 5 flagged this as unavailable for name-target, but a
+  closer read shows the config-target mechanism itself doesn't work today, independent of
+  `comparison_target`. `_remap_vco_domain()` (`tools/extractor.py:424`) drops any
+  `view_category_overrides` record whose raw name candidates contain `.dwg`/`imports in
+  families` **at flatten time** — before `records.csv` is written, for every corpus. By the
+  time `_process_one_domain`'s `is_cad_import` check runs (matching those same substrings
+  against `resolved_label`, a synthesized pattern-level label, not a raw record name), the
+  records it would need to detect are already gone. `tools/corpus_update_runbook.ps1`'s
+  "Known deferred items" list confirms this operator-side: `is_cad_import` is documented as
+  not flowing into `domain_patterns.csv` at all. So this is not "config has evidence name
+  lacks" — config's own evidence for this column is already dead. See §3 item 5 for the full
+  re-classification.
 
 **Conclusion**: the presence/dominance/deviation/corpus-classification logic in
 `_process_one_domain` is input-shape-agnostic once fed normalized rows *and* a
@@ -176,31 +178,49 @@ name projection's actual clustering basis, so it cannot simply be reused verbati
 | 1 | `analysis_run_id` single-value requirement | **Representational** | Purely a `bundle_analysis/common.py` schema contract. A unified writer emits a real (or deliberately-constant, documented) `analysis_run_id` the same way for either target — no information the name projection lacks. |
 | 2 | Hardcoded filenames (`pattern_presence_file.csv` vs `pattern_membership.csv`) | **Representational** | Naming only, once #(the presence-computation gap below) is closed. |
 | 3 | Column-name/grain mismatch (record-level vs file-level, `export_file` vs `export_run_id`) | **Representational, but non-trivial** | Column renames are cosmetic; the record→file aggregation is real, unwritten logic — see §2. Closing it means either porting `_process_one_domain`'s per-file loop into PR2, or (recommended, §4) calling the same function PR2 does not currently call at all. Not a semantic limit of name-identity data — the data needed (which file each record came from) is already in `apply_name_key_policy.py`'s output. |
-| 4 | `domain_patterns.csv` column-set difference | **Representational** | Every missing column (`schema_version`, `analysis_run_id`, `is_candidate_standard`, `notes`, `pattern_label_human`, `pattern_label_source`, `pattern_label_fallback`, `semantic_group`) is either a constant, a derivable aggregate (§2), or an already-optional field with a defined degraded state. `is_cad_import` is the one column here that is semantically forced to `false`, not merely representationally absent — see item 5. |
-| 5 | CAD-import exclusion unavailable for name-target | **Semantic** (confirmed) | Real limitation of what name-identity data represents for the one domain the signal applies to (`view_category_overrides`), and that domain is structurally excluded from name-target entirely (§2). Unification cannot manufacture CAD-import evidence that was never captured under the name projection. |
+| 4 | `domain_patterns.csv` column-set difference | **Representational** | Every missing column (`schema_version`, `analysis_run_id`, `is_candidate_standard`, `notes`, `pattern_label_human`, `pattern_label_source`, `pattern_label_fallback`, `semantic_group`, `is_cad_import`) is either a constant, a derivable aggregate (§2), or an already-optional/effectively-dead field with a defined degraded state — see item 5 for `is_cad_import` specifically. |
+| 5 | CAD-import exclusion unavailable for name-target | **Representational / moot, confirmed pre-existing** (re-classified — see below) | Not name-target-specific at all. `_remap_vco_domain()` (`tools/extractor.py:424`) drops any `view_category_overrides` record whose raw name candidates contain `.dwg`/`imports in families` **at flatten time**, before `records.csv` is even written — for every corpus, regardless of `comparison_target`. By the time `_process_one_domain`'s `is_cad_import` check runs (matching the same substrings against `resolved_label`, a synthesized *pattern*-level label, not a raw record name), the records it would need to detect are already gone. `tools/corpus_update_runbook.ps1`'s own "Known deferred items" list confirms this operator-side: `"is_cad_import: lp.is_import not flowing into domain_patterns.csv"` — i.e. this column is already known-non-functional in **config-target production today**. There is no config-target behavior for unification to preserve parity with here; treat this the same way as item 6 (a pre-existing config-side defect, out of scope for this PR, not a semantic limit of name-identity data). (Flagged in PR review.) |
 | 6 | Row-key/shape-gated scope quirk (`ROW_KEY_DOMAINS`/`SHAPE_GATED_DOMAINS` pre-D-015 names) | **Representational / moot, confirmed pre-existing** | audit_8 already correctly scoped this as a `config`-target quirk unrelated to unification; out of scope here too (fixing it changes `config` output, violating the byte-identical requirement). |
-| 7 | USED view / latent-purgeable filtering blocked for name-target | **Semantic** (confirmed) | `source_cluster_id`'s trailing hash is `join_key_name_identity`'s hash, not `sig_hash` — cross-referencing it against `records/latent_purgeable.csv` (a `sig_hash`-keyed artifact) would silently compare the wrong identity space. No column rename fixes this; it requires either a name-projection-native purgeability signal (does not exist) or an explicit permanent block. Unification does not change this — it only means the block can now be expressed as "USED view requires `comparison_target=config`" in one place instead of the adapter's ad hoc guard. |
+| 7 | USED view / latent-purgeable filtering blocked for name-target | **Representational, contingent on the record_pk join** (re-classified — see below) | `step1_membership_matrix.py`'s *current* implementation joins via `source_cluster_id`'s trailing hash (`sig_hash`) — but that is a property of today's config-only consumer code, not of `latent_purgeable.csv` itself. `tools/compute_latent_purgeable.py`'s own `_OUTPUT_FIELDS` carries **`record_pk`** on every row alongside `sig_hash` (`schema_version, export_run_id, domain, record_pk, sig_hash, latent_purgeable, ...`). A name-target implementation can skip the `sig_hash` join entirely: use the same `record_pk` recovery already required for identity-items reuse (§2, first bullet) to map `latent_purgeable.csv` rows onto name-target's `pattern_membership.csv` record→pattern assignments, then aggregate to `(export_run_id, domain, name pattern_id)` and exclude a pattern only when every member record is latently purgeable. The per-record `latent_purgeable` fact itself is computed once, upstream, via config-projection sig_hash cross-domain reference matching — but like `is_purgeable` (item 8), it is a fact *about a specific record_pk*, and does not care which projection is later used to cluster that record into a reporting pattern. Re-classified from a hard semantic block to a wiring task riding on the same `record_pk` join item 8 already needs. (Flagged in PR review.) |
 | 8 | Placeholder-exclusion / `records.csv`'s `is_purgeable` dependency | **Representational** (re-classified — see below) | `is_purgeable` is a **record-level** column on `records.csv` (`tools/extractor.py:999/1155`, read straight off the record.v2 JSON), not something joined through `sig_hash`. `placeholder_exclusions_legacy.py::compute_placeholder_exclusions()` confirms this directly: it groups rows by `(domain, export_run_id)` and counts truthy `is_purgeable` per group — it never reads `sig_hash`, `join_hash`, or `source_cluster_id` anywhere. Unlike item 7 (USED view), which genuinely cross-references a `sig_hash`-keyed artifact (`latent_purgeable.csv`) through `source_cluster_id`'s trailing hash, placeholder exclusion never enters the pattern-clustering layer at all — it is computed entirely upstream of `comparison_target`. The actual blocker audit_8 hit (`analysis_dir` pointing at `Results_v21/name_key/patterns/name/`, which has no `records/` subtree) is a path-resolution/wiring gap: phase0's `records.csv` exists independent of `comparison_target` and could be pointed at directly once export-run-id normalization (§2) is in place. This was originally mis-classified by analogy to item 7 without checking `placeholder_exclusions_legacy.py`'s actual read surface. (Flagged in PR review.) |
 | 9 | `--compute-share-profile` needs `pattern_share_pct`/`is_dominant_pattern` | **Representational, contingent on #3** | Once the presence/dominance computation is ported/shared (§2), these fields exist natively for name-target with the same semantics they have for config-target — the values are computed from record→file membership, which name-projection data has in full. audit_8 filed this as blocked because PR2 never computed it, not because the name projection lacks the underlying evidence. **Re-classifying this item is the biggest scope change from audit_8**: unification, if it includes porting the presence computation, closes this gap rather than just relocating it. |
 | 10 | `--compare` / `reference_bundle.json` baseline | **Semantic** (confirmed) | No name-projection reference baseline exists or is remotely close to being defined (D-024/D-025-style baseline work would be required); orthogonal to the shape-unification question. |
 | 11 | `--roles` / `file_metadata.csv` filtering | **Representational** (confirmed, already noted as composing cleanly) | No change from audit_8. |
 | 12 | Output-directory namespacing/collision risk | **Representational** | A tooling/CLI convention (separate `--out-dir` roots), unrelated to schema shape. |
 
-**Net correction to audit_8's framing**: item 9 (share-profile) was filed as a hard semantic
-gap in the PR3 brief's original scoping, but Step 0's read shows it is representational
-*conditional on* closing item 3's presence-computation gap. Item 8 (placeholder exclusion) was
-also mis-filed as semantic by analogy to item 7 (USED view) without verifying against
-`placeholder_exclusions_legacy.py`'s actual read surface — it never touches `sig_hash`/
-`join_hash` at all and is purely a wiring gap, not a data-availability one. **Only 7 and 10
-survive as genuine semantic gaps** — CAD-import (5) is best read as a *specific instance* of
-"the config projection's `view_category_overrides` family has evidence the name projection
-structurally cannot have," not a separate general-purpose gap, since the mechanism (label
-substring match) would degrade to always-false even if ported verbatim. Item 6 was already
-correctly scoped as moot/pre-existing in audit_8. This is a second, larger correction to
-audit_8's original scoping than the share-profile one: of the four items audit_8 flagged as
-blocked-for-comparison_target=name, only USED-view purgeability (7) and the `--compare`
-reference baseline (10) turn out to be genuine limits of what name-identity data represents;
-share-profile (9) and placeholder-exclusion (8) are both closeable by unification.
+**Net correction to audit_8's framing**: this Step 0 pass revised three of the four items the
+PR3 brief originally scoped as hard semantic gaps (CAD-import, USED-view, share-profile —
+`--compare` is the fourth and the only one that survives):
+
+- Item 9 (share-profile) is representational *conditional on* closing item 3's
+  presence-computation gap.
+- Item 8 (placeholder exclusion) was mis-filed as semantic by analogy to item 7 without
+  verifying against `placeholder_exclusions_legacy.py`'s actual read surface — it never
+  touches `sig_hash`/`join_hash` at all and is purely a wiring gap.
+- Item 7 (USED view) was also mis-filed as a hard semantic block: it assumed the *existing*
+  `sig_hash`-keyed join in `step1_membership_matrix.py` was the only possible one, but
+  `latent_purgeable.csv` carries `record_pk` on every row, making a `record_pk`-based rollup
+  (riding the same join item 8 needs) a viable alternative that was not considered in the
+  original framing.
+- Item 5 (CAD-import) turns out not to be a name-projection gap at all — `is_cad_import` is
+  already dead/non-functional in **config-target production today** (records get filtered at
+  flatten time before `_process_one_domain` can ever see them; the corpus runbook documents
+  this as a known deferred defect), so there is no config-side behavior for name-target parity
+  to even target.
+
+**Only item 10 (`--compare` / reference-baseline) survives as a genuine semantic gap** — the
+`--compare` concept has no defined name-projection equivalent at all (no baseline artifact,
+no comparison mechanism), which is a materially different situation from items 5/7/8/9, all of
+which had *some* real signal available and were blocked only by an implementation/wiring
+choice in the existing code. This is a substantially larger correction to audit_8's original
+four-item semantic-gap list than either individual review comment suggested in isolation: of
+the four items originally scoped as hard blocks, three turn out to be closeable by
+unification, and the fourth (CAD-import) turns out not to have been a real config-vs-name
+distinction to begin with. Both audit_8 and this document's own first-pass draft under-verified
+these classifications against the actual downstream consumer code before filing them —
+worth flagging as a process note for future Step 0 passes: classification claims of this kind
+need to be checked against the specific function that would need to change, not reasoned about
+by analogy to a similarly-named item.
 
 ## 4. Q1 — Which direction should unification go?
 
@@ -318,13 +338,13 @@ new mechanism:
    target-specific, plus a coverage-check analogous to `_warn_unrecognized_comparison_types()`
    so a report accidentally mixing config- and name-projection rows in one aggregate is never
    silent.
-3. Given the semantic gaps confirmed in §3 (USED view, share-profile pre-unification,
-   `--compare`/reference-baseline), any narrative section whose underlying metric depends on
-   one of those blocked capabilities needs to either be explicitly `config`-only, or carry a
-   provenance caveat analogous to `name_projection_adapter.py`'s
-   `PROVENANCE_NOTE_NAME_TARGET`/`README.md` pattern — that provenance-declaration convention
-   is worth keeping even after the adapter itself is retired, since the underlying semantic
-   gaps (§3 items 5/7/8/10) don't go away just because the shape gaps do.
+3. Given the one genuine semantic gap confirmed in §3 (`--compare`/reference-baseline, item
+   10 — USED view and share-profile turn out to be closeable by unification, not permanent
+   blocks, see §3), any narrative section whose underlying metric depends on that blocked
+   capability needs to either be explicitly `config`-only, or carry a provenance caveat
+   analogous to `name_projection_adapter.py`'s `PROVENANCE_NOTE_NAME_TARGET`/`README.md`
+   pattern — that provenance-declaration convention is worth keeping even after the adapter
+   itself is retired, since item 10's gap doesn't go away just because the shape gaps do.
 
 ## 7. Q4 — Zero behavioral change to `comparison_target=config`
 
@@ -351,14 +371,16 @@ The two halves of this unification have different risk profiles and could reason
 staged as separate PRs:
 
 - **Cheap, low-risk half**: column-set/naming parity for `domain_patterns.csv`'s constant and
-  already-optional-with-fallback fields (audit_8 items 1, 2, 4 minus `is_cad_import`, 11, 12).
-  This is close to what the adapter already does today, just moved into
-  `generate_name_key_patterns.py` natively instead of a post-hoc normalization step.
+  already-optional-with-fallback fields, including `is_cad_import` now that it is known to be
+  a constant false in both targets (audit_8 items 1, 2, 4, 5, 11, 12). This is close to what
+  the adapter already does today, just moved into `generate_name_key_patterns.py` natively
+  instead of a post-hoc normalization step.
 - **Expensive, higher-risk half**: porting/sharing `_process_one_domain`'s presence/dominance/
-  deviation/corpus-classification computation (item 3, and by extension item 9) so
-  `pattern_presence_file.csv` exists natively for `name`-target with real, not placeholder,
-  values — this is the piece that requires refactoring `tools/extractor.py` itself and
-  carries the Q4 regression-test burden.
+  deviation/corpus-classification computation (item 3, and by extension item 9), plus the
+  `record_pk`-based rollups items 7 and 8 both now depend on, so `pattern_presence_file.csv`
+  exists natively for `name`-target with real, not placeholder, values and USED-view/
+  placeholder-exclusion both function — this is the piece that requires refactoring
+  `tools/extractor.py` itself and carries the Q4 regression-test burden.
 
 Splitting these lets the cheap half land (and retire most of `name_projection_adapter.py`'s
 constant-filling code) without gating on the `extractor.py` refactor, while the presence/
