@@ -64,6 +64,11 @@ core/                   Pure Python utilities (no Revit API calls)
   collect.py             FilteredElementCollector caching
   join_key_builder.py   Build join keys from policies with shape-gating
   join_key_policy.py    Load & validate join-key policies
+  name_key_builder.py   Analysis-side reconstruction of the Canonical Name Identity Projection
+                            (join_key_name_identity) from already-exported record.v2 JSON — mirrors
+                            sig_hash_builder.py's role for sig_hash
+  name_key_coverage.py  Native/Widened/Excluded coverage-class registry for the Canonical Name
+                            Identity Projection; single source of truth, see tools/generate_name_key_patterns.py
   graphic_overrides.py  Shared helpers for graphics extraction
   features.py           Cohort-analysis feature surface
   naming.py             Document-derived naming helpers
@@ -73,7 +78,9 @@ core/                   Pure Python utilities (no Revit API calls)
   vg_sig.py              VG signature helpers for view_templates
 
 domains/                One extract(doc, ctx) function per domain (active)
-  identity.py            Project metadata (NO HASH - metadata only)
+  identity.py            Project metadata; despite the module's historical "no hash" framing, it DOES
+                            compute a real sig_hash (D-025) from a subset of captured fields including
+                            project_info.* — see the module's own top-of-file note
   units.py                Length/area/volume format options
   object_styles.py        Object style definitions (model/annotation/analytical/imported partitions)
   line_patterns.py        Line pattern definitions (scale-invariant normalized-segment join key, D-017)
@@ -93,9 +100,22 @@ domains/                One extract(doc, ctx) function per domain (active)
   view_category_overrides_model.py      Model category override partition
   view_category_overrides_annotation.py Annotation category override partition
   materials.py             Materials domain (identity + graphics state; also populates ctx lookup maps)
-  compound_types.py       Compound type family (wall_types active; floor/roof/ceiling stubs; D-018 notes the gap)
+  wall_types.py            Compound type family: wall_types partition (active)
+  floor_types.py           Compound type family: floor_types partition (active)
+  roof_types.py            Compound type family: roof_types partition (active)
+  ceiling_types.py         Compound type family: ceiling_types partition (active). D-018's remaining
+                            compound_types gap is other system-family types (stacked walls, curtain walls,
+                            curtain systems, MEP system types), not these four partitions
+  compound_layers.py       Shared compound-structure-layer helpers for wall/floor/roof/ceiling_types;
+                            not a domain extractor itself (no extract() entry point)
   loaded_family_types.py  FamilySymbol (loaded family) types, parameter-schema evidence model (lft.*/lftp.*); scoped
                             to user-loaded families only — system families pass through but aren't governed (D-018)
+  worksets.py              Workset partition (worksets + worksets_doc, two independent single-collector extractors)
+  browser_organization.py Project Browser sorting/filter-presence configuration (category, sorting_order,
+                            sorting_parameter_id, filter_has_value); consumes worksets' ctx crosswalk. NOT
+                            grouping coverage — the GetFolderItems folder hierarchy is deliberately excluded
+                            (non-deterministic probe-run-dependent tree walk), so two organizations differing
+                            only in grouping can produce the same sig_hash; see the module's own docstring
   graph_2024.json, graph_2025.json, graph_2026.json
                             NOT extractor code — cached Revit-API relationship graphs (per Revit version) generated
                             by sync_revitlookup_reference.py / the RevitLookup sync tooling, used as reference data
@@ -114,6 +134,11 @@ policies/               Join-key, sig-hash, and governance-classification polici
   domain_join_key_policies.json     Per-domain join-key policies with shape-gating
   domain_sig_hash_policies.json     Per-domain sig_hash policy (generated from contracts/domain_identity_keys_v2.json
                                        via tools/generate_sig_hash_policy.py); consumed by core/sig_hash_builder.py
+  domain_name_key_policies.json     Per-domain policy for the Canonical Name Identity Projection
+                                       (join_key_name_identity) — same loader/mechanism as
+                                       domain_join_key_policies.json (core/join_key_policy.py), independent
+                                       policy file; runner loads it into ctx["name_key_policies"]; analysis-side
+                                       consumers are core/name_key_builder.py / tools/apply_name_key_policy.py
   cross_domain_alignment_keys.json  Domain family registry and alignment key definitions
   governance_role_path_patterns.json  Ordered path-substring rules that infer governance_role
                                        (Template/Container/Project/Generic) from central_path_norm
@@ -141,11 +166,29 @@ reference/
 
 tools/                  Analysis & comparison utilities (no Revit dependency; stdlib CSV/JSON only)
   run_extract_all.py     Primary orchestrator — explicit stage machine (see Analysis Pipeline below)
+  extractor.py            Engine behind the `patterns`/`authority` stages — `run_extract_all.py` imports
+                            `emit_analysis`/`emit_records` from this module directly. Owns the production
+                            join_hash-based pattern-clustering algorithm (`_stable_pattern_id()`), path
+                            normalization (see `docs/CENTRAL_PATH_NORM_RULE.md`), and export-file discovery.
+  pattern_id_utils.py     Shared `pattern_id`/`pattern_label` formula per `docs/PATTERN_ID_AND_LABEL_RULES.md`;
+                            a deliberately independent reimplementation of `extractor.py`'s private
+                            `_stable_pattern_id()` (kept stdlib-only, not imported from `extractor.py`, so
+                            `generate_name_key_patterns.py` can't accidentally couple to the production
+                            pipeline). No test currently cross-checks the two implementations stay in
+                            agreement — `tests/test_generate_name_key_patterns.py` only calls the public
+                            `pattern_id_utils.stable_pattern_id()`, never `extractor._stable_pattern_id()` —
+                            so a future change to only one would go uncaught; a real regression test is TODO.
   run_config.json        Phase-1 configuration (domains_in_scope, thresholds, seed_baseline_id)
 
   export_to_flat_tables.py   Phase-0: Flatten record.v2 details → CSV tables (records, identity_items, etc.)
   discover_join_policy.py / apply_join_policy.py   Join-key policy discovery/apply (T1/T2 stages)
   discover_hash_policy.py / generate_sig_hash_policy.py   sig_hash policy discovery/generation (see below)
+  generate_name_key_patterns.py / apply_name_key_policy.py   Canonical Name Identity Projection (PR1/PR2):
+                            apply_name_key_policy.py computes join_key_name_identity per record from
+                            already-exported *.details.json (via core/name_key_builder.py, no re-extraction
+                            needed); generate_name_key_patterns.py parameterizes pattern generation over
+                            `--comparison-target {config,name,both}` so it can run against either the
+                            existing join_hash or the name-identity projection
   join_key_discovery/     Greedy/scored join-key candidate search shared by discover_join_policy.py and
                             discover_hash_policy.py (eval.py, greedy.py)
   join_key_derivation.py, compute_governance_thresholds.py, compute_latent_purgeable.py
@@ -181,6 +224,16 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
   run_segment_orchestrator.py   Reads segment_manifest.csv + run_registry.csv; runs patterns → bundle_analysis
                                   stages per segment in level order; writes per-segment output folders
   extract_segment_subtree.py    Pulls one segment + its ancestors' cross_segment_*.csv rows into a standalone subset
+  build_results_registry.py     Builds BI-friendly results_registry.csv from segment_manifest.csv + run_registry.csv
+                                  — one row per segment, a single stable query surface instead of hand-wiring
+                                  individual segment output folders
+  export_bundle_pattern_detail.py   Exports the bundle -> pattern -> identity_items -> name_population chain for
+                                  one segment as 3 flat BI CSVs (bundle_pattern_inventory/pattern_settings/pattern_names)
+  emit_element_dominance.py     Element-level dominance/BI export utility
+  inspect_lft_similarity.py     Single-pass loaded_family_types similarity analysis across a container corpus,
+                                  grouped by sig_hash, with optional dimensional/classification enrichment
+  reset_wall_types_for_reapply.py   Resets wall_type records blocked solely on wt.function=unsupported.not_applicable
+                                  so the apply stage can re-evaluate them
   governance_manifest.py        Builds disjoint governance populations (Enterprise / each business center /
                                   each client / each named project / Generic) directly from file_metadata.csv —
                                   deliberately NOT built on the segment lattice's powerset (see file docstring)
@@ -212,6 +265,11 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                                   policies/governance/*.json, used by generate_governance_narrative.py. Owns no
                                   governance business content itself -- default threshold values and
                                   domain-governance logic stay in generate_governance_narrative.py (D-021).
+  governance_relationships.py     Relationship/topology evidence layer: project-level composition (which
+                                  projects belong to which client/business-center, file counts) and BC<->client
+                                  rollups derived from file_metadata.csv. Presentation/aggregation only, not
+                                  new derivation logic; does not read cross_segment_summary.csv's
+                                  cascade-producing comparison types.
   governance/standards_governance_report.py   Standards governance report generator
 
   archetype/               Archetype candidate generation & DP1 (Decision Point 1) human-curation workflow:
@@ -239,6 +297,10 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             under pandas on at least minimal synthetic inputs — pre-existing algorithm bug,
                             not a location/import problem (see docs/tools_DEPRECATED.md).
   run_split_detection_all.py   Split detection over all domains
+  acc_scan_dc.py / acc_sync_dc.py   Corpus-collection operator tools (ACC Desktop Connector): scan_dc walks a
+                            root folder and writes an include-flagged manifest CSV of Revit files to fingerprint;
+                            sync_dc hydrates online-only Desktop Connector stub files before the BatchExtract
+                            pyRevit run consumes them
   Powershell Commands.txt  Informal operator runbook (hardcoded paths) — closest thing to a runbook; not automated
 
   _archive/                Confirmed-superseded tools, pruned down to only what's still load-bearing:
@@ -297,6 +359,17 @@ docs/                   Technical documentation
   PATTERN_ID_AND_LABEL_RULES.md      Pattern id / label derivation rules
   cross_segment_comparison.md        compare_cross_segment.py methodology
   governance_narrative_scope_gap_audit.md   Known gaps in governance narrative scope coverage
+  governance_narrative_group1_scope_gap_investigation.md   Historical investigation of a Group 1
+                                       (tc/cp/tp) scope-gating gap in build_cascade() — findings partially
+                                       implemented; consult current code/tests for active behavior
+  governance_generator_cross_compare_coverage.md   Tracks which compare_cross_segment.py CSV outputs
+                                       generate_governance_narrative.py already consumes vs. only partially
+                                       covers
+  governance_evidence_package.md     generate_governance_narrative.py's evidence-package layer (manifest/
+                                       health/evidence-map/findings) — see also "Key docs for analysis work" below
+  governance_interpretation_guide.md Stable, package-type-level interpretation guide for a governance
+                                       evidence package
+  governance_question_routes.md      Candidate question-route catalog for recurring governance-package questions
   METRICS.md                         Concentration metric contracts (HHI / effective clusters)
   analysis-phases-question-map.md    Analysis questions mapped to phases
   tools_PHASE0_1_2_MAP.md            ⚠ Dated 2026-01-29; still references a `tools/phase2_analysis/` package
@@ -304,6 +377,14 @@ docs/                   Technical documentation
                                        above). Treat as historical context, not a current tool index.
   tools_DEPRECATED.md                ⚠ Same staleness caveat — deprecation reasoning is still valid, but some
                                        "replacement" commands reference the same removed `phase2_analysis/` path.
+  phase_2_join_key_discovery_summary   Plain-text summary companion to phase_2_join-key_discovery.md
+  method_invocation_candidates_annotated.csv   Annotated shortlist of RevitLookup methods considered for the
+                                       probe reflection sweep
+  probe_method_invocation_candidates_verification.md   Findings-only Step-0 verification pass over
+                                       method_invocation_candidates.csv (arity/staticness/return-type/
+                                       mutation-safety); no code changes
+  probe_method_invocation_serialization_findings.md   Findings-only follow-up diagnosing serialization-gap/
+                                       missing-invocation/ambiguous-quality-state issues in PROBE_INVENTORY.csv
   research/                          RevitLookup API concept-mapping working files
 
 legacy/                 MVP implementation (preserved reference)
@@ -364,7 +445,7 @@ Consolidated extractors route records internally by record class (Revit system f
 | `dimension_types.py` | `dimension_types_linear`, `_angular`, `_radial`, `_diameter`, `_spot_elevation`, `_spot_coordinate`, `_spot_slope` |
 | `view_templates.py` | `view_templates_floor_structural_area_plans`, `_ceiling_plans`, `_elevations_sections_detail`, `_renderings_drafting`, `_schedules` |
 | `view_category_overrides*.py` | Routed via `view_category_overrides.py`; model and annotation in separate files |
-| `compound_types.py` | `wall_types` active; `floor_types`/`roof_types`/`ceiling_types` stubs (D-018 notes the coverage gap) |
+| `wall_types.py` / `floor_types.py` / `roof_types.py` / `ceiling_types.py` (+ shared `compound_layers.py` helpers) | All four active. D-018's remaining coverage gap is other system-family types (stacked walls, curtain walls, curtain systems, MEP system types), not these partitions |
 
 For consolidated extractors, `extract()` returns a list of per-partition result dicts, each with its own `domain` key.
 
@@ -404,7 +485,11 @@ Treat this as the analysis-side reconstruction/audit layer for sig_hash, not (ye
 
 ## Shape-Gating System
 
-Shape-gating enables conditional join-key composition based on discriminator values. Supported domains: `arrowheads` (by ArrowheadStyle) and `dimension_types_*` partitions. Policy lives in `policies/domain_join_key_policies.json`. See `docs/join_key_shape_gating.md` for schema details.
+Shape-gating enables conditional join-key composition based on discriminator values, via a `shape_gating` block (`discriminator_key` + per-value `shape_requirements`) in a domain's policy entry. Policy lives in `policies/domain_join_key_policies.json`. See `docs/join_key_shape_gating.md` for schema details.
+
+Currently supported via the shared `shape_gating` mechanism: `arrowheads` (discriminator `arrowhead.style`, e.g. Arrow/Heavy end tick mark) and `identity` (discriminator `identity.is_workshared`, gates `identity.revit_version_number` as additional-required when workshared).
+
+**Not** on this mechanism despite the name: `dimension_types_*` (D-015 domain-split architecture). Shape discrimination for dimension_types now happens at the domain-split level instead — each of the 7 partitions (`dimension_types_linear`, `_angular`, `_radial`, `_diameter`, `_spot_elevation`, `_spot_coordinate`, `_spot_slope`) carries its own flat per-domain policy with `dim_type.shape` as a plain required item, not a shared `shape_gating` discriminator block. See `tests/test_dimension_types_shape_gating.py`'s module docstring.
 
 ## Context Dictionary Schema
 
@@ -417,7 +502,7 @@ The runner populates `ctx` for domain cross-references:
 - `phase_filter_uid_to_hash` — phase_filters → view_templates
 - `view_filter_uid_to_hash` / `view_filter_uid_to_sig_hash_v2` — view_filter_definitions → view_templates
 - `line_pattern_uid_to_hash` — line_patterns → object_styles, line_styles
-- `object_style_model_row_key_to_sig_hash` — object_styles_model → view_category_overrides
+- `object_style_row_key_to_sig_hash` — object_styles_model → view_category_overrides
 - `object_style_annotation_row_key_to_sig_hash` — object_styles_annotation → view_category_overrides
 - `material_uid_to_name` / `material_uid_to_class` — materials → compound_types
 
@@ -624,6 +709,7 @@ When working on **analysis**:
 | D-022 | Governance narrative evidence-package layer, Phase 4 — interpretation/routing split: `docs/governance_interpretation_guide.md` (stable), `docs/governance_question_routes.md` (candidate routes), `governance_brief.md` (per-run, generated, computes nothing new) |
 | D-023 | Governance narrative evidence-package layer, Phase 5 — `governance_file_inventory.json`: live `Path.glob` scan of the export directory naming CSVs this generator never reads (header/dtype/row-count only, no sample values), so an escalating reader can discover a drill-down file exists; no query/fetch mechanism added, package stays single-shot |
 | D-024 | Governance narrative evidence-package layer, Phase 6 — the four files `generate_governance_narrative.py` writes no read path for (`comparison_registry.csv`, `cross_segment_file_pairs.csv`, `pattern_reuse_summary_by_domain.csv`, `project_mean_file_pair_jaccard_matrix.csv`) get full evidence-map entries instead of generic-scan treatment; `governance_evidence_map.json` grows from 33 to 35 artifacts |
+| D-025 | `identity` domain expansion — reads `doc.ProjectInformation` for the first time (`project_info.*`: Number/Status/Address/Issue Date/Client/Building/Organization/IFC GUIDs, plus Stantec's `Office` shared parameter); these fields are included in `sig_hash` (hash-breaking, `sig_hash_schema` version bumped) |
 
 `DECISIONS.md` is append-only; a couple of decision numbers (D-014, D-015) have more than one entry as the decision was revised/completed in place — the latest entry for a given number is authoritative. See `DECISIONS.md` for full rationale.
 
