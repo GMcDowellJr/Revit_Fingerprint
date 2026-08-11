@@ -136,6 +136,37 @@ def test_suggest_params_for_domain_harsh_feasible_when_required_count_within_dis
     assert "too large for harsh/validate" not in result["notes"]
 
 
+def test_suggest_params_for_domain_optional_items_inflate_harsh_pool_and_can_make_it_infeasible():
+    # Codex finding: discover_join_policy.py's harsh/validate work_candidates is
+    # req + opt (+ scoped_candidates for harsh) -- optional_items inflates the real
+    # Pareto pool exactly like required_items does, unconditionally, regardless of
+    # --max-candidate-fields. required_count alone (2) is small/feasible here, but
+    # optional_count (50) pushes the TRUE combined baseline (52) far past what the
+    # harsh/validate pool can represent within budget -- must be recognized as
+    # infeasible, not silently treated as feasible just because required_count alone
+    # was small.
+    stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 10}
+    result = suggest_params_for_domain(stats, required_count=2, optional_count=50, subset_budget=2000, min_k=2)
+    assert result["harsh_pareto_feasible"] is False
+    assert result["suggested_max_k_harsh_validate"] == result["suggested_max_k_discover"]
+    assert "too large for harsh/validate Pareto search" in result["notes"]
+    assert "52: 2 required + 50 optional" in result["notes"]
+
+
+def test_suggest_params_for_domain_optional_items_bump_harsh_max_k_when_still_feasible():
+    # Same inflation, but with enough budget headroom that the combined
+    # required+optional baseline (15) still fits within the harsh/validate pool
+    # (max_candidate_fields + policy_fixed_count) -- harsh_max_k must be bumped
+    # above discover_max_k to actually represent it, not silently left at the
+    # (too-small) discover-mode value.
+    stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 10}
+    result = suggest_params_for_domain(stats, required_count=5, optional_count=10, subset_budget=10**9, min_k=1)
+    assert result["harsh_pareto_feasible"] is True
+    assert result["suggested_max_k_harsh_validate"] > result["suggested_max_k_discover"]
+    assert result["suggested_max_k_harsh_validate"] >= 15
+    assert "exceeds the discover-mode budget max_k" in result["notes"]
+
+
 def test_suggest_params_for_domain_recommends_stratify_by_file_id_on_real_concentration():
     # One file with 5000 of 6000 records, 200 files with 5 each (mirrors the CLI
     # smoke test) -- built via compute_domain_stats so file_hhi reflects the
@@ -211,6 +242,31 @@ def test_cli_emit_commands_prints_ready_to_run_invocations(tmp_path: Path):
     ], cwd=Path(__file__).resolve().parents[1], check=True, capture_output=True, text=True)
     assert "tools/discover_join_policy.py" in r.stdout
     assert "--domains units" in r.stdout
+
+
+def test_cli_emit_commands_uses_resolved_phase0_dir_not_unresolved_argument(tmp_path: Path):
+    # Codex finding: --phase0-dir may be given as one of the root forms
+    # _resolve_phase0_dir accepts (here: a root containing results/records/) --
+    # the suggestion run itself resolves and reads correctly, but the emitted
+    # ready-to-run command must use the SAME resolved directory, since
+    # discover_join_policy.py performs no such resolution itself and reads
+    # straight from "<argument>/records.csv". An emitted command built from the
+    # unresolved root argument would fail when actually run.
+    root = tmp_path / "corpus_root"
+    phase0 = root / "results" / "records"
+    _write_csv(phase0 / "records.csv", ["file_id", "domain", "record_pk", "sig_hash"], [
+        {"file_id": "f1", "domain": "units", "record_pk": "1", "sig_hash": "s1"},
+    ])
+    _write_csv(phase0 / "identity_items.csv", ["domain", "record_pk", "item_key", "item_value_type", "item_value"], [
+        {"domain": "units", "record_pk": "1", "item_key": "units.spec", "item_value_type": "str", "item_value": "s"},
+    ])
+    r = subprocess.run([
+        sys.executable, "tools/suggest_discovery_params.py",
+        "--phase0-dir", str(root), "--emit-commands",
+    ], cwd=Path(__file__).resolve().parents[1], check=True, capture_output=True, text=True)
+    assert f"--phase0-dir {phase0}" in r.stdout
+    assert f"--phase0-dir {root} " not in r.stdout
+    assert not r.stdout.rstrip().endswith(f"--phase0-dir {root}")
 
 
 def test_emit_command_single_command_when_discover_and_harsh_k_match():

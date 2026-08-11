@@ -188,6 +188,7 @@ def suggest_params_for_domain(
     stats: Dict[str, object],
     *,
     required_count: int = 0,
+    optional_count: int = 0,
     k_per_group: int = 15,
     sample_floor: int = 500,
     subset_budget: int = 20000,
@@ -206,35 +207,54 @@ def suggest_params_for_domain(
         n_candidates, budget=subset_budget, min_k=min_k,
     )
 
-    # harsh/validate work_candidates fold in the existing required baseline
-    # (req + opt + scoped_candidates / req + opt), so their search space needs
-    # to be able to represent at least required_count fields simultaneously --
-    # the discover-mode budget solve above doesn't know about that baseline.
-    # BUT: tools/discover_join_policy.py's actual pareto_search() (the Callable
-    # API it calls, not the separate policy-aware CLI path elsewhere in
-    # pareto_joinkey_search.py) has no required-fields-aware enumeration -- it's
-    # plain itertools.combinations(fields, k) for every k up to max_k, blind to
-    # which fields are "required". Blindly bumping max_k to required_count+N
-    # without checking the resulting combinatorial cost can recommend a command
-    # that would evaluate billions of subsets (e.g. required_count=20 among 30
-    # candidates at max_k=22 is over 1e9) -- exactly the choking this tool
-    # exists to prevent.
+    # harsh/validate work_candidates fold in the existing required AND optional
+    # baseline (req + opt + scoped_candidates / req + opt -- see
+    # tools/discover_join_policy.py's policy_mode branch), UNCONDITIONALLY on
+    # top of scoped_candidates -- --max-candidate-fields only caps the
+    # data-observed scoped_candidates pool, not req/opt, which can include
+    # policy field names that aren't even among the domain's populated
+    # candidates at all (stale/unpopulated names still count toward the pool
+    # Pareto enumerates over). So the real harsh/validate candidate pool size
+    # is max_candidate_fields + policy_fixed_count, not just
+    # max_candidate_fields -- and the search space needs max_k large enough to
+    # represent selecting the whole req+opt baseline (policy_fixed_count) as a
+    # single candidate. The discover-mode budget solve above knows about
+    # neither.
     #
-    # required_count > discover_max_k can only be reached when discover_max_k
-    # was itself capped by the SAME budget (never by candidate-pool size alone:
-    # required fields are necessarily a subset of the pool, so required_count
-    # can never legitimately exceed n_candidates). solve_candidate_fields_and_k
-    # already returns the *largest* k affordable at that pool/budget -- by the
-    # monotonicity of Sum C(pool, i), any k beyond it is provably unaffordable
-    # at the identical pool/budget, with zero exceptions. So there is no
-    # "smaller headroom" to search for: once this branch triggers, bumping
-    # max_k to represent the baseline is unconditionally infeasible within
-    # budget at this candidate pool. Stay at the budget-safe discover_max_k and
-    # flag the domain as needing --search-modes greedy for harsh/validate
-    # instead (discover_greedy() is O(max_k * candidates), not combinatorial,
-    # so it has no such ceiling).
-    harsh_max_k = discover_max_k
-    harsh_pareto_feasible = not (required_count and required_count > discover_max_k)
+    # tools/discover_join_policy.py's actual pareto_search() (the Callable API
+    # it calls, not the separate policy-aware CLI path elsewhere in
+    # pareto_joinkey_search.py) has no required-fields-aware enumeration --
+    # it's plain itertools.combinations(fields, k) for every k up to max_k,
+    # blind to which fields are "required"/"optional". Blindly bumping max_k
+    # to represent the baseline without checking the resulting combinatorial
+    # cost AT THE LARGER POOL can recommend a command that would evaluate
+    # billions of subsets.
+    #
+    # policy_fixed_count is the absolute minimum k that can represent
+    # selecting the whole baseline as one candidate -- no smaller k can, so
+    # checking cost at exactly that k (against the harsh pool size) is the
+    # tightest possible feasibility check: if even that's unaffordable, no
+    # larger k is either (monotonicity of Sum C(pool, i)), so there's no
+    # "smaller headroom" to search for. When it IS affordable, max_k is set to
+    # max(discover_max_k, policy_fixed_count) for a bit of exploration room
+    # beyond the bare minimum, re-checked against the same budget since cost
+    # still grows with k; if that larger value doesn't fit, it falls back to
+    # the minimal-but-verified-affordable policy_fixed_count instead of
+    # discover_max_k (which was never checked against the harsh pool size at
+    # all).
+    policy_fixed_count = required_count + optional_count
+    harsh_pool_size = max_candidate_fields + policy_fixed_count
+    if not policy_fixed_count:
+        harsh_max_k = discover_max_k
+        harsh_pareto_feasible = True
+    elif _cumulative_subset_count(harsh_pool_size, policy_fixed_count) > subset_budget:
+        harsh_max_k = discover_max_k
+        harsh_pareto_feasible = False
+    else:
+        harsh_max_k = max(discover_max_k, policy_fixed_count)
+        if _cumulative_subset_count(harsh_pool_size, harsh_max_k) > subset_budget:
+            harsh_max_k = policy_fixed_count
+        harsh_pareto_feasible = True
 
     # Concentration, not just N/F average: file_effective_cluster_count (1/HHI
     # over per-file record-count shares) meaningfully below the actual distinct
@@ -253,22 +273,23 @@ def suggest_params_for_domain(
     )
 
     notes: List[str] = []
-    if required_count and required_count > discover_max_k:
-        if harsh_pareto_feasible:
-            notes.append(
-                f"existing required_items count ({required_count}) exceeds the discover-mode "
-                f"budget max_k ({discover_max_k}); harsh/validate runs need --max-k >= {harsh_max_k} "
-                "to be able to represent the current baseline plus new candidates."
-            )
-        else:
-            notes.append(
-                f"existing required_items count ({required_count}) is too large for harsh/validate "
-                f"Pareto search to represent within --subset-budget ({subset_budget}) at "
-                f"--max-candidate-fields {max_candidate_fields} -- pareto_search() has no "
-                "required-fields-aware enumeration, so max_k can't be bumped to fit the baseline "
-                "without a combinatorial blowup. Use --search-modes greedy for harsh/validate on "
-                "this domain instead (discover_greedy() has no such ceiling)."
-            )
+    if policy_fixed_count and not harsh_pareto_feasible:
+        notes.append(
+            f"existing required+optional items count ({policy_fixed_count}: {required_count} "
+            f"required + {optional_count} optional) is too large for harsh/validate Pareto search "
+            f"to represent within --subset-budget ({subset_budget}) at the harsh/validate pool size "
+            f"(--max-candidate-fields {max_candidate_fields} + {policy_fixed_count}) -- pareto_search() "
+            "has no required/optional-fields-aware enumeration, so max_k can't be bumped to fit the "
+            "baseline without a combinatorial blowup. Use --search-modes greedy for harsh/validate on "
+            "this domain instead (discover_greedy() has no such ceiling)."
+        )
+    elif policy_fixed_count and harsh_max_k > discover_max_k:
+        notes.append(
+            f"existing required+optional items count ({policy_fixed_count}: {required_count} "
+            f"required + {optional_count} optional) exceeds the discover-mode budget max_k "
+            f"({discover_max_k}); harsh/validate runs need --max-k >= {harsh_max_k} to be able to "
+            "represent the current baseline plus new candidates."
+        )
     if stratify_recommended:
         notes.append(
             "records concentrated in relatively few files for this population size; "
@@ -284,6 +305,7 @@ def suggest_params_for_domain(
         "distinct_file_count": f,
         "candidate_field_count": n_candidates,
         "required_items_count": required_count,
+        "optional_items_count": optional_count,
         "suggested_sample_size": sample_size,
         "suggested_max_candidate_fields": max_candidate_fields,
         "suggested_max_k_discover": discover_max_k,
@@ -314,20 +336,32 @@ def _resolve_phase0_dir(path: Path) -> Path:
     return path
 
 
-def _load_required_counts(policy_json: Optional[Path]) -> Dict[str, int]:
+def _load_policy_field_counts(policy_json: Optional[Path]) -> Dict[str, Dict[str, int]]:
+    """Per-domain (required_count, optional_count) from a join-key policy JSON.
+
+    Both counts matter for harsh/validate sizing: discover_join_policy.py's
+    work_candidates for those modes is req + opt (+ scoped_candidates for
+    harsh) -- optional_items inflates the real Pareto candidate pool exactly
+    like required_items does, unconditionally and regardless of
+    --max-candidate-fields, including policy field names that aren't even
+    populated anywhere in the domain's data.
+    """
     if not policy_json or not policy_json.exists():
         return {}
     loaded = json.loads(policy_json.read_text(encoding="utf-8"))
     cand = loaded.get("domains") if isinstance(loaded, dict) else {}
     if not isinstance(cand, dict):
         return {}
-    out: Dict[str, int] = {}
+    out: Dict[str, Dict[str, int]] = {}
     for domain, block in cand.items():
         if not isinstance(block, dict):
             continue
         req = block.get("required_items") or block.get("required_fields") or []
-        if isinstance(req, list):
-            out[str(domain)] = len(req)
+        opt = block.get("optional_items") or []
+        out[str(domain)] = {
+            "required_count": len(req) if isinstance(req, list) else 0,
+            "optional_count": len(opt) if isinstance(opt, list) else 0,
+        }
     return out
 
 
@@ -430,14 +464,16 @@ def main() -> None:
         allow = {d.strip() for d in str(args.domains).split(",") if d.strip()}
         domains = [d for d in domains if d in allow]
 
-    required_counts = _load_required_counts(Path(args.policy_json)) if args.policy_json else {}
+    policy_field_counts = _load_policy_field_counts(Path(args.policy_json)) if args.policy_json else {}
 
     rows: List[Dict[str, object]] = []
     for domain in domains:
         stats = compute_domain_stats(records, items, domain)
+        domain_counts = policy_field_counts.get(domain, {})
         suggestion = suggest_params_for_domain(
             stats,
-            required_count=required_counts.get(domain, 0),
+            required_count=domain_counts.get("required_count", 0),
+            optional_count=domain_counts.get("optional_count", 0),
             k_per_group=int(args.sample_k_per_group),
             sample_floor=int(args.sample_floor),
             subset_budget=int(args.subset_budget),
@@ -460,7 +496,7 @@ def main() -> None:
     out_path = Path(args.out) if args.out else (phase0_dir.parent / "diagnostics" / "discovery_param_suggestions.csv")
     fields = [
         "domain", "records_total_domain", "distinct_sig_hash_groups", "distinct_file_count",
-        "candidate_field_count", "required_items_count",
+        "candidate_field_count", "required_items_count", "optional_items_count",
         "suggested_sample_size", "suggested_max_candidate_fields",
         "suggested_max_k_discover", "suggested_max_k_harsh_validate",
         "stratify_by_recommended", "notes",
@@ -470,8 +506,15 @@ def main() -> None:
 
     if args.emit_commands:
         print("\n[suggest] ready-to-run commands:\n", flush=True)
+        # Pass the RESOLVED phase0_dir, not args.phase0_dir verbatim: when
+        # --phase0-dir was given as one of the root forms _resolve_phase0_dir
+        # accepts (a repo root containing results/records, a Results_v21 root,
+        # etc.), discover_join_policy.py performs no such resolution itself --
+        # it reads straight from "<argument>/records.csv" -- so an emitted
+        # command built from the original unresolved argument would fail to
+        # find the CSVs this very suggestion run just read successfully.
         for row in rows:
-            for cmd in _emit_command(str(row["domain"]), row, args.phase0_dir, args.policy_json):
+            for cmd in _emit_command(str(row["domain"]), row, str(phase0_dir), args.policy_json):
                 print(cmd)
                 print()
 

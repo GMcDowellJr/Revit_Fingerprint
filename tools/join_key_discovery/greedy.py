@@ -48,16 +48,38 @@ def discover_greedy(
     )
     diagnostics: List[Dict[str, Any]] = []
 
+    # Seeding `selected` above is not enough on its own: score_candidate ->
+    # build_candidate_join_key_with_details composes the ACTUAL composite key
+    # from `gates.required_fields or selected_fields` -- an OR, not a union --
+    # so whenever cfg.gates.required_fields is set, EVERY candidate this loop
+    # scores below (selected+f for every remaining f) still gets scored using
+    # only the static required baseline, never the candidate actually under
+    # test. That makes every contender tie on identical metrics, so the very
+    # first iteration's tie-break (`_score(best) >= _score(...selected...)`,
+    # which is true here because best's field-count is strictly larger for
+    # otherwise-identical metrics) breaks the loop before `selected` is ever
+    # updated -- harsh/validate mode's greedy search would report metrics
+    # against the required baseline while claiming to have searched beyond it,
+    # and could never actually pick up any optional/discovered field on top.
+    # `selected` already carries the required fields via the seeding above and
+    # only ever grows, so scoring with `gates.required_fields` OMITTED lets
+    # `base_required` fall through to `selected_fields` (=cand, already
+    # required-inclusive) -- the real candidate under test -- while
+    # shape-gating (discriminator_key/shape_requirements) stays active via the
+    # rest of `gates`, unaffected.
+    scoring_gates = {k: v for k, v in (cfg.get("gates") or {}).items() if k != "required_fields"}
+    scoring_cfg = {**cfg, "gates": scoring_gates}
+
     while remaining:
         contenders = []
         for f in remaining:
             cand = sorted(selected + [f], key=lambda s: s.lower())
-            m = score_candidate(domain_records, domain_identity_items, cand, cfg)
+            m = score_candidate(domain_records, domain_identity_items, cand, scoring_cfg)
             contenders.append(m)
         contenders = sorted(contenders, key=_score)
         best = contenders[0]
         diagnostics.append({"step": len(selected) + 1, "best": best, "top3": contenders[:3]})
-        if _score(best) >= _score(score_candidate(domain_records, domain_identity_items, selected, cfg)) and selected:
+        if _score(best) >= _score(score_candidate(domain_records, domain_identity_items, selected, scoring_cfg)) and selected:
             break
         selected = list(best["selected_fields"])
         for f in list(remaining):
@@ -67,9 +89,9 @@ def discover_greedy(
         if float(best.get("coverage", 0.0)) >= 0.999 and float(best.get("collision_rate", 1.0)) <= collision_threshold:
             break
 
-    final_metrics = score_candidate(domain_records, domain_identity_items, selected, cfg)
+    final_metrics = score_candidate(domain_records, domain_identity_items, selected, scoring_cfg)
     contenders = sorted(
-        [score_candidate(domain_records, domain_identity_items, sorted(set(selected + [f]), key=lambda s: s.lower()), cfg) for f in candidate_fields if f not in selected],
+        [score_candidate(domain_records, domain_identity_items, sorted(set(selected + [f]), key=lambda s: s.lower()), scoring_cfg) for f in candidate_fields if f not in selected],
         key=_score,
     )
 

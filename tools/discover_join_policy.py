@@ -471,7 +471,16 @@ def main() -> None:
         # can no longer detect "required field doesn't exist in the data" the
         # way it used to by coincidence (candidate_fields only ever contained
         # fields with at least one populated occurrence).
-        req_missing_from_data = set(req) - set(candidate_fields)
+        #
+        # Checked against the FULL population's item keys (dom_items_all), not
+        # candidate_fields: candidate_fields is _pick_candidate_fields()'s
+        # output over the SAMPLED item set, capped at --max-candidate-fields. A
+        # required field populated only on an unsampled record, or simply
+        # ranked below the candidate-field cap (a real field present in the
+        # data, just not among the top --max-candidate-fields by frequency),
+        # would otherwise be wrongly reported as absent from the data entirely.
+        all_item_keys_domain = {it.get("item_key", "").strip() for it in dom_items_all if it.get("item_key", "").strip()}
+        req_missing_from_data = set(req) - all_item_keys_domain
 
         for policy_mode in policy_modes:
             if policy_mode == "validate":

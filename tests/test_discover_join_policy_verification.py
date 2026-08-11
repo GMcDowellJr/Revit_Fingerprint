@@ -303,6 +303,34 @@ def test_discover_greedy_without_required_fields_behaves_as_before():
     assert result["selected_fields"] == ["field"]
 
 
+def test_discover_greedy_required_seed_still_scores_challengers():
+    # Codex 4th-round finding: seeding `selected` with required_fields (the fix
+    # above) is not sufficient on its own -- score_candidate still composes the
+    # join key from gates.required_fields (ignoring whatever candidate is
+    # actually under test) unless that key is stripped for the search's own
+    # scoring calls. Without the fix, every req1-vs-req1+extra1 candidate would
+    # score identically (both collapse to req1 alone), so the loop's tie-break
+    # would stop before ever adding extra1 -- even though extra1 actually
+    # resolves a real collision (two records share req1's value but differ on
+    # extra1). With the fix, the candidate under test drives the score, so
+    # discover_greedy must pick up extra1.
+    records = [
+        {"record_pk": "1", "sig_hash": "sigA"},
+        {"record_pk": "2", "sig_hash": "sigB"},
+    ]
+    items = [
+        _items_row("1", "req1", "X"),
+        _items_row("2", "req1", "X"),
+        _items_row("1", "extra1", "A"),
+        _items_row("2", "extra1", "B"),
+    ]
+    idx = build_identity_index(items)
+    cfg = {"max_k": 3, "gates": {"required_fields": ["req1"]}}
+    result = discover_greedy(records, idx, ["req1", "extra1"], cfg)
+    assert set(result["selected_fields"]) == {"req1", "extra1"}
+    assert result["metrics"]["collision_rate"] == 0.0
+
+
 # ---------------------------------------------------------------------------
 # blocked_missing_required must still fire for a required field genuinely
 # absent from the data, even though discover_greedy now always echoes the
@@ -338,6 +366,47 @@ def test_validate_mode_blocked_when_required_field_absent_from_data(tmp_path: Pa
     row = rows[0]
     assert row["status"] == "blocked_missing_required"
     assert "units.never_populated" in row["reason"]
+
+
+def test_validate_mode_not_blocked_when_required_field_ranked_below_candidate_cap(tmp_path: Path):
+    # Codex 4th-round finding: req_missing_from_data must be checked against the
+    # FULL domain item set, not candidate_fields (_pick_candidate_fields' output
+    # over the sampled item set, capped at --max-candidate-fields). A required
+    # field that's genuinely populated in the data but ranked below the cap (here:
+    # tied for last by frequency, alphabetically after the other fields) must NOT
+    # be reported as "absent from the data" just because it didn't make the
+    # top---max-candidate-fields cut.
+    phase0 = tmp_path / "results" / "records"
+    _write_csv(phase0 / "records.csv", ["file_id", "domain", "record_pk", "sig_hash"], [
+        {"file_id": "f1", "domain": "units", "record_pk": "1", "sig_hash": "s1"},
+    ])
+    items = [
+        {"domain": "units", "record_pk": "1", "item_key": "units.a", "item_value_type": "str", "item_value": "1"},
+        {"domain": "units", "record_pk": "1", "item_key": "units.b", "item_value_type": "str", "item_value": "1"},
+        {"domain": "units", "record_pk": "1", "item_key": "units.c", "item_value_type": "str", "item_value": "1"},
+        # The required field: alphabetically last, so with --max-candidate-fields 1
+        # (which keeps only the single top-ranked field), it's the one trimmed away
+        # from candidate_fields -- but it IS populated in the data.
+        {"domain": "units", "record_pk": "1", "item_key": "units.required_but_low_ranked", "item_value_type": "str", "item_value": "1"},
+    ]
+    _write_csv(phase0 / "identity_items.csv", ["domain", "record_pk", "item_key", "item_value_type", "item_value"], items)
+    policy_json = tmp_path / "policy.json"
+    policy_json.write_text(
+        '{"domains": {"units": {"required_items": ["units.required_but_low_ranked"]}}}',
+        encoding="utf-8",
+    )
+    subprocess.run([
+        sys.executable, "tools/discover_join_policy.py",
+        "--phase0-dir", str(phase0), "--domains", "units",
+        "--policy-json", str(policy_json), "--max-candidate-fields", "1",
+        "--search-modes", "greedy", "--policy-modes", "validate", "--no-full-verify",
+    ], cwd=Path(__file__).resolve().parents[1], check=True)
+
+    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units.csv").open(encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows
+    row = rows[0]
+    assert row["status"] != "blocked_missing_required", row["reason"]
 
 
 # ---------------------------------------------------------------------------

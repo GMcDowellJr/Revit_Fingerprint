@@ -112,7 +112,13 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
             # back as selected_fields regardless of whether those fields are populated
             # anywhere in the data, so name-matching selected against req alone can no
             # longer detect "required field doesn't exist in the data" -- check directly.
-            req_missing_from_data=set(req)-set(raw)
+            # Checked against dom_items_all (the FULL, unsampled/uncapped per-gate item
+            # set), not raw (_pick_candidate_fields' sampled-and-capped output) -- a
+            # required field populated only on an unsampled record, or simply ranked
+            # below --max-candidate-fields, would otherwise be wrongly reported as
+            # absent from the data entirely.
+            all_item_keys_domain={it.get('item_key','').strip() for it in dom_items_all if it.get('item_key','').strip()}
+            req_missing_from_data=set(req)-all_item_keys_domain
             for pm in args.policy_modes:
                 work=scoped if pm=="discover" else _without_excluded(req+opt if pm=="validate" else req+opt+scoped,excluded)
                 max_k = args.max_k
