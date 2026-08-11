@@ -109,7 +109,11 @@ domains/                One extract(doc, ctx) function per domain (active)
   loaded_family_types.py  FamilySymbol (loaded family) types, parameter-schema evidence model (lft.*/lftp.*); scoped
                             to user-loaded families only — system families pass through but aren't governed (D-018)
   worksets.py              Workset partition (worksets + worksets_doc, two independent single-collector extractors)
-  browser_organization.py Project Browser grouping/sorting configuration; consumes worksets' ctx crosswalk
+  browser_organization.py Project Browser sorting/filter-presence configuration (category, sorting_order,
+                            sorting_parameter_id, filter_has_value); consumes worksets' ctx crosswalk. NOT
+                            grouping coverage — the GetFolderItems folder hierarchy is deliberately excluded
+                            (non-deterministic probe-run-dependent tree walk), so two organizations differing
+                            only in grouping can produce the same sig_hash; see the module's own docstring
   graph_2024.json, graph_2025.json, graph_2026.json
                             NOT extractor code — cached Revit-API relationship graphs (per Revit version) generated
                             by sync_revitlookup_reference.py / the RevitLookup sync tooling, used as reference data
@@ -168,7 +172,10 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             a deliberately independent reimplementation of `extractor.py`'s private
                             `_stable_pattern_id()` (kept stdlib-only, not imported from `extractor.py`, so
                             `generate_name_key_patterns.py` can't accidentally couple to the production
-                            pipeline) — `tests/test_generate_name_key_patterns.py` asserts both formulas agree.
+                            pipeline). No test currently cross-checks the two implementations stay in
+                            agreement — `tests/test_generate_name_key_patterns.py` only calls the public
+                            `pattern_id_utils.stable_pattern_id()`, never `extractor._stable_pattern_id()` —
+                            so a future change to only one would go uncaught; a real regression test is TODO.
   run_config.json        Phase-1 configuration (domains_in_scope, thresholds, seed_baseline_id)
 
   export_to_flat_tables.py   Phase-0: Flatten record.v2 details → CSV tables (records, identity_items, etc.)
