@@ -467,6 +467,13 @@ _SKIP_KEYS = {
 _OPAQUE_KEYS = {
     "dim_type.tick_mark_sig_hash",
     "dim_type.leader_arrowhead_sig_hash",
+    # Area 7 §2/§3/§4 reference-hash fields (PR #412 review) -- same treatment:
+    # the digest itself isn't interpretable, only its presence/absence is.
+    "dim_type.leader_tick_mark_sig_hash",
+    "dim_type.witness_line_tick_mark_sig_hash",
+    "dim_type.centerline_tick_mark_sig_hash",
+    "dim_type.interior_tick_mark_sig_hash",
+    "dim_type.centerline_pattern_sig_hash",
 }
 
 # Text appearance keys — show only when non-default or differentiating
@@ -585,6 +592,16 @@ def _format_identity_items(
         "dim_type.rounding",
         "dim_type.tick_mark_sig_hash",
         "dim_type.leader_arrowhead_sig_hash",
+        # Area 7 reference-hash fields (PR #413 review): must be in priority_order
+        # for their _OPAQUE_KEYS presence-note branch (below) to ever run -- the
+        # remaining-items loop further down explicitly skips _OPAQUE_KEYS members,
+        # so a key that's only in _OPAQUE_KEYS and not here is silently omitted
+        # from the prompt entirely rather than shown as a presence note.
+        "dim_type.leader_tick_mark_sig_hash",
+        "dim_type.witness_line_tick_mark_sig_hash",
+        "dim_type.centerline_tick_mark_sig_hash",
+        "dim_type.interior_tick_mark_sig_hash",
+        "dim_type.centerline_pattern_sig_hash",
     ]
 
     emitted = set()
@@ -596,7 +613,17 @@ def _format_identity_items(
         v = kv[k]
 
         if k in _OPAQUE_KEYS:
-            lines.append(f"{label}: [present — consistent configuration]")
+            # Show a short, stable discriminator (not the full digest) so two
+            # records referencing different configurations still produce
+            # different prompts -- a bare "[present]" literal made every value
+            # of an opaque key collapse to the same prompt text regardless of
+            # which configuration was actually referenced, which could merge
+            # behaviorally distinct join-hash clusters under one synthesized
+            # label (PR #413 review). ref is truncated to 8 chars for real
+            # hash digests; short symbolic values (e.g. "<Solid>") pass through
+            # unchanged since they're already interpretable and short.
+            ref = v[:8] if len(v) > 8 else v
+            lines.append(f"{label}: [present, ref={ref} — consistent configuration]")
             continue
         if k == "dim_type.accuracy":
             lines.append(f"{label}: {_fmt_accuracy(v)}")

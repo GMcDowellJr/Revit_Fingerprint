@@ -153,7 +153,32 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `explicitly_excluded_items` in `policies/domain_join_key_policies.json` gain the same two
   keys, matching `text_types`' existing `leader_arrowhead_uid`/`_name` exclusions, so
   `tools/discover_join_policy.py`'s `discover`/`harsh` modes can't nominate them as join-key
-  candidates.
+  candidates. `_OPAQUE_KEYS` also gains the other 5 new `*_sig_hash` reference-hash fields
+  (`leader_tick_mark_sig_hash`, `witness_line_tick_mark_sig_hash`,
+  `centerline_tick_mark_sig_hash`, `interior_tick_mark_sig_hash`,
+  `centerline_pattern_sig_hash`), matching the pre-existing `tick_mark_sig_hash`/
+  `leader_arrowhead_sig_hash` treatment (PR #412 review, 5th round): the raw digest isn't
+  interpretable, so label-synthesis prompts show a presence note instead of the value,
+  keeping canonical labels dependent on the referenced configuration rather than opaque
+  implementation details. **Follow-up fix (PR #413 review):** adding a key to
+  `_OPAQUE_KEYS` alone doesn't make `_format_identity_items()` emit its presence note —
+  the note is only produced inside the `priority_order` loop, and the separate
+  remaining-items loop further down explicitly skips every `_OPAQUE_KEYS` member. Without
+  also adding the 5 new keys to `priority_order`, they were silently omitted from the
+  prompt entirely (worse than the original raw-digest bug: two configurations differing
+  only in these fields now produced identical prompts with no signal at all). Added all 5
+  to `priority_order`, verified their presence notes now emit correctly. **Second follow-up
+  fix (PR #413 review):** the opaque-key presence note itself was a bare, constant literal
+  (`"[present — consistent configuration]"`) for every value, so two records referencing
+  genuinely different configurations (e.g. different custom tick marks) still produced
+  identical prompt text for that field — losing all discriminating signal and risking
+  behaviorally-distinct join-hash clusters being synthesized under the same canonical
+  label. Changed the presence note to include a short, stable discriminator
+  (`ref={value[:8]}` — 8 hex chars for real digests; short symbolic values like `<Solid>`
+  pass through unchanged) instead of exposing the full digest or nothing at all. Applies to
+  all `_OPAQUE_KEYS` entries, including the 2 pre-existing ones
+  (`tick_mark_sig_hash`/`leader_arrowhead_sig_hash`), not just the 5 new Area 7 keys, since
+  the underlying formatting logic is shared.
 - **`loaded_family_types` domain: `structural_material_type`/`is_active` identity fields (Area 12):**
   `domains/loaded_family_types.py`'s existing per-family loop now reads
   `FamilySymbol.StructuralMaterialType` (via `canonicalize_str`, same
