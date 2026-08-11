@@ -107,6 +107,12 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
             if domain=="loaded_family_types" and CATEGORY_GATE_KEY in raw:
                 scoped=[CATEGORY_GATE_KEY]+[f for f in scoped if f!=CATEGORY_GATE_KEY]
             idx=build_identity_index(dom_items)
+            # See tools/discover_join_policy.py's identical comment: discover_greedy()
+            # (and Pareto's own validate-mode fallback) now echo cfg.gates.required_fields
+            # back as selected_fields regardless of whether those fields are populated
+            # anywhere in the data, so name-matching selected against req alone can no
+            # longer detect "required field doesn't exist in the data" -- check directly.
+            req_missing_from_data=set(req)-set(raw)
             for pm in args.policy_modes:
                 work=scoped if pm=="discover" else _without_excluded(req+opt if pm=="validate" else req+opt+scoped,excluded)
                 max_k = args.max_k
@@ -133,10 +139,10 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
                     else:
                         g=discover_greedy(dom_records,idx,work,{"max_k":max_k,"gates":{"required_fields":req,**gates}})
                         selected=[str(x) for x in g.get('selected_fields',[]) if str(x).strip()];metrics=g.get('metrics',{}) if isinstance(g.get('metrics'),dict) else {}
-                    if pm=="validate" and req and not set(req).issubset(set(selected)):
+                    if pm=="validate" and req and (not set(req).issubset(set(selected)) or req_missing_from_data):
                         status="blocked_missing_required"
                         if not reason:
-                            reason="selected_missing_required"
+                            reason="required_fields_absent_from_data:"+",".join(sorted(req_missing_from_data)) if req_missing_from_data else "selected_missing_required"
                     if not metrics and work: metrics=score_candidate(dom_records,idx,selected,{"gates":{"required_fields":req,**gates}})
                     rows.append({"domain":domain,"discovery_target":target,"policy_mode":pm,"search_mode":sm,"status":status,"reason":reason,"selected_fields":"|".join(selected),"coverage":f"{float(metrics.get('coverage',0.0)):.6f}","collision_rate":f"{float(metrics.get('collision_rate',1.0)):.6f}","fragmentation_rate":f"{float(metrics.get('fragmentation_rate',1.0)):.6f}","records_total":str(int(metrics.get('records_total',0) or 0)),"records_covered":str(int(metrics.get('records_covered',0) or 0)),"collision_records":str(int(metrics.get('collision_records',0) or 0)),"signature_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="sig" else "","join_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="join" else "","frontier_size":str(frontier),"fallback_used":"true" if fallback else "false","shape_gate":gate,"stratify_by":stratify_key})
             candidates.setdefault(domain,{})[gate]=scoped

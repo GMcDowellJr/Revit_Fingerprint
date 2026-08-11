@@ -33,6 +33,27 @@ def _pareto_search_adapter(domain_records, identity_index, candidate_fields, cfg
         return {"frontier": [], "chosen": None, "error": "pareto_dependency_missing"}
 
 
+def _diagnostics_domain_suffix(allow: set) -> str:
+    """Filename suffix for diagnostics CSVs when a run is scoped to specific --domains.
+
+    Sequential --emit-commands invocations of discover_join_policy.py (one per
+    domain or small domain group, as tools/suggest_discovery_params.py's
+    --emit-commands prints) all write to the same fixed diagnostics filenames by
+    default, so each later run silently clobbers the previous run's output before
+    anyone reads it. Suffixing by the scoped domain set keeps per-domain runs'
+    diagnostics side by side. Unscoped (whole-corpus) runs keep the original,
+    unsuffixed filenames -- this only changes behavior when --domains is passed.
+    """
+    if not allow:
+        return ""
+    scoped = sorted(allow, key=str.lower)
+    joined = "_".join(scoped)
+    if len(joined) <= 60:
+        return "__" + joined
+    digest = hashlib.sha1("|".join(scoped).encode("utf-8")).hexdigest()[:10]
+    return f"__{len(scoped)}domains_{digest}"
+
+
 def _write_csv(path: Path, fields: List[str], rows: List[Dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as f:
@@ -42,16 +63,25 @@ def _write_csv(path: Path, fields: List[str], rows: List[Dict[str, str]]) -> Non
             w.writerow({k: r.get(k, "") for k in fields})
 
 
-def _sample_domain_records(records: List[Dict[str, str]], sample_size: int, seed: int) -> List[Dict[str, str]]:
-    if sample_size <= 0 or len(records) <= sample_size:
-        return records
+def _rank_all(records: List[Dict[str, str]], seed: int) -> List[Dict[str, str]]:
+    """Deterministically sort every record by seeded hash rank (always sorts -- no
+    early-return-for-small-inputs shortcut). Shared sort primitive for
+    _sample_domain_records and the stratified top-up logic below, both of which need
+    a full, order-consistent ranking (not just "return whatever was passed in
+    unsorted") to slice remainders correctly.
+    """
 
     def _rank(row: Dict[str, str]) -> str:
         key = row.get("record_pk", "") or row.get("record_id", "") or row.get("file_id", "")
         return hashlib.sha1(f"{seed}|{key}".encode("utf-8")).hexdigest()
 
-    ranked = sorted(records, key=lambda r: (_rank(r), r.get("record_pk", "")))
-    return ranked[:sample_size]
+    return sorted(records, key=lambda r: (_rank(r), r.get("record_pk", "")))
+
+
+def _sample_domain_records(records: List[Dict[str, str]], sample_size: int, seed: int) -> List[Dict[str, str]]:
+    if sample_size <= 0 or len(records) <= sample_size:
+        return records
+    return _rank_all(records, seed)[:sample_size]
 
 
 def _stratified_sample(
@@ -175,13 +205,31 @@ def _stratified_sample(
         out.extend(sampled)
 
     # Top up to (the reduced) sample_size: groups with more records than
-    # per_group contribute their surplus.
+    # per_group contribute their surplus. Uses _rank_all directly rather than
+    # _sample_domain_records(groups[val], len(groups[val]), seed): that call's
+    # sample_size == len(records) always hits the "cap isn't binding" early
+    # return, which yields records in ORIGINAL (unsorted) order -- inconsistent
+    # with first_pass[val], which came from the actual seeded ranking. Slicing
+    # an unsorted list at len(first_pass[val]) would return an arbitrary,
+    # possibly-overlapping remainder instead of "everything not already taken."
     if len(out) < sample_size:
         surplus: List[Dict[str, str]] = []
         for val in ranked_group_keys:
-            all_ranked = _sample_domain_records(groups[val], len(groups[val]), seed)
+            all_ranked = _rank_all(groups[val], seed)
             surplus.extend(all_ranked[len(first_pass[val]):])
         out.extend(surplus[: sample_size - len(out)])
+
+    # If the known groups still can't fill sample_size on their own (e.g. a
+    # large ungrouped slice dwarfing a handful of small known groups -- the
+    # groups above simply don't have enough records to give), pull additional
+    # records from the remainder of the ungrouped pool beyond what was already
+    # reserved. Still deterministic/seeded via _rank_all (same ranking
+    # reserved_ungrouped was sliced from, so this picks up exactly where that
+    # slice left off, no overlap).
+    if len(out) < sample_size and len(ungrouped) > len(reserved_ungrouped):
+        ranked_ungrouped = _rank_all(ungrouped, seed)
+        remaining_ungrouped = ranked_ungrouped[len(reserved_ungrouped):]
+        out.extend(remaining_ungrouped[: sample_size - len(out)])
 
     return reserved_ungrouped + out[:sample_size]
 
@@ -349,9 +397,11 @@ def main() -> None:
     items = _read_csv(items_path)
 
     domains = sorted({r.get("domain", "").strip() for r in records if r.get("domain", "").strip()}, key=str.lower)
+    domain_suffix = ""
     if args.domains:
         allow = {d.strip() for d in str(args.domains).split(",") if d.strip()}
         domains = [d for d in domains if d in allow]
+        domain_suffix = _diagnostics_domain_suffix(allow)
 
     search_modes = [m.strip() for m in str(args.search_modes).split(",") if m.strip()]
     policy_modes = [m.strip() for m in str(args.policy_modes).split(",") if m.strip()]
@@ -407,6 +457,21 @@ def main() -> None:
         excluded = set(normalized["explicitly_excluded_items"])
         gates = normalized["gates"]
         scoped_candidates = _without_excluded(candidate_fields, excluded)
+
+        # Required fields that never appear anywhere in this domain's populated
+        # identity items at all -- i.e. genuinely absent from the data, not just
+        # unresolved for this particular candidate. Computed once per domain,
+        # independent of what greedy/Pareto end up selecting: since
+        # discover_greedy() seeds its selection with cfg.gates.required_fields
+        # regardless of whether those fields are populated anywhere (see
+        # tools/join_key_discovery/greedy.py), and Pareto's own validate-mode
+        # fallback does the same (`selected = list(req)` unconditionally when
+        # the frontier comes back empty), the returned selected_fields NAMES
+        # always trivially satisfy issubset(req) now -- checking selected alone
+        # can no longer detect "required field doesn't exist in the data" the
+        # way it used to by coincidence (candidate_fields only ever contained
+        # fields with at least one populated occurrence).
+        req_missing_from_data = set(req) - set(candidate_fields)
 
         for policy_mode in policy_modes:
             if policy_mode == "validate":
@@ -506,8 +571,10 @@ def main() -> None:
                     selected = [str(x) for x in g.get("selected_fields", []) if str(x).strip()]
                     metrics = g.get("metrics", {}) if isinstance(g.get("metrics"), dict) else {}
 
-                if policy_mode == "validate" and req and not set(req).issubset(set(selected)):
+                if policy_mode == "validate" and req and (not set(req).issubset(set(selected)) or req_missing_from_data):
                     status = "blocked_missing_required"
+                    if req_missing_from_data:
+                        reason = "required_fields_absent_from_data:" + ",".join(sorted(req_missing_from_data))
 
                 # Full-population verification: re-score whatever was selected against
                 # dom_records_all (not the sample) with the same cfg/gates. This is a
@@ -648,12 +715,12 @@ def main() -> None:
         "collision_records_full", "fragmented_sig_count_full", "join_group_count_full", "hhi_full", "effective_cluster_count_full",
         "full_verify_status", "sample_vs_full_diverges",
     ]
-    _write_csv(diagnostics_dir / "join_key_discovery_exploration.csv", fields, sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("policy_mode", ""), r.get("search_mode", ""))))
+    _write_csv(diagnostics_dir / f"join_key_discovery_exploration{domain_suffix}.csv", fields, sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("policy_mode", ""), r.get("search_mode", ""))))
     for mode in policy_modes:
-        _write_csv(diagnostics_dir / f"join_key_{mode}.csv", fields, [r for r in sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("search_mode", ""))) if r.get("policy_mode") == mode])
+        _write_csv(diagnostics_dir / f"join_key_{mode}{domain_suffix}.csv", fields, [r for r in sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("search_mode", ""))) if r.get("policy_mode") == mode])
         for search_mode in search_modes:
             _write_csv(
-                diagnostics_dir / f"join_key_{mode}_{search_mode}.csv",
+                diagnostics_dir / f"join_key_{mode}_{search_mode}{domain_suffix}.csv",
                 fields,
                 [
                     r

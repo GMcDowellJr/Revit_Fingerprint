@@ -5,8 +5,9 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.discover_join_policy import _full_population_verify, _stratified_sample
+from tools.discover_join_policy import _diagnostics_domain_suffix, _full_population_verify, _rank_all, _stratified_sample
 from tools.join_key_discovery.eval import build_identity_index, score_candidate
+from tools.join_key_discovery.greedy import discover_greedy
 
 
 def _write_csv(path: Path, fields, rows):
@@ -215,7 +216,7 @@ def test_full_verify_columns_present_by_default(tmp_path: Path):
         "--search-modes", "greedy", "--policy-modes", "discover",
     ], cwd=Path(__file__).resolve().parents[1], check=True)
 
-    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration.csv").open(encoding="utf-8", newline="") as f:
+    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units.csv").open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     assert rows
     row = rows[0]
@@ -239,7 +240,7 @@ def test_no_full_verify_flag_skips_verification(tmp_path: Path):
         "--search-modes", "greedy", "--policy-modes", "discover", "--no-full-verify",
     ], cwd=Path(__file__).resolve().parents[1], check=True)
 
-    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration.csv").open(encoding="utf-8", newline="") as f:
+    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units.csv").open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     assert rows
     assert rows[0]["full_verify_status"] == "skipped_no_full_verify_flag"
@@ -260,8 +261,154 @@ def test_stratify_by_file_id_end_to_end(tmp_path: Path):
         "--sample-size", "4", "--stratify-by", "file_id",
     ], cwd=Path(__file__).resolve().parents[1], check=True)
 
-    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration.csv").open(encoding="utf-8", newline="") as f:
+    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units.csv").open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     assert rows
     assert rows[0]["stratify_by"] == "file_id"
     assert int(rows[0]["records_sampled_domain"]) == 4
+
+
+# ---------------------------------------------------------------------------
+# discover_greedy: required fields must be preserved, not discovered from scratch
+# (build_candidate_join_key_with_details makes every candidate score identically
+# once cfg.gates.required_fields is set, so a from-empty greedy search stops
+# after one arbitrary field -- see tools/join_key_discovery/greedy.py's comment)
+# ---------------------------------------------------------------------------
+
+def test_discover_greedy_seeds_selected_with_required_fields():
+    records = [{"record_pk": "1", "sig_hash": "s1"}]
+    items = [
+        _items_row("1", "req1", "A"),
+        _items_row("1", "req2", "B"),
+        _items_row("1", "req3", "C"),
+        _items_row("1", "extra1", "D"),
+        _items_row("1", "extra2", "E"),
+    ]
+    idx = build_identity_index(items)
+    cfg = {"max_k": 5, "gates": {"required_fields": ["req1", "req2", "req3"]}}
+    result = discover_greedy(records, idx, ["req1", "req2", "req3", "extra1", "extra2"], cfg)
+    assert set(result["selected_fields"]) == {"req1", "req2", "req3"}
+
+
+def test_discover_greedy_without_required_fields_behaves_as_before():
+    # No cfg.gates.required_fields -> starts from empty selected, same as pre-fix.
+    records = [
+        {"record_pk": "1", "sig_hash": "s1"},
+        {"record_pk": "2", "sig_hash": "s2"},
+    ]
+    items = [_items_row("1", "field", "A"), _items_row("2", "field", "B")]
+    idx = build_identity_index(items)
+    cfg = {"max_k": 2, "gates": {}}
+    result = discover_greedy(records, idx, ["field"], cfg)
+    assert result["selected_fields"] == ["field"]
+
+
+# ---------------------------------------------------------------------------
+# blocked_missing_required must still fire for a required field genuinely
+# absent from the data, even though discover_greedy now always echoes the
+# required baseline by name in selected_fields (the old detection relied on
+# selected_fields never containing an unpopulated field name; that's no
+# longer true after the seeding fix above, so req_missing_from_data is a
+# direct, population-based check independent of search results)
+# ---------------------------------------------------------------------------
+
+def test_validate_mode_blocked_when_required_field_absent_from_data(tmp_path: Path):
+    phase0 = tmp_path / "results" / "records"
+    _write_csv(phase0 / "records.csv", ["file_id", "domain", "record_pk", "sig_hash"], [
+        {"file_id": "f1", "domain": "units", "record_pk": "1", "sig_hash": "s1"},
+    ])
+    _write_csv(phase0 / "identity_items.csv", ["domain", "record_pk", "item_key", "item_value_type", "item_value"], [
+        {"domain": "units", "record_pk": "1", "item_key": "units.spec", "item_value_type": "str", "item_value": "s"},
+    ])
+    policy_json = tmp_path / "policy.json"
+    policy_json.write_text(
+        '{"domains": {"units": {"required_items": ["units.spec", "units.never_populated"]}}}',
+        encoding="utf-8",
+    )
+    subprocess.run([
+        sys.executable, "tools/discover_join_policy.py",
+        "--phase0-dir", str(phase0), "--domains", "units",
+        "--policy-json", str(policy_json),
+        "--search-modes", "greedy", "--policy-modes", "validate", "--no-full-verify",
+    ], cwd=Path(__file__).resolve().parents[1], check=True)
+
+    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units.csv").open(encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows
+    row = rows[0]
+    assert row["status"] == "blocked_missing_required"
+    assert "units.never_populated" in row["reason"]
+
+
+# ---------------------------------------------------------------------------
+# _stratified_sample: known groups too small to fill sample_size must top up
+# from the ungrouped remainder instead of returning short
+# (Codex third-round Finding B: 1 known record + 9999 blank-file_id records,
+# sample_size=500 previously returned only 251)
+# ---------------------------------------------------------------------------
+
+def test_stratified_sample_tops_up_from_ungrouped_remainder_when_groups_are_small():
+    records = [{"record_pk": "known0", "file_id": "onlyfile"}]
+    records += [{"record_pk": f"blank{i}", "file_id": ""} for i in range(9999)]
+    out = _stratified_sample(records, [], "file_id", sample_size=500, seed=17)
+    assert len(out) == 500
+
+
+def test_rank_all_is_deterministic_full_sort():
+    records = [{"record_pk": f"r{i}"} for i in range(50)]
+    ranked1 = _rank_all(records, seed=17)
+    ranked2 = _rank_all(records, seed=17)
+    assert [r["record_pk"] for r in ranked1] == [r["record_pk"] for r in ranked2]
+    assert len(ranked1) == len(records)
+    assert {r["record_pk"] for r in ranked1} == {r["record_pk"] for r in records}
+
+
+# ---------------------------------------------------------------------------
+# Diagnostics filename suffixing: sequential --emit-commands invocations
+# scoped to different --domains must not clobber each other's CSVs
+# (Codex third-round Finding C)
+# ---------------------------------------------------------------------------
+
+def test_diagnostics_domain_suffix_empty_when_unscoped():
+    assert _diagnostics_domain_suffix(set()) == ""
+
+
+def test_diagnostics_domain_suffix_short_domain_list():
+    assert _diagnostics_domain_suffix({"units"}) == "__units"
+    assert _diagnostics_domain_suffix({"b_domain", "a_domain"}) == "__a_domain_b_domain"
+
+
+def test_diagnostics_domain_suffix_falls_back_to_hash_for_long_lists():
+    many = {f"domain_name_{i}" for i in range(20)}
+    suffix = _diagnostics_domain_suffix(many)
+    assert suffix.startswith("__20domains_")
+    assert len(suffix) < 40
+
+
+def test_discover_join_policy_scoped_run_does_not_clobber_unscoped_filenames(tmp_path: Path):
+    phase0 = tmp_path / "results" / "records"
+    _write_csv(phase0 / "records.csv", ["file_id", "domain", "record_pk", "sig_hash"], [
+        {"file_id": "f1", "domain": "units", "record_pk": "1", "sig_hash": "s1"},
+    ])
+    _write_csv(phase0 / "identity_items.csv", ["domain", "record_pk", "item_key", "item_value_type", "item_value"], [
+        {"domain": "units", "record_pk": "1", "item_key": "units.spec", "item_value_type": "str", "item_value": "s"},
+    ])
+    diagnostics_dir = phase0.parent / "diagnostics"
+
+    # First run: unscoped (no --domains) -> unsuffixed filename.
+    subprocess.run([
+        sys.executable, "tools/discover_join_policy.py",
+        "--phase0-dir", str(phase0),
+        "--search-modes", "greedy", "--policy-modes", "discover", "--no-full-verify",
+    ], cwd=Path(__file__).resolve().parents[1], check=True)
+    assert (diagnostics_dir / "join_key_discovery_exploration.csv").exists()
+
+    # Second run: scoped to --domains units -> suffixed filename, does not
+    # touch (or need to match) the unscoped file written above.
+    subprocess.run([
+        sys.executable, "tools/discover_join_policy.py",
+        "--phase0-dir", str(phase0), "--domains", "units",
+        "--search-modes", "greedy", "--policy-modes", "discover", "--no-full-verify",
+    ], cwd=Path(__file__).resolve().parents[1], check=True)
+    assert (diagnostics_dir / "join_key_discovery_exploration__units.csv").exists()
+    assert (diagnostics_dir / "join_key_discovery_exploration.csv").exists()

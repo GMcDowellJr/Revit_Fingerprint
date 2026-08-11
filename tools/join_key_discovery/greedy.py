@@ -25,8 +25,27 @@ def discover_greedy(
     collision_threshold = float(cfg.get("collision_threshold", 0.05))
     near_tie_delta = float(cfg.get("near_tie_delta", 0.005))
 
-    remaining = sorted(set(str(f) for f in candidate_fields if str(f).strip()), key=lambda s: s.lower())
-    selected: List[str] = []
+    # When cfg["gates"]["required_fields"] is set, build_candidate_join_key_with_details
+    # (core/join_key_discovery/eval.py) uses it -- not whatever candidate subset is
+    # actually passed in -- to decide which fields go into the composite join key:
+    # `base_required = gates.get("required_fields") or selected_fields`. That means
+    # every candidate this loop scores below evaluates identically regardless of which
+    # field is being tested, so starting from selected=[] and letting the loop "discover"
+    # its way to the required baseline doesn't work: the very first tie (which is
+    # immediate, since every one-field candidate scores the same) stops the loop after
+    # a single, essentially arbitrary field, while metrics were actually computed against
+    # the full required baseline the whole time -- a misleading, non-representative
+    # result. Seed `selected` with the required fields up front so the reported
+    # selected_fields matches what was actually evaluated.
+    required_fields = sorted(
+        {str(f).strip() for f in ((cfg.get("gates") or {}).get("required_fields") or []) if str(f).strip()},
+        key=lambda s: s.lower(),
+    )
+    selected: List[str] = list(required_fields)
+    remaining = sorted(
+        (set(str(f) for f in candidate_fields if str(f).strip()) - set(selected)),
+        key=lambda s: s.lower(),
+    )
     diagnostics: List[Dict[str, Any]] = []
 
     while remaining:

@@ -25,12 +25,16 @@ This is most relevant to:
 
 If omitted, discovery runs unconstrained except for built-in behavior (such as `loaded_family_types` category gating).
 
+When `required_fields`/`required_items` is populated, `tools/join_key_discovery/eval.py`'s `build_candidate_join_key_with_details()` always composes the join key from `gates["required_fields"]` rather than whatever candidate subset is actually being tested (`base_required = gates.get("required_fields") or selected_fields`) -- so every one-field candidate the greedy search (`tools/join_key_discovery/greedy.py`) would try first scores *identically*, and the search stops after a single, essentially arbitrary field while the metrics it reports were actually computed against the full required baseline the whole time. `discover_greedy()` seeds its `selected` list with the required fields up front (instead of starting from `[]`) so the reported `selected_fields` always matches what was actually evaluated. This is backward-compatible: with no `required_fields` configured (typical unconstrained `discover`-mode usage), `selected` still starts empty and the search behaves exactly as before.
+
+One consequence: `selected_fields` on a `validate`-mode result now always echoes the required-field names by construction, even for a required field that's completely absent from the data -- so the old `blocked_missing_required` detection (which relied on `selected_fields` never containing an unpopulated field name) no longer catches that case on its own. Both `discover_join_policy.py` and `discover_hash_policy.py` also compute a direct, population-based `req_missing_from_data = required_fields - candidate_fields_actually_present_in_data` and OR it into the blocked-status check, independent of what the search returned.
+
 ## Option reference
 - `--phase0-dir`: flattened input directory.
 - `--policy-json`: primary baseline/constraint policy input.
 - `--base-policy`: fallback baseline path when `--policy-json` is not supplied.
 - `--out-policy`: optional candidate-only output JSON (`policy_version: candidate`, non-governed).
-- `--domains`: optional comma-separated domain allow-list.
+- `--domains`: optional comma-separated domain allow-list. When set, diagnostics CSV filenames get a `__<domain[_domain...]>` suffix (or, for long domain lists, a short deterministic hash suffix) so sequential per-domain `--emit-commands` invocations write to distinct files instead of clobbering each other's output under the same fixed filenames. Unscoped (whole-corpus) runs keep the original, unsuffixed filenames.
 - `--discovery-target`: `join`, `sig`, or `both`.
 - `--search-modes`: comma-separated `greedy`, `pareto`.
 - `--policy-modes`:
@@ -63,6 +67,8 @@ When the number of distinct groups exceeds `--sample-size` (the common case for 
 Records the stratifier has no value for at all (e.g. blank `file_id`) get an **unconditionally reserved share** up front — computed as though "ungrouped" were one more stratum among `n_groups + 1` — rather than being subject to that same seeded survival cap alongside the real groups. Equal-but-not-guaranteed odds would still let them land at zero purely by chance whenever known groups alone already exceed `--sample-size`; for records the stratifier has no data on at all, that's a worse failure than any single real group losing the same lottery — it can silently drop an entire uncharacterized slice of the population, not just one specific file/value — so this slice gets a hard guarantee instead.
 
 `tools/suggest_discovery_params.py` (below) will recommend `--stratify-by file_id` automatically when a domain's population looks concentrated in relatively few files.
+
+If, after the reserved-share pass above, the real groups still can't fill `sample_size` on their own (a small handful of known-group records dwarfed by a much larger ungrouped slice -- e.g. 1 known-file record plus 9999 blank-`file_id` records), a final top-up pulls additional records from the remainder of the ungrouped pool beyond what was already reserved, using the same deterministic `seed`-ranked order (`_rank_all()`), so `sample_size` is still reached rather than silently returned short.
 
 ## Full-population verification (`tools/discover_join_policy.py` only)
 
