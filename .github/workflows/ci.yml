@@ -23,5 +23,19 @@ jobs:
       - name: Install pytest
         run: pip install pytest
 
+      - name: Install pandas/scipy
+        # A short, explicit list of tools (see CLAUDE.md) requires pandas/scipy
+        # -- notably tools/pareto_joinkey_search.py, which backs
+        # discover_join_policy.py's/discover_hash_policy.py's --search-modes
+        # pareto, and tools/patterns_analysis/_archive/split_detection_file_level.py
+        # (still live -- invoked directly by tools/run_split_detection_all.py).
+        # Without these installed, importing them raises ModuleNotFoundError;
+        # for pareto_joinkey_search.py specifically, discover_join_policy.py
+        # catches that and silently falls back to an empty frontier, so
+        # pareto-mode tests could pass without Pareto search ever actually
+        # running, letting real bugs in that path go undetected by CI
+        # indefinitely.
+        run: pip install pandas scipy
+
       - name: Run tests
         run: pytest tests/ -v
