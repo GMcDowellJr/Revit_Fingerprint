@@ -4,76 +4,16 @@ import argparse,csv,json
 from pathlib import Path
 from typing import Dict,List
 try:
-    from tools.discover_join_policy import _read_csv,_write_csv,_sample_domain_records,_pick_candidate_fields,_without_excluded,_pareto_search_adapter
+    from tools.discover_join_policy import _read_csv,_write_csv,_sample_domain_records,_stratified_sample,_pick_candidate_fields,_without_excluded,_pareto_search_adapter
     from tools.join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate
     from tools.join_key_discovery.greedy import discover_greedy
 except ModuleNotFoundError:
-    from discover_join_policy import _read_csv,_write_csv,_sample_domain_records,_pick_candidate_fields,_without_excluded,_pareto_search_adapter
+    from discover_join_policy import _read_csv,_write_csv,_sample_domain_records,_stratified_sample,_pick_candidate_fields,_without_excluded,_pareto_search_adapter
     from join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate
     from join_key_discovery.greedy import discover_greedy
 
 TARGET_FILES={"sig":["signature_items.csv","identity_items.csv","phase0_identity_items.csv"],"join":["join_items.csv","identity_items.csv","phase0_identity_items.csv"]}
 CATEGORY_GATE_KEY="lft.shape_gate.category"
-
-
-def _stratified_sample(records, items, stratify_key, sample_size, seed):
-    """Sample records giving equal representation to each unique value of stratify_key.
-
-    Looks up stratify_key from items to build a pk->value map, then takes
-    ceil(sample_size / n_groups) records from each group using the same
-    deterministic hash-rank as _sample_domain_records.  After the first pass,
-    tops up to sample_size from groups with surplus records, then from ungrouped
-    records, so the total always reaches sample_size when enough records exist.
-    Falls back to flat sampling when the key has no item coverage.
-    """
-    import math
-    if not stratify_key or sample_size <= 0 or len(records) <= sample_size:
-        return records
-
-    pk_to_val = {}
-    for it in items:
-        if it.get("item_key","").strip() == stratify_key:
-            pk = it.get("record_pk","").strip()
-            val = it.get("item_value","").strip()
-            if pk and val:
-                pk_to_val[pk] = val
-
-    if not pk_to_val:
-        return _sample_domain_records(records, sample_size, seed)
-
-    groups: Dict[str,List] = {}
-    ungrouped = []
-    for r in records:
-        pk = r.get("record_pk","").strip()
-        val = pk_to_val.get(pk)
-        if val:
-            groups.setdefault(val, []).append(r)
-        else:
-            ungrouped.append(r)
-
-    n_groups = len(groups)
-    if n_groups == 0:
-        return _sample_domain_records(records, sample_size, seed)
-
-    per_group = max(1, math.ceil(sample_size / n_groups))
-    first_pass: Dict[str, List] = {}
-    out: List = []
-    for val in sorted(groups.keys()):
-        sampled = _sample_domain_records(groups[val], per_group, seed)
-        first_pass[val] = sampled
-        out.extend(sampled)
-
-    # Top up to sample_size: groups with more records than per_group contribute
-    # their surplus first (preserving balanced representation), then ungrouped.
-    if len(out) < sample_size:
-        surplus: List = []
-        for val in sorted(groups.keys()):
-            all_ranked = _sample_domain_records(groups[val], len(groups[val]), seed)
-            surplus.extend(all_ranked[len(first_pass[val]):])
-        surplus.extend(_sample_domain_records(ungrouped, len(ungrouped), seed))
-        out.extend(surplus[:sample_size - len(out)])
-
-    return out[:sample_size]
 
 
 def _resolve_phase0_dir(path: Path) -> Path:
@@ -167,6 +107,18 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
             if domain=="loaded_family_types" and CATEGORY_GATE_KEY in raw:
                 scoped=[CATEGORY_GATE_KEY]+[f for f in scoped if f!=CATEGORY_GATE_KEY]
             idx=build_identity_index(dom_items)
+            # See tools/discover_join_policy.py's identical comment: discover_greedy()
+            # (and Pareto's own validate-mode fallback) now echo cfg.gates.required_fields
+            # back as selected_fields regardless of whether those fields are populated
+            # anywhere in the data, so name-matching selected against req alone can no
+            # longer detect "required field doesn't exist in the data" -- check directly.
+            # Checked against dom_items_all (the FULL, unsampled/uncapped per-gate item
+            # set), not raw (_pick_candidate_fields' sampled-and-capped output) -- a
+            # required field populated only on an unsampled record, or simply ranked
+            # below --max-candidate-fields, would otherwise be wrongly reported as
+            # absent from the data entirely.
+            all_item_keys_domain={it.get('item_key','').strip() for it in dom_items_all if it.get('item_key','').strip()}
+            req_missing_from_data=set(req)-all_item_keys_domain
             for pm in args.policy_modes:
                 work=scoped if pm=="discover" else _without_excluded(req+opt if pm=="validate" else req+opt+scoped,excluded)
                 max_k = args.max_k
@@ -193,10 +145,10 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
                     else:
                         g=discover_greedy(dom_records,idx,work,{"max_k":max_k,"gates":{"required_fields":req,**gates}})
                         selected=[str(x) for x in g.get('selected_fields',[]) if str(x).strip()];metrics=g.get('metrics',{}) if isinstance(g.get('metrics'),dict) else {}
-                    if pm=="validate" and req and not set(req).issubset(set(selected)):
+                    if pm=="validate" and req and (not set(req).issubset(set(selected)) or req_missing_from_data):
                         status="blocked_missing_required"
                         if not reason:
-                            reason="selected_missing_required"
+                            reason="required_fields_absent_from_data:"+",".join(sorted(req_missing_from_data)) if req_missing_from_data else "selected_missing_required"
                     if not metrics and work: metrics=score_candidate(dom_records,idx,selected,{"gates":{"required_fields":req,**gates}})
                     rows.append({"domain":domain,"discovery_target":target,"policy_mode":pm,"search_mode":sm,"status":status,"reason":reason,"selected_fields":"|".join(selected),"coverage":f"{float(metrics.get('coverage',0.0)):.6f}","collision_rate":f"{float(metrics.get('collision_rate',1.0)):.6f}","fragmentation_rate":f"{float(metrics.get('fragmentation_rate',1.0)):.6f}","records_total":str(int(metrics.get('records_total',0) or 0)),"records_covered":str(int(metrics.get('records_covered',0) or 0)),"collision_records":str(int(metrics.get('collision_records',0) or 0)),"signature_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="sig" else "","join_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="join" else "","frontier_size":str(frontier),"fallback_used":"true" if fallback else "false","shape_gate":gate,"stratify_by":stratify_key})
             candidates.setdefault(domain,{})[gate]=scoped

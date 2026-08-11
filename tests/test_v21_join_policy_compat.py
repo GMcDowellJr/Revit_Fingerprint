@@ -202,10 +202,12 @@ def test_discover_emits_legacy_compat_shape_and_lists(tmp_path: Path):
     )
 
     diagnostics_dir = phase0_dir.parent / "diagnostics"
-    assert (diagnostics_dir / "join_key_discovery_exploration.csv").exists()
-    assert (diagnostics_dir / "join_key_discover.csv").exists()
-    assert (diagnostics_dir / "join_key_validate.csv").exists()
-    assert (diagnostics_dir / "join_key_harsh.csv").exists()
+    # No --policy-modes given -> CLI default "discover,validate,harsh" -> mode
+    # component is sorted alphabetically: discover, harsh, validate.
+    assert (diagnostics_dir / "join_key_discovery_exploration__dimension_types__discover_harsh_validate.csv").exists()
+    assert (diagnostics_dir / "join_key_discover__dimension_types__discover_harsh_validate.csv").exists()
+    assert (diagnostics_dir / "join_key_validate__dimension_types__discover_harsh_validate.csv").exists()
+    assert (diagnostics_dir / "join_key_harsh__dimension_types__discover_harsh_validate.csv").exists()
 
     out = json.loads(out_policy_path.read_text(encoding="utf-8"))
     dom = out["domains"]["dimension_types"]
@@ -280,7 +282,7 @@ def test_validate_pareto_auto_bumps_max_k_for_required_items(tmp_path: Path):
         cwd=Path(__file__).resolve().parents[1],
     )
 
-    validate_csv = phase0_dir.parent / "diagnostics" / "join_key_validate.csv"
+    validate_csv = phase0_dir.parent / "diagnostics" / "join_key_validate__text_types__validate.csv"
     with validate_csv.open("r", encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     assert rows

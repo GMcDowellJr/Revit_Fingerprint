@@ -181,7 +181,16 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
   run_config.json        Phase-1 configuration (domains_in_scope, thresholds, seed_baseline_id)
 
   export_to_flat_tables.py   Phase-0: Flatten record.v2 details → CSV tables (records, identity_items, etc.)
-  discover_join_policy.py / apply_join_policy.py   Join-key policy discovery/apply (T1/T2 stages)
+  discover_join_policy.py / apply_join_policy.py   Join-key policy discovery/apply (T1/T2 stages). Sampling
+                            supports --stratify-by (file_id or an identity-item key) for balanced representation
+                            across high-volume groups; every selected candidate is also re-scored against the
+                            FULL (unsampled) population by default (coverage_full/collision_rate_full/
+                            fragmentation_rate_full columns, --no-full-verify to skip) -- see docs/hash_discovery_tooling.md
+  suggest_discovery_params.py   Pre-flight sizing for discover_join_policy.py's --sample-size/--max-candidate-fields/
+                            --max-k/--stratify-by, computed per domain from records.csv/identity_items.csv
+                            (population size, distinct sig_hash groups, distinct files, candidate-field count)
+                            instead of guessing flat constants across every domain; --emit-commands prints
+                            ready-to-run discover_join_policy.py invocations
   discover_hash_policy.py / generate_sig_hash_policy.py   sig_hash policy discovery/generation (see below)
   generate_name_key_patterns.py / apply_name_key_policy.py   Canonical Name Identity Projection (PR1/PR2):
                             apply_name_key_policy.py computes join_key_name_identity per record from
@@ -349,7 +358,9 @@ docs/                   Technical documentation
   phase2-identity-and-semantic-plan.md  Phase-2 contract design
   phase_2_join-key_discovery.md      Join-key discovery methodology
   fingerprint_hashing_rules.md       Hashing rule documentation
-  hash_discovery_tooling.md          discover_hash_policy.py / generate_sig_hash_policy.py usage
+  hash_discovery_tooling.md          discover_hash_policy.py / generate_sig_hash_policy.py usage, plus
+                                       discover_join_policy.py's --stratify-by/full-population verification
+                                       and suggest_discovery_params.py's sizing rationale
   extract_stage_matrix.md            Authoritative stage-machine reference for run_extract_all.py (current)
   CSV_CONTRACT_v2.1.md               v2.1 CSV output contract
   V21_PHASE0_EXPORT_SCHEMA.md        v2.1 Phase-0 export schema
